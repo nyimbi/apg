@@ -1,0 +1,559 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Chat and Messaging package-backed APG capability",
+    "entity_count": 0,
+    "name": "chat",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "chat": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_moderation_actions": true,
+          "external_guest_policy_required": true,
+          "require_tenant_context": true,
+          "retention_policy_required": true
+        },
+        "messaging": {
+          "attachments_enabled": true,
+          "delivery_receipts_enabled": true,
+          "event_bus_required": true,
+          "max_message_length": 8000
+        },
+        "moderation": {
+          "moderation_policy_required": true,
+          "moderator_review_supported": true,
+          "nlp_assisted_moderation": true,
+          "restricted_content_filtering": true
+        },
+        "rooms": {
+          "max_members_per_room": 5000,
+          "private_rooms_enabled": true,
+          "public_rooms_enabled": true,
+          "room_owner_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "chat_team_messaging"
+        },
+        "ui": {
+          "enable_chat_console": true,
+          "enable_moderation_queue": true,
+          "enable_presence_panel": true,
+          "enable_room_manager": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Chat and Messaging",
+      "provides": [
+        "chat_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All chat operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "create_room",
+              "room_owner_assigned": false
+            },
+            "description": "Rooms require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "room_owner_required",
+              "required_action": "assign_room_owner"
+            },
+            "name": "room_requires_owner"
+          },
+          {
+            "condition": {
+              "retention_policy_attached": false
+            },
+            "description": "Message rooms require a retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_policy_required",
+              "required_action": "attach_retention_policy"
+            },
+            "name": "retention_policy_required"
+          },
+          {
+            "condition": {
+              "external_guest_present": true,
+              "guest_policy_attached": false
+            },
+            "description": "External guests require a guest policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "guest_policy_required",
+              "required_action": "attach_guest_policy"
+            },
+            "name": "external_guest_requires_policy"
+          },
+          {
+            "condition": {
+              "moderation_completed": false,
+              "restricted_content_detected": true
+            },
+            "description": "Restricted content requires moderation before release.",
+            "effect": {
+              "decision": "deny",
+              "reason": "moderation_required",
+              "required_action": "complete_moderation"
+            },
+            "name": "restricted_content_requires_moderation"
+          },
+          {
+            "condition": {
+              "access_review_recorded": false,
+              "member_count_gt": 5000
+            },
+            "description": "Large rooms require access review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_room_review_required",
+              "required_action": "review_room_access"
+            },
+            "name": "large_room_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All chat operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "create_room",
+            "room_owner_assigned": false
+          },
+          "description": "Rooms require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "room_owner_required",
+            "required_action": "assign_room_owner"
+          },
+          "name": "room_requires_owner"
+        },
+        {
+          "condition": {
+            "retention_policy_attached": false
+          },
+          "description": "Message rooms require a retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_policy_required",
+            "required_action": "attach_retention_policy"
+          },
+          "name": "retention_policy_required"
+        },
+        {
+          "condition": {
+            "external_guest_present": true,
+            "guest_policy_attached": false
+          },
+          "description": "External guests require a guest policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "guest_policy_required",
+            "required_action": "attach_guest_policy"
+          },
+          "name": "external_guest_requires_policy"
+        },
+        {
+          "condition": {
+            "moderation_completed": false,
+            "restricted_content_detected": true
+          },
+          "description": "Restricted content requires moderation before release.",
+          "effect": {
+            "decision": "deny",
+            "reason": "moderation_required",
+            "required_action": "complete_moderation"
+          },
+          "name": "restricted_content_requires_moderation"
+        },
+        {
+          "condition": {
+            "access_review_recorded": false,
+            "member_count_gt": 5000
+          },
+          "description": "Large rooms require access review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_room_review_required",
+            "required_action": "review_room_access"
+          },
+          "name": "large_room_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "ChatAnalytics",
+          "permission": "chat:view",
+          "route": "/chat/analytics"
+        },
+        "dashboard": {
+          "component": "CHATDashboard",
+          "permission": "chat:view",
+          "route": "/chat/dashboard"
+        },
+        "messages": {
+          "component": "MessageConsole",
+          "permission": "chat:send",
+          "route": "/chat/messages"
+        },
+        "moderation": {
+          "component": "ModerationQueue",
+          "permission": "chat:moderate",
+          "route": "/chat/moderation"
+        },
+        "presence": {
+          "component": "PresencePanel",
+          "permission": "chat:view",
+          "route": "/chat/presence"
+        },
+        "retention": {
+          "component": "RetentionPolicy",
+          "permission": "chat:admin",
+          "route": "/chat/retention"
+        },
+        "rooms": {
+          "component": "RoomManager",
+          "permission": "chat:manage_rooms",
+          "route": "/chat/rooms"
+        },
+        "settings": {
+          "component": "CHATSettings",
+          "permission": "chat:admin",
+          "route": "/chat/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "message_thread": {
+            "highlight": "receipt-chip",
+            "visual": "threaded-list"
+          },
+          "moderation_queue": {
+            "status_style": "policy-chip",
+            "visual": "review-lanes"
+          },
+          "presence_panel": {
+            "status_style": "presence-chip",
+            "visual": "availability-grid"
+          },
+          "room_list": {
+            "icon": "messages-square",
+            "risk_style": "membership-band",
+            "status_indicator": "room-pill"
+          }
+        },
+        "name": "chat_team_messaging",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#319795",
+          "color.danger": "#C53030",
+          "color.primary": "#2C5282",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/chat/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "CHATDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/chat/dashboard",
+            "permission": "chat:view"
+          },
+          {
+            "component": "RoomManager",
+            "name": "rooms",
+            "nav_group": "Rooms",
+            "path": "/chat/rooms",
+            "permission": "chat:manage_rooms"
+          },
+          {
+            "component": "MessageConsole",
+            "name": "messages",
+            "nav_group": "Messaging",
+            "path": "/chat/messages",
+            "permission": "chat:send"
+          },
+          {
+            "component": "PresencePanel",
+            "name": "presence",
+            "nav_group": "Messaging",
+            "path": "/chat/presence",
+            "permission": "chat:view"
+          },
+          {
+            "component": "ModerationQueue",
+            "name": "moderation",
+            "nav_group": "Governance",
+            "path": "/chat/moderation",
+            "permission": "chat:moderate"
+          },
+          {
+            "component": "RetentionPolicy",
+            "name": "retention",
+            "nav_group": "Governance",
+            "path": "/chat/retention",
+            "permission": "chat:admin"
+          },
+          {
+            "component": "ChatAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/chat/analytics",
+            "permission": "chat:view"
+          },
+          {
+            "component": "CHATSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/chat/settings",
+            "permission": "chat:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "chat": []
+    }
+  },
+  "contracts": {
+    "chat": {
+      "configuration": {
+        "governance": {
+          "audit_moderation_actions": true,
+          "external_guest_policy_required": true,
+          "require_tenant_context": true,
+          "retention_policy_required": true
+        },
+        "messaging": {
+          "attachments_enabled": true,
+          "delivery_receipts_enabled": true,
+          "event_bus_required": true,
+          "max_message_length": 8000
+        },
+        "moderation": {
+          "moderation_policy_required": true,
+          "moderator_review_supported": true,
+          "nlp_assisted_moderation": true,
+          "restricted_content_filtering": true
+        },
+        "rooms": {
+          "max_members_per_room": 5000,
+          "private_rooms_enabled": true,
+          "public_rooms_enabled": true,
+          "room_owner_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "chat_team_messaging"
+        },
+        "ui": {
+          "enable_chat_console": true,
+          "enable_moderation_queue": true,
+          "enable_presence_panel": true,
+          "enable_room_manager": true
+        }
+      },
+      "id": "chat",
+      "provides": [
+        "chat_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "chat": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "external_guest_requires_policy": {
+      "condition": {
+        "external_guest_present": true,
+        "guest_policy_attached": false
+      },
+      "description": "External guests require a guest policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "guest_policy_required",
+        "required_action": "attach_guest_policy"
+      },
+      "name": "external_guest_requires_policy"
+    },
+    "large_room_requires_review": {
+      "condition": {
+        "access_review_recorded": false,
+        "member_count_gt": 5000
+      },
+      "description": "Large rooms require access review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_room_review_required",
+        "required_action": "review_room_access"
+      },
+      "name": "large_room_requires_review"
+    },
+    "restricted_content_requires_moderation": {
+      "condition": {
+        "moderation_completed": false,
+        "restricted_content_detected": true
+      },
+      "description": "Restricted content requires moderation before release.",
+      "effect": {
+        "decision": "deny",
+        "reason": "moderation_required",
+        "required_action": "complete_moderation"
+      },
+      "name": "restricted_content_requires_moderation"
+    },
+    "retention_policy_required": {
+      "condition": {
+        "retention_policy_attached": false
+      },
+      "description": "Message rooms require a retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retention_policy_required",
+        "required_action": "attach_retention_policy"
+      },
+      "name": "retention_policy_required"
+    },
+    "room_requires_owner": {
+      "condition": {
+        "operation": "create_room",
+        "room_owner_assigned": false
+      },
+      "description": "Rooms require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "room_owner_required",
+        "required_action": "assign_room_owner"
+      },
+      "name": "room_requires_owner"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All chat operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.chat": {
+      "file": "capability_contract.py",
+      "id": "capability.chat",
+      "kind": "capability",
+      "name": "Chat and Messaging",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

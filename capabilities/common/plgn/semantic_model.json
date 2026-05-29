@@ -1,0 +1,559 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Plugin/Extension Framework package-backed APG capability",
+    "entity_count": 0,
+    "name": "plgn",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "plgn": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_plugin_changes": true,
+          "configuration_policy_required": true,
+          "external_plugin_review_required": true,
+          "require_tenant_context": true
+        },
+        "marketplace": {
+          "curated_listing_required": true,
+          "publisher_verification_required": true,
+          "release_channel_policy_required": true,
+          "tenant_install_policy_enabled": true
+        },
+        "plugins": {
+          "dependency_validation_required": true,
+          "manifest_schema_required": true,
+          "plugin_owner_required": true,
+          "signature_required": true
+        },
+        "security": {
+          "permission_review_required": true,
+          "sandbox_policy_required": true,
+          "secret_access_denied_by_default": true,
+          "supply_chain_scan_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "plgn_extension_marketplace"
+        },
+        "ui": {
+          "enable_marketplace": true,
+          "enable_permission_review": true,
+          "enable_plugin_registry": true,
+          "enable_release_manager": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Plugin/Extension Framework",
+      "provides": [
+        "plgn_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All plugin operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "register_plugin",
+              "plugin_owner_assigned": false
+            },
+            "description": "Plugins require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plugin_owner_required",
+              "required_action": "assign_plugin_owner"
+            },
+            "name": "plugin_requires_owner"
+          },
+          {
+            "condition": {
+              "signature_verified": false
+            },
+            "description": "Plugin packages require verified signatures.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plugin_signature_required",
+              "required_action": "verify_plugin_signature"
+            },
+            "name": "plugin_requires_signature"
+          },
+          {
+            "condition": {
+              "permission_review_recorded": false,
+              "permissions_requested": true
+            },
+            "description": "Requested plugin permissions require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "permission_review_required",
+              "required_action": "review_plugin_permissions"
+            },
+            "name": "permissions_require_review"
+          },
+          {
+            "condition": {
+              "operation": "enable_plugin",
+              "sandbox_policy_attached": false
+            },
+            "description": "Plugins require sandbox policy before execution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plugin_sandbox_required",
+              "required_action": "attach_sandbox_policy"
+            },
+            "name": "plugin_requires_sandbox"
+          },
+          {
+            "condition": {
+              "external_plugin": true,
+              "external_review_recorded": false
+            },
+            "description": "External plugins require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "external_plugin_review_required",
+              "required_action": "review_external_plugin"
+            },
+            "name": "external_plugin_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All plugin operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "register_plugin",
+            "plugin_owner_assigned": false
+          },
+          "description": "Plugins require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plugin_owner_required",
+            "required_action": "assign_plugin_owner"
+          },
+          "name": "plugin_requires_owner"
+        },
+        {
+          "condition": {
+            "signature_verified": false
+          },
+          "description": "Plugin packages require verified signatures.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plugin_signature_required",
+            "required_action": "verify_plugin_signature"
+          },
+          "name": "plugin_requires_signature"
+        },
+        {
+          "condition": {
+            "permission_review_recorded": false,
+            "permissions_requested": true
+          },
+          "description": "Requested plugin permissions require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "permission_review_required",
+            "required_action": "review_plugin_permissions"
+          },
+          "name": "permissions_require_review"
+        },
+        {
+          "condition": {
+            "operation": "enable_plugin",
+            "sandbox_policy_attached": false
+          },
+          "description": "Plugins require sandbox policy before execution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plugin_sandbox_required",
+            "required_action": "attach_sandbox_policy"
+          },
+          "name": "plugin_requires_sandbox"
+        },
+        {
+          "condition": {
+            "external_plugin": true,
+            "external_review_recorded": false
+          },
+          "description": "External plugins require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "external_plugin_review_required",
+            "required_action": "review_external_plugin"
+          },
+          "name": "external_plugin_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "dashboard": {
+          "component": "PLGNDashboard",
+          "permission": "plgn:view",
+          "route": "/plgn/dashboard"
+        },
+        "manifests": {
+          "component": "ManifestEditor",
+          "permission": "plgn:publish",
+          "route": "/plgn/manifests"
+        },
+        "marketplace": {
+          "component": "ExtensionMarketplace",
+          "permission": "plgn:install",
+          "route": "/plgn/marketplace"
+        },
+        "permissions": {
+          "component": "PermissionReview",
+          "permission": "plgn:review",
+          "route": "/plgn/permissions"
+        },
+        "plugins": {
+          "component": "PluginRegistry",
+          "permission": "plgn:view",
+          "route": "/plgn/plugins"
+        },
+        "releases": {
+          "component": "ReleaseManager",
+          "permission": "plgn:publish",
+          "route": "/plgn/releases"
+        },
+        "sandbox": {
+          "component": "PluginSandboxPolicy",
+          "permission": "plgn:review",
+          "route": "/plgn/sandbox"
+        },
+        "settings": {
+          "component": "PLGNSettings",
+          "permission": "plgn:admin",
+          "route": "/plgn/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "marketplace_grid": {
+            "highlight": "verified-chip",
+            "visual": "extension-grid"
+          },
+          "permission_review": {
+            "status_style": "review-chip",
+            "visual": "scope-table"
+          },
+          "plugin_card": {
+            "icon": "package-plus",
+            "risk_style": "permission-band",
+            "status_indicator": "trust-pill"
+          },
+          "release_manager": {
+            "status_style": "signature-chip",
+            "visual": "channel-lanes"
+          }
+        },
+        "name": "plgn_extension_marketplace",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#D69E2E",
+          "color.danger": "#C53030",
+          "color.primary": "#2B4C7E",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/plgn/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "PLGNDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/plgn/dashboard",
+            "permission": "plgn:view"
+          },
+          {
+            "component": "ExtensionMarketplace",
+            "name": "marketplace",
+            "nav_group": "Marketplace",
+            "path": "/plgn/marketplace",
+            "permission": "plgn:install"
+          },
+          {
+            "component": "PluginRegistry",
+            "name": "plugins",
+            "nav_group": "Plugins",
+            "path": "/plgn/plugins",
+            "permission": "plgn:view"
+          },
+          {
+            "component": "ManifestEditor",
+            "name": "manifests",
+            "nav_group": "Plugins",
+            "path": "/plgn/manifests",
+            "permission": "plgn:publish"
+          },
+          {
+            "component": "PermissionReview",
+            "name": "permissions",
+            "nav_group": "Security",
+            "path": "/plgn/permissions",
+            "permission": "plgn:review"
+          },
+          {
+            "component": "PluginSandboxPolicy",
+            "name": "sandbox",
+            "nav_group": "Security",
+            "path": "/plgn/sandbox",
+            "permission": "plgn:review"
+          },
+          {
+            "component": "ReleaseManager",
+            "name": "releases",
+            "nav_group": "Release",
+            "path": "/plgn/releases",
+            "permission": "plgn:publish"
+          },
+          {
+            "component": "PLGNSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/plgn/settings",
+            "permission": "plgn:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "plgn": []
+    }
+  },
+  "contracts": {
+    "plgn": {
+      "configuration": {
+        "governance": {
+          "audit_plugin_changes": true,
+          "configuration_policy_required": true,
+          "external_plugin_review_required": true,
+          "require_tenant_context": true
+        },
+        "marketplace": {
+          "curated_listing_required": true,
+          "publisher_verification_required": true,
+          "release_channel_policy_required": true,
+          "tenant_install_policy_enabled": true
+        },
+        "plugins": {
+          "dependency_validation_required": true,
+          "manifest_schema_required": true,
+          "plugin_owner_required": true,
+          "signature_required": true
+        },
+        "security": {
+          "permission_review_required": true,
+          "sandbox_policy_required": true,
+          "secret_access_denied_by_default": true,
+          "supply_chain_scan_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "plgn_extension_marketplace"
+        },
+        "ui": {
+          "enable_marketplace": true,
+          "enable_permission_review": true,
+          "enable_plugin_registry": true,
+          "enable_release_manager": true
+        }
+      },
+      "id": "plgn",
+      "provides": [
+        "plgn_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "plgn": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "external_plugin_requires_review": {
+      "condition": {
+        "external_plugin": true,
+        "external_review_recorded": false
+      },
+      "description": "External plugins require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "external_plugin_review_required",
+        "required_action": "review_external_plugin"
+      },
+      "name": "external_plugin_requires_review"
+    },
+    "permissions_require_review": {
+      "condition": {
+        "permission_review_recorded": false,
+        "permissions_requested": true
+      },
+      "description": "Requested plugin permissions require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "permission_review_required",
+        "required_action": "review_plugin_permissions"
+      },
+      "name": "permissions_require_review"
+    },
+    "plugin_requires_owner": {
+      "condition": {
+        "operation": "register_plugin",
+        "plugin_owner_assigned": false
+      },
+      "description": "Plugins require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plugin_owner_required",
+        "required_action": "assign_plugin_owner"
+      },
+      "name": "plugin_requires_owner"
+    },
+    "plugin_requires_sandbox": {
+      "condition": {
+        "operation": "enable_plugin",
+        "sandbox_policy_attached": false
+      },
+      "description": "Plugins require sandbox policy before execution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plugin_sandbox_required",
+        "required_action": "attach_sandbox_policy"
+      },
+      "name": "plugin_requires_sandbox"
+    },
+    "plugin_requires_signature": {
+      "condition": {
+        "signature_verified": false
+      },
+      "description": "Plugin packages require verified signatures.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plugin_signature_required",
+        "required_action": "verify_plugin_signature"
+      },
+      "name": "plugin_requires_signature"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All plugin operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.plgn": {
+      "file": "capability_contract.py",
+      "id": "capability.plgn",
+      "kind": "capability",
+      "name": "Plugin/Extension Framework",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

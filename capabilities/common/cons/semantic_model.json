@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Consent and Privacy Management package-backed APG capability",
+    "entity_count": 0,
+    "name": "cons",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "cons": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "consents": {
+          "active_consent_required": true,
+          "notice_required": true,
+          "stale_review_days": 365,
+          "withdrawal_supported": true
+        },
+        "governance": {
+          "audit_consent_changes": true,
+          "compliance_mapping_required": true,
+          "require_tenant_context": true,
+          "restricted_processing_controls": true
+        },
+        "privacy_requests": {
+          "dlpd_integration_required": true,
+          "identity_verification_required": true,
+          "request_evidence_required": true,
+          "sla_tracking_enabled": true
+        },
+        "purposes": {
+          "legal_basis_required": true,
+          "notice_link_required": true,
+          "purpose_owner_required": true,
+          "retention_policy_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "cons_privacy_center"
+        },
+        "ui": {
+          "enable_consent_ledger": true,
+          "enable_privacy_dashboard": true,
+          "enable_purpose_registry": true,
+          "enable_request_queue": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Consent and Privacy Management",
+      "provides": [
+        "cons_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All consent and privacy operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "legal_basis_present": false,
+              "operation": "create_purpose"
+            },
+            "description": "Privacy purposes require a legal basis.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legal_basis_required",
+              "required_action": "attach_legal_basis"
+            },
+            "name": "purpose_requires_legal_basis"
+          },
+          {
+            "condition": {
+              "notice_present": false,
+              "operation": "capture_consent"
+            },
+            "description": "Consent capture requires a notice reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notice_required",
+              "required_action": "attach_privacy_notice"
+            },
+            "name": "consent_capture_requires_notice"
+          },
+          {
+            "condition": {
+              "active_consent_present": false,
+              "operation": "process_consent_gated_data"
+            },
+            "description": "Consent-gated processing requires active consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_consent_required",
+              "required_action": "collect_active_consent"
+            },
+            "name": "processing_requires_active_consent"
+          },
+          {
+            "condition": {
+              "identity_verified": false,
+              "operation": "process_privacy_request"
+            },
+            "description": "Privacy requests require identity verification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "identity_verification_required",
+              "required_action": "verify_request_identity"
+            },
+            "name": "privacy_request_requires_identity_verification"
+          },
+          {
+            "condition": {
+              "consent_age_days_gt": 365,
+              "stale_consent_reviewed": false
+            },
+            "description": "Stale consents require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "stale_consent_review_required",
+              "required_action": "review_stale_consent"
+            },
+            "name": "stale_consent_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All consent and privacy operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "legal_basis_present": false,
+            "operation": "create_purpose"
+          },
+          "description": "Privacy purposes require a legal basis.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legal_basis_required",
+            "required_action": "attach_legal_basis"
+          },
+          "name": "purpose_requires_legal_basis"
+        },
+        {
+          "condition": {
+            "notice_present": false,
+            "operation": "capture_consent"
+          },
+          "description": "Consent capture requires a notice reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notice_required",
+            "required_action": "attach_privacy_notice"
+          },
+          "name": "consent_capture_requires_notice"
+        },
+        {
+          "condition": {
+            "active_consent_present": false,
+            "operation": "process_consent_gated_data"
+          },
+          "description": "Consent-gated processing requires active consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_consent_required",
+            "required_action": "collect_active_consent"
+          },
+          "name": "processing_requires_active_consent"
+        },
+        {
+          "condition": {
+            "identity_verified": false,
+            "operation": "process_privacy_request"
+          },
+          "description": "Privacy requests require identity verification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "identity_verification_required",
+            "required_action": "verify_request_identity"
+          },
+          "name": "privacy_request_requires_identity_verification"
+        },
+        {
+          "condition": {
+            "consent_age_days_gt": 365,
+            "stale_consent_reviewed": false
+          },
+          "description": "Stale consents require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "stale_consent_review_required",
+            "required_action": "review_stale_consent"
+          },
+          "name": "stale_consent_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "audit": {
+          "component": "PrivacyAudit",
+          "permission": "cons:admin",
+          "route": "/cons/audit"
+        },
+        "consents": {
+          "component": "ConsentLedger",
+          "permission": "cons:view",
+          "route": "/cons/consents"
+        },
+        "dashboard": {
+          "component": "CONSDashboard",
+          "permission": "cons:view",
+          "route": "/cons/dashboard"
+        },
+        "notices": {
+          "component": "PrivacyNotices",
+          "permission": "cons:manage_purposes",
+          "route": "/cons/notices"
+        },
+        "preferences": {
+          "component": "PreferenceCenter",
+          "permission": "cons:capture",
+          "route": "/cons/preferences"
+        },
+        "purposes": {
+          "component": "PurposeRegistry",
+          "permission": "cons:manage_purposes",
+          "route": "/cons/purposes"
+        },
+        "requests": {
+          "component": "PrivacyRequestQueue",
+          "permission": "cons:process_requests",
+          "route": "/cons/requests"
+        },
+        "settings": {
+          "component": "CONSSettings",
+          "permission": "cons:admin",
+          "route": "/cons/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "consent_ledger": {
+            "highlight": "withdrawal-chip",
+            "visual": "event-timeline"
+          },
+          "preference_center": {
+            "status_style": "active-chip",
+            "visual": "consent-toggle-list"
+          },
+          "purpose_card": {
+            "icon": "shield-check",
+            "risk_style": "privacy-band",
+            "status_indicator": "basis-pill"
+          },
+          "request_queue": {
+            "status_style": "verification-chip",
+            "visual": "sla-board"
+          }
+        },
+        "name": "cons_privacy_center",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#805AD5",
+          "color.danger": "#C53030",
+          "color.primary": "#234E52",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/cons/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "CONSDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/cons/dashboard",
+            "permission": "cons:view"
+          },
+          {
+            "component": "PurposeRegistry",
+            "name": "purposes",
+            "nav_group": "Policy",
+            "path": "/cons/purposes",
+            "permission": "cons:manage_purposes"
+          },
+          {
+            "component": "PrivacyNotices",
+            "name": "notices",
+            "nav_group": "Policy",
+            "path": "/cons/notices",
+            "permission": "cons:manage_purposes"
+          },
+          {
+            "component": "ConsentLedger",
+            "name": "consents",
+            "nav_group": "Consent",
+            "path": "/cons/consents",
+            "permission": "cons:view"
+          },
+          {
+            "component": "PrivacyRequestQueue",
+            "name": "requests",
+            "nav_group": "Requests",
+            "path": "/cons/requests",
+            "permission": "cons:process_requests"
+          },
+          {
+            "component": "PreferenceCenter",
+            "name": "preferences",
+            "nav_group": "Consent",
+            "path": "/cons/preferences",
+            "permission": "cons:capture"
+          },
+          {
+            "component": "PrivacyAudit",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/cons/audit",
+            "permission": "cons:admin"
+          },
+          {
+            "component": "CONSSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/cons/settings",
+            "permission": "cons:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "cons": []
+    }
+  },
+  "contracts": {
+    "cons": {
+      "configuration": {
+        "consents": {
+          "active_consent_required": true,
+          "notice_required": true,
+          "stale_review_days": 365,
+          "withdrawal_supported": true
+        },
+        "governance": {
+          "audit_consent_changes": true,
+          "compliance_mapping_required": true,
+          "require_tenant_context": true,
+          "restricted_processing_controls": true
+        },
+        "privacy_requests": {
+          "dlpd_integration_required": true,
+          "identity_verification_required": true,
+          "request_evidence_required": true,
+          "sla_tracking_enabled": true
+        },
+        "purposes": {
+          "legal_basis_required": true,
+          "notice_link_required": true,
+          "purpose_owner_required": true,
+          "retention_policy_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "cons_privacy_center"
+        },
+        "ui": {
+          "enable_consent_ledger": true,
+          "enable_privacy_dashboard": true,
+          "enable_purpose_registry": true,
+          "enable_request_queue": true
+        }
+      },
+      "id": "cons",
+      "provides": [
+        "cons_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "cons": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "consent_capture_requires_notice": {
+      "condition": {
+        "notice_present": false,
+        "operation": "capture_consent"
+      },
+      "description": "Consent capture requires a notice reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "notice_required",
+        "required_action": "attach_privacy_notice"
+      },
+      "name": "consent_capture_requires_notice"
+    },
+    "privacy_request_requires_identity_verification": {
+      "condition": {
+        "identity_verified": false,
+        "operation": "process_privacy_request"
+      },
+      "description": "Privacy requests require identity verification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "identity_verification_required",
+        "required_action": "verify_request_identity"
+      },
+      "name": "privacy_request_requires_identity_verification"
+    },
+    "processing_requires_active_consent": {
+      "condition": {
+        "active_consent_present": false,
+        "operation": "process_consent_gated_data"
+      },
+      "description": "Consent-gated processing requires active consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_consent_required",
+        "required_action": "collect_active_consent"
+      },
+      "name": "processing_requires_active_consent"
+    },
+    "purpose_requires_legal_basis": {
+      "condition": {
+        "legal_basis_present": false,
+        "operation": "create_purpose"
+      },
+      "description": "Privacy purposes require a legal basis.",
+      "effect": {
+        "decision": "deny",
+        "reason": "legal_basis_required",
+        "required_action": "attach_legal_basis"
+      },
+      "name": "purpose_requires_legal_basis"
+    },
+    "stale_consent_requires_review": {
+      "condition": {
+        "consent_age_days_gt": 365,
+        "stale_consent_reviewed": false
+      },
+      "description": "Stale consents require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "stale_consent_review_required",
+        "required_action": "review_stale_consent"
+      },
+      "name": "stale_consent_requires_review"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All consent and privacy operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.cons": {
+      "file": "capability_contract.py",
+      "id": "capability.cons",
+      "kind": "capability",
+      "name": "Consent and Privacy Management",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

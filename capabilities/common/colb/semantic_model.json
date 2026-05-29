@@ -1,0 +1,572 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Collaboration Tools package-backed APG capability",
+    "entity_count": 0,
+    "name": "colb",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "colb": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_collaboration_events": true,
+          "external_collaboration_policy_required": true,
+          "require_tenant_context": true,
+          "retention_policy_required": true
+        },
+        "protocols": {
+          "enabled": [
+            "websocket",
+            "webrtc",
+            "mqtt",
+            "grpc"
+          ],
+          "fallback_protocol_enabled": true,
+          "protocol_health_required": true,
+          "secure_transport_required": true
+        },
+        "sessions": {
+          "conflict_resolution": "operational_transform",
+          "presence_required": true,
+          "realtime_sync_enabled": true,
+          "session_recording_supported": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "colb_collaboration_workspace"
+        },
+        "ui": {
+          "enable_annotation_panel": true,
+          "enable_protocol_monitor": true,
+          "enable_session_console": true,
+          "enable_workspace_dashboard": true
+        },
+        "workspaces": {
+          "artifact_policy_required": true,
+          "guest_access_supported": true,
+          "max_participants_per_workspace": 1000,
+          "workspace_owner_required": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Collaboration Tools",
+      "provides": [
+        "colb_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All collaboration operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "create_workspace",
+              "workspace_owner_assigned": false
+            },
+            "description": "Workspaces require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_owner_required",
+              "required_action": "assign_workspace_owner"
+            },
+            "name": "workspace_requires_owner"
+          },
+          {
+            "condition": {
+              "external_participant_present": true,
+              "external_policy_attached": false
+            },
+            "description": "External collaboration requires a tenant policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "external_policy_required",
+              "required_action": "attach_external_collaboration_policy"
+            },
+            "name": "external_collaboration_requires_policy"
+          },
+          {
+            "condition": {
+              "realtime_session": true,
+              "secure_transport": false
+            },
+            "description": "Realtime protocols require secure transport.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secure_transport_required",
+              "required_action": "enable_secure_transport"
+            },
+            "name": "secure_transport_required"
+          },
+          {
+            "condition": {
+              "artifact_policy_attached": false,
+              "shared_artifact_present": true
+            },
+            "description": "Shared artifacts require an artifact policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_policy_required",
+              "required_action": "attach_artifact_policy"
+            },
+            "name": "artifact_policy_required"
+          },
+          {
+            "condition": {
+              "membership_review_recorded": false,
+              "participant_count_gt": 1000
+            },
+            "description": "Large workspaces require membership review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_workspace_review_required",
+              "required_action": "review_workspace_membership"
+            },
+            "name": "large_workspace_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All collaboration operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "create_workspace",
+            "workspace_owner_assigned": false
+          },
+          "description": "Workspaces require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_owner_required",
+            "required_action": "assign_workspace_owner"
+          },
+          "name": "workspace_requires_owner"
+        },
+        {
+          "condition": {
+            "external_participant_present": true,
+            "external_policy_attached": false
+          },
+          "description": "External collaboration requires a tenant policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "external_policy_required",
+            "required_action": "attach_external_collaboration_policy"
+          },
+          "name": "external_collaboration_requires_policy"
+        },
+        {
+          "condition": {
+            "realtime_session": true,
+            "secure_transport": false
+          },
+          "description": "Realtime protocols require secure transport.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secure_transport_required",
+            "required_action": "enable_secure_transport"
+          },
+          "name": "secure_transport_required"
+        },
+        {
+          "condition": {
+            "artifact_policy_attached": false,
+            "shared_artifact_present": true
+          },
+          "description": "Shared artifacts require an artifact policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_policy_required",
+            "required_action": "attach_artifact_policy"
+          },
+          "name": "artifact_policy_required"
+        },
+        {
+          "condition": {
+            "membership_review_recorded": false,
+            "participant_count_gt": 1000
+          },
+          "description": "Large workspaces require membership review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_workspace_review_required",
+            "required_action": "review_workspace_membership"
+          },
+          "name": "large_workspace_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "CollaborationAnalytics",
+          "permission": "colb:view",
+          "route": "/colb/analytics"
+        },
+        "annotations": {
+          "component": "AnnotationThreads",
+          "permission": "colb:collaborate",
+          "route": "/colb/annotations"
+        },
+        "dashboard": {
+          "component": "COLBDashboard",
+          "permission": "colb:view",
+          "route": "/colb/dashboard"
+        },
+        "presence": {
+          "component": "PresenceSync",
+          "permission": "colb:view",
+          "route": "/colb/presence"
+        },
+        "protocols": {
+          "component": "ProtocolMonitor",
+          "permission": "colb:admin",
+          "route": "/colb/protocols"
+        },
+        "sessions": {
+          "component": "SessionConsole",
+          "permission": "colb:manage_sessions",
+          "route": "/colb/sessions"
+        },
+        "settings": {
+          "component": "COLBSettings",
+          "permission": "colb:admin",
+          "route": "/colb/settings"
+        },
+        "workspaces": {
+          "component": "WorkspaceManager",
+          "permission": "colb:create_workspace",
+          "route": "/colb/workspaces"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "annotation_panel": {
+            "status_style": "decision-chip",
+            "visual": "threaded-comments"
+          },
+          "protocol_monitor": {
+            "status_style": "transport-chip",
+            "visual": "protocol-health-table"
+          },
+          "session_canvas": {
+            "highlight": "presence-chip",
+            "visual": "collaborative-surface"
+          },
+          "workspace_grid": {
+            "icon": "users",
+            "risk_style": "membership-band",
+            "status_indicator": "workspace-pill"
+          }
+        },
+        "name": "colb_collaboration_workspace",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#DD6B20",
+          "color.danger": "#C53030",
+          "color.primary": "#2B6CB0",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/colb/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "COLBDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/colb/dashboard",
+            "permission": "colb:view"
+          },
+          {
+            "component": "WorkspaceManager",
+            "name": "workspaces",
+            "nav_group": "Workspaces",
+            "path": "/colb/workspaces",
+            "permission": "colb:create_workspace"
+          },
+          {
+            "component": "SessionConsole",
+            "name": "sessions",
+            "nav_group": "Realtime",
+            "path": "/colb/sessions",
+            "permission": "colb:manage_sessions"
+          },
+          {
+            "component": "PresenceSync",
+            "name": "presence",
+            "nav_group": "Realtime",
+            "path": "/colb/presence",
+            "permission": "colb:view"
+          },
+          {
+            "component": "AnnotationThreads",
+            "name": "annotations",
+            "nav_group": "Artifacts",
+            "path": "/colb/annotations",
+            "permission": "colb:collaborate"
+          },
+          {
+            "component": "ProtocolMonitor",
+            "name": "protocols",
+            "nav_group": "Operations",
+            "path": "/colb/protocols",
+            "permission": "colb:admin"
+          },
+          {
+            "component": "CollaborationAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/colb/analytics",
+            "permission": "colb:view"
+          },
+          {
+            "component": "COLBSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/colb/settings",
+            "permission": "colb:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "colb": []
+    }
+  },
+  "contracts": {
+    "colb": {
+      "configuration": {
+        "governance": {
+          "audit_collaboration_events": true,
+          "external_collaboration_policy_required": true,
+          "require_tenant_context": true,
+          "retention_policy_required": true
+        },
+        "protocols": {
+          "enabled": [
+            "websocket",
+            "webrtc",
+            "mqtt",
+            "grpc"
+          ],
+          "fallback_protocol_enabled": true,
+          "protocol_health_required": true,
+          "secure_transport_required": true
+        },
+        "sessions": {
+          "conflict_resolution": "operational_transform",
+          "presence_required": true,
+          "realtime_sync_enabled": true,
+          "session_recording_supported": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "colb_collaboration_workspace"
+        },
+        "ui": {
+          "enable_annotation_panel": true,
+          "enable_protocol_monitor": true,
+          "enable_session_console": true,
+          "enable_workspace_dashboard": true
+        },
+        "workspaces": {
+          "artifact_policy_required": true,
+          "guest_access_supported": true,
+          "max_participants_per_workspace": 1000,
+          "workspace_owner_required": true
+        }
+      },
+      "id": "colb",
+      "provides": [
+        "colb_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "colb": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "artifact_policy_required": {
+      "condition": {
+        "artifact_policy_attached": false,
+        "shared_artifact_present": true
+      },
+      "description": "Shared artifacts require an artifact policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_policy_required",
+        "required_action": "attach_artifact_policy"
+      },
+      "name": "artifact_policy_required"
+    },
+    "external_collaboration_requires_policy": {
+      "condition": {
+        "external_participant_present": true,
+        "external_policy_attached": false
+      },
+      "description": "External collaboration requires a tenant policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "external_policy_required",
+        "required_action": "attach_external_collaboration_policy"
+      },
+      "name": "external_collaboration_requires_policy"
+    },
+    "large_workspace_requires_review": {
+      "condition": {
+        "membership_review_recorded": false,
+        "participant_count_gt": 1000
+      },
+      "description": "Large workspaces require membership review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_workspace_review_required",
+        "required_action": "review_workspace_membership"
+      },
+      "name": "large_workspace_requires_review"
+    },
+    "secure_transport_required": {
+      "condition": {
+        "realtime_session": true,
+        "secure_transport": false
+      },
+      "description": "Realtime protocols require secure transport.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secure_transport_required",
+        "required_action": "enable_secure_transport"
+      },
+      "name": "secure_transport_required"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All collaboration operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "workspace_requires_owner": {
+      "condition": {
+        "operation": "create_workspace",
+        "workspace_owner_assigned": false
+      },
+      "description": "Workspaces require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workspace_owner_required",
+        "required_action": "assign_workspace_owner"
+      },
+      "name": "workspace_requires_owner"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.colb": {
+      "file": "capability_contract.py",
+      "id": "capability.colb",
+      "kind": "capability",
+      "name": "Collaboration Tools",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

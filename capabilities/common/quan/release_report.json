@@ -1,0 +1,26 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Quantum Computing",
+        "errors": [],
+        "route_count": 8,
+        "rule_count": 6
+      }
+    },
+    "self_test": {
+      "capability": "quan",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "quan",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "quan",
+  "source": "capability_contract.py",
+  "target": "python"
+}

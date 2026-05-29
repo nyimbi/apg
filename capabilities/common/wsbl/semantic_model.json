@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Website Builder package-backed APG capability",
+    "entity_count": 0,
+    "name": "wsbl",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "wsbl": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_publication_changes": true,
+          "component_policy_required": true,
+          "public_site_controls_required": true,
+          "require_tenant_context": true
+        },
+        "pages": {
+          "content_versioning_enabled": true,
+          "custom_component_review_required": true,
+          "draft_autosave_enabled": true,
+          "structured_sections_required": true
+        },
+        "publishing": {
+          "accessibility_pass_required": true,
+          "approval_required": true,
+          "privacy_banner_policy_required": true,
+          "rollback_supported": true
+        },
+        "sites": {
+          "domain_validation_required": true,
+          "environment_preview_enabled": true,
+          "multi_locale_enabled": true,
+          "site_owner_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "wsbl_site_builder"
+        },
+        "ui": {
+          "enable_component_library": true,
+          "enable_page_editor": true,
+          "enable_publish_queue": true,
+          "enable_site_console": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Website Builder",
+      "provides": [
+        "wsbl_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All website-builder operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "create_site",
+              "site_owner_assigned": false
+            },
+            "description": "Sites require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "site_owner_required",
+              "required_action": "assign_site_owner"
+            },
+            "name": "site_requires_owner"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "publish_site"
+            },
+            "description": "Site publishing requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "site_publish_approval_required",
+              "required_action": "record_publish_approval"
+            },
+            "name": "publish_requires_approval"
+          },
+          {
+            "condition": {
+              "component_review_recorded": false,
+              "custom_component_present": true
+            },
+            "description": "Custom components require review before use.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_review_required",
+              "required_action": "review_custom_component"
+            },
+            "name": "custom_component_requires_review"
+          },
+          {
+            "condition": {
+              "accessibility_passed": false,
+              "public_site": true
+            },
+            "description": "Public sites require an accessibility pass.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_pass_required",
+              "required_action": "complete_accessibility_pass"
+            },
+            "name": "public_site_requires_accessibility_pass"
+          },
+          {
+            "condition": {
+              "consent_policy_attached": false,
+              "privacy_banner_required": true
+            },
+            "description": "Privacy banners require an attached consent policy.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "consent_policy_required",
+              "required_action": "attach_consent_policy"
+            },
+            "name": "privacy_banner_requires_consent_policy"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All website-builder operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "create_site",
+            "site_owner_assigned": false
+          },
+          "description": "Sites require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "site_owner_required",
+            "required_action": "assign_site_owner"
+          },
+          "name": "site_requires_owner"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "publish_site"
+          },
+          "description": "Site publishing requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "site_publish_approval_required",
+            "required_action": "record_publish_approval"
+          },
+          "name": "publish_requires_approval"
+        },
+        {
+          "condition": {
+            "component_review_recorded": false,
+            "custom_component_present": true
+          },
+          "description": "Custom components require review before use.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_review_required",
+            "required_action": "review_custom_component"
+          },
+          "name": "custom_component_requires_review"
+        },
+        {
+          "condition": {
+            "accessibility_passed": false,
+            "public_site": true
+          },
+          "description": "Public sites require an accessibility pass.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_pass_required",
+            "required_action": "complete_accessibility_pass"
+          },
+          "name": "public_site_requires_accessibility_pass"
+        },
+        {
+          "condition": {
+            "consent_policy_attached": false,
+            "privacy_banner_required": true
+          },
+          "description": "Privacy banners require an attached consent policy.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "consent_policy_required",
+            "required_action": "attach_consent_policy"
+          },
+          "name": "privacy_banner_requires_consent_policy"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "SiteAnalytics",
+          "permission": "wsbl:view",
+          "route": "/wsbl/analytics"
+        },
+        "components": {
+          "component": "ComponentLibrary",
+          "permission": "wsbl:build",
+          "route": "/wsbl/components"
+        },
+        "dashboard": {
+          "component": "WSBLDashboard",
+          "permission": "wsbl:view",
+          "route": "/wsbl/dashboard"
+        },
+        "editor": {
+          "component": "PageEditor",
+          "permission": "wsbl:build",
+          "route": "/wsbl/editor"
+        },
+        "pages": {
+          "component": "PageLibrary",
+          "permission": "wsbl:build",
+          "route": "/wsbl/pages"
+        },
+        "publishing": {
+          "component": "PublishQueue",
+          "permission": "wsbl:publish",
+          "route": "/wsbl/publishing"
+        },
+        "settings": {
+          "component": "WSBLSettings",
+          "permission": "wsbl:admin",
+          "route": "/wsbl/settings"
+        },
+        "sites": {
+          "component": "SiteConsole",
+          "permission": "wsbl:manage_sites",
+          "route": "/wsbl/sites"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "analytics_panel": {
+            "status_style": "trend-chip",
+            "visual": "traffic-grid"
+          },
+          "page_editor": {
+            "highlight": "component-chip",
+            "visual": "section-builder"
+          },
+          "publish_queue": {
+            "status_style": "approval-chip",
+            "visual": "release-checklist"
+          },
+          "site_card": {
+            "icon": "layout-template",
+            "risk_style": "publish-band",
+            "status_indicator": "site-pill"
+          }
+        },
+        "name": "wsbl_site_builder",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#38A169",
+          "color.danger": "#C53030",
+          "color.primary": "#2C5282",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/wsbl/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "WSBLDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/wsbl/dashboard",
+            "permission": "wsbl:view"
+          },
+          {
+            "component": "SiteConsole",
+            "name": "sites",
+            "nav_group": "Sites",
+            "path": "/wsbl/sites",
+            "permission": "wsbl:manage_sites"
+          },
+          {
+            "component": "PageLibrary",
+            "name": "pages",
+            "nav_group": "Pages",
+            "path": "/wsbl/pages",
+            "permission": "wsbl:build"
+          },
+          {
+            "component": "PageEditor",
+            "name": "editor",
+            "nav_group": "Build",
+            "path": "/wsbl/editor",
+            "permission": "wsbl:build"
+          },
+          {
+            "component": "ComponentLibrary",
+            "name": "components",
+            "nav_group": "Build",
+            "path": "/wsbl/components",
+            "permission": "wsbl:build"
+          },
+          {
+            "component": "PublishQueue",
+            "name": "publishing",
+            "nav_group": "Release",
+            "path": "/wsbl/publishing",
+            "permission": "wsbl:publish"
+          },
+          {
+            "component": "SiteAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/wsbl/analytics",
+            "permission": "wsbl:view"
+          },
+          {
+            "component": "WSBLSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/wsbl/settings",
+            "permission": "wsbl:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "wsbl": []
+    }
+  },
+  "contracts": {
+    "wsbl": {
+      "configuration": {
+        "governance": {
+          "audit_publication_changes": true,
+          "component_policy_required": true,
+          "public_site_controls_required": true,
+          "require_tenant_context": true
+        },
+        "pages": {
+          "content_versioning_enabled": true,
+          "custom_component_review_required": true,
+          "draft_autosave_enabled": true,
+          "structured_sections_required": true
+        },
+        "publishing": {
+          "accessibility_pass_required": true,
+          "approval_required": true,
+          "privacy_banner_policy_required": true,
+          "rollback_supported": true
+        },
+        "sites": {
+          "domain_validation_required": true,
+          "environment_preview_enabled": true,
+          "multi_locale_enabled": true,
+          "site_owner_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "wsbl_site_builder"
+        },
+        "ui": {
+          "enable_component_library": true,
+          "enable_page_editor": true,
+          "enable_publish_queue": true,
+          "enable_site_console": true
+        }
+      },
+      "id": "wsbl",
+      "provides": [
+        "wsbl_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "wsbl": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "custom_component_requires_review": {
+      "condition": {
+        "component_review_recorded": false,
+        "custom_component_present": true
+      },
+      "description": "Custom components require review before use.",
+      "effect": {
+        "decision": "deny",
+        "reason": "component_review_required",
+        "required_action": "review_custom_component"
+      },
+      "name": "custom_component_requires_review"
+    },
+    "privacy_banner_requires_consent_policy": {
+      "condition": {
+        "consent_policy_attached": false,
+        "privacy_banner_required": true
+      },
+      "description": "Privacy banners require an attached consent policy.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "consent_policy_required",
+        "required_action": "attach_consent_policy"
+      },
+      "name": "privacy_banner_requires_consent_policy"
+    },
+    "public_site_requires_accessibility_pass": {
+      "condition": {
+        "accessibility_passed": false,
+        "public_site": true
+      },
+      "description": "Public sites require an accessibility pass.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_pass_required",
+        "required_action": "complete_accessibility_pass"
+      },
+      "name": "public_site_requires_accessibility_pass"
+    },
+    "publish_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "publish_site"
+      },
+      "description": "Site publishing requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "site_publish_approval_required",
+        "required_action": "record_publish_approval"
+      },
+      "name": "publish_requires_approval"
+    },
+    "site_requires_owner": {
+      "condition": {
+        "operation": "create_site",
+        "site_owner_assigned": false
+      },
+      "description": "Sites require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "site_owner_required",
+        "required_action": "assign_site_owner"
+      },
+      "name": "site_requires_owner"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All website-builder operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.wsbl": {
+      "file": "capability_contract.py",
+      "id": "capability.wsbl",
+      "kind": "capability",
+      "name": "Website Builder",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

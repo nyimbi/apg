@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "AI Core Framework package-backed APG capability",
+    "entity_count": 0,
+    "name": "aicr",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "aicr": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "ai_audit_events_required": true,
+          "auth_required": true,
+          "monitoring_required": true,
+          "require_tenant_context": true
+        },
+        "inference": {
+          "default_timeout_seconds": 60,
+          "max_concurrent_requests": 10000,
+          "model_policy_required": true,
+          "prompt_audit_enabled": true
+        },
+        "orchestration": {
+          "edge_cloud_mesh_enabled": true,
+          "human_approval_for_high_risk": true,
+          "multi_modal_fusion_enabled": true,
+          "workflow_orchestration_enabled": true
+        },
+        "services": {
+          "endpoint_health_required": true,
+          "max_services_per_tenant": 100,
+          "registry_enabled": true,
+          "service_owner_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "aicr_ai_control_console"
+        },
+        "ui": {
+          "enable_governance_center": true,
+          "enable_inference_console": true,
+          "enable_service_registry": true,
+          "enable_workflow_designer": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "AI Core Framework",
+      "provides": [
+        "aicr_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All AI core operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "register_service",
+              "owner_assigned": false
+            },
+            "description": "AI service registration requires an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_owner_required",
+              "required_action": "assign_service_owner"
+            },
+            "name": "service_registration_requires_owner"
+          },
+          {
+            "condition": {
+              "model_policy_attached": false,
+              "operation": "run_inference"
+            },
+            "description": "Inference requires an attached model policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_policy_required",
+              "required_action": "attach_model_policy"
+            },
+            "name": "inference_requires_model_policy"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "workflow_risk": "high"
+            },
+            "description": "High-risk AI workflows require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "high_risk_workflow_requires_approval"
+          },
+          {
+            "condition": {
+              "routing_requested": true,
+              "service_health": "unhealthy"
+            },
+            "description": "Unhealthy AI services cannot receive routed work.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_unhealthy",
+              "required_action": "restore_service_health"
+            },
+            "name": "unhealthy_service_blocks_routing"
+          },
+          {
+            "condition": {
+              "context_tokens_gt": 128000,
+              "review_recorded": false
+            },
+            "description": "Large context windows require cost and safety review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_context_review_required",
+              "required_action": "record_context_review"
+            },
+            "name": "large_context_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All AI core operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "register_service",
+            "owner_assigned": false
+          },
+          "description": "AI service registration requires an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_owner_required",
+            "required_action": "assign_service_owner"
+          },
+          "name": "service_registration_requires_owner"
+        },
+        {
+          "condition": {
+            "model_policy_attached": false,
+            "operation": "run_inference"
+          },
+          "description": "Inference requires an attached model policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_policy_required",
+            "required_action": "attach_model_policy"
+          },
+          "name": "inference_requires_model_policy"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "workflow_risk": "high"
+          },
+          "description": "High-risk AI workflows require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "high_risk_workflow_requires_approval"
+        },
+        {
+          "condition": {
+            "routing_requested": true,
+            "service_health": "unhealthy"
+          },
+          "description": "Unhealthy AI services cannot receive routed work.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_unhealthy",
+            "required_action": "restore_service_health"
+          },
+          "name": "unhealthy_service_blocks_routing"
+        },
+        {
+          "condition": {
+            "context_tokens_gt": 128000,
+            "review_recorded": false
+          },
+          "description": "Large context windows require cost and safety review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_context_review_required",
+            "required_action": "record_context_review"
+          },
+          "name": "large_context_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "dashboard": {
+          "component": "AICRDashboard",
+          "permission": "aicr:view",
+          "route": "/aicr/dashboard"
+        },
+        "governance": {
+          "component": "AIGovernanceCenter",
+          "permission": "aicr:govern",
+          "route": "/aicr/governance"
+        },
+        "inference": {
+          "component": "InferenceConsole",
+          "permission": "aicr:run_inference",
+          "route": "/aicr/inference"
+        },
+        "metrics": {
+          "component": "AICRMetrics",
+          "permission": "aicr:view_metrics",
+          "route": "/aicr/metrics"
+        },
+        "models": {
+          "component": "ModelCatalog",
+          "permission": "aicr:view_models",
+          "route": "/aicr/models"
+        },
+        "services": {
+          "component": "AIServiceRegistry",
+          "permission": "aicr:manage_services",
+          "route": "/aicr/services"
+        },
+        "settings": {
+          "component": "AICRSettings",
+          "permission": "aicr:admin",
+          "route": "/aicr/settings"
+        },
+        "workflows": {
+          "component": "AIWorkflowDesigner",
+          "permission": "aicr:manage_workflows",
+          "route": "/aicr/workflows"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "ai_service_card": {
+            "icon": "brain-circuit",
+            "risk_style": "policy-band",
+            "status_indicator": "health-pill"
+          },
+          "governance_rule_stack": {
+            "status_style": "decision-chip",
+            "visual": "rule-ladder"
+          },
+          "inference_trace_panel": {
+            "highlight": "latency-chip",
+            "visual": "request-timeline"
+          },
+          "workflow_graph": {
+            "edge_style": "handoff-line",
+            "visual": "directed-agent-graph"
+          }
+        },
+        "name": "aicr_ai_control_console",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#7C3AED",
+          "color.danger": "#C53030",
+          "color.primary": "#243B6B",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F6F7FB",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/aicr/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "AICRDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/aicr/dashboard",
+            "permission": "aicr:view"
+          },
+          {
+            "component": "AIServiceRegistry",
+            "name": "services",
+            "nav_group": "Services",
+            "path": "/aicr/services",
+            "permission": "aicr:manage_services"
+          },
+          {
+            "component": "InferenceConsole",
+            "name": "inference",
+            "nav_group": "Runtime",
+            "path": "/aicr/inference",
+            "permission": "aicr:run_inference"
+          },
+          {
+            "component": "ModelCatalog",
+            "name": "models",
+            "nav_group": "Runtime",
+            "path": "/aicr/models",
+            "permission": "aicr:view_models"
+          },
+          {
+            "component": "AIWorkflowDesigner",
+            "name": "workflows",
+            "nav_group": "Orchestration",
+            "path": "/aicr/workflows",
+            "permission": "aicr:manage_workflows"
+          },
+          {
+            "component": "AIGovernanceCenter",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/aicr/governance",
+            "permission": "aicr:govern"
+          },
+          {
+            "component": "AICRMetrics",
+            "name": "metrics",
+            "nav_group": "Operations",
+            "path": "/aicr/metrics",
+            "permission": "aicr:view_metrics"
+          },
+          {
+            "component": "AICRSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/aicr/settings",
+            "permission": "aicr:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "dashboard.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "aicr": []
+    }
+  },
+  "contracts": {
+    "aicr": {
+      "configuration": {
+        "governance": {
+          "ai_audit_events_required": true,
+          "auth_required": true,
+          "monitoring_required": true,
+          "require_tenant_context": true
+        },
+        "inference": {
+          "default_timeout_seconds": 60,
+          "max_concurrent_requests": 10000,
+          "model_policy_required": true,
+          "prompt_audit_enabled": true
+        },
+        "orchestration": {
+          "edge_cloud_mesh_enabled": true,
+          "human_approval_for_high_risk": true,
+          "multi_modal_fusion_enabled": true,
+          "workflow_orchestration_enabled": true
+        },
+        "services": {
+          "endpoint_health_required": true,
+          "max_services_per_tenant": 100,
+          "registry_enabled": true,
+          "service_owner_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "aicr_ai_control_console"
+        },
+        "ui": {
+          "enable_governance_center": true,
+          "enable_inference_console": true,
+          "enable_service_registry": true,
+          "enable_workflow_designer": true
+        }
+      },
+      "id": "aicr",
+      "provides": [
+        "aicr_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "aicr": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "high_risk_workflow_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "workflow_risk": "high"
+      },
+      "description": "High-risk AI workflows require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "high_risk_workflow_requires_approval"
+    },
+    "inference_requires_model_policy": {
+      "condition": {
+        "model_policy_attached": false,
+        "operation": "run_inference"
+      },
+      "description": "Inference requires an attached model policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_policy_required",
+        "required_action": "attach_model_policy"
+      },
+      "name": "inference_requires_model_policy"
+    },
+    "large_context_requires_review": {
+      "condition": {
+        "context_tokens_gt": 128000,
+        "review_recorded": false
+      },
+      "description": "Large context windows require cost and safety review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_context_review_required",
+        "required_action": "record_context_review"
+      },
+      "name": "large_context_requires_review"
+    },
+    "service_registration_requires_owner": {
+      "condition": {
+        "operation": "register_service",
+        "owner_assigned": false
+      },
+      "description": "AI service registration requires an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_owner_required",
+        "required_action": "assign_service_owner"
+      },
+      "name": "service_registration_requires_owner"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All AI core operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "unhealthy_service_blocks_routing": {
+      "condition": {
+        "routing_requested": true,
+        "service_health": "unhealthy"
+      },
+      "description": "Unhealthy AI services cannot receive routed work.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_unhealthy",
+        "required_action": "restore_service_health"
+      },
+      "name": "unhealthy_service_blocks_routing"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.aicr": {
+      "file": "capability_contract.py",
+      "id": "capability.aicr",
+      "kind": "capability",
+      "name": "AI Core Framework",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

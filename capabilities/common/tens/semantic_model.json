@@ -1,0 +1,559 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Tenants Legacy package-backed APG capability",
+    "entity_count": 0,
+    "name": "tens",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "tens": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "access": {
+          "auth_boundary_required": true,
+          "legacy_role_mapping_required": true,
+          "privileged_access_review_required": true,
+          "tenant_isolation_validation_required": true
+        },
+        "governance": {
+          "audit_legacy_tenant_changes": true,
+          "deprecation_plan_required": true,
+          "require_tenant_context": true,
+          "stale_tenant_review_days": 180
+        },
+        "legacy_mapping": {
+          "compatibility_scope_required": true,
+          "legacy_owner_required": true,
+          "mapping_validation_required": true,
+          "source_system_required": true
+        },
+        "migration": {
+          "approval_required": true,
+          "migration_plan_required": true,
+          "post_migration_validation_required": true,
+          "rollback_plan_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "tens_legacy_tenant_migration"
+        },
+        "ui": {
+          "enable_boundary_review": true,
+          "enable_legacy_tenant_registry": true,
+          "enable_mapping_workbench": true,
+          "enable_migration_queue": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Tenants Legacy",
+      "provides": [
+        "tens_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All legacy tenant operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "legacy_owner_assigned": false,
+              "operation": "register_legacy_tenant"
+            },
+            "description": "Legacy tenants require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legacy_owner_required",
+              "required_action": "assign_legacy_owner"
+            },
+            "name": "legacy_tenant_requires_owner"
+          },
+          {
+            "condition": {
+              "mapping_validated": false,
+              "operation": "map_tenant"
+            },
+            "description": "Tenant mappings require validation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mapping_validation_required",
+              "required_action": "validate_tenant_mapping"
+            },
+            "name": "mapping_requires_validation"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "migrate_tenant"
+            },
+            "description": "Legacy tenant migrations require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "migration_approval_required",
+              "required_action": "record_migration_approval"
+            },
+            "name": "migration_requires_approval"
+          },
+          {
+            "condition": {
+              "auth_boundary_validated": false
+            },
+            "description": "Legacy tenant access requires validated auth boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auth_boundary_required",
+              "required_action": "validate_auth_boundary"
+            },
+            "name": "access_boundary_required"
+          },
+          {
+            "condition": {
+              "days_since_activity_gt": 180,
+              "stale_review_recorded": false
+            },
+            "description": "Stale legacy tenants require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "stale_legacy_tenant_review_required",
+              "required_action": "review_legacy_tenant"
+            },
+            "name": "stale_legacy_tenant_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All legacy tenant operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "legacy_owner_assigned": false,
+            "operation": "register_legacy_tenant"
+          },
+          "description": "Legacy tenants require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legacy_owner_required",
+            "required_action": "assign_legacy_owner"
+          },
+          "name": "legacy_tenant_requires_owner"
+        },
+        {
+          "condition": {
+            "mapping_validated": false,
+            "operation": "map_tenant"
+          },
+          "description": "Tenant mappings require validation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mapping_validation_required",
+            "required_action": "validate_tenant_mapping"
+          },
+          "name": "mapping_requires_validation"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "migrate_tenant"
+          },
+          "description": "Legacy tenant migrations require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "migration_approval_required",
+            "required_action": "record_migration_approval"
+          },
+          "name": "migration_requires_approval"
+        },
+        {
+          "condition": {
+            "auth_boundary_validated": false
+          },
+          "description": "Legacy tenant access requires validated auth boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auth_boundary_required",
+            "required_action": "validate_auth_boundary"
+          },
+          "name": "access_boundary_required"
+        },
+        {
+          "condition": {
+            "days_since_activity_gt": 180,
+            "stale_review_recorded": false
+          },
+          "description": "Stale legacy tenants require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "stale_legacy_tenant_review_required",
+            "required_action": "review_legacy_tenant"
+          },
+          "name": "stale_legacy_tenant_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "audit": {
+          "component": "LegacyTenantAudit",
+          "permission": "tens:view",
+          "route": "/tens/audit"
+        },
+        "boundaries": {
+          "component": "BoundaryReview",
+          "permission": "tens:approve",
+          "route": "/tens/boundaries"
+        },
+        "dashboard": {
+          "component": "TENSDashboard",
+          "permission": "tens:view",
+          "route": "/tens/dashboard"
+        },
+        "deprecation": {
+          "component": "DeprecationPlan",
+          "permission": "tens:approve",
+          "route": "/tens/deprecation"
+        },
+        "mappings": {
+          "component": "TenantMappingWorkbench",
+          "permission": "tens:map",
+          "route": "/tens/mappings"
+        },
+        "migrations": {
+          "component": "MigrationQueue",
+          "permission": "tens:migrate",
+          "route": "/tens/migrations"
+        },
+        "settings": {
+          "component": "TENSSettings",
+          "permission": "tens:admin",
+          "route": "/tens/settings"
+        },
+        "tenants": {
+          "component": "LegacyTenantRegistry",
+          "permission": "tens:view",
+          "route": "/tens/tenants"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "boundary_review": {
+            "status_style": "isolation-chip",
+            "visual": "access-matrix"
+          },
+          "mapping_workbench": {
+            "highlight": "validation-chip",
+            "visual": "mapping-table"
+          },
+          "migration_queue": {
+            "status_style": "approval-chip",
+            "visual": "migration-lanes"
+          },
+          "tenant_card": {
+            "icon": "building-2",
+            "risk_style": "migration-band",
+            "status_indicator": "legacy-pill"
+          }
+        },
+        "name": "tens_legacy_tenant_migration",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#B7791F",
+          "color.danger": "#C53030",
+          "color.primary": "#28536B",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/tens/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "TENSDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/tens/dashboard",
+            "permission": "tens:view"
+          },
+          {
+            "component": "LegacyTenantRegistry",
+            "name": "tenants",
+            "nav_group": "Tenants",
+            "path": "/tens/tenants",
+            "permission": "tens:view"
+          },
+          {
+            "component": "TenantMappingWorkbench",
+            "name": "mappings",
+            "nav_group": "Mapping",
+            "path": "/tens/mappings",
+            "permission": "tens:map"
+          },
+          {
+            "component": "MigrationQueue",
+            "name": "migrations",
+            "nav_group": "Migration",
+            "path": "/tens/migrations",
+            "permission": "tens:migrate"
+          },
+          {
+            "component": "BoundaryReview",
+            "name": "boundaries",
+            "nav_group": "Access",
+            "path": "/tens/boundaries",
+            "permission": "tens:approve"
+          },
+          {
+            "component": "DeprecationPlan",
+            "name": "deprecation",
+            "nav_group": "Governance",
+            "path": "/tens/deprecation",
+            "permission": "tens:approve"
+          },
+          {
+            "component": "LegacyTenantAudit",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/tens/audit",
+            "permission": "tens:view"
+          },
+          {
+            "component": "TENSSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/tens/settings",
+            "permission": "tens:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "tens": []
+    }
+  },
+  "contracts": {
+    "tens": {
+      "configuration": {
+        "access": {
+          "auth_boundary_required": true,
+          "legacy_role_mapping_required": true,
+          "privileged_access_review_required": true,
+          "tenant_isolation_validation_required": true
+        },
+        "governance": {
+          "audit_legacy_tenant_changes": true,
+          "deprecation_plan_required": true,
+          "require_tenant_context": true,
+          "stale_tenant_review_days": 180
+        },
+        "legacy_mapping": {
+          "compatibility_scope_required": true,
+          "legacy_owner_required": true,
+          "mapping_validation_required": true,
+          "source_system_required": true
+        },
+        "migration": {
+          "approval_required": true,
+          "migration_plan_required": true,
+          "post_migration_validation_required": true,
+          "rollback_plan_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "tens_legacy_tenant_migration"
+        },
+        "ui": {
+          "enable_boundary_review": true,
+          "enable_legacy_tenant_registry": true,
+          "enable_mapping_workbench": true,
+          "enable_migration_queue": true
+        }
+      },
+      "id": "tens",
+      "provides": [
+        "tens_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "tens": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "access_boundary_required": {
+      "condition": {
+        "auth_boundary_validated": false
+      },
+      "description": "Legacy tenant access requires validated auth boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "auth_boundary_required",
+        "required_action": "validate_auth_boundary"
+      },
+      "name": "access_boundary_required"
+    },
+    "legacy_tenant_requires_owner": {
+      "condition": {
+        "legacy_owner_assigned": false,
+        "operation": "register_legacy_tenant"
+      },
+      "description": "Legacy tenants require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "legacy_owner_required",
+        "required_action": "assign_legacy_owner"
+      },
+      "name": "legacy_tenant_requires_owner"
+    },
+    "mapping_requires_validation": {
+      "condition": {
+        "mapping_validated": false,
+        "operation": "map_tenant"
+      },
+      "description": "Tenant mappings require validation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mapping_validation_required",
+        "required_action": "validate_tenant_mapping"
+      },
+      "name": "mapping_requires_validation"
+    },
+    "migration_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "migrate_tenant"
+      },
+      "description": "Legacy tenant migrations require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "migration_approval_required",
+        "required_action": "record_migration_approval"
+      },
+      "name": "migration_requires_approval"
+    },
+    "stale_legacy_tenant_requires_review": {
+      "condition": {
+        "days_since_activity_gt": 180,
+        "stale_review_recorded": false
+      },
+      "description": "Stale legacy tenants require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "stale_legacy_tenant_review_required",
+        "required_action": "review_legacy_tenant"
+      },
+      "name": "stale_legacy_tenant_requires_review"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All legacy tenant operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.tens": {
+      "file": "capability_contract.py",
+      "id": "capability.tens",
+      "kind": "capability",
+      "name": "Tenants Legacy",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

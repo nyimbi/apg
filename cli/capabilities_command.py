@@ -22,6 +22,7 @@ from compiler.capability_publish import (
 	build_capability_publish_report,
 )
 from compiler.capability_operability import audit_capability_operability
+from compiler.capability_materializer import materialize_capability_packages
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
@@ -1042,6 +1043,50 @@ def audit(strict_package_artifacts: bool, as_json: bool) -> None:
 			click.echo(f"  warning: {warning}")
 		if len(report["warnings"]) > 10:
 			click.echo(f"  ... {len(report['warnings']) - 10} more warning(s)")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="materialize-packages")
+@click.option("--root", type=click.Path(path_type=Path), default=None, help="Capability root directory to materialize")
+@click.option("--capability", "capability_id", default=None, help="Materialize one capability id")
+@click.option("--dry-run", is_flag=True, help="Report files that would be written without changing the workspace")
+@click.option("--force", is_flag=True, help="Overwrite existing materialized files")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-package-materialization.v1 JSON")
+def materialize_packages(
+	root: Path | None,
+	capability_id: str | None,
+	dry_run: bool,
+	force: bool,
+	as_json: bool,
+) -> None:
+	"""Materialize missing package artifacts for executable capability contracts."""
+	report = materialize_capability_packages(
+		root=root,
+		capability=capability_id,
+		dry_run=dry_run,
+		force=force,
+	)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		status = "OK" if report["ok"] else "FAILED"
+		action = "would write" if dry_run else "wrote"
+		count = report["would_write_count"] if dry_run else report["written_count"]
+		click.echo(
+			f"Capability package materialization {status}: "
+			f"{report['package_count']} package(s), {action} {count} file(s), "
+			f"skipped {report['skipped_count']} existing file(s)"
+		)
+		for record in report["records"][:10]:
+			record_count = len(record["would_write"]) if dry_run else len(record["written"])
+			click.echo(f"  {record['capability']}: {record_count} file(s)")
+		if len(report["records"]) > 10:
+			click.echo(f"  ... {len(report['records']) - 10} more package(s)")
+		for error in report["errors"]:
+			click.echo(f"  error: {error}")
+		for warning in report["warnings"]:
+			click.echo(f"  warning: {warning}")
 	if not report["ok"]:
 		raise click.exceptions.Exit(1)
 

@@ -16,6 +16,71 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-29 07:58 EAT
+
+Capability package materialization slice:
+
+- Added `apg capabilities materialize-packages --json`, emitting
+  `apg.capability-package-materialization.v1` and writing only missing package
+  artifacts for validated executable capability contracts unless `--force` is
+  used.
+- Added `compiler/capability_materializer.py` so package artifacts are derived
+  from the current contract registry rather than regenerated from inferred
+  path names or stale specs.
+- Materialized missing package artifacts across all 109 checked-in capability
+  packages: package specs where absent, dependency-light record/service/API/view
+  helpers, publishable `app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`, and package-local tests.
+- Updated the CLI surface audit and contributor-facing docs so
+  `materialize-packages` is part of the documented capability lifecycle.
+
+Verification:
+
+- `./.venv/bin/python -m py_compile compiler/capability_materializer.py
+  cli/capabilities_command.py tests/test_cli_capability_materializer.py` ->
+  passed.
+- `./.venv/bin/pytest -q tests/test_cli_capability_materializer.py` -> 2
+  passed.
+- `./.venv/bin/apg capabilities materialize-packages --dry-run --json` ->
+  passed with 109 packages, 0 errors, 885 files to write, and 314 existing
+  files skipped.
+- `./.venv/bin/apg capabilities materialize-packages --json` -> passed with
+  109 packages, 885 files written, 314 existing files skipped, and 0 errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` ->
+  passed with 109/109 contracts operable, 109 complete packages, 0 partial
+  packages, 0 package gaps, and 0 errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/accs --json`
+  -> passed with runtime self-test loaded and a publishable catalog patch.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json`
+  -> passed with runtime self-test loaded and a publishable catalog patch.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fin/apy/accounts_payable --json` -> passed with runtime
+  self-test loaded and a publishable catalog patch.
+- `./.venv/bin/pytest -q tests/test_cli_capability_materializer.py
+  tests/test_tooling_audit.py::test_cli_surface_audit_tracks_documented_command_groups`
+  -> 3 passed.
+- `./.venv/bin/apg docs audit --json` -> passed with 15/15 required docs, 68
+  local links, 55 documented commands, 0 violations, and 0 unknown documented
+  commands.
+- `git diff --check -- compiler/capability_materializer.py
+  cli/capabilities_command.py compiler/tooling_audit.py
+  tests/test_cli_capability_materializer.py docs/tooling.md
+  docs/developer_guide.md docs/contributors_guide.md
+  docs/capacity_development_guide.md docs/progress_log.md` -> passed.
+- `./.venv/bin/apg tooling audit --json` -> passed with 19/19 surfaces, 109
+  complete capability packages, 0 package gaps, 0 blocking gaps, and 0 errors.
+- A post-materialization `./.venv/bin/apg capabilities materialize-packages
+  --dry-run --json` -> passed with 109 packages, 0 files to write, 1,199
+  existing package artifacts skipped, and 0 errors.
+
+Known remaining gaps:
+
+- Capability packages now have complete materialized artifact shape and strict
+  audit proof. Many package services are still dependency-light contract-backed
+  baselines rather than full domain implementations; future capacity work
+  should replace generic helpers with domain behavior behind the same package
+  contracts and publish evidence.
+
 ### 2026-05-29 07:47 EAT
 
 Contributor acceleration documentation slice:

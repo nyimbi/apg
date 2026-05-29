@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Scheduling and Job Orchestration package-backed APG capability",
+    "entity_count": 0,
+    "name": "schd",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "schd": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_job_runs": true,
+          "external_job_approval_required": true,
+          "manual_run_reason_required": true,
+          "require_tenant_context": true
+        },
+        "jobs": {
+          "critical_job_monitoring_required": true,
+          "dead_letter_queue_enabled": true,
+          "max_runtime_minutes": 720,
+          "retry_policy_required": true
+        },
+        "schedules": {
+          "calendar_policy_required": true,
+          "max_active_schedules": 10000,
+          "schedule_owner_required": true,
+          "timezone_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "schd_scheduler_ops"
+        },
+        "ui": {
+          "enable_calendar_manager": true,
+          "enable_job_monitor": true,
+          "enable_schedule_console": true,
+          "enable_worker_dashboard": true
+        },
+        "workers": {
+          "autoscaling_supported": true,
+          "capacity_limits_required": true,
+          "health_check_required": true,
+          "worker_pool_required": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Scheduling and Job Orchestration",
+      "provides": [
+        "schd_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All scheduling operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "create_schedule",
+              "schedule_owner_assigned": false
+            },
+            "description": "Schedules require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schedule_owner_required",
+              "required_action": "assign_schedule_owner"
+            },
+            "name": "schedule_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_schedule",
+              "timezone_present": false
+            },
+            "description": "Schedules require an explicit timezone.",
+            "effect": {
+              "decision": "deny",
+              "reason": "timezone_required",
+              "required_action": "set_timezone"
+            },
+            "name": "timezone_required"
+          },
+          {
+            "condition": {
+              "job_criticality": "critical",
+              "monitoring_attached": false
+            },
+            "description": "Critical jobs require monitoring.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_job_monitoring_required",
+              "required_action": "attach_monitoring"
+            },
+            "name": "critical_job_requires_monitoring"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "external_job": true
+            },
+            "description": "External jobs require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "external_job_approval_required",
+              "required_action": "record_external_job_approval"
+            },
+            "name": "external_job_requires_approval"
+          },
+          {
+            "condition": {
+              "expected_runtime_minutes_gt": 720,
+              "runtime_review_recorded": false
+            },
+            "description": "Long-running jobs require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "long_running_job_review_required",
+              "required_action": "review_job_runtime"
+            },
+            "name": "long_running_job_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All scheduling operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "create_schedule",
+            "schedule_owner_assigned": false
+          },
+          "description": "Schedules require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schedule_owner_required",
+            "required_action": "assign_schedule_owner"
+          },
+          "name": "schedule_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_schedule",
+            "timezone_present": false
+          },
+          "description": "Schedules require an explicit timezone.",
+          "effect": {
+            "decision": "deny",
+            "reason": "timezone_required",
+            "required_action": "set_timezone"
+          },
+          "name": "timezone_required"
+        },
+        {
+          "condition": {
+            "job_criticality": "critical",
+            "monitoring_attached": false
+          },
+          "description": "Critical jobs require monitoring.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_job_monitoring_required",
+            "required_action": "attach_monitoring"
+          },
+          "name": "critical_job_requires_monitoring"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "external_job": true
+          },
+          "description": "External jobs require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "external_job_approval_required",
+            "required_action": "record_external_job_approval"
+          },
+          "name": "external_job_requires_approval"
+        },
+        {
+          "condition": {
+            "expected_runtime_minutes_gt": 720,
+            "runtime_review_recorded": false
+          },
+          "description": "Long-running jobs require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "long_running_job_review_required",
+            "required_action": "review_job_runtime"
+          },
+          "name": "long_running_job_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "SchedulerAnalytics",
+          "permission": "schd:view",
+          "route": "/schd/analytics"
+        },
+        "calendars": {
+          "component": "CalendarManager",
+          "permission": "schd:schedule",
+          "route": "/schd/calendars"
+        },
+        "dashboard": {
+          "component": "SCHDDashboard",
+          "permission": "schd:view",
+          "route": "/schd/dashboard"
+        },
+        "jobs": {
+          "component": "JobLibrary",
+          "permission": "schd:run_jobs",
+          "route": "/schd/jobs"
+        },
+        "runs": {
+          "component": "RunMonitor",
+          "permission": "schd:view",
+          "route": "/schd/runs"
+        },
+        "schedules": {
+          "component": "ScheduleConsole",
+          "permission": "schd:schedule",
+          "route": "/schd/schedules"
+        },
+        "settings": {
+          "component": "SCHDSettings",
+          "permission": "schd:admin",
+          "route": "/schd/settings"
+        },
+        "workers": {
+          "component": "WorkerDashboard",
+          "permission": "schd:manage_workers",
+          "route": "/schd/workers"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "job_run_table": {
+            "highlight": "runtime-chip",
+            "visual": "run-list"
+          },
+          "retry_panel": {
+            "status_style": "backoff-chip",
+            "visual": "retry-ladder"
+          },
+          "schedule_calendar": {
+            "icon": "calendar-clock",
+            "risk_style": "calendar-band",
+            "status_indicator": "schedule-pill"
+          },
+          "worker_pool": {
+            "status_style": "health-chip",
+            "visual": "capacity-grid"
+          }
+        },
+        "name": "schd_scheduler_ops",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#D69E2E",
+          "color.danger": "#C53030",
+          "color.primary": "#28536B",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/schd/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "SCHDDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/schd/dashboard",
+            "permission": "schd:view"
+          },
+          {
+            "component": "ScheduleConsole",
+            "name": "schedules",
+            "nav_group": "Schedules",
+            "path": "/schd/schedules",
+            "permission": "schd:schedule"
+          },
+          {
+            "component": "JobLibrary",
+            "name": "jobs",
+            "nav_group": "Jobs",
+            "path": "/schd/jobs",
+            "permission": "schd:run_jobs"
+          },
+          {
+            "component": "RunMonitor",
+            "name": "runs",
+            "nav_group": "Runtime",
+            "path": "/schd/runs",
+            "permission": "schd:view"
+          },
+          {
+            "component": "WorkerDashboard",
+            "name": "workers",
+            "nav_group": "Workers",
+            "path": "/schd/workers",
+            "permission": "schd:manage_workers"
+          },
+          {
+            "component": "CalendarManager",
+            "name": "calendars",
+            "nav_group": "Schedules",
+            "path": "/schd/calendars",
+            "permission": "schd:schedule"
+          },
+          {
+            "component": "SchedulerAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/schd/analytics",
+            "permission": "schd:view"
+          },
+          {
+            "component": "SCHDSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/schd/settings",
+            "permission": "schd:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "schd": []
+    }
+  },
+  "contracts": {
+    "schd": {
+      "configuration": {
+        "governance": {
+          "audit_job_runs": true,
+          "external_job_approval_required": true,
+          "manual_run_reason_required": true,
+          "require_tenant_context": true
+        },
+        "jobs": {
+          "critical_job_monitoring_required": true,
+          "dead_letter_queue_enabled": true,
+          "max_runtime_minutes": 720,
+          "retry_policy_required": true
+        },
+        "schedules": {
+          "calendar_policy_required": true,
+          "max_active_schedules": 10000,
+          "schedule_owner_required": true,
+          "timezone_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "schd_scheduler_ops"
+        },
+        "ui": {
+          "enable_calendar_manager": true,
+          "enable_job_monitor": true,
+          "enable_schedule_console": true,
+          "enable_worker_dashboard": true
+        },
+        "workers": {
+          "autoscaling_supported": true,
+          "capacity_limits_required": true,
+          "health_check_required": true,
+          "worker_pool_required": true
+        }
+      },
+      "id": "schd",
+      "provides": [
+        "schd_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "schd": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "critical_job_requires_monitoring": {
+      "condition": {
+        "job_criticality": "critical",
+        "monitoring_attached": false
+      },
+      "description": "Critical jobs require monitoring.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_job_monitoring_required",
+        "required_action": "attach_monitoring"
+      },
+      "name": "critical_job_requires_monitoring"
+    },
+    "external_job_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "external_job": true
+      },
+      "description": "External jobs require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "external_job_approval_required",
+        "required_action": "record_external_job_approval"
+      },
+      "name": "external_job_requires_approval"
+    },
+    "long_running_job_requires_review": {
+      "condition": {
+        "expected_runtime_minutes_gt": 720,
+        "runtime_review_recorded": false
+      },
+      "description": "Long-running jobs require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "long_running_job_review_required",
+        "required_action": "review_job_runtime"
+      },
+      "name": "long_running_job_requires_review"
+    },
+    "schedule_requires_owner": {
+      "condition": {
+        "operation": "create_schedule",
+        "schedule_owner_assigned": false
+      },
+      "description": "Schedules require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schedule_owner_required",
+        "required_action": "assign_schedule_owner"
+      },
+      "name": "schedule_requires_owner"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All scheduling operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "timezone_required": {
+      "condition": {
+        "operation": "create_schedule",
+        "timezone_present": false
+      },
+      "description": "Schedules require an explicit timezone.",
+      "effect": {
+        "decision": "deny",
+        "reason": "timezone_required",
+        "required_action": "set_timezone"
+      },
+      "name": "timezone_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.schd": {
+      "file": "capability_contract.py",
+      "id": "capability.schd",
+      "kind": "capability",
+      "name": "Scheduling and Job Orchestration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

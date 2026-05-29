@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Help and Knowledge Base package-backed APG capability",
+    "entity_count": 0,
+    "name": "help",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "help": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "answers": {
+          "citations_required": true,
+          "minimum_answer_confidence": 0.76,
+          "rag_enabled": true,
+          "unsafe_answer_blocking": true
+        },
+        "content": {
+          "article_owner_required": true,
+          "freshness_review_days": 90,
+          "localization_supported": true,
+          "publication_approval_required": true
+        },
+        "governance": {
+          "audit_publication": true,
+          "require_tenant_context": true,
+          "source_approval_required": true,
+          "support_feedback_review_required": true
+        },
+        "search": {
+          "feedback_boosting_enabled": true,
+          "query_logging_enabled": true,
+          "restricted_content_filtering": true,
+          "semantic_search_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "help_support_knowledge"
+        },
+        "ui": {
+          "enable_answer_console": true,
+          "enable_article_editor": true,
+          "enable_curation_queue": true,
+          "enable_help_center": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Help and Knowledge Base",
+      "provides": [
+        "help_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All help operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "article_owner_assigned": false,
+              "operation": "create_article"
+            },
+            "description": "Knowledge articles require accountable owners.",
+            "effect": {
+              "decision": "deny",
+              "reason": "article_owner_required",
+              "required_action": "assign_article_owner"
+            },
+            "name": "article_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "publish_article",
+              "publication_approved": false
+            },
+            "description": "Articles require approval before publication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_approval_required",
+              "required_action": "approve_publication"
+            },
+            "name": "publication_requires_approval"
+          },
+          {
+            "condition": {
+              "citations_present": false,
+              "operation": "generate_answer"
+            },
+            "description": "Generated answers require source citations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "citations_required",
+              "required_action": "attach_answer_citations"
+            },
+            "name": "answer_requires_citations"
+          },
+          {
+            "condition": {
+              "rbac_filter_applied": false,
+              "restricted_content_present": true
+            },
+            "description": "Restricted help content requires RBAC filtering.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rbac_filter_required",
+              "required_action": "apply_rbac_filter"
+            },
+            "name": "restricted_content_requires_filtering"
+          },
+          {
+            "condition": {
+              "article_age_days_gt": 90,
+              "freshness_review_recorded": false
+            },
+            "description": "Stale knowledge articles require curation review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "freshness_review_required",
+              "required_action": "review_article_freshness"
+            },
+            "name": "stale_article_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All help operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "article_owner_assigned": false,
+            "operation": "create_article"
+          },
+          "description": "Knowledge articles require accountable owners.",
+          "effect": {
+            "decision": "deny",
+            "reason": "article_owner_required",
+            "required_action": "assign_article_owner"
+          },
+          "name": "article_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "publish_article",
+            "publication_approved": false
+          },
+          "description": "Articles require approval before publication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_approval_required",
+            "required_action": "approve_publication"
+          },
+          "name": "publication_requires_approval"
+        },
+        {
+          "condition": {
+            "citations_present": false,
+            "operation": "generate_answer"
+          },
+          "description": "Generated answers require source citations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "citations_required",
+            "required_action": "attach_answer_citations"
+          },
+          "name": "answer_requires_citations"
+        },
+        {
+          "condition": {
+            "rbac_filter_applied": false,
+            "restricted_content_present": true
+          },
+          "description": "Restricted help content requires RBAC filtering.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rbac_filter_required",
+            "required_action": "apply_rbac_filter"
+          },
+          "name": "restricted_content_requires_filtering"
+        },
+        {
+          "condition": {
+            "article_age_days_gt": 90,
+            "freshness_review_recorded": false
+          },
+          "description": "Stale knowledge articles require curation review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "freshness_review_required",
+            "required_action": "review_article_freshness"
+          },
+          "name": "stale_article_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "SupportAnalytics",
+          "permission": "help:view",
+          "route": "/help/analytics"
+        },
+        "answers": {
+          "component": "AnswerConsole",
+          "permission": "help:ask",
+          "route": "/help/answers"
+        },
+        "articles": {
+          "component": "ArticleLibrary",
+          "permission": "help:view",
+          "route": "/help/articles"
+        },
+        "curation": {
+          "component": "CurationQueue",
+          "permission": "help:publish",
+          "route": "/help/curation"
+        },
+        "dashboard": {
+          "component": "HELPDashboard",
+          "permission": "help:view",
+          "route": "/help/dashboard"
+        },
+        "editor": {
+          "component": "ArticleEditor",
+          "permission": "help:edit_articles",
+          "route": "/help/editor"
+        },
+        "home": {
+          "component": "HelpCenter",
+          "permission": "help:view",
+          "route": "/help/home"
+        },
+        "settings": {
+          "component": "HELPSettings",
+          "permission": "help:admin",
+          "route": "/help/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "answer_panel": {
+            "highlight": "confidence-chip",
+            "visual": "cited-answer"
+          },
+          "article_library": {
+            "icon": "book-open",
+            "risk_style": "freshness-band",
+            "status_indicator": "article-pill"
+          },
+          "curation_queue": {
+            "status_style": "approval-chip",
+            "visual": "review-list"
+          },
+          "feedback_table": {
+            "status_style": "sentiment-chip",
+            "visual": "feedback-grid"
+          }
+        },
+        "name": "help_support_knowledge",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#38A169",
+          "color.danger": "#C53030",
+          "color.primary": "#28536B",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/help/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "HELPDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/help/dashboard",
+            "permission": "help:view"
+          },
+          {
+            "component": "HelpCenter",
+            "name": "home",
+            "nav_group": "Help",
+            "path": "/help/home",
+            "permission": "help:view"
+          },
+          {
+            "component": "ArticleLibrary",
+            "name": "articles",
+            "nav_group": "Help",
+            "path": "/help/articles",
+            "permission": "help:view"
+          },
+          {
+            "component": "ArticleEditor",
+            "name": "editor",
+            "nav_group": "Authoring",
+            "path": "/help/editor",
+            "permission": "help:edit_articles"
+          },
+          {
+            "component": "AnswerConsole",
+            "name": "answers",
+            "nav_group": "Assistant",
+            "path": "/help/answers",
+            "permission": "help:ask"
+          },
+          {
+            "component": "CurationQueue",
+            "name": "curation",
+            "nav_group": "Governance",
+            "path": "/help/curation",
+            "permission": "help:publish"
+          },
+          {
+            "component": "SupportAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/help/analytics",
+            "permission": "help:view"
+          },
+          {
+            "component": "HELPSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/help/settings",
+            "permission": "help:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "help": []
+    }
+  },
+  "contracts": {
+    "help": {
+      "configuration": {
+        "answers": {
+          "citations_required": true,
+          "minimum_answer_confidence": 0.76,
+          "rag_enabled": true,
+          "unsafe_answer_blocking": true
+        },
+        "content": {
+          "article_owner_required": true,
+          "freshness_review_days": 90,
+          "localization_supported": true,
+          "publication_approval_required": true
+        },
+        "governance": {
+          "audit_publication": true,
+          "require_tenant_context": true,
+          "source_approval_required": true,
+          "support_feedback_review_required": true
+        },
+        "search": {
+          "feedback_boosting_enabled": true,
+          "query_logging_enabled": true,
+          "restricted_content_filtering": true,
+          "semantic_search_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "help_support_knowledge"
+        },
+        "ui": {
+          "enable_answer_console": true,
+          "enable_article_editor": true,
+          "enable_curation_queue": true,
+          "enable_help_center": true
+        }
+      },
+      "id": "help",
+      "provides": [
+        "help_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "help": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "answer_requires_citations": {
+      "condition": {
+        "citations_present": false,
+        "operation": "generate_answer"
+      },
+      "description": "Generated answers require source citations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "citations_required",
+        "required_action": "attach_answer_citations"
+      },
+      "name": "answer_requires_citations"
+    },
+    "article_requires_owner": {
+      "condition": {
+        "article_owner_assigned": false,
+        "operation": "create_article"
+      },
+      "description": "Knowledge articles require accountable owners.",
+      "effect": {
+        "decision": "deny",
+        "reason": "article_owner_required",
+        "required_action": "assign_article_owner"
+      },
+      "name": "article_requires_owner"
+    },
+    "publication_requires_approval": {
+      "condition": {
+        "operation": "publish_article",
+        "publication_approved": false
+      },
+      "description": "Articles require approval before publication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "publication_approval_required",
+        "required_action": "approve_publication"
+      },
+      "name": "publication_requires_approval"
+    },
+    "restricted_content_requires_filtering": {
+      "condition": {
+        "rbac_filter_applied": false,
+        "restricted_content_present": true
+      },
+      "description": "Restricted help content requires RBAC filtering.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rbac_filter_required",
+        "required_action": "apply_rbac_filter"
+      },
+      "name": "restricted_content_requires_filtering"
+    },
+    "stale_article_requires_review": {
+      "condition": {
+        "article_age_days_gt": 90,
+        "freshness_review_recorded": false
+      },
+      "description": "Stale knowledge articles require curation review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "freshness_review_required",
+        "required_action": "review_article_freshness"
+      },
+      "name": "stale_article_requires_review"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All help operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.help": {
+      "file": "capability_contract.py",
+      "id": "capability.help",
+      "kind": "capability",
+      "name": "Help and Knowledge Base",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

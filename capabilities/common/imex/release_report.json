@@ -1,0 +1,26 @@
+{
+  "evidence": {
+    "contracts": {
+      "capability_contract": {
+        "display_name": "Import/Export",
+        "errors": [],
+        "route_count": 8,
+        "rule_count": 6
+      }
+    },
+    "self_test": {
+      "capability": "imex",
+      "passed": true,
+      "status": "ok"
+    },
+    "semantic_model": {
+      "capability": "imex",
+      "format": "apg.semantic-model.v1"
+    }
+  },
+  "format": "apg.release-report.v1",
+  "ok": true,
+  "package": "imex",
+  "source": "capability_contract.py",
+  "target": "python"
+}

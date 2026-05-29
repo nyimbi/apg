@@ -186,8 +186,10 @@ Add a capability package:
 1. Scaffold or create `capabilities/<domain>/<code>/`.
 2. Keep `capability_contract.py`, service code, views, `app.py`,
    `semantic_model.json`, package manifest, release report, and tests aligned.
-3. Validate contracts, run focused package tests, and run publish-plan.
-4. Add or update the APG example that composes the capability.
+3. Use `apg capabilities materialize-packages --capability <id> --json` when a
+   checked-in contract is valid but package artifacts are missing.
+4. Validate contracts, run focused package tests, and run publish-plan.
+5. Add or update the APG example that composes the capability.
 
 Add a new capacity:
 
@@ -437,6 +439,7 @@ Validate, inspect, and publish-plan capabilities through the CLI:
 ```bash
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --json
+./.venv/bin/apg capabilities materialize-packages --dry-run --json
 ./.venv/bin/apg capabilities inspect <capability_id> --json
 ./.venv/bin/apg capabilities evaluate-rules <capability_id> --context-json '{}' --json
 ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
@@ -556,6 +559,7 @@ Use the narrowest lane that proves the claim.
 | Release/package | `./.venv/bin/apg package path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-package --json` |
 | Evidence bundle | `./.venv/bin/apg evidence path/to/app.apg --catalog /tmp/apg-capability-catalog.json --target web --out /tmp/apg-evidence --json` |
 | Capabilities | `./.venv/bin/apg capabilities validate-contracts --json` and `./.venv/bin/apg capabilities audit --json` |
+| Capability package closure | `./.venv/bin/apg capabilities materialize-packages --dry-run --json`, `./.venv/bin/apg capabilities materialize-packages --json`, and `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` |
 | Tooling | `./.venv/bin/apg tooling audit --json` |
 | Environment doctor | `./.venv/bin/apg doctor --json` |
 | Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |

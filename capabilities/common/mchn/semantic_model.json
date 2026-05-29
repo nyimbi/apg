@@ -1,0 +1,578 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Multi-Channel Output package-backed APG capability",
+    "entity_count": 0,
+    "name": "mchn",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "mchn": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "channels": {
+          "channel_owner_required": true,
+          "enabled": [
+            "email",
+            "sms",
+            "push",
+            "pdf",
+            "web",
+            "api",
+            "print"
+          ],
+          "fallback_required": true,
+          "health_required": true
+        },
+        "delivery": {
+          "delivery_receipts_enabled": true,
+          "recipient_policy_required": true,
+          "sensitive_output_encryption_required": true,
+          "throttle_policy_required": true
+        },
+        "governance": {
+          "audit_output_events": true,
+          "compliance_policy_required": true,
+          "require_tenant_context": true,
+          "restricted_content_filtering": true
+        },
+        "rendering": {
+          "format_validation_required": true,
+          "localization_supported": true,
+          "template_approval_required": true,
+          "theme_policy_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "mchn_omnichannel_output"
+        },
+        "ui": {
+          "enable_channel_monitor": true,
+          "enable_output_dashboard": true,
+          "enable_route_console": true,
+          "enable_template_manager": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Multi-Channel Output",
+      "provides": [
+        "mchn_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All output operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "channel_owner_assigned": false,
+              "operation": "create_channel"
+            },
+            "description": "Output channels require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_owner_required",
+              "required_action": "assign_channel_owner"
+            },
+            "name": "channel_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "publish_template",
+              "template_approved": false
+            },
+            "description": "Output templates require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_approval_required",
+              "required_action": "approve_template"
+            },
+            "name": "template_requires_approval"
+          },
+          {
+            "condition": {
+              "output_encrypted": false,
+              "sensitive_output": true
+            },
+            "description": "Sensitive output requires encryption.",
+            "effect": {
+              "decision": "deny",
+              "reason": "output_encryption_required",
+              "required_action": "encrypt_output"
+            },
+            "name": "sensitive_output_requires_encryption"
+          },
+          {
+            "condition": {
+              "channel_health": "unhealthy",
+              "delivery_requested": true
+            },
+            "description": "Unhealthy channels cannot receive delivery.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_unhealthy",
+              "required_action": "reroute_or_restore_channel"
+            },
+            "name": "unhealthy_channel_blocks_delivery"
+          },
+          {
+            "condition": {
+              "delivery_review_recorded": false,
+              "recipient_count_gt": 10000
+            },
+            "description": "Large deliveries require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_delivery_review_required",
+              "required_action": "review_delivery"
+            },
+            "name": "large_delivery_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All output operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "channel_owner_assigned": false,
+            "operation": "create_channel"
+          },
+          "description": "Output channels require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_owner_required",
+            "required_action": "assign_channel_owner"
+          },
+          "name": "channel_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "publish_template",
+            "template_approved": false
+          },
+          "description": "Output templates require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_approval_required",
+            "required_action": "approve_template"
+          },
+          "name": "template_requires_approval"
+        },
+        {
+          "condition": {
+            "output_encrypted": false,
+            "sensitive_output": true
+          },
+          "description": "Sensitive output requires encryption.",
+          "effect": {
+            "decision": "deny",
+            "reason": "output_encryption_required",
+            "required_action": "encrypt_output"
+          },
+          "name": "sensitive_output_requires_encryption"
+        },
+        {
+          "condition": {
+            "channel_health": "unhealthy",
+            "delivery_requested": true
+          },
+          "description": "Unhealthy channels cannot receive delivery.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_unhealthy",
+            "required_action": "reroute_or_restore_channel"
+          },
+          "name": "unhealthy_channel_blocks_delivery"
+        },
+        {
+          "condition": {
+            "delivery_review_recorded": false,
+            "recipient_count_gt": 10000
+          },
+          "description": "Large deliveries require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_delivery_review_required",
+            "required_action": "review_delivery"
+          },
+          "name": "large_delivery_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "OutputAnalytics",
+          "permission": "mchn:view",
+          "route": "/mchn/analytics"
+        },
+        "channels": {
+          "component": "ChannelMonitor",
+          "permission": "mchn:admin",
+          "route": "/mchn/channels"
+        },
+        "dashboard": {
+          "component": "MCHNDashboard",
+          "permission": "mchn:view",
+          "route": "/mchn/dashboard"
+        },
+        "policies": {
+          "component": "OutputPolicies",
+          "permission": "mchn:admin",
+          "route": "/mchn/policies"
+        },
+        "render": {
+          "component": "RenderConsole",
+          "permission": "mchn:render",
+          "route": "/mchn/render"
+        },
+        "routes": {
+          "component": "RouteConsole",
+          "permission": "mchn:route",
+          "route": "/mchn/routes"
+        },
+        "settings": {
+          "component": "MCHNSettings",
+          "permission": "mchn:admin",
+          "route": "/mchn/settings"
+        },
+        "templates": {
+          "component": "TemplateManager",
+          "permission": "mchn:manage_templates",
+          "route": "/mchn/templates"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "channel_monitor": {
+            "status_style": "health-chip",
+            "visual": "channel-health-table"
+          },
+          "render_preview": {
+            "status_style": "validation-chip",
+            "visual": "format-preview"
+          },
+          "route_console": {
+            "icon": "route",
+            "risk_style": "policy-band",
+            "status_indicator": "route-pill"
+          },
+          "template_manager": {
+            "highlight": "locale-chip",
+            "visual": "template-grid"
+          }
+        },
+        "name": "mchn_omnichannel_output",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#DD6B20",
+          "color.danger": "#C53030",
+          "color.primary": "#28536B",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/mchn/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "MCHNDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/mchn/dashboard",
+            "permission": "mchn:view"
+          },
+          {
+            "component": "RenderConsole",
+            "name": "render",
+            "nav_group": "Rendering",
+            "path": "/mchn/render",
+            "permission": "mchn:render"
+          },
+          {
+            "component": "TemplateManager",
+            "name": "templates",
+            "nav_group": "Rendering",
+            "path": "/mchn/templates",
+            "permission": "mchn:manage_templates"
+          },
+          {
+            "component": "RouteConsole",
+            "name": "routes",
+            "nav_group": "Routing",
+            "path": "/mchn/routes",
+            "permission": "mchn:route"
+          },
+          {
+            "component": "ChannelMonitor",
+            "name": "channels",
+            "nav_group": "Channels",
+            "path": "/mchn/channels",
+            "permission": "mchn:admin"
+          },
+          {
+            "component": "OutputAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/mchn/analytics",
+            "permission": "mchn:view"
+          },
+          {
+            "component": "OutputPolicies",
+            "name": "policies",
+            "nav_group": "Governance",
+            "path": "/mchn/policies",
+            "permission": "mchn:admin"
+          },
+          {
+            "component": "MCHNSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/mchn/settings",
+            "permission": "mchn:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "mchn": []
+    }
+  },
+  "contracts": {
+    "mchn": {
+      "configuration": {
+        "channels": {
+          "channel_owner_required": true,
+          "enabled": [
+            "email",
+            "sms",
+            "push",
+            "pdf",
+            "web",
+            "api",
+            "print"
+          ],
+          "fallback_required": true,
+          "health_required": true
+        },
+        "delivery": {
+          "delivery_receipts_enabled": true,
+          "recipient_policy_required": true,
+          "sensitive_output_encryption_required": true,
+          "throttle_policy_required": true
+        },
+        "governance": {
+          "audit_output_events": true,
+          "compliance_policy_required": true,
+          "require_tenant_context": true,
+          "restricted_content_filtering": true
+        },
+        "rendering": {
+          "format_validation_required": true,
+          "localization_supported": true,
+          "template_approval_required": true,
+          "theme_policy_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "mchn_omnichannel_output"
+        },
+        "ui": {
+          "enable_channel_monitor": true,
+          "enable_output_dashboard": true,
+          "enable_route_console": true,
+          "enable_template_manager": true
+        }
+      },
+      "id": "mchn",
+      "provides": [
+        "mchn_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "mchn": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "channel_requires_owner": {
+      "condition": {
+        "channel_owner_assigned": false,
+        "operation": "create_channel"
+      },
+      "description": "Output channels require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "channel_owner_required",
+        "required_action": "assign_channel_owner"
+      },
+      "name": "channel_requires_owner"
+    },
+    "large_delivery_requires_review": {
+      "condition": {
+        "delivery_review_recorded": false,
+        "recipient_count_gt": 10000
+      },
+      "description": "Large deliveries require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_delivery_review_required",
+        "required_action": "review_delivery"
+      },
+      "name": "large_delivery_requires_review"
+    },
+    "sensitive_output_requires_encryption": {
+      "condition": {
+        "output_encrypted": false,
+        "sensitive_output": true
+      },
+      "description": "Sensitive output requires encryption.",
+      "effect": {
+        "decision": "deny",
+        "reason": "output_encryption_required",
+        "required_action": "encrypt_output"
+      },
+      "name": "sensitive_output_requires_encryption"
+    },
+    "template_requires_approval": {
+      "condition": {
+        "operation": "publish_template",
+        "template_approved": false
+      },
+      "description": "Output templates require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_approval_required",
+        "required_action": "approve_template"
+      },
+      "name": "template_requires_approval"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All output operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "unhealthy_channel_blocks_delivery": {
+      "condition": {
+        "channel_health": "unhealthy",
+        "delivery_requested": true
+      },
+      "description": "Unhealthy channels cannot receive delivery.",
+      "effect": {
+        "decision": "deny",
+        "reason": "channel_unhealthy",
+        "required_action": "reroute_or_restore_channel"
+      },
+      "name": "unhealthy_channel_blocks_delivery"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.mchn": {
+      "file": "capability_contract.py",
+      "id": "capability.mchn",
+      "kind": "capability",
+      "name": "Multi-Channel Output",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

@@ -1,0 +1,553 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Zero Trust Network Access package-backed APG capability",
+    "entity_count": 0,
+    "name": "ztna",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "ztna": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "devices": {
+          "attestation_required_for_sensitive_resources": true,
+          "managed_device_preferred": true,
+          "minimum_device_trust": 0.7,
+          "posture_required": true
+        },
+        "governance": {
+          "audit_access_decisions": true,
+          "deny_by_default": true,
+          "require_tenant_context": true,
+          "risk_threshold": 0.8
+        },
+        "identities": {
+          "continuous_identity_checks": true,
+          "federated_identity_allowed": true,
+          "mfa_required_for_privileged": true,
+          "verified_identity_required": true
+        },
+        "resources": {
+          "least_privilege_default": true,
+          "microsegmentation_enabled": true,
+          "resource_policy_required": true,
+          "session_recording_for_privileged": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "ztna_zero_trust_ops"
+        },
+        "ui": {
+          "enable_access_console": true,
+          "enable_device_posture": true,
+          "enable_resource_map": true,
+          "enable_session_monitor": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Zero Trust Network Access",
+      "provides": [
+        "ztna_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All zero-trust decisions require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "identity_verified": false
+            },
+            "description": "Access requires verified identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "identity_verification_required",
+              "required_action": "verify_identity"
+            },
+            "name": "identity_must_be_verified"
+          },
+          {
+            "condition": {
+              "device_posture_present": false
+            },
+            "description": "Access requires current device posture.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_posture_required",
+              "required_action": "collect_device_posture"
+            },
+            "name": "device_posture_required"
+          },
+          {
+            "condition": {
+              "resource_policy_attached": false
+            },
+            "description": "Resource access requires a matching policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "resource_policy_required",
+              "required_action": "attach_resource_policy"
+            },
+            "name": "resource_policy_required"
+          },
+          {
+            "condition": {
+              "access_level": "privileged",
+              "mfa_completed": false
+            },
+            "description": "Privileged access requires MFA.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privileged_mfa_required",
+              "required_action": "complete_mfa"
+            },
+            "name": "privileged_access_requires_mfa"
+          },
+          {
+            "condition": {
+              "access_review_recorded": false,
+              "access_risk_score_gt": 0.8
+            },
+            "description": "High-risk access decisions require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_risk_access_review_required",
+              "required_action": "review_access_request"
+            },
+            "name": "high_risk_access_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All zero-trust decisions require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "identity_verified": false
+          },
+          "description": "Access requires verified identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "identity_verification_required",
+            "required_action": "verify_identity"
+          },
+          "name": "identity_must_be_verified"
+        },
+        {
+          "condition": {
+            "device_posture_present": false
+          },
+          "description": "Access requires current device posture.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_posture_required",
+            "required_action": "collect_device_posture"
+          },
+          "name": "device_posture_required"
+        },
+        {
+          "condition": {
+            "resource_policy_attached": false
+          },
+          "description": "Resource access requires a matching policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "resource_policy_required",
+            "required_action": "attach_resource_policy"
+          },
+          "name": "resource_policy_required"
+        },
+        {
+          "condition": {
+            "access_level": "privileged",
+            "mfa_completed": false
+          },
+          "description": "Privileged access requires MFA.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privileged_mfa_required",
+            "required_action": "complete_mfa"
+          },
+          "name": "privileged_access_requires_mfa"
+        },
+        {
+          "condition": {
+            "access_review_recorded": false,
+            "access_risk_score_gt": 0.8
+          },
+          "description": "High-risk access decisions require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_risk_access_review_required",
+            "required_action": "review_access_request"
+          },
+          "name": "high_risk_access_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "access": {
+          "component": "AccessRequests",
+          "permission": "ztna:approve_access",
+          "route": "/ztna/access"
+        },
+        "dashboard": {
+          "component": "ZTNADashboard",
+          "permission": "ztna:view",
+          "route": "/ztna/dashboard"
+        },
+        "devices": {
+          "component": "DevicePosture",
+          "permission": "ztna:manage_devices",
+          "route": "/ztna/devices"
+        },
+        "policies": {
+          "component": "ZeroTrustPolicies",
+          "permission": "ztna:manage_policies",
+          "route": "/ztna/policies"
+        },
+        "resources": {
+          "component": "ResourceMap",
+          "permission": "ztna:manage_policies",
+          "route": "/ztna/resources"
+        },
+        "risk": {
+          "component": "AccessRiskConsole",
+          "permission": "ztna:view",
+          "route": "/ztna/risk"
+        },
+        "sessions": {
+          "component": "SessionMonitor",
+          "permission": "ztna:view",
+          "route": "/ztna/sessions"
+        },
+        "settings": {
+          "component": "ZTNASettings",
+          "permission": "ztna:admin",
+          "route": "/ztna/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "access_decision": {
+            "icon": "shield",
+            "risk_style": "trust-band",
+            "status_indicator": "decision-pill"
+          },
+          "device_posture": {
+            "highlight": "trust-score-chip",
+            "visual": "posture-checklist"
+          },
+          "resource_map": {
+            "status_style": "policy-chip",
+            "visual": "segmented-network-map"
+          },
+          "session_monitor": {
+            "status_style": "reauth-chip",
+            "visual": "active-session-table"
+          }
+        },
+        "name": "ztna_zero_trust_ops",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#38A169",
+          "color.danger": "#C53030",
+          "color.primary": "#1A365D",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/ztna/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ZTNADashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/ztna/dashboard",
+            "permission": "ztna:view"
+          },
+          {
+            "component": "ZeroTrustPolicies",
+            "name": "policies",
+            "nav_group": "Policies",
+            "path": "/ztna/policies",
+            "permission": "ztna:manage_policies"
+          },
+          {
+            "component": "DevicePosture",
+            "name": "devices",
+            "nav_group": "Devices",
+            "path": "/ztna/devices",
+            "permission": "ztna:manage_devices"
+          },
+          {
+            "component": "ResourceMap",
+            "name": "resources",
+            "nav_group": "Resources",
+            "path": "/ztna/resources",
+            "permission": "ztna:manage_policies"
+          },
+          {
+            "component": "AccessRequests",
+            "name": "access",
+            "nav_group": "Access",
+            "path": "/ztna/access",
+            "permission": "ztna:approve_access"
+          },
+          {
+            "component": "SessionMonitor",
+            "name": "sessions",
+            "nav_group": "Operations",
+            "path": "/ztna/sessions",
+            "permission": "ztna:view"
+          },
+          {
+            "component": "AccessRiskConsole",
+            "name": "risk",
+            "nav_group": "Operations",
+            "path": "/ztna/risk",
+            "permission": "ztna:view"
+          },
+          {
+            "component": "ZTNASettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/ztna/settings",
+            "permission": "ztna:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "ztna": []
+    }
+  },
+  "contracts": {
+    "ztna": {
+      "configuration": {
+        "devices": {
+          "attestation_required_for_sensitive_resources": true,
+          "managed_device_preferred": true,
+          "minimum_device_trust": 0.7,
+          "posture_required": true
+        },
+        "governance": {
+          "audit_access_decisions": true,
+          "deny_by_default": true,
+          "require_tenant_context": true,
+          "risk_threshold": 0.8
+        },
+        "identities": {
+          "continuous_identity_checks": true,
+          "federated_identity_allowed": true,
+          "mfa_required_for_privileged": true,
+          "verified_identity_required": true
+        },
+        "resources": {
+          "least_privilege_default": true,
+          "microsegmentation_enabled": true,
+          "resource_policy_required": true,
+          "session_recording_for_privileged": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "ztna_zero_trust_ops"
+        },
+        "ui": {
+          "enable_access_console": true,
+          "enable_device_posture": true,
+          "enable_resource_map": true,
+          "enable_session_monitor": true
+        }
+      },
+      "id": "ztna",
+      "provides": [
+        "ztna_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "ztna": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "device_posture_required": {
+      "condition": {
+        "device_posture_present": false
+      },
+      "description": "Access requires current device posture.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_posture_required",
+        "required_action": "collect_device_posture"
+      },
+      "name": "device_posture_required"
+    },
+    "high_risk_access_requires_review": {
+      "condition": {
+        "access_review_recorded": false,
+        "access_risk_score_gt": 0.8
+      },
+      "description": "High-risk access decisions require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "high_risk_access_review_required",
+        "required_action": "review_access_request"
+      },
+      "name": "high_risk_access_requires_review"
+    },
+    "identity_must_be_verified": {
+      "condition": {
+        "identity_verified": false
+      },
+      "description": "Access requires verified identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "identity_verification_required",
+        "required_action": "verify_identity"
+      },
+      "name": "identity_must_be_verified"
+    },
+    "privileged_access_requires_mfa": {
+      "condition": {
+        "access_level": "privileged",
+        "mfa_completed": false
+      },
+      "description": "Privileged access requires MFA.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privileged_mfa_required",
+        "required_action": "complete_mfa"
+      },
+      "name": "privileged_access_requires_mfa"
+    },
+    "resource_policy_required": {
+      "condition": {
+        "resource_policy_attached": false
+      },
+      "description": "Resource access requires a matching policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "resource_policy_required",
+        "required_action": "attach_resource_policy"
+      },
+      "name": "resource_policy_required"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All zero-trust decisions require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.ztna": {
+      "file": "capability_contract.py",
+      "id": "capability.ztna",
+      "kind": "capability",
+      "name": "Zero Trust Network Access",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

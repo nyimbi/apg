@@ -1,0 +1,574 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Biometric Processing package-backed APG capability",
+    "entity_count": 0,
+    "name": "biop",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "biop": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_template_access": true,
+          "cross_border_processing_review": true,
+          "explicit_consent_required": true,
+          "require_tenant_context": true
+        },
+        "liveness": {
+          "minimum_liveness_score": 0.82,
+          "passive_liveness_allowed": true,
+          "presentation_attack_detection": true,
+          "required_for_authentication": true
+        },
+        "modalities": {
+          "enabled": [
+            "face",
+            "fingerprint",
+            "voice",
+            "iris",
+            "behavioral"
+          ],
+          "minimum_match_confidence": 0.86,
+          "multi_modal_required_for_high_risk": true,
+          "quality_threshold": 0.72
+        },
+        "templates": {
+          "encrypted_storage_required": true,
+          "raw_sample_retention": "disabled",
+          "revocation_supported": true,
+          "template_rotation_days": 365
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "biop_biometric_control"
+        },
+        "ui": {
+          "enable_biometric_dashboard": true,
+          "enable_compliance_view": true,
+          "enable_enrollment_console": true,
+          "enable_verification_workbench": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Biometric Processing",
+      "provides": [
+        "biop_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All biometric operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "consent_recorded": false,
+              "operation": "process_biometric"
+            },
+            "description": "Biometric processing requires explicit consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_required",
+              "required_action": "record_consent"
+            },
+            "name": "biometric_processing_requires_consent"
+          },
+          {
+            "condition": {
+              "operation": "store_template",
+              "template_encrypted": false
+            },
+            "description": "Stored biometric templates must be encrypted.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_encryption_required",
+              "required_action": "encrypt_template"
+            },
+            "name": "template_storage_requires_encryption"
+          },
+          {
+            "condition": {
+              "liveness_passed": false,
+              "operation": "authenticate"
+            },
+            "description": "Authentication using biometrics requires liveness evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "liveness_required",
+              "required_action": "complete_liveness_check"
+            },
+            "name": "authentication_requires_liveness"
+          },
+          {
+            "condition": {
+              "cross_border_processing": true,
+              "privacy_review_recorded": false
+            },
+            "description": "Cross-border biometric use requires governance review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_review_required",
+              "required_action": "record_privacy_review"
+            },
+            "name": "cross_border_use_requires_review"
+          },
+          {
+            "condition": {
+              "human_review_recorded": false,
+              "match_confidence_lt": 0.86
+            },
+            "description": "Low-confidence biometric matches require human review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_match_confidence",
+              "required_action": "review_match"
+            },
+            "name": "low_match_confidence_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All biometric operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "consent_recorded": false,
+            "operation": "process_biometric"
+          },
+          "description": "Biometric processing requires explicit consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_required",
+            "required_action": "record_consent"
+          },
+          "name": "biometric_processing_requires_consent"
+        },
+        {
+          "condition": {
+            "operation": "store_template",
+            "template_encrypted": false
+          },
+          "description": "Stored biometric templates must be encrypted.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_encryption_required",
+            "required_action": "encrypt_template"
+          },
+          "name": "template_storage_requires_encryption"
+        },
+        {
+          "condition": {
+            "liveness_passed": false,
+            "operation": "authenticate"
+          },
+          "description": "Authentication using biometrics requires liveness evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "liveness_required",
+            "required_action": "complete_liveness_check"
+          },
+          "name": "authentication_requires_liveness"
+        },
+        {
+          "condition": {
+            "cross_border_processing": true,
+            "privacy_review_recorded": false
+          },
+          "description": "Cross-border biometric use requires governance review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_review_required",
+            "required_action": "record_privacy_review"
+          },
+          "name": "cross_border_use_requires_review"
+        },
+        {
+          "condition": {
+            "human_review_recorded": false,
+            "match_confidence_lt": 0.86
+          },
+          "description": "Low-confidence biometric matches require human review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_match_confidence",
+            "required_action": "review_match"
+          },
+          "name": "low_match_confidence_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "BiometricAnalytics",
+          "permission": "biop:view",
+          "route": "/biop/analytics"
+        },
+        "compliance": {
+          "component": "BiometricCompliance",
+          "permission": "biop:review",
+          "route": "/biop/compliance"
+        },
+        "dashboard": {
+          "component": "BIOPDashboard",
+          "permission": "biop:view",
+          "route": "/biop/dashboard"
+        },
+        "enrollments": {
+          "component": "BiometricEnrollments",
+          "permission": "biop:enroll",
+          "route": "/biop/enrollments"
+        },
+        "liveness": {
+          "component": "LivenessWorkbench",
+          "permission": "biop:verify",
+          "route": "/biop/liveness"
+        },
+        "settings": {
+          "component": "BIOPSettings",
+          "permission": "biop:admin",
+          "route": "/biop/settings"
+        },
+        "users": {
+          "component": "BiometricUsers",
+          "permission": "biop:view",
+          "route": "/biop/users"
+        },
+        "verification": {
+          "component": "BiometricVerification",
+          "permission": "biop:verify",
+          "route": "/biop/verification"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "liveness_panel": {
+            "status_style": "pad-chip",
+            "visual": "challenge-meter"
+          },
+          "match_result": {
+            "status_style": "review-chip",
+            "visual": "confidence-meter"
+          },
+          "modality_matrix": {
+            "icon": "fingerprint",
+            "risk_style": "consent-band",
+            "status_indicator": "modality-pill"
+          },
+          "template_vault": {
+            "highlight": "rotation-chip",
+            "visual": "encrypted-record-list"
+          }
+        },
+        "name": "biop_biometric_control",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2B6CB0",
+          "color.danger": "#C53030",
+          "color.primary": "#214E34",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F6F8F7",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/biop/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "BIOPDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/biop/dashboard",
+            "permission": "biop:view"
+          },
+          {
+            "component": "BiometricUsers",
+            "name": "users",
+            "nav_group": "Identity",
+            "path": "/biop/users",
+            "permission": "biop:view"
+          },
+          {
+            "component": "BiometricEnrollments",
+            "name": "enrollments",
+            "nav_group": "Identity",
+            "path": "/biop/enrollments",
+            "permission": "biop:enroll"
+          },
+          {
+            "component": "BiometricVerification",
+            "name": "verification",
+            "nav_group": "Verification",
+            "path": "/biop/verification",
+            "permission": "biop:verify"
+          },
+          {
+            "component": "LivenessWorkbench",
+            "name": "liveness",
+            "nav_group": "Verification",
+            "path": "/biop/liveness",
+            "permission": "biop:verify"
+          },
+          {
+            "component": "BiometricCompliance",
+            "name": "compliance",
+            "nav_group": "Governance",
+            "path": "/biop/compliance",
+            "permission": "biop:review"
+          },
+          {
+            "component": "BiometricAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/biop/analytics",
+            "permission": "biop:view"
+          },
+          {
+            "component": "BIOPSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/biop/settings",
+            "permission": "biop:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "biop": []
+    }
+  },
+  "contracts": {
+    "biop": {
+      "configuration": {
+        "governance": {
+          "audit_template_access": true,
+          "cross_border_processing_review": true,
+          "explicit_consent_required": true,
+          "require_tenant_context": true
+        },
+        "liveness": {
+          "minimum_liveness_score": 0.82,
+          "passive_liveness_allowed": true,
+          "presentation_attack_detection": true,
+          "required_for_authentication": true
+        },
+        "modalities": {
+          "enabled": [
+            "face",
+            "fingerprint",
+            "voice",
+            "iris",
+            "behavioral"
+          ],
+          "minimum_match_confidence": 0.86,
+          "multi_modal_required_for_high_risk": true,
+          "quality_threshold": 0.72
+        },
+        "templates": {
+          "encrypted_storage_required": true,
+          "raw_sample_retention": "disabled",
+          "revocation_supported": true,
+          "template_rotation_days": 365
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "biop_biometric_control"
+        },
+        "ui": {
+          "enable_biometric_dashboard": true,
+          "enable_compliance_view": true,
+          "enable_enrollment_console": true,
+          "enable_verification_workbench": true
+        }
+      },
+      "id": "biop",
+      "provides": [
+        "biop_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "biop": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "authentication_requires_liveness": {
+      "condition": {
+        "liveness_passed": false,
+        "operation": "authenticate"
+      },
+      "description": "Authentication using biometrics requires liveness evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "liveness_required",
+        "required_action": "complete_liveness_check"
+      },
+      "name": "authentication_requires_liveness"
+    },
+    "biometric_processing_requires_consent": {
+      "condition": {
+        "consent_recorded": false,
+        "operation": "process_biometric"
+      },
+      "description": "Biometric processing requires explicit consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_required",
+        "required_action": "record_consent"
+      },
+      "name": "biometric_processing_requires_consent"
+    },
+    "cross_border_use_requires_review": {
+      "condition": {
+        "cross_border_processing": true,
+        "privacy_review_recorded": false
+      },
+      "description": "Cross-border biometric use requires governance review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privacy_review_required",
+        "required_action": "record_privacy_review"
+      },
+      "name": "cross_border_use_requires_review"
+    },
+    "low_match_confidence_requires_review": {
+      "condition": {
+        "human_review_recorded": false,
+        "match_confidence_lt": 0.86
+      },
+      "description": "Low-confidence biometric matches require human review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_match_confidence",
+        "required_action": "review_match"
+      },
+      "name": "low_match_confidence_requires_review"
+    },
+    "template_storage_requires_encryption": {
+      "condition": {
+        "operation": "store_template",
+        "template_encrypted": false
+      },
+      "description": "Stored biometric templates must be encrypted.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_encryption_required",
+        "required_action": "encrypt_template"
+      },
+      "name": "template_storage_requires_encryption"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All biometric operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.biop": {
+      "file": "capability_contract.py",
+      "id": "capability.biop",
+      "kind": "capability",
+      "name": "Biometric Processing",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

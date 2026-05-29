@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Video Conferencing package-backed APG capability",
+    "entity_count": 0,
+    "name": "vidc",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "vidc": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_meeting_events": true,
+          "external_guest_policy_required": true,
+          "moderation_policy_required": true,
+          "require_tenant_context": true
+        },
+        "media": {
+          "captioning_supported": true,
+          "computer_vision_assist_enabled": true,
+          "recording_encryption_required": true,
+          "secure_transport_required": true
+        },
+        "meetings": {
+          "host_required": true,
+          "max_participants": 500,
+          "screen_share_policy_required": true,
+          "waiting_room_enabled": true
+        },
+        "recordings": {
+          "access_audit_required": true,
+          "recording_consent_required": true,
+          "retention_policy_required": true,
+          "transcript_export_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "vidc_meeting_room"
+        },
+        "ui": {
+          "enable_caption_workbench": true,
+          "enable_meeting_dashboard": true,
+          "enable_recording_library": true,
+          "enable_room_console": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Video Conferencing",
+      "provides": [
+        "vidc_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All video operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "host_present": false,
+              "operation": "start_meeting"
+            },
+            "description": "Meetings require an accountable host.",
+            "effect": {
+              "decision": "deny",
+              "reason": "host_required",
+              "required_action": "assign_or_wait_for_host"
+            },
+            "name": "meeting_requires_host"
+          },
+          {
+            "condition": {
+              "external_guest_present": true,
+              "guest_policy_attached": false
+            },
+            "description": "External guests require an access policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "guest_policy_required",
+              "required_action": "attach_guest_policy"
+            },
+            "name": "external_guest_requires_policy"
+          },
+          {
+            "condition": {
+              "recording_consent_recorded": false,
+              "recording_requested": true
+            },
+            "description": "Meeting recordings require consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recording_consent_required",
+              "required_action": "record_meeting_consent"
+            },
+            "name": "recording_requires_consent"
+          },
+          {
+            "condition": {
+              "recording_encrypted": false,
+              "recording_requested": true
+            },
+            "description": "Meeting recordings must be encrypted.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recording_encryption_required",
+              "required_action": "encrypt_recording"
+            },
+            "name": "recording_requires_encryption"
+          },
+          {
+            "condition": {
+              "capacity_review_recorded": false,
+              "participant_count_gt": 500
+            },
+            "description": "Large meetings require capacity and moderation review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_meeting_review_required",
+              "required_action": "review_meeting_capacity"
+            },
+            "name": "large_meeting_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All video operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "host_present": false,
+            "operation": "start_meeting"
+          },
+          "description": "Meetings require an accountable host.",
+          "effect": {
+            "decision": "deny",
+            "reason": "host_required",
+            "required_action": "assign_or_wait_for_host"
+          },
+          "name": "meeting_requires_host"
+        },
+        {
+          "condition": {
+            "external_guest_present": true,
+            "guest_policy_attached": false
+          },
+          "description": "External guests require an access policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "guest_policy_required",
+            "required_action": "attach_guest_policy"
+          },
+          "name": "external_guest_requires_policy"
+        },
+        {
+          "condition": {
+            "recording_consent_recorded": false,
+            "recording_requested": true
+          },
+          "description": "Meeting recordings require consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recording_consent_required",
+            "required_action": "record_meeting_consent"
+          },
+          "name": "recording_requires_consent"
+        },
+        {
+          "condition": {
+            "recording_encrypted": false,
+            "recording_requested": true
+          },
+          "description": "Meeting recordings must be encrypted.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recording_encryption_required",
+            "required_action": "encrypt_recording"
+          },
+          "name": "recording_requires_encryption"
+        },
+        {
+          "condition": {
+            "capacity_review_recorded": false,
+            "participant_count_gt": 500
+          },
+          "description": "Large meetings require capacity and moderation review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_meeting_review_required",
+            "required_action": "review_meeting_capacity"
+          },
+          "name": "large_meeting_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "analytics": {
+          "component": "MeetingAnalytics",
+          "permission": "vidc:view",
+          "route": "/vidc/analytics"
+        },
+        "captions": {
+          "component": "CaptionWorkbench",
+          "permission": "vidc:view",
+          "route": "/vidc/captions"
+        },
+        "dashboard": {
+          "component": "VIDCDashboard",
+          "permission": "vidc:view",
+          "route": "/vidc/dashboard"
+        },
+        "meetings": {
+          "component": "MeetingConsole",
+          "permission": "vidc:schedule",
+          "route": "/vidc/meetings"
+        },
+        "participants": {
+          "component": "ParticipantPanel",
+          "permission": "vidc:moderate",
+          "route": "/vidc/participants"
+        },
+        "recordings": {
+          "component": "RecordingLibrary",
+          "permission": "vidc:manage_recordings",
+          "route": "/vidc/recordings"
+        },
+        "rooms": {
+          "component": "RoomManager",
+          "permission": "vidc:moderate",
+          "route": "/vidc/rooms"
+        },
+        "settings": {
+          "component": "VIDCSettings",
+          "permission": "vidc:admin",
+          "route": "/vidc/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "caption_panel": {
+            "status_style": "language-chip",
+            "visual": "transcript-lines"
+          },
+          "meeting_grid": {
+            "icon": "video",
+            "risk_style": "capacity-band",
+            "status_indicator": "meeting-pill"
+          },
+          "participant_strip": {
+            "highlight": "host-chip",
+            "visual": "participant-tiles"
+          },
+          "recording_library": {
+            "status_style": "retention-chip",
+            "visual": "recording-list"
+          }
+        },
+        "name": "vidc_meeting_room",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#319795",
+          "color.danger": "#C53030",
+          "color.primary": "#2C5282",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/vidc/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "VIDCDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/vidc/dashboard",
+            "permission": "vidc:view"
+          },
+          {
+            "component": "MeetingConsole",
+            "name": "meetings",
+            "nav_group": "Meetings",
+            "path": "/vidc/meetings",
+            "permission": "vidc:schedule"
+          },
+          {
+            "component": "RoomManager",
+            "name": "rooms",
+            "nav_group": "Meetings",
+            "path": "/vidc/rooms",
+            "permission": "vidc:moderate"
+          },
+          {
+            "component": "ParticipantPanel",
+            "name": "participants",
+            "nav_group": "Meetings",
+            "path": "/vidc/participants",
+            "permission": "vidc:moderate"
+          },
+          {
+            "component": "RecordingLibrary",
+            "name": "recordings",
+            "nav_group": "Artifacts",
+            "path": "/vidc/recordings",
+            "permission": "vidc:manage_recordings"
+          },
+          {
+            "component": "CaptionWorkbench",
+            "name": "captions",
+            "nav_group": "Artifacts",
+            "path": "/vidc/captions",
+            "permission": "vidc:view"
+          },
+          {
+            "component": "MeetingAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/vidc/analytics",
+            "permission": "vidc:view"
+          },
+          {
+            "component": "VIDCSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/vidc/settings",
+            "permission": "vidc:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "vidc": []
+    }
+  },
+  "contracts": {
+    "vidc": {
+      "configuration": {
+        "governance": {
+          "audit_meeting_events": true,
+          "external_guest_policy_required": true,
+          "moderation_policy_required": true,
+          "require_tenant_context": true
+        },
+        "media": {
+          "captioning_supported": true,
+          "computer_vision_assist_enabled": true,
+          "recording_encryption_required": true,
+          "secure_transport_required": true
+        },
+        "meetings": {
+          "host_required": true,
+          "max_participants": 500,
+          "screen_share_policy_required": true,
+          "waiting_room_enabled": true
+        },
+        "recordings": {
+          "access_audit_required": true,
+          "recording_consent_required": true,
+          "retention_policy_required": true,
+          "transcript_export_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "vidc_meeting_room"
+        },
+        "ui": {
+          "enable_caption_workbench": true,
+          "enable_meeting_dashboard": true,
+          "enable_recording_library": true,
+          "enable_room_console": true
+        }
+      },
+      "id": "vidc",
+      "provides": [
+        "vidc_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "vidc": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "external_guest_requires_policy": {
+      "condition": {
+        "external_guest_present": true,
+        "guest_policy_attached": false
+      },
+      "description": "External guests require an access policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "guest_policy_required",
+        "required_action": "attach_guest_policy"
+      },
+      "name": "external_guest_requires_policy"
+    },
+    "large_meeting_requires_review": {
+      "condition": {
+        "capacity_review_recorded": false,
+        "participant_count_gt": 500
+      },
+      "description": "Large meetings require capacity and moderation review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_meeting_review_required",
+        "required_action": "review_meeting_capacity"
+      },
+      "name": "large_meeting_requires_review"
+    },
+    "meeting_requires_host": {
+      "condition": {
+        "host_present": false,
+        "operation": "start_meeting"
+      },
+      "description": "Meetings require an accountable host.",
+      "effect": {
+        "decision": "deny",
+        "reason": "host_required",
+        "required_action": "assign_or_wait_for_host"
+      },
+      "name": "meeting_requires_host"
+    },
+    "recording_requires_consent": {
+      "condition": {
+        "recording_consent_recorded": false,
+        "recording_requested": true
+      },
+      "description": "Meeting recordings require consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recording_consent_required",
+        "required_action": "record_meeting_consent"
+      },
+      "name": "recording_requires_consent"
+    },
+    "recording_requires_encryption": {
+      "condition": {
+        "recording_encrypted": false,
+        "recording_requested": true
+      },
+      "description": "Meeting recordings must be encrypted.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recording_encryption_required",
+        "required_action": "encrypt_recording"
+      },
+      "name": "recording_requires_encryption"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All video operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.vidc": {
+      "file": "capability_contract.py",
+      "id": "capability.vidc",
+      "kind": "capability",
+      "name": "Video Conferencing",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

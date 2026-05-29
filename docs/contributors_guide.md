@@ -97,7 +97,7 @@ Example work packets:
 | Packet | Files expected | Verification |
 | --- | --- | --- |
 | Add one generator route to expose a semantic-model section | `compiler/code_generator.py`, focused generator test, one example output if needed | compile representative example, smoke test |
-| Make one capability package publish-plan ready | one `capabilities/<domain>/<code>/` tree | package tests, capability audit, publish-plan |
+| Make one capability package publish-plan ready | one `capabilities/<domain>/<code>/` tree | materialize-packages, package tests, capability audit, publish-plan |
 | Add one author-facing APG construct | grammar, AST, semantic model, docs, fixture | parser/semantic tests, compile example |
 | Improve one onboarding path | `docs/*.md`, `docs/progress_log.md` | docs audit and diff check |
 
@@ -311,7 +311,7 @@ every contribution, especially when compute or battery is constrained.
 | Semantic model | semantic model fixture audit or focused semantic tests |
 | Generator | representative `apg compile ... --verify` and generated smoke test |
 | Capability contract | `apg capabilities validate-contracts --json`, `apg capabilities audit --json`, and focused contract tests |
-| Capability scaffold/package | scaffold, publish-plan, publish-apply dry run, focused package tests |
+| Capability scaffold/package | scaffold or materialize-packages, publish-plan, publish-apply dry run, focused package tests |
 | Repository hygiene | `./.venv/bin/apg hygiene audit --json` and `./.venv/bin/python -m pytest -q tests/test_repository_hygiene.py` |
 
 Always inspect command output before claiming a pass.
@@ -330,6 +330,7 @@ Then iterate:
 ./.venv/bin/python -m pytest -q capabilities/common/demo/tests
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --json
+./.venv/bin/apg capabilities materialize-packages --capability common_demo --json
 ./.venv/bin/apg capabilities inspect common_demo --json
 ./.venv/bin/apg capabilities evaluate-rules common_demo --context-json '{}' --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/demo --json
@@ -376,6 +377,7 @@ Minimum capacity evidence:
 ./.venv/bin/python /tmp/apg-capacity/smoke_test.py
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --json
+./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ```
 
 For numbered examples or compiler-facing capacity work, also run:

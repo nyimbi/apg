@@ -1,0 +1,559 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Platform Foundation package-backed APG capability",
+    "entity_count": 0,
+    "name": "plfd",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "plfd": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "baselines": {
+          "audit_baseline_required": true,
+          "auth_baseline_required": true,
+          "configuration_baseline_required": true,
+          "tenant_baseline_required": true
+        },
+        "foundation": {
+          "dependency_map_required": true,
+          "readiness_score_required": true,
+          "service_owner_required": true,
+          "tier_classification_required": true
+        },
+        "governance": {
+          "audit_foundation_changes": true,
+          "broad_change_review_required": true,
+          "require_tenant_context": true,
+          "security_review_required": true
+        },
+        "operations": {
+          "change_window_required": true,
+          "health_gate_required": true,
+          "monitoring_required": true,
+          "rollback_plan_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "plfd_platform_foundation"
+        },
+        "ui": {
+          "enable_baseline_manager": true,
+          "enable_dependency_map": true,
+          "enable_foundation_dashboard": true,
+          "enable_readiness_gate": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Platform Foundation",
+      "provides": [
+        "plfd_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All platform-foundation operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "register_foundation_service",
+              "service_owner_assigned": false
+            },
+            "description": "Foundation services require owners.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_owner_required",
+              "required_action": "assign_service_owner"
+            },
+            "name": "foundation_service_requires_owner"
+          },
+          {
+            "condition": {
+              "dependencies_healthy": false,
+              "operation": "approve_platform_change"
+            },
+            "description": "Foundation changes require healthy dependencies.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dependency_health_required",
+              "required_action": "restore_dependency_health"
+            },
+            "name": "dependency_health_required"
+          },
+          {
+            "condition": {
+              "configuration_baseline_present": false
+            },
+            "description": "Foundation services require configuration baselines.",
+            "effect": {
+              "decision": "deny",
+              "reason": "configuration_baseline_required",
+              "required_action": "attach_configuration_baseline"
+            },
+            "name": "configuration_baseline_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "approve_platform_change"
+            },
+            "description": "Platform foundation changes require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "platform_change_approval_required",
+              "required_action": "record_platform_approval"
+            },
+            "name": "platform_change_requires_approval"
+          },
+          {
+            "condition": {
+              "affected_capability_count_gt": 10,
+              "broad_review_recorded": false
+            },
+            "description": "Broad platform changes require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "broad_platform_review_required",
+              "required_action": "review_platform_change"
+            },
+            "name": "broad_platform_change_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All platform-foundation operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "register_foundation_service",
+            "service_owner_assigned": false
+          },
+          "description": "Foundation services require owners.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_owner_required",
+            "required_action": "assign_service_owner"
+          },
+          "name": "foundation_service_requires_owner"
+        },
+        {
+          "condition": {
+            "dependencies_healthy": false,
+            "operation": "approve_platform_change"
+          },
+          "description": "Foundation changes require healthy dependencies.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dependency_health_required",
+            "required_action": "restore_dependency_health"
+          },
+          "name": "dependency_health_required"
+        },
+        {
+          "condition": {
+            "configuration_baseline_present": false
+          },
+          "description": "Foundation services require configuration baselines.",
+          "effect": {
+            "decision": "deny",
+            "reason": "configuration_baseline_required",
+            "required_action": "attach_configuration_baseline"
+          },
+          "name": "configuration_baseline_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "approve_platform_change"
+          },
+          "description": "Platform foundation changes require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "platform_change_approval_required",
+            "required_action": "record_platform_approval"
+          },
+          "name": "platform_change_requires_approval"
+        },
+        {
+          "condition": {
+            "affected_capability_count_gt": 10,
+            "broad_review_recorded": false
+          },
+          "description": "Broad platform changes require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "broad_platform_review_required",
+            "required_action": "review_platform_change"
+          },
+          "name": "broad_platform_change_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "baselines": {
+          "component": "BaselineManager",
+          "permission": "plfd:manage_baselines",
+          "route": "/plfd/baselines"
+        },
+        "changes": {
+          "component": "PlatformChangeQueue",
+          "permission": "plfd:approve_changes",
+          "route": "/plfd/changes"
+        },
+        "dashboard": {
+          "component": "PLFDDashboard",
+          "permission": "plfd:view",
+          "route": "/plfd/dashboard"
+        },
+        "dependencies": {
+          "component": "DependencyMap",
+          "permission": "plfd:view",
+          "route": "/plfd/dependencies"
+        },
+        "governance": {
+          "component": "FoundationGovernance",
+          "permission": "plfd:admin",
+          "route": "/plfd/governance"
+        },
+        "readiness": {
+          "component": "ReadinessGate",
+          "permission": "plfd:view",
+          "route": "/plfd/readiness"
+        },
+        "services": {
+          "component": "FoundationServices",
+          "permission": "plfd:manage_services",
+          "route": "/plfd/services"
+        },
+        "settings": {
+          "component": "PLFDSettings",
+          "permission": "plfd:admin",
+          "route": "/plfd/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "baseline_manager": {
+            "status_style": "baseline-chip",
+            "visual": "policy-grid"
+          },
+          "change_queue": {
+            "status_style": "risk-chip",
+            "visual": "approval-lanes"
+          },
+          "dependency_map": {
+            "highlight": "health-chip",
+            "visual": "service-graph"
+          },
+          "foundation_card": {
+            "icon": "layers",
+            "risk_style": "readiness-band",
+            "status_indicator": "tier-pill"
+          }
+        },
+        "name": "plfd_platform_foundation",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#38A169",
+          "color.danger": "#C53030",
+          "color.primary": "#2A4365",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/plfd/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "PLFDDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/plfd/dashboard",
+            "permission": "plfd:view"
+          },
+          {
+            "component": "FoundationServices",
+            "name": "services",
+            "nav_group": "Services",
+            "path": "/plfd/services",
+            "permission": "plfd:manage_services"
+          },
+          {
+            "component": "DependencyMap",
+            "name": "dependencies",
+            "nav_group": "Readiness",
+            "path": "/plfd/dependencies",
+            "permission": "plfd:view"
+          },
+          {
+            "component": "BaselineManager",
+            "name": "baselines",
+            "nav_group": "Baselines",
+            "path": "/plfd/baselines",
+            "permission": "plfd:manage_baselines"
+          },
+          {
+            "component": "ReadinessGate",
+            "name": "readiness",
+            "nav_group": "Readiness",
+            "path": "/plfd/readiness",
+            "permission": "plfd:view"
+          },
+          {
+            "component": "PlatformChangeQueue",
+            "name": "changes",
+            "nav_group": "Governance",
+            "path": "/plfd/changes",
+            "permission": "plfd:approve_changes"
+          },
+          {
+            "component": "FoundationGovernance",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/plfd/governance",
+            "permission": "plfd:admin"
+          },
+          {
+            "component": "PLFDSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/plfd/settings",
+            "permission": "plfd:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "plfd": []
+    }
+  },
+  "contracts": {
+    "plfd": {
+      "configuration": {
+        "baselines": {
+          "audit_baseline_required": true,
+          "auth_baseline_required": true,
+          "configuration_baseline_required": true,
+          "tenant_baseline_required": true
+        },
+        "foundation": {
+          "dependency_map_required": true,
+          "readiness_score_required": true,
+          "service_owner_required": true,
+          "tier_classification_required": true
+        },
+        "governance": {
+          "audit_foundation_changes": true,
+          "broad_change_review_required": true,
+          "require_tenant_context": true,
+          "security_review_required": true
+        },
+        "operations": {
+          "change_window_required": true,
+          "health_gate_required": true,
+          "monitoring_required": true,
+          "rollback_plan_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "plfd_platform_foundation"
+        },
+        "ui": {
+          "enable_baseline_manager": true,
+          "enable_dependency_map": true,
+          "enable_foundation_dashboard": true,
+          "enable_readiness_gate": true
+        }
+      },
+      "id": "plfd",
+      "provides": [
+        "plfd_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "plfd": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "broad_platform_change_requires_review": {
+      "condition": {
+        "affected_capability_count_gt": 10,
+        "broad_review_recorded": false
+      },
+      "description": "Broad platform changes require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "broad_platform_review_required",
+        "required_action": "review_platform_change"
+      },
+      "name": "broad_platform_change_requires_review"
+    },
+    "configuration_baseline_required": {
+      "condition": {
+        "configuration_baseline_present": false
+      },
+      "description": "Foundation services require configuration baselines.",
+      "effect": {
+        "decision": "deny",
+        "reason": "configuration_baseline_required",
+        "required_action": "attach_configuration_baseline"
+      },
+      "name": "configuration_baseline_required"
+    },
+    "dependency_health_required": {
+      "condition": {
+        "dependencies_healthy": false,
+        "operation": "approve_platform_change"
+      },
+      "description": "Foundation changes require healthy dependencies.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dependency_health_required",
+        "required_action": "restore_dependency_health"
+      },
+      "name": "dependency_health_required"
+    },
+    "foundation_service_requires_owner": {
+      "condition": {
+        "operation": "register_foundation_service",
+        "service_owner_assigned": false
+      },
+      "description": "Foundation services require owners.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_owner_required",
+        "required_action": "assign_service_owner"
+      },
+      "name": "foundation_service_requires_owner"
+    },
+    "platform_change_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "approve_platform_change"
+      },
+      "description": "Platform foundation changes require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "platform_change_approval_required",
+        "required_action": "record_platform_approval"
+      },
+      "name": "platform_change_requires_approval"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All platform-foundation operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.plfd": {
+      "file": "capability_contract.py",
+      "id": "capability.plfd",
+      "kind": "capability",
+      "name": "Platform Foundation",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

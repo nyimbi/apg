@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "User Management package-backed APG capability",
+    "entity_count": 0,
+    "name": "usrm",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "usrm": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "access": {
+          "least_privilege_policy_required": true,
+          "periodic_access_review_required": true,
+          "privileged_mfa_required": true,
+          "role_assignment_audit_required": true
+        },
+        "governance": {
+          "audit_user_changes": true,
+          "identity_federation_supported": true,
+          "privacy_preference_sync_required": true,
+          "require_tenant_context": true
+        },
+        "lifecycle": {
+          "bulk_action_review_threshold": 25,
+          "deprovision_access_revocation_required": true,
+          "invite_consent_notice_required": true,
+          "manager_approval_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "usrm_user_lifecycle"
+        },
+        "ui": {
+          "enable_access_review": true,
+          "enable_lifecycle_queue": true,
+          "enable_privacy_preferences": true,
+          "enable_user_directory": true
+        },
+        "users": {
+          "profile_validation_required": true,
+          "status_history_enabled": true,
+          "unique_identity_required": true,
+          "user_owner_required": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "User Management",
+      "provides": [
+        "usrm_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All user-management operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "create_user",
+              "unique_identity_present": false
+            },
+            "description": "Users require a unique identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unique_identity_required",
+              "required_action": "attach_unique_identity"
+            },
+            "name": "user_requires_identity"
+          },
+          {
+            "condition": {
+              "consent_notice_attached": false,
+              "operation": "invite_user"
+            },
+            "description": "User invitations require a privacy/consent notice.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_notice_required",
+              "required_action": "attach_consent_notice"
+            },
+            "name": "invite_requires_consent_notice"
+          },
+          {
+            "condition": {
+              "mfa_enabled": false,
+              "privileged_user": true
+            },
+            "description": "Privileged users require MFA.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mfa_required",
+              "required_action": "enable_mfa"
+            },
+            "name": "privileged_user_requires_mfa"
+          },
+          {
+            "condition": {
+              "access_revoked": false,
+              "operation": "deprovision_user"
+            },
+            "description": "Deprovisioning requires access revocation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_revocation_required",
+              "required_action": "revoke_user_access"
+            },
+            "name": "deprovision_requires_access_revocation"
+          },
+          {
+            "condition": {
+              "affected_user_count_gt": 25,
+              "bulk_review_recorded": false
+            },
+            "description": "Bulk user actions require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "bulk_user_review_required",
+              "required_action": "review_bulk_user_action"
+            },
+            "name": "bulk_user_action_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All user-management operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "create_user",
+            "unique_identity_present": false
+          },
+          "description": "Users require a unique identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unique_identity_required",
+            "required_action": "attach_unique_identity"
+          },
+          "name": "user_requires_identity"
+        },
+        {
+          "condition": {
+            "consent_notice_attached": false,
+            "operation": "invite_user"
+          },
+          "description": "User invitations require a privacy/consent notice.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_notice_required",
+            "required_action": "attach_consent_notice"
+          },
+          "name": "invite_requires_consent_notice"
+        },
+        {
+          "condition": {
+            "mfa_enabled": false,
+            "privileged_user": true
+          },
+          "description": "Privileged users require MFA.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mfa_required",
+            "required_action": "enable_mfa"
+          },
+          "name": "privileged_user_requires_mfa"
+        },
+        {
+          "condition": {
+            "access_revoked": false,
+            "operation": "deprovision_user"
+          },
+          "description": "Deprovisioning requires access revocation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_revocation_required",
+            "required_action": "revoke_user_access"
+          },
+          "name": "deprovision_requires_access_revocation"
+        },
+        {
+          "condition": {
+            "affected_user_count_gt": 25,
+            "bulk_review_recorded": false
+          },
+          "description": "Bulk user actions require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "bulk_user_review_required",
+            "required_action": "review_bulk_user_action"
+          },
+          "name": "bulk_user_action_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "access": {
+          "component": "AccessReview",
+          "permission": "usrm:review_access",
+          "route": "/usrm/access"
+        },
+        "dashboard": {
+          "component": "USRMDashboard",
+          "permission": "usrm:view",
+          "route": "/usrm/dashboard"
+        },
+        "deprovisioning": {
+          "component": "DeprovisioningCenter",
+          "permission": "usrm:deprovision",
+          "route": "/usrm/deprovisioning"
+        },
+        "lifecycle": {
+          "component": "LifecycleQueue",
+          "permission": "usrm:manage_users",
+          "route": "/usrm/lifecycle"
+        },
+        "privacy": {
+          "component": "PrivacyPreferences",
+          "permission": "usrm:view",
+          "route": "/usrm/privacy"
+        },
+        "profiles": {
+          "component": "ProfileManager",
+          "permission": "usrm:manage_users",
+          "route": "/usrm/profiles"
+        },
+        "settings": {
+          "component": "USRMSettings",
+          "permission": "usrm:admin",
+          "route": "/usrm/settings"
+        },
+        "users": {
+          "component": "UserDirectory",
+          "permission": "usrm:manage_users",
+          "route": "/usrm/users"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "access_review": {
+            "status_style": "mfa-chip",
+            "visual": "entitlement-matrix"
+          },
+          "lifecycle_queue": {
+            "highlight": "stage-chip",
+            "visual": "approval-list"
+          },
+          "privacy_panel": {
+            "status_style": "consent-chip",
+            "visual": "preference-list"
+          },
+          "user_card": {
+            "icon": "user-cog",
+            "risk_style": "access-band",
+            "status_indicator": "status-pill"
+          }
+        },
+        "name": "usrm_user_lifecycle",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#38A169",
+          "color.danger": "#C53030",
+          "color.primary": "#2B4C7E",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/usrm/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "USRMDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/usrm/dashboard",
+            "permission": "usrm:view"
+          },
+          {
+            "component": "UserDirectory",
+            "name": "users",
+            "nav_group": "Users",
+            "path": "/usrm/users",
+            "permission": "usrm:manage_users"
+          },
+          {
+            "component": "ProfileManager",
+            "name": "profiles",
+            "nav_group": "Users",
+            "path": "/usrm/profiles",
+            "permission": "usrm:manage_users"
+          },
+          {
+            "component": "LifecycleQueue",
+            "name": "lifecycle",
+            "nav_group": "Lifecycle",
+            "path": "/usrm/lifecycle",
+            "permission": "usrm:manage_users"
+          },
+          {
+            "component": "AccessReview",
+            "name": "access",
+            "nav_group": "Access",
+            "path": "/usrm/access",
+            "permission": "usrm:review_access"
+          },
+          {
+            "component": "PrivacyPreferences",
+            "name": "privacy",
+            "nav_group": "Privacy",
+            "path": "/usrm/privacy",
+            "permission": "usrm:view"
+          },
+          {
+            "component": "DeprovisioningCenter",
+            "name": "deprovisioning",
+            "nav_group": "Lifecycle",
+            "path": "/usrm/deprovisioning",
+            "permission": "usrm:deprovision"
+          },
+          {
+            "component": "USRMSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/usrm/settings",
+            "permission": "usrm:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "usrm": []
+    }
+  },
+  "contracts": {
+    "usrm": {
+      "configuration": {
+        "access": {
+          "least_privilege_policy_required": true,
+          "periodic_access_review_required": true,
+          "privileged_mfa_required": true,
+          "role_assignment_audit_required": true
+        },
+        "governance": {
+          "audit_user_changes": true,
+          "identity_federation_supported": true,
+          "privacy_preference_sync_required": true,
+          "require_tenant_context": true
+        },
+        "lifecycle": {
+          "bulk_action_review_threshold": 25,
+          "deprovision_access_revocation_required": true,
+          "invite_consent_notice_required": true,
+          "manager_approval_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "usrm_user_lifecycle"
+        },
+        "ui": {
+          "enable_access_review": true,
+          "enable_lifecycle_queue": true,
+          "enable_privacy_preferences": true,
+          "enable_user_directory": true
+        },
+        "users": {
+          "profile_validation_required": true,
+          "status_history_enabled": true,
+          "unique_identity_required": true,
+          "user_owner_required": true
+        }
+      },
+      "id": "usrm",
+      "provides": [
+        "usrm_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "usrm": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "bulk_user_action_requires_review": {
+      "condition": {
+        "affected_user_count_gt": 25,
+        "bulk_review_recorded": false
+      },
+      "description": "Bulk user actions require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "bulk_user_review_required",
+        "required_action": "review_bulk_user_action"
+      },
+      "name": "bulk_user_action_requires_review"
+    },
+    "deprovision_requires_access_revocation": {
+      "condition": {
+        "access_revoked": false,
+        "operation": "deprovision_user"
+      },
+      "description": "Deprovisioning requires access revocation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_revocation_required",
+        "required_action": "revoke_user_access"
+      },
+      "name": "deprovision_requires_access_revocation"
+    },
+    "invite_requires_consent_notice": {
+      "condition": {
+        "consent_notice_attached": false,
+        "operation": "invite_user"
+      },
+      "description": "User invitations require a privacy/consent notice.",
+      "effect": {
+        "decision": "deny",
+        "reason": "consent_notice_required",
+        "required_action": "attach_consent_notice"
+      },
+      "name": "invite_requires_consent_notice"
+    },
+    "privileged_user_requires_mfa": {
+      "condition": {
+        "mfa_enabled": false,
+        "privileged_user": true
+      },
+      "description": "Privileged users require MFA.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mfa_required",
+        "required_action": "enable_mfa"
+      },
+      "name": "privileged_user_requires_mfa"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All user-management operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "user_requires_identity": {
+      "condition": {
+        "operation": "create_user",
+        "unique_identity_present": false
+      },
+      "description": "Users require a unique identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unique_identity_required",
+        "required_action": "attach_unique_identity"
+      },
+      "name": "user_requires_identity"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.usrm": {
+      "file": "capability_contract.py",
+      "id": "capability.usrm",
+      "kind": "capability",
+      "name": "User Management",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

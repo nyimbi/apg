@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Accessibility Services package-backed APG capability",
+    "entity_count": 0,
+    "name": "accs",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "accs": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "assistive": {
+          "keyboard_navigation_required": true,
+          "media_captions_required": true,
+          "screen_reader_preview_enabled": true,
+          "semantic_labels_required": true
+        },
+        "audits": {
+          "audit_standard_required": true,
+          "automated_checks_enabled": true,
+          "critical_issue_review_required": true,
+          "published_ui_contrast_required": true
+        },
+        "governance": {
+          "audit_change_logging": true,
+          "compliance_exports_enabled": true,
+          "remediation_owner_required": true,
+          "require_tenant_context": true
+        },
+        "standards": {
+          "default_standard": "WCAG-2.2-AA",
+          "localized_guidance_enabled": true,
+          "policy_versioning_enabled": true,
+          "standard_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "accs_accessibility_ops"
+        },
+        "ui": {
+          "enable_assistive_preview": true,
+          "enable_audit_console": true,
+          "enable_findings_board": true,
+          "enable_remediation_queue": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Accessibility Services",
+      "provides": [
+        "accs_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All accessibility operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "start_audit",
+              "standard_selected": false
+            },
+            "description": "Accessibility audits require a selected standard.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_standard_required",
+              "required_action": "select_accessibility_standard"
+            },
+            "name": "audit_requires_standard"
+          },
+          {
+            "condition": {
+              "remediation_owner_assigned": false,
+              "violation_detected": true
+            },
+            "description": "Accessibility findings require a remediation owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "remediation_owner_required",
+              "required_action": "assign_remediation_owner"
+            },
+            "name": "violation_requires_remediation_owner"
+          },
+          {
+            "condition": {
+              "contrast_passed": false,
+              "published_ui": true
+            },
+            "description": "Published UI requires contrast validation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contrast_validation_required",
+              "required_action": "fix_contrast"
+            },
+            "name": "published_ui_requires_contrast"
+          },
+          {
+            "condition": {
+              "captions_available": false,
+              "media_content_present": true
+            },
+            "description": "Media content requires captions or transcripts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "captions_required",
+              "required_action": "add_captions_or_transcript"
+            },
+            "name": "media_requires_captions"
+          },
+          {
+            "condition": {
+              "issue_severity": "critical",
+              "review_recorded": false
+            },
+            "description": "Critical accessibility issues require formal review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "critical_accessibility_review_required",
+              "required_action": "review_critical_issue"
+            },
+            "name": "critical_issue_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All accessibility operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "start_audit",
+            "standard_selected": false
+          },
+          "description": "Accessibility audits require a selected standard.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_standard_required",
+            "required_action": "select_accessibility_standard"
+          },
+          "name": "audit_requires_standard"
+        },
+        {
+          "condition": {
+            "remediation_owner_assigned": false,
+            "violation_detected": true
+          },
+          "description": "Accessibility findings require a remediation owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "remediation_owner_required",
+            "required_action": "assign_remediation_owner"
+          },
+          "name": "violation_requires_remediation_owner"
+        },
+        {
+          "condition": {
+            "contrast_passed": false,
+            "published_ui": true
+          },
+          "description": "Published UI requires contrast validation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contrast_validation_required",
+            "required_action": "fix_contrast"
+          },
+          "name": "published_ui_requires_contrast"
+        },
+        {
+          "condition": {
+            "captions_available": false,
+            "media_content_present": true
+          },
+          "description": "Media content requires captions or transcripts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "captions_required",
+            "required_action": "add_captions_or_transcript"
+          },
+          "name": "media_requires_captions"
+        },
+        {
+          "condition": {
+            "issue_severity": "critical",
+            "review_recorded": false
+          },
+          "description": "Critical accessibility issues require formal review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "critical_accessibility_review_required",
+            "required_action": "review_critical_issue"
+          },
+          "name": "critical_issue_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "assistive": {
+          "component": "AssistivePreview",
+          "permission": "accs:audit",
+          "route": "/accs/assistive"
+        },
+        "audits": {
+          "component": "AuditConsole",
+          "permission": "accs:audit",
+          "route": "/accs/audits"
+        },
+        "compliance": {
+          "component": "AccessibilityCompliance",
+          "permission": "accs:manage_standards",
+          "route": "/accs/compliance"
+        },
+        "dashboard": {
+          "component": "ACCSDashboard",
+          "permission": "accs:view",
+          "route": "/accs/dashboard"
+        },
+        "findings": {
+          "component": "FindingsBoard",
+          "permission": "accs:view",
+          "route": "/accs/findings"
+        },
+        "media": {
+          "component": "MediaAccessibility",
+          "permission": "accs:remediate",
+          "route": "/accs/media"
+        },
+        "remediation": {
+          "component": "RemediationQueue",
+          "permission": "accs:remediate",
+          "route": "/accs/remediation"
+        },
+        "settings": {
+          "component": "ACCSSettings",
+          "permission": "accs:admin",
+          "route": "/accs/settings"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "assistive_preview": {
+            "status_style": "label-chip",
+            "visual": "semantic-tree"
+          },
+          "audit_score": {
+            "icon": "badge-check",
+            "risk_style": "severity-band",
+            "status_indicator": "score-pill"
+          },
+          "compliance_panel": {
+            "status_style": "evidence-chip",
+            "visual": "standard-matrix"
+          },
+          "finding_board": {
+            "highlight": "blocked-chip",
+            "visual": "kanban-list"
+          }
+        },
+        "name": "accs_accessibility_ops",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#3182CE",
+          "color.danger": "#C53030",
+          "color.primary": "#22543D",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/accs/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ACCSDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/accs/dashboard",
+            "permission": "accs:view"
+          },
+          {
+            "component": "AuditConsole",
+            "name": "audits",
+            "nav_group": "Audits",
+            "path": "/accs/audits",
+            "permission": "accs:audit"
+          },
+          {
+            "component": "FindingsBoard",
+            "name": "findings",
+            "nav_group": "Audits",
+            "path": "/accs/findings",
+            "permission": "accs:view"
+          },
+          {
+            "component": "RemediationQueue",
+            "name": "remediation",
+            "nav_group": "Remediation",
+            "path": "/accs/remediation",
+            "permission": "accs:remediate"
+          },
+          {
+            "component": "AssistivePreview",
+            "name": "assistive",
+            "nav_group": "Assistive",
+            "path": "/accs/assistive",
+            "permission": "accs:audit"
+          },
+          {
+            "component": "MediaAccessibility",
+            "name": "media",
+            "nav_group": "Content",
+            "path": "/accs/media",
+            "permission": "accs:remediate"
+          },
+          {
+            "component": "AccessibilityCompliance",
+            "name": "compliance",
+            "nav_group": "Governance",
+            "path": "/accs/compliance",
+            "permission": "accs:manage_standards"
+          },
+          {
+            "component": "ACCSSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/accs/settings",
+            "permission": "accs:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "accs": []
+    }
+  },
+  "contracts": {
+    "accs": {
+      "configuration": {
+        "assistive": {
+          "keyboard_navigation_required": true,
+          "media_captions_required": true,
+          "screen_reader_preview_enabled": true,
+          "semantic_labels_required": true
+        },
+        "audits": {
+          "audit_standard_required": true,
+          "automated_checks_enabled": true,
+          "critical_issue_review_required": true,
+          "published_ui_contrast_required": true
+        },
+        "governance": {
+          "audit_change_logging": true,
+          "compliance_exports_enabled": true,
+          "remediation_owner_required": true,
+          "require_tenant_context": true
+        },
+        "standards": {
+          "default_standard": "WCAG-2.2-AA",
+          "localized_guidance_enabled": true,
+          "policy_versioning_enabled": true,
+          "standard_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "accs_accessibility_ops"
+        },
+        "ui": {
+          "enable_assistive_preview": true,
+          "enable_audit_console": true,
+          "enable_findings_board": true,
+          "enable_remediation_queue": true
+        }
+      },
+      "id": "accs",
+      "provides": [
+        "accs_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "accs": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "audit_requires_standard": {
+      "condition": {
+        "operation": "start_audit",
+        "standard_selected": false
+      },
+      "description": "Accessibility audits require a selected standard.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_standard_required",
+        "required_action": "select_accessibility_standard"
+      },
+      "name": "audit_requires_standard"
+    },
+    "critical_issue_requires_review": {
+      "condition": {
+        "issue_severity": "critical",
+        "review_recorded": false
+      },
+      "description": "Critical accessibility issues require formal review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "critical_accessibility_review_required",
+        "required_action": "review_critical_issue"
+      },
+      "name": "critical_issue_requires_review"
+    },
+    "media_requires_captions": {
+      "condition": {
+        "captions_available": false,
+        "media_content_present": true
+      },
+      "description": "Media content requires captions or transcripts.",
+      "effect": {
+        "decision": "deny",
+        "reason": "captions_required",
+        "required_action": "add_captions_or_transcript"
+      },
+      "name": "media_requires_captions"
+    },
+    "published_ui_requires_contrast": {
+      "condition": {
+        "contrast_passed": false,
+        "published_ui": true
+      },
+      "description": "Published UI requires contrast validation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "contrast_validation_required",
+        "required_action": "fix_contrast"
+      },
+      "name": "published_ui_requires_contrast"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All accessibility operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "violation_requires_remediation_owner": {
+      "condition": {
+        "remediation_owner_assigned": false,
+        "violation_detected": true
+      },
+      "description": "Accessibility findings require a remediation owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "remediation_owner_required",
+        "required_action": "assign_remediation_owner"
+      },
+      "name": "violation_requires_remediation_owner"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.accs": {
+      "file": "capability_contract.py",
+      "id": "capability.accs",
+      "kind": "capability",
+      "name": "Accessibility Services",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

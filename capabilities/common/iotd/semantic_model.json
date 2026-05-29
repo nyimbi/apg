@@ -1,0 +1,562 @@
+{
+  "agents": {},
+  "app": {
+    "description": "IoT Device Integration package-backed APG capability",
+    "entity_count": 0,
+    "name": "iotd",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "iotd": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "commands": {
+          "ack_timeout_seconds": 30,
+          "command_approval_required": true,
+          "command_audit_required": true,
+          "dangerous_command_review_required": true
+        },
+        "devices": {
+          "certificate_rotation_days": 90,
+          "device_identity_required": true,
+          "fleet_grouping_enabled": true,
+          "owner_required": true
+        },
+        "governance": {
+          "device_rbac_required": true,
+          "firmware_signature_required": true,
+          "require_tenant_context": true,
+          "stale_device_review_days": 30
+        },
+        "telemetry": {
+          "encryption_required": true,
+          "event_bus_required": true,
+          "offline_buffering_enabled": true,
+          "schema_validation_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "iotd_device_ops"
+        },
+        "ui": {
+          "enable_command_center": true,
+          "enable_device_console": true,
+          "enable_firmware_manager": true,
+          "enable_telemetry_monitor": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "IoT Device Integration",
+      "provides": [
+        "iotd_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All IoT operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "device_identity_present": false,
+              "operation": "register_device"
+            },
+            "description": "Devices require provisioned identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_identity_required",
+              "required_action": "provision_device_identity"
+            },
+            "name": "device_requires_identity"
+          },
+          {
+            "condition": {
+              "encryption_applied": false,
+              "operation": "ingest_telemetry"
+            },
+            "description": "Telemetry ingestion requires encryption.",
+            "effect": {
+              "decision": "deny",
+              "reason": "telemetry_encryption_required",
+              "required_action": "encrypt_telemetry"
+            },
+            "name": "telemetry_requires_encryption"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "dangerous_command": true
+            },
+            "description": "Dangerous device commands require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "command_approval_required",
+              "required_action": "record_command_approval"
+            },
+            "name": "dangerous_command_requires_approval"
+          },
+          {
+            "condition": {
+              "firmware_signature_verified": false,
+              "operation": "deploy_firmware"
+            },
+            "description": "Firmware updates require signed artifacts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "firmware_signature_required",
+              "required_action": "verify_firmware_signature"
+            },
+            "name": "firmware_requires_signature"
+          },
+          {
+            "condition": {
+              "last_seen_days_gt": 30,
+              "stale_device_reviewed": false
+            },
+            "description": "Stale devices require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "stale_device_review_required",
+              "required_action": "review_device_status"
+            },
+            "name": "stale_device_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All IoT operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "device_identity_present": false,
+            "operation": "register_device"
+          },
+          "description": "Devices require provisioned identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_identity_required",
+            "required_action": "provision_device_identity"
+          },
+          "name": "device_requires_identity"
+        },
+        {
+          "condition": {
+            "encryption_applied": false,
+            "operation": "ingest_telemetry"
+          },
+          "description": "Telemetry ingestion requires encryption.",
+          "effect": {
+            "decision": "deny",
+            "reason": "telemetry_encryption_required",
+            "required_action": "encrypt_telemetry"
+          },
+          "name": "telemetry_requires_encryption"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "dangerous_command": true
+          },
+          "description": "Dangerous device commands require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "command_approval_required",
+            "required_action": "record_command_approval"
+          },
+          "name": "dangerous_command_requires_approval"
+        },
+        {
+          "condition": {
+            "firmware_signature_verified": false,
+            "operation": "deploy_firmware"
+          },
+          "description": "Firmware updates require signed artifacts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "firmware_signature_required",
+            "required_action": "verify_firmware_signature"
+          },
+          "name": "firmware_requires_signature"
+        },
+        {
+          "condition": {
+            "last_seen_days_gt": 30,
+            "stale_device_reviewed": false
+          },
+          "description": "Stale devices require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "stale_device_review_required",
+            "required_action": "review_device_status"
+          },
+          "name": "stale_device_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "commands": {
+          "component": "CommandCenter",
+          "permission": "iotd:command",
+          "route": "/iotd/commands"
+        },
+        "dashboard": {
+          "component": "IOTDDashboard",
+          "permission": "iotd:view",
+          "route": "/iotd/dashboard"
+        },
+        "devices": {
+          "component": "DeviceRegistry",
+          "permission": "iotd:register",
+          "route": "/iotd/devices"
+        },
+        "firmware": {
+          "component": "FirmwareManager",
+          "permission": "iotd:manage_firmware",
+          "route": "/iotd/firmware"
+        },
+        "rules": {
+          "component": "DeviceRules",
+          "permission": "iotd:admin",
+          "route": "/iotd/rules"
+        },
+        "security": {
+          "component": "DeviceSecurity",
+          "permission": "iotd:admin",
+          "route": "/iotd/security"
+        },
+        "settings": {
+          "component": "IOTDSettings",
+          "permission": "iotd:admin",
+          "route": "/iotd/settings"
+        },
+        "telemetry": {
+          "component": "TelemetryMonitor",
+          "permission": "iotd:view",
+          "route": "/iotd/telemetry"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "command_center": {
+            "status_style": "ack-chip",
+            "visual": "approval-console"
+          },
+          "device_card": {
+            "icon": "radio",
+            "risk_style": "connectivity-band",
+            "status_indicator": "fleet-pill"
+          },
+          "firmware_manager": {
+            "status_style": "signature-chip",
+            "visual": "rollout-lanes"
+          },
+          "telemetry_stream": {
+            "highlight": "schema-chip",
+            "visual": "signal-table"
+          }
+        },
+        "name": "iotd_device_ops",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#2C5282",
+          "color.danger": "#C53030",
+          "color.primary": "#22543D",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/iotd/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "IOTDDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/iotd/dashboard",
+            "permission": "iotd:view"
+          },
+          {
+            "component": "DeviceRegistry",
+            "name": "devices",
+            "nav_group": "Devices",
+            "path": "/iotd/devices",
+            "permission": "iotd:register"
+          },
+          {
+            "component": "TelemetryMonitor",
+            "name": "telemetry",
+            "nav_group": "Telemetry",
+            "path": "/iotd/telemetry",
+            "permission": "iotd:view"
+          },
+          {
+            "component": "CommandCenter",
+            "name": "commands",
+            "nav_group": "Control",
+            "path": "/iotd/commands",
+            "permission": "iotd:command"
+          },
+          {
+            "component": "FirmwareManager",
+            "name": "firmware",
+            "nav_group": "Lifecycle",
+            "path": "/iotd/firmware",
+            "permission": "iotd:manage_firmware"
+          },
+          {
+            "component": "DeviceSecurity",
+            "name": "security",
+            "nav_group": "Security",
+            "path": "/iotd/security",
+            "permission": "iotd:admin"
+          },
+          {
+            "component": "DeviceRules",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/iotd/rules",
+            "permission": "iotd:admin"
+          },
+          {
+            "component": "IOTDSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/iotd/settings",
+            "permission": "iotd:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "iotd": []
+    }
+  },
+  "contracts": {
+    "iotd": {
+      "configuration": {
+        "commands": {
+          "ack_timeout_seconds": 30,
+          "command_approval_required": true,
+          "command_audit_required": true,
+          "dangerous_command_review_required": true
+        },
+        "devices": {
+          "certificate_rotation_days": 90,
+          "device_identity_required": true,
+          "fleet_grouping_enabled": true,
+          "owner_required": true
+        },
+        "governance": {
+          "device_rbac_required": true,
+          "firmware_signature_required": true,
+          "require_tenant_context": true,
+          "stale_device_review_days": 30
+        },
+        "telemetry": {
+          "encryption_required": true,
+          "event_bus_required": true,
+          "offline_buffering_enabled": true,
+          "schema_validation_required": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "iotd_device_ops"
+        },
+        "ui": {
+          "enable_command_center": true,
+          "enable_device_console": true,
+          "enable_firmware_manager": true,
+          "enable_telemetry_monitor": true
+        }
+      },
+      "id": "iotd",
+      "provides": [
+        "iotd_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "iotd": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "dangerous_command_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "dangerous_command": true
+      },
+      "description": "Dangerous device commands require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "command_approval_required",
+        "required_action": "record_command_approval"
+      },
+      "name": "dangerous_command_requires_approval"
+    },
+    "device_requires_identity": {
+      "condition": {
+        "device_identity_present": false,
+        "operation": "register_device"
+      },
+      "description": "Devices require provisioned identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_identity_required",
+        "required_action": "provision_device_identity"
+      },
+      "name": "device_requires_identity"
+    },
+    "firmware_requires_signature": {
+      "condition": {
+        "firmware_signature_verified": false,
+        "operation": "deploy_firmware"
+      },
+      "description": "Firmware updates require signed artifacts.",
+      "effect": {
+        "decision": "deny",
+        "reason": "firmware_signature_required",
+        "required_action": "verify_firmware_signature"
+      },
+      "name": "firmware_requires_signature"
+    },
+    "stale_device_requires_review": {
+      "condition": {
+        "last_seen_days_gt": 30,
+        "stale_device_reviewed": false
+      },
+      "description": "Stale devices require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "stale_device_review_required",
+        "required_action": "review_device_status"
+      },
+      "name": "stale_device_requires_review"
+    },
+    "telemetry_requires_encryption": {
+      "condition": {
+        "encryption_applied": false,
+        "operation": "ingest_telemetry"
+      },
+      "description": "Telemetry ingestion requires encryption.",
+      "effect": {
+        "decision": "deny",
+        "reason": "telemetry_encryption_required",
+        "required_action": "encrypt_telemetry"
+      },
+      "name": "telemetry_requires_encryption"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All IoT operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.iotd": {
+      "file": "capability_contract.py",
+      "id": "capability.iotd",
+      "kind": "capability",
+      "name": "IoT Device Integration",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

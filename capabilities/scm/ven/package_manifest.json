@@ -1,0 +1,21 @@
+{
+  "base_target": "python",
+  "display_name": "Vendor Management",
+  "format": "apg.package-manifest.v1",
+  "generated_artifacts": [
+    "cap_spec.md",
+    "models.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py",
+    "semantic_model.json",
+    "release_report.json"
+  ],
+  "name": "scm_ven",
+  "profile": "capability",
+  "profile_artifacts": [
+    "package_manifest.json"
+  ],
+  "version": "1.0.0"
+}

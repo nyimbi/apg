@@ -1,0 +1,544 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Anomaly Detection package-backed APG capability",
+    "entity_count": 0,
+    "name": "anom",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "anom": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "baselines": {
+          "auto_baseline_enabled": true,
+          "baseline_review_required": true,
+          "drift_reset_requires_approval": true
+        },
+        "detection": {
+          "default_sensitivity": "medium",
+          "event_detection_enabled": true,
+          "metric_detection_enabled": true,
+          "minimum_baseline_points": 50
+        },
+        "governance": {
+          "audit_detections": true,
+          "monitoring_source_required": true,
+          "require_tenant_context": true
+        },
+        "investigation": {
+          "critical_anomalies_require_owner": true,
+          "feedback_loop_enabled": true,
+          "root_cause_hints_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "anom_signal_console"
+        },
+        "ui": {
+          "enable_baseline_console": true,
+          "enable_feedback_review": true,
+          "enable_investigation_queue": true,
+          "enable_signal_board": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Anomaly Detection",
+      "provides": [
+        "anom_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All anomaly detection operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "monitoring_source_present": false,
+              "operation": "detect"
+            },
+            "description": "Anomaly detection requires a monitoring source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_source_required",
+              "required_action": "attach_monitoring_source"
+            },
+            "name": "detection_requires_monitoring_source"
+          },
+          {
+            "condition": {
+              "history_points_lt": 50,
+              "operation": "create_baseline"
+            },
+            "description": "Baselines require enough historical observations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "insufficient_baseline_history",
+              "required_action": "collect_more_history"
+            },
+            "name": "baseline_requires_history"
+          },
+          {
+            "condition": {
+              "owner_assigned": false,
+              "severity": "critical"
+            },
+            "description": "Critical anomalies require an investigation owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investigation_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "critical_anomaly_requires_owner"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "reset_baseline"
+            },
+            "description": "Baseline reset after drift requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_reset_approval_required",
+              "required_action": "record_approval"
+            },
+            "name": "baseline_reset_requires_approval"
+          },
+          {
+            "condition": {
+              "false_positive_rate_gt": 0.2,
+              "tuning_review_recorded": false
+            },
+            "description": "High false-positive rates require tuning review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "tuning_review_required",
+              "required_action": "record_tuning_review"
+            },
+            "name": "high_false_positive_rate_requires_tuning"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All anomaly detection operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "monitoring_source_present": false,
+            "operation": "detect"
+          },
+          "description": "Anomaly detection requires a monitoring source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_source_required",
+            "required_action": "attach_monitoring_source"
+          },
+          "name": "detection_requires_monitoring_source"
+        },
+        {
+          "condition": {
+            "history_points_lt": 50,
+            "operation": "create_baseline"
+          },
+          "description": "Baselines require enough historical observations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "insufficient_baseline_history",
+            "required_action": "collect_more_history"
+          },
+          "name": "baseline_requires_history"
+        },
+        {
+          "condition": {
+            "owner_assigned": false,
+            "severity": "critical"
+          },
+          "description": "Critical anomalies require an investigation owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investigation_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "critical_anomaly_requires_owner"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "reset_baseline"
+          },
+          "description": "Baseline reset after drift requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_reset_approval_required",
+            "required_action": "record_approval"
+          },
+          "name": "baseline_reset_requires_approval"
+        },
+        {
+          "condition": {
+            "false_positive_rate_gt": 0.2,
+            "tuning_review_recorded": false
+          },
+          "description": "High false-positive rates require tuning review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "tuning_review_required",
+            "required_action": "record_tuning_review"
+          },
+          "name": "high_false_positive_rate_requires_tuning"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "baselines": {
+          "component": "BaselineConsole",
+          "permission": "anom:tune",
+          "route": "/anom/baselines"
+        },
+        "dashboard": {
+          "component": "ANOMDashboard",
+          "permission": "anom:view",
+          "route": "/anom/dashboard"
+        },
+        "feedback": {
+          "component": "FeedbackReview",
+          "permission": "anom:tune",
+          "route": "/anom/feedback"
+        },
+        "investigations": {
+          "component": "InvestigationQueue",
+          "permission": "anom:investigate",
+          "route": "/anom/investigations"
+        },
+        "rules": {
+          "component": "AnomalyRuleManager",
+          "permission": "anom:manage_rules",
+          "route": "/anom/rules"
+        },
+        "settings": {
+          "component": "ANOMSettings",
+          "permission": "anom:admin",
+          "route": "/anom/settings"
+        },
+        "signals": {
+          "component": "SignalBoard",
+          "permission": "anom:detect",
+          "route": "/anom/signals"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "baseline_chart": {
+            "highlight": "drift-marker",
+            "visual": "threshold-band"
+          },
+          "feedback_panel": {
+            "threshold_style": "false-positive-meter",
+            "visual": "review-stack"
+          },
+          "investigation_timeline": {
+            "status_style": "owner-chip",
+            "visual": "event-timeline"
+          },
+          "signal_card": {
+            "icon": "activity",
+            "risk_style": "anomaly-band",
+            "status_indicator": "severity-pill"
+          }
+        },
+        "name": "anom_signal_console",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#D1495B",
+          "color.danger": "#C53030",
+          "color.primary": "#334E68",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F6F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/anom/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ANOMDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/anom/dashboard",
+            "permission": "anom:view"
+          },
+          {
+            "component": "SignalBoard",
+            "name": "signals",
+            "nav_group": "Signals",
+            "path": "/anom/signals",
+            "permission": "anom:detect"
+          },
+          {
+            "component": "BaselineConsole",
+            "name": "baselines",
+            "nav_group": "Baselines",
+            "path": "/anom/baselines",
+            "permission": "anom:tune"
+          },
+          {
+            "component": "InvestigationQueue",
+            "name": "investigations",
+            "nav_group": "Investigations",
+            "path": "/anom/investigations",
+            "permission": "anom:investigate"
+          },
+          {
+            "component": "AnomalyRuleManager",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/anom/rules",
+            "permission": "anom:manage_rules"
+          },
+          {
+            "component": "FeedbackReview",
+            "name": "feedback",
+            "nav_group": "Quality",
+            "path": "/anom/feedback",
+            "permission": "anom:tune"
+          },
+          {
+            "component": "ANOMSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/anom/settings",
+            "permission": "anom:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "__init__.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "anom": []
+    }
+  },
+  "contracts": {
+    "anom": {
+      "configuration": {
+        "baselines": {
+          "auto_baseline_enabled": true,
+          "baseline_review_required": true,
+          "drift_reset_requires_approval": true
+        },
+        "detection": {
+          "default_sensitivity": "medium",
+          "event_detection_enabled": true,
+          "metric_detection_enabled": true,
+          "minimum_baseline_points": 50
+        },
+        "governance": {
+          "audit_detections": true,
+          "monitoring_source_required": true,
+          "require_tenant_context": true
+        },
+        "investigation": {
+          "critical_anomalies_require_owner": true,
+          "feedback_loop_enabled": true,
+          "root_cause_hints_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "anom_signal_console"
+        },
+        "ui": {
+          "enable_baseline_console": true,
+          "enable_feedback_review": true,
+          "enable_investigation_queue": true,
+          "enable_signal_board": true
+        }
+      },
+      "id": "anom",
+      "provides": [
+        "anom_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "anom": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "baseline_requires_history": {
+      "condition": {
+        "history_points_lt": 50,
+        "operation": "create_baseline"
+      },
+      "description": "Baselines require enough historical observations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "insufficient_baseline_history",
+        "required_action": "collect_more_history"
+      },
+      "name": "baseline_requires_history"
+    },
+    "baseline_reset_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "reset_baseline"
+      },
+      "description": "Baseline reset after drift requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_reset_approval_required",
+        "required_action": "record_approval"
+      },
+      "name": "baseline_reset_requires_approval"
+    },
+    "critical_anomaly_requires_owner": {
+      "condition": {
+        "owner_assigned": false,
+        "severity": "critical"
+      },
+      "description": "Critical anomalies require an investigation owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "investigation_owner_required",
+        "required_action": "assign_owner"
+      },
+      "name": "critical_anomaly_requires_owner"
+    },
+    "detection_requires_monitoring_source": {
+      "condition": {
+        "monitoring_source_present": false,
+        "operation": "detect"
+      },
+      "description": "Anomaly detection requires a monitoring source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "monitoring_source_required",
+        "required_action": "attach_monitoring_source"
+      },
+      "name": "detection_requires_monitoring_source"
+    },
+    "high_false_positive_rate_requires_tuning": {
+      "condition": {
+        "false_positive_rate_gt": 0.2,
+        "tuning_review_recorded": false
+      },
+      "description": "High false-positive rates require tuning review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "tuning_review_required",
+        "required_action": "record_tuning_review"
+      },
+      "name": "high_false_positive_rate_requires_tuning"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All anomaly detection operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.anom": {
+      "file": "capability_contract.py",
+      "id": "capability.anom",
+      "kind": "capability",
+      "name": "Anomaly Detection",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

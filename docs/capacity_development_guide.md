@@ -208,8 +208,10 @@ tests should exist.
 10. Compose the generated application shell.
 11. Compile and verify.
 12. Add focused tests.
-13. Document the capacity and update the progress log.
-14. Commit and push the verified slice.
+13. Materialize missing package artifacts when a valid contract does not yet
+    have publishable package evidence.
+14. Document the capacity and update the progress log.
+15. Commit and push the verified slice.
 
 ## Capacity Readiness Levels
 
@@ -327,6 +329,7 @@ Move or create the package under `capabilities/<domain>/<code>/`, then validate:
 ./.venv/bin/python -m pytest -q capabilities/procurement/approvals/tests
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --json
+./.venv/bin/apg capabilities materialize-packages --capability procurement_approvals --json
 ./.venv/bin/apg capabilities inspect procurement_approvals --json
 ```
 
@@ -584,6 +587,7 @@ Choose tests by the layer changed:
 ./.venv/bin/apg compile path/to/capacity.apg --output /tmp/apg-capacity --verify
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --json
+./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/python -m pytest -q tests/test_capability_contract_registry.py
 ./.venv/bin/python -m pytest -q tests/test_generated_workflow_runtime.py
 ./.venv/bin/apg doctor --json
@@ -689,6 +693,8 @@ A capacity is ready to build on when:
   routes, and manifests.
 - capability contracts have named provides, requires, configuration, rules, UI,
   and theme.
+- capability packages have complete artifacts under
+  `apg capabilities audit --strict-package-artifacts --json`.
 - rules are deterministic and named.
 - screens declare relationships.
 - workflows declare executable steps.

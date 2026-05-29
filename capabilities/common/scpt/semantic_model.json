@@ -1,0 +1,570 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Custom Scripting Engine package-backed APG capability",
+    "entity_count": 0,
+    "name": "scpt",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "scpt": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "governance": {
+          "audit_executions": true,
+          "dangerous_permission_approval_required": true,
+          "require_tenant_context": true,
+          "workflow_binding_policy_required": true
+        },
+        "packages": {
+          "allowlist_required": true,
+          "dangerous_import_blocking": true,
+          "filesystem_access_policy_required": true,
+          "secret_access_policy_required": true
+        },
+        "sandbox": {
+          "max_memory_mb": 512,
+          "max_runtime_seconds": 300,
+          "network_disabled_by_default": true,
+          "sandbox_required": true
+        },
+        "scripts": {
+          "allowed_languages": [
+            "python",
+            "javascript",
+            "apg"
+          ],
+          "review_required_for_publish": true,
+          "script_owner_required": true,
+          "versioning_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "scpt_script_workbench"
+        },
+        "ui": {
+          "enable_execution_console": true,
+          "enable_package_policy": true,
+          "enable_sandbox_monitor": true,
+          "enable_script_workbench": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Custom Scripting Engine",
+      "provides": [
+        "scpt_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All scripting operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "create_script",
+              "script_owner_assigned": false
+            },
+            "description": "Scripts require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "script_owner_required",
+              "required_action": "assign_script_owner"
+            },
+            "name": "script_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "execute_script",
+              "sandbox_attached": false
+            },
+            "description": "Script execution requires an active sandbox.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sandbox_required",
+              "required_action": "attach_sandbox"
+            },
+            "name": "sandbox_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "dangerous_permission_requested": true
+            },
+            "description": "Dangerous permissions require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dangerous_permission_approval_required",
+              "required_action": "record_permission_approval"
+            },
+            "name": "dangerous_permission_requires_approval"
+          },
+          {
+            "condition": {
+              "network_access_requested": true,
+              "network_policy_attached": false
+            },
+            "description": "Network access requires an explicit policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "network_policy_required",
+              "required_action": "attach_network_policy"
+            },
+            "name": "external_network_requires_policy"
+          },
+          {
+            "condition": {
+              "requested_memory_mb_gt": 512,
+              "resource_review_recorded": false
+            },
+            "description": "High resource scripts require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "resource_review_required",
+              "required_action": "review_script_resources"
+            },
+            "name": "high_resource_script_requires_review"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All scripting operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "create_script",
+            "script_owner_assigned": false
+          },
+          "description": "Scripts require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "script_owner_required",
+            "required_action": "assign_script_owner"
+          },
+          "name": "script_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "execute_script",
+            "sandbox_attached": false
+          },
+          "description": "Script execution requires an active sandbox.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sandbox_required",
+            "required_action": "attach_sandbox"
+          },
+          "name": "sandbox_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "dangerous_permission_requested": true
+          },
+          "description": "Dangerous permissions require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dangerous_permission_approval_required",
+            "required_action": "record_permission_approval"
+          },
+          "name": "dangerous_permission_requires_approval"
+        },
+        {
+          "condition": {
+            "network_access_requested": true,
+            "network_policy_attached": false
+          },
+          "description": "Network access requires an explicit policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "network_policy_required",
+            "required_action": "attach_network_policy"
+          },
+          "name": "external_network_requires_policy"
+        },
+        {
+          "condition": {
+            "requested_memory_mb_gt": 512,
+            "resource_review_recorded": false
+          },
+          "description": "High resource scripts require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "resource_review_required",
+            "required_action": "review_script_resources"
+          },
+          "name": "high_resource_script_requires_review"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "approvals": {
+          "component": "ScriptApprovals",
+          "permission": "scpt:approve",
+          "route": "/scpt/approvals"
+        },
+        "dashboard": {
+          "component": "SCPTDashboard",
+          "permission": "scpt:view",
+          "route": "/scpt/dashboard"
+        },
+        "executions": {
+          "component": "ExecutionConsole",
+          "permission": "scpt:execute",
+          "route": "/scpt/executions"
+        },
+        "packages": {
+          "component": "PackagePolicy",
+          "permission": "scpt:approve",
+          "route": "/scpt/packages"
+        },
+        "sandboxes": {
+          "component": "SandboxMonitor",
+          "permission": "scpt:admin",
+          "route": "/scpt/sandboxes"
+        },
+        "scripts": {
+          "component": "ScriptRegistry",
+          "permission": "scpt:view",
+          "route": "/scpt/scripts"
+        },
+        "settings": {
+          "component": "SCPTSettings",
+          "permission": "scpt:admin",
+          "route": "/scpt/settings"
+        },
+        "workbench": {
+          "component": "ScriptWorkbench",
+          "permission": "scpt:write",
+          "route": "/scpt/workbench"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "execution_log": {
+            "highlight": "runtime-chip",
+            "visual": "log-stream"
+          },
+          "package_policy": {
+            "status_style": "approval-chip",
+            "visual": "allowlist-table"
+          },
+          "sandbox_monitor": {
+            "status_style": "isolation-chip",
+            "visual": "resource-meter"
+          },
+          "script_editor": {
+            "icon": "code-2",
+            "risk_style": "permission-band",
+            "status_indicator": "script-pill"
+          }
+        },
+        "name": "scpt_script_workbench",
+        "tokens": {
+          "border.radius": "8px",
+          "color.accent": "#805AD5",
+          "color.danger": "#C53030",
+          "color.primary": "#2A4365",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
+          "density": "compact",
+          "surface.canvas": "#F7F8FA",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/scpt/api/v1",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "SCPTDashboard",
+            "name": "dashboard",
+            "nav_group": "Overview",
+            "path": "/scpt/dashboard",
+            "permission": "scpt:view"
+          },
+          {
+            "component": "ScriptWorkbench",
+            "name": "workbench",
+            "nav_group": "Scripts",
+            "path": "/scpt/workbench",
+            "permission": "scpt:write"
+          },
+          {
+            "component": "ScriptRegistry",
+            "name": "scripts",
+            "nav_group": "Scripts",
+            "path": "/scpt/scripts",
+            "permission": "scpt:view"
+          },
+          {
+            "component": "ExecutionConsole",
+            "name": "executions",
+            "nav_group": "Runtime",
+            "path": "/scpt/executions",
+            "permission": "scpt:execute"
+          },
+          {
+            "component": "SandboxMonitor",
+            "name": "sandboxes",
+            "nav_group": "Runtime",
+            "path": "/scpt/sandboxes",
+            "permission": "scpt:admin"
+          },
+          {
+            "component": "PackagePolicy",
+            "name": "packages",
+            "nav_group": "Governance",
+            "path": "/scpt/packages",
+            "permission": "scpt:approve"
+          },
+          {
+            "component": "ScriptApprovals",
+            "name": "approvals",
+            "nav_group": "Governance",
+            "path": "/scpt/approvals",
+            "permission": "scpt:approve"
+          },
+          {
+            "component": "SCPTSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/scpt/settings",
+            "permission": "scpt:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "templates/",
+          "static/"
+        ],
+        "view_module": "views.py"
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "scpt": []
+    }
+  },
+  "contracts": {
+    "scpt": {
+      "configuration": {
+        "governance": {
+          "audit_executions": true,
+          "dangerous_permission_approval_required": true,
+          "require_tenant_context": true,
+          "workflow_binding_policy_required": true
+        },
+        "packages": {
+          "allowlist_required": true,
+          "dangerous_import_blocking": true,
+          "filesystem_access_policy_required": true,
+          "secret_access_policy_required": true
+        },
+        "sandbox": {
+          "max_memory_mb": 512,
+          "max_runtime_seconds": 300,
+          "network_disabled_by_default": true,
+          "sandbox_required": true
+        },
+        "scripts": {
+          "allowed_languages": [
+            "python",
+            "javascript",
+            "apg"
+          ],
+          "review_required_for_publish": true,
+          "script_owner_required": true,
+          "versioning_enabled": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "scpt_script_workbench"
+        },
+        "ui": {
+          "enable_execution_console": true,
+          "enable_package_policy": true,
+          "enable_sandbox_monitor": true,
+          "enable_script_workbench": true
+        }
+      },
+      "id": "scpt",
+      "provides": [
+        "scpt_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "scpt": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "dangerous_permission_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "dangerous_permission_requested": true
+      },
+      "description": "Dangerous permissions require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dangerous_permission_approval_required",
+        "required_action": "record_permission_approval"
+      },
+      "name": "dangerous_permission_requires_approval"
+    },
+    "external_network_requires_policy": {
+      "condition": {
+        "network_access_requested": true,
+        "network_policy_attached": false
+      },
+      "description": "Network access requires an explicit policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "network_policy_required",
+        "required_action": "attach_network_policy"
+      },
+      "name": "external_network_requires_policy"
+    },
+    "high_resource_script_requires_review": {
+      "condition": {
+        "requested_memory_mb_gt": 512,
+        "resource_review_recorded": false
+      },
+      "description": "High resource scripts require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "resource_review_required",
+        "required_action": "review_script_resources"
+      },
+      "name": "high_resource_script_requires_review"
+    },
+    "sandbox_required": {
+      "condition": {
+        "operation": "execute_script",
+        "sandbox_attached": false
+      },
+      "description": "Script execution requires an active sandbox.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sandbox_required",
+        "required_action": "attach_sandbox"
+      },
+      "name": "sandbox_required"
+    },
+    "script_requires_owner": {
+      "condition": {
+        "operation": "create_script",
+        "script_owner_assigned": false
+      },
+      "description": "Scripts require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "script_owner_required",
+        "required_action": "assign_script_owner"
+      },
+      "name": "script_requires_owner"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All scripting operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.scpt": {
+      "file": "capability_contract.py",
+      "id": "capability.scpt",
+      "kind": "capability",
+      "name": "Custom Scripting Engine",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}

@@ -1,0 +1,468 @@
+{
+  "agents": {},
+  "app": {
+    "description": "Configuration Management package-backed APG capability",
+    "entity_count": 0,
+    "name": "conf",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "conf": {
+      "approvals": {},
+      "business_rules": [],
+      "components": {},
+      "configuration": {
+        "automation": {
+          "auto_remediation_enabled": false,
+          "default_deployment_strategy": "rolling",
+          "enable_ai_assistance": true,
+          "validation_mode": "strict"
+        },
+        "gitops": {
+          "auto_create_pull_requests": true,
+          "default_branch": "main",
+          "drift_detection_interval_seconds": 300,
+          "enforce_signed_commits": true
+        },
+        "security": {
+          "record_audit_trail": true,
+          "require_change_approval_for_production": true,
+          "require_secret_encryption": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "conf_control_room"
+        },
+        "ui": {
+          "enable_drift_dashboard": true,
+          "enable_gitops_center": true,
+          "enable_policy_workbench": true,
+          "enable_topology_view": true
+        }
+      },
+      "erp_modules": [
+        "common"
+      ],
+      "i18n": {},
+      "master_data": {},
+      "name": "Configuration Management",
+      "provides": [
+        "conf_operations"
+      ],
+      "requires": [],
+      "rule_engine": {
+        "rules": [
+          {
+            "condition": {
+              "requested_operation": "apply",
+              "validation_passed": false
+            },
+            "description": "Configuration changes must pass validation before apply.",
+            "effect": {
+              "decision": "deny",
+              "reason": "validation_required",
+              "required_action": "run_validation"
+            },
+            "name": "validate_before_apply"
+          },
+          {
+            "condition": {
+              "change_approved": false,
+              "target_environment": "production"
+            },
+            "description": "Production changes require explicit approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "production_approval_required",
+              "required_action": "collect_change_approval"
+            },
+            "name": "production_changes_require_approval"
+          },
+          {
+            "condition": {
+              "contains_secrets": true,
+              "secrets_encrypted": false
+            },
+            "description": "Secret-bearing configurations require encrypted secret storage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secret_encryption_required",
+              "required_action": "encrypt_secrets"
+            },
+            "name": "encrypted_secrets_required"
+          },
+          {
+            "condition": {
+              "drift_detected": true,
+              "remediation_plan_available": false
+            },
+            "description": "Drifted resources need a remediation plan before rollout.",
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_remediation_required",
+              "required_action": "generate_remediation_plan"
+            },
+            "name": "drift_requires_remediation_plan"
+          }
+        ],
+        "type": "deterministic"
+      },
+      "rules": [
+        {
+          "condition": {
+            "requested_operation": "apply",
+            "validation_passed": false
+          },
+          "description": "Configuration changes must pass validation before apply.",
+          "effect": {
+            "decision": "deny",
+            "reason": "validation_required",
+            "required_action": "run_validation"
+          },
+          "name": "validate_before_apply"
+        },
+        {
+          "condition": {
+            "change_approved": false,
+            "target_environment": "production"
+          },
+          "description": "Production changes require explicit approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "production_approval_required",
+            "required_action": "collect_change_approval"
+          },
+          "name": "production_changes_require_approval"
+        },
+        {
+          "condition": {
+            "contains_secrets": true,
+            "secrets_encrypted": false
+          },
+          "description": "Secret-bearing configurations require encrypted secret storage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secret_encryption_required",
+            "required_action": "encrypt_secrets"
+          },
+          "name": "encrypted_secrets_required"
+        },
+        {
+          "condition": {
+            "drift_detected": true,
+            "remediation_plan_available": false
+          },
+          "description": "Drifted resources need a remediation plan before rollout.",
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_remediation_required",
+            "required_action": "generate_remediation_plan"
+          },
+          "name": "drift_requires_remediation_plan"
+        }
+      ],
+      "runtime": {
+        "api": "api.py",
+        "entrypoint": "app.py",
+        "service": "service.py",
+        "views": "views.py"
+      },
+      "screens": {
+        "dashboard": {
+          "component": "ConfigurationDashboard",
+          "permission": "conf:view",
+          "route": "/config/dashboard"
+        },
+        "deployments": {
+          "component": "ConfigurationDeploymentCenter",
+          "permission": "conf:deploy",
+          "route": "/config/deployments"
+        },
+        "drift": {
+          "component": "ConfigurationDriftConsole",
+          "permission": "conf:view",
+          "route": "/config/drift"
+        },
+        "gitops": {
+          "component": "ConfigurationGitOpsCenter",
+          "permission": "conf:deploy",
+          "route": "/config/gitops"
+        },
+        "policies": {
+          "component": "ConfigurationPolicyWorkbench",
+          "permission": "conf:admin",
+          "route": "/config/policies"
+        },
+        "resources": {
+          "component": "ConfigurationResourceCatalog",
+          "permission": "conf:view",
+          "route": "/config/resources"
+        },
+        "settings": {
+          "component": "ConfigurationSettings",
+          "permission": "conf:admin",
+          "route": "/config/settings"
+        },
+        "templates": {
+          "component": "ConfigurationTemplateLibrary",
+          "permission": "conf:create",
+          "route": "/config/templates"
+        }
+      },
+      "streaming": {},
+      "theme": {
+        "components": {
+          "configuration_resource_card": {
+            "icon": "server-stack",
+            "shape": "rounded-rectangle",
+            "status_indicator": "top-bar"
+          },
+          "deployment_timeline": {
+            "highlight_current_stage": "true",
+            "line_style": "segmented"
+          },
+          "drift_badge": {
+            "icon": "radar",
+            "variant": "attention"
+          }
+        },
+        "name": "conf_control_room",
+        "tokens": {
+          "border.radius": "10px",
+          "color.accent": "#A16207",
+          "color.danger": "#B91C1C",
+          "color.primary": "#0F766E",
+          "color.success": "#2F855A",
+          "color.warning": "#C2410C",
+          "density": "comfortable",
+          "surface.canvas": "#F4F7F6",
+          "surface.panel": "#FFFFFF",
+          "text.primary": "#16302B",
+          "text.secondary": "#4B635D"
+        }
+      },
+      "ui": {
+        "api_prefix": "/api/v1/config",
+        "blueprint_module": "blueprints/blueprint.py",
+        "requires_theme": true,
+        "routes": [
+          {
+            "component": "ConfigurationDashboard",
+            "name": "dashboard",
+            "nav_group": "Operations",
+            "path": "/config/dashboard",
+            "permission": "conf:view"
+          },
+          {
+            "component": "ConfigurationResourceCatalog",
+            "name": "resources",
+            "nav_group": "Author",
+            "path": "/config/resources",
+            "permission": "conf:view"
+          },
+          {
+            "component": "ConfigurationTemplateLibrary",
+            "name": "templates",
+            "nav_group": "Author",
+            "path": "/config/templates",
+            "permission": "conf:create"
+          },
+          {
+            "component": "ConfigurationPolicyWorkbench",
+            "name": "policies",
+            "nav_group": "Governance",
+            "path": "/config/policies",
+            "permission": "conf:admin"
+          },
+          {
+            "component": "ConfigurationDeploymentCenter",
+            "name": "deployments",
+            "nav_group": "Operations",
+            "path": "/config/deployments",
+            "permission": "conf:deploy"
+          },
+          {
+            "component": "ConfigurationDriftConsole",
+            "name": "drift",
+            "nav_group": "Governance",
+            "path": "/config/drift",
+            "permission": "conf:view"
+          },
+          {
+            "component": "ConfigurationGitOpsCenter",
+            "name": "gitops",
+            "nav_group": "Operations",
+            "path": "/config/gitops",
+            "permission": "conf:deploy"
+          },
+          {
+            "component": "ConfigurationSettings",
+            "name": "settings",
+            "nav_group": "Administration",
+            "path": "/config/settings",
+            "permission": "conf:admin"
+          }
+        ],
+        "shell": "apg_python",
+        "template_roots": [
+          "blueprints/"
+        ]
+      }
+    }
+  },
+  "composition": {
+    "agent_teams": {},
+    "applications": {},
+    "capability_dependencies": {
+      "conf": []
+    }
+  },
+  "contracts": {
+    "conf": {
+      "configuration": {
+        "automation": {
+          "auto_remediation_enabled": false,
+          "default_deployment_strategy": "rolling",
+          "enable_ai_assistance": true,
+          "validation_mode": "strict"
+        },
+        "gitops": {
+          "auto_create_pull_requests": true,
+          "default_branch": "main",
+          "drift_detection_interval_seconds": 300,
+          "enforce_signed_commits": true
+        },
+        "security": {
+          "record_audit_trail": true,
+          "require_change_approval_for_production": true,
+          "require_secret_encryption": true
+        },
+        "tenant_id": "default",
+        "theme": {
+          "allow_tenant_overrides": true,
+          "default_theme": "conf_control_room"
+        },
+        "ui": {
+          "enable_drift_dashboard": true,
+          "enable_gitops_center": true,
+          "enable_policy_workbench": true,
+          "enable_topology_view": true
+        }
+      },
+      "id": "conf",
+      "provides": [
+        "conf_operations"
+      ],
+      "requires": []
+    }
+  },
+  "deployment": {
+    "source": "capability_contract.py",
+    "target": "python"
+  },
+  "diagnostics": [],
+  "flows": {},
+  "format": "apg.semantic-model.v1",
+  "graphs": {
+    "capability": {
+      "edges": 0,
+      "kind": "capability",
+      "nodes": 1
+    },
+    "package": {
+      "edges": 1,
+      "kind": "package",
+      "nodes": 2
+    }
+  },
+  "llms": {},
+  "ok": true,
+  "operations": {},
+  "packages": {
+    "conf": {
+      "entrypoint": "app.py",
+      "profile": "capability"
+    }
+  },
+  "roles": {},
+  "rules": {
+    "drift_requires_remediation_plan": {
+      "condition": {
+        "drift_detected": true,
+        "remediation_plan_available": false
+      },
+      "description": "Drifted resources need a remediation plan before rollout.",
+      "effect": {
+        "decision": "deny",
+        "reason": "drift_remediation_required",
+        "required_action": "generate_remediation_plan"
+      },
+      "name": "drift_requires_remediation_plan"
+    },
+    "encrypted_secrets_required": {
+      "condition": {
+        "contains_secrets": true,
+        "secrets_encrypted": false
+      },
+      "description": "Secret-bearing configurations require encrypted secret storage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secret_encryption_required",
+        "required_action": "encrypt_secrets"
+      },
+      "name": "encrypted_secrets_required"
+    },
+    "production_changes_require_approval": {
+      "condition": {
+        "change_approved": false,
+        "target_environment": "production"
+      },
+      "description": "Production changes require explicit approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "production_approval_required",
+        "required_action": "collect_change_approval"
+      },
+      "name": "production_changes_require_approval"
+    },
+    "validate_before_apply": {
+      "condition": {
+        "requested_operation": "apply",
+        "validation_passed": false
+      },
+      "description": "Configuration changes must pass validation before apply.",
+      "effect": {
+        "decision": "deny",
+        "reason": "validation_required",
+        "required_action": "run_validation"
+      },
+      "name": "validate_before_apply"
+    }
+  },
+  "security": {},
+  "source_files": [
+    "capability_contract.py"
+  ],
+  "symbols": {
+    "capability.conf": {
+      "file": "capability_contract.py",
+      "id": "capability.conf",
+      "kind": "capability",
+      "name": "Configuration Management",
+      "range": {
+        "end": {
+          "character": 1,
+          "line": 0
+        },
+        "start": {
+          "character": 0,
+          "line": 0
+        }
+      },
+      "references": []
+    }
+  },
+  "tables": {},
+  "views": {}
+}
