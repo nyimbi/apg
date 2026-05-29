@@ -1,7 +1,10 @@
 """Regression coverage for the AUTH executable capability contract."""
 
+import pytest
+
 from .. import get_capability_info, register_capability
 from ..capability_contract import evaluate_capability_rules, get_capability_contract
+from ..service import AuthService
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
@@ -78,3 +81,190 @@ def test_capability_info_and_registration_include_manifest_and_theme():
 	assert registration["aliases"] == ["auth_rbac"]
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_components"]["metrics"] == "/auth/metrics/overview"
+
+
+def test_auth_service_runs_identity_role_session_access_and_privacy_lifecycle():
+	service = AuthService()
+
+	identity = service.register_identity(
+		user_id="user-1",
+		tenant_id="tenant-a",
+		email="ada@example.com",
+		display_name="Ada Lovelace",
+		mfa_enabled=True,
+		behavioral_trust_score=0.92,
+		biometric_enrolled=True,
+		privacy_budget=0.75,
+	)
+	role = service.define_role(
+		role_id="role-admin",
+		tenant_id="tenant-a",
+		name="Tenant Administrator",
+		permissions=["auth:view", "auth:admin"],
+		tier="admin",
+		approval_recorded=True,
+	)
+	assignment = service.assign_role(
+		assignment_id="assign-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		role_id="role-admin",
+		assigned_by="security-owner",
+		approval_recorded=True,
+	)
+	session = service.start_session(
+		session_id="session-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		device_id="device-1",
+		mfa_verified=True,
+		risk_level="medium",
+	)
+	decision = service.evaluate_access(
+		decision_id="decision-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		permission="auth:admin",
+		session_id="session-1",
+		requested_permission_tier="privileged",
+	)
+	privacy_query = service.run_privacy_query(
+		query_id="query-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		query_type="risk_histogram",
+		epsilon_cost=0.25,
+	)
+
+	assert identity["mfa_enabled"] is True
+	assert role["tier"] == "admin"
+	assert assignment["approval_recorded"] is True
+	assert session["trust_score"] > 0.7
+	assert decision["decision"] == "allow"
+	assert decision["role_ids"] == ["role-admin"]
+	assert privacy_query["status"] == "completed"
+	assert privacy_query["remaining_budget"] == 0.5
+	assert service.dashboard_summary("tenant-a") == {
+		"tenant_id": "tenant-a",
+		"identity_count": 1,
+		"active_session_count": 1,
+		"role_count": 1,
+		"admin_assignment_count": 1,
+		"denied_decision_count": 0,
+		"privacy_review_count": 0,
+		"average_trust_score": session["trust_score"],
+	}
+	assert service.list_records("tenant-a")[0]["id"] == "user-1"
+	assert service.list_audit_events("tenant-a")
+
+
+def test_auth_service_enforces_contract_guardrails():
+	service = AuthService()
+	service.register_identity(
+		user_id="user-1",
+		tenant_id="tenant-a",
+		email="ada@example.com",
+		display_name="Ada Lovelace",
+		status="locked",
+		tenant_memberships=["tenant-b"],
+	)
+	service.define_role(
+		role_id="role-admin",
+		tenant_id="tenant-a",
+		name="Tenant Administrator",
+		permissions=["auth:admin"],
+		tier="admin",
+	)
+
+	with pytest.raises(PermissionError, match="account_locked"):
+		service.start_session(
+			session_id="session-locked",
+			tenant_id="tenant-a",
+			user_id="user-1",
+			device_id="device-1",
+		)
+
+	with pytest.raises(PermissionError, match="approval_required_for_admin_role_assignment"):
+		service.assign_role(
+			assignment_id="assign-denied",
+			tenant_id="tenant-a",
+			user_id="user-1",
+			role_id="role-admin",
+			assigned_by="security-owner",
+		)
+
+	service.register_identity(
+		user_id="user-2",
+		tenant_id="tenant-a",
+		email="grace@example.com",
+		display_name="Grace Hopper",
+		tenant_memberships=["tenant-b"],
+	)
+	with pytest.raises(PermissionError, match="trusted_issuer_required"):
+		service.start_session(
+			session_id="session-untrusted",
+			tenant_id="tenant-a",
+			user_id="user-2",
+			device_id="device-2",
+			auth_source="federated",
+			issuer_trusted=False,
+		)
+	with pytest.raises(PermissionError, match="tenant_membership_required"):
+		service.start_session(
+			session_id="session-cross",
+			tenant_id="tenant-c",
+			user_id="user-2",
+			device_id="device-2",
+		)
+
+
+def test_auth_service_tracks_privacy_review_and_denied_access():
+	service = AuthService()
+	service.register_identity(
+		user_id="user-1",
+		tenant_id="tenant-a",
+		email="ada@example.com",
+		display_name="Ada Lovelace",
+		privacy_budget=0.1,
+	)
+	service.define_role(
+		role_id="role-viewer",
+		tenant_id="tenant-a",
+		name="Viewer",
+		permissions=["auth:view"],
+	)
+	service.assign_role(
+		assignment_id="assign-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		role_id="role-viewer",
+		assigned_by="security-owner",
+	)
+	session = service.start_session(
+		session_id="session-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		device_id="device-1",
+	)
+	decision = service.evaluate_access(
+		decision_id="decision-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		permission="auth:admin",
+		session_id=session["id"],
+	)
+	query = service.run_privacy_query(
+		query_id="query-1",
+		tenant_id="tenant-a",
+		user_id="user-1",
+		query_type="risk_histogram",
+		epsilon_cost=0.2,
+	)
+
+	assert decision["decision"] == "deny"
+	assert decision["reasons"] == ["permission_not_granted"]
+	assert query["status"] == "review_required"
+	assert query["reasons"] == ["privacy_budget_exhausted"]
+	summary = service.dashboard_summary("tenant-a")
+	assert summary["denied_decision_count"] == 1
+	assert summary["privacy_review_count"] == 1

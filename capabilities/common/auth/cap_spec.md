@@ -6,6 +6,22 @@
 
 The APG Authentication & RBAC capability delivers a comprehensive identity and access management solution that combines traditional RBAC with advanced ABAC and CBAC models. This enhanced version introduces revolutionary features that make it 10x better than industry leaders like Okta, Auth0, and Azure AD through AI-powered behavioral authentication, quantum-resistant security, and zero-friction user experiences.
 
+### Current Executable Package Runtime
+
+The package currently exposes a dependency-light `AuthService` that applications
+and tests can compose without starting the full Flask or advanced authentication
+runtime. The service owns tenant identities, role definitions, role assignments,
+authentication sessions, access decisions, privacy analytics budget decisions,
+dashboard summaries, and audit events behind the AUTH capability contract.
+
+The service enforces the executable rule contract for locked identities,
+privileged access MFA, high-risk step-up authentication, administrative role
+assignment approval, trusted federation issuers, cross-tenant membership, and
+privacy budget review. The larger revolutionary authentication manager,
+Flask-AppBuilder views, and REST API remain the integration boundary for richer
+runtime deployments; the dependency-light service is the package-backed
+composition surface used by APG generated applications and capability evidence.
+
 ### APG Platform Context
 This capability serves as the foundational security layer for all APG capabilities, providing seamless identity management across the entire APG ecosystem while enabling third-party integrations and standalone deployments.
 

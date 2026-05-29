@@ -10376,6 +10376,28 @@ Battery-conscious verification:
 - `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 60 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
 - `git diff --check -- capabilities/common/edge/__init__.py capabilities/common/edge/models.py capabilities/common/edge/edge_engine.py capabilities/common/edge/service.py capabilities/common/edge/api.py capabilities/common/edge/views.py capabilities/common/edge/test_capability_contract.py capabilities/common/edge/cap_spec.md docs/progress_log.md` passed with no whitespace errors.
 
+### 2026-05-29 11:54 EAT
+
+Executable AUTH identity and RBAC runtime slice:
+
+- Converted the remaining generated AUTH model/service surfaces into dependency-light domain state while preserving the larger revolutionary authentication manager, REST API, Flask-AppBuilder views, and advanced custom modules.
+- Replaced `AuthRecord` with tenant identities, roles, role assignments, sessions, access decisions, privacy analytics queries, and audit events.
+- Added `AuthService` behavior for identity registration, role definition, admin role-assignment approval, session start/revoke, federated issuer checks, cross-tenant membership checks, privileged-access MFA, high-risk step-up enforcement, RBAC permission decisions, privacy-budget review, dashboard summaries, audit events, and compatibility record helpers.
+- Updated `cap_spec.md` to describe the current package-backed AUTH service boundary and how it composes with the richer authentication runtime.
+- Expanded AUTH package tests for successful identity-role-session-access-privacy lifecycle execution, locked-account denial, admin-role approval enforcement, trusted-federation enforcement, tenant-membership enforcement, privacy review tracking, denied-access tracking, dashboard summaries, and compatibility record listing.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/capability_contract.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_materialized_package.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_materialized_package.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed by the capability contract|materialized APG capability package|AuthRecord" capabilities/common/auth` returned no remaining AUTH baseline markers.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json` passed with `ok: true`; `auth` is now `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json` passed with `ok: true`, warnings empty, side-effect-free catalog patch, loaded runtime evidence, self-test passed, and release evidence remained valid.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with `ok: true`; `auth` is now removed from warnings, domain-specific packages increased to 69, mixed packages dropped to 4, and warning count dropped to 40.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` passed with `ok: true`, 109 operable contracts, 109 complete packages, 0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with `ok: true`, 15 required docs found, 68 local links checked, 61 documented commands checked, 0 broken links, 0 unknown documented commands, and 0 violations.
+- `git diff --check -- capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/cap_spec.md` passed with no whitespace errors.
+
 ### 2026-05-29 11:41 EAT
 
 Developer, contributor, and capacity guide immediate-effectiveness expansion:
