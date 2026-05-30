@@ -1,399 +1,55 @@
-"""
-Main Application Entry Point for APG Real-Time Collaboration
+"""Publishable APG capability package entrypoint for Real-Time Collaboration."""
 
-Provides both FastAPI and Flask-AppBuilder integration with proper initialization.
-"""
+from __future__ import annotations
 
-import asyncio
-import logging
-import signal
-import sys
-from contextlib import asynccontextmanager
-from typing import Dict, Any
-
-import uvicorn
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
-
-# APG RTC imports
-from .config import get_config
-from .database import initialize_database, close_database, test_database_connection
-from .websocket_manager import websocket_manager
-from .api import router as rtc_router
-
-# Configure logging
-logging.basicConfig(
-	level=logging.INFO,
-	format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+import json
+from typing import Any
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-	"""Application lifespan manager"""
-	logger.info("Starting APG Real-Time Collaboration service...")
-	
-	try:
-		# Initialize configuration
-		config = get_config()
-		logger.info(f"Loaded configuration for environment: {config.environment}")
-		
-		# Initialize database
-		await initialize_database()
-		logger.info("Database initialized successfully")
-		
-		# Test database connection
-		if not await test_database_connection():
-			raise RuntimeError("Database connection failed")
-		
-		# Initialize WebSocket manager
-		await websocket_manager.start()
-		logger.info("WebSocket manager started")
-		
-		# Set up signal handlers for graceful shutdown
-		def signal_handler(signum, frame):
-			logger.info(f"Received signal {signum}, initiating graceful shutdown...")
-			asyncio.create_task(shutdown())
-		
-		signal.signal(signal.SIGINT, signal_handler)
-		signal.signal(signal.SIGTERM, signal_handler)
-		
-		logger.info("APG Real-Time Collaboration service started successfully")
-		
-		yield
-		
-	except Exception as e:
-		logger.error(f"Failed to start application: {e}")
-		raise
-	
-	finally:
-		# Cleanup on shutdown
-		await shutdown()
+SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Real-Time Collaboration package-backed APG capability", "entity_count": 0, "name": "ckm_rtc", "version": "1.0.0"}, "capabilities": {"ckm_rtc": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"adapters": {"api_helpers": "api.py", "audit_sink": "audl", "configuration": "conf", "event_stream": "bytewax", "generated_app_runtime": "lifecycle.RtcLifecycleService", "identity": "auth", "legacy_runtime": "runtime_app.py", "monitoring": "moni", "notification": "ckm_not", "scheduler": "schd", "view_models": "views.py"}, "collaboration": {"co_edit_locking_required": true, "decision_capture_required": true, "form_delegation_supported": true, "page_context_required": true}, "governance": {"audit_collaboration_events": true, "batch_event_stream": "bytewax", "decision_trace_required": true, "state_change_requires_audit": true}, "media": {"protocols": ["websocket", "webrtc", "grpc", "sip", "rtmp", "socketio"], "recording_requires_consent": true, "screen_share_requires_permission": true}, "messaging": {"message_audit_required": true, "retention_policy_required": true, "sensitive_content_review_supported": true}, "observability": {"agent_activity_required": true, "audit_required": true, "event_stream": "bytewax", "session_metrics_required": true, "trace_required": true}, "presence": {"context_disclosure_required": true, "heartbeat_required": true, "stale_after_seconds": 90, "tenant_scoped": true}, "rtc_agents": {"agent_assist_enabled": true, "agent_contribution_disclosure_required": true, "agent_registration_required": true, "agent_runtime_required": true, "agent_scope_required": true, "allowed_roles": ["session_facilitator", "decision_reviewer", "transcript_reviewer", "risk_moderator", "workflow_assistant"], "supported_runtimes": ["codex", "claude_code", "opencode", "pi"]}, "sessions": {"join_policy_required": true, "max_participants": 250, "owner_required": true, "participant_policy_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ckm_rtc_collaboration_ops"}, "ui": {"enable_agent_panel": true, "enable_analytics": true, "enable_audit": true, "enable_dashboard": true, "enable_decision_log": true, "enable_media_controls": true, "enable_message_stream": true, "enable_presence_panel": true, "enable_room_console": true, "enable_rules": true}}, "erp_modules": ["ckm"], "i18n": {}, "master_data": {}, "name": "Real-Time Collaboration", "provides": ["collaboration_sessions", "presence_awareness", "real_time_messaging", "media_collaboration", "decision_capture", "page_collaboration", "rtc_agents"], "requires": ["auth", "conf", "audl", "ckm_not"], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "RTC operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_session", "owner_present": false}, "description": "Collaboration sessions require an accountable owner.", "effect": {"decision": "deny", "reason": "session_owner_required", "required_action": "assign_session_owner"}, "name": "session_requires_owner"}, {"condition": {"operation": "create_session", "participant_policy_attached": false}, "description": "Collaboration sessions require a participant policy.", "effect": {"decision": "deny", "reason": "participant_policy_required", "required_action": "attach_participant_policy"}, "name": "session_requires_participant_policy"}, {"condition": {"operation": "join_session", "participant_allowed": false}, "description": "Participants must be allowed by the session policy.", "effect": {"decision": "deny", "reason": "participant_not_allowed", "required_action": "update_participant_policy"}, "name": "join_requires_allowed_participant"}, {"condition": {"heartbeat_present": false, "operation": "update_presence"}, "description": "Presence updates require heartbeat evidence.", "effect": {"decision": "deny", "reason": "presence_heartbeat_required", "required_action": "send_presence_heartbeat"}, "name": "presence_requires_heartbeat"}, {"condition": {"operation": "post_message", "session_active": false}, "description": "Messages require an active collaboration session.", "effect": {"decision": "deny", "reason": "active_session_required", "required_action": "reactivate_or_create_session"}, "name": "message_requires_active_session"}, {"condition": {"operation": "post_message", "review_recorded": false, "sensitive_content_detected": true}, "description": "Sensitive messages require review before broad sharing.", "effect": {"decision": "require_review", "reason": "sensitive_content_review_required", "required_action": "record_content_review"}, "name": "sensitive_message_requires_review"}, {"condition": {"operation": "start_screen_share", "screen_share_permission": false}, "description": "Screen sharing requires explicit permission.", "effect": {"decision": "deny", "reason": "screen_share_permission_required", "required_action": "grant_screen_share_permission"}, "name": "screen_share_requires_permission"}, {"condition": {"operation": "start_recording", "recording_consent_present": false}, "description": "Session recording requires consent.", "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "capture_recording_consent"}, "name": "recording_requires_consent"}, {"condition": {"decision_trace_present": false, "operation": "capture_decision"}, "description": "Captured decisions require trace evidence.", "effect": {"decision": "deny", "reason": "decision_trace_required", "required_action": "attach_decision_trace"}, "name": "decision_requires_trace"}, {"condition": {"agent_registered": false, "rtc_agent_present": true}, "description": "AI RTC agents must be registered.", "effect": {"decision": "deny", "reason": "rtc_agent_registration_required", "required_action": "register_rtc_agent"}, "name": "rtc_agent_requires_registration"}, {"condition": {"agent_runtime_supported": false, "rtc_agent_present": true}, "description": "AI RTC agents must use a supported runtime.", "effect": {"decision": "deny", "reason": "rtc_agent_runtime_not_supported", "required_action": "choose_supported_rtc_agent_runtime"}, "name": "rtc_agent_runtime_supported"}, {"condition": {"agent_role_supported": false, "rtc_agent_present": true}, "description": "AI RTC agents must use a supported role.", "effect": {"decision": "deny", "reason": "rtc_agent_role_not_supported", "required_action": "choose_supported_rtc_agent_role"}, "name": "rtc_agent_role_supported"}, {"condition": {"agent_scope_present": false, "rtc_agent_present": true}, "description": "AI RTC agents require explicit scope.", "effect": {"decision": "deny", "reason": "rtc_agent_scope_required", "required_action": "set_rtc_agent_scope"}, "name": "rtc_agent_requires_scope"}, {"condition": {"agent_contribution_disclosed": false, "rtc_agent_present": true}, "description": "AI RTC-agent contributions require disclosure.", "effect": {"decision": "deny", "reason": "rtc_agent_disclosure_required", "required_action": "disclose_rtc_agent"}, "name": "rtc_agent_requires_disclosure"}, {"condition": {"audit_event_recorded": false, "state_change_requested": true}, "description": "RTC lifecycle state changes require audit evidence.", "effect": {"decision": "deny", "reason": "rtc_audit_event_required", "required_action": "record_rtc_audit_event"}, "name": "rtc_state_change_requires_audit"}, {"condition": {"event_stream_ne": "bytewax", "requested_operation": "batch_rtc_mutation"}, "description": "Batch RTC mutations must use Bytewax event streams.", "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}, "name": "batch_rtc_mutation_requires_bytewax"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "RTC operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_session", "owner_present": false}, "description": "Collaboration sessions require an accountable owner.", "effect": {"decision": "deny", "reason": "session_owner_required", "required_action": "assign_session_owner"}, "name": "session_requires_owner"}, {"condition": {"operation": "create_session", "participant_policy_attached": false}, "description": "Collaboration sessions require a participant policy.", "effect": {"decision": "deny", "reason": "participant_policy_required", "required_action": "attach_participant_policy"}, "name": "session_requires_participant_policy"}, {"condition": {"operation": "join_session", "participant_allowed": false}, "description": "Participants must be allowed by the session policy.", "effect": {"decision": "deny", "reason": "participant_not_allowed", "required_action": "update_participant_policy"}, "name": "join_requires_allowed_participant"}, {"condition": {"heartbeat_present": false, "operation": "update_presence"}, "description": "Presence updates require heartbeat evidence.", "effect": {"decision": "deny", "reason": "presence_heartbeat_required", "required_action": "send_presence_heartbeat"}, "name": "presence_requires_heartbeat"}, {"condition": {"operation": "post_message", "session_active": false}, "description": "Messages require an active collaboration session.", "effect": {"decision": "deny", "reason": "active_session_required", "required_action": "reactivate_or_create_session"}, "name": "message_requires_active_session"}, {"condition": {"operation": "post_message", "review_recorded": false, "sensitive_content_detected": true}, "description": "Sensitive messages require review before broad sharing.", "effect": {"decision": "require_review", "reason": "sensitive_content_review_required", "required_action": "record_content_review"}, "name": "sensitive_message_requires_review"}, {"condition": {"operation": "start_screen_share", "screen_share_permission": false}, "description": "Screen sharing requires explicit permission.", "effect": {"decision": "deny", "reason": "screen_share_permission_required", "required_action": "grant_screen_share_permission"}, "name": "screen_share_requires_permission"}, {"condition": {"operation": "start_recording", "recording_consent_present": false}, "description": "Session recording requires consent.", "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "capture_recording_consent"}, "name": "recording_requires_consent"}, {"condition": {"decision_trace_present": false, "operation": "capture_decision"}, "description": "Captured decisions require trace evidence.", "effect": {"decision": "deny", "reason": "decision_trace_required", "required_action": "attach_decision_trace"}, "name": "decision_requires_trace"}, {"condition": {"agent_registered": false, "rtc_agent_present": true}, "description": "AI RTC agents must be registered.", "effect": {"decision": "deny", "reason": "rtc_agent_registration_required", "required_action": "register_rtc_agent"}, "name": "rtc_agent_requires_registration"}, {"condition": {"agent_runtime_supported": false, "rtc_agent_present": true}, "description": "AI RTC agents must use a supported runtime.", "effect": {"decision": "deny", "reason": "rtc_agent_runtime_not_supported", "required_action": "choose_supported_rtc_agent_runtime"}, "name": "rtc_agent_runtime_supported"}, {"condition": {"agent_role_supported": false, "rtc_agent_present": true}, "description": "AI RTC agents must use a supported role.", "effect": {"decision": "deny", "reason": "rtc_agent_role_not_supported", "required_action": "choose_supported_rtc_agent_role"}, "name": "rtc_agent_role_supported"}, {"condition": {"agent_scope_present": false, "rtc_agent_present": true}, "description": "AI RTC agents require explicit scope.", "effect": {"decision": "deny", "reason": "rtc_agent_scope_required", "required_action": "set_rtc_agent_scope"}, "name": "rtc_agent_requires_scope"}, {"condition": {"agent_contribution_disclosed": false, "rtc_agent_present": true}, "description": "AI RTC-agent contributions require disclosure.", "effect": {"decision": "deny", "reason": "rtc_agent_disclosure_required", "required_action": "disclose_rtc_agent"}, "name": "rtc_agent_requires_disclosure"}, {"condition": {"audit_event_recorded": false, "state_change_requested": true}, "description": "RTC lifecycle state changes require audit evidence.", "effect": {"decision": "deny", "reason": "rtc_audit_event_required", "required_action": "record_rtc_audit_event"}, "name": "rtc_state_change_requires_audit"}, {"condition": {"event_stream_ne": "bytewax", "requested_operation": "batch_rtc_mutation"}, "description": "Batch RTC mutations must use Bytewax event streams.", "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}, "name": "batch_rtc_mutation_requires_bytewax"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"agents": {"component": "RtcAgentPanel", "permission": "ckm_rtc:govern", "route": "/ckm-rtc/agents"}, "analytics": {"component": "RtcAnalytics", "permission": "ckm_rtc:view", "route": "/ckm-rtc/analytics"}, "audit": {"component": "RtcAudit", "permission": "ckm_rtc:view", "route": "/ckm-rtc/audit"}, "dashboard": {"component": "RtcDashboard", "permission": "ckm_rtc:view", "route": "/ckm-rtc/dashboard"}, "decisions": {"component": "RtcDecisionLog", "permission": "ckm_rtc:participate", "route": "/ckm-rtc/decisions"}, "media": {"component": "RtcMediaControls", "permission": "ckm_rtc:participate", "route": "/ckm-rtc/media"}, "messages": {"component": "RtcMessageStream", "permission": "ckm_rtc:participate", "route": "/ckm-rtc/messages"}, "presence": {"component": "RtcPresencePanel", "permission": "ckm_rtc:view", "route": "/ckm-rtc/presence"}, "rooms": {"component": "RtcRoomConsole", "permission": "ckm_rtc:manage_rooms", "route": "/ckm-rtc/rooms"}, "rules": {"component": "RtcRules", "permission": "ckm_rtc:govern", "route": "/ckm-rtc/rules"}, "settings": {"component": "RtcSettings", "permission": "ckm_rtc:admin", "route": "/ckm-rtc/settings"}}, "streaming": {"batch_mutation_guardrail": "batch_rtc_mutation_requires_bytewax", "events": ["rtc_session_created", "rtc_participant_joined", "rtc_presence_updated", "rtc_message_posted", "rtc_screen_share_started", "rtc_recording_started", "rtc_decision_captured", "rtc_agent_registered"], "processor": "bytewax", "state": ["sessions", "participants", "presence", "messages", "media_events", "decisions", "rtc_agents", "audit_events"], "topic": "apg.ckm_rtc.lifecycle"}, "theme": {"components": {"audit": {"status_style": "decision-chip", "visual": "event-ledger"}, "decision_log": {"icon": "clipboard-check", "status_indicator": "trace-chip"}, "media_controls": {"icon": "video", "status_indicator": "consent-chip"}, "message_stream": {"icon": "message-circle", "status_indicator": "retention-chip"}, "presence_panel": {"icon": "users", "status_indicator": "heartbeat-chip"}, "room_console": {"icon": "messages-square", "risk_style": "participant-band", "status_indicator": "session-pill"}, "rtc_agent_panel": {"icon": "bot", "status_indicator": "scope-chip"}, "stream_health": {"status_style": "stream-chip", "visual": "event-lane"}}, "name": "ckm_rtc_collaboration_ops", "tokens": {"border.radius": "8px", "color.accent": "#2A9D8F", "color.danger": "#C53030", "color.primary": "#1F4E5F", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/ckm-rtc/api/v1", "requires_theme": true, "routes": [{"component": "RtcDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/ckm-rtc/dashboard", "permission": "ckm_rtc:view"}, {"component": "RtcRoomConsole", "name": "rooms", "nav_group": "Collaboration", "path": "/ckm-rtc/rooms", "permission": "ckm_rtc:manage_rooms"}, {"component": "RtcPresencePanel", "name": "presence", "nav_group": "Collaboration", "path": "/ckm-rtc/presence", "permission": "ckm_rtc:view"}, {"component": "RtcMessageStream", "name": "messages", "nav_group": "Collaboration", "path": "/ckm-rtc/messages", "permission": "ckm_rtc:participate"}, {"component": "RtcMediaControls", "name": "media", "nav_group": "Media", "path": "/ckm-rtc/media", "permission": "ckm_rtc:participate"}, {"component": "RtcDecisionLog", "name": "decisions", "nav_group": "Governance", "path": "/ckm-rtc/decisions", "permission": "ckm_rtc:participate"}, {"component": "RtcAgentPanel", "name": "agents", "nav_group": "Governance", "path": "/ckm-rtc/agents", "permission": "ckm_rtc:govern"}, {"component": "RtcRules", "name": "rules", "nav_group": "Governance", "path": "/ckm-rtc/rules", "permission": "ckm_rtc:govern"}, {"component": "RtcAnalytics", "name": "analytics", "nav_group": "Insights", "path": "/ckm-rtc/analytics", "permission": "ckm_rtc:view"}, {"component": "RtcAudit", "name": "audit", "nav_group": "Governance", "path": "/ckm-rtc/audit", "permission": "ckm_rtc:view"}, {"component": "RtcSettings", "name": "settings", "nav_group": "Administration", "path": "/ckm-rtc/settings", "permission": "ckm_rtc:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"ckm_rtc": ["auth", "conf", "audl", "ckm_not"]}}, "contracts": {"ckm_rtc": {"configuration": {"adapters": {"api_helpers": "api.py", "audit_sink": "audl", "configuration": "conf", "event_stream": "bytewax", "generated_app_runtime": "lifecycle.RtcLifecycleService", "identity": "auth", "legacy_runtime": "runtime_app.py", "monitoring": "moni", "notification": "ckm_not", "scheduler": "schd", "view_models": "views.py"}, "collaboration": {"co_edit_locking_required": true, "decision_capture_required": true, "form_delegation_supported": true, "page_context_required": true}, "governance": {"audit_collaboration_events": true, "batch_event_stream": "bytewax", "decision_trace_required": true, "state_change_requires_audit": true}, "media": {"protocols": ["websocket", "webrtc", "grpc", "sip", "rtmp", "socketio"], "recording_requires_consent": true, "screen_share_requires_permission": true}, "messaging": {"message_audit_required": true, "retention_policy_required": true, "sensitive_content_review_supported": true}, "observability": {"agent_activity_required": true, "audit_required": true, "event_stream": "bytewax", "session_metrics_required": true, "trace_required": true}, "presence": {"context_disclosure_required": true, "heartbeat_required": true, "stale_after_seconds": 90, "tenant_scoped": true}, "rtc_agents": {"agent_assist_enabled": true, "agent_contribution_disclosure_required": true, "agent_registration_required": true, "agent_runtime_required": true, "agent_scope_required": true, "allowed_roles": ["session_facilitator", "decision_reviewer", "transcript_reviewer", "risk_moderator", "workflow_assistant"], "supported_runtimes": ["codex", "claude_code", "opencode", "pi"]}, "sessions": {"join_policy_required": true, "max_participants": 250, "owner_required": true, "participant_policy_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ckm_rtc_collaboration_ops"}, "ui": {"enable_agent_panel": true, "enable_analytics": true, "enable_audit": true, "enable_dashboard": true, "enable_decision_log": true, "enable_media_controls": true, "enable_message_stream": true, "enable_presence_panel": true, "enable_room_console": true, "enable_rules": true}}, "id": "ckm_rtc", "provides": ["collaboration_sessions", "presence_awareness", "real_time_messaging", "media_collaboration", "decision_capture", "page_collaboration", "rtc_agents"], "requires": ["auth", "conf", "audl", "ckm_not"]}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 4, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"ckm_rtc": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"batch_rtc_mutation_requires_bytewax": {"condition": {"event_stream_ne": "bytewax", "requested_operation": "batch_rtc_mutation"}, "description": "Batch RTC mutations must use Bytewax event streams.", "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}, "name": "batch_rtc_mutation_requires_bytewax"}, "decision_requires_trace": {"condition": {"decision_trace_present": false, "operation": "capture_decision"}, "description": "Captured decisions require trace evidence.", "effect": {"decision": "deny", "reason": "decision_trace_required", "required_action": "attach_decision_trace"}, "name": "decision_requires_trace"}, "join_requires_allowed_participant": {"condition": {"operation": "join_session", "participant_allowed": false}, "description": "Participants must be allowed by the session policy.", "effect": {"decision": "deny", "reason": "participant_not_allowed", "required_action": "update_participant_policy"}, "name": "join_requires_allowed_participant"}, "message_requires_active_session": {"condition": {"operation": "post_message", "session_active": false}, "description": "Messages require an active collaboration session.", "effect": {"decision": "deny", "reason": "active_session_required", "required_action": "reactivate_or_create_session"}, "name": "message_requires_active_session"}, "presence_requires_heartbeat": {"condition": {"heartbeat_present": false, "operation": "update_presence"}, "description": "Presence updates require heartbeat evidence.", "effect": {"decision": "deny", "reason": "presence_heartbeat_required", "required_action": "send_presence_heartbeat"}, "name": "presence_requires_heartbeat"}, "recording_requires_consent": {"condition": {"operation": "start_recording", "recording_consent_present": false}, "description": "Session recording requires consent.", "effect": {"decision": "deny", "reason": "recording_consent_required", "required_action": "capture_recording_consent"}, "name": "recording_requires_consent"}, "rtc_agent_requires_disclosure": {"condition": {"agent_contribution_disclosed": false, "rtc_agent_present": true}, "description": "AI RTC-agent contributions require disclosure.", "effect": {"decision": "deny", "reason": "rtc_agent_disclosure_required", "required_action": "disclose_rtc_agent"}, "name": "rtc_agent_requires_disclosure"}, "rtc_agent_requires_registration": {"condition": {"agent_registered": false, "rtc_agent_present": true}, "description": "AI RTC agents must be registered.", "effect": {"decision": "deny", "reason": "rtc_agent_registration_required", "required_action": "register_rtc_agent"}, "name": "rtc_agent_requires_registration"}, "rtc_agent_requires_scope": {"condition": {"agent_scope_present": false, "rtc_agent_present": true}, "description": "AI RTC agents require explicit scope.", "effect": {"decision": "deny", "reason": "rtc_agent_scope_required", "required_action": "set_rtc_agent_scope"}, "name": "rtc_agent_requires_scope"}, "rtc_agent_role_supported": {"condition": {"agent_role_supported": false, "rtc_agent_present": true}, "description": "AI RTC agents must use a supported role.", "effect": {"decision": "deny", "reason": "rtc_agent_role_not_supported", "required_action": "choose_supported_rtc_agent_role"}, "name": "rtc_agent_role_supported"}, "rtc_agent_runtime_supported": {"condition": {"agent_runtime_supported": false, "rtc_agent_present": true}, "description": "AI RTC agents must use a supported runtime.", "effect": {"decision": "deny", "reason": "rtc_agent_runtime_not_supported", "required_action": "choose_supported_rtc_agent_runtime"}, "name": "rtc_agent_runtime_supported"}, "rtc_state_change_requires_audit": {"condition": {"audit_event_recorded": false, "state_change_requested": true}, "description": "RTC lifecycle state changes require audit evidence.", "effect": {"decision": "deny", "reason": "rtc_audit_event_required", "required_action": "record_rtc_audit_event"}, "name": "rtc_state_change_requires_audit"}, "screen_share_requires_permission": {"condition": {"operation": "start_screen_share", "screen_share_permission": false}, "description": "Screen sharing requires explicit permission.", "effect": {"decision": "deny", "reason": "screen_share_permission_required", "required_action": "grant_screen_share_permission"}, "name": "screen_share_requires_permission"}, "sensitive_message_requires_review": {"condition": {"operation": "post_message", "review_recorded": false, "sensitive_content_detected": true}, "description": "Sensitive messages require review before broad sharing.", "effect": {"decision": "require_review", "reason": "sensitive_content_review_required", "required_action": "record_content_review"}, "name": "sensitive_message_requires_review"}, "session_requires_owner": {"condition": {"operation": "create_session", "owner_present": false}, "description": "Collaboration sessions require an accountable owner.", "effect": {"decision": "deny", "reason": "session_owner_required", "required_action": "assign_session_owner"}, "name": "session_requires_owner"}, "session_requires_participant_policy": {"condition": {"operation": "create_session", "participant_policy_attached": false}, "description": "Collaboration sessions require a participant policy.", "effect": {"decision": "deny", "reason": "participant_policy_required", "required_action": "attach_participant_policy"}, "name": "session_requires_participant_policy"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "RTC operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.ckm_rtc": {"file": "capability_contract.py", "id": "capability.ckm_rtc", "kind": "capability", "name": "Real-Time Collaboration", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
 
 
-async def shutdown():
-	"""Graceful shutdown"""
-	logger.info("Shutting down APG Real-Time Collaboration service...")
-	
-	try:
-		# Stop WebSocket manager
-		await websocket_manager.stop()
-		logger.info("WebSocket manager stopped")
-		
-		# Close database connections
-		await close_database()
-		logger.info("Database connections closed")
-		
-	except Exception as e:
-		logger.error(f"Error during shutdown: {e}")
-	
-	logger.info("Shutdown complete")
+def semantic_model() -> dict[str, Any]:
+	"""Return the package semantic model."""
+	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
 
 
-def create_app() -> FastAPI:
-	"""Create and configure FastAPI application"""
-	config = get_config()
-	
-	# Create FastAPI app with lifespan
-	app = FastAPI(
-		title="APG Real-Time Collaboration",
-		description="Revolutionary real-time collaboration with Teams/Zoom/Meet features and Flask-AppBuilder integration",
-		version="1.0.0",
-		lifespan=lifespan,
-		debug=config.debug
-	)
-	
-	# Add middleware
-	app.add_middleware(
-		CORSMiddleware,
-		allow_origins=config.security.cors_origins,
-		allow_credentials=True,
-		allow_methods=["*"],
-		allow_headers=["*"],
-	)
-	
-	app.add_middleware(
-		TrustedHostMiddleware,
-		allowed_hosts=config.security.allowed_hosts
-	)
-	
-	# Include API router
-	app.include_router(rtc_router)
-	
-	# Add root endpoint
-	@app.get("/")
-	async def root():
-		"""Root endpoint with service information"""
-		config = get_config()
-		return {
-			"service": "APG Real-Time Collaboration",
-			"version": "1.0.0",
-			"environment": config.environment,
-			"status": "running",
-			"features": {
-				"page_collaboration": True,
-				"video_calls": True,
-				"screen_sharing": True,
-				"recording": True,
-				"teams_integration": config.third_party.teams_enabled,
-				"zoom_integration": config.third_party.zoom_enabled,
-				"google_meet_integration": config.third_party.google_meet_enabled,
-				"ai_features": True,
-				"analytics": True
-			},
-			"endpoints": {
-				"api": "/api/v1/rtc",
-				"websocket": "/api/v1/rtc/ws",
-				"health": "/api/v1/rtc/health",
-				"docs": "/docs"
-			}
-		}
-	
-	# Add health check endpoint at root level
-	@app.get("/health")
-	async def health_check():
-		"""Simple health check"""
-		try:
-			# Test database connection
-			db_healthy = await test_database_connection()
-			
-			# Test WebSocket manager
-			ws_stats = websocket_manager.get_connection_stats()
-			
-			status = "healthy" if db_healthy else "unhealthy"
-			
-			return {
-				"status": status,
-				"database": "healthy" if db_healthy else "unhealthy",
-				"websocket": "healthy",
-				"connections": ws_stats.get("total_connections", 0),
-				"timestamp": "2024-01-30T12:00:00Z"
-			}
-			
-		except Exception as e:
-			logger.error(f"Health check failed: {e}")
-			return JSONResponse(
-				status_code=503,
-				content={
-					"status": "unhealthy",
-					"error": str(e),
-					"timestamp": "2024-01-30T12:00:00Z"
-				}
-			)
-	
-	# Add exception handlers
-	@app.exception_handler(HTTPException)
-	async def http_exception_handler(request, exc):
-		"""Handle HTTP exceptions"""
-		return JSONResponse(
-			status_code=exc.status_code,
-			content={
-				"error": exc.detail,
-				"status_code": exc.status_code,
-				"timestamp": "2024-01-30T12:00:00Z"
-			}
-		)
-	
-	@app.exception_handler(Exception)
-	async def general_exception_handler(request, exc):
-		"""Handle general exceptions"""
-		logger.error(f"Unhandled exception: {exc}")
-		return JSONResponse(
-			status_code=500,
-			content={
-				"error": "Internal server error",
-				"status_code": 500,
-				"timestamp": "2024-01-30T12:00:00Z"
-			}
-		)
-	
-	return app
+def component_manifest() -> dict[str, Any]:
+	"""Return the APG component manifest for this capability package."""
+	return {
+		"format": "apg.component-manifest.v1",
+		"kind": "apg.generated_application",
+		"name": "ckm_rtc",
+		"display_name": "Real-Time Collaboration",
+		"target": "python",
+		"interfaces": {
+			"health": "/health",
+			"self_test": "/self-test",
+			"semantic_model": "/semantic-model.json",
+		},
+		"capabilities": ["ckm_rtc"],
+	}
 
 
-# Create the application instance
-app = create_app()
-
-
-# Flask-AppBuilder integration class
-class RTCFlaskAppBuilderIntegration:
-	"""Integration with Flask-AppBuilder"""
-	
-	def __init__(self, appbuilder=None):
-		self.appbuilder = appbuilder
-		self.config = get_config()
-	
-	def register_with_appbuilder(self, appbuilder):
-		"""Register RTC capability with Flask-AppBuilder"""
-		from .blueprint import real_time_collaboration_blueprint
-		
-		# Register blueprint
-		if hasattr(appbuilder.app, 'register_blueprint'):
-			blueprint = real_time_collaboration_blueprint.create_blueprint()
-			appbuilder.app.register_blueprint(blueprint)
-		
-		# Register views
-		real_time_collaboration_blueprint.register_with_appbuilder(appbuilder)
-		
-		# Initialize capability
-		real_time_collaboration_blueprint.initialize_capability(appbuilder.app)
-		
-		logger.info("APG Real-Time Collaboration registered with Flask-AppBuilder")
-	
-	def get_collaboration_widget_html(self, page_url: str) -> str:
-		"""Get collaboration widget HTML for Flask-AppBuilder pages"""
-		return f"""
-		<div id="rtc-collaboration-widget" data-page-url="{page_url}">
-			<!-- Collaboration widget will be loaded here -->
-			<script src="/static/rtc/collaboration-widget.js"></script>
-		</div>
-		"""
-
-
-# CLI commands
-class RTCCLICommands:
-	"""Command-line interface commands"""
-	
-	@staticmethod
-	async def init_database():
-		"""Initialize database"""
-		try:
-			await initialize_database()
-			print("✅ Database initialized successfully")
-		except Exception as e:
-			print(f"❌ Database initialization failed: {e}")
-			sys.exit(1)
-	
-	@staticmethod
-	async def test_database():
-		"""Test database connection"""
-		try:
-			if await test_database_connection():
-				print("✅ Database connection successful")
-			else:
-				print("❌ Database connection failed")
-				sys.exit(1)
-		except Exception as e:
-			print(f"❌ Database test failed: {e}")
-			sys.exit(1)
-	
-	@staticmethod
-	async def start_websocket_server():
-		"""Start standalone WebSocket server"""
-		config = get_config()
-		
-		try:
-			await websocket_manager.start()
-			print(f"✅ WebSocket server started on {config.websocket.host}:{config.websocket.port}")
-			
-			# Keep running
-			while True:
-				await asyncio.sleep(1)
-				
-		except KeyboardInterrupt:
-			print("\n🛑 Shutting down WebSocket server...")
-			await websocket_manager.stop()
-		except Exception as e:
-			print(f"❌ WebSocket server failed: {e}")
-			sys.exit(1)
-	
-	@staticmethod
-	def start_api_server():
-		"""Start API server"""
-		config = get_config()
-		
-		uvicorn.run(
-			"app:app",
-			host=config.api.host,
-			port=config.api.port,
-			workers=1 if config.api.reload else config.api.workers,
-			reload=config.api.reload,
-			log_level=config.logging.level.lower(),
-			access_log=True
-		)
-	
-	@staticmethod
-	async def validate_config():
-		"""Validate configuration"""
-		try:
-			config = get_config()
-			print("✅ Configuration loaded successfully")
-			print(f"   Environment: {config.environment}")
-			print(f"   Database URL: {config.database.url}")
-			print(f"   Redis URL: {config.redis.url}")
-			print(f"   API Host: {config.api.host}:{config.api.port}")
-			print(f"   WebSocket Host: {config.websocket.host}:{config.websocket.port}")
-			
-			# Test third-party integrations
-			if config.third_party.teams_enabled:
-				print("✅ Teams integration enabled")
-			if config.third_party.zoom_enabled:
-				print("✅ Zoom integration enabled")
-			if config.third_party.google_meet_enabled:
-				print("✅ Google Meet integration enabled")
-			
-		except Exception as e:
-			print(f"❌ Configuration validation failed: {e}")
-			sys.exit(1)
-
-
-# Development utilities
-async def run_development_setup():
-	"""Set up development environment"""
-	print("🚀 Setting up APG Real-Time Collaboration development environment...")
-	
-	try:
-		# Validate configuration
-		await RTCCLICommands.validate_config()
-		
-		# Initialize database
-		await RTCCLICommands.init_database()
-		
-		# Test database connection
-		await RTCCLICommands.test_database()
-		
-		print("✅ Development environment setup complete!")
-		print("\nNext steps:")
-		print("1. Start the API server: python -m uvicorn app:app --reload")
-		print("2. Start the WebSocket server: python -c 'import asyncio; from app import RTCCLICommands; asyncio.run(RTCCLICommands.start_websocket_server())'")
-		print("3. Open http://localhost:8000 to view the API")
-		print("4. Open http://localhost:8000/docs for API documentation")
-		
-	except Exception as e:
-		print(f"❌ Development setup failed: {e}")
-		sys.exit(1)
+def self_test() -> dict[str, Any]:
+	"""Run a dependency-light package self-test."""
+	model = semantic_model()
+	manifest = component_manifest()
+	errors: list[str] = []
+	if model.get("format") != "apg.semantic-model.v1":
+		errors.append("semantic model format mismatch")
+	if "ckm_rtc" not in model.get("capabilities", {}):
+		errors.append("capability missing from semantic model")
+	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
+		errors.append("component manifest semantic model interface mismatch")
+	return {
+		"passed": not errors,
+		"status": "ok" if not errors else "failed",
+		"errors": errors,
+		"routes": ["/health", "/self-test", "/component.json", "/semantic-model.json"],
+		"capability": "ckm_rtc",
+	}
 
 
 if __name__ == "__main__":
-	import sys
-	
-	if len(sys.argv) > 1:
-		command = sys.argv[1]
-		
-		if command == "init-db":
-			asyncio.run(RTCCLICommands.init_database())
-		elif command == "test-db":
-			asyncio.run(RTCCLICommands.test_database())
-		elif command == "start-ws":
-			asyncio.run(RTCCLICommands.start_websocket_server())
-		elif command == "validate-config":
-			asyncio.run(RTCCLICommands.validate_config())
-		elif command == "dev-setup":
-			asyncio.run(run_development_setup())
-		elif command == "serve":
-			RTCCLICommands.start_api_server()
-		else:
-			print(f"Unknown command: {command}")
-			print("Available commands:")
-			print("  init-db         - Initialize database")
-			print("  test-db         - Test database connection")
-			print("  start-ws        - Start WebSocket server")
-			print("  validate-config - Validate configuration")
-			print("  dev-setup       - Set up development environment")
-			print("  serve           - Start API server")
-			sys.exit(1)
-	else:
-		# Default: start API server
-		RTCCLICommands.start_api_server()
+	print(json.dumps(self_test(), indent=2, sort_keys=True))

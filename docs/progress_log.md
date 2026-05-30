@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 18:38 EAT
+
+CKM RTC real-time collaboration lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the RTC capability,
+  and replaced `cap_spec.md` with a pointer to the active packet specification.
+- Expanded `capability_contract.py` with RTC-agent, session, presence,
+  messaging, media, collaboration, governance, observability, adapter, UI,
+  theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, session owner, participant
+  policy, allowed participants, presence heartbeat, active-session messaging,
+  sensitive-message review, screen-share permission, recording consent,
+  decision trace evidence, RTC-agent registration/runtime/role/scope/disclosure,
+  audit-backed state changes, and Bytewax batch RTC mutation.
+- Added dependency-light `lifecycle.py` with sessions, participants, presence,
+  messages, media events, decisions, RTC agents, audit events, dashboard
+  summary, and batch mutation validation.
+- Preserved the legacy FastAPI/WebSocket runtime as `runtime_app.py` and made
+  `app.py` the dependency-light package entrypoint required by publish checks.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract and lifecycle surfaces.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Added `test_capability_contract.py` for focused contract, rule, lifecycle,
+  app, semantic evidence, and documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/ckm/rtc/__init__.py
+  capabilities/ckm/rtc/capability_contract.py capabilities/ckm/rtc/lifecycle.py
+  capabilities/ckm/rtc/app.py capabilities/ckm/rtc/runtime_app.py
+  capabilities/ckm/rtc/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/ckm/rtc/test_capability_contract.py`
+  passed with 4 tests.
+- `./.venv/bin/python -c "import importlib; pkg =
+  importlib.import_module('capabilities.ckm.rtc'); service =
+  pkg.RtcLifecycleService('tenant-proof'); service.create_session('room-1',
+  'Proof room', 'user-owner', 'ctx/proof', ['user-owner']);
+  print(service.dashboard_summary())"` passed and confirmed session creation
+  plus Bytewax stream metadata in the lifecycle summary.
+- `jq '.capabilities.ckm_rtc.streaming.processor,
+  .capabilities.ckm_rtc.configuration.rtc_agents.supported_runtimes,
+  .capabilities.ckm_rtc.screens.agents.route,
+  (.capabilities.ckm_rtc.rules[] | select(.name=="recording_requires_consent")
+  | .effect.reason), (.capabilities.ckm_rtc.rules[] |
+  select(.name=="batch_rtc_mutation_requires_bytewax") | .effect.reason)'
+  capabilities/ckm/rtc/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/ckm-rtc/agents`,
+  `recording_consent_required`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/ckm/rtc --json` passed with `ckm_rtc` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/ckm/rtc --json`
+  passed with `side_effect_free: true` and no warnings.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/ckm/rtc docs/progress_log.md` passed.
+- Not run: legacy media/database RTC integration suite, live WebSocket/WebRTC/
+  SIP/RTMP/Socket.IO/gRPC runtime, durable database migrations, live scheduler,
+  live Bytewax topology, rendered browser UI, performance checks, and full
+  repository tests.
+
 ### 2026-05-30 18:24 EAT
 
 CKM NOT notification lifecycle/guardrail packet:

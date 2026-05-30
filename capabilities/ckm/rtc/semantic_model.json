@@ -12,30 +12,103 @@
       "business_rules": [],
       "components": {},
       "configuration": {
-        "capability": {
-          "category": "Ckm",
-          "enabled": true,
-          "id": "ckm_rtc",
-          "name": "Real-Time Collaboration",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/ckm/rtc/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "lifecycle.RtcLifecycleService",
+          "identity": "auth",
+          "legacy_runtime": "runtime_app.py",
+          "monitoring": "moni",
+          "notification": "ckm_not",
+          "scheduler": "schd",
+          "view_models": "views.py"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "collaboration": {
+          "co_edit_locking_required": true,
+          "decision_capture_required": true,
+          "form_delegation_supported": true,
+          "page_context_required": true
+        },
+        "governance": {
+          "audit_collaboration_events": true,
+          "batch_event_stream": "bytewax",
+          "decision_trace_required": true,
+          "state_change_requires_audit": true
+        },
+        "media": {
+          "protocols": [
+            "websocket",
+            "webrtc",
+            "grpc",
+            "sip",
+            "rtmp",
+            "socketio"
+          ],
+          "recording_requires_consent": true,
+          "screen_share_requires_permission": true
+        },
+        "messaging": {
+          "message_audit_required": true,
+          "retention_policy_required": true,
+          "sensitive_content_review_supported": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "session_metrics_required": true,
+          "trace_required": true
+        },
+        "presence": {
+          "context_disclosure_required": true,
+          "heartbeat_required": true,
+          "stale_after_seconds": 90,
+          "tenant_scoped": true
+        },
+        "rtc_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "session_facilitator",
+            "decision_reviewer",
+            "transcript_reviewer",
+            "risk_moderator",
+            "workflow_assistant"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "sessions": {
+          "join_policy_required": true,
+          "max_participants": 250,
+          "owner_required": true,
+          "participant_policy_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "ckm_rtc_operations"
+          "default_theme": "ckm_rtc_collaboration_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_decision_log": true,
+          "enable_media_controls": true,
+          "enable_message_stream": true,
+          "enable_presence_panel": true,
+          "enable_room_console": true,
+          "enable_rules": true
         }
       },
       "erp_modules": [
@@ -45,16 +118,27 @@
       "master_data": {},
       "name": "Real-Time Collaboration",
       "provides": [
-        "ckm_rtc_operations"
+        "collaboration_sessions",
+        "presence_awareness",
+        "real_time_messaging",
+        "media_collaboration",
+        "decision_capture",
+        "page_collaboration",
+        "rtc_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "conf",
+        "audl",
+        "ckm_not"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Real-Time Collaboration operations require tenant context.",
+            "description": "RTC operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -64,29 +148,212 @@
           },
           {
             "condition": {
-              "operation_type": "write",
-              "policy_attached": false
+              "operation": "create_session",
+              "owner_present": false
             },
-            "description": "Real-Time Collaboration write operations require policy enforcement.",
+            "description": "Collaboration sessions require an accountable owner.",
             "effect": {
               "decision": "deny",
-              "reason": "operation_policy_required",
-              "required_action": "attach_operation_policy"
+              "reason": "session_owner_required",
+              "required_action": "assign_session_owner"
             },
-            "name": "operation_policy_required"
+            "name": "session_requires_owner"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "create_session",
+              "participant_policy_attached": false
             },
-            "description": "High-risk Real-Time Collaboration operations require review.",
+            "description": "Collaboration sessions require a participant policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "participant_policy_required",
+              "required_action": "attach_participant_policy"
+            },
+            "name": "session_requires_participant_policy"
+          },
+          {
+            "condition": {
+              "operation": "join_session",
+              "participant_allowed": false
+            },
+            "description": "Participants must be allowed by the session policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "participant_not_allowed",
+              "required_action": "update_participant_policy"
+            },
+            "name": "join_requires_allowed_participant"
+          },
+          {
+            "condition": {
+              "heartbeat_present": false,
+              "operation": "update_presence"
+            },
+            "description": "Presence updates require heartbeat evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "presence_heartbeat_required",
+              "required_action": "send_presence_heartbeat"
+            },
+            "name": "presence_requires_heartbeat"
+          },
+          {
+            "condition": {
+              "operation": "post_message",
+              "session_active": false
+            },
+            "description": "Messages require an active collaboration session.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_session_required",
+              "required_action": "reactivate_or_create_session"
+            },
+            "name": "message_requires_active_session"
+          },
+          {
+            "condition": {
+              "operation": "post_message",
+              "review_recorded": false,
+              "sensitive_content_detected": true
+            },
+            "description": "Sensitive messages require review before broad sharing.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "sensitive_content_review_required",
+              "required_action": "record_content_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "sensitive_message_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "start_screen_share",
+              "screen_share_permission": false
+            },
+            "description": "Screen sharing requires explicit permission.",
+            "effect": {
+              "decision": "deny",
+              "reason": "screen_share_permission_required",
+              "required_action": "grant_screen_share_permission"
+            },
+            "name": "screen_share_requires_permission"
+          },
+          {
+            "condition": {
+              "operation": "start_recording",
+              "recording_consent_present": false
+            },
+            "description": "Session recording requires consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recording_consent_required",
+              "required_action": "capture_recording_consent"
+            },
+            "name": "recording_requires_consent"
+          },
+          {
+            "condition": {
+              "decision_trace_present": false,
+              "operation": "capture_decision"
+            },
+            "description": "Captured decisions require trace evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "decision_trace_required",
+              "required_action": "attach_decision_trace"
+            },
+            "name": "decision_requires_trace"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "rtc_agent_present": true
+            },
+            "description": "AI RTC agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rtc_agent_registration_required",
+              "required_action": "register_rtc_agent"
+            },
+            "name": "rtc_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "rtc_agent_present": true
+            },
+            "description": "AI RTC agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rtc_agent_runtime_not_supported",
+              "required_action": "choose_supported_rtc_agent_runtime"
+            },
+            "name": "rtc_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "rtc_agent_present": true
+            },
+            "description": "AI RTC agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rtc_agent_role_not_supported",
+              "required_action": "choose_supported_rtc_agent_role"
+            },
+            "name": "rtc_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "rtc_agent_present": true
+            },
+            "description": "AI RTC agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rtc_agent_scope_required",
+              "required_action": "set_rtc_agent_scope"
+            },
+            "name": "rtc_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "rtc_agent_present": true
+            },
+            "description": "AI RTC-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rtc_agent_disclosure_required",
+              "required_action": "disclose_rtc_agent"
+            },
+            "name": "rtc_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "RTC lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rtc_audit_event_required",
+              "required_action": "record_rtc_audit_event"
+            },
+            "name": "rtc_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_rtc_mutation"
+            },
+            "description": "Batch RTC mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_rtc_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -96,7 +363,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Real-Time Collaboration operations require tenant context.",
+          "description": "RTC operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -106,29 +373,212 @@
         },
         {
           "condition": {
-            "operation_type": "write",
-            "policy_attached": false
+            "operation": "create_session",
+            "owner_present": false
           },
-          "description": "Real-Time Collaboration write operations require policy enforcement.",
+          "description": "Collaboration sessions require an accountable owner.",
           "effect": {
             "decision": "deny",
-            "reason": "operation_policy_required",
-            "required_action": "attach_operation_policy"
+            "reason": "session_owner_required",
+            "required_action": "assign_session_owner"
           },
-          "name": "operation_policy_required"
+          "name": "session_requires_owner"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "create_session",
+            "participant_policy_attached": false
           },
-          "description": "High-risk Real-Time Collaboration operations require review.",
+          "description": "Collaboration sessions require a participant policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "participant_policy_required",
+            "required_action": "attach_participant_policy"
+          },
+          "name": "session_requires_participant_policy"
+        },
+        {
+          "condition": {
+            "operation": "join_session",
+            "participant_allowed": false
+          },
+          "description": "Participants must be allowed by the session policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "participant_not_allowed",
+            "required_action": "update_participant_policy"
+          },
+          "name": "join_requires_allowed_participant"
+        },
+        {
+          "condition": {
+            "heartbeat_present": false,
+            "operation": "update_presence"
+          },
+          "description": "Presence updates require heartbeat evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "presence_heartbeat_required",
+            "required_action": "send_presence_heartbeat"
+          },
+          "name": "presence_requires_heartbeat"
+        },
+        {
+          "condition": {
+            "operation": "post_message",
+            "session_active": false
+          },
+          "description": "Messages require an active collaboration session.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_session_required",
+            "required_action": "reactivate_or_create_session"
+          },
+          "name": "message_requires_active_session"
+        },
+        {
+          "condition": {
+            "operation": "post_message",
+            "review_recorded": false,
+            "sensitive_content_detected": true
+          },
+          "description": "Sensitive messages require review before broad sharing.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "sensitive_content_review_required",
+            "required_action": "record_content_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "sensitive_message_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "start_screen_share",
+            "screen_share_permission": false
+          },
+          "description": "Screen sharing requires explicit permission.",
+          "effect": {
+            "decision": "deny",
+            "reason": "screen_share_permission_required",
+            "required_action": "grant_screen_share_permission"
+          },
+          "name": "screen_share_requires_permission"
+        },
+        {
+          "condition": {
+            "operation": "start_recording",
+            "recording_consent_present": false
+          },
+          "description": "Session recording requires consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recording_consent_required",
+            "required_action": "capture_recording_consent"
+          },
+          "name": "recording_requires_consent"
+        },
+        {
+          "condition": {
+            "decision_trace_present": false,
+            "operation": "capture_decision"
+          },
+          "description": "Captured decisions require trace evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "decision_trace_required",
+            "required_action": "attach_decision_trace"
+          },
+          "name": "decision_requires_trace"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "rtc_agent_present": true
+          },
+          "description": "AI RTC agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rtc_agent_registration_required",
+            "required_action": "register_rtc_agent"
+          },
+          "name": "rtc_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "rtc_agent_present": true
+          },
+          "description": "AI RTC agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rtc_agent_runtime_not_supported",
+            "required_action": "choose_supported_rtc_agent_runtime"
+          },
+          "name": "rtc_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "rtc_agent_present": true
+          },
+          "description": "AI RTC agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rtc_agent_role_not_supported",
+            "required_action": "choose_supported_rtc_agent_role"
+          },
+          "name": "rtc_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "rtc_agent_present": true
+          },
+          "description": "AI RTC agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rtc_agent_scope_required",
+            "required_action": "set_rtc_agent_scope"
+          },
+          "name": "rtc_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "rtc_agent_present": true
+          },
+          "description": "AI RTC-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rtc_agent_disclosure_required",
+            "required_action": "disclose_rtc_agent"
+          },
+          "name": "rtc_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "RTC lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rtc_audit_event_required",
+            "required_action": "record_rtc_audit_event"
+          },
+          "name": "rtc_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_rtc_mutation"
+          },
+          "description": "Batch RTC mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_rtc_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -138,54 +588,129 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "RtcAgentPanel",
+          "permission": "ckm_rtc:govern",
+          "route": "/ckm-rtc/agents"
+        },
+        "analytics": {
+          "component": "RtcAnalytics",
+          "permission": "ckm_rtc:view",
+          "route": "/ckm-rtc/analytics"
+        },
+        "audit": {
+          "component": "RtcAudit",
+          "permission": "ckm_rtc:view",
+          "route": "/ckm-rtc/audit"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "RtcDashboard",
           "permission": "ckm_rtc:view",
           "route": "/ckm-rtc/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "ckm_rtc:operate",
-          "route": "/ckm-rtc/operations"
+        "decisions": {
+          "component": "RtcDecisionLog",
+          "permission": "ckm_rtc:participate",
+          "route": "/ckm-rtc/decisions"
+        },
+        "media": {
+          "component": "RtcMediaControls",
+          "permission": "ckm_rtc:participate",
+          "route": "/ckm-rtc/media"
+        },
+        "messages": {
+          "component": "RtcMessageStream",
+          "permission": "ckm_rtc:participate",
+          "route": "/ckm-rtc/messages"
+        },
+        "presence": {
+          "component": "RtcPresencePanel",
+          "permission": "ckm_rtc:view",
+          "route": "/ckm-rtc/presence"
+        },
+        "rooms": {
+          "component": "RtcRoomConsole",
+          "permission": "ckm_rtc:manage_rooms",
+          "route": "/ckm-rtc/rooms"
         },
         "rules": {
-          "component": "CapabilityRules",
+          "component": "RtcRules",
           "permission": "ckm_rtc:govern",
           "route": "/ckm-rtc/rules"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "RtcSettings",
           "permission": "ckm_rtc:admin",
           "route": "/ckm-rtc/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_rtc_mutation_requires_bytewax",
+        "events": [
+          "rtc_session_created",
+          "rtc_participant_joined",
+          "rtc_presence_updated",
+          "rtc_message_posted",
+          "rtc_screen_share_started",
+          "rtc_recording_started",
+          "rtc_decision_captured",
+          "rtc_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "sessions",
+          "participants",
+          "presence",
+          "messages",
+          "media_events",
+          "decisions",
+          "rtc_agents",
+          "audit_events"
+        ],
+        "topic": "apg.ckm_rtc.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
-          },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
-          },
-          "rules": {
+          "audit": {
             "status_style": "decision-chip",
-            "visual": "rule-list"
+            "visual": "event-ledger"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "decision_log": {
+            "icon": "clipboard-check",
+            "status_indicator": "trace-chip"
+          },
+          "media_controls": {
+            "icon": "video",
+            "status_indicator": "consent-chip"
+          },
+          "message_stream": {
+            "icon": "message-circle",
+            "status_indicator": "retention-chip"
+          },
+          "presence_panel": {
+            "icon": "users",
+            "status_indicator": "heartbeat-chip"
+          },
+          "room_console": {
+            "icon": "messages-square",
+            "risk_style": "participant-band",
+            "status_indicator": "session-pill"
+          },
+          "rtc_agent_panel": {
+            "icon": "bot",
+            "status_indicator": "scope-chip"
+          },
+          "stream_health": {
+            "status_style": "stream-chip",
+            "visual": "event-lane"
           }
         },
-        "name": "ckm_rtc_operations",
+        "name": "ckm_rtc_collaboration_ops",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
+          "color.accent": "#2A9D8F",
           "color.danger": "#C53030",
-          "color.primary": "#28536B",
+          "color.primary": "#1F4E5F",
           "color.success": "#2F855A",
           "color.warning": "#B7791F",
           "density": "compact",
@@ -200,28 +725,77 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "RtcDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/ckm-rtc/dashboard",
             "permission": "ckm_rtc:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/ckm-rtc/operations",
-            "permission": "ckm_rtc:operate"
+            "component": "RtcRoomConsole",
+            "name": "rooms",
+            "nav_group": "Collaboration",
+            "path": "/ckm-rtc/rooms",
+            "permission": "ckm_rtc:manage_rooms"
           },
           {
-            "component": "CapabilityRules",
+            "component": "RtcPresencePanel",
+            "name": "presence",
+            "nav_group": "Collaboration",
+            "path": "/ckm-rtc/presence",
+            "permission": "ckm_rtc:view"
+          },
+          {
+            "component": "RtcMessageStream",
+            "name": "messages",
+            "nav_group": "Collaboration",
+            "path": "/ckm-rtc/messages",
+            "permission": "ckm_rtc:participate"
+          },
+          {
+            "component": "RtcMediaControls",
+            "name": "media",
+            "nav_group": "Media",
+            "path": "/ckm-rtc/media",
+            "permission": "ckm_rtc:participate"
+          },
+          {
+            "component": "RtcDecisionLog",
+            "name": "decisions",
+            "nav_group": "Governance",
+            "path": "/ckm-rtc/decisions",
+            "permission": "ckm_rtc:participate"
+          },
+          {
+            "component": "RtcAgentPanel",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/ckm-rtc/agents",
+            "permission": "ckm_rtc:govern"
+          },
+          {
+            "component": "RtcRules",
             "name": "rules",
             "nav_group": "Governance",
             "path": "/ckm-rtc/rules",
             "permission": "ckm_rtc:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "RtcAnalytics",
+            "name": "analytics",
+            "nav_group": "Insights",
+            "path": "/ckm-rtc/analytics",
+            "permission": "ckm_rtc:view"
+          },
+          {
+            "component": "RtcAudit",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/ckm-rtc/audit",
+            "permission": "ckm_rtc:view"
+          },
+          {
+            "component": "RtcSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/ckm-rtc/settings",
@@ -241,43 +815,132 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "ckm_rtc": []
+      "ckm_rtc": [
+        "auth",
+        "conf",
+        "audl",
+        "ckm_not"
+      ]
     }
   },
   "contracts": {
     "ckm_rtc": {
       "configuration": {
-        "capability": {
-          "category": "Ckm",
-          "enabled": true,
-          "id": "ckm_rtc",
-          "name": "Real-Time Collaboration",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/ckm/rtc/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "lifecycle.RtcLifecycleService",
+          "identity": "auth",
+          "legacy_runtime": "runtime_app.py",
+          "monitoring": "moni",
+          "notification": "ckm_not",
+          "scheduler": "schd",
+          "view_models": "views.py"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "collaboration": {
+          "co_edit_locking_required": true,
+          "decision_capture_required": true,
+          "form_delegation_supported": true,
+          "page_context_required": true
+        },
+        "governance": {
+          "audit_collaboration_events": true,
+          "batch_event_stream": "bytewax",
+          "decision_trace_required": true,
+          "state_change_requires_audit": true
+        },
+        "media": {
+          "protocols": [
+            "websocket",
+            "webrtc",
+            "grpc",
+            "sip",
+            "rtmp",
+            "socketio"
+          ],
+          "recording_requires_consent": true,
+          "screen_share_requires_permission": true
+        },
+        "messaging": {
+          "message_audit_required": true,
+          "retention_policy_required": true,
+          "sensitive_content_review_supported": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "session_metrics_required": true,
+          "trace_required": true
+        },
+        "presence": {
+          "context_disclosure_required": true,
+          "heartbeat_required": true,
+          "stale_after_seconds": 90,
+          "tenant_scoped": true
+        },
+        "rtc_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "session_facilitator",
+            "decision_reviewer",
+            "transcript_reviewer",
+            "risk_moderator",
+            "workflow_assistant"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "sessions": {
+          "join_policy_required": true,
+          "max_participants": 250,
+          "owner_required": true,
+          "participant_policy_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "ckm_rtc_operations"
+          "default_theme": "ckm_rtc_collaboration_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_decision_log": true,
+          "enable_media_controls": true,
+          "enable_message_stream": true,
+          "enable_presence_panel": true,
+          "enable_room_console": true,
+          "enable_rules": true
         }
       },
       "id": "ckm_rtc",
       "provides": [
-        "ckm_rtc_operations"
+        "collaboration_sessions",
+        "presence_awareness",
+        "real_time_messaging",
+        "media_collaboration",
+        "decision_capture",
+        "page_collaboration",
+        "rtc_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "conf",
+        "audl",
+        "ckm_not"
+      ]
     }
   },
   "deployment": {
@@ -289,7 +952,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -310,37 +973,220 @@
   },
   "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "batch_rtc_mutation_requires_bytewax": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_rtc_mutation"
       },
-      "description": "High-risk Real-Time Collaboration operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Real-Time Collaboration write operations require policy enforcement.",
+      "description": "Batch RTC mutations must use Bytewax event streams.",
       "effect": {
         "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
       },
-      "name": "operation_policy_required"
+      "name": "batch_rtc_mutation_requires_bytewax"
+    },
+    "decision_requires_trace": {
+      "condition": {
+        "decision_trace_present": false,
+        "operation": "capture_decision"
+      },
+      "description": "Captured decisions require trace evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "decision_trace_required",
+        "required_action": "attach_decision_trace"
+      },
+      "name": "decision_requires_trace"
+    },
+    "join_requires_allowed_participant": {
+      "condition": {
+        "operation": "join_session",
+        "participant_allowed": false
+      },
+      "description": "Participants must be allowed by the session policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "participant_not_allowed",
+        "required_action": "update_participant_policy"
+      },
+      "name": "join_requires_allowed_participant"
+    },
+    "message_requires_active_session": {
+      "condition": {
+        "operation": "post_message",
+        "session_active": false
+      },
+      "description": "Messages require an active collaboration session.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_session_required",
+        "required_action": "reactivate_or_create_session"
+      },
+      "name": "message_requires_active_session"
+    },
+    "presence_requires_heartbeat": {
+      "condition": {
+        "heartbeat_present": false,
+        "operation": "update_presence"
+      },
+      "description": "Presence updates require heartbeat evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "presence_heartbeat_required",
+        "required_action": "send_presence_heartbeat"
+      },
+      "name": "presence_requires_heartbeat"
+    },
+    "recording_requires_consent": {
+      "condition": {
+        "operation": "start_recording",
+        "recording_consent_present": false
+      },
+      "description": "Session recording requires consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recording_consent_required",
+        "required_action": "capture_recording_consent"
+      },
+      "name": "recording_requires_consent"
+    },
+    "rtc_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "rtc_agent_present": true
+      },
+      "description": "AI RTC-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rtc_agent_disclosure_required",
+        "required_action": "disclose_rtc_agent"
+      },
+      "name": "rtc_agent_requires_disclosure"
+    },
+    "rtc_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "rtc_agent_present": true
+      },
+      "description": "AI RTC agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rtc_agent_registration_required",
+        "required_action": "register_rtc_agent"
+      },
+      "name": "rtc_agent_requires_registration"
+    },
+    "rtc_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "rtc_agent_present": true
+      },
+      "description": "AI RTC agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rtc_agent_scope_required",
+        "required_action": "set_rtc_agent_scope"
+      },
+      "name": "rtc_agent_requires_scope"
+    },
+    "rtc_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "rtc_agent_present": true
+      },
+      "description": "AI RTC agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rtc_agent_role_not_supported",
+        "required_action": "choose_supported_rtc_agent_role"
+      },
+      "name": "rtc_agent_role_supported"
+    },
+    "rtc_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "rtc_agent_present": true
+      },
+      "description": "AI RTC agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rtc_agent_runtime_not_supported",
+        "required_action": "choose_supported_rtc_agent_runtime"
+      },
+      "name": "rtc_agent_runtime_supported"
+    },
+    "rtc_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "RTC lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rtc_audit_event_required",
+        "required_action": "record_rtc_audit_event"
+      },
+      "name": "rtc_state_change_requires_audit"
+    },
+    "screen_share_requires_permission": {
+      "condition": {
+        "operation": "start_screen_share",
+        "screen_share_permission": false
+      },
+      "description": "Screen sharing requires explicit permission.",
+      "effect": {
+        "decision": "deny",
+        "reason": "screen_share_permission_required",
+        "required_action": "grant_screen_share_permission"
+      },
+      "name": "screen_share_requires_permission"
+    },
+    "sensitive_message_requires_review": {
+      "condition": {
+        "operation": "post_message",
+        "review_recorded": false,
+        "sensitive_content_detected": true
+      },
+      "description": "Sensitive messages require review before broad sharing.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "sensitive_content_review_required",
+        "required_action": "record_content_review"
+      },
+      "name": "sensitive_message_requires_review"
+    },
+    "session_requires_owner": {
+      "condition": {
+        "operation": "create_session",
+        "owner_present": false
+      },
+      "description": "Collaboration sessions require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_owner_required",
+        "required_action": "assign_session_owner"
+      },
+      "name": "session_requires_owner"
+    },
+    "session_requires_participant_policy": {
+      "condition": {
+        "operation": "create_session",
+        "participant_policy_attached": false
+      },
+      "description": "Collaboration sessions require a participant policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "participant_policy_required",
+        "required_action": "attach_participant_policy"
+      },
+      "name": "session_requires_participant_policy"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Real-Time Collaboration operations require tenant context.",
+      "description": "RTC operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
