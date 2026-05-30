@@ -1,1388 +1,588 @@
-"""
-APG Integration API Management - Service Layer
+"""Dependency-light Integration API Management lifecycle service."""
 
-Comprehensive service layer for API gateway management, security, analytics,
-and developer portal operations with enterprise-grade features.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
+from copy import deepcopy
+from datetime import datetime
+from typing import Any
+from uuid import uuid4
 
-import asyncio
-import hashlib
-import secrets
-import json
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any, Tuple, Union
-from dataclasses import dataclass
-from uuid_extensions import uuid7str
-
-# Third-party imports
 try:
-	import aiohttp
-except ImportError:  # pragma: no cover - exercised in dependency-light test envs
-	aiohttp = None
-try:
-	import aiocache
-except ImportError:  # pragma: no cover - exercised in dependency-light test envs
-	class _AioCacheModule:
-		Cache = Any
-	aiocache = _AioCacheModule()
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select, update, delete, and_, or_, func
-from pydantic import ValidationError
+	from .capability_contract import (
+		API_EVENT_STREAM,
+		STREAMING,
+		SUPPORTED_API_AGENT_ROLES,
+		SUPPORTED_API_AGENT_RUNTIMES,
+		SUPPORTED_AUTH_TYPES,
+		SUPPORTED_ENVIRONMENTS,
+		SUPPORTED_METHODS,
+		SUPPORTED_PLANS,
+		SUPPORTED_POLICY_TYPES,
+		SUPPORTED_PROTOCOLS,
+		evaluate_capability_rules,
+		get_capability_contract,
+	)
+except ImportError:  # pragma: no cover - supports direct file loading in tests
+	from capability_contract import (  # type: ignore
+		API_EVENT_STREAM,
+		STREAMING,
+		SUPPORTED_API_AGENT_ROLES,
+		SUPPORTED_API_AGENT_RUNTIMES,
+		SUPPORTED_AUTH_TYPES,
+		SUPPORTED_ENVIRONMENTS,
+		SUPPORTED_METHODS,
+		SUPPORTED_PLANS,
+		SUPPORTED_POLICY_TYPES,
+		SUPPORTED_PROTOCOLS,
+		evaluate_capability_rules,
+		get_capability_contract,
+	)
 
-# Internal imports
-from .models import (
-	AMAPI, AMEndpoint, AMPolicy, AMConsumer, AMAPIKey, AMSubscription,
-	AMDeployment, AMAnalytics, AMUsageRecord,
-	APIConfig, EndpointConfig, PolicyConfig, ConsumerConfig, APIKeyConfig,
-	SubscriptionConfig, APIStatus, AuthenticationType, PolicyType
-)
-
-# =============================================================================
-# Service Configuration and Base Classes
-# =============================================================================
-
-@dataclass
-class GatewayConfig:
-	"""Gateway configuration settings."""
-	default_timeout_ms: int = 30000
-	max_retries: int = 3
-	connection_pool_size: int = 100
-	rate_limit_window_seconds: int = 60
-	cache_ttl_seconds: int = 300
-	metrics_collection_interval: int = 60
-
-@dataclass
-class SecurityConfig:
-	"""Security configuration settings."""
-	api_key_length: int = 32
-	jwt_secret_key: str = "your-secret-key"
-	jwt_algorithm: str = "HS256"
-	jwt_expiration_hours: int = 24
-	password_hash_iterations: int = 100000
 
 class APIManagementError(Exception):
 	"""Base exception for API Management operations."""
-	pass
+
 
 class APINotFoundError(APIManagementError):
 	"""Raised when an API is not found."""
-	pass
+
 
 class ConsumerNotFoundError(APIManagementError):
 	"""Raised when a consumer is not found."""
-	pass
+
 
 class AuthenticationError(APIManagementError):
 	"""Raised when authentication fails."""
-	pass
+
 
 class AuthorizationError(APIManagementError):
 	"""Raised when authorization fails."""
-	pass
+
 
 class RateLimitExceededError(APIManagementError):
-	"""Raised when rate limit is exceeded."""
-	pass
-
-# =============================================================================
-# API Lifecycle Management Service
-# =============================================================================
-
-class APILifecycleService:
-	"""Service for managing API registration, versioning, and lifecycle."""
-
-	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache):
-		self.db_session = db_session
-		self.cache = cache
-		self._log_prefix = "[APILifecycleService]"
-
-	async def register_api(
-		self,
-		config: APIConfig,
-		tenant_id: str,
-		capability_id: str,
-		created_by: str
-	) -> str:
-		"""Register a new API with the management platform."""
-		try:
-			# Validate API configuration
-			await self._validate_api_config(config, tenant_id)
-
-			# Create API record
-			api = AMAPI(
-				api_name=config.api_name,
-				api_title=config.api_title,
-				api_description=config.api_description,
-				version=config.version,
-				protocol_type=config.protocol_type.value,
-				base_path=config.base_path,
-				upstream_url=config.upstream_url,
-				is_public=config.is_public,
-				documentation_url=config.documentation_url,
-				openapi_spec=config.openapi_spec,
-				timeout_ms=config.timeout_ms,
-				retry_attempts=config.retry_attempts,
-				load_balancing_algorithm=config.load_balancing_algorithm.value,
-				auth_type=config.auth_type.value,
-				auth_config=config.auth_config,
-				default_rate_limit=config.default_rate_limit,
-				category=config.category,
-				tags=config.tags,
-				tenant_id=tenant_id,
-				capability_id=capability_id,
-				created_by=created_by,
-				status=APIStatus.DRAFT.value
-			)
-
-			self.db_session.add(api)
-			await self.db_session.commit()
-
-			# Clear cache
-			await self._invalidate_api_cache(tenant_id)
-
-			self._log_api_operation("register", api.api_id, created_by)
-			return api.api_id
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to register API: {str(e)}")
-
-	async def update_api(
-		self,
-		api_id: str,
-		config: APIConfig,
-		tenant_id: str,
-		updated_by: str
-	) -> bool:
-		"""Update an existing API configuration."""
-		try:
-			# Get existing API
-			api = await self._get_api_by_id(api_id, tenant_id)
-			if not api:
-				raise APINotFoundError(f"API {api_id} not found")
-
-			# Update fields
-			api.api_title = config.api_title
-			api.api_description = config.api_description
-			api.upstream_url = config.upstream_url
-			api.is_public = config.is_public
-			api.documentation_url = config.documentation_url
-			api.openapi_spec = config.openapi_spec
-			api.timeout_ms = config.timeout_ms
-			api.retry_attempts = config.retry_attempts
-			api.load_balancing_algorithm = config.load_balancing_algorithm.value
-			api.auth_type = config.auth_type.value
-			api.auth_config = config.auth_config
-			api.default_rate_limit = config.default_rate_limit
-			api.category = config.category
-			api.tags = config.tags
-			api.updated_by = updated_by
-
-			await self.db_session.commit()
-
-			# Clear cache
-			await self._invalidate_api_cache(tenant_id, api_id)
-
-			self._log_api_operation("update", api_id, updated_by)
-			return True
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to update API: {str(e)}")
-
-	async def activate_api(self, api_id: str, tenant_id: str, activated_by: str) -> bool:
-		"""Activate an API to make it available for consumption."""
-		try:
-			api = await self._get_api_by_id(api_id, tenant_id)
-			if not api:
-				raise APINotFoundError(f"API {api_id} not found")
-
-			# Validate API is ready for activation
-			await self._validate_api_for_activation(api)
-
-			api.status = APIStatus.ACTIVE.value
-			api.updated_by = activated_by
-
-			await self.db_session.commit()
-
-			# Clear cache and trigger gateway update
-			await self._invalidate_api_cache(tenant_id, api_id)
-			await self._notify_gateway_update(api_id)
-
-			self._log_api_operation("activate", api_id, activated_by)
-			return True
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to activate API: {str(e)}")
-
-	async def deprecate_api(
-		self,
-		api_id: str,
-		tenant_id: str,
-		deprecated_by: str,
-		deprecation_notice: Optional[str] = None
-	) -> bool:
-		"""Deprecate an API with optional migration notice."""
-		try:
-			api = await self._get_api_by_id(api_id, tenant_id)
-			if not api:
-				raise APINotFoundError(f"API {api_id} not found")
-
-			api.status = APIStatus.DEPRECATED.value
-			api.updated_by = deprecated_by
-
-			# Add deprecation notice to metadata
-			if deprecation_notice:
-				api.auth_config = api.auth_config or {}
-				api.auth_config["deprecation_notice"] = deprecation_notice
-				api.auth_config["deprecated_at"] = datetime.now(timezone.utc).isoformat()
-
-			await self.db_session.commit()
-
-			# Notify consumers about deprecation
-			await self._notify_api_deprecation(api_id, deprecation_notice)
-
-			self._log_api_operation("deprecate", api_id, deprecated_by)
-			return True
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to deprecate API: {str(e)}")
-
-	async def get_api(self, api_id: str, tenant_id: str) -> Optional[AMAPI]:
-		"""Get API details by ID."""
-		return await self._get_api_by_id(api_id, tenant_id)
-
-	async def list_apis(
-		self,
-		tenant_id: str,
-		capability_id: Optional[str] = None,
-		status: Optional[APIStatus] = None,
-		public_only: bool = False,
-		limit: int = 100,
-		offset: int = 0
-	) -> Tuple[List[AMAPI], int]:
-		"""List APIs with filtering options."""
-		try:
-			# Build query
-			query = select(AMAPI).where(AMAPI.tenant_id == tenant_id)
-
-			if capability_id:
-				query = query.where(AMAPI.capability_id == capability_id)
-
-			if status:
-				query = query.where(AMAPI.status == status.value)
-
-			if public_only:
-				query = query.where(AMAPI.is_public == True)
-
-			# Count total
-			count_query = select(func.count(AMAPI.api_id)).select_from(query.subquery())
-			total_count = (await self.db_session.execute(count_query)).scalar()
-
-			# Apply pagination
-			query = query.offset(offset).limit(limit).order_by(AMAPI.created_at.desc())
-
-			result = await self.db_session.execute(query)
-			apis = result.scalars().all()
-
-			return list(apis), total_count
-
-		except Exception as e:
-			raise APIManagementError(f"Failed to list APIs: {str(e)}")
-
-	async def add_endpoint(
-		self,
-		api_id: str,
-		config: EndpointConfig,
-		tenant_id: str,
-		created_by: str
-	) -> str:
-		"""Add an endpoint to an existing API."""
-		try:
-			# Validate API exists
-			api = await self._get_api_by_id(api_id, tenant_id)
-			if not api:
-				raise APINotFoundError(f"API {api_id} not found")
-
-			# Create endpoint
-			endpoint = AMEndpoint(
-				api_id=api_id,
-				path=config.path,
-				method=config.method,
-				operation_id=config.operation_id,
-				summary=config.summary,
-				description=config.description,
-				request_schema=config.request_schema,
-				response_schema=config.response_schema,
-				parameters=config.parameters,
-				auth_required=config.auth_required,
-				scopes_required=config.scopes_required,
-				rate_limit_override=config.rate_limit_override,
-				cache_enabled=config.cache_enabled,
-				cache_ttl_seconds=config.cache_ttl_seconds,
-				deprecated=config.deprecated,
-				examples=config.examples
-			)
-
-			self.db_session.add(endpoint)
-			await self.db_session.commit()
-
-			# Update API schema if OpenAPI spec exists
-			await self._update_openapi_spec(api_id)
-
-			self._log_api_operation("add_endpoint", api_id, created_by,
-								   extra={"endpoint": endpoint.endpoint_id})
-			return endpoint.endpoint_id
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to add endpoint: {str(e)}")
-
-	# Private helper methods
-
-	async def _validate_api_config(self, config: APIConfig, tenant_id: str):
-		"""Validate API configuration for registration."""
-		# Check for duplicate API name/version
-		existing = await self.db_session.execute(
-			select(AMAPI).where(
-				and_(
-					AMAPI.api_name == config.api_name,
-					AMAPI.version == config.version,
-					AMAPI.tenant_id == tenant_id
-				)
-			)
-		)
-		if existing.scalar():
-			raise APIManagementError(f"API {config.api_name} version {config.version} already exists")
-
-		# Validate upstream URL accessibility
-		await self._validate_upstream_url(config.upstream_url)
-
-	async def _validate_upstream_url(self, url: str):
-		"""Validate that upstream URL is accessible."""
-		if aiohttp is None:
-			return
-		try:
-			async with aiohttp.ClientSession() as session:
-				async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as response:
-					if response.status >= 500:
-						raise APIManagementError(f"Upstream URL {url} returned server error")
-		except Exception:
-			# Log warning but don't fail registration
-			pass
-
-	async def _get_api_by_id(self, api_id: str, tenant_id: str) -> Optional[AMAPI]:
-		"""Get API by ID with tenant isolation."""
-		cache_key = f"api:{tenant_id}:{api_id}"
-
-		# Try cache first
-		cached = await self.cache.get(cache_key)
-		if cached:
-			return cached
-
-		# Query database
-		result = await self.db_session.execute(
-			select(AMAPI).where(
-				and_(AMAPI.api_id == api_id, AMAPI.tenant_id == tenant_id)
-			)
-		)
-		api = result.scalar_one_or_none()
-
-		# Cache result
-		if api:
-			await self.cache.set(cache_key, api, ttl=300)
-
-		return api
-
-	async def _validate_api_for_activation(self, api: AMAPI):
-		"""Validate API is ready for activation."""
-		# Check if API has at least one endpoint
-		endpoint_count = await self.db_session.execute(
-			select(func.count(AMEndpoint.endpoint_id)).where(AMEndpoint.api_id == api.api_id)
-		)
-		if endpoint_count.scalar() == 0:
-			raise APIManagementError("API must have at least one endpoint to be activated")
-
-	async def _invalidate_api_cache(self, tenant_id: str, api_id: Optional[str] = None):
-		"""Invalidate API cache entries."""
-		if api_id:
-			await self.cache.delete(f"api:{tenant_id}:{api_id}")
-		else:
-			# Clear all API cache for tenant
-			await self.cache.delete_pattern(f"api:{tenant_id}:*")
-
-	async def _notify_gateway_update(self, api_id: str):
-		"""Notify gateway about API updates."""
-		result = await self.db_session.execute(
-			select(AMAPI).where(AMAPI.api_id == api_id)
-		)
-		api = result.scalar_one_or_none()
-		if not api:
-			return
-
-		endpoint_result = await self.db_session.execute(
-			select(AMEndpoint).where(AMEndpoint.api_id == api_id)
-		)
-		endpoints = endpoint_result.scalars().all()
-		event = {
-			"event_type": "api_gateway_update",
-			"api_id": api.api_id,
-			"api_name": api.api_name,
-			"version": api.version,
-			"status": api.status,
-			"base_path": api.base_path,
-			"upstream_url": api.upstream_url,
-			"auth_type": api.auth_type,
-			"default_rate_limit": api.default_rate_limit,
-			"endpoint_count": len(endpoints),
-			"endpoints": [
-				{
-					"endpoint_id": endpoint.endpoint_id,
-					"path": endpoint.path,
-					"method": endpoint.method,
-					"auth_required": endpoint.auth_required,
-					"cache_enabled": endpoint.cache_enabled,
-					"deprecated": endpoint.deprecated
-				}
-				for endpoint in endpoints
-			],
-			"timestamp": datetime.now(timezone.utc).isoformat()
-		}
-		await self.cache.set(f"gateway:update:{api_id}", event, ttl=3600)
-		await self._append_cache_event("gateway:update_events", event)
-
-	async def _notify_api_deprecation(self, api_id: str, notice: Optional[str]):
-		"""Notify API consumers about deprecation."""
-		subscription_result = await self.db_session.execute(
-			select(AMSubscription).where(AMSubscription.api_id == api_id)
-		)
-		subscriptions = subscription_result.scalars().all()
-		consumer_ids = [subscription.consumer_id for subscription in subscriptions]
-		notification = {
-			"event_type": "api_deprecated",
-			"api_id": api_id,
-			"notice": notice or "This API has been deprecated.",
-			"consumer_ids": consumer_ids,
-			"consumer_count": len(consumer_ids),
-			"timestamp": datetime.now(timezone.utc).isoformat()
-		}
-		await self.cache.set(f"api:deprecation:{api_id}", notification, ttl=86400)
-		await self._append_cache_event("api:deprecation_events", notification)
-
-	async def _update_openapi_spec(self, api_id: str):
-		"""Update OpenAPI specification after endpoint changes."""
-		api_result = await self.db_session.execute(
-			select(AMAPI).where(AMAPI.api_id == api_id)
-		)
-		api = api_result.scalar_one_or_none()
-		if not api:
-			return
-
-		endpoint_result = await self.db_session.execute(
-			select(AMEndpoint).where(AMEndpoint.api_id == api_id)
-		)
-		endpoints = sorted(
-			endpoint_result.scalars().all(),
-			key=lambda endpoint: (endpoint.path, endpoint.method)
-		)
-
-		paths: Dict[str, Dict[str, Any]] = {}
-		for endpoint in endpoints:
-			method = endpoint.method.lower()
-			operation: Dict[str, Any] = {
-				"operationId": endpoint.operation_id or f"{method}_{endpoint.path.strip('/').replace('/', '_') or 'root'}",
-				"summary": endpoint.summary or f"{endpoint.method} {endpoint.path}",
-				"description": endpoint.description or "",
-				"deprecated": bool(endpoint.deprecated),
-				"parameters": endpoint.parameters or [],
-				"responses": {
-					"200": {
-						"description": "Successful response"
-					}
-				}
-			}
-			if endpoint.response_schema:
-				operation["responses"]["200"]["content"] = {
-					"application/json": {
-						"schema": endpoint.response_schema
-					}
-				}
-			if endpoint.request_schema:
-				operation["requestBody"] = {
-					"required": True,
-					"content": {
-						"application/json": {
-							"schema": endpoint.request_schema
-						}
-					}
-				}
-			if endpoint.auth_required:
-				operation["security"] = [{"apiKeyAuth": endpoint.scopes_required or []}]
-			paths.setdefault(endpoint.path, {})[method] = operation
-
-		spec: Dict[str, Any] = {
-			"openapi": "3.0.3",
-			"info": {
-				"title": api.api_title,
-				"description": api.api_description or "",
-				"version": api.version
-			},
-			"servers": [
-				{
-					"url": api.base_path,
-					"description": "APG gateway base path"
-				}
-			],
-			"paths": paths,
-			"components": {
-				"securitySchemes": {
-					"apiKeyAuth": {
-						"type": "apiKey",
-						"in": "header",
-						"name": "X-API-Key"
-					}
-				}
-			}
-		}
-		api.openapi_spec = spec
-		api.updated_at = datetime.now(timezone.utc)
-		await self.db_session.commit()
-		await self._invalidate_api_cache(api.tenant_id, api_id)
-		await self.cache.set(f"api:openapi:{api_id}", spec, ttl=3600)
-
-	async def _append_cache_event(self, key: str, event: Dict[str, Any], limit: int = 100):
-		"""Append an event to a cache-backed event ledger."""
-		events = await self.cache.get(key) or []
-		events.append(event)
-		await self.cache.set(key, events[-limit:], ttl=86400)
-
-	def _log_api_operation(self, operation: str, api_id: str, user: str, extra: Optional[Dict] = None):
-		"""Log API management operations."""
-		log_data = {
+	"""Raised when a rate limit is exceeded."""
+
+
+class IntApiService:
+	"""In-memory executable service for API management lifecycle packets."""
+
+	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, *_: Any, **__: Any) -> None:
+		self.tenant_id = tenant_id
+		self.user_id = user_id
+		self.apis: dict[str, dict[str, Any]] = {}
+		self.endpoints: dict[str, dict[str, Any]] = {}
+		self.policies: dict[str, dict[str, Any]] = {}
+		self.consumers: dict[str, dict[str, Any]] = {}
+		self.api_keys: dict[str, dict[str, Any]] = {}
+		self.subscriptions: dict[str, dict[str, Any]] = {}
+		self.deployments: dict[str, dict[str, Any]] = {}
+		self.usage_records: dict[str, dict[str, Any]] = {}
+		self.agents: dict[str, dict[str, Any]] = {}
+		self._audit_events: list[dict[str, Any]] = []
+
+	def _tenant(self, tenant_id: str | None = None) -> str:
+		value = tenant_id or self.tenant_id
+		if not value:
+			raise PermissionError("tenant_context_required")
+		return value
+
+	def _record_id(self, prefix: str, explicit: str | None = None) -> str:
+		return explicit or f"{prefix}-{uuid4().hex[:12]}"
+
+	def _now(self) -> str:
+		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+	def _base_context(self, tenant_id: str, operation: str) -> dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"tenant_context_present": True,
 			"operation": operation,
+			"operation_type": "write",
+			"policy_attached": True,
+		}
+
+	def _assert_rules(self, context: dict[str, Any]) -> None:
+		result = evaluate_capability_rules(context)
+		if result["decision"] != "allow":
+			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+
+	def _emit(self, tenant_id: str, event_type: str, record: dict[str, Any]) -> None:
+		self._audit_events.append({
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"record_id": record["id"],
+			"record_type": record["type"],
+			"status": record["status"],
+			"stream": API_EVENT_STREAM,
+			"processor": "bytewax",
+			"emitted_at": self._now(),
+		})
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def register_api(
+		self,
+		api_id: str,
+		tenant_id: str,
+		name: str,
+		title: str,
+		base_path: str,
+		upstream_url: str,
+		owner_id: str,
+		version: str = "1.0.0",
+		protocol: str = "rest",
+		auth_type: str = "api_key",
+		rate_limit_per_minute: int = 1000,
+		reviewed_by: str | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		external_upstream = upstream_url.startswith("http://") or upstream_url.startswith("https://")
+		context = self._base_context(tenant, "register_api")
+		context.update({
+			"name_present": bool(name),
+			"title_present": bool(title),
+			"base_path_present": bool(base_path),
+			"base_path_valid": bool(base_path and base_path.startswith("/")),
+			"upstream_present": bool(upstream_url),
+			"owner_present": bool(owner_id),
+			"protocol_supported": protocol in SUPPORTED_PROTOCOLS,
+			"auth_type_supported": auth_type in SUPPORTED_AUTH_TYPES,
+			"rate_limit": rate_limit_per_minute,
+			"external_upstream": external_upstream,
+			"review_recorded": bool(reviewed_by),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("api", api_id),
+			"type": "integration_api",
+			"kind": "api",
+			"tenant_id": tenant,
+			"name": name,
+			"title": title,
+			"base_path": base_path,
+			"upstream_url": upstream_url,
+			"owner_id": owner_id,
+			"version": version,
+			"protocol": protocol,
+			"auth_type": auth_type,
+			"rate_limit_per_minute": rate_limit_per_minute,
+			"reviewed_by": reviewed_by,
+			"approved_by": None,
+			"metadata": deepcopy(metadata or {}),
+			"status": "draft",
+			"created_at": self._now(),
+			"updated_at": self._now(),
+		}
+		self.apis[record["id"]] = record
+		self._emit(tenant, "api_registered", record)
+		return deepcopy(record)
+
+	def register_endpoint(
+		self,
+		endpoint_id: str,
+		tenant_id: str,
+		api_id: str,
+		path: str,
+		method: str,
+		auth_required: bool = True,
+		rate_limit_override: int | None = None,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		api = self.apis.get(api_id)
+		method = method.upper()
+		context = self._base_context(tenant, "register_endpoint")
+		context.update({
+			"api_present": bool(api and api["tenant_id"] == tenant),
+			"path_present": bool(path),
+			"path_valid": bool(path and path.startswith("/")),
+			"method_supported": method in SUPPORTED_METHODS,
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("endpoint", endpoint_id),
+			"type": "integration_api_endpoint",
+			"kind": "endpoint",
+			"tenant_id": tenant,
 			"api_id": api_id,
-			"user": user,
-			"timestamp": datetime.now(timezone.utc).isoformat()
+			"path": path,
+			"method": method,
+			"auth_required": auth_required,
+			"rate_limit_override": rate_limit_override,
+			"status": "active",
+			"created_at": self._now(),
 		}
-		if extra:
-			log_data.update(extra)
+		self.endpoints[record["id"]] = record
+		self._emit(tenant, "endpoint_registered", record)
+		return deepcopy(record)
 
-		print(f"{self._log_prefix} {operation.upper()}: {json.dumps(log_data)}")
-
-# =============================================================================
-# Consumer Management Service
-# =============================================================================
-
-class ConsumerManagementService:
-	"""Service for managing API consumers and authentication."""
-
-	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache, security_config: SecurityConfig):
-		self.db_session = db_session
-		self.cache = cache
-		self.security_config = security_config
-		self._log_prefix = "[ConsumerManagementService]"
-
-	async def register_consumer(
-		self,
-		config: ConsumerConfig,
-		tenant_id: str,
-		created_by: str
-	) -> str:
-		"""Register a new API consumer."""
-		try:
-			# Create consumer record
-			consumer = AMConsumer(
-				consumer_name=config.consumer_name,
-				organization=config.organization,
-				contact_email=config.contact_email,
-				contact_name=config.contact_name,
-				allowed_apis=config.allowed_apis,
-				ip_whitelist=config.ip_whitelist,
-				global_rate_limit=config.global_rate_limit,
-				global_quota_limit=config.global_quota_limit,
-				portal_access=config.portal_access,
-				tenant_id=tenant_id,
-				created_by=created_by
-			)
-
-			self.db_session.add(consumer)
-			await self.db_session.commit()
-
-			self._log_consumer_operation("register", consumer.consumer_id, created_by)
-			return consumer.consumer_id
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to register consumer: {str(e)}")
-
-	async def create_api_key(
-		self,
-		consumer_id: str,
-		config: APIKeyConfig,
-		tenant_id: str,
-		created_by: str
-	) -> Tuple[str, str]:
-		"""Create a new API key for a consumer."""
-		try:
-			# Validate consumer exists
-			consumer = await self._get_consumer_by_id(consumer_id, tenant_id)
-			if not consumer:
-				raise ConsumerNotFoundError(f"Consumer {consumer_id} not found")
-
-			# Generate API key
-			api_key = self._generate_api_key()
-			key_hash = self._hash_api_key(api_key)
-			key_prefix = api_key[:8]
-
-			# Create API key record
-			api_key_record = AMAPIKey(
-				consumer_id=consumer_id,
-				key_name=config.key_name,
-				key_hash=key_hash,
-				key_prefix=key_prefix,
-				scopes=config.scopes,
-				allowed_apis=config.allowed_apis,
-				expires_at=config.expires_at,
-				rate_limit_override=config.rate_limit_override,
-				quota_limit_override=config.quota_limit_override,
-				ip_restrictions=config.ip_restrictions,
-				referer_restrictions=config.referer_restrictions,
-				created_by=created_by
-			)
-
-			self.db_session.add(api_key_record)
-			await self.db_session.commit()
-
-			self._log_consumer_operation("create_api_key", consumer_id, created_by,
-										extra={"key_id": api_key_record.key_id})
-			return api_key_record.key_id, api_key
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to create API key: {str(e)}")
-
-	async def authenticate_api_key(self, api_key: str) -> Optional[AMAPIKey]:
-		"""Authenticate an API key and return key details."""
-		try:
-			key_hash = self._hash_api_key(api_key)
-
-			# Check cache first
-			cache_key = f"api_key:{key_hash}"
-			cached = await self.cache.get(cache_key)
-			if cached:
-				return cached
-
-			# Query database
-			result = await self.db_session.execute(
-				select(AMAPIKey).where(
-					and_(
-						AMAPIKey.key_hash == key_hash,
-						AMAPIKey.active == True,
-						or_(
-							AMAPIKey.expires_at.is_(None),
-							AMAPIKey.expires_at > datetime.now(timezone.utc)
-						)
-					)
-				)
-			)
-			api_key_record = result.scalar_one_or_none()
-
-			if api_key_record:
-				# Update last used timestamp
-				api_key_record.last_used_at = datetime.now(timezone.utc)
-				await self.db_session.commit()
-
-				# Cache the result
-				await self.cache.set(cache_key, api_key_record, ttl=300)
-
-			return api_key_record
-
-		except Exception as e:
-			raise AuthenticationError(f"Failed to authenticate API key: {str(e)}")
-
-	async def authorize_api_access(
-		self,
-		api_key_record: AMAPIKey,
-		api_id: str,
-		endpoint_path: str,
-		scopes_required: List[str]
-	) -> bool:
-		"""Authorize API access for a consumer."""
-		try:
-			# Check if API is in allowed list (empty list means all APIs allowed)
-			if api_key_record.allowed_apis and api_id not in api_key_record.allowed_apis:
-				return False
-
-			# Check scopes
-			if scopes_required:
-				if not api_key_record.scopes:
-					return False
-				if not all(scope in api_key_record.scopes for scope in scopes_required):
-					return False
-
-			# Additional authorization checks could be added here
-			return True
-
-		except Exception as e:
-			raise AuthorizationError(f"Failed to authorize API access: {str(e)}")
-
-	async def revoke_api_key(self, key_id: str, tenant_id: str, revoked_by: str) -> bool:
-		"""Revoke an API key."""
-		try:
-			# Get API key with consumer tenant check
-			result = await self.db_session.execute(
-				select(AMAPIKey).join(AMConsumer).where(
-					and_(
-						AMAPIKey.key_id == key_id,
-						AMConsumer.tenant_id == tenant_id
-					)
-				)
-			)
-			api_key_record = result.scalar_one_or_none()
-
-			if not api_key_record:
-				raise APIManagementError(f"API key {key_id} not found")
-
-			api_key_record.active = False
-			await self.db_session.commit()
-
-			# Clear cache
-			await self.cache.delete(f"api_key:{api_key_record.key_hash}")
-
-			self._log_consumer_operation("revoke_api_key", api_key_record.consumer_id, revoked_by,
-										extra={"key_id": key_id})
-			return True
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to revoke API key: {str(e)}")
-
-	async def list_consumers(
-		self,
-		tenant_id: str,
-		status: Optional[str] = None,
-		limit: int = 100,
-		offset: int = 0
-	) -> Tuple[List[AMConsumer], int]:
-		"""List consumers with filtering options."""
-		try:
-			query = select(AMConsumer).where(AMConsumer.tenant_id == tenant_id)
-
-			if status:
-				query = query.where(AMConsumer.status == status)
-
-			# Count total
-			count_query = select(func.count(AMConsumer.consumer_id)).select_from(query.subquery())
-			total_count = (await self.db_session.execute(count_query)).scalar()
-
-			# Apply pagination
-			query = query.offset(offset).limit(limit).order_by(AMConsumer.created_at.desc())
-
-			result = await self.db_session.execute(query)
-			consumers = result.scalars().all()
-
-			return list(consumers), total_count
-
-		except Exception as e:
-			raise APIManagementError(f"Failed to list consumers: {str(e)}")
-
-	# Private helper methods
-
-	def _generate_api_key(self) -> str:
-		"""Generate a secure API key."""
-		return secrets.token_urlsafe(self.security_config.api_key_length)
-
-	def _hash_api_key(self, api_key: str) -> str:
-		"""Hash an API key for secure storage."""
-		return hashlib.pbkdf2_hmac(
-			'sha256',
-			api_key.encode('utf-8'),
-			self.security_config.jwt_secret_key.encode('utf-8'),
-			self.security_config.password_hash_iterations
-		).hex()
-
-	async def _get_consumer_by_id(self, consumer_id: str, tenant_id: str) -> Optional[AMConsumer]:
-		"""Get consumer by ID with tenant isolation."""
-		result = await self.db_session.execute(
-			select(AMConsumer).where(
-				and_(AMConsumer.consumer_id == consumer_id, AMConsumer.tenant_id == tenant_id)
-			)
-		)
-		return result.scalar_one_or_none()
-
-	def _log_consumer_operation(self, operation: str, consumer_id: str, user: str, extra: Optional[Dict] = None):
-		"""Log consumer management operations."""
-		log_data = {
-			"operation": operation,
-			"consumer_id": consumer_id,
-			"user": user,
-			"timestamp": datetime.now(timezone.utc).isoformat()
-		}
-		if extra:
-			log_data.update(extra)
-
-		print(f"{self._log_prefix} {operation.upper()}: {json.dumps(log_data)}")
-
-# =============================================================================
-# Policy Management Service
-# =============================================================================
-
-class PolicyManagementService:
-	"""Service for managing API policies (rate limiting, security, etc.)."""
-
-	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache):
-		self.db_session = db_session
-		self.cache = cache
-		self._log_prefix = "[PolicyManagementService]"
-
-	async def create_policy(
-		self,
-		api_id: str,
-		config: PolicyConfig,
-		tenant_id: str,
-		created_by: str
-	) -> str:
-		"""Create a new policy for an API."""
-		try:
-			# Validate API exists
-			api = await self._get_api_by_id(api_id, tenant_id)
-			if not api:
-				raise APINotFoundError(f"API {api_id} not found")
-
-			# Validate policy configuration
-			await self._validate_policy_config(config)
-
-			# Create policy
-			policy = AMPolicy(
-				api_id=api_id,
-				policy_name=config.policy_name,
-				policy_type=config.policy_type.value,
-				policy_description=config.policy_description,
-				config=config.config,
-				execution_order=config.execution_order,
-				enabled=config.enabled,
-				conditions=config.conditions,
-				applies_to_endpoints=config.applies_to_endpoints,
-				created_by=created_by
-			)
-
-			self.db_session.add(policy)
-			await self.db_session.commit()
-
-			# Clear policy cache
-			await self._invalidate_policy_cache(api_id)
-
-			self._log_policy_operation("create", policy.policy_id, created_by)
-			return policy.policy_id
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to create policy: {str(e)}")
-
-	async def get_api_policies(self, api_id: str, tenant_id: str) -> List[AMPolicy]:
-		"""Get all policies for an API."""
-		try:
-			# Check cache first
-			cache_key = f"policies:{api_id}"
-			cached = await self.cache.get(cache_key)
-			if cached:
-				return cached
-
-			# Validate API exists and belongs to tenant
-			api = await self._get_api_by_id(api_id, tenant_id)
-			if not api:
-				raise APINotFoundError(f"API {api_id} not found")
-
-			# Query policies
-			result = await self.db_session.execute(
-				select(AMPolicy).where(AMPolicy.api_id == api_id)
-				.order_by(AMPolicy.execution_order, AMPolicy.created_at)
-			)
-			policies = list(result.scalars().all())
-
-			# Cache result
-			await self.cache.set(cache_key, policies, ttl=300)
-
-			return policies
-
-		except Exception as e:
-			raise APIManagementError(f"Failed to get API policies: {str(e)}")
-
-	async def update_policy(
+	def attach_policy(
 		self,
 		policy_id: str,
-		config: PolicyConfig,
 		tenant_id: str,
-		updated_by: str
-	) -> bool:
-		"""Update an existing policy."""
-		try:
-			# Get policy with tenant validation
-			policy = await self._get_policy_by_id(policy_id, tenant_id)
-			if not policy:
-				raise APIManagementError(f"Policy {policy_id} not found")
-
-			# Validate policy configuration
-			await self._validate_policy_config(config)
-
-			# Update policy
-			policy.policy_name = config.policy_name
-			policy.policy_description = config.policy_description
-			policy.config = config.config
-			policy.execution_order = config.execution_order
-			policy.enabled = config.enabled
-			policy.conditions = config.conditions
-			policy.applies_to_endpoints = config.applies_to_endpoints
-
-			await self.db_session.commit()
-
-			# Clear cache
-			await self._invalidate_policy_cache(policy.api_id)
-
-			self._log_policy_operation("update", policy_id, updated_by)
-			return True
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to update policy: {str(e)}")
-
-	async def delete_policy(self, policy_id: str, tenant_id: str, deleted_by: str) -> bool:
-		"""Delete a policy."""
-		try:
-			# Get policy with tenant validation
-			policy = await self._get_policy_by_id(policy_id, tenant_id)
-			if not policy:
-				raise APIManagementError(f"Policy {policy_id} not found")
-
-			api_id = policy.api_id
-
-			await self.db_session.delete(policy)
-			await self.db_session.commit()
-
-			# Clear cache
-			await self._invalidate_policy_cache(api_id)
-
-			self._log_policy_operation("delete", policy_id, deleted_by)
-			return True
-
-		except Exception as e:
-			await self.db_session.rollback()
-			raise APIManagementError(f"Failed to delete policy: {str(e)}")
-
-	# Private helper methods
-
-	async def _validate_policy_config(self, config: PolicyConfig):
-		"""Validate policy configuration."""
-		# Basic validation based on policy type
-		if config.policy_type == PolicyType.RATE_LIMITING:
-			required_fields = ['requests_per_minute', 'window_size_seconds']
-			for field in required_fields:
-				if field not in config.config:
-					raise APIManagementError(f"Rate limiting policy requires '{field}' configuration")
-
-		elif config.policy_type == PolicyType.AUTHENTICATION:
-			if 'type' not in config.config:
-				raise APIManagementError("Authentication policy requires 'type' configuration")
-
-	async def _get_api_by_id(self, api_id: str, tenant_id: str) -> Optional[AMAPI]:
-		"""Get API by ID with tenant validation."""
-		result = await self.db_session.execute(
-			select(AMAPI).where(
-				and_(AMAPI.api_id == api_id, AMAPI.tenant_id == tenant_id)
-			)
-		)
-		return result.scalar_one_or_none()
-
-	async def _get_policy_by_id(self, policy_id: str, tenant_id: str) -> Optional[AMPolicy]:
-		"""Get policy by ID with tenant validation."""
-		result = await self.db_session.execute(
-			select(AMPolicy).join(AMAPI).where(
-				and_(
-					AMPolicy.policy_id == policy_id,
-					AMAPI.tenant_id == tenant_id
-				)
-			)
-		)
-		return result.scalar_one_or_none()
-
-	async def _invalidate_policy_cache(self, api_id: str):
-		"""Invalidate policy cache for an API."""
-		await self.cache.delete(f"policies:{api_id}")
-
-	def _log_policy_operation(self, operation: str, policy_id: str, user: str, extra: Optional[Dict] = None):
-		"""Log policy management operations."""
-		log_data = {
-			"operation": operation,
-			"policy_id": policy_id,
-			"user": user,
-			"timestamp": datetime.now(timezone.utc).isoformat()
-		}
-		if extra:
-			log_data.update(extra)
-
-		print(f"{self._log_prefix} {operation.upper()}: {json.dumps(log_data)}")
-
-# =============================================================================
-# Analytics Service
-# =============================================================================
-
-class AnalyticsService:
-	"""Service for collecting and analyzing API usage metrics."""
-
-	def __init__(self, db_session: AsyncSession, cache: aiocache.Cache):
-		self.db_session = db_session
-		self.cache = cache
-		self._log_prefix = "[AnalyticsService]"
-
-	async def record_api_usage(
-		self,
-		request_id: str,
-		consumer_id: str,
 		api_id: str,
-		endpoint_path: str,
-		method: str,
-		response_status: int,
-		response_time_ms: int,
-		request_size_bytes: Optional[int] = None,
-		response_size_bytes: Optional[int] = None,
-		client_ip: Optional[str] = None,
-		user_agent: Optional[str] = None,
-		tenant_id: str = "default"
-	):
-		"""Record API usage for analytics and billing."""
-		try:
-			usage_record = AMUsageRecord(
-				request_id=request_id,
-				consumer_id=consumer_id,
-				api_id=api_id,
-				endpoint_path=endpoint_path,
-				method=method,
-				timestamp=datetime.now(timezone.utc),
-				response_status=response_status,
-				response_time_ms=response_time_ms,
-				request_size_bytes=request_size_bytes,
-				response_size_bytes=response_size_bytes,
-				client_ip=client_ip,
-				user_agent=user_agent,
-				tenant_id=tenant_id
-			)
-
-			self.db_session.add(usage_record)
-			await self.db_session.commit()
-
-			# Update real-time metrics
-			await self._update_realtime_metrics(api_id, consumer_id, response_status, response_time_ms)
-
-		except Exception as e:
-			# Don't fail the API request if analytics recording fails
-			print(f"{self._log_prefix} Failed to record usage: {str(e)}")
-
-	async def get_api_metrics(
-		self,
-		api_id: str,
-		tenant_id: str,
-		start_time: Optional[datetime] = None,
-		end_time: Optional[datetime] = None,
-		granularity: str = "hour"
-	) -> Dict[str, Any]:
-		"""Get aggregated metrics for an API."""
-		try:
-			if not start_time:
-				start_time = datetime.now(timezone.utc) - timedelta(days=7)
-			if not end_time:
-				end_time = datetime.now(timezone.utc)
-
-			# Request count
-			request_count = await self._get_request_count(api_id, start_time, end_time)
-
-			# Error rate
-			error_rate = await self._get_error_rate(api_id, start_time, end_time)
-
-			# Average response time
-			avg_response_time = await self._get_average_response_time(api_id, start_time, end_time)
-
-			# Top consumers
-			top_consumers = await self._get_top_consumers(api_id, start_time, end_time)
-
-			# Time series data
-			time_series = await self._get_time_series_data(api_id, start_time, end_time, granularity)
-
-			return {
-				"api_id": api_id,
-				"period": {
-					"start": start_time.isoformat(),
-					"end": end_time.isoformat()
-				},
-				"summary": {
-					"total_requests": request_count,
-					"error_rate": error_rate,
-					"average_response_time_ms": avg_response_time
-				},
-				"top_consumers": top_consumers,
-				"time_series": time_series
-			}
-
-		except Exception as e:
-			raise APIManagementError(f"Failed to get API metrics: {str(e)}")
-
-	async def get_consumer_usage(
-		self,
-		consumer_id: str,
-		tenant_id: str,
-		start_time: Optional[datetime] = None,
-		end_time: Optional[datetime] = None
-	) -> Dict[str, Any]:
-		"""Get usage statistics for a consumer."""
-		try:
-			if not start_time:
-				start_time = datetime.now(timezone.utc) - timedelta(days=30)
-			if not end_time:
-				end_time = datetime.now(timezone.utc)
-
-			# Total requests
-			total_requests = await self._get_consumer_request_count(consumer_id, start_time, end_time)
-
-			# API breakdown
-			api_breakdown = await self._get_consumer_api_breakdown(consumer_id, start_time, end_time)
-
-			# Daily usage
-			daily_usage = await self._get_consumer_daily_usage(consumer_id, start_time, end_time)
-
-			return {
-				"consumer_id": consumer_id,
-				"period": {
-					"start": start_time.isoformat(),
-					"end": end_time.isoformat()
-				},
-				"total_requests": total_requests,
-				"api_breakdown": api_breakdown,
-				"daily_usage": daily_usage
-			}
-
-		except Exception as e:
-			raise APIManagementError(f"Failed to get consumer usage: {str(e)}")
-
-	# Private helper methods for analytics calculations
-
-	async def _update_realtime_metrics(self, api_id: str, consumer_id: str, status: int, response_time: int):
-		"""Update real-time metrics in cache."""
-		now = datetime.now(timezone.utc).isoformat()
-		api_key = f"metrics:realtime:api:{api_id}"
-		consumer_key = f"metrics:realtime:consumer:{consumer_id}"
-
-		api_metrics = await self.cache.get(api_key) or {
+		policy_type: str,
+		name: str,
+		config: dict[str, Any],
+		execution_order: int = 100,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		api = self.apis.get(api_id)
+		context = self._base_context(tenant, "attach_policy")
+		context.update({
+			"api_present": bool(api and api["tenant_id"] == tenant),
+			"name_present": bool(name),
+			"policy_type_supported": policy_type in SUPPORTED_POLICY_TYPES,
+			"config_present": bool(config),
+			"execution_order": execution_order,
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("policy", policy_id),
+			"type": "integration_api_policy",
+			"kind": "policy",
+			"tenant_id": tenant,
 			"api_id": api_id,
-			"total_requests": 0,
-			"error_count": 0,
-			"total_response_time_ms": 0,
-			"min_response_time_ms": None,
-			"max_response_time_ms": None,
-			"status_counts": {},
-			"consumer_counts": {},
-			"last_status": None,
-			"last_response_time_ms": None,
-			"updated_at": None
+			"policy_type": policy_type,
+			"name": name,
+			"config": deepcopy(config),
+			"execution_order": execution_order,
+			"status": "active",
+			"created_at": self._now(),
 		}
-		consumer_metrics = await self.cache.get(consumer_key) or {
-			"consumer_id": consumer_id,
-			"total_requests": 0,
-			"error_count": 0,
-			"total_response_time_ms": 0,
-			"api_counts": {},
-			"updated_at": None
-		}
+		self.policies[record["id"]] = record
+		self._emit(tenant, "policy_attached", record)
+		return deepcopy(record)
 
-		api_metrics["total_requests"] += 1
-		api_metrics["total_response_time_ms"] += response_time
-		api_metrics["last_status"] = status
-		api_metrics["last_response_time_ms"] = response_time
-		api_metrics["updated_at"] = now
-		api_metrics["min_response_time_ms"] = (
-			response_time
-			if api_metrics["min_response_time_ms"] is None
-			else min(api_metrics["min_response_time_ms"], response_time)
-		)
-		api_metrics["max_response_time_ms"] = (
-			response_time
-			if api_metrics["max_response_time_ms"] is None
-			else max(api_metrics["max_response_time_ms"], response_time)
-		)
-		if status >= 400:
-			api_metrics["error_count"] += 1
-		status_key = str(status)
-		api_metrics["status_counts"][status_key] = api_metrics["status_counts"].get(status_key, 0) + 1
-		api_metrics["consumer_counts"][consumer_id] = api_metrics["consumer_counts"].get(consumer_id, 0) + 1
-		api_metrics["average_response_time_ms"] = (
-			api_metrics["total_response_time_ms"] / api_metrics["total_requests"]
-		)
-		api_metrics["error_rate_percent"] = (
-			api_metrics["error_count"] / api_metrics["total_requests"]
-		) * 100
-
-		consumer_metrics["total_requests"] += 1
-		consumer_metrics["total_response_time_ms"] += response_time
-		if status >= 400:
-			consumer_metrics["error_count"] += 1
-		consumer_metrics["api_counts"][api_id] = consumer_metrics["api_counts"].get(api_id, 0) + 1
-		consumer_metrics["average_response_time_ms"] = (
-			consumer_metrics["total_response_time_ms"] / consumer_metrics["total_requests"]
-		)
-		consumer_metrics["error_rate_percent"] = (
-			consumer_metrics["error_count"] / consumer_metrics["total_requests"]
-		) * 100
-		consumer_metrics["updated_at"] = now
-
-		await self.cache.set(api_key, api_metrics, ttl=3600)
-		await self.cache.set(consumer_key, consumer_metrics, ttl=3600)
-
-	async def _get_request_count(self, api_id: str, start_time: datetime, end_time: datetime) -> int:
-		"""Get total request count for an API in time range."""
-		result = await self.db_session.execute(
-			select(func.count(AMUsageRecord.record_id)).where(
-				and_(
-					AMUsageRecord.api_id == api_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time
-				)
-			)
-		)
-		return result.scalar() or 0
-
-	async def _get_error_rate(self, api_id: str, start_time: datetime, end_time: datetime) -> float:
-		"""Calculate error rate for an API."""
-		total_result = await self.db_session.execute(
-			select(func.count(AMUsageRecord.record_id)).where(
-				and_(
-					AMUsageRecord.api_id == api_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time
-				)
-			)
-		)
-		total = total_result.scalar() or 0
-
-		if total == 0:
-			return 0.0
-
-		error_result = await self.db_session.execute(
-			select(func.count(AMUsageRecord.record_id)).where(
-				and_(
-					AMUsageRecord.api_id == api_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time,
-					AMUsageRecord.response_status >= 400
-				)
-			)
-		)
-		errors = error_result.scalar() or 0
-
-		return (errors / total) * 100
-
-	async def _get_average_response_time(self, api_id: str, start_time: datetime, end_time: datetime) -> float:
-		"""Get average response time for an API."""
-		result = await self.db_session.execute(
-			select(func.avg(AMUsageRecord.response_time_ms)).where(
-				and_(
-					AMUsageRecord.api_id == api_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time
-				)
-			)
-		)
-		return result.scalar() or 0.0
-
-	async def _get_top_consumers(self, api_id: str, start_time: datetime, end_time: datetime, limit: int = 10) -> List[Dict]:
-		"""Get top consumers by request count."""
-		result = await self.db_session.execute(
-			select(
-				AMUsageRecord.consumer_id,
-				func.count(AMUsageRecord.record_id).label('request_count')
-			).where(
-				and_(
-					AMUsageRecord.api_id == api_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time
-				)
-			).group_by(AMUsageRecord.consumer_id)
-			.order_by(func.count(AMUsageRecord.record_id).desc())
-			.limit(limit)
-		)
-
-		return [
-			{"consumer_id": row.consumer_id, "request_count": row.request_count}
-			for row in result
-		]
-
-	async def _get_time_series_data(
+	def register_consumer(
 		self,
+		consumer_id: str,
+		tenant_id: str,
+		name: str,
+		contact_email: str,
+		owner_id: str,
+		external: bool = False,
+		reviewed_by: str | None = None,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "register_consumer")
+		context.update({
+			"name_present": bool(name),
+			"email_present": bool(contact_email),
+			"email_valid": "@" in contact_email and "." in contact_email.rsplit("@", 1)[-1],
+			"owner_present": bool(owner_id),
+			"external_consumer": external,
+			"review_recorded": bool(reviewed_by),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("consumer", consumer_id),
+			"type": "integration_api_consumer",
+			"kind": "consumer",
+			"tenant_id": tenant,
+			"name": name,
+			"contact_email": contact_email,
+			"owner_id": owner_id,
+			"external": external,
+			"reviewed_by": reviewed_by,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.consumers[record["id"]] = record
+		self._emit(tenant, "consumer_registered", record)
+		return deepcopy(record)
+
+	def issue_api_key(
+		self,
+		key_id: str,
+		tenant_id: str,
+		consumer_id: str,
+		name: str,
+		scopes: list[str],
+		expires_on: str,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		consumer = self.consumers.get(consumer_id)
+		context = self._base_context(tenant, "issue_api_key")
+		context.update({
+			"consumer_present": bool(consumer and consumer["tenant_id"] == tenant),
+			"name_present": bool(name),
+			"scope_present": bool(scopes),
+			"expiration_present": bool(expires_on),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("key", key_id),
+			"type": "integration_api_key",
+			"kind": "api_key",
+			"tenant_id": tenant,
+			"consumer_id": consumer_id,
+			"name": name,
+			"key_prefix": f"apg_{uuid4().hex[:8]}",
+			"scopes": list(scopes),
+			"expires_on": expires_on,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.api_keys[record["id"]] = record
+		self._emit(tenant, "api_key_issued", record)
+		return deepcopy(record)
+
+	def create_subscription(
+		self,
+		subscription_id: str,
+		tenant_id: str,
+		consumer_id: str,
 		api_id: str,
-		start_time: datetime,
-		end_time: datetime,
-		granularity: str
-	) -> List[Dict]:
-		"""Get time series data for an API."""
-		# This would generate time series data based on granularity
-		# Simplified implementation
-		return []
+		plan: str,
+		approved_by: str,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		api = self.apis.get(api_id)
+		consumer = self.consumers.get(consumer_id)
+		context = self._base_context(tenant, "create_subscription")
+		context.update({
+			"consumer_present": bool(consumer and consumer["tenant_id"] == tenant),
+			"api_present": bool(api and api["tenant_id"] == tenant),
+			"plan_supported": plan in SUPPORTED_PLANS,
+			"approval_recorded": bool(approved_by),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("subscription", subscription_id),
+			"type": "integration_api_subscription",
+			"kind": "subscription",
+			"tenant_id": tenant,
+			"consumer_id": consumer_id,
+			"api_id": api_id,
+			"plan": plan,
+			"approved_by": approved_by,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.subscriptions[record["id"]] = record
+		self._emit(tenant, "subscription_created", record)
+		return deepcopy(record)
 
-	async def _get_consumer_request_count(self, consumer_id: str, start_time: datetime, end_time: datetime) -> int:
-		"""Get total request count for a consumer."""
-		result = await self.db_session.execute(
-			select(func.count(AMUsageRecord.record_id)).where(
-				and_(
-					AMUsageRecord.consumer_id == consumer_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time
-				)
-			)
+	def approve_api(self, api_id: str, tenant_id: str, approved_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		api = self.apis.get(api_id)
+		if not api or api["tenant_id"] != tenant:
+			raise PermissionError("api_required")
+		self._assert_rules({
+			**self._base_context(tenant, "approve_api"),
+			"approver_present": bool(approved_by),
+		})
+		api["approved_by"] = approved_by
+		api["status"] = "approved"
+		api["updated_at"] = self._now()
+		self._emit(tenant, "api_approved", api)
+		return deepcopy(api)
+
+	def deploy_api(
+		self,
+		deployment_id: str,
+		tenant_id: str,
+		api_id: str,
+		environment: str,
+		gateway_route: str,
+		deployed_by: str,
+		approved_by: str | None = None,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		api = self.apis.get(api_id)
+		context = self._base_context(tenant, "deploy_api")
+		context.update({
+			"api_present": bool(api and api["tenant_id"] == tenant),
+			"environment_supported": environment in SUPPORTED_ENVIRONMENTS,
+			"route_present": bool(gateway_route),
+			"deployer_present": bool(deployed_by),
+			"production_environment": environment == "prod",
+			"approval_recorded": bool(approved_by),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("deployment", deployment_id),
+			"type": "integration_api_deployment",
+			"kind": "deployment",
+			"tenant_id": tenant,
+			"api_id": api_id,
+			"environment": environment,
+			"gateway_route": gateway_route,
+			"deployed_by": deployed_by,
+			"approved_by": approved_by,
+			"status": "deployed",
+			"created_at": self._now(),
+		}
+		api["status"] = "deployed"
+		api["updated_at"] = self._now()
+		self.deployments[record["id"]] = record
+		self._emit(tenant, "api_deployed", record)
+		return deepcopy(record)
+
+	def record_usage(
+		self,
+		usage_id: str,
+		tenant_id: str,
+		api_id: str,
+		consumer_id: str | None,
+		endpoint_id: str | None,
+		status_code: int,
+		latency_ms: int,
+		reviewed_by: str | None = None,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		api = self.apis.get(api_id)
+		context = self._base_context(tenant, "record_usage")
+		context.update({
+			"api_present": bool(api and api["tenant_id"] == tenant),
+			"status_code_present": status_code is not None,
+			"latency_ms": latency_ms,
+			"slow_request": latency_ms >= 2000,
+			"review_recorded": bool(reviewed_by),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("usage", usage_id),
+			"type": "integration_api_usage",
+			"kind": "usage",
+			"tenant_id": tenant,
+			"api_id": api_id,
+			"consumer_id": consumer_id,
+			"endpoint_id": endpoint_id,
+			"status_code": status_code,
+			"latency_ms": latency_ms,
+			"reviewed_by": reviewed_by,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.usage_records[record["id"]] = record
+		self._emit(tenant, "usage_recorded", record)
+		return deepcopy(record)
+
+	def register_api_agent(self, tenant_id: str, name: str, runtime: str, role: str, scope: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "register_api_agent")
+		context.update({
+			"agent_runtime_supported": runtime in SUPPORTED_API_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_API_AGENT_ROLES,
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("agent"),
+			"type": "integration_api_agent",
+			"kind": "agent",
+			"tenant_id": tenant,
+			"name": name,
+			"runtime": runtime,
+			"role": role,
+			"scope": scope,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.agents[record["id"]] = record
+		self._emit(tenant, "api_agent_registered", record)
+		return deepcopy(record)
+
+	def validate_api_agent_action(self, tenant_id: str, agent_id: str, action: str, privileged_scope: bool, human_approval_recorded: bool) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		agent = self.agents.get(agent_id)
+		if not agent or agent["tenant_id"] != tenant:
+			raise PermissionError("api_agent_required")
+		result = evaluate_capability_rules({
+			"tenant_id": tenant,
+			"tenant_context_present": True,
+			"operation": "api_agent_action",
+			"action": action,
+			"privileged_scope": privileged_scope,
+			"human_approval_recorded": human_approval_recorded,
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+		return result
+
+	def validate_batch(self, tenant_id: str, event_count: int, event_stream: str = "bytewax") -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		self._assert_rules({
+			"tenant_id": tenant,
+			"tenant_context_present": True,
+			"operation": "api_batch",
+			"event_stream": event_stream,
+		})
+		return {"tenant_id": tenant, "event_count": event_count, "processor": "bytewax", "stream": API_EVENT_STREAM}
+
+	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "draft") -> dict[str, Any]:
+		data = dict(metadata or {})
+		record = self.register_api(
+			record_id,
+			tenant_id,
+			str(data.get("name") or data.get("api_name") or record_id),
+			str(data.get("title") or data.get("api_title") or record_id),
+			str(data.get("base_path") or f"/{record_id}"),
+			str(data.get("upstream_url") or "internal://service"),
+			str(data.get("owner_id") or "system"),
+			str(data.get("version") or "1.0.0"),
+			str(data.get("protocol") or "rest"),
+			str(data.get("auth_type") or "api_key"),
+			int(data.get("rate_limit_per_minute", 1000)),
+			data.get("reviewed_by"),
+			{"compatibility_status": status, **data},
 		)
-		return result.scalar() or 0
+		record["status"] = status
+		self.apis[record["id"]]["status"] = status
+		return record
 
-	async def _get_consumer_api_breakdown(self, consumer_id: str, start_time: datetime, end_time: datetime) -> List[Dict]:
-		"""Get API usage breakdown for a consumer."""
-		result = await self.db_session.execute(
-			select(
-				AMUsageRecord.api_id,
-				func.count(AMUsageRecord.record_id).label('request_count')
-			).where(
-				and_(
-					AMUsageRecord.consumer_id == consumer_id,
-					AMUsageRecord.timestamp >= start_time,
-					AMUsageRecord.timestamp <= end_time
-				)
-			).group_by(AMUsageRecord.api_id)
-			.order_by(func.count(AMUsageRecord.record_id).desc())
-		)
+	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		usage = self.list_records("usage_records", tenant)
+		return {
+			"tenant_id": tenant,
+			"api_count": len(self.list_records("apis", tenant)),
+			"endpoint_count": len(self.list_records("endpoints", tenant)),
+			"policy_count": len(self.list_records("policies", tenant)),
+			"consumer_count": len(self.list_records("consumers", tenant)),
+			"api_key_count": len(self.list_records("api_keys", tenant)),
+			"subscription_count": len(self.list_records("subscriptions", tenant)),
+			"deployment_count": len(self.list_records("deployments", tenant)),
+			"usage_record_count": len(usage),
+			"slow_request_count": len([record for record in usage if record["latency_ms"] >= 2000]),
+			"api_agent_count": len(self.list_records("agents", tenant)),
+			"audit_event_count": len(self.audit_events(tenant)),
+			"overall_status": "attention_required" if any(record["latency_ms"] >= 2000 for record in usage) else "operating",
+			"streaming": deepcopy(STREAMING),
+		}
 
-		return [
-			{"api_id": row.api_id, "request_count": row.request_count}
-			for row in result
-		]
+	def audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		return [deepcopy(event) for event in self._audit_events if event["tenant_id"] == tenant]
 
-	async def _get_consumer_daily_usage(self, consumer_id: str, start_time: datetime, end_time: datetime) -> List[Dict]:
-		"""Get daily usage data for a consumer."""
-		# This would generate daily usage statistics
-		# Simplified implementation
-		return []
+	def list_records(self, collection: str | None = None, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		if collection is None:
+			return self.list_all_records(tenant)
+		if not hasattr(self, collection):
+			raise KeyError(collection)
+		store = getattr(self, collection)
+		if isinstance(store, dict):
+			return [deepcopy(record) for record in store.values() if record["tenant_id"] == tenant]
+		if isinstance(store, list):
+			return [deepcopy(record) for record in store if record["tenant_id"] == tenant]
+		raise TypeError(f"{collection} is not a record collection")
 
-# Export all services
-__all__ = [
-	"APILifecycleService",
-	"ConsumerManagementService",
-	"PolicyManagementService",
-	"AnalyticsService",
-	"GatewayConfig",
-	"SecurityConfig",
-	"APIManagementError",
-	"APINotFoundError",
-	"ConsumerNotFoundError",
-	"AuthenticationError",
-	"AuthorizationError",
-	"RateLimitExceededError"
-]
+	def list_all_records(self, tenant_id: str) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		records: list[dict[str, Any]] = []
+		for collection in ["apis", "endpoints", "policies", "consumers", "api_keys", "subscriptions", "deployments", "usage_records", "agents"]:
+			records.extend(self.list_records(collection, tenant))
+		return sorted(records, key=lambda item: (item["kind"], item["id"]))
+
+
+APILifecycleService = IntApiService
+ConsumerManagementService = IntApiService
+PolicyManagementService = IntApiService
+AnalyticsService = IntApiService
+APIService = IntApiService

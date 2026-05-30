@@ -16,6 +16,87 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 01:14 EAT
+
+Integration API Management lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md`, `PLAN.md`, and `README.md` for
+  `capabilities/int/api`, and refreshed `cap_spec.md` with the active API
+  management runtime summary.
+- Replaced the generated contract wrapper with explicit API, endpoint, policy,
+  consumer, API-key, subscription, deployment, usage-analytics, API-agent,
+  governance, observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added 49 deterministic guardrails for tenant context, policy attachment, API
+  name/title/base path/upstream/owner/protocol/auth/rate limit/external-upstream
+  review, endpoint API/path/method, policy API/name/type/config/execution order,
+  consumer name/email/owner/external review, key consumer/name/scope/expiration,
+  subscription consumer/API/plan/approval, API approver, deployment API/
+  environment/route/deployer/production approval, usage API/status/latency/slow
+  request review, API batch/event Bytewax routing, API-agent runtime/role, and
+  privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light lifecycle helpers for APIs, endpoints, policies, consumers,
+  API keys, subscriptions, deployments, usage records, API-agent registration,
+  agent-action validation, batch validation, dashboard summaries, API wrappers,
+  screen models, semantic model, component manifest, and package self-test.
+- Preserved `APILifecycleService`, `ConsumerManagementService`,
+  `PolicyManagementService`, `AnalyticsService`, and `APIService` as
+  compatibility aliases while keeping live gateway, database, portal, auth,
+  discovery, analytics, and event-topology adapters outside the top-level APG
+  surface.
+- Added first-class API-agent composition metadata for Codex, Claude Code,
+  OpenCode, and Pi runtimes across API design, policy, security, consumer,
+  deployment, and analytics review roles.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the executable app surface.
+- Replaced the old generated package test with focused contract, rule, service,
+  guardrail, API/view, app, semantic, Bytewax, and agent tests.
+- Removed stale generated planning material and cleaned stale marker wording in
+  INT API helper modules and evidence files.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/int/api/__init__.py
+  capabilities/int/api/capability_contract.py
+  capabilities/int/api/service.py
+  capabilities/int/api/api.py
+  capabilities/int/api/views.py
+  capabilities/int/api/app.py
+  capabilities/int/api/tests/test_package_contract.py` passed.
+- Syntax-only compile for adjacent helper modules (`discovery.py`,
+  `integration.py`, `monitoring.py`, `gateway.py`, `factory.py`, `runner.py`,
+  and `config.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/int/api/tests/test_package_contract.py` passed with 6 tests and
+  5 pre-existing SQLAlchemy/Pydantic deprecation warnings from `models.py`,
+  `config.py`, and `discovery.py`.
+- `./.venv/bin/python capabilities/int/api/app.py` passed package self-test.
+- `./.venv/bin/apg capabilities inspect int_api --json` confirmed `ok: true`,
+  11 routes, 49 rules, and `int_api_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/int/api --json`
+  confirmed side-effect-free publish planning with Bytewax stream metadata and
+  no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/int/api --json` passed with `domain_specific` implementation
+  level and 0 baseline markers.
+- Semantic metadata probe confirmed `bytewax`, `api_agents`, the agents route,
+  supported-agent runtime guardrail, Bytewax batch guardrail, external upstream
+  review guardrail, API approver guardrail, and deployment deployer guardrail.
+- Service smoke executed API -> endpoint -> policy -> consumer -> key ->
+  subscription -> approval -> deployment -> usage -> API agent and produced 10
+  audit events.
+- INT API stale-marker scan returned no matches.
+- `git diff --check -- capabilities/int/api docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live gateway
+  routing, durable API stores, live auth/audit/notification/discovery/developer
+  portal/policy/analytics adapters, durable Bytewax topology, load/performance
+  checks, or failover checks during this battery-conscious slice.
+
 ### 2026-05-31 01:01 EAT
 
 GRC document management lifecycle/guardrail packet:

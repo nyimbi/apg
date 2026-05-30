@@ -1,60 +1,204 @@
 {
-  "agents": {},
   "app": {
     "description": "Integration API Management package-backed APG capability",
-    "entity_count": 0,
+    "entity_count": 9,
     "name": "int_api",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "int_api": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "General Cross-Functional",
-          "enabled": true,
-          "id": "int_api",
-          "name": "Integration API Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/int/api/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "analytics_sink": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "developer_portal": "adapter",
+          "event_stream": "bytewax",
+          "gateway": "adapter",
+          "notification": "adapter",
+          "policy_management": "adapter",
+          "service_discovery": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "analytics": {
+          "api_required": true,
+          "latency_required": true,
+          "latency_review_threshold_ms": 2000,
+          "status_code_required": true
+        },
+        "api_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "review_prepare_and_recommend",
+          "supported_roles": [
+            "api_designer",
+            "policy_reviewer",
+            "security_reviewer",
+            "consumer_reviewer",
+            "deployment_reviewer",
+            "analytics_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "api_keys": {
+          "consumer_required": true,
+          "expiration_required": true,
+          "name_required": true,
+          "scope_required": true
+        },
+        "apis": {
+          "base_path_required": true,
+          "default_rate_limit_minimum": 1,
+          "external_upstream_review_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_auth_types": [
+            "api_key",
+            "oauth2",
+            "jwt",
+            "mtls",
+            "none"
+          ],
+          "supported_protocols": [
+            "rest",
+            "graphql",
+            "grpc",
+            "webhook"
+          ],
+          "title_required": true,
+          "upstream_required": true
+        },
+        "consumers": {
+          "contact_email_required": true,
+          "external_consumer_review_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "deployments": {
+          "api_required": true,
+          "deployer_required": true,
+          "production_approval_required": true,
+          "route_required": true,
+          "supported_environments": [
+            "dev",
+            "test",
+            "stage",
+            "prod"
+          ]
+        },
+        "endpoints": {
+          "api_required": true,
+          "auth_required_by_default": true,
+          "path_required": true,
+          "supported_methods": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_analytics_events": true,
+          "emit_api_events": true,
+          "emit_consumer_events": true,
+          "emit_deployment_events": true,
+          "emit_endpoint_events": true,
+          "emit_key_events": true,
+          "emit_policy_events": true,
+          "emit_subscription_events": true,
+          "event_stream": "apg.int.api.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "policies": {
+          "config_required": true,
+          "execution_order_required": true,
+          "name_required": true,
+          "supported_policy_types": [
+            "rate_limit",
+            "quota",
+            "auth",
+            "transform",
+            "cors",
+            "ip_filter",
+            "circuit_breaker"
+          ]
+        },
+        "subscriptions": {
+          "api_required": true,
+          "approval_required": true,
+          "consumer_required": true,
+          "supported_plans": [
+            "sandbox",
+            "standard",
+            "premium",
+            "internal"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "int_api_operations"
+          "default_theme": "int_api_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_analytics": true,
+          "enable_apis": true,
+          "enable_consumers": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_deployments": true,
+          "enable_endpoints": true,
+          "enable_keys": true,
+          "enable_policies": true,
+          "enable_settings": true,
+          "enable_subscriptions": true
         }
       },
-      "erp_modules": [
-        "int"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Integration API Management",
       "provides": [
-        "int_api_operations"
+        "api_registry_lifecycle",
+        "api_endpoint_lifecycle",
+        "api_policy_lifecycle",
+        "api_consumer_lifecycle",
+        "api_key_lifecycle",
+        "api_subscription_lifecycle",
+        "api_deployment_workflow",
+        "api_gateway_route_catalog",
+        "api_analytics_workflow",
+        "api_dashboard_service",
+        "api_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "policy_management",
+        "service_discovery",
+        "developer_portal"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Integration API Management operations require tenant context.",
+            "description": "API management operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +211,629 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Integration API Management write operations require policy enforcement.",
+            "description": "API management writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "api_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "name_present": false,
+              "operation": "register_api"
             },
-            "description": "High-risk Integration API Management operations require review.",
+            "description": "APIs require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_name_required",
+              "required_action": "set_api_name"
+            },
+            "name": "api_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "register_api",
+              "title_present": false
+            },
+            "description": "APIs require title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_title_required",
+              "required_action": "set_api_title"
+            },
+            "name": "api_requires_title"
+          },
+          {
+            "condition": {
+              "base_path_present": false,
+              "operation": "register_api"
+            },
+            "description": "APIs require base path.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_base_path_required",
+              "required_action": "set_base_path"
+            },
+            "name": "api_requires_base_path"
+          },
+          {
+            "condition": {
+              "base_path_valid": false,
+              "operation": "register_api"
+            },
+            "description": "API base path must start with slash.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_base_path_invalid",
+              "required_action": "set_valid_base_path"
+            },
+            "name": "api_base_path_format"
+          },
+          {
+            "condition": {
+              "operation": "register_api",
+              "upstream_present": false
+            },
+            "description": "APIs require upstream URL.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_upstream_required",
+              "required_action": "set_upstream_url"
+            },
+            "name": "api_requires_upstream"
+          },
+          {
+            "condition": {
+              "operation": "register_api",
+              "owner_present": false
+            },
+            "description": "APIs require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_owner_required",
+              "required_action": "assign_api_owner"
+            },
+            "name": "api_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_api",
+              "protocol_supported": false
+            },
+            "description": "API protocol must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_protocol_not_supported",
+              "required_action": "select_supported_protocol"
+            },
+            "name": "api_protocol_supported"
+          },
+          {
+            "condition": {
+              "auth_type_supported": false,
+              "operation": "register_api"
+            },
+            "description": "API authentication type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_auth_type_not_supported",
+              "required_action": "select_supported_auth_type"
+            },
+            "name": "api_auth_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_api",
+              "rate_limit_lte": 0
+            },
+            "description": "API rate limit must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_rate_limit_required",
+              "required_action": "set_rate_limit"
+            },
+            "name": "api_rate_limit_positive"
+          },
+          {
+            "condition": {
+              "external_upstream": true,
+              "operation": "register_api",
+              "review_recorded": false
+            },
+            "description": "External upstream APIs require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "external_upstream_review_required",
+              "required_action": "record_upstream_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "external_upstream_requires_review"
+          },
+          {
+            "condition": {
+              "api_present": false,
+              "operation": "register_endpoint"
+            },
+            "description": "Endpoints require API.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_required",
+              "required_action": "select_api"
+            },
+            "name": "endpoint_requires_api"
+          },
+          {
+            "condition": {
+              "operation": "register_endpoint",
+              "path_present": false
+            },
+            "description": "Endpoints require path.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_path_required",
+              "required_action": "set_endpoint_path"
+            },
+            "name": "endpoint_requires_path"
+          },
+          {
+            "condition": {
+              "operation": "register_endpoint",
+              "path_valid": false
+            },
+            "description": "Endpoint path must start with slash.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_path_invalid",
+              "required_action": "set_valid_endpoint_path"
+            },
+            "name": "endpoint_path_format"
+          },
+          {
+            "condition": {
+              "method_supported": false,
+              "operation": "register_endpoint"
+            },
+            "description": "Endpoint method must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "endpoint_method_not_supported",
+              "required_action": "select_supported_method"
+            },
+            "name": "endpoint_method_supported"
+          },
+          {
+            "condition": {
+              "api_present": false,
+              "operation": "attach_policy"
+            },
+            "description": "Policies require API.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_required",
+              "required_action": "select_api"
+            },
+            "name": "policy_requires_api"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "attach_policy"
+            },
+            "description": "Policies require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_name_required",
+              "required_action": "set_policy_name"
+            },
+            "name": "policy_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "attach_policy",
+              "policy_type_supported": false
+            },
+            "description": "Policy type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_type_not_supported",
+              "required_action": "select_supported_policy_type"
+            },
+            "name": "policy_type_supported"
+          },
+          {
+            "condition": {
+              "config_present": false,
+              "operation": "attach_policy"
+            },
+            "description": "Policies require configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_config_required",
+              "required_action": "set_policy_config"
+            },
+            "name": "policy_requires_config"
+          },
+          {
+            "condition": {
+              "execution_order_lt": 0,
+              "operation": "attach_policy"
+            },
+            "description": "Policy execution order must be nonnegative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_execution_order_invalid",
+              "required_action": "set_execution_order"
+            },
+            "name": "policy_execution_order_nonnegative"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "register_consumer"
+            },
+            "description": "Consumers require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_name_required",
+              "required_action": "set_consumer_name"
+            },
+            "name": "consumer_requires_name"
+          },
+          {
+            "condition": {
+              "email_present": false,
+              "operation": "register_consumer"
+            },
+            "description": "Consumers require contact email.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_email_required",
+              "required_action": "set_contact_email"
+            },
+            "name": "consumer_requires_email"
+          },
+          {
+            "condition": {
+              "email_valid": false,
+              "operation": "register_consumer"
+            },
+            "description": "Consumer email must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_email_invalid",
+              "required_action": "set_valid_email"
+            },
+            "name": "consumer_email_format"
+          },
+          {
+            "condition": {
+              "operation": "register_consumer",
+              "owner_present": false
+            },
+            "description": "Consumers require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_owner_required",
+              "required_action": "assign_consumer_owner"
+            },
+            "name": "consumer_requires_owner"
+          },
+          {
+            "condition": {
+              "external_consumer": true,
+              "operation": "register_consumer",
+              "review_recorded": false
+            },
+            "description": "External consumers require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "external_consumer_review_required",
+              "required_action": "record_consumer_review"
+            },
+            "name": "external_consumer_requires_review"
+          },
+          {
+            "condition": {
+              "consumer_present": false,
+              "operation": "issue_api_key"
+            },
+            "description": "API keys require consumer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_required",
+              "required_action": "select_consumer"
+            },
+            "name": "api_key_requires_consumer"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "issue_api_key"
+            },
+            "description": "API keys require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_key_name_required",
+              "required_action": "set_key_name"
+            },
+            "name": "api_key_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "issue_api_key",
+              "scope_present": false
+            },
+            "description": "API keys require scopes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_key_scope_required",
+              "required_action": "set_key_scope"
+            },
+            "name": "api_key_requires_scope"
+          },
+          {
+            "condition": {
+              "expiration_present": false,
+              "operation": "issue_api_key"
+            },
+            "description": "API keys require expiration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_key_expiration_required",
+              "required_action": "set_key_expiration"
+            },
+            "name": "api_key_requires_expiration"
+          },
+          {
+            "condition": {
+              "consumer_present": false,
+              "operation": "create_subscription"
+            },
+            "description": "Subscriptions require consumer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_required",
+              "required_action": "select_consumer"
+            },
+            "name": "subscription_requires_consumer"
+          },
+          {
+            "condition": {
+              "api_present": false,
+              "operation": "create_subscription"
+            },
+            "description": "Subscriptions require API.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_required",
+              "required_action": "select_api"
+            },
+            "name": "subscription_requires_api"
+          },
+          {
+            "condition": {
+              "operation": "create_subscription",
+              "plan_supported": false
+            },
+            "description": "Subscription plan must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "subscription_plan_not_supported",
+              "required_action": "select_supported_plan"
+            },
+            "name": "subscription_plan_supported"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_subscription"
+            },
+            "description": "Subscriptions require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "subscription_approval_required",
+              "required_action": "record_subscription_approval"
+            },
+            "name": "subscription_requires_approval"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "approve_api"
+            },
+            "description": "API approval requires approver.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_approver_required",
+              "required_action": "assign_api_approver"
+            },
+            "name": "api_approval_requires_approver"
+          },
+          {
+            "condition": {
+              "api_present": false,
+              "operation": "deploy_api"
+            },
+            "description": "Deployments require API.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_required",
+              "required_action": "select_api"
+            },
+            "name": "deployment_requires_api"
+          },
+          {
+            "condition": {
+              "environment_supported": false,
+              "operation": "deploy_api"
+            },
+            "description": "Deployment environment must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "environment_not_supported",
+              "required_action": "select_supported_environment"
+            },
+            "name": "deployment_environment_supported"
+          },
+          {
+            "condition": {
+              "operation": "deploy_api",
+              "route_present": false
+            },
+            "description": "Deployments require gateway route.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_route_required",
+              "required_action": "set_gateway_route"
+            },
+            "name": "deployment_requires_route"
+          },
+          {
+            "condition": {
+              "deployer_present": false,
+              "operation": "deploy_api"
+            },
+            "description": "Deployments require deployer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployer_required",
+              "required_action": "assign_deployer"
+            },
+            "name": "deployment_requires_deployer"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "deploy_api",
+              "production_environment": true
+            },
+            "description": "Production deployments require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "production_deployment_approval_required",
+              "required_action": "record_deployment_approval"
+            },
+            "name": "production_deployment_requires_approval"
+          },
+          {
+            "condition": {
+              "api_present": false,
+              "operation": "record_usage"
+            },
+            "description": "Usage records require API.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_required",
+              "required_action": "select_api"
+            },
+            "name": "usage_requires_api"
+          },
+          {
+            "condition": {
+              "operation": "record_usage",
+              "status_code_present": false
+            },
+            "description": "Usage records require status code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "status_code_required",
+              "required_action": "set_status_code"
+            },
+            "name": "usage_status_code_required"
+          },
+          {
+            "condition": {
+              "latency_ms_lt": 0,
+              "operation": "record_usage"
+            },
+            "description": "Usage latency must be nonnegative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "latency_invalid",
+              "required_action": "set_valid_latency"
+            },
+            "name": "usage_latency_nonnegative"
+          },
+          {
+            "condition": {
+              "operation": "record_usage",
+              "review_recorded": false,
+              "slow_request": true
+            },
+            "description": "Slow API usage requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "slow_request_review_required",
+              "required_action": "record_latency_review"
+            },
+            "name": "slow_usage_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "api_batch"
+            },
+            "description": "API batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_api_batch_to_bytewax"
+            },
+            "name": "api_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "api_event"
+            },
+            "description": "API events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_api_event_to_bytewax"
+            },
+            "name": "api_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_api_agent"
+            },
+            "description": "API agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "api_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_api_agent"
+            },
+            "description": "API agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "api_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "api_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged API actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_api_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +843,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Integration API Management operations require tenant context.",
+          "description": "API management operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +856,629 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Integration API Management write operations require policy enforcement.",
+          "description": "API management writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "api_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "name_present": false,
+            "operation": "register_api"
           },
-          "description": "High-risk Integration API Management operations require review.",
+          "description": "APIs require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_name_required",
+            "required_action": "set_api_name"
+          },
+          "name": "api_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "register_api",
+            "title_present": false
+          },
+          "description": "APIs require title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_title_required",
+            "required_action": "set_api_title"
+          },
+          "name": "api_requires_title"
+        },
+        {
+          "condition": {
+            "base_path_present": false,
+            "operation": "register_api"
+          },
+          "description": "APIs require base path.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_base_path_required",
+            "required_action": "set_base_path"
+          },
+          "name": "api_requires_base_path"
+        },
+        {
+          "condition": {
+            "base_path_valid": false,
+            "operation": "register_api"
+          },
+          "description": "API base path must start with slash.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_base_path_invalid",
+            "required_action": "set_valid_base_path"
+          },
+          "name": "api_base_path_format"
+        },
+        {
+          "condition": {
+            "operation": "register_api",
+            "upstream_present": false
+          },
+          "description": "APIs require upstream URL.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_upstream_required",
+            "required_action": "set_upstream_url"
+          },
+          "name": "api_requires_upstream"
+        },
+        {
+          "condition": {
+            "operation": "register_api",
+            "owner_present": false
+          },
+          "description": "APIs require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_owner_required",
+            "required_action": "assign_api_owner"
+          },
+          "name": "api_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_api",
+            "protocol_supported": false
+          },
+          "description": "API protocol must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_protocol_not_supported",
+            "required_action": "select_supported_protocol"
+          },
+          "name": "api_protocol_supported"
+        },
+        {
+          "condition": {
+            "auth_type_supported": false,
+            "operation": "register_api"
+          },
+          "description": "API authentication type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_auth_type_not_supported",
+            "required_action": "select_supported_auth_type"
+          },
+          "name": "api_auth_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_api",
+            "rate_limit_lte": 0
+          },
+          "description": "API rate limit must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_rate_limit_required",
+            "required_action": "set_rate_limit"
+          },
+          "name": "api_rate_limit_positive"
+        },
+        {
+          "condition": {
+            "external_upstream": true,
+            "operation": "register_api",
+            "review_recorded": false
+          },
+          "description": "External upstream APIs require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "external_upstream_review_required",
+            "required_action": "record_upstream_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "external_upstream_requires_review"
+        },
+        {
+          "condition": {
+            "api_present": false,
+            "operation": "register_endpoint"
+          },
+          "description": "Endpoints require API.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_required",
+            "required_action": "select_api"
+          },
+          "name": "endpoint_requires_api"
+        },
+        {
+          "condition": {
+            "operation": "register_endpoint",
+            "path_present": false
+          },
+          "description": "Endpoints require path.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_path_required",
+            "required_action": "set_endpoint_path"
+          },
+          "name": "endpoint_requires_path"
+        },
+        {
+          "condition": {
+            "operation": "register_endpoint",
+            "path_valid": false
+          },
+          "description": "Endpoint path must start with slash.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_path_invalid",
+            "required_action": "set_valid_endpoint_path"
+          },
+          "name": "endpoint_path_format"
+        },
+        {
+          "condition": {
+            "method_supported": false,
+            "operation": "register_endpoint"
+          },
+          "description": "Endpoint method must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "endpoint_method_not_supported",
+            "required_action": "select_supported_method"
+          },
+          "name": "endpoint_method_supported"
+        },
+        {
+          "condition": {
+            "api_present": false,
+            "operation": "attach_policy"
+          },
+          "description": "Policies require API.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_required",
+            "required_action": "select_api"
+          },
+          "name": "policy_requires_api"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "attach_policy"
+          },
+          "description": "Policies require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_name_required",
+            "required_action": "set_policy_name"
+          },
+          "name": "policy_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "attach_policy",
+            "policy_type_supported": false
+          },
+          "description": "Policy type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_type_not_supported",
+            "required_action": "select_supported_policy_type"
+          },
+          "name": "policy_type_supported"
+        },
+        {
+          "condition": {
+            "config_present": false,
+            "operation": "attach_policy"
+          },
+          "description": "Policies require configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_config_required",
+            "required_action": "set_policy_config"
+          },
+          "name": "policy_requires_config"
+        },
+        {
+          "condition": {
+            "execution_order_lt": 0,
+            "operation": "attach_policy"
+          },
+          "description": "Policy execution order must be nonnegative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_execution_order_invalid",
+            "required_action": "set_execution_order"
+          },
+          "name": "policy_execution_order_nonnegative"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "register_consumer"
+          },
+          "description": "Consumers require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_name_required",
+            "required_action": "set_consumer_name"
+          },
+          "name": "consumer_requires_name"
+        },
+        {
+          "condition": {
+            "email_present": false,
+            "operation": "register_consumer"
+          },
+          "description": "Consumers require contact email.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_email_required",
+            "required_action": "set_contact_email"
+          },
+          "name": "consumer_requires_email"
+        },
+        {
+          "condition": {
+            "email_valid": false,
+            "operation": "register_consumer"
+          },
+          "description": "Consumer email must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_email_invalid",
+            "required_action": "set_valid_email"
+          },
+          "name": "consumer_email_format"
+        },
+        {
+          "condition": {
+            "operation": "register_consumer",
+            "owner_present": false
+          },
+          "description": "Consumers require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_owner_required",
+            "required_action": "assign_consumer_owner"
+          },
+          "name": "consumer_requires_owner"
+        },
+        {
+          "condition": {
+            "external_consumer": true,
+            "operation": "register_consumer",
+            "review_recorded": false
+          },
+          "description": "External consumers require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "external_consumer_review_required",
+            "required_action": "record_consumer_review"
+          },
+          "name": "external_consumer_requires_review"
+        },
+        {
+          "condition": {
+            "consumer_present": false,
+            "operation": "issue_api_key"
+          },
+          "description": "API keys require consumer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_required",
+            "required_action": "select_consumer"
+          },
+          "name": "api_key_requires_consumer"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "issue_api_key"
+          },
+          "description": "API keys require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_key_name_required",
+            "required_action": "set_key_name"
+          },
+          "name": "api_key_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "issue_api_key",
+            "scope_present": false
+          },
+          "description": "API keys require scopes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_key_scope_required",
+            "required_action": "set_key_scope"
+          },
+          "name": "api_key_requires_scope"
+        },
+        {
+          "condition": {
+            "expiration_present": false,
+            "operation": "issue_api_key"
+          },
+          "description": "API keys require expiration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_key_expiration_required",
+            "required_action": "set_key_expiration"
+          },
+          "name": "api_key_requires_expiration"
+        },
+        {
+          "condition": {
+            "consumer_present": false,
+            "operation": "create_subscription"
+          },
+          "description": "Subscriptions require consumer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_required",
+            "required_action": "select_consumer"
+          },
+          "name": "subscription_requires_consumer"
+        },
+        {
+          "condition": {
+            "api_present": false,
+            "operation": "create_subscription"
+          },
+          "description": "Subscriptions require API.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_required",
+            "required_action": "select_api"
+          },
+          "name": "subscription_requires_api"
+        },
+        {
+          "condition": {
+            "operation": "create_subscription",
+            "plan_supported": false
+          },
+          "description": "Subscription plan must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "subscription_plan_not_supported",
+            "required_action": "select_supported_plan"
+          },
+          "name": "subscription_plan_supported"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_subscription"
+          },
+          "description": "Subscriptions require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "subscription_approval_required",
+            "required_action": "record_subscription_approval"
+          },
+          "name": "subscription_requires_approval"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "approve_api"
+          },
+          "description": "API approval requires approver.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_approver_required",
+            "required_action": "assign_api_approver"
+          },
+          "name": "api_approval_requires_approver"
+        },
+        {
+          "condition": {
+            "api_present": false,
+            "operation": "deploy_api"
+          },
+          "description": "Deployments require API.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_required",
+            "required_action": "select_api"
+          },
+          "name": "deployment_requires_api"
+        },
+        {
+          "condition": {
+            "environment_supported": false,
+            "operation": "deploy_api"
+          },
+          "description": "Deployment environment must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "environment_not_supported",
+            "required_action": "select_supported_environment"
+          },
+          "name": "deployment_environment_supported"
+        },
+        {
+          "condition": {
+            "operation": "deploy_api",
+            "route_present": false
+          },
+          "description": "Deployments require gateway route.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_route_required",
+            "required_action": "set_gateway_route"
+          },
+          "name": "deployment_requires_route"
+        },
+        {
+          "condition": {
+            "deployer_present": false,
+            "operation": "deploy_api"
+          },
+          "description": "Deployments require deployer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployer_required",
+            "required_action": "assign_deployer"
+          },
+          "name": "deployment_requires_deployer"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "deploy_api",
+            "production_environment": true
+          },
+          "description": "Production deployments require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "production_deployment_approval_required",
+            "required_action": "record_deployment_approval"
+          },
+          "name": "production_deployment_requires_approval"
+        },
+        {
+          "condition": {
+            "api_present": false,
+            "operation": "record_usage"
+          },
+          "description": "Usage records require API.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_required",
+            "required_action": "select_api"
+          },
+          "name": "usage_requires_api"
+        },
+        {
+          "condition": {
+            "operation": "record_usage",
+            "status_code_present": false
+          },
+          "description": "Usage records require status code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "status_code_required",
+            "required_action": "set_status_code"
+          },
+          "name": "usage_status_code_required"
+        },
+        {
+          "condition": {
+            "latency_ms_lt": 0,
+            "operation": "record_usage"
+          },
+          "description": "Usage latency must be nonnegative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "latency_invalid",
+            "required_action": "set_valid_latency"
+          },
+          "name": "usage_latency_nonnegative"
+        },
+        {
+          "condition": {
+            "operation": "record_usage",
+            "review_recorded": false,
+            "slow_request": true
+          },
+          "description": "Slow API usage requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "slow_request_review_required",
+            "required_action": "record_latency_review"
+          },
+          "name": "slow_usage_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "api_batch"
+          },
+          "description": "API batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_api_batch_to_bytewax"
+          },
+          "name": "api_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "api_event"
+          },
+          "description": "API events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_api_event_to_bytewax"
+          },
+          "name": "api_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_api_agent"
+          },
+          "description": "API agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "api_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_api_agent"
+          },
+          "description": "API agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "api_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "api_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged API actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_api_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,55 +1488,141 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "ApiAgentWorkbench",
+          "permission": "int_api:admin",
+          "route": "/int-api/agents"
+        },
+        "analytics": {
+          "component": "ApiAnalyticsDashboard",
+          "permission": "int_api:view_analytics",
+          "route": "/int-api/analytics"
+        },
+        "apis": {
+          "component": "ApiRegistryWorkbench",
+          "permission": "int_api:manage_apis",
+          "route": "/int-api/apis"
+        },
+        "consumers": {
+          "component": "ConsumerWorkbench",
+          "permission": "int_api:manage_consumers",
+          "route": "/int-api/consumers"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "ApiManagementDashboard",
           "permission": "int_api:view",
           "route": "/int-api/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "int_api:operate",
-          "route": "/int-api/operations"
+        "deployments": {
+          "component": "DeploymentWorkbench",
+          "permission": "int_api:deploy",
+          "route": "/int-api/deployments"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "int_api:govern",
-          "route": "/int-api/rules"
+        "endpoints": {
+          "component": "EndpointWorkbench",
+          "permission": "int_api:manage_endpoints",
+          "route": "/int-api/endpoints"
+        },
+        "keys": {
+          "component": "ApiKeyWorkbench",
+          "permission": "int_api:manage_keys",
+          "route": "/int-api/keys"
+        },
+        "policies": {
+          "component": "PolicyWorkbench",
+          "permission": "int_api:manage_policies",
+          "route": "/int-api/policies"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "ApiManagementSettings",
           "permission": "int_api:admin",
           "route": "/int-api/settings"
+        },
+        "subscriptions": {
+          "component": "SubscriptionWorkbench",
+          "permission": "int_api:manage_subscriptions",
+          "route": "/int-api/subscriptions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "api_registered",
+          "endpoint_registered",
+          "policy_attached",
+          "consumer_registered",
+          "api_key_issued",
+          "subscription_created",
+          "api_approved",
+          "api_deployed",
+          "usage_recorded",
+          "api_agent_registered"
+        ],
+        "guardrails": [
+          "api_batch_requires_bytewax",
+          "api_event_requires_bytewax",
+          "privileged_api_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "approved",
+          "deployed",
+          "suspended",
+          "revoked",
+          "queued",
+          "blocked"
+        ],
+        "stream": "apg.int.api.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
+          "analytics": {
             "status_style": "sla-chip",
-            "visual": "work-queue"
+            "visual": "metrics-grid"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "apis": {
+            "icon": "network",
+            "status_indicator": "api-pill",
+            "visual": "registry-list"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "consumers": {
+            "status_style": "consumer-chip",
+            "visual": "consumer-list"
+          },
+          "deployments": {
+            "status_style": "environment-chip",
+            "visual": "deployment-lane"
+          },
+          "endpoints": {
+            "status_style": "method-chip",
+            "visual": "route-table"
+          },
+          "keys": {
+            "status_style": "key-chip",
+            "visual": "key-ledger"
+          },
+          "policies": {
+            "status_style": "policy-chip",
+            "visual": "policy-stack"
+          },
+          "subscriptions": {
+            "status_style": "plan-chip",
+            "visual": "subscription-board"
           }
         },
-        "name": "int_api_operations",
+        "name": "int_api_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
-          "color.danger": "#C53030",
+          "color.accent": "#6B5B95",
+          "color.danger": "#B42318",
           "color.primary": "#28536B",
-          "color.success": "#2F855A",
+          "color.success": "#237A57",
           "color.warning": "#B7791F",
           "density": "compact",
           "surface.canvas": "#F7F8FA",
@@ -200,28 +1636,77 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "ApiManagementDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/int-api/dashboard",
             "permission": "int_api:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/int-api/operations",
-            "permission": "int_api:operate"
+            "component": "ApiRegistryWorkbench",
+            "name": "apis",
+            "nav_group": "APIs",
+            "path": "/int-api/apis",
+            "permission": "int_api:manage_apis"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "EndpointWorkbench",
+            "name": "endpoints",
+            "nav_group": "APIs",
+            "path": "/int-api/endpoints",
+            "permission": "int_api:manage_endpoints"
+          },
+          {
+            "component": "PolicyWorkbench",
+            "name": "policies",
             "nav_group": "Governance",
-            "path": "/int-api/rules",
-            "permission": "int_api:govern"
+            "path": "/int-api/policies",
+            "permission": "int_api:manage_policies"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ConsumerWorkbench",
+            "name": "consumers",
+            "nav_group": "Consumers",
+            "path": "/int-api/consumers",
+            "permission": "int_api:manage_consumers"
+          },
+          {
+            "component": "ApiKeyWorkbench",
+            "name": "keys",
+            "nav_group": "Consumers",
+            "path": "/int-api/keys",
+            "permission": "int_api:manage_keys"
+          },
+          {
+            "component": "SubscriptionWorkbench",
+            "name": "subscriptions",
+            "nav_group": "Consumers",
+            "path": "/int-api/subscriptions",
+            "permission": "int_api:manage_subscriptions"
+          },
+          {
+            "component": "DeploymentWorkbench",
+            "name": "deployments",
+            "nav_group": "Gateway",
+            "path": "/int-api/deployments",
+            "permission": "int_api:deploy"
+          },
+          {
+            "component": "ApiAnalyticsDashboard",
+            "name": "analytics",
+            "nav_group": "Analytics",
+            "path": "/int-api/analytics",
+            "permission": "int_api:view_analytics"
+          },
+          {
+            "component": "ApiAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/int-api/agents",
+            "permission": "int_api:admin"
+          },
+          {
+            "component": "ApiManagementSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/int-api/settings",
@@ -234,50 +1719,230 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "api_governance_review": {
+        "roles": [
+          "api_designer",
+          "policy_reviewer",
+          "security_reviewer",
+          "consumer_reviewer",
+          "deployment_reviewer",
+          "analytics_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "int_api": []
+      "int_api": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "policy_management",
+        "service_discovery",
+        "developer_portal"
+      ]
     }
   },
   "contracts": {
     "int_api": {
       "configuration": {
-        "capability": {
-          "category": "General Cross-Functional",
-          "enabled": true,
-          "id": "int_api",
-          "name": "Integration API Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/int/api/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "analytics_sink": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "developer_portal": "adapter",
+          "event_stream": "bytewax",
+          "gateway": "adapter",
+          "notification": "adapter",
+          "policy_management": "adapter",
+          "service_discovery": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "analytics": {
+          "api_required": true,
+          "latency_required": true,
+          "latency_review_threshold_ms": 2000,
+          "status_code_required": true
+        },
+        "api_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "review_prepare_and_recommend",
+          "supported_roles": [
+            "api_designer",
+            "policy_reviewer",
+            "security_reviewer",
+            "consumer_reviewer",
+            "deployment_reviewer",
+            "analytics_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "api_keys": {
+          "consumer_required": true,
+          "expiration_required": true,
+          "name_required": true,
+          "scope_required": true
+        },
+        "apis": {
+          "base_path_required": true,
+          "default_rate_limit_minimum": 1,
+          "external_upstream_review_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_auth_types": [
+            "api_key",
+            "oauth2",
+            "jwt",
+            "mtls",
+            "none"
+          ],
+          "supported_protocols": [
+            "rest",
+            "graphql",
+            "grpc",
+            "webhook"
+          ],
+          "title_required": true,
+          "upstream_required": true
+        },
+        "consumers": {
+          "contact_email_required": true,
+          "external_consumer_review_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "deployments": {
+          "api_required": true,
+          "deployer_required": true,
+          "production_approval_required": true,
+          "route_required": true,
+          "supported_environments": [
+            "dev",
+            "test",
+            "stage",
+            "prod"
+          ]
+        },
+        "endpoints": {
+          "api_required": true,
+          "auth_required_by_default": true,
+          "path_required": true,
+          "supported_methods": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_analytics_events": true,
+          "emit_api_events": true,
+          "emit_consumer_events": true,
+          "emit_deployment_events": true,
+          "emit_endpoint_events": true,
+          "emit_key_events": true,
+          "emit_policy_events": true,
+          "emit_subscription_events": true,
+          "event_stream": "apg.int.api.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "policies": {
+          "config_required": true,
+          "execution_order_required": true,
+          "name_required": true,
+          "supported_policy_types": [
+            "rate_limit",
+            "quota",
+            "auth",
+            "transform",
+            "cors",
+            "ip_filter",
+            "circuit_breaker"
+          ]
+        },
+        "subscriptions": {
+          "api_required": true,
+          "approval_required": true,
+          "consumer_required": true,
+          "supported_plans": [
+            "sandbox",
+            "standard",
+            "premium",
+            "internal"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "int_api_operations"
+          "default_theme": "int_api_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_analytics": true,
+          "enable_apis": true,
+          "enable_consumers": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_deployments": true,
+          "enable_endpoints": true,
+          "enable_keys": true,
+          "enable_policies": true,
+          "enable_settings": true,
+          "enable_subscriptions": true
         }
       },
       "id": "int_api",
       "provides": [
-        "int_api_operations"
+        "api_registry_lifecycle",
+        "api_endpoint_lifecycle",
+        "api_policy_lifecycle",
+        "api_consumer_lifecycle",
+        "api_key_lifecycle",
+        "api_subscription_lifecycle",
+        "api_deployment_workflow",
+        "api_gateway_route_catalog",
+        "api_analytics_workflow",
+        "api_dashboard_service",
+        "api_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "policy_management",
+        "service_discovery",
+        "developer_portal"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1950,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 8,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "int_api": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Integration API Management operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Integration API Management write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Integration API Management operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.int_api": {
-      "file": "capability_contract.py",
-      "id": "capability.int_api",
-      "kind": "capability",
-      "name": "Integration API Management",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

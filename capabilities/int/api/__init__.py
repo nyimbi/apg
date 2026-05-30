@@ -1,291 +1,103 @@
-"""
-APG Integration API Management - Module Initialization
+"""Integration API Management APG capability package."""
 
-Comprehensive API gateway and management platform providing secure, scalable,
-and monitored integration between APG capabilities and external systems.
-
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
-
-from .models import (
-	# SQLAlchemy Models
-	AMAPI,
-	AMEndpoint,
-	AMPolicy,
-	AMConsumer,
-	AMAPIKey,
-	AMSubscription,
-	AMDeployment,
-	AMAnalytics,
-	AMUsageRecord,
-	
-	# Enums
-	APIStatus,
-	APIVersion,
-	ProtocolType,
-	AuthenticationType,
-	PolicyType,
-	DeploymentStrategy,
-	ConsumerStatus,
-	MetricType,
-	LoadBalancingAlgorithm,
-	
-	# Pydantic Models
-	APIConfig,
-	EndpointConfig,
-	PolicyConfig,
-	ConsumerConfig,
-	APIKeyConfig,
-	SubscriptionConfig
-)
-
-from .service import (
-	APILifecycleService,
-	ConsumerManagementService,
-	PolicyManagementService,
-	AnalyticsService
-)
-
-from .views import (
-	# Forms
-	APIConfigForm,
-	PolicyConfigForm,
-	ConsumerRegistrationForm,
-	
-	# API Management Views
-	APIManagementView,
-	EndpointManagementView,
-	PolicyManagementView,
-	
-	# Consumer Management Views
-	ConsumerManagementView,
-	APIKeyManagementView,
-	
-	# Analytics Views
-	AnalyticsDashboardView,
-	UsageRecordsView,
-	
-	# Developer Portal Views
-	DeveloperPortalView,
-	
-	# Deployment Views
-	DeploymentManagementView
-)
+from __future__ import annotations
 
 from .api import (
+	AnalyticsApi,
 	APIManagementApi,
 	ConsumerManagementApi,
-	AnalyticsApi,
 	GatewayApi,
-	register_api_endpoints
+	approve_api,
+	attach_policy,
+	capability_status,
+	create_record,
+	create_subscription,
+	dashboard_summary,
+	deploy_api,
+	issue_api_key,
+	list_records,
+	record_usage,
+	register_api,
+	register_api_agent,
+	register_api_endpoints,
+	register_consumer,
+	register_endpoint,
+	service,
+)
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, evaluate_capability_rules, get_capability_contract
+from .service import (
+	APIManagementError,
+	APINotFoundError,
+	APILifecycleService,
+	AnalyticsService,
+	APIService,
+	AuthenticationError,
+	AuthorizationError,
+	ConsumerManagementService,
+	ConsumerNotFoundError,
+	IntApiService,
+	PolicyManagementService,
+	RateLimitExceededError,
 )
 
-from .blueprint import (
-	integration_api_management_bp,
-	create_integration_api_management_blueprint,
-	init_integration_api_management
-)
 
-from .discovery import (
-	ServiceDiscovery,
-	APGCapabilityInfo,
-	APIDiscoveryInfo,
-	ServiceHealth,
-	CapabilityType
-)
-
-from .integration import (
-	APGIntegrationManager,
-	APGEvent,
-	EventType,
-	WorkflowStatus,
-	CrossCapabilityWorkflow,
-	WorkflowStep,
-	PolicyRule
-)
-
-from .monitoring import (
-	MetricsCollector,
-	HealthMonitor,
-	AlertManager,
-	HealthCheck,
-	Metric,
-	HealthReport
-)
-
-from .gateway import (
-	APIGateway,
-	GatewayRouter,
-	LoadBalancer,
-	CircuitBreaker
-)
-
-from .config import (
-	APIManagementSettings,
-	create_configuration,
-	ConfigurationManager
-)
-
-from .runner import (
-	GatewayApplication,
-	run_gateway,
-	main
-)
-
-from .factory import (
-	IntegrationAPIManagementCapability,
-	create_integration_api_management_capability,
-	create_standalone_capability,
-	get_capability_metadata
-)
-
-# Capability metadata
 __capability_info__ = {
-	'capability_id': 'integration_api_management',
-	'capability_name': 'Integration API Management',
-	'capability_code': 'IAM',
-	'version': '1.0.0',
-	'category': 'general_cross_functional',
-	'maturity_level': 'foundation_infrastructure',
-	'criticality': 'CRITICAL',
-	'description': 'Comprehensive API gateway and management platform for secure, scalable integration',
-	'features': [
-		'High-Performance API Gateway (100K+ RPS)',
-		'OAuth 2.0/OIDC Authentication & JWT Management',
-		'API Lifecycle Management with Versioning',
-		'Developer Portal with Interactive Documentation',
-		'Real-time Analytics & Performance Monitoring',
-		'Policy Engine for Security & Rate Limiting',
-		'Multi-tenant Isolation & Enterprise Security'
+	"capability_id": CAPABILITY_ID,
+	"capability_name": CAPABILITY_NAME,
+	"capability_code": "INT_API",
+	"version": CAPABILITY_VERSION,
+	"category": "integration",
+	"description": "Composable API registry, gateway governance, consumer, policy, deployment, analytics, and API-agent lifecycle capability.",
+	"provides": [
+		"api_registry_lifecycle",
+		"api_endpoint_lifecycle",
+		"api_policy_lifecycle",
+		"api_consumer_lifecycle",
+		"api_deployment_workflow",
+		"api_agents",
 	],
-	'dependencies': [
-		'capability_registry',
-		'event_streaming_bus'
-	],
-	'provides': [
-		'api_gateway',
-		'api_lifecycle_management',
-		'consumer_management',
-		'analytics_monitoring',
-		'developer_portal'
-	]
 }
 
-# Version information
-__version__ = '1.0.0'
-__author__ = 'Nyimbi Odero <nyimbi@gmail.com>'
-__copyright__ = '© 2025 Datacraft. All rights reserved.'
+__version__ = CAPABILITY_VERSION
 
-# Export all public interfaces
 __all__ = [
-	# Core capability info
-	'__capability_info__',
-	'__version__',
-	'__author__',
-	'__copyright__',
-	
-	# SQLAlchemy Models
-	'AMAPI',
-	'AMEndpoint', 
-	'AMPolicy',
-	'AMConsumer',
-	'AMAPIKey',
-	'AMSubscription',
-	'AMDeployment',
-	'AMAnalytics',
-	'AMUsageRecord',
-	
-	# Enums
-	'APIStatus',
-	'APIVersion',
-	'ProtocolType',
-	'AuthenticationType',
-	'PolicyType',
-	'DeploymentStrategy',
-	'ConsumerStatus',
-	'MetricType',
-	'LoadBalancingAlgorithm',
-	'ServiceHealth',
-	'CapabilityType',
-	'EventType',
-	'WorkflowStatus',
-	
-	# Pydantic Models
-	'APIConfig',
-	'EndpointConfig',
-	'PolicyConfig',
-	'ConsumerConfig',
-	'APIKeyConfig',
-	'SubscriptionConfig',
-	'APGCapabilityInfo',
-	'APIDiscoveryInfo',
-	'CrossCapabilityWorkflow',
-	'WorkflowStep',
-	'PolicyRule',
-	
-	# Services
-	'APILifecycleService',
-	'ConsumerManagementService',
-	'PolicyManagementService',
-	'AnalyticsService',
-	
-	# Forms
-	'APIConfigForm',
-	'PolicyConfigForm',
-	'ConsumerRegistrationForm',
-	
-	# Views
-	'APIManagementView',
-	'EndpointManagementView',
-	'PolicyManagementView',
-	'ConsumerManagementView',
-	'APIKeyManagementView',
-	'AnalyticsDashboardView',
-	'UsageRecordsView',
-	'DeveloperPortalView',
-	'DeploymentManagementView',
-	
-	# API Endpoints
-	'APIManagementApi',
-	'ConsumerManagementApi',
-	'AnalyticsApi',
-	'GatewayApi',
-	'register_api_endpoints',
-	
-	# Blueprint
-	'integration_api_management_bp',
-	'create_integration_api_management_blueprint',
-	'init_integration_api_management',
-	
-	# Discovery and Integration
-	'ServiceDiscovery',
-	'APGIntegrationManager',
-	'APGEvent',
-	
-	# Monitoring and Gateway
-	'MetricsCollector',
-	'HealthMonitor',
-	'AlertManager',
-	'HealthCheck',
-	'Metric',
-	'HealthReport',
-	'APIGateway',
-	'GatewayRouter',
-	'LoadBalancer',
-	'CircuitBreaker',
-	
-	# Configuration and Runner
-	'APIManagementSettings',
-	'create_configuration',
-	'ConfigurationManager',
-	'GatewayApplication',
-	'run_gateway',
-	'main',
-	
-	# Factory
-	'IntegrationAPIManagementCapability',
-	'create_integration_api_management_capability',
-	'create_standalone_capability',
-	'get_capability_metadata'
+	"AnalyticsApi",
+	"AnalyticsService",
+	"APIManagementApi",
+	"APIManagementError",
+	"APINotFoundError",
+	"APILifecycleService",
+	"APIService",
+	"AuthenticationError",
+	"AuthorizationError",
+	"CAPABILITY_ID",
+	"CAPABILITY_NAME",
+	"CAPABILITY_VERSION",
+	"ConsumerManagementApi",
+	"ConsumerManagementService",
+	"ConsumerNotFoundError",
+	"GatewayApi",
+	"IntApiService",
+	"PolicyManagementService",
+	"RateLimitExceededError",
+	"__capability_info__",
+	"__version__",
+	"approve_api",
+	"attach_policy",
+	"capability_status",
+	"create_record",
+	"create_subscription",
+	"dashboard_summary",
+	"deploy_api",
+	"evaluate_capability_rules",
+	"get_capability_contract",
+	"issue_api_key",
+	"list_records",
+	"record_usage",
+	"register_api",
+	"register_api_agent",
+	"register_api_endpoints",
+	"register_consumer",
+	"register_endpoint",
+	"service",
 ]

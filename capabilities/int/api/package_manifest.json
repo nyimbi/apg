@@ -4,7 +4,7 @@
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,39 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 11,
+  "rule_count": 49,
+  "streaming": {
+    "events": [
+      "api_registered",
+      "endpoint_registered",
+      "policy_attached",
+      "consumer_registered",
+      "api_key_issued",
+      "subscription_created",
+      "api_approved",
+      "api_deployed",
+      "usage_recorded",
+      "api_agent_registered"
+    ],
+    "guardrails": [
+      "api_batch_requires_bytewax",
+      "api_event_requires_bytewax",
+      "privileged_api_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "approved",
+      "deployed",
+      "suspended",
+      "revoked",
+      "queued",
+      "blocked"
+    ],
+    "stream": "apg.int.api.lifecycle"
+  },
+  "version": "2.1.0"
 }
