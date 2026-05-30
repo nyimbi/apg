@@ -25,6 +25,7 @@ from .models import (
 	ModelArtifact,
 	ModelVersion,
 	PromotionRequest,
+	RetirementRecord,
 	RollbackRecord,
 	utc_now_iso,
 )
@@ -48,6 +49,7 @@ class MlcmService:
 		self._deployments: dict[str, DeploymentRecord] = {}
 		self._drift_signals: dict[str, DriftSignal] = {}
 		self._rollbacks: dict[str, RollbackRecord] = {}
+		self._retirements: dict[str, RetirementRecord] = {}
 		self._audit_events: dict[str, MlcmAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -73,6 +75,9 @@ class MlcmService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "register_model",
 			"owner_assigned": bool(owner),
+			"name_present": bool(name),
+			"problem_type_present": bool(problem_type),
+			"risk_level_present": bool(risk_level),
 		})
 		self._raise_if_denied(result)
 		model = ModelArtifact(
@@ -365,6 +370,48 @@ class MlcmService:
 		self._audit(tenant_id, "deployment_rolled_back", rollback.id, reason)
 		return rollback.to_dict()
 
+	def retire_model(
+		self,
+		retirement_id: str,
+		tenant_id: str,
+		model_id: str,
+		impact_review_ref: str,
+		retired_by: str = "",
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		model = self._require_model(model_id, tenant_id)
+		serving_deployments = [
+			deployment
+			for deployment in self._deployments.values()
+			if deployment.tenant_id == tenant_id
+			and deployment.model_id == model.id
+			and deployment.status == "serving"
+		]
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_model",
+			"impact_review_recorded": bool(impact_review_ref),
+			"serving_deployments_present": bool(serving_deployments),
+		})
+		self._raise_if_denied(result)
+		retirement = RetirementRecord(
+			id=retirement_id,
+			tenant_id=tenant_id,
+			model_id=model.id,
+			impact_review_ref=impact_review_ref,
+			retired_by=retired_by,
+			metadata=dict(metadata or {}),
+		)
+		model.status = "retired"
+		model.updated_at = utc_now_iso()
+		for version in self._versions.values():
+			if version.tenant_id == tenant_id and version.model_id == model.id:
+				version.status = "retired"
+		self._retirements[retirement.id] = retirement
+		self._audit(tenant_id, "model_retired", retirement.id, f"Retired model {model.id}")
+		return retirement.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -412,6 +459,9 @@ class MlcmService:
 	def list_rollbacks(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._rollbacks, tenant_id)
 
+	def list_retirements(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._retirements, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -428,6 +478,7 @@ class MlcmService:
 			"version_count": len(versions),
 			"deployment_count": len(deployments),
 			"serving_count": sum(1 for item in deployments if item.status == "serving"),
+			"retired_model_count": sum(1 for item in models if item.status == "retired"),
 			"production_version_count": sum(1 for item in versions if item.stage == "production"),
 			"pending_promotion_count": sum(1 for item in promotions if item.status == "blocked"),
 			"unresolved_drift_count": sum(1 for item in drift if item.drift_detected and not item.review_recorded),

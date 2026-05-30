@@ -13,7 +13,7 @@ from .capability_contract import (
 __version__ = "1.0.0"
 __capability_id__ = "mlcm"
 __capability_name__ = "AI Model Lifecycle Management"
-__apg_dependencies__ = ["aicr", "moni", "audl"]
+__apg_dependencies__ = ["aicr", "moni", "audl", "auth"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "mlcm",
@@ -34,6 +34,8 @@ capability_metadata: dict[str, Any] = {
 		"promotion_gates",
 		"deployment_board",
 		"drift_monitoring",
+		"rollback_orchestration",
+		"model_retirement",
 		"model_governance"
 	],
 	"composition_patterns": [
@@ -49,15 +51,21 @@ capability_metadata: dict[str, Any] = {
 	"ui_routes": {
 		"main": "/mlcm",
 		"models": "/mlcm/models",
+		"versions": "/mlcm/versions",
+		"model_cards": "/mlcm/model-cards",
 		"evaluation": "/mlcm/evaluation",
+		"promotion": "/mlcm/promotion",
 		"deployments": "/mlcm/deployments",
-		"drift": "/mlcm/drift"
+		"drift": "/mlcm/drift",
+		"rollback": "/mlcm/rollback",
+		"audit": "/mlcm/audit"
 	},
 	"permissions": [
 		"mlcm:view",
 		"mlcm:view_models",
 		"mlcm:manage_models",
 		"mlcm:evaluate",
+		"mlcm:promote",
 		"mlcm:deploy",
 		"mlcm:view_drift",
 		"mlcm:govern",
@@ -85,6 +93,8 @@ def register_capability() -> dict[str, Any]:
 			"promotion_gates": "Promote models through governed dev, staging, and production stages",
 			"model_evaluation": "Attach evaluation baselines, scores, and release evidence",
 			"drift_monitoring": "Surface drift state for review, rollback, and retraining workflows",
+			"rollback_orchestration": "Rollback deployments to prior same-model versions with audit evidence",
+			"model_retirement": "Retire models after impact review and serving-deployment drain",
 			"capability_rules": "Evaluate deterministic model lifecycle governance rules",
 			"visual_theming": "Apply model-ops console theme tokens and components"
 		},
@@ -92,9 +102,13 @@ def register_capability() -> dict[str, Any]:
 			"models": "/mlcm/api/v1/models",
 			"versions": "/mlcm/api/v1/versions",
 			"evaluations": "/mlcm/api/v1/evaluations",
+			"promotions": "/mlcm/api/v1/promotions",
 			"deployments": "/mlcm/api/v1/deployments",
-			"drift": "/mlcm/api/v1/drift"
+			"drift": "/mlcm/api/v1/drift",
+			"rollback": "/mlcm/api/v1/rollback",
+			"retirements": "/mlcm/api/v1/retirements"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]

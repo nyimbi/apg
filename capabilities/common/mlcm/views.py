@@ -43,6 +43,27 @@ def registry_model(
 	}
 
 
+def model_card_library_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"model_cards": [
+			{
+				"version_id": version["id"],
+				"model_id": version["model_id"],
+				"stage": version["stage"],
+				"complete": bool(version["model_card"]),
+				"model_card": version["model_card"],
+			}
+			for version in service.list_versions(tenant_id)
+		],
+		"route": "/mlcm/model-cards",
+	}
+
+
 def version_manager_model(
 	service: MlcmService | None = None,
 	tenant_id: str = "default",
@@ -71,6 +92,27 @@ def evaluation_console_model(
 	}
 
 
+def baseline_evidence_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"baselines": [
+			{
+				"version_id": version["id"],
+				"baseline_ref": version["baseline_ref"],
+				"training_data_ref": version["training_data_ref"],
+				"evaluation_id": version["evaluation_id"],
+			}
+			for version in service.list_versions(tenant_id)
+		],
+		"evaluations": service.list_evaluations(tenant_id),
+		"route": "/mlcm/baselines",
+	}
+
+
 def deployment_board_model(
 	service: MlcmService | None = None,
 	tenant_id: str = "default",
@@ -82,6 +124,33 @@ def deployment_board_model(
 		"deployments": service.list_deployments(tenant_id),
 		"rollbacks": service.list_rollbacks(tenant_id),
 		"route": "/mlcm/deployments",
+	}
+
+
+def promotion_board_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"promotions": service.list_promotion_requests(tenant_id),
+		"versions": service.list_versions(tenant_id),
+		"route": "/mlcm/promotion",
+	}
+
+
+def rollback_console_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"deployments": service.list_deployments(tenant_id),
+		"rollbacks": service.list_rollbacks(tenant_id),
+		"retirements": service.list_retirements(tenant_id),
+		"route": "/mlcm/rollback",
 	}
 
 
@@ -103,6 +172,18 @@ def drift_monitor_model(
 	}
 
 
+def audit_timeline_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"route": "/mlcm/audit",
+	}
+
+
 def governance_model(
 	service: MlcmService | None = None,
 	tenant_id: str = "default",
@@ -113,6 +194,7 @@ def governance_model(
 		"tenant_id": tenant_id,
 		"rules": contract["rule_engine"]["rules"],
 		"promotions": service.list_promotion_requests(tenant_id),
+		"retirements": service.list_retirements(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"route": "/mlcm/governance",
 	}

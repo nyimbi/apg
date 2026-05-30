@@ -283,6 +283,32 @@ class RollbackRecord:
 
 
 @dataclass
+class RetirementRecord:
+	"""Model retirement action with impact-review evidence."""
+
+	id: str
+	tenant_id: str
+	model_id: str
+	impact_review_ref: str
+	retired_by: str = ""
+	status: str = "completed"
+	created_at: str = field(default_factory=utc_now_iso)
+	metadata: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"model_id": self.model_id,
+			"impact_review_ref": self.impact_review_ref,
+			"retired_by": self.retired_by,
+			"status": self.status,
+			"created_at": self.created_at,
+			"metadata": dict(self.metadata),
+		}
+
+
+@dataclass
 class MlcmAuditEvent:
 	"""Audit event emitted by model lifecycle operations."""
 

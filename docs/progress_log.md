@@ -13974,3 +13974,47 @@ Not run to preserve battery:
 - Legacy advanced ML, edge, federated, neuromorphic, quantum, security, and
   deployment heavy tests.
 - Load, latency, token-cost, drift, and throughput benchmarks.
+
+### 2026-05-30 08:12 EAT
+
+MLCM lifecycle and guardrail packet:
+
+- Selected `capabilities/common/mlcm` as the next common capability after AICR.
+- Added root `README.md` and replaced `SPECIFICATION.md`, `PLAN.md`, and
+  `cap_spec.md` to define the governed model lifecycle packet.
+- Expanded the MLCM contract to 35 deterministic guardrails, 13 UI routes,
+  registry/version/evaluation/promotion/deployment/monitoring/governance/
+  observability/adapter configuration, Bytewax event-stream adapter evidence,
+  and model-ops console theme components.
+- Extended `service.MlcmService` with model retirement after impact review and
+  serving-deployment drain, plus retirement summaries and list surfaces.
+- Extended `models.py`, `api.py`, and `views.py` with retirement, model-card,
+  baseline, promotion, rollback, and audit surfaces for generated applications.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed stale package tests from materialized wording to package-contract
+  wording and expanded focused tests for Bytewax, rule count, route count,
+  dynamic package evidence, rollback, retirement, and UI view models.
+- Manual review found and fixed an unclear rule-engine test scenario with a
+  duplicate `operation` key.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mlcm/__init__.py capabilities/common/mlcm/capability_contract.py capabilities/common/mlcm/models.py capabilities/common/mlcm/lifecycle_runtime.py capabilities/common/mlcm/service.py capabilities/common/mlcm/api.py capabilities/common/mlcm/views.py capabilities/common/mlcm/app.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, 13 routes, 35 rules, Bytewax event stream, and `service.MlcmService`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mlcm --json` passed with `ok: true`; MLCM remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mlcm --json` passed with 13 UI routes, 35 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/mlcm/README.md capabilities/common/mlcm/SPECIFICATION.md capabilities/common/mlcm/PLAN.md capabilities/common/mlcm/cap_spec.md capabilities/common/mlcm/__init__.py capabilities/common/mlcm/capability_contract.py capabilities/common/mlcm/lifecycle_runtime.py capabilities/common/mlcm/models.py capabilities/common/mlcm/service.py capabilities/common/mlcm/api.py capabilities/common/mlcm/views.py capabilities/common/mlcm/app.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/mlcm/tests/test_package_contract.py capabilities/common/mlcm/package_manifest.json capabilities/common/mlcm/release_report.json capabilities/common/mlcm/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/mlcm docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live model registry, provider, artifact-store, and deployment integrations.
+- Live Bytewax stream execution.
+- External AICR, AUTH, AUDL, MONI, and artifact-store adapters.
+- Rendered browser UI behavior.
+- Persistent database migrations.
+- Load, latency, token-cost, drift, and throughput benchmarks.

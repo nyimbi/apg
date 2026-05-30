@@ -5,13 +5,125 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "AI Model Lifecycle Management package-backed APG capability", "entity_count": 0, "name": "mlcm", "version": "1.0.0"}, "capabilities": {"mlcm": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"evaluation": {"baseline_required": true, "drift_monitoring_enabled": true, "minimum_eval_score": 0.8}, "governance": {"audit_model_changes": true, "model_card_required": true, "require_tenant_context": true, "risk_review_required": true}, "promotion": {"approval_required_for_production": true, "rollback_enabled": true, "stage_gates": ["dev", "staging", "production"]}, "registry": {"model_registry_enabled": true, "owner_required": true, "versioning_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mlcm_model_ops_console"}, "ui": {"enable_deployment_board": true, "enable_drift_monitor": true, "enable_evaluation_console": true, "enable_registry": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "AI Model Lifecycle Management", "provides": ["mlcm_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All model lifecycle operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "register_model", "owner_assigned": false}, "description": "Model registration requires an owner.", "effect": {"decision": "deny", "reason": "model_owner_required", "required_action": "assign_model_owner"}, "name": "model_registration_requires_owner"}, {"condition": {"approval_recorded": false, "target_stage": "production"}, "description": "Production model promotion requires approval.", "effect": {"decision": "deny", "reason": "promotion_approval_required", "required_action": "record_promotion_approval"}, "name": "production_promotion_requires_approval"}, {"condition": {"model_card_present": false, "operation": "deploy_model"}, "description": "Model deployments require model-card documentation.", "effect": {"decision": "deny", "reason": "model_card_required", "required_action": "attach_model_card"}, "name": "deployment_requires_model_card"}, {"condition": {"eval_score_lt": 0.8, "promotion_requested": true}, "description": "Low evaluation scores block promotion.", "effect": {"decision": "deny", "reason": "evaluation_score_too_low", "required_action": "improve_or_waive_evaluation"}, "name": "low_eval_score_blocks_promotion"}, {"condition": {"drift_detected": true, "drift_review_recorded": false}, "description": "Drifted models require review before continued serving.", "effect": {"decision": "require_review", "reason": "drift_review_required", "required_action": "record_drift_review"}, "name": "drifted_model_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All model lifecycle operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "register_model", "owner_assigned": false}, "description": "Model registration requires an owner.", "effect": {"decision": "deny", "reason": "model_owner_required", "required_action": "assign_model_owner"}, "name": "model_registration_requires_owner"}, {"condition": {"approval_recorded": false, "target_stage": "production"}, "description": "Production model promotion requires approval.", "effect": {"decision": "deny", "reason": "promotion_approval_required", "required_action": "record_promotion_approval"}, "name": "production_promotion_requires_approval"}, {"condition": {"model_card_present": false, "operation": "deploy_model"}, "description": "Model deployments require model-card documentation.", "effect": {"decision": "deny", "reason": "model_card_required", "required_action": "attach_model_card"}, "name": "deployment_requires_model_card"}, {"condition": {"eval_score_lt": 0.8, "promotion_requested": true}, "description": "Low evaluation scores block promotion.", "effect": {"decision": "deny", "reason": "evaluation_score_too_low", "required_action": "improve_or_waive_evaluation"}, "name": "low_eval_score_blocks_promotion"}, {"condition": {"drift_detected": true, "drift_review_recorded": false}, "description": "Drifted models require review before continued serving.", "effect": {"decision": "require_review", "reason": "drift_review_required", "required_action": "record_drift_review"}, "name": "drifted_model_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "MLCMDashboard", "permission": "mlcm:view", "route": "/mlcm/dashboard"}, "deployments": {"component": "DeploymentBoard", "permission": "mlcm:deploy", "route": "/mlcm/deployments"}, "drift": {"component": "DriftMonitor", "permission": "mlcm:view_drift", "route": "/mlcm/drift"}, "evaluation": {"component": "EvaluationConsole", "permission": "mlcm:evaluate", "route": "/mlcm/evaluation"}, "governance": {"component": "ModelGovernance", "permission": "mlcm:govern", "route": "/mlcm/governance"}, "registry": {"component": "ModelRegistry", "permission": "mlcm:view_models", "route": "/mlcm/models"}, "settings": {"component": "MLCMSettings", "permission": "mlcm:admin", "route": "/mlcm/settings"}, "versions": {"component": "ModelVersionManager", "permission": "mlcm:manage_models", "route": "/mlcm/versions"}}, "streaming": {}, "theme": {"components": {"drift_monitor_chart": {"threshold_style": "drift-lines", "visual": "time-series-grid"}, "model_card_panel": {"status_style": "completeness-pill", "visual": "evidence-list"}, "model_version_row": {"icon": "layers", "risk_style": "eval-band", "status_indicator": "stage-pill"}, "promotion_gate_panel": {"highlight": "approval-chip", "visual": "gate-stack"}}, "name": "mlcm_model_ops_console", "tokens": {"border.radius": "8px", "color.accent": "#D97706", "color.danger": "#C53030", "color.primary": "#244B5A", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/mlcm/api/v1", "requires_theme": true, "routes": [{"component": "MLCMDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/mlcm/dashboard", "permission": "mlcm:view"}, {"component": "ModelRegistry", "name": "registry", "nav_group": "Registry", "path": "/mlcm/models", "permission": "mlcm:view_models"}, {"component": "ModelVersionManager", "name": "versions", "nav_group": "Registry", "path": "/mlcm/versions", "permission": "mlcm:manage_models"}, {"component": "EvaluationConsole", "name": "evaluation", "nav_group": "Quality", "path": "/mlcm/evaluation", "permission": "mlcm:evaluate"}, {"component": "DeploymentBoard", "name": "deployments", "nav_group": "Operations", "path": "/mlcm/deployments", "permission": "mlcm:deploy"}, {"component": "DriftMonitor", "name": "drift", "nav_group": "Operations", "path": "/mlcm/drift", "permission": "mlcm:view_drift"}, {"component": "ModelGovernance", "name": "governance", "nav_group": "Governance", "path": "/mlcm/governance", "permission": "mlcm:govern"}, {"component": "MLCMSettings", "name": "settings", "nav_group": "Administration", "path": "/mlcm/settings", "permission": "mlcm:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"mlcm": []}}, "contracts": {"mlcm": {"configuration": {"evaluation": {"baseline_required": true, "drift_monitoring_enabled": true, "minimum_eval_score": 0.8}, "governance": {"audit_model_changes": true, "model_card_required": true, "require_tenant_context": true, "risk_review_required": true}, "promotion": {"approval_required_for_production": true, "rollback_enabled": true, "stage_gates": ["dev", "staging", "production"]}, "registry": {"model_registry_enabled": true, "owner_required": true, "versioning_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mlcm_model_ops_console"}, "ui": {"enable_deployment_board": true, "enable_drift_monitor": true, "enable_evaluation_console": true, "enable_registry": true}}, "id": "mlcm", "provides": ["mlcm_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"mlcm": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"deployment_requires_model_card": {"condition": {"model_card_present": false, "operation": "deploy_model"}, "description": "Model deployments require model-card documentation.", "effect": {"decision": "deny", "reason": "model_card_required", "required_action": "attach_model_card"}, "name": "deployment_requires_model_card"}, "drifted_model_requires_review": {"condition": {"drift_detected": true, "drift_review_recorded": false}, "description": "Drifted models require review before continued serving.", "effect": {"decision": "require_review", "reason": "drift_review_required", "required_action": "record_drift_review"}, "name": "drifted_model_requires_review"}, "low_eval_score_blocks_promotion": {"condition": {"eval_score_lt": 0.8, "promotion_requested": true}, "description": "Low evaluation scores block promotion.", "effect": {"decision": "deny", "reason": "evaluation_score_too_low", "required_action": "improve_or_waive_evaluation"}, "name": "low_eval_score_blocks_promotion"}, "model_registration_requires_owner": {"condition": {"operation": "register_model", "owner_assigned": false}, "description": "Model registration requires an owner.", "effect": {"decision": "deny", "reason": "model_owner_required", "required_action": "assign_model_owner"}, "name": "model_registration_requires_owner"}, "production_promotion_requires_approval": {"condition": {"approval_recorded": false, "target_stage": "production"}, "description": "Production model promotion requires approval.", "effect": {"decision": "deny", "reason": "promotion_approval_required", "required_action": "record_promotion_approval"}, "name": "production_promotion_requires_approval"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All model lifecycle operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.mlcm": {"file": "capability_contract.py", "id": "capability.mlcm", "kind": "capability", "name": "AI Model Lifecycle Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("mlcm_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "mlcm",
+			"version": "1.0.0",
+			"description": "AI Model Lifecycle Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"mlcm": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"mlcm": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["mlcm_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.MlcmService",
+					"views": "views.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"promotion": "PromotionRequest",
+					"deployment": "DeploymentRecord",
+					"drift": "DriftSignal",
+					"rollback": "RollbackRecord",
+					"retirement": "RetirementRecord",
+				},
+				"model_lifecycle": {
+					"model": "ModelArtifact",
+					"version": "ModelVersion",
+					"evaluation": "EvaluationRun",
+					"promotion": "PromotionRequest",
+					"target": "DeploymentTarget",
+					"deployment": "DeploymentRecord",
+					"drift": "DriftSignal",
+					"rollback": "RollbackRecord",
+					"retirement": "RetirementRecord",
+					"audit": "MlcmAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"mlcm": {
+				"id": "mlcm",
+				"configuration": contract["configuration"],
+				"provides": ["mlcm_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"mlcm": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.mlcm": {
+				"id": "capability.mlcm",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +148,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("mlcm", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "mlcm" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("MLCM semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("MLCM semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("MLCM adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.MlcmService":
+		errors.append("MLCM generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

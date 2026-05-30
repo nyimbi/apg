@@ -3,6 +3,9 @@
   "display_name": "AI Model Lifecycle Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
     "models.py",
     "service.py",

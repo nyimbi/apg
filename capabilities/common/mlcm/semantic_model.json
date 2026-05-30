@@ -8,23 +8,78 @@
   },
   "capabilities": {
     "mlcm": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "artifact_store": "filestore",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.MlcmService",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "production_runtime": "service.MlcmService"
+      },
+      "approvals": {
+        "deployment": "DeploymentRecord",
+        "drift": "DriftSignal",
+        "promotion": "PromotionRequest",
+        "retirement": "RetirementRecord",
+        "rollback": "RollbackRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "artifact_store": "filestore",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MlcmService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "production_runtime": "service.MlcmService"
+        },
+        "deployment": {
+          "active_target_required": true,
+          "approval_required_for_production": true,
+          "canary_limit_percent": 50,
+          "health_check_required": true,
+          "rollback_enabled": true
+        },
         "evaluation": {
           "baseline_required": true,
-          "drift_monitoring_enabled": true,
+          "evidence_required": true,
+          "explainability_required_for_high_risk": true,
+          "fairness_review_required_for_high_risk": true,
           "minimum_eval_score": 0.8
         },
         "governance": {
           "audit_model_changes": true,
+          "auth_required": true,
+          "cross_tenant_access_allowed": false,
           "model_card_required": true,
           "require_tenant_context": true,
+          "retirement_impact_review_required": true,
           "risk_review_required": true
+        },
+        "monitoring": {
+          "default_drift_threshold": 0.2,
+          "drift_monitoring_enabled": true,
+          "monitoring_event_stream": "bytewax",
+          "quality_metrics_required": true,
+          "unresolved_drift_blocks_deployment": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "lineage_required": true,
+          "metrics_required": true,
+          "trace_required": true
         },
         "promotion": {
           "approval_required_for_production": true,
+          "evaluation_required": true,
           "rollback_enabled": true,
           "stage_gates": [
             "dev",
@@ -33,9 +88,10 @@
           ]
         },
         "registry": {
+          "max_models_per_tenant": 10000,
           "model_registry_enabled": true,
           "owner_required": true,
-          "versioning_required": true
+          "risk_level_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -43,10 +99,25 @@
           "default_theme": "mlcm_model_ops_console"
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_dashboard": true,
           "enable_deployment_board": true,
           "enable_drift_monitor": true,
           "enable_evaluation_console": true,
-          "enable_registry": true
+          "enable_governance": true,
+          "enable_model_cards": true,
+          "enable_promotion_board": true,
+          "enable_registry": true,
+          "enable_rollback_console": true,
+          "enable_settings": true,
+          "enable_versions": true
+        },
+        "versions": {
+          "artifact_uri_required": true,
+          "baseline_required": true,
+          "model_card_required": true,
+          "training_data_required": true,
+          "versioning_required": true
         }
       },
       "erp_modules": [
@@ -54,6 +125,18 @@
       ],
       "i18n": {},
       "master_data": {},
+      "model_lifecycle": {
+        "audit": "MlcmAuditEvent",
+        "deployment": "DeploymentRecord",
+        "drift": "DriftSignal",
+        "evaluation": "EvaluationRun",
+        "model": "ModelArtifact",
+        "promotion": "PromotionRequest",
+        "retirement": "RetirementRecord",
+        "rollback": "RollbackRecord",
+        "target": "DeploymentTarget",
+        "version": "ModelVersion"
+      },
       "name": "AI Model Lifecycle Management",
       "provides": [
         "mlcm_operations"
@@ -85,6 +168,178 @@
               "required_action": "assign_model_owner"
             },
             "name": "model_registration_requires_owner"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "register_model"
+            },
+            "description": "Model registration requires a model name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_name_required",
+              "required_action": "name_model"
+            },
+            "name": "model_registration_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "register_model",
+              "problem_type_present": false
+            },
+            "description": "Model registration requires problem-type metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "problem_type_required",
+              "required_action": "classify_model_problem_type"
+            },
+            "name": "model_registration_requires_problem_type"
+          },
+          {
+            "condition": {
+              "operation": "register_model",
+              "risk_level_present": false
+            },
+            "description": "Model registration requires risk-level metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_risk_level_required",
+              "required_action": "assign_model_risk_level"
+            },
+            "name": "model_registration_requires_risk_level"
+          },
+          {
+            "condition": {
+              "model_registered": false,
+              "operation": "create_version"
+            },
+            "description": "Version creation requires a registered model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_model_required",
+              "required_action": "register_model"
+            },
+            "name": "version_creation_requires_registered_model"
+          },
+          {
+            "condition": {
+              "artifact_uri_present": false,
+              "operation": "create_version"
+            },
+            "description": "Version creation requires an artifact URI.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_uri_required",
+              "required_action": "attach_artifact_uri"
+            },
+            "name": "version_creation_requires_artifact_uri"
+          },
+          {
+            "condition": {
+              "operation": "create_version",
+              "training_data_ref_present": false
+            },
+            "description": "Version creation requires training data lineage.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "training_data_lineage_required",
+              "required_action": "attach_training_data_ref"
+            },
+            "name": "version_creation_requires_training_data"
+          },
+          {
+            "condition": {
+              "baseline_ref_present": false,
+              "operation": "create_version"
+            },
+            "description": "Version creation requires baseline lineage.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "baseline_ref_required",
+              "required_action": "attach_baseline_ref"
+            },
+            "name": "version_creation_requires_baseline"
+          },
+          {
+            "condition": {
+              "model_card_present": false,
+              "non_dev_stage": true,
+              "operation": "create_version"
+            },
+            "description": "Non-development versions require model-card evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_card_required",
+              "required_action": "attach_model_card"
+            },
+            "name": "version_creation_requires_model_card_for_non_dev"
+          },
+          {
+            "condition": {
+              "baseline_ref_present": false,
+              "operation": "record_evaluation"
+            },
+            "description": "Evaluation runs require a baseline reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evaluation_baseline_required",
+              "required_action": "attach_evaluation_baseline"
+            },
+            "name": "evaluation_requires_baseline"
+          },
+          {
+            "condition": {
+              "evidence_refs_present": false,
+              "operation": "record_evaluation"
+            },
+            "description": "Evaluation runs require evidence references.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "evaluation_evidence_required",
+              "required_action": "attach_evaluation_evidence"
+            },
+            "name": "evaluation_requires_evidence"
+          },
+          {
+            "condition": {
+              "fairness_review_recorded": false,
+              "operation": "record_evaluation",
+              "risk_level": "high"
+            },
+            "description": "High-risk model evaluation requires fairness review evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "fairness_review_required",
+              "required_action": "record_fairness_review"
+            },
+            "name": "high_risk_evaluation_requires_fairness_review"
+          },
+          {
+            "condition": {
+              "explainability_recorded": false,
+              "operation": "record_evaluation",
+              "risk_level": "high"
+            },
+            "description": "High-risk model evaluation requires explainability evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "explainability_required",
+              "required_action": "record_explainability_evidence"
+            },
+            "name": "high_risk_evaluation_requires_explainability"
+          },
+          {
+            "condition": {
+              "evaluation_recorded": false,
+              "operation": "promote_model"
+            },
+            "description": "Promotion requires evaluation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_evaluation_required",
+              "required_action": "record_model_evaluation"
+            },
+            "name": "promotion_requires_evaluation"
           },
           {
             "condition": {
@@ -127,6 +382,60 @@
           },
           {
             "condition": {
+              "operation": "deploy_model",
+              "target_active": false
+            },
+            "description": "Deployments require active serving targets.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_target_inactive",
+              "required_action": "activate_or_change_target"
+            },
+            "name": "deployment_requires_active_target"
+          },
+          {
+            "condition": {
+              "deployment_approval_recorded": false,
+              "operation": "deploy_model",
+              "target_stage": "production"
+            },
+            "description": "Production deployments require approval evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_approval_required",
+              "required_action": "record_deployment_approval"
+            },
+            "name": "production_deployment_requires_approval"
+          },
+          {
+            "condition": {
+              "canary_percent_gt": 50,
+              "operation": "deploy_model",
+              "rollout_review_recorded": false
+            },
+            "description": "Large canary percentages require rollout review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "rollout_review_required",
+              "required_action": "record_rollout_review"
+            },
+            "name": "canary_limit_requires_review"
+          },
+          {
+            "condition": {
+              "health_check_recorded": false,
+              "operation": "deploy_model"
+            },
+            "description": "Deployments require health-check evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "deployment_health_check_required",
+              "required_action": "record_health_check"
+            },
+            "name": "deployment_requires_health_check"
+          },
+          {
+            "condition": {
               "drift_detected": true,
               "drift_review_recorded": false
             },
@@ -137,6 +446,162 @@
               "required_action": "record_drift_review"
             },
             "name": "drifted_model_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "deploy_model",
+              "target_stage": "production",
+              "unresolved_drift_present": true
+            },
+            "description": "Production deployments are blocked when drift is unresolved.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unresolved_drift_blocks_deployment",
+              "required_action": "resolve_drift_review"
+            },
+            "name": "unresolved_drift_blocks_production_deployment"
+          },
+          {
+            "condition": {
+              "operation": "record_drift",
+              "threshold_present": false
+            },
+            "description": "Drift signals require a threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_threshold_required",
+              "required_action": "attach_drift_threshold"
+            },
+            "name": "drift_signal_requires_threshold"
+          },
+          {
+            "condition": {
+              "operation": "record_metric",
+              "owner_assigned": false
+            },
+            "description": "Quality metrics require an accountable owner.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "metric_owner_required",
+              "required_action": "assign_metric_owner"
+            },
+            "name": "quality_metric_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "rollback_deployment",
+              "reason_present": false
+            },
+            "description": "Rollbacks require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_reason_required",
+              "required_action": "record_rollback_reason"
+            },
+            "name": "rollback_requires_reason"
+          },
+          {
+            "condition": {
+              "operation": "rollback_deployment",
+              "same_model": false
+            },
+            "description": "Rollbacks must target a version of the same model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_version_model_mismatch",
+              "required_action": "select_same_model_version"
+            },
+            "name": "rollback_requires_same_model"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_model"
+            },
+            "description": "Model retirement requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_retirement_review_required",
+              "required_action": "record_retirement_impact"
+            },
+            "name": "retirement_requires_impact_review"
+          },
+          {
+            "condition": {
+              "operation": "retire_model",
+              "serving_deployments_present": true
+            },
+            "description": "Model retirement requires serving deployments to be drained.",
+            "effect": {
+              "decision": "deny",
+              "reason": "serving_deployments_present",
+              "required_action": "drain_serving_deployments"
+            },
+            "name": "retirement_requires_no_serving_deployments"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Cross-tenant model access is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_access_denied",
+              "required_action": "use_tenant_scoped_model"
+            },
+            "name": "cross_tenant_model_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Lifecycle state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "audit_event_required_for_state_change"
+          },
+          {
+            "condition": {
+              "event_stream": "kafka",
+              "operation": "configure_monitoring"
+            },
+            "description": "Monitoring event flows must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "bytewax_stream_required_for_monitoring"
+          },
+          {
+            "condition": {
+              "lineage_complete": false,
+              "operation": "release_candidate"
+            },
+            "description": "Release candidates require dataset, baseline, and artifact lineage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "release_lineage_required",
+              "required_action": "complete_release_lineage"
+            },
+            "name": "lineage_required_for_release"
+          },
+          {
+            "condition": {
+              "human_review_recorded": false,
+              "risk_level": "critical"
+            },
+            "description": "Critical-risk model operations require human review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "critical_risk_human_review_required",
+              "required_action": "record_human_review"
+            },
+            "name": "human_review_required_for_critical_risk"
           }
         ],
         "type": "deterministic"
@@ -166,6 +631,178 @@
             "required_action": "assign_model_owner"
           },
           "name": "model_registration_requires_owner"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "register_model"
+          },
+          "description": "Model registration requires a model name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_name_required",
+            "required_action": "name_model"
+          },
+          "name": "model_registration_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "register_model",
+            "problem_type_present": false
+          },
+          "description": "Model registration requires problem-type metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "problem_type_required",
+            "required_action": "classify_model_problem_type"
+          },
+          "name": "model_registration_requires_problem_type"
+        },
+        {
+          "condition": {
+            "operation": "register_model",
+            "risk_level_present": false
+          },
+          "description": "Model registration requires risk-level metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_risk_level_required",
+            "required_action": "assign_model_risk_level"
+          },
+          "name": "model_registration_requires_risk_level"
+        },
+        {
+          "condition": {
+            "model_registered": false,
+            "operation": "create_version"
+          },
+          "description": "Version creation requires a registered model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_model_required",
+            "required_action": "register_model"
+          },
+          "name": "version_creation_requires_registered_model"
+        },
+        {
+          "condition": {
+            "artifact_uri_present": false,
+            "operation": "create_version"
+          },
+          "description": "Version creation requires an artifact URI.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_uri_required",
+            "required_action": "attach_artifact_uri"
+          },
+          "name": "version_creation_requires_artifact_uri"
+        },
+        {
+          "condition": {
+            "operation": "create_version",
+            "training_data_ref_present": false
+          },
+          "description": "Version creation requires training data lineage.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "training_data_lineage_required",
+            "required_action": "attach_training_data_ref"
+          },
+          "name": "version_creation_requires_training_data"
+        },
+        {
+          "condition": {
+            "baseline_ref_present": false,
+            "operation": "create_version"
+          },
+          "description": "Version creation requires baseline lineage.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "baseline_ref_required",
+            "required_action": "attach_baseline_ref"
+          },
+          "name": "version_creation_requires_baseline"
+        },
+        {
+          "condition": {
+            "model_card_present": false,
+            "non_dev_stage": true,
+            "operation": "create_version"
+          },
+          "description": "Non-development versions require model-card evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_card_required",
+            "required_action": "attach_model_card"
+          },
+          "name": "version_creation_requires_model_card_for_non_dev"
+        },
+        {
+          "condition": {
+            "baseline_ref_present": false,
+            "operation": "record_evaluation"
+          },
+          "description": "Evaluation runs require a baseline reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evaluation_baseline_required",
+            "required_action": "attach_evaluation_baseline"
+          },
+          "name": "evaluation_requires_baseline"
+        },
+        {
+          "condition": {
+            "evidence_refs_present": false,
+            "operation": "record_evaluation"
+          },
+          "description": "Evaluation runs require evidence references.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "evaluation_evidence_required",
+            "required_action": "attach_evaluation_evidence"
+          },
+          "name": "evaluation_requires_evidence"
+        },
+        {
+          "condition": {
+            "fairness_review_recorded": false,
+            "operation": "record_evaluation",
+            "risk_level": "high"
+          },
+          "description": "High-risk model evaluation requires fairness review evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "fairness_review_required",
+            "required_action": "record_fairness_review"
+          },
+          "name": "high_risk_evaluation_requires_fairness_review"
+        },
+        {
+          "condition": {
+            "explainability_recorded": false,
+            "operation": "record_evaluation",
+            "risk_level": "high"
+          },
+          "description": "High-risk model evaluation requires explainability evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "explainability_required",
+            "required_action": "record_explainability_evidence"
+          },
+          "name": "high_risk_evaluation_requires_explainability"
+        },
+        {
+          "condition": {
+            "evaluation_recorded": false,
+            "operation": "promote_model"
+          },
+          "description": "Promotion requires evaluation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_evaluation_required",
+            "required_action": "record_model_evaluation"
+          },
+          "name": "promotion_requires_evaluation"
         },
         {
           "condition": {
@@ -208,6 +845,60 @@
         },
         {
           "condition": {
+            "operation": "deploy_model",
+            "target_active": false
+          },
+          "description": "Deployments require active serving targets.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_target_inactive",
+            "required_action": "activate_or_change_target"
+          },
+          "name": "deployment_requires_active_target"
+        },
+        {
+          "condition": {
+            "deployment_approval_recorded": false,
+            "operation": "deploy_model",
+            "target_stage": "production"
+          },
+          "description": "Production deployments require approval evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_approval_required",
+            "required_action": "record_deployment_approval"
+          },
+          "name": "production_deployment_requires_approval"
+        },
+        {
+          "condition": {
+            "canary_percent_gt": 50,
+            "operation": "deploy_model",
+            "rollout_review_recorded": false
+          },
+          "description": "Large canary percentages require rollout review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "rollout_review_required",
+            "required_action": "record_rollout_review"
+          },
+          "name": "canary_limit_requires_review"
+        },
+        {
+          "condition": {
+            "health_check_recorded": false,
+            "operation": "deploy_model"
+          },
+          "description": "Deployments require health-check evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "deployment_health_check_required",
+            "required_action": "record_health_check"
+          },
+          "name": "deployment_requires_health_check"
+        },
+        {
+          "condition": {
             "drift_detected": true,
             "drift_review_recorded": false
           },
@@ -218,15 +909,181 @@
             "required_action": "record_drift_review"
           },
           "name": "drifted_model_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "deploy_model",
+            "target_stage": "production",
+            "unresolved_drift_present": true
+          },
+          "description": "Production deployments are blocked when drift is unresolved.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unresolved_drift_blocks_deployment",
+            "required_action": "resolve_drift_review"
+          },
+          "name": "unresolved_drift_blocks_production_deployment"
+        },
+        {
+          "condition": {
+            "operation": "record_drift",
+            "threshold_present": false
+          },
+          "description": "Drift signals require a threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_threshold_required",
+            "required_action": "attach_drift_threshold"
+          },
+          "name": "drift_signal_requires_threshold"
+        },
+        {
+          "condition": {
+            "operation": "record_metric",
+            "owner_assigned": false
+          },
+          "description": "Quality metrics require an accountable owner.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "metric_owner_required",
+            "required_action": "assign_metric_owner"
+          },
+          "name": "quality_metric_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "rollback_deployment",
+            "reason_present": false
+          },
+          "description": "Rollbacks require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_reason_required",
+            "required_action": "record_rollback_reason"
+          },
+          "name": "rollback_requires_reason"
+        },
+        {
+          "condition": {
+            "operation": "rollback_deployment",
+            "same_model": false
+          },
+          "description": "Rollbacks must target a version of the same model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_version_model_mismatch",
+            "required_action": "select_same_model_version"
+          },
+          "name": "rollback_requires_same_model"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_model"
+          },
+          "description": "Model retirement requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_retirement_review_required",
+            "required_action": "record_retirement_impact"
+          },
+          "name": "retirement_requires_impact_review"
+        },
+        {
+          "condition": {
+            "operation": "retire_model",
+            "serving_deployments_present": true
+          },
+          "description": "Model retirement requires serving deployments to be drained.",
+          "effect": {
+            "decision": "deny",
+            "reason": "serving_deployments_present",
+            "required_action": "drain_serving_deployments"
+          },
+          "name": "retirement_requires_no_serving_deployments"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Cross-tenant model access is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_access_denied",
+            "required_action": "use_tenant_scoped_model"
+          },
+          "name": "cross_tenant_model_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Lifecycle state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "audit_event_required_for_state_change"
+        },
+        {
+          "condition": {
+            "event_stream": "kafka",
+            "operation": "configure_monitoring"
+          },
+          "description": "Monitoring event flows must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "bytewax_stream_required_for_monitoring"
+        },
+        {
+          "condition": {
+            "lineage_complete": false,
+            "operation": "release_candidate"
+          },
+          "description": "Release candidates require dataset, baseline, and artifact lineage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "release_lineage_required",
+            "required_action": "complete_release_lineage"
+          },
+          "name": "lineage_required_for_release"
+        },
+        {
+          "condition": {
+            "human_review_recorded": false,
+            "risk_level": "critical"
+          },
+          "description": "Critical-risk model operations require human review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "critical_risk_human_review_required",
+            "required_action": "record_human_review"
+          },
+          "name": "human_review_required_for_critical_risk"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "service": "service.MlcmService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "MLCMAuditTimeline",
+          "permission": "mlcm:view",
+          "route": "/mlcm/audit"
+        },
+        "baselines": {
+          "component": "BaselineEvidence",
+          "permission": "mlcm:evaluate",
+          "route": "/mlcm/baselines"
+        },
         "dashboard": {
           "component": "MLCMDashboard",
           "permission": "mlcm:view",
@@ -252,10 +1109,25 @@
           "permission": "mlcm:govern",
           "route": "/mlcm/governance"
         },
+        "model_cards": {
+          "component": "ModelCardLibrary",
+          "permission": "mlcm:view_models",
+          "route": "/mlcm/model-cards"
+        },
+        "promotion": {
+          "component": "PromotionBoard",
+          "permission": "mlcm:promote",
+          "route": "/mlcm/promotion"
+        },
         "registry": {
           "component": "ModelRegistry",
           "permission": "mlcm:view_models",
           "route": "/mlcm/models"
+        },
+        "rollback": {
+          "component": "RollbackConsole",
+          "permission": "mlcm:deploy",
+          "route": "/mlcm/rollback"
         },
         "settings": {
           "component": "MLCMSettings",
@@ -268,12 +1140,31 @@
           "route": "/mlcm/versions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
+          "baseline_evidence_panel": {
+            "highlight": "baseline-chip",
+            "visual": "dataset-lineage"
+          },
+          "deployment_rollout_panel": {
+            "highlight": "canary-chip",
+            "visual": "rollout-meter"
+          },
           "drift_monitor_chart": {
             "threshold_style": "drift-lines",
             "visual": "time-series-grid"
+          },
+          "model_card_library": {
+            "icon": "file-check",
+            "risk_style": "lineage-band",
+            "status_indicator": "completeness-pill"
           },
           "model_card_panel": {
             "status_style": "completeness-pill",
@@ -287,6 +1178,10 @@
           "promotion_gate_panel": {
             "highlight": "approval-chip",
             "visual": "gate-stack"
+          },
+          "rollback_console": {
+            "status_style": "rollback-chip",
+            "visual": "version-timeline"
           }
         },
         "name": "mlcm_model_ops_console",
@@ -330,11 +1225,32 @@
             "permission": "mlcm:manage_models"
           },
           {
+            "component": "ModelCardLibrary",
+            "name": "model_cards",
+            "nav_group": "Registry",
+            "path": "/mlcm/model-cards",
+            "permission": "mlcm:view_models"
+          },
+          {
             "component": "EvaluationConsole",
             "name": "evaluation",
             "nav_group": "Quality",
             "path": "/mlcm/evaluation",
             "permission": "mlcm:evaluate"
+          },
+          {
+            "component": "BaselineEvidence",
+            "name": "baselines",
+            "nav_group": "Quality",
+            "path": "/mlcm/baselines",
+            "permission": "mlcm:evaluate"
+          },
+          {
+            "component": "PromotionBoard",
+            "name": "promotion",
+            "nav_group": "Release",
+            "path": "/mlcm/promotion",
+            "permission": "mlcm:promote"
           },
           {
             "component": "DeploymentBoard",
@@ -351,11 +1267,25 @@
             "permission": "mlcm:view_drift"
           },
           {
+            "component": "RollbackConsole",
+            "name": "rollback",
+            "nav_group": "Operations",
+            "path": "/mlcm/rollback",
+            "permission": "mlcm:deploy"
+          },
+          {
             "component": "ModelGovernance",
             "name": "governance",
             "nav_group": "Governance",
             "path": "/mlcm/governance",
             "permission": "mlcm:govern"
+          },
+          {
+            "component": "MLCMAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/mlcm/audit",
+            "permission": "mlcm:view"
           },
           {
             "component": "MLCMSettings",
@@ -384,19 +1314,57 @@
   "contracts": {
     "mlcm": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "artifact_store": "filestore",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MlcmService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "production_runtime": "service.MlcmService"
+        },
+        "deployment": {
+          "active_target_required": true,
+          "approval_required_for_production": true,
+          "canary_limit_percent": 50,
+          "health_check_required": true,
+          "rollback_enabled": true
+        },
         "evaluation": {
           "baseline_required": true,
-          "drift_monitoring_enabled": true,
+          "evidence_required": true,
+          "explainability_required_for_high_risk": true,
+          "fairness_review_required_for_high_risk": true,
           "minimum_eval_score": 0.8
         },
         "governance": {
           "audit_model_changes": true,
+          "auth_required": true,
+          "cross_tenant_access_allowed": false,
           "model_card_required": true,
           "require_tenant_context": true,
+          "retirement_impact_review_required": true,
           "risk_review_required": true
+        },
+        "monitoring": {
+          "default_drift_threshold": 0.2,
+          "drift_monitoring_enabled": true,
+          "monitoring_event_stream": "bytewax",
+          "quality_metrics_required": true,
+          "unresolved_drift_blocks_deployment": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "lineage_required": true,
+          "metrics_required": true,
+          "trace_required": true
         },
         "promotion": {
           "approval_required_for_production": true,
+          "evaluation_required": true,
           "rollback_enabled": true,
           "stage_gates": [
             "dev",
@@ -405,9 +1373,10 @@
           ]
         },
         "registry": {
+          "max_models_per_tenant": 10000,
           "model_registry_enabled": true,
           "owner_required": true,
-          "versioning_required": true
+          "risk_level_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -415,10 +1384,25 @@
           "default_theme": "mlcm_model_ops_console"
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_dashboard": true,
           "enable_deployment_board": true,
           "enable_drift_monitor": true,
           "enable_evaluation_console": true,
-          "enable_registry": true
+          "enable_governance": true,
+          "enable_model_cards": true,
+          "enable_promotion_board": true,
+          "enable_registry": true,
+          "enable_rollback_console": true,
+          "enable_settings": true,
+          "enable_versions": true
+        },
+        "versions": {
+          "artifact_uri_required": true,
+          "baseline_required": true,
+          "model_card_required": true,
+          "training_data_required": true,
+          "versioning_required": true
         }
       },
       "id": "mlcm",
@@ -458,6 +1442,84 @@
   },
   "roles": {},
   "rules": {
+    "audit_event_required_for_state_change": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Lifecycle state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "audit_event_required_for_state_change"
+    },
+    "bytewax_stream_required_for_monitoring": {
+      "condition": {
+        "event_stream": "kafka",
+        "operation": "configure_monitoring"
+      },
+      "description": "Monitoring event flows must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "bytewax_stream_required_for_monitoring"
+    },
+    "canary_limit_requires_review": {
+      "condition": {
+        "canary_percent_gt": 50,
+        "operation": "deploy_model",
+        "rollout_review_recorded": false
+      },
+      "description": "Large canary percentages require rollout review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "rollout_review_required",
+        "required_action": "record_rollout_review"
+      },
+      "name": "canary_limit_requires_review"
+    },
+    "cross_tenant_model_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Cross-tenant model access is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_access_denied",
+        "required_action": "use_tenant_scoped_model"
+      },
+      "name": "cross_tenant_model_access_denied"
+    },
+    "deployment_requires_active_target": {
+      "condition": {
+        "operation": "deploy_model",
+        "target_active": false
+      },
+      "description": "Deployments require active serving targets.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_target_inactive",
+        "required_action": "activate_or_change_target"
+      },
+      "name": "deployment_requires_active_target"
+    },
+    "deployment_requires_health_check": {
+      "condition": {
+        "health_check_recorded": false,
+        "operation": "deploy_model"
+      },
+      "description": "Deployments require health-check evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "deployment_health_check_required",
+        "required_action": "record_health_check"
+      },
+      "name": "deployment_requires_health_check"
+    },
     "deployment_requires_model_card": {
       "condition": {
         "model_card_present": false,
@@ -470,6 +1532,19 @@
         "required_action": "attach_model_card"
       },
       "name": "deployment_requires_model_card"
+    },
+    "drift_signal_requires_threshold": {
+      "condition": {
+        "operation": "record_drift",
+        "threshold_present": false
+      },
+      "description": "Drift signals require a threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "drift_threshold_required",
+        "required_action": "attach_drift_threshold"
+      },
+      "name": "drift_signal_requires_threshold"
     },
     "drifted_model_requires_review": {
       "condition": {
@@ -484,6 +1559,86 @@
       },
       "name": "drifted_model_requires_review"
     },
+    "evaluation_requires_baseline": {
+      "condition": {
+        "baseline_ref_present": false,
+        "operation": "record_evaluation"
+      },
+      "description": "Evaluation runs require a baseline reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "evaluation_baseline_required",
+        "required_action": "attach_evaluation_baseline"
+      },
+      "name": "evaluation_requires_baseline"
+    },
+    "evaluation_requires_evidence": {
+      "condition": {
+        "evidence_refs_present": false,
+        "operation": "record_evaluation"
+      },
+      "description": "Evaluation runs require evidence references.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "evaluation_evidence_required",
+        "required_action": "attach_evaluation_evidence"
+      },
+      "name": "evaluation_requires_evidence"
+    },
+    "high_risk_evaluation_requires_explainability": {
+      "condition": {
+        "explainability_recorded": false,
+        "operation": "record_evaluation",
+        "risk_level": "high"
+      },
+      "description": "High-risk model evaluation requires explainability evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "explainability_required",
+        "required_action": "record_explainability_evidence"
+      },
+      "name": "high_risk_evaluation_requires_explainability"
+    },
+    "high_risk_evaluation_requires_fairness_review": {
+      "condition": {
+        "fairness_review_recorded": false,
+        "operation": "record_evaluation",
+        "risk_level": "high"
+      },
+      "description": "High-risk model evaluation requires fairness review evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "fairness_review_required",
+        "required_action": "record_fairness_review"
+      },
+      "name": "high_risk_evaluation_requires_fairness_review"
+    },
+    "human_review_required_for_critical_risk": {
+      "condition": {
+        "human_review_recorded": false,
+        "risk_level": "critical"
+      },
+      "description": "Critical-risk model operations require human review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "critical_risk_human_review_required",
+        "required_action": "record_human_review"
+      },
+      "name": "human_review_required_for_critical_risk"
+    },
+    "lineage_required_for_release": {
+      "condition": {
+        "lineage_complete": false,
+        "operation": "release_candidate"
+      },
+      "description": "Release candidates require dataset, baseline, and artifact lineage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "release_lineage_required",
+        "required_action": "complete_release_lineage"
+      },
+      "name": "lineage_required_for_release"
+    },
     "low_eval_score_blocks_promotion": {
       "condition": {
         "eval_score_lt": 0.8,
@@ -496,6 +1651,19 @@
         "required_action": "improve_or_waive_evaluation"
       },
       "name": "low_eval_score_blocks_promotion"
+    },
+    "model_registration_requires_name": {
+      "condition": {
+        "name_present": false,
+        "operation": "register_model"
+      },
+      "description": "Model registration requires a model name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_name_required",
+        "required_action": "name_model"
+      },
+      "name": "model_registration_requires_name"
     },
     "model_registration_requires_owner": {
       "condition": {
@@ -510,6 +1678,46 @@
       },
       "name": "model_registration_requires_owner"
     },
+    "model_registration_requires_problem_type": {
+      "condition": {
+        "operation": "register_model",
+        "problem_type_present": false
+      },
+      "description": "Model registration requires problem-type metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "problem_type_required",
+        "required_action": "classify_model_problem_type"
+      },
+      "name": "model_registration_requires_problem_type"
+    },
+    "model_registration_requires_risk_level": {
+      "condition": {
+        "operation": "register_model",
+        "risk_level_present": false
+      },
+      "description": "Model registration requires risk-level metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_risk_level_required",
+        "required_action": "assign_model_risk_level"
+      },
+      "name": "model_registration_requires_risk_level"
+    },
+    "production_deployment_requires_approval": {
+      "condition": {
+        "deployment_approval_recorded": false,
+        "operation": "deploy_model",
+        "target_stage": "production"
+      },
+      "description": "Production deployments require approval evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_approval_required",
+        "required_action": "record_deployment_approval"
+      },
+      "name": "production_deployment_requires_approval"
+    },
     "production_promotion_requires_approval": {
       "condition": {
         "approval_recorded": false,
@@ -523,6 +1731,84 @@
       },
       "name": "production_promotion_requires_approval"
     },
+    "promotion_requires_evaluation": {
+      "condition": {
+        "evaluation_recorded": false,
+        "operation": "promote_model"
+      },
+      "description": "Promotion requires evaluation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_evaluation_required",
+        "required_action": "record_model_evaluation"
+      },
+      "name": "promotion_requires_evaluation"
+    },
+    "quality_metric_requires_owner": {
+      "condition": {
+        "operation": "record_metric",
+        "owner_assigned": false
+      },
+      "description": "Quality metrics require an accountable owner.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "metric_owner_required",
+        "required_action": "assign_metric_owner"
+      },
+      "name": "quality_metric_requires_owner"
+    },
+    "retirement_requires_impact_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_model"
+      },
+      "description": "Model retirement requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_retirement_review_required",
+        "required_action": "record_retirement_impact"
+      },
+      "name": "retirement_requires_impact_review"
+    },
+    "retirement_requires_no_serving_deployments": {
+      "condition": {
+        "operation": "retire_model",
+        "serving_deployments_present": true
+      },
+      "description": "Model retirement requires serving deployments to be drained.",
+      "effect": {
+        "decision": "deny",
+        "reason": "serving_deployments_present",
+        "required_action": "drain_serving_deployments"
+      },
+      "name": "retirement_requires_no_serving_deployments"
+    },
+    "rollback_requires_reason": {
+      "condition": {
+        "operation": "rollback_deployment",
+        "reason_present": false
+      },
+      "description": "Rollbacks require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_reason_required",
+        "required_action": "record_rollback_reason"
+      },
+      "name": "rollback_requires_reason"
+    },
+    "rollback_requires_same_model": {
+      "condition": {
+        "operation": "rollback_deployment",
+        "same_model": false
+      },
+      "description": "Rollbacks must target a version of the same model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_version_model_mismatch",
+        "required_action": "select_same_model_version"
+      },
+      "name": "rollback_requires_same_model"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -534,6 +1820,86 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "unresolved_drift_blocks_production_deployment": {
+      "condition": {
+        "operation": "deploy_model",
+        "target_stage": "production",
+        "unresolved_drift_present": true
+      },
+      "description": "Production deployments are blocked when drift is unresolved.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unresolved_drift_blocks_deployment",
+        "required_action": "resolve_drift_review"
+      },
+      "name": "unresolved_drift_blocks_production_deployment"
+    },
+    "version_creation_requires_artifact_uri": {
+      "condition": {
+        "artifact_uri_present": false,
+        "operation": "create_version"
+      },
+      "description": "Version creation requires an artifact URI.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_uri_required",
+        "required_action": "attach_artifact_uri"
+      },
+      "name": "version_creation_requires_artifact_uri"
+    },
+    "version_creation_requires_baseline": {
+      "condition": {
+        "baseline_ref_present": false,
+        "operation": "create_version"
+      },
+      "description": "Version creation requires baseline lineage.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "baseline_ref_required",
+        "required_action": "attach_baseline_ref"
+      },
+      "name": "version_creation_requires_baseline"
+    },
+    "version_creation_requires_model_card_for_non_dev": {
+      "condition": {
+        "model_card_present": false,
+        "non_dev_stage": true,
+        "operation": "create_version"
+      },
+      "description": "Non-development versions require model-card evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_card_required",
+        "required_action": "attach_model_card"
+      },
+      "name": "version_creation_requires_model_card_for_non_dev"
+    },
+    "version_creation_requires_registered_model": {
+      "condition": {
+        "model_registered": false,
+        "operation": "create_version"
+      },
+      "description": "Version creation requires a registered model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_model_required",
+        "required_action": "register_model"
+      },
+      "name": "version_creation_requires_registered_model"
+    },
+    "version_creation_requires_training_data": {
+      "condition": {
+        "operation": "create_version",
+        "training_data_ref_present": false
+      },
+      "description": "Version creation requires training data lineage.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "training_data_lineage_required",
+        "required_action": "attach_training_data_ref"
+      },
+      "name": "version_creation_requires_training_data"
     }
   },
   "security": {},

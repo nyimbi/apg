@@ -1,4 +1,4 @@
-"""AI Model Lifecycle Management package contract and runtime tests."""
+"""Package contract tests for MLCM."""
 
 from __future__ import annotations
 
@@ -23,18 +23,20 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_mlcm_contract_shape_is_valid():
-	module = _load_module("materialized_contract_mlcm", PACKAGE_DIR / "capability_contract.py")
+def test_package_contract_shape_is_valid():
+	module = _load_module("package_contract_mlcm", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "mlcm"
-	assert contract["ui"]["routes"]
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_mlcm_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_mlcm", PACKAGE_DIR / "app.py")
+def test_package_app_entrypoint_is_publishable():
+	module = _load_module("package_app_mlcm", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -45,6 +47,8 @@ def test_mlcm_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "mlcm" in model["capabilities"]
+	assert model["capabilities"]["mlcm"]["runtime"]["service"] == "service.MlcmService"
+	assert model["capabilities"]["mlcm"]["streaming"]["engine"] == "bytewax"
 
 
 def test_mlcm_compatibility_record_uses_model_registry():

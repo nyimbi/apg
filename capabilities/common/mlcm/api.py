@@ -137,6 +137,17 @@ def rollback_deployment(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def retire_model(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.retire_model(
+		retirement_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		model_id=str(payload["model_id"]),
+		impact_review_ref=str(payload.get("impact_review_ref") or ""),
+		retired_by=str(payload.get("retired_by") or ""),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
