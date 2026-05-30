@@ -1,10 +1,9 @@
 {
   "base_target": "python",
-  "display_name": "Capability Registry - Comprehensive Specification",
+  "display_name": "Capability Registry",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +16,5 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "version": "2.1.0"
 }

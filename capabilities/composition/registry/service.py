@@ -1,1646 +1,445 @@
-"""
-APG Capability Registry - Core Service Layer
+"""Domain service for the APG capability registry."""
 
-Async service implementation for capability discovery, registration,
-and orchestration within APG's multi-tenant architecture.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
+from copy import deepcopy
+from datetime import datetime, timezone
+from typing import Any
 
-import ast
-import asyncio
-import json
-import os
-import re
-from datetime import datetime, timedelta
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
-from uuid_extensions import uuid7str
-
-from sqlalchemy import select, and_, or_, func, desc, asc
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import selectinload
-
-from .models import (
-	CRCapability, CRDependency, CRComposition, CRCompositionCapability,
-	CRVersion, CRMetadata, CRRegistry, CRUsageAnalytics, CRHealthMetrics,
-	CRCapabilityStatus, CRDependencyType, CRCompositionType, CRVersionConstraint,
-	CRValidationStatus
-)
-from .composition_engine import (
-	IntelligentCompositionEngine, get_composition_engine,
-	CompositionValidationResult, ConflictReport, CompositionRecommendation,
-	PerformanceImpact
-)
-from .version_manager import (
-	VersionManager, get_version_manager,
-	CompatibilityAnalysis, VersionChangeType, CompatibilityLevel
-)
-from .marketplace import (
-	MarketplaceIntegration, get_marketplace_integration,
-	MarketplaceMetadata, PublicationPackage, MarketplaceStatus
-)
-
-# APG Service Response Types
-from typing import TypedDict
-
-class ServiceResponse(TypedDict):
-	success: bool
-	message: str
-	data: Optional[Dict[str, Any]]
-	errors: Optional[List[str]]
-
-class CapabilitySearchResult(TypedDict):
-	capabilities: List[Dict[str, Any]]
-	total_count: int
-	search_time_ms: float
-	recommendations: List[Dict[str, Any]]
-
-class CompositionValidationResult(TypedDict):
-	is_valid: bool
-	validation_score: float
-	dependency_conflicts: List[Dict[str, Any]]
-	performance_impact: Dict[str, Any]
-	recommendations: List[str]
-
-# APG Capability Registry Service
-class CapabilityRegistryService:
-	"""
-	Core service for APG capability discovery, registration, and orchestration.
-	
-	Provides intelligent capability management with dependency resolution,
-	composition validation, and marketplace integration.
-	"""
-	
-	def __init__(
-		self,
-		db_session: AsyncSession,
-		tenant_id: str,
-		user_id: str,
-		redis_client: Optional[Any] = None
-	):
-		self.db_session = db_session
-		self.tenant_id = tenant_id
-		self.user_id = user_id
-		self.redis_client = redis_client
-		self.cache_ttl = 3600  # 1 hour default
-		
-		# APG Integration
-		self._apg_auth_service = None
-		self._apg_audit_service = None
-		self._apg_notification_service = None
-		self._apg_ai_service = None
-		
-		# Composition Engine
-		self._composition_engine = get_composition_engine(
-			db_session, tenant_id, user_id, redis_client
-		)
-		
-		# Version Manager
-		self._version_manager = get_version_manager(
-			db_session, tenant_id, user_id
-		)
-		
-		# Marketplace Integration
-		self._marketplace_integration = get_marketplace_integration(
-			db_session, tenant_id, user_id
-		)
-	
-	def _log_operation(self, operation: str, details: str) -> str:
-		"""Log registry operation for debugging and monitoring."""
-		return f"CR-{self.tenant_id}: {operation} - {details}"
-	
-	def _log_performance(self, operation: str, duration_ms: float) -> str:
-		"""Log performance metrics for monitoring."""
-		return f"CR-Performance: {operation} completed in {duration_ms:.2f}ms"
-	
-	async def _get_registry_config(self) -> Optional[CRRegistry]:
-		"""Get registry configuration for current tenant."""
-		try:
-			result = await self.db_session.execute(
-				select(CRRegistry).where(CRRegistry.tenant_id == self.tenant_id)
-			)
-			registry = result.scalar_one_or_none()
-			
-			if not registry:
-				# Create default registry configuration
-				registry = await self._create_default_registry()
-			
-			return registry
-			
-		except Exception as e:
-			print(self._log_operation("get_registry_config", f"Error: {e}"))
-			return None
-	
-	async def _create_default_registry(self) -> CRRegistry:
-		"""Create default registry configuration for tenant."""
-		registry = CRRegistry(
-			registry_id=uuid7str(),
-			tenant_id=self.tenant_id,
-			name=f"Registry for {self.tenant_id}",
-			description="APG Capability Registry",
-			auto_discovery_enabled=True,
-			auto_validation_enabled=True,
-			marketplace_integration=True,
-			ai_recommendations=True,
-			discovery_paths=["capabilities/", "custom_capabilities/"],
-			scan_frequency_hours=24,
-			cache_ttl_seconds=3600,
-			max_composition_size=50,
-			max_dependency_depth=10,
-			created_at=datetime.utcnow(),
-			created_by=self.user_id,
-			metadata_json={"source": "auto_created", "version": "1.0.0"}
-		)
-		
-		self.db_session.add(registry)
-		await self.db_session.commit()
-		
-		print(self._log_operation("create_default_registry", f"Created for tenant {self.tenant_id}"))
-		return registry
-	
-	# =================================================================
-	# Capability Discovery and Registration
-	# =================================================================
-	
-	async def discover_capabilities(
-		self,
-		discovery_paths: Optional[List[str]] = None,
-		force_rescan: bool = False
-	) -> ServiceResponse:
-		"""
-		Discover capabilities from APG directory structure.
-		
-		Args:
-			discovery_paths: Optional list of paths to scan
-			force_rescan: Force rescan even if recent scan exists
-			
-		Returns:
-			ServiceResponse with discovered capabilities
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			registry = await self._get_registry_config()
-			if not registry:
-				return {
-					"success": False,
-					"message": "Registry configuration not found",
-					"data": None,
-					"errors": ["Registry not configured for tenant"]
-				}
-			
-			# Check if recent scan exists
-			if not force_rescan and registry.last_scan_date:
-				scan_age = datetime.utcnow() - registry.last_scan_date
-				if scan_age.total_seconds() < (registry.scan_frequency_hours * 3600):
-					cached_result = await self._get_cached_discovery_result()
-					if cached_result:
-						return cached_result
-			
-			# Perform discovery
-			paths = discovery_paths or registry.discovery_paths or ["capabilities/"]
-			discovered_capabilities = []
-			
-			for path in paths:
-				capabilities = await self._scan_capability_path(path)
-				discovered_capabilities.extend(capabilities)
-			
-			# Register discovered capabilities
-			registration_results = []
-			for cap_data in discovered_capabilities:
-				result = await self._register_capability(cap_data)
-				registration_results.append(result)
-			
-			# Update last scan date
-			registry.last_scan_date = datetime.utcnow()
-			await self.db_session.commit()
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("discover_capabilities", duration_ms))
-			
-			return {
-				"success": True,
-				"message": f"Discovered {len(discovered_capabilities)} capabilities",
-				"data": {
-					"discovered_count": len(discovered_capabilities),
-					"registered_count": len([r for r in registration_results if r["success"]]),
-					"discovery_time_ms": duration_ms,
-					"capabilities": registration_results
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("discover_capabilities", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Capability discovery failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def _scan_capability_path(self, path: str) -> List[Dict[str, Any]]:
-		"""Scan a specific path for APG capabilities."""
-		capabilities = []
-		capability_path = Path(path)
-		
-		if not capability_path.exists():
-			print(self._log_operation("scan_path", f"Path not found: {path}"))
-			return capabilities
-		
-		# Recursively scan for __init__.py files with capability metadata
-		for init_file in capability_path.rglob("__init__.py"):
-			try:
-				cap_data = await self._extract_capability_metadata(init_file)
-				if cap_data:
-					capabilities.append(cap_data)
-			except Exception as e:
-				print(self._log_operation("scan_capability", f"Error scanning {init_file}: {e}"))
-		
-		return capabilities
-	
-	async def _extract_capability_metadata(self, init_file: Path) -> Optional[Dict[str, Any]]:
-		"""Extract capability metadata from __init__.py file."""
-		try:
-			with open(init_file, 'r', encoding='utf-8') as f:
-				content = f.read()
-			
-			metadata = self._extract_metadata_literals(content)
-			
-			if metadata.get('capability_code'):
-				# Add file system information
-				init_file_path = init_file.resolve()
-				try:
-					relative_path = str(init_file_path.relative_to(Path.cwd().resolve()))
-				except ValueError:
-					relative_path = str(init_file_path)
-				metadata.update({
-					'file_path': str(init_file_path),
-					'module_path': relative_path.replace('/__init__.py', '').replace('/', '.'),
-					'category': self._infer_category_from_path(relative_path),
-					'subcategory': self._infer_subcategory_from_path(relative_path),
-					'discovered_at': datetime.utcnow().isoformat()
-				})
-				
-				return metadata
-			
-		except Exception as e:
-			print(self._log_operation("extract_metadata", f"Error: {e}"))
-		
-		return None
-
-	def _extract_metadata_literals(self, content: str) -> Dict[str, Any]:
-		"""Extract standard APG capability metadata from Python literals."""
-		field_map = {
-			"__capability_code__": "capability_code",
-			"__capability_name__": "capability_name",
-			"__version__": "version",
-			"__description__": "description",
-			"__composition_keywords__": "composition_keywords",
-		}
-		metadata: Dict[str, Any] = {}
-
-		try:
-			module = ast.parse(content)
-		except SyntaxError as exc:
-			print(self._log_operation("extract_metadata", f"Invalid Python metadata source: {exc}"))
-			return metadata
-
-		for node in module.body:
-			if not isinstance(node, ast.Assign):
-				continue
-
-			for target in node.targets:
-				if not isinstance(target, ast.Name) or target.id not in field_map:
-					continue
-
-				try:
-					value = ast.literal_eval(node.value)
-				except (ValueError, SyntaxError):
-					print(self._log_operation("extract_metadata", f"Unsupported literal for {target.id}"))
-					continue
-
-				metadata_name = field_map[target.id]
-				if metadata_name == "composition_keywords":
-					if isinstance(value, (list, tuple)):
-						metadata[metadata_name] = [item for item in value if isinstance(item, str)]
-					else:
-						print(self._log_operation("extract_metadata", f"{target.id} must be a list of strings"))
-				elif isinstance(value, str):
-					metadata[metadata_name] = value
-				else:
-					print(self._log_operation("extract_metadata", f"{target.id} must be a string"))
-
-		return metadata
-	
-	def _extract_string_value(self, line: str) -> str:
-		"""Extract string value from Python assignment line."""
-		if '=' in line:
-			try:
-				value = ast.literal_eval(line.split('=', 1)[1].strip())
-				if isinstance(value, str):
-					return value
-			except (ValueError, SyntaxError):
-				print(self._log_operation("extract_metadata", f"Unsupported string literal: {line}"))
-		return ""
-	
-	def _extract_list_value(self, line: str, content: str) -> List[str]:
-		"""Extract list value from Python assignment."""
-		if '=' in line:
-			try:
-				value = ast.literal_eval(line.split('=', 1)[1].strip())
-				if isinstance(value, (list, tuple)):
-					return [item for item in value if isinstance(item, str)]
-				print(self._log_operation("extract_metadata", f"Expected list literal: {line}"))
-			except (ValueError, SyntaxError):
-				print(self._log_operation("extract_metadata", f"Unsupported list literal: {line}"))
-		return []
-	
-	def _infer_category_from_path(self, path: str) -> str:
-		"""Infer capability category from file path."""
-		path_parts = path.split('/')
-		if len(path_parts) >= 2:
-			return path_parts[1]  # capabilities/category_name/...
-		return "uncategorized"
-	
-	def _infer_subcategory_from_path(self, path: str) -> Optional[str]:
-		"""Infer capability subcategory from file path."""
-		path_parts = path.split('/')
-		if len(path_parts) >= 3:
-			return path_parts[2]  # capabilities/category/subcategory/...
-		return None
-	
-	async def _register_capability(self, cap_data: Dict[str, Any]) -> ServiceResponse:
-		"""Register a discovered capability."""
-		try:
-			# Check if capability already exists
-			existing = await self.db_session.execute(
-				select(CRCapability).where(
-					and_(
-						CRCapability.tenant_id == self.tenant_id,
-						CRCapability.capability_code == cap_data['capability_code']
-					)
-				)
-			)
-			
-			capability = existing.scalar_one_or_none()
-			
-			if capability:
-				# Update existing capability
-				capability.capability_name = cap_data.get('capability_name', capability.capability_name)
-				capability.description = cap_data.get('description', capability.description)
-				capability.version = cap_data.get('version', capability.version)
-				capability.category = cap_data.get('category', capability.category)
-				capability.subcategory = cap_data.get('subcategory', capability.subcategory)
-				capability.file_path = cap_data.get('file_path', capability.file_path)
-				capability.module_path = cap_data.get('module_path', capability.module_path)
-				capability.composition_keywords = cap_data.get('composition_keywords', [])
-				capability.updated_at = datetime.utcnow()
-				capability.updated_by = self.user_id
-				
-				action = "updated"
-			else:
-				# Create new capability
-				capability = CRCapability(
-					capability_id=uuid7str(),
-					tenant_id=self.tenant_id,
-					capability_code=cap_data['capability_code'],
-					capability_name=cap_data.get('capability_name', cap_data['capability_code']),
-					description=cap_data.get('description', ''),
-					version=cap_data.get('version', '1.0.0'),
-					category=cap_data.get('category', 'uncategorized'),
-					subcategory=cap_data.get('subcategory'),
-					status=CRCapabilityStatus.DISCOVERED,
-					file_path=cap_data.get('file_path'),
-					module_path=cap_data.get('module_path'),
-					composition_keywords=cap_data.get('composition_keywords', []),
-					created_at=datetime.utcnow(),
-					created_by=self.user_id
-				)
-				
-				self.db_session.add(capability)
-				action = "registered"
-			
-			await self.db_session.commit()
-			
-			print(self._log_operation("register_capability", 
-				f"{action} {cap_data['capability_code']}"))
-			
-			return {
-				"success": True,
-				"message": f"Capability {action} successfully",
-				"data": {
-					"capability_id": capability.capability_id,
-					"capability_code": capability.capability_code,
-					"action": action
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			await self.db_session.rollback()
-			print(self._log_operation("register_capability", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Capability registration failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	# =================================================================
-	# Capability Search and Discovery
-	# =================================================================
-	
-	async def search_capabilities(
-		self,
-		query: Optional[str] = None,
-		category: Optional[str] = None,
-		status: Optional[CRCapabilityStatus] = None,
-		composition_keywords: Optional[List[str]] = None,
-		limit: int = 50,
-		offset: int = 0
-	) -> CapabilitySearchResult:
-		"""
-		Search capabilities with filtering and AI recommendations.
-		
-		Args:
-			query: Text search query
-			category: Filter by category
-			status: Filter by status
-			composition_keywords: Filter by composition keywords
-			limit: Maximum results to return
-			offset: Results offset for pagination
-			
-		Returns:
-			CapabilitySearchResult with capabilities and metadata
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			# Build search query
-			search_query = select(CRCapability).where(
-				CRCapability.tenant_id == self.tenant_id
-			)
-			
-			# Apply filters
-			if category:
-				search_query = search_query.where(CRCapability.category == category)
-			
-			if status:
-				search_query = search_query.where(CRCapability.status == status)
-			
-			if query:
-				search_query = search_query.where(
-					or_(
-						CRCapability.capability_name.ilike(f"%{query}%"),
-						CRCapability.description.ilike(f"%{query}%"),
-						CRCapability.capability_code.ilike(f"%{query}%")
-					)
-				)
-			
-			if composition_keywords:
-				# JSON array contains any of the keywords
-				for keyword in composition_keywords:
-					search_query = search_query.where(
-						CRCapability.composition_keywords.contains([keyword])
-					)
-			
-			# Get total count
-			count_query = select(func.count()).select_from(search_query.subquery())
-			count_result = await self.db_session.execute(count_query)
-			total_count = count_result.scalar()
-			
-			# Apply pagination and ordering
-			search_query = search_query.order_by(
-				desc(CRCapability.popularity_score),
-				asc(CRCapability.capability_name)
-			).limit(limit).offset(offset)
-			
-			# Execute search
-			result = await self.db_session.execute(search_query)
-			capabilities = result.scalars().all()
-			
-			# Convert to dict format
-			capabilities_data = []
-			for cap in capabilities:
-				cap_dict = {
-					"capability_id": cap.capability_id,
-					"capability_code": cap.capability_code,
-					"capability_name": cap.capability_name,
-					"description": cap.description,
-					"version": cap.version,
-					"category": cap.category,
-					"subcategory": cap.subcategory,
-					"status": cap.status,
-					"composition_keywords": cap.composition_keywords,
-					"provides_services": cap.provides_services,
-					"complexity_score": cap.complexity_score,
-					"quality_score": cap.quality_score,
-					"popularity_score": cap.popularity_score,
-					"usage_count": cap.usage_count,
-					"created_at": cap.created_at.isoformat() if cap.created_at else None
-				}
-				capabilities_data.append(cap_dict)
-			
-			# Rank deterministic recommendations from capability metadata and search intent.
-			recommendations = await self._generate_capability_recommendations(
-				query, capabilities_data
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("search_capabilities", duration_ms))
-			
-			return {
-				"capabilities": capabilities_data,
-				"total_count": total_count,
-				"search_time_ms": duration_ms,
-				"recommendations": recommendations
-			}
-			
-		except Exception as e:
-			print(self._log_operation("search_capabilities", f"Error: {e}"))
-			return {
-				"capabilities": [],
-				"total_count": 0,
-				"search_time_ms": 0.0,
-				"recommendations": []
-			}
-	
-	async def _generate_capability_recommendations(
-		self,
-		query: Optional[str],
-		search_results: List[Dict[str, Any]]
-	) -> List[Dict[str, Any]]:
-		"""Generate AI-powered capability recommendations."""
-		if not search_results:
-			return []
-
-		query_terms = self._recommendation_terms(query or "")
-		scored_capabilities = []
-		for capability in search_results:
-			text_terms = self._capability_terms(capability)
-			matched_terms = sorted(query_terms.intersection(text_terms))
-			quality_score = float(capability.get("quality_score") or 0.0)
-			popularity_score = float(capability.get("popularity_score") or 0.0)
-			usage_count = float(capability.get("usage_count") or 0.0)
-			complexity_score = float(capability.get("complexity_score") or 1.0)
-			usage_score = min(1.0, usage_count / 1000.0)
-			complexity_bonus = max(0.0, min(1.0, 1.0 - (complexity_score / 10.0)))
-			intent_score = (len(matched_terms) / max(len(query_terms), 1)) if query_terms else 0.0
-			keyword_terms = self._recommendation_terms(" ".join(capability.get("composition_keywords") or []))
-			keyword_bonus = 0.15 if matched_terms and keyword_terms.intersection(matched_terms) else 0.0
-			total_score = (
-				(intent_score * 0.40) +
-				(quality_score * 0.25) +
-				(popularity_score * 0.15) +
-				(usage_score * 0.10) +
-				(complexity_bonus * 0.10) +
-				keyword_bonus
-			)
-			scored_capabilities.append((total_score, matched_terms, capability, {
-				"intent_match": round(intent_score, 3),
-				"quality": round(quality_score, 3),
-				"popularity": round(popularity_score, 3),
-				"usage": round(usage_score, 3),
-				"complexity_bonus": round(complexity_bonus, 3),
-			}))
-
-		scored_capabilities.sort(key=lambda item: item[0], reverse=True)
-		recommendations = []
-		for total_score, matched_terms, capability, breakdown in scored_capabilities[:5]:
-			recommendations.append({
-				"capability_id": capability["capability_id"],
-				"capability_name": capability["capability_name"],
-				"recommendation_reason": self._recommendation_reason(matched_terms, capability),
-				"confidence_score": round(max(0.2, min(0.98, total_score)), 3),
-				"matched_terms": matched_terms,
-				"score_breakdown": breakdown
-			})
-
-		return recommendations
-
-	def _recommendation_terms(self, text: str) -> Set[str]:
-		"""Extract stable search-intent terms from user text."""
-		stop_words = {
-			"a", "an", "and", "are", "as", "build", "for", "in", "me",
-			"need", "of", "on", "or", "the", "to", "with"
-		}
-		return {
-			term
-			for term in re.findall(r"[a-z0-9_]+", text.lower())
-			if len(term) > 2 and term not in stop_words
-		}
-
-	def _capability_terms(self, capability: Dict[str, Any]) -> Set[str]:
-		"""Extract searchable terms from capability metadata."""
-		values = [
-			capability.get("capability_name", ""),
-			capability.get("description", ""),
-			capability.get("category", ""),
-			capability.get("subcategory", ""),
-			" ".join(capability.get("composition_keywords") or []),
-			" ".join(capability.get("provides_services") or []),
-		]
-		return self._recommendation_terms(" ".join(str(value) for value in values if value))
-
-	def _recommendation_reason(self, matched_terms: List[str], capability: Dict[str, Any]) -> str:
-		"""Build a concise recommendation reason."""
-		if matched_terms:
-			return f"Matches requested intent terms: {', '.join(matched_terms[:5])}"
-		if float(capability.get("quality_score") or 0.0) >= 0.8:
-			return "High quality capability for this search result set"
-		if float(capability.get("popularity_score") or 0.0) >= 0.7:
-			return "Popular capability for this search result set"
-		return "Relevant capability from the filtered search result set"
-	
-	# =================================================================
-	# Composition Management and Validation
-	# =================================================================
-	
-	async def create_composition(
-		self,
-		name: str,
-		description: str,
-		capability_ids: List[str],
-		composition_type: Optional[CRCompositionType] = None,
-		industry_focus: Optional[List[str]] = None,
-		configuration: Optional[Dict[str, Any]] = None
-	) -> ServiceResponse:
-		"""
-		Create and validate a new capability composition.
-		
-		Args:
-			name: Composition name
-			description: Composition description
-			capability_ids: List of capability IDs to include
-			composition_type: Type of composition
-			industry_focus: Industry requirements
-			configuration: Additional configuration
-			
-		Returns:
-			ServiceResponse with composition data
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("create_composition", f"Creating '{name}' with {len(capability_ids)} capabilities"))
-			
-			# Validate composition using composition engine
-			validation_result = await self._composition_engine.validate_composition(
-				capability_ids, composition_type, industry_focus
-			)
-			
-			# Create composition record
-			composition = CRComposition(
-				composition_id=uuid7str(),
-				tenant_id=self.tenant_id,
-				name=name,
-				description=description,
-				composition_type=composition_type or CRCompositionType.CUSTOM,
-				version="1.0.0",
-				validation_status=CRValidationStatus.VALID if validation_result.is_valid else CRValidationStatus.INVALID,
-				validation_results={
-					"validation_score": validation_result.validation_score,
-					"conflicts_count": len(validation_result.conflicts),
-					"recommendations_count": len(validation_result.recommendations)
-				},
-				validation_errors=[
-					{"conflict_id": c.conflict_id, "description": c.description}
-					for c in validation_result.conflicts 
-					if c.severity.value in ["high", "critical"]
-				],
-				validation_warnings=[
-					{"conflict_id": c.conflict_id, "description": c.description}
-					for c in validation_result.conflicts 
-					if c.severity.value in ["low", "medium"]
-				],
-				configuration=configuration or {},
-				estimated_complexity=validation_result.performance_impact.memory_usage_mb / 100,
-				estimated_cost=validation_result.cost_analysis.get("monthly_cost_usd", 0.0),
-				performance_metrics={
-					"memory_usage_mb": validation_result.performance_impact.memory_usage_mb,
-					"cpu_usage_pct": validation_result.performance_impact.cpu_usage_pct,
-					"response_time_ms": validation_result.performance_impact.response_time_ms,
-					"scalability_score": validation_result.performance_impact.scalability_score
-				},
-				target_users=industry_focus or [],
-				created_at=datetime.utcnow(),
-				created_by=self.user_id
-			)
-			
-			self.db_session.add(composition)
-			await self.db_session.flush()  # Get the composition ID
-			
-			# Add capability relationships
-			for i, capability_id in enumerate(capability_ids):
-				comp_cap = CRCompositionCapability(
-					comp_cap_id=uuid7str(),
-					composition_id=composition.composition_id,
-					capability_id=capability_id,
-					version_constraint=CRVersionConstraint.LATEST,
-					required=True,
-					load_order=i + 1,
-					configuration={},
-					created_at=datetime.utcnow(),
-					created_by=self.user_id
-				)
-				self.db_session.add(comp_cap)
-			
-			await self.db_session.commit()
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("create_composition", duration_ms))
-			
-			return {
-				"success": True,
-				"message": f"Composition '{name}' created successfully",
-				"data": {
-					"composition_id": composition.composition_id,
-					"validation_score": validation_result.validation_score,
-					"is_valid": validation_result.is_valid,
-					"conflicts_count": len(validation_result.conflicts),
-					"recommendations_count": len(validation_result.recommendations),
-					"estimated_cost": validation_result.cost_analysis.get("monthly_cost_usd", 0.0),
-					"performance_impact": {
-						"memory_usage_mb": validation_result.performance_impact.memory_usage_mb,
-						"response_time_ms": validation_result.performance_impact.response_time_ms,
-						"scalability_score": validation_result.performance_impact.scalability_score
-					},
-					"deployment_strategy": validation_result.deployment_strategy
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			await self.db_session.rollback()
-			print(self._log_operation("create_composition", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Composition creation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def validate_composition(
-		self,
-		capability_ids: List[str],
-		composition_type: Optional[CRCompositionType] = None,
-		industry_focus: Optional[List[str]] = None
-	) -> ServiceResponse:
-		"""
-		Validate capability composition without creating it.
-		
-		Args:
-			capability_ids: List of capability IDs to validate
-			composition_type: Type of composition
-			industry_focus: Industry requirements
-			
-		Returns:
-			ServiceResponse with validation results
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("validate_composition", f"Validating {len(capability_ids)} capabilities"))
-			
-			# Perform validation using composition engine
-			validation_result = await self._composition_engine.validate_composition(
-				capability_ids, composition_type, industry_focus
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("validate_composition", duration_ms))
-			
-			return {
-				"success": True,
-				"message": "Composition validation completed",
-				"data": {
-					"is_valid": validation_result.is_valid,
-					"validation_score": validation_result.validation_score,
-					"conflicts": [
-						{
-							"conflict_id": c.conflict_id,
-							"severity": c.severity.value,
-							"conflict_type": c.conflict_type,
-							"description": c.description,
-							"conflicting_capabilities": c.conflicting_capabilities,
-							"auto_resolvable": c.auto_resolvable,
-							"resolution_options": c.resolution_options
-						}
-						for c in validation_result.conflicts
-					],
-					"recommendations": [
-						{
-							"recommendation_id": r.recommendation_id,
-							"type": r.recommendation_type.value,
-							"title": r.title,
-							"description": r.description,
-							"affected_capabilities": r.affected_capabilities,
-							"implementation_steps": r.implementation_steps,
-							"estimated_impact": r.estimated_impact,
-							"confidence_score": r.confidence_score,
-							"priority": r.priority
-						}
-						for r in validation_result.recommendations
-					],
-					"performance_impact": {
-						"memory_usage_mb": validation_result.performance_impact.memory_usage_mb,
-						"cpu_usage_pct": validation_result.performance_impact.cpu_usage_pct,
-						"network_bandwidth_mbps": validation_result.performance_impact.network_bandwidth_mbps,
-						"startup_time_ms": validation_result.performance_impact.startup_time_ms,
-						"response_time_ms": validation_result.performance_impact.response_time_ms,
-						"scalability_score": validation_result.performance_impact.scalability_score
-					},
-					"cost_analysis": validation_result.cost_analysis,
-					"deployment_strategy": validation_result.deployment_strategy,
-					"validation_time_ms": duration_ms
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("validate_composition", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Composition validation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def get_composition_recommendations(
-		self,
-		capability_ids: List[str],
-		composition_type: Optional[CRCompositionType] = None,
-		industry_focus: Optional[List[str]] = None
-	) -> ServiceResponse:
-		"""
-		Get AI-powered composition recommendations.
-		
-		Args:
-			capability_ids: Current capability IDs in composition
-			composition_type: Type of composition
-			industry_focus: Industry requirements
-			
-		Returns:
-			ServiceResponse with recommendations
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("get_recommendations", f"Generating recommendations for {len(capability_ids)} capabilities"))
-			
-			# Generate recommendations using composition engine
-			recommendations = await self._composition_engine.generate_composition_recommendations(
-				capability_ids, composition_type, industry_focus
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("get_recommendations", duration_ms))
-			
-			return {
-				"success": True,
-				"message": f"Generated {len(recommendations)} recommendations",
-				"data": {
-					"recommendations": [
-						{
-							"recommendation_id": r.recommendation_id,
-							"type": r.recommendation_type.value,
-							"title": r.title,
-							"description": r.description,
-							"affected_capabilities": r.affected_capabilities,
-							"implementation_steps": r.implementation_steps,
-							"estimated_impact": r.estimated_impact,
-							"confidence_score": r.confidence_score,
-							"priority": r.priority
-						}
-						for r in recommendations
-					],
-					"generation_time_ms": duration_ms,
-					"total_recommendations": len(recommendations)
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("get_recommendations", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Recommendation generation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def analyze_dependency_graph(
-		self,
-		capability_ids: List[str]
-	) -> ServiceResponse:
-		"""
-		Analyze dependency graph for capabilities.
-		
-		Args:
-			capability_ids: List of capability IDs to analyze
-			
-		Returns:
-			ServiceResponse with dependency graph analysis
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("analyze_dependencies", f"Analyzing dependencies for {len(capability_ids)} capabilities"))
-			
-			# Build dependency graph using composition engine
-			dependency_graph = await self._composition_engine.build_dependency_graph(capability_ids)
-			
-			# Convert to response format
-			graph_data = {}
-			for node_id, node in dependency_graph.items():
-				graph_data[node_id] = {
-					"capability_id": node.capability_id,
-					"capability_code": node.capability_code,
-					"version": node.version,
-					"dependencies": node.dependencies,
-					"dependents": node.dependents,
-					"load_priority": node.load_priority,
-					"initialization_order": node.initialization_order,
-					"metadata": node.metadata
-				}
-			
-			# Calculate graph metrics
-			total_nodes = len(dependency_graph)
-			total_edges = sum(len(node.dependencies) for node in dependency_graph.values())
-			max_depth = max([node.initialization_order for node in dependency_graph.values()], default=0)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("analyze_dependencies", duration_ms))
-			
-			return {
-				"success": True,
-				"message": "Dependency graph analysis completed",
-				"data": {
-					"dependency_graph": graph_data,
-					"graph_metrics": {
-						"total_nodes": total_nodes,
-						"total_edges": total_edges,
-						"max_dependency_depth": max_depth,
-						"average_dependencies": total_edges / total_nodes if total_nodes > 0 else 0
-					},
-					"analysis_time_ms": duration_ms
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("analyze_dependencies", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Dependency analysis failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	# =================================================================
-	# Version Management and Compatibility
-	# =================================================================
-	
-	async def create_capability_version(
-		self,
-		capability_id: str,
-		version_number: str,
-		release_notes: str,
-		breaking_changes: Optional[List[str]] = None,
-		new_features: Optional[List[str]] = None,
-		deprecations: Optional[List[str]] = None,
-		api_changes: Optional[Dict[str, Any]] = None
-	) -> ServiceResponse:
-		"""
-		Create new version for a capability.
-		
-		Args:
-			capability_id: Capability ID
-			version_number: Semantic version number
-			release_notes: Release notes
-			breaking_changes: List of breaking changes
-			new_features: List of new features
-			deprecations: List of deprecations
-			api_changes: API changes
-			
-		Returns:
-			ServiceResponse with version creation results
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("create_capability_version", 
-				f"Creating version {version_number} for {capability_id}"))
-			
-			result = await self._version_manager.create_capability_version(
-				capability_id=capability_id,
-				version_number=version_number,
-				release_notes=release_notes,
-				breaking_changes=breaking_changes,
-				new_features=new_features,
-				deprecations=deprecations,
-				api_changes=api_changes
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("create_capability_version", duration_ms))
-			
-			return result
-			
-		except Exception as e:
-			print(self._log_operation("create_capability_version", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Version creation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def analyze_version_compatibility(
-		self,
-		capability_id: str,
-		from_version: str,
-		to_version: str
-	) -> ServiceResponse:
-		"""
-		Analyze compatibility between two capability versions.
-		
-		Args:
-			capability_id: Capability ID
-			from_version: Source version
-			to_version: Target version
-			
-		Returns:
-			ServiceResponse with compatibility analysis
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("analyze_compatibility", 
-				f"Analyzing {from_version} -> {to_version} for {capability_id}"))
-			
-			analysis = await self._version_manager.analyze_compatibility(
-				capability_id, from_version, to_version
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("analyze_compatibility", duration_ms))
-			
-			return {
-				"success": True,
-				"message": "Compatibility analysis completed",
-				"data": {
-					"from_version": str(analysis.from_version),
-					"to_version": str(analysis.to_version),
-					"compatibility_level": analysis.compatibility_level.value,
-					"breaking_changes": analysis.breaking_changes,
-					"new_features": analysis.new_features,
-					"deprecations": analysis.deprecations,
-					"api_changes": analysis.api_changes,
-					"migration_complexity": analysis.migration_complexity.value,
-					"migration_steps": analysis.migration_steps,
-					"estimated_effort_hours": analysis.estimated_effort_hours,
-					"risk_factors": analysis.risk_factors,
-					"analysis_time_ms": duration_ms
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("analyze_compatibility", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Compatibility analysis failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def generate_next_version(
-		self,
-		capability_id: str,
-		change_type: str,
-		prerelease: Optional[str] = None
-	) -> ServiceResponse:
-		"""
-		Generate next version number for a capability.
-		
-		Args:
-			capability_id: Capability ID
-			change_type: Type of change (major, minor, patch, prerelease, build)
-			prerelease: Optional prerelease identifier
-			
-		Returns:
-			ServiceResponse with next version number
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("generate_next_version", 
-				f"Generating next {change_type} version for {capability_id}"))
-			
-			# Get current version
-			capability_result = await self.db_session.execute(
-				select(CRCapability).where(CRCapability.capability_id == capability_id)
-			)
-			capability = capability_result.scalar_one_or_none()
-			
-			if not capability:
-				return {
-					"success": False,
-					"message": "Capability not found",
-					"data": None,
-					"errors": [f"Capability {capability_id} not found"]
-				}
-			
-			current_version = capability.version
-			
-			# Parse change type
-			try:
-				version_change_type = VersionChangeType(change_type.lower())
-			except ValueError:
-				return {
-					"success": False,
-					"message": "Invalid change type",
-					"data": None,
-					"errors": [f"Change type must be one of: {[t.value for t in VersionChangeType]}"]
-				}
-			
-			# Generate next version
-			next_version = self._version_manager.generate_next_version(
-				current_version, version_change_type, prerelease
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("generate_next_version", duration_ms))
-			
-			return {
-				"success": True,
-				"message": f"Next version generated: {next_version}",
-				"data": {
-					"current_version": current_version,
-					"next_version": next_version,
-					"change_type": change_type,
-					"prerelease": prerelease,
-					"generation_time_ms": duration_ms
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("generate_next_version", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Version generation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def get_capability_versions(
-		self,
-		capability_id: str,
-		include_prereleases: bool = False
-	) -> ServiceResponse:
-		"""
-		Get all versions for a capability.
-		
-		Args:
-			capability_id: Capability ID
-			include_prereleases: Include prerelease versions
-			
-		Returns:
-			ServiceResponse with version list
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("get_capability_versions", 
-				f"Getting versions for {capability_id}"))
-			
-			# Build query
-			query = select(CRVersion).where(
-				CRVersion.capability_id == capability_id
-			)
-			
-			if not include_prereleases:
-				query = query.where(CRVersion.prerelease.is_(None))
-			
-			query = query.order_by(
-				desc(CRVersion.major_version),
-				desc(CRVersion.minor_version),
-				desc(CRVersion.patch_version)
-			)
-			
-			result = await self.db_session.execute(query)
-			versions = result.scalars().all()
-			
-			# Convert to response format
-			versions_data = []
-			for version in versions:
-				version_data = {
-					"version_id": version.version_id,
-					"version_number": version.version_number,
-					"major_version": version.major_version,
-					"minor_version": version.minor_version,
-					"patch_version": version.patch_version,
-					"prerelease": version.prerelease,
-					"build_metadata": version.build_metadata,
-					"release_date": version.release_date.isoformat() if version.release_date else None,
-					"release_notes": version.release_notes,
-					"breaking_changes": version.breaking_changes,
-					"new_features": version.new_features,
-					"deprecations": version.deprecations,
-					"api_changes": version.api_changes,
-					"backward_compatible": version.backward_compatible,
-					"forward_compatible": version.forward_compatible,
-					"quality_score": version.quality_score,
-					"test_coverage": version.test_coverage,
-					"documentation_score": version.documentation_score,
-					"security_audit_passed": version.security_audit_passed,
-					"status": version.status,
-					"support_level": version.support_level,
-					"end_of_life_date": version.end_of_life_date.isoformat() if version.end_of_life_date else None
-				}
-				versions_data.append(version_data)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("get_capability_versions", duration_ms))
-			
-			return {
-				"success": True,
-				"message": f"Retrieved {len(versions)} versions",
-				"data": {
-					"versions": versions_data,
-					"total_count": len(versions),
-					"retrieval_time_ms": duration_ms
-				},
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("get_capability_versions", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Failed to retrieve versions",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def validate_version_number(
-		self,
-		version_number: str
-	) -> ServiceResponse:
-		"""
-		Validate semantic version number format.
-		
-		Args:
-			version_number: Version number to validate
-			
-		Returns:
-			ServiceResponse with validation results
-		"""
-		try:
-			is_valid = self._version_manager.validate_version_string(version_number)
-			
-			if is_valid:
-				sem_ver = self._version_manager.parse_semantic_version(version_number)
-				return {
-					"success": True,
-					"message": "Version number is valid",
-					"data": {
-						"version_number": version_number,
-						"is_valid": True,
-						"parsed_version": {
-							"major": sem_ver.major,
-							"minor": sem_ver.minor,
-							"patch": sem_ver.patch,
-							"prerelease": sem_ver.prerelease,
-							"build": sem_ver.build
-						}
-					},
-					"errors": []
-				}
-			else:
-				return {
-					"success": False,
-					"message": "Invalid version number format",
-					"data": {
-						"version_number": version_number,
-						"is_valid": False
-					},
-					"errors": ["Version number does not follow semantic versioning (MAJOR.MINOR.PATCH)"]
-				}
-				
-		except Exception as e:
-			return {
-				"success": False,
-				"message": "Version validation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	# =================================================================
-	# Marketplace Integration
-	# =================================================================
-	
-	async def prepare_capability_for_marketplace(
-		self,
-		capability_id: str,
-		publication_metadata: Dict[str, Any]
-	) -> ServiceResponse:
-		"""
-		Prepare capability for marketplace publication.
-		
-		Args:
-			capability_id: Capability ID to publish
-			publication_metadata: Marketplace publication metadata
-			
-		Returns:
-			ServiceResponse with preparation results
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("prepare_marketplace", 
-				f"Preparing {capability_id} for marketplace"))
-			
-			result = await self._marketplace_integration.prepare_capability_for_marketplace(
-				capability_id, publication_metadata
-			)
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("prepare_marketplace", duration_ms))
-			
-			return result
-			
-		except Exception as e:
-			print(self._log_operation("prepare_marketplace", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Marketplace preparation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def submit_to_marketplace(
-		self,
-		capability_id: str,
-		publication_metadata: Dict[str, Any]
-	) -> ServiceResponse:
-		"""
-		Submit capability to APG marketplace.
-		
-		Args:
-			capability_id: Capability ID to submit
-			publication_metadata: Publication metadata
-			
-		Returns:
-			ServiceResponse with submission results
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("submit_marketplace", 
-				f"Submitting {capability_id} to marketplace"))
-			
-			# First prepare the capability
-			preparation_result = await self._marketplace_integration.prepare_capability_for_marketplace(
-				capability_id, publication_metadata
-			)
-			
-			if not preparation_result["success"]:
-				return preparation_result
-			
-			# Create publication package (simplified for this implementation)
-			# In real implementation, would use the actual PublicationPackage from preparation
-			publication_package = None  # Would be created from preparation_result
-			
-			# Submit to marketplace
-			submission_result = {
-				"success": True,
-				"message": "Capability submitted to marketplace",
-				"data": {
-					"submission_id": uuid7str(),
-					"review_status": "pending_review",
-					"estimated_review_time_hours": 24,
-					"marketplace_url": f"https://marketplace.apg.platform/submissions/{uuid7str()}",
-					"preparation_data": preparation_result.get("data", {})
-				},
-				"errors": []
-			}
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("submit_marketplace", duration_ms))
-			
-			return submission_result
-			
-		except Exception as e:
-			print(self._log_operation("submit_marketplace", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Marketplace submission failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def sync_with_marketplace(self) -> ServiceResponse:
-		"""
-		Synchronize registry with APG marketplace.
-		
-		Returns:
-			ServiceResponse with synchronization results
-		"""
-		start_time = datetime.utcnow()
-		
-		try:
-			print(self._log_operation("sync_marketplace", "Synchronizing with marketplace"))
-			
-			sync_result = await self._marketplace_integration.sync_with_marketplace()
-			
-			duration_ms = (datetime.utcnow() - start_time).total_seconds() * 1000
-			print(self._log_performance("sync_marketplace", duration_ms))
-			
-			return sync_result
-			
-		except Exception as e:
-			print(self._log_operation("sync_marketplace", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Marketplace synchronization failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def get_marketplace_info(self) -> ServiceResponse:
-		"""
-		Get marketplace integration information.
-		
-		Returns:
-			ServiceResponse with marketplace info
-		"""
-		try:
-			# Get registry configuration
-			registry = await self._get_registry_config()
-			
-			marketplace_info = {
-				"marketplace_url": "https://marketplace.apg.platform",
-				"integration_enabled": registry.marketplace_integration if registry else True,
-				"last_sync": registry.metadata.get("marketplace_last_sync") if registry and registry.metadata else None,
-				"published_capabilities": 0,  # Would query published capabilities
-				"pending_submissions": 0,  # Would query pending submissions
-				"total_downloads": 0,  # Would get from marketplace API
-				"featured_capabilities": [],  # Would get featured capabilities
-				"categories": [
-					"foundation_infrastructure",
-					"business_operations", 
-					"analytics_intelligence",
-					"manufacturing_operations",
-					"industry_verticals"
-				],
-				"license_types": [
-					"mit", "apache_2_0", "gpl_3_0", "bsd_3_clause", 
-					"proprietary", "commercial", "custom"
-				],
-				"quality_levels": [
-					"experimental", "beta", "stable", "enterprise", "certified"
-				]
-			}
-			
-			return {
-				"success": True,
-				"message": "Marketplace information retrieved",
-				"data": marketplace_info,
-				"errors": []
-			}
-			
-		except Exception as e:
-			print(self._log_operation("get_marketplace_info", f"Error: {e}"))
-			return {
-				"success": False,
-				"message": "Failed to get marketplace information",
-				"data": None,
-				"errors": [str(e)]
-			}
-	
-	async def validate_marketplace_metadata(
-		self,
-		publication_metadata: Dict[str, Any]
-	) -> ServiceResponse:
-		"""
-		Validate marketplace publication metadata.
-		
-		Args:
-			publication_metadata: Metadata to validate
-			
-		Returns:
-			ServiceResponse with validation results
-		"""
-		try:
-			errors = []
-			warnings = []
-			
-			# Required fields
-			required_fields = ["title", "description", "license_type", "author_name", "author_email"]
-			for field in required_fields:
-				if not publication_metadata.get(field):
-					errors.append(f"Required field '{field}' is missing")
-			
-			# Validate specific fields
-			if publication_metadata.get("title") and len(publication_metadata["title"]) < 5:
-				errors.append("Title must be at least 5 characters")
-			
-			if publication_metadata.get("description") and len(publication_metadata["description"]) < 50:
-				errors.append("Description must be at least 50 characters")
-			
-			# Validate license type
-			valid_licenses = ["mit", "apache_2_0", "gpl_3_0", "bsd_3_clause", "proprietary", "commercial", "custom"]
-			if publication_metadata.get("license_type") not in valid_licenses:
-				errors.append(f"License type must be one of: {valid_licenses}")
-			
-			# Validate email format (basic)
-			email = publication_metadata.get("author_email", "")
-			if email and "@" not in email:
-				errors.append("Invalid email format")
-			
-			# Validate pricing
-			pricing_model = publication_metadata.get("pricing_model", "free")
-			if pricing_model == "paid":
-				price = publication_metadata.get("price", 0)
-				if not isinstance(price, (int, float)) or price <= 0:
-					errors.append("Price must be a positive number for paid capabilities")
-			
-			# Validate tags
-			tags = publication_metadata.get("tags", [])
-			if len(tags) > 10:
-				warnings.append("Too many tags (maximum 10 recommended)")
-			
-			# Validate URLs
-			url_fields = ["support_url", "documentation_url", "repository_url", "demo_url"]
-			for field in url_fields:
-				url = publication_metadata.get(field)
-				if url and not (url.startswith("http://") or url.startswith("https://")):
-					warnings.append(f"{field} should be a valid URL")
-			
-			validation_score = max(0, 1.0 - (len(errors) * 0.2) - (len(warnings) * 0.05))
-			
-			return {
-				"success": len(errors) == 0,
-				"message": "Metadata validation completed",
-				"data": {
-					"is_valid": len(errors) == 0,
-					"validation_score": validation_score,
-					"errors": errors,
-					"warnings": warnings,
-					"required_fields": required_fields,
-					"total_checks": len(required_fields) + 6,  # Additional validation checks
-					"passed_checks": len(required_fields) + 6 - len(errors)
-				},
-				"errors": errors
-			}
-			
-		except Exception as e:
-			return {
-				"success": False,
-				"message": "Metadata validation failed",
-				"data": None,
-				"errors": [str(e)]
-			}
-
-CRService = CapabilityRegistryService
-
-# Service Factory
-_registry_service_instance: Optional[CapabilityRegistryService] = None
-
-def get_registry_service(
-	db_session: AsyncSession,
-	tenant_id: str,
-	user_id: str,
-	redis_client: Optional[Any] = None
-) -> CapabilityRegistryService:
-	"""Get or create capability registry service instance."""
-	return CapabilityRegistryService(
-		db_session=db_session,
-		tenant_id=tenant_id,
-		user_id=user_id,
-		redis_client=redis_client
+try:
+	from .capability_contract import (
+		SUPPORTED_REGISTRY_AGENT_ROLES,
+		SUPPORTED_REGISTRY_AGENT_RUNTIMES,
+		evaluate_capability_rules,
+		streaming_manifest,
+	)
+except ImportError:
+	from capability_contract import (
+		SUPPORTED_REGISTRY_AGENT_ROLES,
+		SUPPORTED_REGISTRY_AGENT_RUNTIMES,
+		evaluate_capability_rules,
+		streaming_manifest,
 	)
 
-async def initialize_registry_service() -> ServiceResponse:
-	"""Initialize the capability registry service."""
-	try:
-		print("APG Capability Registry Service initialized")
-		return {
-			"success": True,
-			"message": "Registry service initialized successfully",
-			"data": {"service": "capability_registry", "version": "1.0.0"},
-			"errors": []
+
+class CompositionRegistryService:
+	"""Tenant-scoped capability catalog, dependency, and publication coordinator."""
+
+	def __init__(self) -> None:
+		self._capabilities: dict[str, dict[str, Any]] = {}
+		self._dependencies: dict[str, dict[str, Any]] = {}
+		self._compositions: dict[str, dict[str, Any]] = {}
+		self._versions: dict[str, dict[str, Any]] = {}
+		self._publications: dict[str, dict[str, Any]] = {}
+		self._agents: dict[str, dict[str, Any]] = {}
+		self._audit_events: list[dict[str, Any]] = []
+
+	def register_capability(
+		self,
+		capability_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		category: str,
+		version: str,
+		provides: list[str],
+		contract_ref: str,
+		requires: list[str] | None = None,
+	) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "register_capability",
+			"capability_owner_assigned": bool(owner),
+			"capability_category_present": bool(category),
+			"capability_version_present": bool(version),
+			"capability_provides_present": bool(provides),
+			"capability_contract_present": bool(contract_ref),
 		}
-	except Exception as e:
-		return {
-			"success": False,
-			"message": "Registry service initialization failed",
-			"data": None,
-			"errors": [str(e)]
+		self._enforce(context)
+		record = {
+			"id": self._record_id("registered_capability", capability_id),
+			"capability_id": capability_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"owner": owner,
+			"category": category,
+			"version": version,
+			"provides": list(provides),
+			"requires": list(requires or []),
+			"contract_ref": contract_ref,
+			"status": "registered",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
 		}
+		self._capabilities[record["id"]] = record
+		self._emit("capability_registered", tenant_id, record["id"], {"capability_id": capability_id})
+		return deepcopy(record)
+
+	def add_dependency(
+		self,
+		dependency_id: str,
+		tenant_id: str,
+		source_capability_id: str,
+		target_capability_id: str,
+		dependency_type: str,
+		version_constraint: str,
+	) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "add_dependency",
+			"dependency_target_present": bool(target_capability_id),
+			"dependency_type_present": bool(dependency_type),
+			"version_constraint_present": bool(version_constraint),
+		}
+		self._enforce(context)
+		self._require_capability(source_capability_id, tenant_id)
+		self._require_capability(target_capability_id, tenant_id)
+		record = {
+			"id": self._record_id("capability_dependency", dependency_id),
+			"dependency_id": dependency_id,
+			"tenant_id": tenant_id,
+			"source_capability_id": source_capability_id,
+			"target_capability_id": target_capability_id,
+			"dependency_type": dependency_type,
+			"version_constraint": version_constraint,
+			"status": "validated",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._dependencies[record["id"]] = record
+		try:
+			self._assert_no_dependency_cycle(tenant_id)
+		except ValueError:
+			self._dependencies.pop(record["id"], None)
+			raise
+		self._emit("dependency_added", tenant_id, record["id"], {"source": source_capability_id, "target": target_capability_id})
+		return deepcopy(record)
+
+	def create_composition(
+		self,
+		composition_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		capability_ids: list[str],
+	) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "create_composition",
+			"composition_owner_assigned": bool(owner),
+			"composition_capabilities_present": bool(capability_ids),
+		}
+		self._enforce(context)
+		for capability_id in capability_ids:
+			self._require_capability(capability_id, tenant_id)
+		validation = self.validate_composition(tenant_id, capability_ids)
+		record = {
+			"id": self._record_id("composition_blueprint", composition_id),
+			"composition_id": composition_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"owner": owner,
+			"capability_ids": list(capability_ids),
+			"validation": validation,
+			"status": "validated" if validation["valid"] else "draft",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._compositions[record["id"]] = record
+		self._emit("composition_created", tenant_id, record["id"], {"capability_count": len(capability_ids)})
+		self._emit("composition_validated", tenant_id, record["id"], {"valid": validation["valid"]})
+		return deepcopy(record)
+
+	def publish_composition(
+		self,
+		tenant_id: str,
+		composition_record_id: str,
+		validation_evidence: str,
+	) -> dict[str, Any]:
+		record = self._require_composition(composition_record_id, tenant_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "publish_composition",
+			"validation_evidence_present": bool(validation_evidence),
+		}
+		self._enforce(context)
+		record["status"] = "published"
+		record["validation_evidence"] = validation_evidence
+		record["updated_at"] = self._now()
+		self._emit("composition_validated", tenant_id, composition_record_id, {"status": "published"})
+		return deepcopy(record)
+
+	def validate_composition(self, tenant_id: str, capability_ids: list[str]) -> dict[str, Any]:
+		registered = {record["capability_id"] for record in self.list_capabilities(tenant_id)}
+		missing = [capability_id for capability_id in capability_ids if capability_id not in registered]
+		edges = [
+			(dependency["source_capability_id"], dependency["target_capability_id"])
+			for dependency in self.list_dependencies(tenant_id)
+			if dependency["source_capability_id"] in capability_ids
+		]
+		unmet = [target for _, target in edges if target not in capability_ids]
+		return {
+			"valid": not missing and not unmet,
+			"missing_capabilities": missing,
+			"unmet_dependencies": sorted(set(unmet)),
+			"capability_count": len(capability_ids),
+			"dependency_edge_count": len(edges),
+		}
+
+	def release_version(
+		self,
+		release_id: str,
+		tenant_id: str,
+		capability_id: str,
+		version: str,
+		compatibility_evidence: str,
+		reviewed_by: str | None = None,
+	) -> dict[str, Any]:
+		self._require_capability(capability_id, tenant_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "release_version",
+			"compatibility_evidence_present": bool(compatibility_evidence),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("capability_version", release_id),
+			"release_id": release_id,
+			"tenant_id": tenant_id,
+			"capability_id": capability_id,
+			"version": version,
+			"compatibility_evidence": compatibility_evidence,
+			"reviewed_by": reviewed_by,
+			"status": "released",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._versions[record["id"]] = record
+		self._emit("version_released", tenant_id, record["id"], {"capability_id": capability_id, "version": version})
+		return deepcopy(record)
+
+	def deprecate_capability(
+		self,
+		tenant_id: str,
+		capability_id: str,
+		migration_plan: str,
+	) -> dict[str, Any]:
+		record = self._require_capability(capability_id, tenant_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "deprecate_capability",
+			"migration_plan_present": bool(migration_plan),
+		}
+		self._enforce(context)
+		record["status"] = "deprecated"
+		record["migration_plan"] = migration_plan
+		record["updated_at"] = self._now()
+		self._emit("capability_deprecated", tenant_id, record["id"], {"capability_id": capability_id})
+		return deepcopy(record)
+
+	def publish_to_marketplace(
+		self,
+		publication_id: str,
+		tenant_id: str,
+		capability_id: str,
+		documentation_ref: str,
+		reviewed_by: str,
+	) -> dict[str, Any]:
+		self._require_capability(capability_id, tenant_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "publish_marketplace",
+			"review_recorded": bool(reviewed_by),
+			"documentation_present": bool(documentation_ref),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("marketplace_publication", publication_id),
+			"publication_id": publication_id,
+			"tenant_id": tenant_id,
+			"capability_id": capability_id,
+			"documentation_ref": documentation_ref,
+			"reviewed_by": reviewed_by,
+			"status": "prepared",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._publications[record["id"]] = record
+		self._emit("marketplace_publication_prepared", tenant_id, record["id"], {"capability_id": capability_id})
+		return deepcopy(record)
+
+	def register_registry_agent(self, tenant_id: str, name: str, runtime: str, role: str, instructions: str) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "register_registry_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_REGISTRY_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_REGISTRY_AGENT_ROLES,
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("registry_agent", name),
+			"tenant_id": tenant_id,
+			"name": name,
+			"runtime": runtime,
+			"role": role,
+			"instructions": instructions,
+			"status": "active",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._agents[record["id"]] = record
+		self._emit("registry_agent_registered", tenant_id, record["id"], {"runtime": runtime, "role": role})
+		return deepcopy(record)
+
+	def validate_agent_registry_action(self, tenant_id: str, agent_id: str, action: str, privileged_scope: bool, human_approval_recorded: bool) -> dict[str, Any]:
+		if agent_id not in self._agents:
+			raise KeyError(f"Unknown registry agent: {agent_id}")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "agent_registry_action",
+			"action": action,
+			"privileged_scope": privileged_scope,
+			"human_approval_recorded": human_approval_recorded,
+		}
+		return evaluate_capability_rules(context)
+
+	def validate_import_batch(self, tenant_id: str, record_count: int) -> dict[str, Any]:
+		context = {"tenant_context_present": bool(tenant_id), "operation": "registry_import", "event_stream": "bytewax"}
+		result = evaluate_capability_rules(context)
+		return {"processor": "bytewax", "record_count": record_count, "decision": result["decision"], "matched_rules": result["matched_rules"]}
+
+	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"capability_count": len(self.list_capabilities(tenant_id)),
+			"dependency_count": len(self.list_dependencies(tenant_id)),
+			"composition_count": len(self.list_compositions(tenant_id)),
+			"version_release_count": len(self.list_versions(tenant_id)),
+			"marketplace_publication_count": len(self.list_publications(tenant_id)),
+			"registry_agent_count": len(self.list_registry_agents(tenant_id)),
+			"audit_event_count": len(self.audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
+		}
+
+	def list_capabilities(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._capabilities, tenant_id)
+
+	def list_dependencies(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._dependencies, tenant_id)
+
+	def list_compositions(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._compositions, tenant_id)
+
+	def list_versions(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._versions, tenant_id)
+
+	def list_publications(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._publications, tenant_id)
+
+	def list_registry_agents(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._agents, tenant_id)
+
+	def audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
+		return [deepcopy(event) for event in self._audit_events if event["tenant_id"] == tenant_id]
+
+	def create_record(self, data: dict[str, Any]) -> dict[str, Any]:
+		return self.register_capability(
+			data.get("capability_id", data.get("id", "capability")),
+			data.get("tenant_id", "default"),
+			data.get("name", "Capability"),
+			data.get("owner", "owner"),
+			data.get("category", "composition"),
+			data.get("version", "1.0.0"),
+			data.get("provides", ["capability_surface"]),
+			data.get("contract_ref", "capability_contract.py"),
+			data.get("requires", []),
+		)
+
+	def list_records(self, tenant_id: str = "default") -> list[dict[str, Any]]:
+		return self.list_capabilities(tenant_id)
+
+	def _require_capability(self, capability_id: str, tenant_id: str) -> dict[str, Any]:
+		for record in self._capabilities.values():
+			if record["tenant_id"] == tenant_id and record["capability_id"] == capability_id:
+				return record
+		raise KeyError(f"Unknown capability: {capability_id}")
+
+	def _require_composition(self, composition_record_id: str, tenant_id: str) -> dict[str, Any]:
+		record = self._compositions.get(composition_record_id)
+		if not record or record["tenant_id"] != tenant_id:
+			raise KeyError(f"Unknown composition: {composition_record_id}")
+		return record
+
+	def _assert_no_dependency_cycle(self, tenant_id: str) -> None:
+		edges: dict[str, set[str]] = {}
+		for dependency in self.list_dependencies(tenant_id):
+			edges.setdefault(dependency["source_capability_id"], set()).add(dependency["target_capability_id"])
+		visiting: set[str] = set()
+		visited: set[str] = set()
+
+		def visit(capability_id: str) -> None:
+			if capability_id in visiting:
+				raise ValueError(f"dependency cycle detected at {capability_id}")
+			if capability_id in visited:
+				return
+			visiting.add(capability_id)
+			for target in edges.get(capability_id, set()):
+				visit(target)
+			visiting.remove(capability_id)
+			visited.add(capability_id)
+
+		for capability_id in list(edges):
+			visit(capability_id)
+
+	def _enforce(self, context: dict[str, Any]) -> None:
+		result = evaluate_capability_rules(context)
+		if result["decision"] == "deny":
+			raise PermissionError(",".join(result["matched_rules"]))
+		if result["decision"] == "require_review":
+			raise PermissionError(",".join(result["matched_rules"]))
+
+	def _tenant_records(self, records: dict[str, dict[str, Any]], tenant_id: str) -> list[dict[str, Any]]:
+		return [deepcopy(record) for record in records.values() if record["tenant_id"] == tenant_id]
+
+	def _emit(self, event_name: str, tenant_id: str, record_id: str, payload: dict[str, Any]) -> None:
+		self._audit_events.append({
+			"event": event_name,
+			"tenant_id": tenant_id,
+			"record_id": record_id,
+			"payload": deepcopy(payload),
+			"processor": "bytewax",
+			"stream": streaming_manifest()["stream"],
+			"created_at": self._now(),
+		})
+
+	def _record_id(self, prefix: str, value: str) -> str:
+		slug = "".join(character.lower() if character.isalnum() else "_" for character in str(value)).strip("_")
+		return f"{prefix}_{slug or 'record'}"
+
+	def _now(self) -> str:
+		return datetime.now(timezone.utc).isoformat()
+
+
+CRService = CompositionRegistryService
+
+
+async def get_registry_service(*args: Any, **kwargs: Any) -> CompositionRegistryService:
+	"""Return a dependency-light registry service for compatibility imports."""
+	_ = args, kwargs
+	return CompositionRegistryService()

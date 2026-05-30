@@ -2,25 +2,233 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
-        "display_name": "Capability Registry - Comprehensive Specification",
+        "display_name": "Capability Registry",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 9,
+        "rule_count": 22
       }
     },
     "self_test": {
       "capability": "composition_registry",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
       "capability": "composition_registry",
-      "format": "apg.semantic-model.v1"
+      "format": "apg.semantic-model.v1",
+      "streaming": {
+        "events": [
+          "capability_registered",
+          "dependency_added",
+          "composition_created",
+          "composition_validated",
+          "version_released",
+          "capability_deprecated",
+          "marketplace_publication_prepared",
+          "registry_agent_registered"
+        ],
+        "guardrails": [
+          "registry_import_requires_bytewax",
+          "registry_event_requires_bytewax",
+          "privileged_agent_registry_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "registered",
+          "validated",
+          "released",
+          "published",
+          "deprecated",
+          "retired"
+        ],
+        "stream": "apg.composition.registry.lifecycle"
+      }
     }
   },
   "format": "apg.release-report.v1",
   "ok": true,
   "package": "composition_registry",
+  "registration": {
+    "capability": "composition_registry",
+    "display_name": "Capability Registry",
+    "provides": [
+      "capability_catalog_lifecycle",
+      "dependency_graph_management",
+      "composition_blueprint_validation",
+      "version_compatibility_governance",
+      "marketplace_publication_governance",
+      "registry_discovery",
+      "registry_agents"
+    ],
+    "requires": [
+      "auth",
+      "audl",
+      "ntfy",
+      "composition_events",
+      "composition_config",
+      "composition_access"
+    ],
+    "streaming": {
+      "events": [
+        "capability_registered",
+        "dependency_added",
+        "composition_created",
+        "composition_validated",
+        "version_released",
+        "capability_deprecated",
+        "marketplace_publication_prepared",
+        "registry_agent_registered"
+      ],
+      "guardrails": [
+        "registry_import_requires_bytewax",
+        "registry_event_requires_bytewax",
+        "privileged_agent_registry_action_requires_human_approval"
+      ],
+      "key": "tenant_id",
+      "processor": "bytewax",
+      "states": [
+        "draft",
+        "registered",
+        "validated",
+        "released",
+        "published",
+        "deprecated",
+        "retired"
+      ],
+      "stream": "apg.composition.registry.lifecycle"
+    },
+    "theme": {
+      "components": {
+        "agent_workbench": {
+          "status_style": "approval-chip",
+          "visual": "review-lane"
+        },
+        "catalog": {
+          "icon": "blocks",
+          "risk_style": "quality-band",
+          "status_indicator": "capability-pill"
+        },
+        "compositions": {
+          "status_style": "validation-chip",
+          "visual": "composition-board"
+        },
+        "dependencies": {
+          "status_style": "edge-chip",
+          "visual": "dependency-graph"
+        },
+        "marketplace": {
+          "status_style": "review-chip",
+          "visual": "publication-list"
+        },
+        "rule_center": {
+          "status_style": "guardrail-chip",
+          "visual": "rule-grid"
+        },
+        "versions": {
+          "status_style": "compatibility-chip",
+          "visual": "version-lanes"
+        }
+      },
+      "name": "composition_registry_control",
+      "tokens": {
+        "border.radius": "8px",
+        "color.accent": "#C44536",
+        "color.danger": "#C53030",
+        "color.primary": "#28536B",
+        "color.success": "#2F855A",
+        "color.warning": "#B7791F",
+        "density": "compact",
+        "surface.canvas": "#F7F8FA",
+        "surface.panel": "#FFFFFF",
+        "text.primary": "#172033",
+        "text.secondary": "#52606D"
+      }
+    },
+    "ui": {
+      "api_prefix": "/composition-registry/api/v1",
+      "requires_theme": true,
+      "routes": [
+        {
+          "component": "RegistryDashboard",
+          "name": "dashboard",
+          "nav_group": "Overview",
+          "path": "/composition-registry/dashboard",
+          "permission": "composition_registry:view"
+        },
+        {
+          "component": "CapabilityCatalog",
+          "name": "catalog",
+          "nav_group": "Catalog",
+          "path": "/composition-registry/catalog",
+          "permission": "composition_registry:manage_catalog"
+        },
+        {
+          "component": "DependencyGraph",
+          "name": "dependencies",
+          "nav_group": "Graph",
+          "path": "/composition-registry/dependencies",
+          "permission": "composition_registry:manage_dependencies"
+        },
+        {
+          "component": "CompositionBlueprints",
+          "name": "compositions",
+          "nav_group": "Compositions",
+          "path": "/composition-registry/compositions",
+          "permission": "composition_registry:compose"
+        },
+        {
+          "component": "VersionGovernance",
+          "name": "versions",
+          "nav_group": "Release",
+          "path": "/composition-registry/versions",
+          "permission": "composition_registry:release"
+        },
+        {
+          "component": "MarketplacePublication",
+          "name": "marketplace",
+          "nav_group": "Marketplace",
+          "path": "/composition-registry/marketplace",
+          "permission": "composition_registry:publish"
+        },
+        {
+          "component": "RegistryRuleCenter",
+          "name": "rules",
+          "nav_group": "Governance",
+          "path": "/composition-registry/rules",
+          "permission": "composition_registry:govern"
+        },
+        {
+          "component": "RegistryAgentWorkbench",
+          "name": "agents",
+          "nav_group": "Automation",
+          "path": "/composition-registry/agents",
+          "permission": "composition_registry:admin"
+        },
+        {
+          "component": "RegistrySettings",
+          "name": "settings",
+          "nav_group": "Administration",
+          "path": "/composition-registry/settings",
+          "permission": "composition_registry:admin"
+        }
+      ],
+      "shell": "apg_python",
+      "template_roots": [
+        "templates/",
+        "static/"
+      ],
+      "view_module": "views.py"
+    }
+  },
   "source": "capability_contract.py",
   "target": "python"
 }

@@ -16,6 +16,92 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 22:46 EAT
+
+Composition REGISTRY capability-catalog lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md` for the `composition_registry`
+  capability, and replaced `README.md` plus `cap_spec.md` with the active
+  package usage and lifecycle summary.
+- Replaced the generic spec-backed contract with explicit catalog, dependency,
+  composition blueprint, version, marketplace, registry-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  capability owner/category/version/provides/contract, dependency target/type
+  and version constraint, composition owner/capabilities/publication validation,
+  version compatibility evidence, deprecation migration plan, marketplace
+  review/documentation, registry import Bytewax streams, registry event Bytewax
+  streams, registry-agent runtime/role, and privileged agent-action approval.
+- Replaced dependency-heavy publishable service/API/view/app surfaces with
+  dependency-light registry lifecycle helpers for capability registration,
+  dependency graph edges, composition validation, composition publication,
+  version release, deprecation, marketplace publication preparation, import
+  validation, registry-agent registration, dashboard summaries, audit events,
+  API helpers, and screen models.
+- Review hardening moved dependency field guardrails before capability lookup
+  and rolls back in-memory dependency edges if cycle detection fails.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, capability, dependency, composition, version,
+  marketplace, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/composition/registry/__init__.py
+  capabilities/composition/registry/capability_contract.py
+  capabilities/composition/registry/service.py
+  capabilities/composition/registry/api.py
+  capabilities/composition/registry/views.py
+  capabilities/composition/registry/app.py
+  capabilities/composition/registry/tests/test_package_contract.py
+  capabilities/composition/registry/conftest.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/composition/registry/tests/test_package_contract.py` passed with
+  5 tests.
+- `./.venv/bin/apg capabilities inspect composition_registry --json | jq '.ok,
+  .summary.route_count, .summary.rule_count, .summary.theme'` confirmed `true`,
+  9 routes, 22 rules, and `composition_registry_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/composition/registry
+  --json | jq '.ok, .side_effect_free, .warnings, .errors,
+  (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'` confirmed
+  `true`, `true`, no warnings, no errors, `composition_registry`, `bytewax`,
+  `bytewax`, and runtime evidence loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/composition/registry --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python capabilities/composition/registry/app.py` passed package
+  self-test.
+- `./.venv/bin/python -c "from capabilities.composition.registry import
+  CompositionRegistryService; service=CompositionRegistryService();
+  service.register_registry_agent('tenant-proof','Proof agent','codex',
+  'dependency_reviewer','review dependency graph');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  registry-agent registration, audit event emission, and Bytewax stream
+  metadata.
+- `jq '.capabilities.composition_registry.streaming.processor,
+  .capabilities.composition_registry.provides,
+  .capabilities.composition_registry.requires,
+  .capabilities.composition_registry.screens.agents.route,
+  (.capabilities.composition_registry.rules[] |
+  select(.name=="registry_agent_runtime_supported") | .effect.reason),
+  (.capabilities.composition_registry.rules[] |
+  select(.name=="registry_import_requires_bytewax") | .effect.reason)'
+  capabilities/composition/registry/semantic_model.json` confirmed `bytewax`,
+  registry-agent provides, required services, `/composition-registry/agents`,
+  `registry_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/composition/registry` passed.
+- Not run: durable registry/search stores, live marketplace publishing,
+  durable audit sinks, live Bytewax topology, rendered browser UI, registry
+  performance/failover checks, and full repository tests.
+
 ### 2026-05-30 22:36 EAT
 
 Composition ORCHESTRATION workflow lifecycle/guardrail packet:

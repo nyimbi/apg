@@ -1,60 +1,126 @@
 {
   "agents": {},
   "app": {
-    "description": "Capability Registry - Comprehensive Specification package-backed APG capability",
-    "entity_count": 0,
+    "description": "Capability registry package-backed APG capability",
+    "entity_count": 7,
     "name": "composition_registry",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "composition_registry": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Composition",
-          "enabled": true,
-          "id": "composition_registry",
-          "name": "Capability Registry - Comprehensive Specification",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/registry/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "search_index": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "catalog": {
+          "category_required": true,
+          "contract_required": true,
+          "owner_required": true,
+          "provides_required": true,
+          "version_required": true
+        },
+        "composition_blueprints": {
+          "capability_required": true,
+          "owner_required": true,
+          "publish_validation_required": true,
+          "validation_required": true
+        },
+        "dependencies": {
+          "cycle_detection_enabled": true,
+          "dependency_type_required": true,
+          "target_required": true,
+          "version_constraint_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privileged_registry_changes_reviewed": true,
           "require_tenant_context": true
+        },
+        "marketplace": {
+          "documentation_required": true,
+          "publication_review_required": true,
+          "security_review_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_catalog_events": true,
+          "emit_composition_events": true,
+          "emit_dependency_events": true,
+          "event_stream": "apg.composition.registry.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "registry_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "capability_curator",
+            "dependency_reviewer",
+            "composition_reviewer",
+            "version_reviewer",
+            "marketplace_reviewer",
+            "security_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_registry_operations"
+          "default_theme": "composition_registry_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_catalog": true,
+          "enable_compositions": true,
           "enable_dashboard": true,
-          "enable_operations": true,
+          "enable_dependencies": true,
+          "enable_marketplace": true,
           "enable_rules": true,
-          "enable_settings": true
+          "enable_settings": true,
+          "enable_versions": true
+        },
+        "versions": {
+          "compatibility_evidence_required": true,
+          "migration_plan_required_for_deprecation": true,
+          "release_review_required": true
         }
       },
-      "erp_modules": [
-        "composition"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Capability Registry - Comprehensive Specification",
+      "name": "Capability Registry",
       "provides": [
-        "composition_registry_operations"
+        "capability_catalog_lifecycle",
+        "dependency_graph_management",
+        "composition_blueprint_validation",
+        "version_compatibility_governance",
+        "marketplace_publication_governance",
+        "registry_discovery",
+        "registry_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "composition_access"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Capability Registry - Comprehensive Specification operations require tenant context.",
+            "description": "Registry operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +133,274 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Capability Registry - Comprehensive Specification write operations require policy enforcement.",
+            "description": "Registry write operations require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "registry_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "capability_owner_assigned": false,
+              "operation": "register_capability"
             },
-            "description": "High-risk Capability Registry - Comprehensive Specification operations require review.",
+            "description": "Registered capabilities require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capability_owner_required",
+              "required_action": "assign_capability_owner"
+            },
+            "name": "capability_requires_owner"
+          },
+          {
+            "condition": {
+              "capability_category_present": false,
+              "operation": "register_capability"
+            },
+            "description": "Registered capabilities require a category.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capability_category_required",
+              "required_action": "set_capability_category"
+            },
+            "name": "capability_requires_category"
+          },
+          {
+            "condition": {
+              "capability_version_present": false,
+              "operation": "register_capability"
+            },
+            "description": "Registered capabilities require a version.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capability_version_required",
+              "required_action": "set_capability_version"
+            },
+            "name": "capability_requires_version"
+          },
+          {
+            "condition": {
+              "capability_provides_present": false,
+              "operation": "register_capability"
+            },
+            "description": "Registered capabilities require at least one provided surface.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capability_provides_required",
+              "required_action": "declare_provided_surfaces"
+            },
+            "name": "capability_requires_provides"
+          },
+          {
+            "condition": {
+              "capability_contract_present": false,
+              "operation": "register_capability"
+            },
+            "description": "Registered capabilities require an executable contract reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capability_contract_required",
+              "required_action": "attach_capability_contract"
+            },
+            "name": "capability_requires_contract"
+          },
+          {
+            "condition": {
+              "dependency_target_present": false,
+              "operation": "add_dependency"
+            },
+            "description": "Dependencies require a target capability.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dependency_target_required",
+              "required_action": "attach_dependency_target"
+            },
+            "name": "dependency_requires_target"
+          },
+          {
+            "condition": {
+              "dependency_type_present": false,
+              "operation": "add_dependency"
+            },
+            "description": "Dependencies require a dependency type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dependency_type_required",
+              "required_action": "set_dependency_type"
+            },
+            "name": "dependency_requires_type"
+          },
+          {
+            "condition": {
+              "operation": "add_dependency",
+              "version_constraint_present": false
+            },
+            "description": "Dependencies require a version constraint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dependency_version_constraint_required",
+              "required_action": "set_version_constraint"
+            },
+            "name": "dependency_requires_version_constraint"
+          },
+          {
+            "condition": {
+              "composition_owner_assigned": false,
+              "operation": "create_composition"
+            },
+            "description": "Composition blueprints require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "composition_owner_required",
+              "required_action": "assign_composition_owner"
+            },
+            "name": "composition_requires_owner"
+          },
+          {
+            "condition": {
+              "composition_capabilities_present": false,
+              "operation": "create_composition"
+            },
+            "description": "Composition blueprints require capabilities.",
+            "effect": {
+              "decision": "deny",
+              "reason": "composition_capabilities_required",
+              "required_action": "add_capabilities_to_composition"
+            },
+            "name": "composition_requires_capabilities"
+          },
+          {
+            "condition": {
+              "operation": "publish_composition",
+              "validation_evidence_present": false
+            },
+            "description": "Published compositions require validation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "composition_validation_required",
+              "required_action": "attach_composition_validation"
+            },
+            "name": "composition_publish_requires_validation"
+          },
+          {
+            "condition": {
+              "compatibility_evidence_present": false,
+              "operation": "release_version"
+            },
+            "description": "Capability version releases require compatibility evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compatibility_evidence_required",
+              "required_action": "attach_compatibility_evidence"
+            },
+            "name": "version_release_requires_compatibility"
+          },
+          {
+            "condition": {
+              "migration_plan_present": false,
+              "operation": "deprecate_capability"
+            },
+            "description": "Capability deprecation requires a migration plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "migration_plan_required",
+              "required_action": "attach_migration_plan"
+            },
+            "name": "deprecation_requires_migration_plan"
+          },
+          {
+            "condition": {
+              "operation": "publish_marketplace",
+              "review_recorded": false
+            },
+            "description": "Marketplace publication requires review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "marketplace_review_required",
+              "required_action": "record_marketplace_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "marketplace_publish_requires_review"
+          },
+          {
+            "condition": {
+              "documentation_present": false,
+              "operation": "publish_marketplace"
+            },
+            "description": "Marketplace publication requires documentation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "marketplace_documentation_required",
+              "required_action": "attach_marketplace_documentation"
+            },
+            "name": "marketplace_publish_requires_documentation"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "registry_import"
+            },
+            "description": "Registry import batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_registry_import_to_bytewax"
+            },
+            "name": "registry_import_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "registry_event"
+            },
+            "description": "Registry lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_registry_event_to_bytewax"
+            },
+            "name": "registry_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_registry_agent"
+            },
+            "description": "Registry agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registry_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "registry_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_registry_agent"
+            },
+            "description": "Registry agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registry_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "registry_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_registry_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged registry actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_registry_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +410,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Capability Registry - Comprehensive Specification operations require tenant context.",
+          "description": "Registry operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +423,274 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Capability Registry - Comprehensive Specification write operations require policy enforcement.",
+          "description": "Registry write operations require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "registry_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "capability_owner_assigned": false,
+            "operation": "register_capability"
           },
-          "description": "High-risk Capability Registry - Comprehensive Specification operations require review.",
+          "description": "Registered capabilities require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capability_owner_required",
+            "required_action": "assign_capability_owner"
+          },
+          "name": "capability_requires_owner"
+        },
+        {
+          "condition": {
+            "capability_category_present": false,
+            "operation": "register_capability"
+          },
+          "description": "Registered capabilities require a category.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capability_category_required",
+            "required_action": "set_capability_category"
+          },
+          "name": "capability_requires_category"
+        },
+        {
+          "condition": {
+            "capability_version_present": false,
+            "operation": "register_capability"
+          },
+          "description": "Registered capabilities require a version.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capability_version_required",
+            "required_action": "set_capability_version"
+          },
+          "name": "capability_requires_version"
+        },
+        {
+          "condition": {
+            "capability_provides_present": false,
+            "operation": "register_capability"
+          },
+          "description": "Registered capabilities require at least one provided surface.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capability_provides_required",
+            "required_action": "declare_provided_surfaces"
+          },
+          "name": "capability_requires_provides"
+        },
+        {
+          "condition": {
+            "capability_contract_present": false,
+            "operation": "register_capability"
+          },
+          "description": "Registered capabilities require an executable contract reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capability_contract_required",
+            "required_action": "attach_capability_contract"
+          },
+          "name": "capability_requires_contract"
+        },
+        {
+          "condition": {
+            "dependency_target_present": false,
+            "operation": "add_dependency"
+          },
+          "description": "Dependencies require a target capability.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dependency_target_required",
+            "required_action": "attach_dependency_target"
+          },
+          "name": "dependency_requires_target"
+        },
+        {
+          "condition": {
+            "dependency_type_present": false,
+            "operation": "add_dependency"
+          },
+          "description": "Dependencies require a dependency type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dependency_type_required",
+            "required_action": "set_dependency_type"
+          },
+          "name": "dependency_requires_type"
+        },
+        {
+          "condition": {
+            "operation": "add_dependency",
+            "version_constraint_present": false
+          },
+          "description": "Dependencies require a version constraint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dependency_version_constraint_required",
+            "required_action": "set_version_constraint"
+          },
+          "name": "dependency_requires_version_constraint"
+        },
+        {
+          "condition": {
+            "composition_owner_assigned": false,
+            "operation": "create_composition"
+          },
+          "description": "Composition blueprints require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "composition_owner_required",
+            "required_action": "assign_composition_owner"
+          },
+          "name": "composition_requires_owner"
+        },
+        {
+          "condition": {
+            "composition_capabilities_present": false,
+            "operation": "create_composition"
+          },
+          "description": "Composition blueprints require capabilities.",
+          "effect": {
+            "decision": "deny",
+            "reason": "composition_capabilities_required",
+            "required_action": "add_capabilities_to_composition"
+          },
+          "name": "composition_requires_capabilities"
+        },
+        {
+          "condition": {
+            "operation": "publish_composition",
+            "validation_evidence_present": false
+          },
+          "description": "Published compositions require validation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "composition_validation_required",
+            "required_action": "attach_composition_validation"
+          },
+          "name": "composition_publish_requires_validation"
+        },
+        {
+          "condition": {
+            "compatibility_evidence_present": false,
+            "operation": "release_version"
+          },
+          "description": "Capability version releases require compatibility evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compatibility_evidence_required",
+            "required_action": "attach_compatibility_evidence"
+          },
+          "name": "version_release_requires_compatibility"
+        },
+        {
+          "condition": {
+            "migration_plan_present": false,
+            "operation": "deprecate_capability"
+          },
+          "description": "Capability deprecation requires a migration plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "migration_plan_required",
+            "required_action": "attach_migration_plan"
+          },
+          "name": "deprecation_requires_migration_plan"
+        },
+        {
+          "condition": {
+            "operation": "publish_marketplace",
+            "review_recorded": false
+          },
+          "description": "Marketplace publication requires review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "marketplace_review_required",
+            "required_action": "record_marketplace_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "marketplace_publish_requires_review"
+        },
+        {
+          "condition": {
+            "documentation_present": false,
+            "operation": "publish_marketplace"
+          },
+          "description": "Marketplace publication requires documentation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "marketplace_documentation_required",
+            "required_action": "attach_marketplace_documentation"
+          },
+          "name": "marketplace_publish_requires_documentation"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "registry_import"
+          },
+          "description": "Registry import batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_registry_import_to_bytewax"
+          },
+          "name": "registry_import_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "registry_event"
+          },
+          "description": "Registry lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_registry_event_to_bytewax"
+          },
+          "name": "registry_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_registry_agent"
+          },
+          "description": "Registry agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registry_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "registry_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_registry_agent"
+          },
+          "description": "Registry agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registry_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "registry_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_registry_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged registry actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_registry_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +700,114 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "RegistryAgentWorkbench",
+          "permission": "composition_registry:admin",
+          "route": "/composition-registry/agents"
+        },
+        "catalog": {
+          "component": "CapabilityCatalog",
+          "permission": "composition_registry:manage_catalog",
+          "route": "/composition-registry/catalog"
+        },
+        "compositions": {
+          "component": "CompositionBlueprints",
+          "permission": "composition_registry:compose",
+          "route": "/composition-registry/compositions"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "RegistryDashboard",
           "permission": "composition_registry:view",
           "route": "/composition-registry/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "composition_registry:operate",
-          "route": "/composition-registry/operations"
+        "dependencies": {
+          "component": "DependencyGraph",
+          "permission": "composition_registry:manage_dependencies",
+          "route": "/composition-registry/dependencies"
+        },
+        "marketplace": {
+          "component": "MarketplacePublication",
+          "permission": "composition_registry:publish",
+          "route": "/composition-registry/marketplace"
         },
         "rules": {
-          "component": "CapabilityRules",
+          "component": "RegistryRuleCenter",
           "permission": "composition_registry:govern",
           "route": "/composition-registry/rules"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "RegistrySettings",
           "permission": "composition_registry:admin",
           "route": "/composition-registry/settings"
+        },
+        "versions": {
+          "component": "VersionGovernance",
+          "permission": "composition_registry:release",
+          "route": "/composition-registry/versions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "capability_registered",
+          "dependency_added",
+          "composition_created",
+          "composition_validated",
+          "version_released",
+          "capability_deprecated",
+          "marketplace_publication_prepared",
+          "registry_agent_registered"
+        ],
+        "guardrails": [
+          "registry_import_requires_bytewax",
+          "registry_event_requires_bytewax",
+          "privileged_agent_registry_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "registered",
+          "validated",
+          "released",
+          "published",
+          "deprecated",
+          "retired"
+        ],
+        "stream": "apg.composition.registry.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "catalog": {
+            "icon": "blocks",
+            "risk_style": "quality-band",
+            "status_indicator": "capability-pill"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "compositions": {
+            "status_style": "validation-chip",
+            "visual": "composition-board"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "dependencies": {
+            "status_style": "edge-chip",
+            "visual": "dependency-graph"
+          },
+          "marketplace": {
+            "status_style": "review-chip",
+            "visual": "publication-list"
+          },
+          "rule_center": {
+            "status_style": "guardrail-chip",
+            "visual": "rule-grid"
+          },
+          "versions": {
+            "status_style": "compatibility-chip",
+            "visual": "version-lanes"
           }
         },
-        "name": "composition_registry_operations",
+        "name": "composition_registry_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +827,63 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "RegistryDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/composition-registry/dashboard",
             "permission": "composition_registry:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/composition-registry/operations",
-            "permission": "composition_registry:operate"
+            "component": "CapabilityCatalog",
+            "name": "catalog",
+            "nav_group": "Catalog",
+            "path": "/composition-registry/catalog",
+            "permission": "composition_registry:manage_catalog"
           },
           {
-            "component": "CapabilityRules",
+            "component": "DependencyGraph",
+            "name": "dependencies",
+            "nav_group": "Graph",
+            "path": "/composition-registry/dependencies",
+            "permission": "composition_registry:manage_dependencies"
+          },
+          {
+            "component": "CompositionBlueprints",
+            "name": "compositions",
+            "nav_group": "Compositions",
+            "path": "/composition-registry/compositions",
+            "permission": "composition_registry:compose"
+          },
+          {
+            "component": "VersionGovernance",
+            "name": "versions",
+            "nav_group": "Release",
+            "path": "/composition-registry/versions",
+            "permission": "composition_registry:release"
+          },
+          {
+            "component": "MarketplacePublication",
+            "name": "marketplace",
+            "nav_group": "Marketplace",
+            "path": "/composition-registry/marketplace",
+            "permission": "composition_registry:publish"
+          },
+          {
+            "component": "RegistryRuleCenter",
             "name": "rules",
             "nav_group": "Governance",
             "path": "/composition-registry/rules",
             "permission": "composition_registry:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "RegistryAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/composition-registry/agents",
+            "permission": "composition_registry:admin"
+          },
+          {
+            "component": "RegistrySettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/composition-registry/settings",
@@ -238,46 +900,143 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "capability_registry": {
+        "supported_roles": [
+          "capability_curator",
+          "dependency_reviewer",
+          "composition_reviewer",
+          "version_reviewer",
+          "marketplace_reviewer",
+          "security_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "composition_registry": []
+      "composition_registry": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "composition_access"
+      ]
     }
   },
   "contracts": {
     "composition_registry": {
       "configuration": {
-        "capability": {
-          "category": "Composition",
-          "enabled": true,
-          "id": "composition_registry",
-          "name": "Capability Registry - Comprehensive Specification",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/registry/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "search_index": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "catalog": {
+          "category_required": true,
+          "contract_required": true,
+          "owner_required": true,
+          "provides_required": true,
+          "version_required": true
+        },
+        "composition_blueprints": {
+          "capability_required": true,
+          "owner_required": true,
+          "publish_validation_required": true,
+          "validation_required": true
+        },
+        "dependencies": {
+          "cycle_detection_enabled": true,
+          "dependency_type_required": true,
+          "target_required": true,
+          "version_constraint_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privileged_registry_changes_reviewed": true,
           "require_tenant_context": true
+        },
+        "marketplace": {
+          "documentation_required": true,
+          "publication_review_required": true,
+          "security_review_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_catalog_events": true,
+          "emit_composition_events": true,
+          "emit_dependency_events": true,
+          "event_stream": "apg.composition.registry.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "registry_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "capability_curator",
+            "dependency_reviewer",
+            "composition_reviewer",
+            "version_reviewer",
+            "marketplace_reviewer",
+            "security_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_registry_operations"
+          "default_theme": "composition_registry_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_catalog": true,
+          "enable_compositions": true,
           "enable_dashboard": true,
-          "enable_operations": true,
+          "enable_dependencies": true,
+          "enable_marketplace": true,
           "enable_rules": true,
-          "enable_settings": true
+          "enable_settings": true,
+          "enable_versions": true
+        },
+        "versions": {
+          "compatibility_evidence_required": true,
+          "migration_plan_required_for_deprecation": true,
+          "release_review_required": true
         }
       },
       "id": "composition_registry",
       "provides": [
-        "composition_registry_operations"
+        "capability_catalog_lifecycle",
+        "dependency_graph_management",
+        "composition_blueprint_validation",
+        "version_compatibility_governance",
+        "marketplace_publication_governance",
+        "registry_discovery",
+        "registry_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "composition_access"
+      ]
     }
   },
   "deployment": {
@@ -289,89 +1048,304 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "composition_registry": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "capability_requires_category": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "capability_category_present": false,
+        "operation": "register_capability"
       },
-      "description": "High-risk Capability Registry - Comprehensive Specification operations require review.",
+      "description": "Registered capabilities require a category.",
+      "effect": {
+        "decision": "deny",
+        "reason": "capability_category_required",
+        "required_action": "set_capability_category"
+      },
+      "name": "capability_requires_category"
+    },
+    "capability_requires_contract": {
+      "condition": {
+        "capability_contract_present": false,
+        "operation": "register_capability"
+      },
+      "description": "Registered capabilities require an executable contract reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "capability_contract_required",
+        "required_action": "attach_capability_contract"
+      },
+      "name": "capability_requires_contract"
+    },
+    "capability_requires_owner": {
+      "condition": {
+        "capability_owner_assigned": false,
+        "operation": "register_capability"
+      },
+      "description": "Registered capabilities require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "capability_owner_required",
+        "required_action": "assign_capability_owner"
+      },
+      "name": "capability_requires_owner"
+    },
+    "capability_requires_provides": {
+      "condition": {
+        "capability_provides_present": false,
+        "operation": "register_capability"
+      },
+      "description": "Registered capabilities require at least one provided surface.",
+      "effect": {
+        "decision": "deny",
+        "reason": "capability_provides_required",
+        "required_action": "declare_provided_surfaces"
+      },
+      "name": "capability_requires_provides"
+    },
+    "capability_requires_version": {
+      "condition": {
+        "capability_version_present": false,
+        "operation": "register_capability"
+      },
+      "description": "Registered capabilities require a version.",
+      "effect": {
+        "decision": "deny",
+        "reason": "capability_version_required",
+        "required_action": "set_capability_version"
+      },
+      "name": "capability_requires_version"
+    },
+    "composition_publish_requires_validation": {
+      "condition": {
+        "operation": "publish_composition",
+        "validation_evidence_present": false
+      },
+      "description": "Published compositions require validation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "composition_validation_required",
+        "required_action": "attach_composition_validation"
+      },
+      "name": "composition_publish_requires_validation"
+    },
+    "composition_requires_capabilities": {
+      "condition": {
+        "composition_capabilities_present": false,
+        "operation": "create_composition"
+      },
+      "description": "Composition blueprints require capabilities.",
+      "effect": {
+        "decision": "deny",
+        "reason": "composition_capabilities_required",
+        "required_action": "add_capabilities_to_composition"
+      },
+      "name": "composition_requires_capabilities"
+    },
+    "composition_requires_owner": {
+      "condition": {
+        "composition_owner_assigned": false,
+        "operation": "create_composition"
+      },
+      "description": "Composition blueprints require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "composition_owner_required",
+        "required_action": "assign_composition_owner"
+      },
+      "name": "composition_requires_owner"
+    },
+    "dependency_requires_target": {
+      "condition": {
+        "dependency_target_present": false,
+        "operation": "add_dependency"
+      },
+      "description": "Dependencies require a target capability.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dependency_target_required",
+        "required_action": "attach_dependency_target"
+      },
+      "name": "dependency_requires_target"
+    },
+    "dependency_requires_type": {
+      "condition": {
+        "dependency_type_present": false,
+        "operation": "add_dependency"
+      },
+      "description": "Dependencies require a dependency type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dependency_type_required",
+        "required_action": "set_dependency_type"
+      },
+      "name": "dependency_requires_type"
+    },
+    "dependency_requires_version_constraint": {
+      "condition": {
+        "operation": "add_dependency",
+        "version_constraint_present": false
+      },
+      "description": "Dependencies require a version constraint.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dependency_version_constraint_required",
+        "required_action": "set_version_constraint"
+      },
+      "name": "dependency_requires_version_constraint"
+    },
+    "deprecation_requires_migration_plan": {
+      "condition": {
+        "migration_plan_present": false,
+        "operation": "deprecate_capability"
+      },
+      "description": "Capability deprecation requires a migration plan.",
+      "effect": {
+        "decision": "deny",
+        "reason": "migration_plan_required",
+        "required_action": "attach_migration_plan"
+      },
+      "name": "deprecation_requires_migration_plan"
+    },
+    "marketplace_publish_requires_documentation": {
+      "condition": {
+        "documentation_present": false,
+        "operation": "publish_marketplace"
+      },
+      "description": "Marketplace publication requires documentation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "marketplace_documentation_required",
+        "required_action": "attach_marketplace_documentation"
+      },
+      "name": "marketplace_publish_requires_documentation"
+    },
+    "marketplace_publish_requires_review": {
+      "condition": {
+        "operation": "publish_marketplace",
+        "review_recorded": false
+      },
+      "description": "Marketplace publication requires review.",
       "effect": {
         "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "reason": "marketplace_review_required",
+        "required_action": "record_marketplace_review"
       },
-      "name": "high_risk_requires_review"
+      "name": "marketplace_publish_requires_review"
     },
-    "operation_policy_required": {
+    "privileged_agent_registry_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_registry_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged registry actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_registry_action_requires_human_approval"
+    },
+    "registry_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_registry_agent"
+      },
+      "description": "Registry agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registry_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "registry_agent_role_supported"
+    },
+    "registry_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_registry_agent"
+      },
+      "description": "Registry agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registry_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "registry_agent_runtime_supported"
+    },
+    "registry_event_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "registry_event"
+      },
+      "description": "Registry lifecycle events require Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_registry_event_to_bytewax"
+      },
+      "name": "registry_event_requires_bytewax"
+    },
+    "registry_import_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "registry_import"
+      },
+      "description": "Registry import batches require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_registry_import_to_bytewax"
+      },
+      "name": "registry_import_requires_bytewax"
+    },
+    "registry_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Capability Registry - Comprehensive Specification write operations require policy enforcement.",
+      "description": "Registry write operations require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "registry_write_requires_policy"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Capability Registry - Comprehensive Specification operations require tenant context.",
+      "description": "Registry operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.composition_registry": {
-      "file": "capability_contract.py",
-      "id": "capability.composition_registry",
-      "kind": "capability",
-      "name": "Capability Registry - Comprehensive Specification",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+    },
+    "version_release_requires_compatibility": {
+      "condition": {
+        "compatibility_evidence_present": false,
+        "operation": "release_version"
       },
-      "references": []
+      "description": "Capability version releases require compatibility evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compatibility_evidence_required",
+        "required_action": "attach_compatibility_evidence"
+      },
+      "name": "version_release_requires_compatibility"
     }
-  },
-  "tables": {},
-  "views": {}
+  }
 }
