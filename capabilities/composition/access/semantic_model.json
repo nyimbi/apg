@@ -1,60 +1,134 @@
 {
   "agents": {},
   "app": {
-    "description": "Access Control Integration Hub package-backed APG capability",
-    "entity_count": 0,
+    "description": "Composition access-control package-backed APG capability",
+    "entity_count": 7,
     "name": "composition_access",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "composition_access": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Composition",
+        "access_agents": {
           "enabled": true,
-          "id": "composition_access",
-          "name": "Access Control Integration Hub",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/access/cap_spec.md",
-          "version": "2.0.0"
+          "human_approval_required": true,
+          "max_autonomous_scope": "read_and_recommend",
+          "supported_roles": [
+            "access_architect",
+            "policy_reviewer",
+            "grant_reviewer",
+            "risk_reviewer",
+            "session_reviewer",
+            "audit_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "cross_capability_guardrails": true,
+          "privileged_action_review": true,
           "require_tenant_context": true
+        },
+        "grants": {
+          "approval_required_for_privileged": true,
+          "expiry_required_for_elevated_access": true,
+          "justification_required": true,
+          "separation_of_duties_required": true
+        },
+        "identity_providers": {
+          "metadata_validation_required": true,
+          "provider_owner_required": true,
+          "secret_reference_required": true,
+          "supported_types": [
+            "local",
+            "oidc",
+            "saml",
+            "ldap",
+            "api_key",
+            "jwt"
+          ],
+          "test_evidence_required": true
+        },
+        "observability": {
+          "emit_decision_events": true,
+          "emit_grant_events": true,
+          "emit_policy_events": true,
+          "emit_provider_events": true,
+          "event_stream": "apg.composition.access.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "policies": {
+          "conditions_required_for_sensitive_resources": true,
+          "effect_required": true,
+          "policy_owner_required": true,
+          "review_required_for_deny_override": true,
+          "simulation_required_for_high_risk": true
+        },
+        "resources": {
+          "composition_boundary_required": true,
+          "owner_required": true,
+          "registry_required": true,
+          "scope_required": true
+        },
+        "sessions": {
+          "adaptive_step_up_enabled": true,
+          "continuous_evaluation_enabled": true,
+          "max_risk_without_review": 74,
+          "risk_scoring_enabled": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_access_operations"
+          "default_theme": "composition_access_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_audit_console": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_decision_explorer": true,
+          "enable_grant_workbench": true,
+          "enable_policy_studio": true,
+          "enable_provider_console": true,
           "enable_settings": true
         }
       },
-      "erp_modules": [
-        "composition"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Access Control Integration Hub",
       "provides": [
-        "composition_access_operations"
+        "identity_provider_composition",
+        "resource_access_registry",
+        "policy_orchestration",
+        "grant_lifecycle",
+        "session_risk_control",
+        "access_decision_audit",
+        "access_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "conf",
+        "registry"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Access Control Integration Hub operations require tenant context.",
+            "description": "All composition access operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -64,29 +138,244 @@
           },
           {
             "condition": {
-              "operation_type": "write",
-              "policy_attached": false
+              "operation": "register_provider",
+              "provider_owner_assigned": false
             },
-            "description": "Access Control Integration Hub write operations require policy enforcement.",
+            "description": "Identity providers require an accountable owner.",
             "effect": {
               "decision": "deny",
-              "reason": "operation_policy_required",
-              "required_action": "attach_operation_policy"
+              "reason": "provider_owner_required",
+              "required_action": "assign_provider_owner"
             },
-            "name": "operation_policy_required"
+            "name": "provider_requires_owner"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "activate_provider",
+              "provider_metadata_validated": false
             },
-            "description": "High-risk Access Control Integration Hub operations require review.",
+            "description": "Identity providers require validated metadata and test evidence before activation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_metadata_validation_required",
+              "required_action": "validate_provider_metadata"
+            },
+            "name": "provider_requires_metadata_evidence"
+          },
+          {
+            "condition": {
+              "external_provider": true,
+              "operation": "activate_provider",
+              "secret_reference_present": false
+            },
+            "description": "External providers require a vault or secret-manager reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_secret_reference_required",
+              "required_action": "attach_secret_reference"
+            },
+            "name": "provider_requires_secret_reference"
+          },
+          {
+            "condition": {
+              "operation": "register_resource",
+              "resource_owner_assigned": false
+            },
+            "description": "Protected resources require an owner and registered scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "resource_owner_required",
+              "required_action": "assign_resource_owner"
+            },
+            "name": "resource_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_resource",
+              "scope_present": false
+            },
+            "description": "Protected resources require at least one access scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "resource_scope_required",
+              "required_action": "define_resource_scope"
+            },
+            "name": "resource_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "create_policy",
+              "policy_owner_assigned": false
+            },
+            "description": "Policies require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_owner_required",
+              "required_action": "assign_policy_owner"
+            },
+            "name": "policy_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_policy",
+              "policy_conditions_present": false,
+              "sensitive_resource": true
+            },
+            "description": "Sensitive-resource policies require explicit conditions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_conditions_required",
+              "required_action": "define_policy_conditions"
+            },
+            "name": "sensitive_policy_requires_conditions"
+          },
+          {
+            "condition": {
+              "operation": "activate_policy",
+              "risk_level": "high",
+              "simulation_evidence_present": false
+            },
+            "description": "High-risk policy changes require simulation evidence.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "policy_simulation_required",
+              "required_action": "attach_policy_simulation"
             },
-            "name": "high_risk_requires_review"
+            "name": "high_risk_policy_requires_simulation"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_grant",
+              "privileged_scope": true
+            },
+            "description": "Privileged grants require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privileged_grant_approval_required",
+              "required_action": "record_grant_approval"
+            },
+            "name": "privileged_grant_requires_approval"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "create_grant",
+              "privileged_scope": true
+            },
+            "description": "Privileged grants require an expiry time.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privileged_grant_expiry_required",
+              "required_action": "set_grant_expiry"
+            },
+            "name": "privileged_grant_requires_expiry"
+          },
+          {
+            "condition": {
+              "operation": "create_grant",
+              "separation_of_duties_passed": false
+            },
+            "description": "A requester cannot self-approve privileged access.",
+            "effect": {
+              "decision": "deny",
+              "reason": "separation_of_duties_required",
+              "required_action": "select_independent_approver"
+            },
+            "name": "grant_requires_separation_of_duties"
+          },
+          {
+            "condition": {
+              "justification_present": false,
+              "operation": "create_grant"
+            },
+            "description": "Access grants require business justification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "grant_justification_required",
+              "required_action": "attach_grant_justification"
+            },
+            "name": "grant_requires_justification"
+          },
+          {
+            "condition": {
+              "operation": "evaluate_session",
+              "risk_score_gt": 74,
+              "step_up_completed": false
+            },
+            "description": "High-risk sessions require adaptive step-up authentication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "adaptive_step_up_required",
+              "required_action": "complete_step_up_authentication"
+            },
+            "name": "high_risk_session_requires_step_up"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "record_decision"
+            },
+            "description": "Access decisions must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_access_decision_to_bytewax"
+            },
+            "name": "decision_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_grant"
+            },
+            "description": "Batch grant changes require Bytewax lifecycle coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_grants_to_bytewax"
+            },
+            "name": "batch_grant_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_access_agent"
+            },
+            "description": "Access-control agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "access_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_access_agent"
+            },
+            "description": "Access-control agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "access_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_access_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged access actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +385,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Access Control Integration Hub operations require tenant context.",
+          "description": "All composition access operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -106,29 +395,244 @@
         },
         {
           "condition": {
-            "operation_type": "write",
-            "policy_attached": false
+            "operation": "register_provider",
+            "provider_owner_assigned": false
           },
-          "description": "Access Control Integration Hub write operations require policy enforcement.",
+          "description": "Identity providers require an accountable owner.",
           "effect": {
             "decision": "deny",
-            "reason": "operation_policy_required",
-            "required_action": "attach_operation_policy"
+            "reason": "provider_owner_required",
+            "required_action": "assign_provider_owner"
           },
-          "name": "operation_policy_required"
+          "name": "provider_requires_owner"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "activate_provider",
+            "provider_metadata_validated": false
           },
-          "description": "High-risk Access Control Integration Hub operations require review.",
+          "description": "Identity providers require validated metadata and test evidence before activation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_metadata_validation_required",
+            "required_action": "validate_provider_metadata"
+          },
+          "name": "provider_requires_metadata_evidence"
+        },
+        {
+          "condition": {
+            "external_provider": true,
+            "operation": "activate_provider",
+            "secret_reference_present": false
+          },
+          "description": "External providers require a vault or secret-manager reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_secret_reference_required",
+            "required_action": "attach_secret_reference"
+          },
+          "name": "provider_requires_secret_reference"
+        },
+        {
+          "condition": {
+            "operation": "register_resource",
+            "resource_owner_assigned": false
+          },
+          "description": "Protected resources require an owner and registered scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "resource_owner_required",
+            "required_action": "assign_resource_owner"
+          },
+          "name": "resource_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_resource",
+            "scope_present": false
+          },
+          "description": "Protected resources require at least one access scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "resource_scope_required",
+            "required_action": "define_resource_scope"
+          },
+          "name": "resource_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "create_policy",
+            "policy_owner_assigned": false
+          },
+          "description": "Policies require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_owner_required",
+            "required_action": "assign_policy_owner"
+          },
+          "name": "policy_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_policy",
+            "policy_conditions_present": false,
+            "sensitive_resource": true
+          },
+          "description": "Sensitive-resource policies require explicit conditions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_conditions_required",
+            "required_action": "define_policy_conditions"
+          },
+          "name": "sensitive_policy_requires_conditions"
+        },
+        {
+          "condition": {
+            "operation": "activate_policy",
+            "risk_level": "high",
+            "simulation_evidence_present": false
+          },
+          "description": "High-risk policy changes require simulation evidence.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "policy_simulation_required",
+            "required_action": "attach_policy_simulation"
           },
-          "name": "high_risk_requires_review"
+          "name": "high_risk_policy_requires_simulation"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_grant",
+            "privileged_scope": true
+          },
+          "description": "Privileged grants require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privileged_grant_approval_required",
+            "required_action": "record_grant_approval"
+          },
+          "name": "privileged_grant_requires_approval"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "create_grant",
+            "privileged_scope": true
+          },
+          "description": "Privileged grants require an expiry time.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privileged_grant_expiry_required",
+            "required_action": "set_grant_expiry"
+          },
+          "name": "privileged_grant_requires_expiry"
+        },
+        {
+          "condition": {
+            "operation": "create_grant",
+            "separation_of_duties_passed": false
+          },
+          "description": "A requester cannot self-approve privileged access.",
+          "effect": {
+            "decision": "deny",
+            "reason": "separation_of_duties_required",
+            "required_action": "select_independent_approver"
+          },
+          "name": "grant_requires_separation_of_duties"
+        },
+        {
+          "condition": {
+            "justification_present": false,
+            "operation": "create_grant"
+          },
+          "description": "Access grants require business justification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "grant_justification_required",
+            "required_action": "attach_grant_justification"
+          },
+          "name": "grant_requires_justification"
+        },
+        {
+          "condition": {
+            "operation": "evaluate_session",
+            "risk_score_gt": 74,
+            "step_up_completed": false
+          },
+          "description": "High-risk sessions require adaptive step-up authentication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "adaptive_step_up_required",
+            "required_action": "complete_step_up_authentication"
+          },
+          "name": "high_risk_session_requires_step_up"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "record_decision"
+          },
+          "description": "Access decisions must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_access_decision_to_bytewax"
+          },
+          "name": "decision_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_grant"
+          },
+          "description": "Batch grant changes require Bytewax lifecycle coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_grants_to_bytewax"
+          },
+          "name": "batch_grant_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_access_agent"
+          },
+          "description": "Access-control agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "access_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_access_agent"
+          },
+          "description": "Access-control agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "access_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_access_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged access actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +642,117 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "AccessAgentWorkbench",
+          "permission": "composition_access:admin",
+          "route": "/composition-access/agents"
+        },
+        "audit": {
+          "component": "AccessAuditConsole",
+          "permission": "composition_access:audit",
+          "route": "/composition-access/audit"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "AccessDashboard",
           "permission": "composition_access:view",
           "route": "/composition-access/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "composition_access:operate",
-          "route": "/composition-access/operations"
+        "decisions": {
+          "component": "AccessDecisionExplorer",
+          "permission": "composition_access:view",
+          "route": "/composition-access/decisions"
         },
-        "rules": {
-          "component": "CapabilityRules",
+        "grants": {
+          "component": "AccessGrantWorkbench",
+          "permission": "composition_access:grant",
+          "route": "/composition-access/grants"
+        },
+        "policies": {
+          "component": "AccessPolicyStudio",
           "permission": "composition_access:govern",
-          "route": "/composition-access/rules"
+          "route": "/composition-access/policies"
+        },
+        "providers": {
+          "component": "AccessProviderConsole",
+          "permission": "composition_access:admin",
+          "route": "/composition-access/providers"
+        },
+        "resources": {
+          "component": "AccessResourceRegistry",
+          "permission": "composition_access:govern",
+          "route": "/composition-access/resources"
+        },
+        "sessions": {
+          "component": "AccessSessionMonitor",
+          "permission": "composition_access:operate",
+          "route": "/composition-access/sessions"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "AccessSettings",
           "permission": "composition_access:admin",
           "route": "/composition-access/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "provider_registered",
+          "provider_activated",
+          "resource_registered",
+          "policy_created",
+          "policy_activated",
+          "grant_created",
+          "grant_revoked",
+          "session_evaluated",
+          "access_decision_recorded",
+          "access_agent_registered"
+        ],
+        "guardrails": [
+          "decision_requires_bytewax_stream",
+          "batch_grant_requires_bytewax",
+          "privileged_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "review_required",
+          "approved",
+          "denied",
+          "revoked",
+          "blocked"
+        ],
+        "stream": "apg.composition.access.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
-          },
-          "rules": {
+          "decision_explorer": {
             "status_style": "decision-chip",
-            "visual": "rule-list"
+            "visual": "decision-timeline"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "grant_workbench": {
+            "status_style": "grant-chip",
+            "visual": "approval-queue"
+          },
+          "policy_studio": {
+            "status_style": "policy-chip",
+            "visual": "rule-grid"
+          },
+          "provider_console": {
+            "icon": "key-round",
+            "risk_style": "trust-band",
+            "status_indicator": "provider-pill"
+          },
+          "session_monitor": {
+            "status_style": "session-chip",
+            "visual": "risk-lane"
           }
         },
-        "name": "composition_access_operations",
+        "name": "composition_access_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +772,70 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "AccessDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/composition-access/dashboard",
             "permission": "composition_access:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/composition-access/operations",
-            "permission": "composition_access:operate"
+            "component": "AccessProviderConsole",
+            "name": "providers",
+            "nav_group": "Identity",
+            "path": "/composition-access/providers",
+            "permission": "composition_access:admin"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/composition-access/rules",
+            "component": "AccessResourceRegistry",
+            "name": "resources",
+            "nav_group": "Resources",
+            "path": "/composition-access/resources",
             "permission": "composition_access:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "AccessPolicyStudio",
+            "name": "policies",
+            "nav_group": "Policy",
+            "path": "/composition-access/policies",
+            "permission": "composition_access:govern"
+          },
+          {
+            "component": "AccessGrantWorkbench",
+            "name": "grants",
+            "nav_group": "Access",
+            "path": "/composition-access/grants",
+            "permission": "composition_access:grant"
+          },
+          {
+            "component": "AccessDecisionExplorer",
+            "name": "decisions",
+            "nav_group": "Operations",
+            "path": "/composition-access/decisions",
+            "permission": "composition_access:view"
+          },
+          {
+            "component": "AccessSessionMonitor",
+            "name": "sessions",
+            "nav_group": "Operations",
+            "path": "/composition-access/sessions",
+            "permission": "composition_access:operate"
+          },
+          {
+            "component": "AccessAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/composition-access/agents",
+            "permission": "composition_access:admin"
+          },
+          {
+            "component": "AccessAuditConsole",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/composition-access/audit",
+            "permission": "composition_access:audit"
+          },
+          {
+            "component": "AccessSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/composition-access/settings",
@@ -238,46 +852,150 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "access_control": {
+        "supported_roles": [
+          "access_architect",
+          "policy_reviewer",
+          "grant_reviewer",
+          "risk_reviewer",
+          "session_reviewer",
+          "audit_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "composition_access": []
+      "composition_access": [
+        "auth",
+        "audl",
+        "ntfy",
+        "conf",
+        "registry"
+      ]
     }
   },
   "contracts": {
     "composition_access": {
       "configuration": {
-        "capability": {
-          "category": "Composition",
+        "access_agents": {
           "enabled": true,
-          "id": "composition_access",
-          "name": "Access Control Integration Hub",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/access/cap_spec.md",
-          "version": "2.0.0"
+          "human_approval_required": true,
+          "max_autonomous_scope": "read_and_recommend",
+          "supported_roles": [
+            "access_architect",
+            "policy_reviewer",
+            "grant_reviewer",
+            "risk_reviewer",
+            "session_reviewer",
+            "audit_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "cross_capability_guardrails": true,
+          "privileged_action_review": true,
           "require_tenant_context": true
+        },
+        "grants": {
+          "approval_required_for_privileged": true,
+          "expiry_required_for_elevated_access": true,
+          "justification_required": true,
+          "separation_of_duties_required": true
+        },
+        "identity_providers": {
+          "metadata_validation_required": true,
+          "provider_owner_required": true,
+          "secret_reference_required": true,
+          "supported_types": [
+            "local",
+            "oidc",
+            "saml",
+            "ldap",
+            "api_key",
+            "jwt"
+          ],
+          "test_evidence_required": true
+        },
+        "observability": {
+          "emit_decision_events": true,
+          "emit_grant_events": true,
+          "emit_policy_events": true,
+          "emit_provider_events": true,
+          "event_stream": "apg.composition.access.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "policies": {
+          "conditions_required_for_sensitive_resources": true,
+          "effect_required": true,
+          "policy_owner_required": true,
+          "review_required_for_deny_override": true,
+          "simulation_required_for_high_risk": true
+        },
+        "resources": {
+          "composition_boundary_required": true,
+          "owner_required": true,
+          "registry_required": true,
+          "scope_required": true
+        },
+        "sessions": {
+          "adaptive_step_up_enabled": true,
+          "continuous_evaluation_enabled": true,
+          "max_risk_without_review": 74,
+          "risk_scoring_enabled": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_access_operations"
+          "default_theme": "composition_access_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_audit_console": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_decision_explorer": true,
+          "enable_grant_workbench": true,
+          "enable_policy_studio": true,
+          "enable_provider_console": true,
           "enable_settings": true
         }
       },
       "id": "composition_access",
       "provides": [
-        "composition_access_operations"
+        "identity_provider_composition",
+        "resource_access_registry",
+        "policy_orchestration",
+        "grant_lifecycle",
+        "session_risk_control",
+        "access_decision_audit",
+        "access_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "conf",
+        "registry"
+      ]
     }
   },
   "deployment": {
@@ -289,58 +1007,265 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "composition_access": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "access_agent_role_supported": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "agent_role_supported": false,
+        "operation": "register_access_agent"
       },
-      "description": "High-risk Access Control Integration Hub operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Access Control Integration Hub write operations require policy enforcement.",
+      "description": "Access-control agents must use an approved role.",
       "effect": {
         "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
+        "reason": "access_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
       },
-      "name": "operation_policy_required"
+      "name": "access_agent_role_supported"
+    },
+    "access_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_access_agent"
+      },
+      "description": "Access-control agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "access_agent_runtime_supported"
+    },
+    "batch_grant_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_grant"
+      },
+      "description": "Batch grant changes require Bytewax lifecycle coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_grants_to_bytewax"
+      },
+      "name": "batch_grant_requires_bytewax"
+    },
+    "decision_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "record_decision"
+      },
+      "description": "Access decisions must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_access_decision_to_bytewax"
+      },
+      "name": "decision_requires_bytewax_stream"
+    },
+    "grant_requires_justification": {
+      "condition": {
+        "justification_present": false,
+        "operation": "create_grant"
+      },
+      "description": "Access grants require business justification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "grant_justification_required",
+        "required_action": "attach_grant_justification"
+      },
+      "name": "grant_requires_justification"
+    },
+    "grant_requires_separation_of_duties": {
+      "condition": {
+        "operation": "create_grant",
+        "separation_of_duties_passed": false
+      },
+      "description": "A requester cannot self-approve privileged access.",
+      "effect": {
+        "decision": "deny",
+        "reason": "separation_of_duties_required",
+        "required_action": "select_independent_approver"
+      },
+      "name": "grant_requires_separation_of_duties"
+    },
+    "high_risk_policy_requires_simulation": {
+      "condition": {
+        "operation": "activate_policy",
+        "risk_level": "high",
+        "simulation_evidence_present": false
+      },
+      "description": "High-risk policy changes require simulation evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "policy_simulation_required",
+        "required_action": "attach_policy_simulation"
+      },
+      "name": "high_risk_policy_requires_simulation"
+    },
+    "high_risk_session_requires_step_up": {
+      "condition": {
+        "operation": "evaluate_session",
+        "risk_score_gt": 74,
+        "step_up_completed": false
+      },
+      "description": "High-risk sessions require adaptive step-up authentication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "adaptive_step_up_required",
+        "required_action": "complete_step_up_authentication"
+      },
+      "name": "high_risk_session_requires_step_up"
+    },
+    "policy_requires_owner": {
+      "condition": {
+        "operation": "create_policy",
+        "policy_owner_assigned": false
+      },
+      "description": "Policies require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_owner_required",
+        "required_action": "assign_policy_owner"
+      },
+      "name": "policy_requires_owner"
+    },
+    "privileged_agent_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_access_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged access actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_action_requires_human_approval"
+    },
+    "privileged_grant_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "create_grant",
+        "privileged_scope": true
+      },
+      "description": "Privileged grants require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privileged_grant_approval_required",
+        "required_action": "record_grant_approval"
+      },
+      "name": "privileged_grant_requires_approval"
+    },
+    "privileged_grant_requires_expiry": {
+      "condition": {
+        "expiry_present": false,
+        "operation": "create_grant",
+        "privileged_scope": true
+      },
+      "description": "Privileged grants require an expiry time.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privileged_grant_expiry_required",
+        "required_action": "set_grant_expiry"
+      },
+      "name": "privileged_grant_requires_expiry"
+    },
+    "provider_requires_metadata_evidence": {
+      "condition": {
+        "operation": "activate_provider",
+        "provider_metadata_validated": false
+      },
+      "description": "Identity providers require validated metadata and test evidence before activation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_metadata_validation_required",
+        "required_action": "validate_provider_metadata"
+      },
+      "name": "provider_requires_metadata_evidence"
+    },
+    "provider_requires_owner": {
+      "condition": {
+        "operation": "register_provider",
+        "provider_owner_assigned": false
+      },
+      "description": "Identity providers require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_owner_required",
+        "required_action": "assign_provider_owner"
+      },
+      "name": "provider_requires_owner"
+    },
+    "provider_requires_secret_reference": {
+      "condition": {
+        "external_provider": true,
+        "operation": "activate_provider",
+        "secret_reference_present": false
+      },
+      "description": "External providers require a vault or secret-manager reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_secret_reference_required",
+        "required_action": "attach_secret_reference"
+      },
+      "name": "provider_requires_secret_reference"
+    },
+    "resource_requires_owner": {
+      "condition": {
+        "operation": "register_resource",
+        "resource_owner_assigned": false
+      },
+      "description": "Protected resources require an owner and registered scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "resource_owner_required",
+        "required_action": "assign_resource_owner"
+      },
+      "name": "resource_requires_owner"
+    },
+    "resource_requires_scope": {
+      "condition": {
+        "operation": "register_resource",
+        "scope_present": false
+      },
+      "description": "Protected resources require at least one access scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "resource_scope_required",
+        "required_action": "define_resource_scope"
+      },
+      "name": "resource_requires_scope"
+    },
+    "sensitive_policy_requires_conditions": {
+      "condition": {
+        "operation": "create_policy",
+        "policy_conditions_present": false,
+        "sensitive_resource": true
+      },
+      "description": "Sensitive-resource policies require explicit conditions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_conditions_required",
+        "required_action": "define_policy_conditions"
+      },
+      "name": "sensitive_policy_requires_conditions"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Access Control Integration Hub operations require tenant context.",
+      "description": "All composition access operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
@@ -348,30 +1273,5 @@
       },
       "name": "tenant_context_required"
     }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.composition_access": {
-      "file": "capability_contract.py",
-      "id": "capability.composition_access",
-      "kind": "capability",
-      "name": "Access Control Integration Hub",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

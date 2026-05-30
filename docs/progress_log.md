@@ -16,6 +16,93 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 22:18 EAT
+
+Composition ACCESS access-control lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the
+  `composition_access` capability, and replaced `cap_spec.md` with the active
+  packet summary.
+- Expanded `capability_contract.py` with provider, resource, policy, grant,
+  session, decision, access-agent, governance, observability, adapter, UI,
+  theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, provider ownership,
+  provider metadata validation, provider secret references, resource ownership,
+  resource scopes, policy ownership, sensitive-resource conditions, high-risk
+  policy simulation and review, privileged grant approval, privileged grant
+  expiry, separation of duties, grant justification, high-risk session step-up,
+  decision Bytewax streams, batch grant Bytewax streams, access-agent
+  runtime/role, and privileged agent-action approval.
+- Replaced heavyweight package entrypoints with dependency-light
+  `CompositionAccessService` records and operations for providers, resources,
+  policies, grants, sessions, decisions, agents, audit events, dashboard
+  summaries, and compatibility record helpers.
+- Extended API helpers and view models with provider console, policy studio,
+  grant workbench, decision explorer, session monitor, agent workbench, audit
+  console, dashboard, and Bytewax metadata surfaces.
+- Updated package registration to expose access agents, required dependencies,
+  route contracts, theme contracts, and streaming metadata without importing
+  optional platform services.
+- Refreshed package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, policy, grant, session, and decision
+  guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/composition/access/__init__.py
+  capabilities/composition/access/capability_contract.py
+  capabilities/composition/access/models.py
+  capabilities/composition/access/service.py
+  capabilities/composition/access/api.py capabilities/composition/access/views.py
+  capabilities/composition/access/app.py
+  capabilities/composition/access/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/composition/access/tests/test_package_contract.py` passed with 5
+  tests.
+- `./.venv/bin/apg capabilities inspect composition_access --json` passed and
+  confirmed 12 configuration sections, 19 rules, 10 routes, and
+  `composition_access_control` theme metadata.
+- `./.venv/bin/apg capabilities publish-plan capabilities/composition/access
+  --json | jq '.ok, .side_effect_free, .warnings, .errors,
+  (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'` confirmed
+  `true`, `true`, no warnings, no errors, `composition_access`, `bytewax`,
+  `bytewax`, and runtime evidence loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/composition/access --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "from capabilities.composition.access import
+  CompositionAccessService; service=CompositionAccessService();
+  service.register_access_agent('tenant-proof','Proof agent','codex',
+  'grant_reviewer','review grants'); print(service.dashboard_summary(
+  'tenant-proof'))"` passed and confirmed access-agent registration, audit
+  event emission, and Bytewax stream metadata.
+- `jq '.capabilities.composition_access.streaming.processor,
+  .capabilities.composition_access.provides,
+  .capabilities.composition_access.requires,
+  .capabilities.composition_access.screens.agents.route,
+  (.capabilities.composition_access.rules[] |
+  select(.name=="access_agent_runtime_supported") | .effect.reason),
+  (.capabilities.composition_access.rules[] |
+  select(.name=="decision_requires_bytewax_stream") | .effect.reason)'
+  capabilities/composition/access/semantic_model.json` confirmed `bytewax`,
+  access-agent provides, required services, `/composition-access/agents`,
+  `access_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/python capabilities/composition/access/app.py` passed package
+  self-test.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/composition/access` and
+  `git diff --check -- docs/progress_log.md` passed before this progress entry;
+  rerun after this entry before commit.
+- Not run: live identity providers, vault/secret stores, external policy
+  engines, durable audit sinks, notification adapters, live Bytewax topology,
+  rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 21:46 EAT
 
 Common WSBL website-builder lifecycle/guardrail packet:
