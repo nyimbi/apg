@@ -5,7 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_PLFD_AGENT_ROLES,
+	SUPPORTED_PLFD_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+	streaming_manifest,
+)
+from .models import PlfdAgent
+from .service import PlfdService
 
 __version__ = "1.0.0"
 __capability_id__ = "plfd"
@@ -24,7 +32,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["foundation_registry", "dependency_posture", "configuration_baselines", "readiness_gates", "platform_governance"],
+	"provides": ["foundation_registry", "dependency_posture", "configuration_baselines", "readiness_gates", "platform_governance", "plfd_agents"],
 	"permissions": ["plfd:view", "plfd:manage_services", "plfd:manage_baselines", "plfd:approve_changes", "plfd:admin"]
 }
 
@@ -40,6 +48,8 @@ def register_capability() -> dict[str, Any]:
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
 		"optional_dependencies": ["moni", "hlth", "regy", "secu", "plgn"],
+		"provides": contract["provides"],
+		"requires": contract["requires"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,13 +58,16 @@ def register_capability() -> dict[str, Any]:
 			"dependency_posture": "Validate baseline dependency health and core service availability",
 			"configuration_baselines": "Manage required configuration, tenant, auth, and audit baselines",
 			"readiness_gates": "Gate platform changes on health, monitoring, security, and rollback evidence",
+			"plfd_agents": "Register scoped AI foundation agents for service, dependency, baseline, readiness, change, and security review",
 			"capability_rules": "Evaluate deterministic platform-foundation rules",
+			"event_streaming": "Emit platform foundation lifecycle events through Bytewax",
 			"visual_theming": "Apply platform foundation theme tokens and components"
 		},
-		"endpoints": {"services": "/plfd/api/v1/services", "dependencies": "/plfd/api/v1/dependencies", "baselines": "/plfd/api/v1/baselines", "readiness": "/plfd/api/v1/readiness", "changes": "/plfd/api/v1/changes"},
+		"endpoints": {"services": "/plfd/api/v1/services", "dependencies": "/plfd/api/v1/dependencies", "baselines": "/plfd/api/v1/baselines", "readiness": "/plfd/api/v1/readiness", "changes": "/plfd/api/v1/changes", "agents": "/plfd/api/v1/agents", "audit": "/plfd/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 
@@ -66,4 +79,19 @@ def get_capability_info() -> dict[str, Any]:
 	return info
 
 
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+	"PlfdAgent",
+	"PlfdService",
+	"SUPPORTED_PLFD_AGENT_ROLES",
+	"SUPPORTED_PLFD_AGENT_RUNTIMES",
+	"capability_metadata",
+	"evaluate_capability_rules",
+	"get_capability_contract",
+	"get_capability_info",
+	"register_capability",
+	"streaming_manifest",
+	"__apg_dependencies__",
+	"__capability_id__",
+	"__capability_name__",
+	"__version__",
+]

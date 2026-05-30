@@ -3,14 +3,19 @@
   "display_name": "Platform Foundation",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
     "models.py",
     "service.py",
     "api.py",
     "views.py",
     "app.py",
     "semantic_model.json",
-    "release_report.json"
+    "release_report.json",
+    "test_capability_contract.py"
   ],
   "name": "plfd",
   "profile": "capability",

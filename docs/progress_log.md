@@ -17180,3 +17180,62 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External NTFY, AUTH, CONF, AUDL, I18N, THEM, WFLO, COMP, or AGNT adapters.
+
+### 2026-05-30 20:05 EAT
+
+PLFD lifecycle and guardrail packet:
+
+- Selected `capabilities/common/plfd` after MCHN because it was the next
+  capability with an existing `cap_spec.md` but missing the local README,
+  specification, and plan packet.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable PLFD contract to cover foundation services,
+  dependency posture, configuration/tenant/auth/audit baselines, readiness
+  assessments, platform changes, PLFD agents, observability, APG adapters, UI
+  routes, visual theme tokens, and Bytewax event streaming.
+- Added deterministic guardrails for tenant context, service owner, service
+  tier, readiness score, dependency evidence, baseline evidence, baseline
+  approver, dependency health, configuration baseline, change owner, affected
+  capability scope, platform approval, security review, change window,
+  rollback plan, Bytewax change stream, broad-change review, AI-agent
+  registration, supported AI-agent runtime and role, agent scope, contribution
+  disclosure, audited state changes, and Bytewax-backed batch foundation
+  mutation.
+- Added the `PlfdAgent` model and extended `PlfdService` with tenant-local
+  lifecycle IDs, PLFD-agent registration, Bytewax change enforcement,
+  batch-mutation validation, stronger service/dependency/baseline/change
+  guardrails, and dashboard streaming metadata.
+- Added API helpers for PLFD-agent registration, audit listing, and batch
+  mutation validation.
+- Added dashboard streaming metadata plus AI-agent, audit-trail, and
+  foundation-policy view models.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle rules, PLFD-agent guardrails,
+  tenant-local IDs, Bytewax change and batch policy, generated evidence,
+  and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/plfd/__init__.py capabilities/common/plfd/capability_contract.py capabilities/common/plfd/models.py capabilities/common/plfd/foundation_runtime.py capabilities/common/plfd/service.py capabilities/common/plfd/api.py capabilities/common/plfd/views.py capabilities/common/plfd/app.py capabilities/common/plfd/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/plfd/test_capability_contract.py`
+  passed with 8 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... PlfdService ... register_plfd_agent ... dashboard_summary ..."` returned dashboard evidence with one PLFD agent and `bytewax` streaming metadata; import emitted the existing optional OpenTelemetry warning.
+- `jq '.capabilities.plfd.streaming.processor, .capabilities.plfd.configuration.plfd_agents.supported_runtimes, .capabilities.plfd.screens.agents.route, ...' capabilities/common/plfd/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, `/plfd/agents`, `plfd_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/plfd --json` passed with `ok: true`; PLFD remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/plfd --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker,
+  and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/plfd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live configuration stores, tenant registries, identity providers, durable
+  audit stores, monitoring/health/security providers, plugin registries,
+  rendered browser UI, and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External CONF, MTEN, AUTH, AUDL, MONI, HLTH, REGY, SECU, PLGN, or AGNT
+  adapters.

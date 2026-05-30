@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_PLFD_AGENT_ROLES,
+	SUPPORTED_PLFD_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+)
 from .foundation_runtime import (
 	change_review_status,
 	dependencies_are_healthy,
@@ -21,6 +27,7 @@ from .models import (
 	FoundationDependency,
 	FoundationService,
 	PlatformChange,
+	PlfdAgent,
 	PlfdAuditEvent,
 	ReadinessAssessment,
 	utc_now,
@@ -37,6 +44,7 @@ class PlfdService:
 		self._assessments: dict[str, ReadinessAssessment] = {}
 		self._changes: dict[str, PlatformChange] = {}
 		self._audit_events: dict[str, PlfdAuditEvent] = {}
+		self._agents: dict[str, PlfdAgent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -65,6 +73,8 @@ class PlfdService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "register_foundation_service",
 			"service_owner_assigned": bool(owner),
+			"tier_classified": bool(tier),
+			"readiness_score_present": readiness_score is not None,
 			"configuration_baseline_present": bool(configuration_baseline_present),
 		})
 		self._raise_if_denied(result)
@@ -84,7 +94,7 @@ class PlfdService:
 			status="registered",
 			metadata=dict(metadata or {}),
 		)
-		self._services[service.id] = service
+		self._services[_state_key(tenant_id, service.id)] = service
 		self._record_audit(tenant_id, service.id, "foundation_service_registered", owner, "allow")
 		return service.to_dict()
 
@@ -98,6 +108,12 @@ class PlfdService:
 		required: bool = True,
 		evidence_ref: str = "",
 	) -> dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_dependency",
+			"dependency_evidence_present": bool(evidence_ref),
+		})
+		self._raise_if_denied(result)
 		self._require_service(source_service_id, tenant_id)
 		self._require_service(target_service_id, tenant_id)
 		dependency = FoundationDependency(
@@ -109,8 +125,8 @@ class PlfdService:
 			required=bool(required),
 			evidence_ref=evidence_ref,
 		)
-		self._dependencies[dependency.id] = dependency
-		self._record_audit(tenant_id, dependency.id, "dependency_recorded", "plfd", "allow")
+		self._dependencies[_state_key(tenant_id, dependency.id)] = dependency
+		self._record_audit(tenant_id, dependency.id, "dependency_recorded", "plfd", result["decision"], reasons=self._reasons(result))
 		return dependency.to_dict()
 
 	def attach_baseline(
@@ -123,11 +139,14 @@ class PlfdService:
 		approved_by: str,
 		status: str = "approved",
 	) -> dict[str, Any]:
-		self._require_service(service_id, tenant_id)
-		if not evidence_ref:
-			raise PermissionError("baseline_evidence_required")
-		if not approved_by:
-			raise PermissionError("baseline_approver_required")
+		service = self._require_service(service_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "attach_baseline",
+			"baseline_evidence_present": bool(evidence_ref),
+			"baseline_approver_present": bool(approved_by),
+		})
+		self._raise_if_denied(result)
 		if status not in {"approved", "draft", "rejected"}:
 			raise ValueError("baseline_status_invalid")
 		baseline = FoundationBaseline(
@@ -139,12 +158,11 @@ class PlfdService:
 			approved_by=approved_by,
 			status=status,
 		)
-		self._baselines[baseline.id] = baseline
-		service = self._services[service_id]
+		self._baselines[_state_key(tenant_id, baseline.id)] = baseline
 		if baseline.baseline_type == "configuration" and status == "approved":
 			service.configuration_baseline_present = True
 			service.updated_at = utc_now()
-		self._record_audit(tenant_id, baseline.id, "baseline_attached", approved_by, status)
+		self._record_audit(tenant_id, baseline.id, "baseline_attached", approved_by, result["decision"], reasons=self._reasons(result))
 		return baseline.to_dict()
 
 	def assess_readiness(self, assessment_id: str, tenant_id: str, service_id: str) -> dict[str, Any]:
@@ -174,7 +192,7 @@ class PlfdService:
 			change_window_ready=bool(service.change_window_ref),
 			issues=tuple(issues),
 		)
-		self._assessments[assessment.id] = assessment
+		self._assessments[_state_key(tenant_id, assessment.id)] = assessment
 		service.status = "ready" if status == "ready" else "blocked"
 		service.updated_at = utc_now()
 		self._record_audit(tenant_id, assessment.id, "readiness_assessed", "plfd", status, reasons=tuple(issues))
@@ -196,10 +214,13 @@ class PlfdService:
 		rollback_plan_ref: str = "",
 	) -> dict[str, Any]:
 		service = self._require_service(service_id, tenant_id)
-		if not owner:
-			raise PermissionError("change_owner_required")
-		if affected_capability_count < 1:
-			raise PermissionError("affected_capability_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "propose_platform_change",
+			"change_owner_present": bool(owner),
+			"affected_capability_count": affected_capability_count,
+		})
+		self._raise_if_denied(result)
 		if dependencies_healthy is None:
 			dependencies_healthy = dependencies_are_healthy(self._service_dependency_dicts(tenant_id, service_id))
 		change = PlatformChange(
@@ -217,8 +238,8 @@ class PlfdService:
 			rollback_plan_ref=rollback_plan_ref or service.rollback_plan_ref,
 			status=change_review_status(int(affected_capability_count), bool(broad_review_recorded)),
 		)
-		self._changes[change.id] = change
-		self._record_audit(tenant_id, change.id, "platform_change_proposed", owner, change.status)
+		self._changes[_state_key(tenant_id, change.id)] = change
+		self._record_audit(tenant_id, change.id, "platform_change_proposed", owner, change.status, reasons=self._reasons(result))
 		return change.to_dict()
 
 	def approve_platform_change(
@@ -229,6 +250,7 @@ class PlfdService:
 		approval_recorded: bool = True,
 		broad_review_recorded: bool | None = None,
 		security_review_recorded: bool | None = None,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		change = self._require_change(change_id, tenant_id)
 		service = self._require_service(change.service_id, tenant_id)
@@ -246,19 +268,17 @@ class PlfdService:
 			"configuration_baseline_present": service.configuration_baseline_present,
 			"affected_capability_count": change.affected_capability_count,
 			"broad_review_recorded": change.broad_review_recorded,
+			"security_review_recorded": change.security_review_recorded,
+			"change_window_present": bool(change.change_window_ref),
+			"rollback_plan_present": bool(change.rollback_plan_ref),
+			"event_stream": event_stream_name(event_stream),
 		})
 		self._raise_if_denied(result)
 		self._raise_if_review_required(result)
-		if not change.security_review_recorded:
-			raise PermissionError("security_review_required")
-		if not change.change_window_ref:
-			raise PermissionError("change_window_required")
-		if not change.rollback_plan_ref:
-			raise PermissionError("rollback_plan_required")
 		change.status = "approved"
 		change.approved_at = utc_now()
 		service.updated_at = utc_now()
-		self._record_audit(tenant_id, change.id, "platform_change_approved", approver, "allow")
+		self._record_audit(tenant_id, change.id, "platform_change_approved", approver, result["decision"], reasons=self._reasons(result))
 		return change.to_dict()
 
 	def create_record(
@@ -304,6 +324,51 @@ class PlfdService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def register_plfd_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"plfd_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_PLFD_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_PLFD_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		agent = PlfdAgent(
+			id=agent_id or f"plfd-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._record_audit(tenant_id, agent.id, "plfd_agent_registered", name, result["decision"])
+		return agent.to_dict()
+
+	def validate_batch_foundation_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_foundation_mutation",
+			"event_stream": event_stream,
+		})
+
+	def list_plfd_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		services = self.list_services(tenant_id)
 		assessments = self.list_readiness_assessments(tenant_id)
@@ -318,9 +383,11 @@ class PlfdService:
 			"unhealthy_dependency_count": len([item for item in self.list_dependencies(tenant_id) if item["required"] and item["health_status"] != "healthy"]),
 			"baseline_count": len(self.list_baselines(tenant_id)),
 			"readiness_assessment_count": len(assessments),
+			"plfd_agent_count": len(self.list_plfd_agents(tenant_id)),
 			"approved_change_count": len([item for item in changes if item["status"] == "approved"]),
 			"pending_change_count": len([item for item in changes if item["status"] != "approved"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -328,13 +395,13 @@ class PlfdService:
 		self._raise_if_denied(result)
 
 	def _require_service(self, service_id: str, tenant_id: str) -> FoundationService:
-		service = self._services.get(service_id)
+		service = self._services.get(_state_key(tenant_id, service_id))
 		if service is None or service.tenant_id != tenant_id:
 			raise KeyError("foundation_service_not_found")
 		return service
 
 	def _require_change(self, change_id: str, tenant_id: str) -> PlatformChange:
-		change = self._changes.get(change_id)
+		change = self._changes.get(_state_key(tenant_id, change_id))
 		if change is None or change.tenant_id != tenant_id:
 			raise KeyError("platform_change_not_found")
 		return change
@@ -355,11 +422,11 @@ class PlfdService:
 
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "deny":
-			raise PermissionError(self._reasons(result))
+			raise PermissionError(", ".join(self._reasons(result)) or "platform_foundation_policy_blocked")
 
 	def _raise_if_review_required(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "require_review":
-			raise PermissionError(self._reasons(result))
+			raise PermissionError(", ".join(self._reasons(result)) or "platform_foundation_review_required")
 
 	def _record_audit(
 		self,
@@ -387,8 +454,16 @@ class PlfdService:
 			values = [item for item in values if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(values, key=lambda item: item.id)]
 
-	def _reasons(self, result: dict[str, Any]) -> str:
-		return ", ".join(
+	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		return tuple(
 			action.get("reason", "platform_foundation_policy_blocked")
 			for action in result.get("actions", [])
-		) or "platform_foundation_policy_blocked"
+		)
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"

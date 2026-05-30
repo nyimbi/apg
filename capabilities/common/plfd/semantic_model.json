@@ -12,9 +12,26 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.PlfdService",
+          "health": "hlth",
+          "identity": "auth",
+          "monitoring": "moni",
+          "multi_tenant": "mten",
+          "plugins": "plgn",
+          "registry": "regy",
+          "security": "secu",
+          "view_models": "views.py"
+        },
         "baselines": {
           "audit_baseline_required": true,
           "auth_baseline_required": true,
+          "baseline_approver_required": true,
+          "baseline_evidence_required": true,
           "configuration_baseline_required": true,
           "tenant_baseline_required": true
         },
@@ -26,15 +43,49 @@
         },
         "governance": {
           "audit_foundation_changes": true,
+          "batch_event_stream": "bytewax",
           "broad_change_review_required": true,
           "require_tenant_context": true,
-          "security_review_required": true
+          "security_review_required": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "dependency_metrics_required": true,
+          "event_stream": "bytewax",
+          "foundation_metrics_required": true,
+          "readiness_metrics_required": true
         },
         "operations": {
           "change_window_required": true,
+          "event_stream": "bytewax",
           "health_gate_required": true,
           "monitoring_required": true,
           "rollback_plan_required": true
+        },
+        "plfd_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "foundation_reviewer",
+            "dependency_reviewer",
+            "baseline_reviewer",
+            "readiness_reviewer",
+            "change_reviewer",
+            "security_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -42,6 +93,8 @@
           "default_theme": "plfd_platform_foundation"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_baseline_manager": true,
           "enable_dependency_map": true,
           "enable_foundation_dashboard": true,
@@ -55,9 +108,19 @@
       "master_data": {},
       "name": "Platform Foundation",
       "provides": [
-        "plfd_operations"
+        "foundation_registry",
+        "dependency_posture",
+        "configuration_baselines",
+        "readiness_gates",
+        "platform_governance",
+        "plfd_agents"
       ],
-      "requires": [],
+      "requires": [
+        "conf",
+        "mten",
+        "auth",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +150,71 @@
           },
           {
             "condition": {
+              "operation": "register_foundation_service",
+              "tier_classified": false
+            },
+            "description": "Foundation services require tier classification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tier_classification_required",
+              "required_action": "classify_service_tier"
+            },
+            "name": "foundation_service_requires_tier"
+          },
+          {
+            "condition": {
+              "operation": "register_foundation_service",
+              "readiness_score_present": false
+            },
+            "description": "Foundation services require readiness score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "readiness_score_required",
+              "required_action": "record_readiness_score"
+            },
+            "name": "foundation_service_requires_readiness_score"
+          },
+          {
+            "condition": {
+              "dependency_evidence_present": false,
+              "operation": "record_dependency"
+            },
+            "description": "Foundation dependencies require health evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dependency_evidence_required",
+              "required_action": "attach_dependency_evidence"
+            },
+            "name": "dependency_requires_evidence"
+          },
+          {
+            "condition": {
+              "baseline_evidence_present": false,
+              "operation": "attach_baseline"
+            },
+            "description": "Foundation baselines require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_evidence_required",
+              "required_action": "attach_baseline_evidence"
+            },
+            "name": "baseline_requires_evidence"
+          },
+          {
+            "condition": {
+              "baseline_approver_present": false,
+              "operation": "attach_baseline"
+            },
+            "description": "Foundation baselines require approver identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_approver_required",
+              "required_action": "attach_baseline_approver"
+            },
+            "name": "baseline_requires_approver"
+          },
+          {
+            "condition": {
               "dependencies_healthy": false,
               "operation": "approve_platform_change"
             },
@@ -112,6 +240,32 @@
           },
           {
             "condition": {
+              "change_owner_present": false,
+              "operation": "propose_platform_change"
+            },
+            "description": "Platform foundation changes require owner identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_owner_required",
+              "required_action": "attach_change_owner"
+            },
+            "name": "platform_change_requires_owner"
+          },
+          {
+            "condition": {
+              "affected_capability_count_lte": 0,
+              "operation": "propose_platform_change"
+            },
+            "description": "Platform changes require affected capability scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "affected_capability_required",
+              "required_action": "set_affected_capability_scope"
+            },
+            "name": "platform_change_requires_affected_capability"
+          },
+          {
+            "condition": {
               "approval_recorded": false,
               "operation": "approve_platform_change"
             },
@@ -125,6 +279,58 @@
           },
           {
             "condition": {
+              "operation": "approve_platform_change",
+              "security_review_recorded": false
+            },
+            "description": "Platform changes require security review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_review_required",
+              "required_action": "record_security_review"
+            },
+            "name": "platform_change_requires_security_review"
+          },
+          {
+            "condition": {
+              "change_window_present": false,
+              "operation": "approve_platform_change"
+            },
+            "description": "Platform changes require change window.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_window_required",
+              "required_action": "attach_change_window"
+            },
+            "name": "platform_change_requires_window"
+          },
+          {
+            "condition": {
+              "operation": "approve_platform_change",
+              "rollback_plan_present": false
+            },
+            "description": "Platform changes require rollback plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_plan_required",
+              "required_action": "attach_rollback_plan"
+            },
+            "name": "platform_change_requires_rollback"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "approve_platform_change"
+            },
+            "description": "Platform change lifecycle events require Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "platform_change_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "affected_capability_count_gt": 10,
               "broad_review_recorded": false
             },
@@ -135,6 +341,97 @@
               "required_action": "review_platform_change"
             },
             "name": "broad_platform_change_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "plfd_agent_present": true
+            },
+            "description": "AI foundation agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plfd_agent_registration_required",
+              "required_action": "register_plfd_agent"
+            },
+            "name": "plfd_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "plfd_agent_present": true
+            },
+            "description": "AI foundation agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plfd_agent_runtime_not_supported",
+              "required_action": "choose_supported_plfd_agent_runtime"
+            },
+            "name": "plfd_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "plfd_agent_present": true
+            },
+            "description": "AI foundation agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plfd_agent_role_not_supported",
+              "required_action": "choose_supported_plfd_agent_role"
+            },
+            "name": "plfd_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "plfd_agent_present": true
+            },
+            "description": "AI foundation agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plfd_agent_scope_required",
+              "required_action": "set_plfd_agent_scope"
+            },
+            "name": "plfd_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "plfd_agent_present": true
+            },
+            "description": "AI foundation-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plfd_agent_disclosure_required",
+              "required_action": "disclose_plfd_agent"
+            },
+            "name": "plfd_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Platform foundation lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plfd_audit_event_required",
+              "required_action": "record_plfd_audit_event"
+            },
+            "name": "plfd_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_foundation_mutation"
+            },
+            "description": "Batch foundation mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_foundation_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -167,6 +464,71 @@
         },
         {
           "condition": {
+            "operation": "register_foundation_service",
+            "tier_classified": false
+          },
+          "description": "Foundation services require tier classification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tier_classification_required",
+            "required_action": "classify_service_tier"
+          },
+          "name": "foundation_service_requires_tier"
+        },
+        {
+          "condition": {
+            "operation": "register_foundation_service",
+            "readiness_score_present": false
+          },
+          "description": "Foundation services require readiness score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "readiness_score_required",
+            "required_action": "record_readiness_score"
+          },
+          "name": "foundation_service_requires_readiness_score"
+        },
+        {
+          "condition": {
+            "dependency_evidence_present": false,
+            "operation": "record_dependency"
+          },
+          "description": "Foundation dependencies require health evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dependency_evidence_required",
+            "required_action": "attach_dependency_evidence"
+          },
+          "name": "dependency_requires_evidence"
+        },
+        {
+          "condition": {
+            "baseline_evidence_present": false,
+            "operation": "attach_baseline"
+          },
+          "description": "Foundation baselines require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_evidence_required",
+            "required_action": "attach_baseline_evidence"
+          },
+          "name": "baseline_requires_evidence"
+        },
+        {
+          "condition": {
+            "baseline_approver_present": false,
+            "operation": "attach_baseline"
+          },
+          "description": "Foundation baselines require approver identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_approver_required",
+            "required_action": "attach_baseline_approver"
+          },
+          "name": "baseline_requires_approver"
+        },
+        {
+          "condition": {
             "dependencies_healthy": false,
             "operation": "approve_platform_change"
           },
@@ -192,6 +554,32 @@
         },
         {
           "condition": {
+            "change_owner_present": false,
+            "operation": "propose_platform_change"
+          },
+          "description": "Platform foundation changes require owner identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_owner_required",
+            "required_action": "attach_change_owner"
+          },
+          "name": "platform_change_requires_owner"
+        },
+        {
+          "condition": {
+            "affected_capability_count_lte": 0,
+            "operation": "propose_platform_change"
+          },
+          "description": "Platform changes require affected capability scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "affected_capability_required",
+            "required_action": "set_affected_capability_scope"
+          },
+          "name": "platform_change_requires_affected_capability"
+        },
+        {
+          "condition": {
             "approval_recorded": false,
             "operation": "approve_platform_change"
           },
@@ -205,6 +593,58 @@
         },
         {
           "condition": {
+            "operation": "approve_platform_change",
+            "security_review_recorded": false
+          },
+          "description": "Platform changes require security review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_review_required",
+            "required_action": "record_security_review"
+          },
+          "name": "platform_change_requires_security_review"
+        },
+        {
+          "condition": {
+            "change_window_present": false,
+            "operation": "approve_platform_change"
+          },
+          "description": "Platform changes require change window.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_window_required",
+            "required_action": "attach_change_window"
+          },
+          "name": "platform_change_requires_window"
+        },
+        {
+          "condition": {
+            "operation": "approve_platform_change",
+            "rollback_plan_present": false
+          },
+          "description": "Platform changes require rollback plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_plan_required",
+            "required_action": "attach_rollback_plan"
+          },
+          "name": "platform_change_requires_rollback"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "approve_platform_change"
+          },
+          "description": "Platform change lifecycle events require Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "platform_change_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "affected_capability_count_gt": 10,
             "broad_review_recorded": false
           },
@@ -215,6 +655,97 @@
             "required_action": "review_platform_change"
           },
           "name": "broad_platform_change_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "plfd_agent_present": true
+          },
+          "description": "AI foundation agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plfd_agent_registration_required",
+            "required_action": "register_plfd_agent"
+          },
+          "name": "plfd_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "plfd_agent_present": true
+          },
+          "description": "AI foundation agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plfd_agent_runtime_not_supported",
+            "required_action": "choose_supported_plfd_agent_runtime"
+          },
+          "name": "plfd_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "plfd_agent_present": true
+          },
+          "description": "AI foundation agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plfd_agent_role_not_supported",
+            "required_action": "choose_supported_plfd_agent_role"
+          },
+          "name": "plfd_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "plfd_agent_present": true
+          },
+          "description": "AI foundation agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plfd_agent_scope_required",
+            "required_action": "set_plfd_agent_scope"
+          },
+          "name": "plfd_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "plfd_agent_present": true
+          },
+          "description": "AI foundation-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plfd_agent_disclosure_required",
+            "required_action": "disclose_plfd_agent"
+          },
+          "name": "plfd_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Platform foundation lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plfd_audit_event_required",
+            "required_action": "record_plfd_audit_event"
+          },
+          "name": "plfd_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_foundation_mutation"
+          },
+          "description": "Batch foundation mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_foundation_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -224,6 +755,16 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "PLFDAgentPanel",
+          "permission": "plfd:admin",
+          "route": "/plfd/agents"
+        },
+        "audit": {
+          "component": "FoundationAuditTrail",
+          "permission": "plfd:admin",
+          "route": "/plfd/audit"
+        },
         "baselines": {
           "component": "BaselineManager",
           "permission": "plfd:manage_baselines",
@@ -265,9 +806,39 @@
           "route": "/plfd/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_foundation_mutation_requires_bytewax",
+        "events": [
+          "plfd_service_registered",
+          "plfd_dependency_recorded",
+          "plfd_baseline_attached",
+          "plfd_readiness_assessed",
+          "plfd_change_proposed",
+          "plfd_change_approved",
+          "plfd_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "services",
+          "dependencies",
+          "baselines",
+          "readiness_assessments",
+          "changes",
+          "plfd_agents",
+          "audit_events"
+        ],
+        "topic": "apg.plfd.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "foundation-chip",
+            "visual": "event-timeline"
+          },
           "baseline_manager": {
             "status_style": "baseline-chip",
             "visual": "policy-grid"
@@ -348,10 +919,24 @@
             "permission": "plfd:approve_changes"
           },
           {
+            "component": "PLFDAgentPanel",
+            "name": "agents",
+            "nav_group": "Operations",
+            "path": "/plfd/agents",
+            "permission": "plfd:admin"
+          },
+          {
             "component": "FoundationGovernance",
             "name": "governance",
             "nav_group": "Governance",
             "path": "/plfd/governance",
+            "permission": "plfd:admin"
+          },
+          {
+            "component": "FoundationAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/plfd/audit",
             "permission": "plfd:admin"
           },
           {
@@ -375,15 +960,37 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "plfd": []
+      "plfd": [
+        "conf",
+        "mten",
+        "auth",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "plfd": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.PlfdService",
+          "health": "hlth",
+          "identity": "auth",
+          "monitoring": "moni",
+          "multi_tenant": "mten",
+          "plugins": "plgn",
+          "registry": "regy",
+          "security": "secu",
+          "view_models": "views.py"
+        },
         "baselines": {
           "audit_baseline_required": true,
           "auth_baseline_required": true,
+          "baseline_approver_required": true,
+          "baseline_evidence_required": true,
           "configuration_baseline_required": true,
           "tenant_baseline_required": true
         },
@@ -395,15 +1002,49 @@
         },
         "governance": {
           "audit_foundation_changes": true,
+          "batch_event_stream": "bytewax",
           "broad_change_review_required": true,
           "require_tenant_context": true,
-          "security_review_required": true
+          "security_review_required": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "dependency_metrics_required": true,
+          "event_stream": "bytewax",
+          "foundation_metrics_required": true,
+          "readiness_metrics_required": true
         },
         "operations": {
           "change_window_required": true,
+          "event_stream": "bytewax",
           "health_gate_required": true,
           "monitoring_required": true,
           "rollback_plan_required": true
+        },
+        "plfd_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "foundation_reviewer",
+            "dependency_reviewer",
+            "baseline_reviewer",
+            "readiness_reviewer",
+            "change_reviewer",
+            "security_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -411,6 +1052,8 @@
           "default_theme": "plfd_platform_foundation"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_baseline_manager": true,
           "enable_dependency_map": true,
           "enable_foundation_dashboard": true,
@@ -419,9 +1062,19 @@
       },
       "id": "plfd",
       "provides": [
-        "plfd_operations"
+        "foundation_registry",
+        "dependency_posture",
+        "configuration_baselines",
+        "readiness_gates",
+        "platform_governance",
+        "plfd_agents"
       ],
-      "requires": []
+      "requires": [
+        "conf",
+        "mten",
+        "auth",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -433,7 +1086,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -454,6 +1107,45 @@
   },
   "roles": {},
   "rules": {
+    "baseline_requires_approver": {
+      "condition": {
+        "baseline_approver_present": false,
+        "operation": "attach_baseline"
+      },
+      "description": "Foundation baselines require approver identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_approver_required",
+        "required_action": "attach_baseline_approver"
+      },
+      "name": "baseline_requires_approver"
+    },
+    "baseline_requires_evidence": {
+      "condition": {
+        "baseline_evidence_present": false,
+        "operation": "attach_baseline"
+      },
+      "description": "Foundation baselines require evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_evidence_required",
+        "required_action": "attach_baseline_evidence"
+      },
+      "name": "baseline_requires_evidence"
+    },
+    "batch_foundation_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_foundation_mutation"
+      },
+      "description": "Batch foundation mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_foundation_mutation_requires_bytewax"
+    },
     "broad_platform_change_requires_review": {
       "condition": {
         "affected_capability_count_gt": 10,
@@ -492,6 +1184,19 @@
       },
       "name": "dependency_health_required"
     },
+    "dependency_requires_evidence": {
+      "condition": {
+        "dependency_evidence_present": false,
+        "operation": "record_dependency"
+      },
+      "description": "Foundation dependencies require health evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dependency_evidence_required",
+        "required_action": "attach_dependency_evidence"
+      },
+      "name": "dependency_requires_evidence"
+    },
     "foundation_service_requires_owner": {
       "condition": {
         "operation": "register_foundation_service",
@@ -505,6 +1210,45 @@
       },
       "name": "foundation_service_requires_owner"
     },
+    "foundation_service_requires_readiness_score": {
+      "condition": {
+        "operation": "register_foundation_service",
+        "readiness_score_present": false
+      },
+      "description": "Foundation services require readiness score.",
+      "effect": {
+        "decision": "deny",
+        "reason": "readiness_score_required",
+        "required_action": "record_readiness_score"
+      },
+      "name": "foundation_service_requires_readiness_score"
+    },
+    "foundation_service_requires_tier": {
+      "condition": {
+        "operation": "register_foundation_service",
+        "tier_classified": false
+      },
+      "description": "Foundation services require tier classification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tier_classification_required",
+        "required_action": "classify_service_tier"
+      },
+      "name": "foundation_service_requires_tier"
+    },
+    "platform_change_requires_affected_capability": {
+      "condition": {
+        "affected_capability_count_lte": 0,
+        "operation": "propose_platform_change"
+      },
+      "description": "Platform changes require affected capability scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "affected_capability_required",
+        "required_action": "set_affected_capability_scope"
+      },
+      "name": "platform_change_requires_affected_capability"
+    },
     "platform_change_requires_approval": {
       "condition": {
         "approval_recorded": false,
@@ -517,6 +1261,149 @@
         "required_action": "record_platform_approval"
       },
       "name": "platform_change_requires_approval"
+    },
+    "platform_change_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "approve_platform_change"
+      },
+      "description": "Platform change lifecycle events require Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "platform_change_requires_bytewax_stream"
+    },
+    "platform_change_requires_owner": {
+      "condition": {
+        "change_owner_present": false,
+        "operation": "propose_platform_change"
+      },
+      "description": "Platform foundation changes require owner identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "change_owner_required",
+        "required_action": "attach_change_owner"
+      },
+      "name": "platform_change_requires_owner"
+    },
+    "platform_change_requires_rollback": {
+      "condition": {
+        "operation": "approve_platform_change",
+        "rollback_plan_present": false
+      },
+      "description": "Platform changes require rollback plan.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_plan_required",
+        "required_action": "attach_rollback_plan"
+      },
+      "name": "platform_change_requires_rollback"
+    },
+    "platform_change_requires_security_review": {
+      "condition": {
+        "operation": "approve_platform_change",
+        "security_review_recorded": false
+      },
+      "description": "Platform changes require security review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_review_required",
+        "required_action": "record_security_review"
+      },
+      "name": "platform_change_requires_security_review"
+    },
+    "platform_change_requires_window": {
+      "condition": {
+        "change_window_present": false,
+        "operation": "approve_platform_change"
+      },
+      "description": "Platform changes require change window.",
+      "effect": {
+        "decision": "deny",
+        "reason": "change_window_required",
+        "required_action": "attach_change_window"
+      },
+      "name": "platform_change_requires_window"
+    },
+    "plfd_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "plfd_agent_present": true
+      },
+      "description": "AI foundation-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plfd_agent_disclosure_required",
+        "required_action": "disclose_plfd_agent"
+      },
+      "name": "plfd_agent_requires_disclosure"
+    },
+    "plfd_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "plfd_agent_present": true
+      },
+      "description": "AI foundation agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plfd_agent_registration_required",
+        "required_action": "register_plfd_agent"
+      },
+      "name": "plfd_agent_requires_registration"
+    },
+    "plfd_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "plfd_agent_present": true
+      },
+      "description": "AI foundation agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plfd_agent_scope_required",
+        "required_action": "set_plfd_agent_scope"
+      },
+      "name": "plfd_agent_requires_scope"
+    },
+    "plfd_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "plfd_agent_present": true
+      },
+      "description": "AI foundation agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plfd_agent_role_not_supported",
+        "required_action": "choose_supported_plfd_agent_role"
+      },
+      "name": "plfd_agent_role_supported"
+    },
+    "plfd_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "plfd_agent_present": true
+      },
+      "description": "AI foundation agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plfd_agent_runtime_not_supported",
+        "required_action": "choose_supported_plfd_agent_runtime"
+      },
+      "name": "plfd_agent_runtime_supported"
+    },
+    "plfd_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Platform foundation lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plfd_audit_event_required",
+        "required_action": "record_plfd_audit_event"
+      },
+      "name": "plfd_state_change_requires_audit"
     },
     "tenant_context_required": {
       "condition": {

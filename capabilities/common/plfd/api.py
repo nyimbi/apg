@@ -99,7 +99,24 @@ def approve_platform_change(payload: dict[str, Any]) -> dict[str, Any]:
 		approval_recorded=bool(payload.get("approval_recorded", True)),
 		broad_review_recorded=payload.get("broad_review_recorded"),
 		security_review_recorded=payload.get("security_review_recorded"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
+
+
+def register_plfd_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_plfd_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
+def validate_batch_foundation_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_foundation_mutation(event_stream)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
@@ -113,6 +130,14 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_plfd_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_plfd_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

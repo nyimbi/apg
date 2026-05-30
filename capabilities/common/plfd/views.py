@@ -27,6 +27,7 @@ def dashboard_model(
 		"changes": service.list_changes(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -73,4 +74,34 @@ def governance_model(service: PlfdService, tenant_id: str = "default") -> dict[s
 		"route": "/plfd/governance",
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
+	}
+
+
+def plfd_agent_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/plfd/agents",
+		"plfd_agents": service.list_plfd_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["plfd_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["plfd_agents"]["allowed_roles"],
+		"permissions": ["plfd:view", "plfd:admin"],
+	}
+
+
+def audit_trail_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plfd/audit",
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["plfd:admin"],
+	}
+
+
+def foundation_policy_model(service: PlfdService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/plfd/governance",
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"configuration": contract["configuration"],
+		"baselines": service.list_baselines(tenant_id),
 	}
