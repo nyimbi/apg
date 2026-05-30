@@ -1,14 +1,14 @@
 """
-APG Configuration Management Capability - Revolutionary Infrastructure Automation
+APG Configuration Management Capability - Production Infrastructure Automation
 
-AI-native configuration management system providing 10x improvement over industry
+AI-native configuration management system providing measurable improvement over industry
 leaders through predictive intelligence, universal abstraction, and autonomous operations.
 
 © 2025 Datacraft - www.datacraft.co.ke
 Author: Nyimbi Odero <nyimbi@gmail.com>
 """
 
-from .service import ConfService, RevolutionaryConfigurationManager, create_configuration_manager, get_config_manager
+from .service import ConfService, ProductionConfigurationManager, create_configuration_manager, get_config_manager
 from .models import (
 	# Core Models
 	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
@@ -52,6 +52,7 @@ def register_capability() -> dict:
 			"deployments": "Coordinate controlled rollout workflows",
 			"gitops": "Manage GitOps-driven configuration promotion",
 			"drift_management": "Detect and review configuration drift remediation",
+			"configuration_agents": "Register and govern configuration review agents",
 			"audit_events": "Expose configuration governance evidence",
 			"capability_rules": "Evaluate deterministic capability-specific rules",
 			"visual_theming": "Apply tenant-aware configuration workspace theming"
@@ -64,6 +65,7 @@ def register_capability() -> dict:
 			"deployments": "/api/v1/config/deployments",
 			"drift": "/api/v1/config/drift",
 			"drift_remediation": "/api/v1/config/drift/remediation",
+			"agents": "/api/v1/config/agents",
 			"audit": "/api/v1/config/audit",
 			"insights": "/api/v1/config/insights",
 			"metrics": "/api/v1/config/metrics"
@@ -81,6 +83,7 @@ def register_capability() -> dict:
 			"conf:deploy",
 			"conf:approve",
 			"conf:remediate",
+			"conf:agent_manage",
 			"conf:admin"
 		]
 	}
@@ -89,7 +92,7 @@ def register_capability() -> dict:
 __all__ = [
 	# Service Layer
 	"ConfService",
-	"RevolutionaryConfigurationManager",
+	"ProductionConfigurationManager",
 	"create_configuration_manager",
 	"get_config_manager",
 	"register_capability",

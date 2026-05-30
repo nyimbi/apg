@@ -14,6 +14,8 @@ The capability must be executable without importing the full production automati
 - Require encrypted handling for secret-bearing configuration.
 - Require rollback evidence for production deployments.
 - Track drift findings and require a remediation plan plus independent review before drift remediation is executed.
+- Treat configuration review agents as first-class configuration citizens with supported runtime, role, owner, purpose, and human-approval policy evidence.
+- Publish lifecycle stream metadata through Bytewax so composition tooling can route configuration events without broker-specific assumptions.
 - Expose rule, API, UI, theme, audit, and semantic model evidence for APG composition.
 
 ## First-Class Domain Concepts
@@ -107,6 +109,24 @@ Required evidence:
 - `reasons`
 - `metadata`
 
+### Configuration Agent
+
+A tenant-scoped AI or automation agent allowed to inspect, prepare, and
+recommend configuration changes while leaving privileged approval and deployment
+actions under human control.
+
+Required evidence:
+
+- `id`
+- `tenant_id`
+- `name`
+- `runtime`
+- `role`
+- `purpose`
+- `owner`
+- `human_approval_required`
+- `status`
+
 ## Lifecycle Requirements
 
 ### Record Creation
@@ -151,6 +171,22 @@ Required evidence:
 - Approved remediation changes the record status back to `active`.
 - Rejected remediation leaves the finding as rejected and does not mutate the record.
 
+### Agent Registration
+
+- Supported runtimes are `codex`, `claude_code`, `opencode`, and `pi`.
+- Supported roles are `configuration_reviewer`, `drift_reviewer`,
+  `policy_reviewer`, and `deployment_reviewer`.
+- Agent name, purpose, and owner are required.
+- Agents may inspect, prepare, and recommend; they may not autonomously approve,
+  deploy, or remediate privileged changes without human approval evidence.
+
+### Lifecycle Streaming
+
+- Configuration lifecycle events are described on
+  `apg.common.conf.lifecycle`.
+- Stream processor metadata must be `bytewax`.
+- Event ordering is tenant-scoped through `tenant_id`.
+
 ## Rules
 
 The deterministic rule engine must enforce at least:
@@ -164,6 +200,10 @@ The deterministic rule engine must enforce at least:
 - `change_review_requires_independent_reviewer`
 - `drift_requires_remediation_plan`
 - `drift_review_requires_independent_reviewer`
+- `bytewax_event_stream_required`
+- `conf_agent_runtime_supported`
+- `conf_agent_role_supported`
+- `conf_agent_privileged_action_requires_approval`
 
 ## UI Surfaces
 
@@ -176,6 +216,7 @@ CONF must expose routes and theme components for:
 - Deployment center
 - Drift console
 - Drift remediation queue
+- Configuration agent roster
 - Policy workbench
 - GitOps center
 - Audit console

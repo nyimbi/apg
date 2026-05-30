@@ -13,6 +13,11 @@ The Configuration Management capability (`conf`) is the foundational capability 
 - **Validation**: Built-in validation for configuration values
 - **Security**: Sensitive configuration handling and protection
 - **Multi-tenancy**: Tenant-isolated configuration management
+- **Agent Composition**: Codex, Claude Code, OpenCode, and Pi review agents can
+  inspect, prepare, and recommend configuration changes under human approval
+  guardrails.
+- **Lifecycle Streaming**: APG composition metadata publishes configuration
+  lifecycle events on Bytewax stream metadata.
 
 ## Features
 

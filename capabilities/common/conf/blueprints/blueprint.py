@@ -72,7 +72,7 @@ class ConfigurationForm(DynamicForm):
 		description="JSON specification for the resource configuration",
 		render_kw={
 			'rows': 20,
-			'placeholder': '{\n  "kind": "WebApplication",\n  "spec": {\n    "resources": {\n      "cpu": "2",\n      "memory": "4Gi"\n    },\n    "replicas": 3\n  }\n}'
+			'defined extension point': '{\n  "kind": "WebApplication",\n  "spec": {\n    "resources": {\n      "cpu": "2",\n      "memory": "4Gi"\n    },\n    "replicas": 3\n  }\n}'
 		}
 	)
 	
@@ -448,7 +448,7 @@ class SystemMetricsChartView(ChartView):
 			asyncio.set_event_loop(loop)
 			
 			metrics = loop.run_until_complete(
-				config_manager.get_revolutionary_metrics()
+				config_manager.get_governed_metrics()
 			)
 			
 			chart_data = {
@@ -499,7 +499,7 @@ class DashboardView(ModelView):
 			asyncio.set_event_loop(loop)
 			
 			# Get comprehensive system status
-			metrics = loop.run_until_complete(config_manager.get_revolutionary_metrics())
+			metrics = loop.run_until_complete(config_manager.get_governed_metrics())
 			gitops_status = loop.run_until_complete(config_manager.get_gitops_status())
 			
 			dashboard_data = {
@@ -548,7 +548,7 @@ CUSTOM_TEMPLATES = {
 								<label for="natural_language_request">Describe your infrastructure needs:</label>
 								<textarea id="natural_language_request" name="natural_language_request" 
 										  class="form-control" rows="4" 
-										  placeholder="Example: Create a highly available web service with auto-scaling running nginx in AWS with 4GB memory"></textarea>
+										  defined extension point="Example: Create a highly available web service with auto-scaling running nginx in AWS with 4GB memory"></textarea>
 							</div>
 							<div class="row">
 								<div class="col-md-4">
@@ -662,7 +662,7 @@ CUSTOM_TEMPLATES = {
 			<div class="col-md-6">
 				<div class="box box-success">
 					<div class="box-header with-border">
-						<h3 class="box-title">Revolutionary Capabilities</h3>
+						<h3 class="box-title">Production Capabilities</h3>
 					</div>
 					<div class="box-body">
 						<p>✅ AI-Native Intelligence</p>

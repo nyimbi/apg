@@ -1,6 +1,6 @@
 """
 APG Configuration Management - Quantum-Ready Cryptographic Security Layer
-Revolutionary post-quantum cryptography implementation for future-proof security.
+Production post-quantum cryptography implementation for future-proof security.
 """
 
 import asyncio
@@ -140,7 +140,7 @@ class QuantumCryptographicOperation(BaseModel):
 
 
 class QuantumSecurityManager:
-    """Revolutionary quantum-ready cryptographic security manager"""
+    """Production quantum-ready cryptographic security manager"""
     
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id
@@ -876,7 +876,7 @@ class QuantumSecurityManager:
         avg_pq_time = sum(op.operation_time_ms for op in pq_operations) / len(pq_operations)
         
         # Estimated classical equivalent time (would be measured in production)
-        estimated_classical_time = avg_pq_time * 0.1  # Assume PQ is 10x slower
+        estimated_classical_time = avg_pq_time * 0.1  # Assume PQ is measurable slower
         
         if estimated_classical_time == 0:
             return 0.0

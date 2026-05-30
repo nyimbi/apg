@@ -12,6 +12,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+CONF_EVENT_STREAM = "apg.common.conf.lifecycle"
+SUPPORTED_CONF_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_CONF_AGENT_ROLES = ["configuration_reviewer", "drift_reviewer", "policy_reviewer", "deployment_reviewer"]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped CONF configuration defaults and schema."""
@@ -43,6 +48,21 @@ class CapabilityConfiguration:
 			"drift_remediation_requires_review": True,
 			"approval_notes_required": True
 		},
+		"conf_agents": {
+			"enabled": True,
+			"supported_runtimes": SUPPORTED_CONF_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_CONF_AGENT_ROLES,
+			"max_autonomous_scope": "inspect_prepare_and_recommend",
+			"human_approval_required": True
+		},
+		"observability": {
+			"event_stream": CONF_EVENT_STREAM,
+			"stream_processor": "bytewax",
+			"emit_record_events": True,
+			"emit_change_events": True,
+			"emit_deployment_events": True,
+			"emit_agent_events": True
+		},
 		"ui": {
 			"enable_topology_view": True,
 			"enable_policy_workbench": True,
@@ -50,6 +70,7 @@ class CapabilityConfiguration:
 			"enable_gitops_center": True,
 			"enable_change_queue": True,
 			"enable_drift_remediation_queue": True,
+			"enable_agents": True,
 			"enable_audit_console": True
 		},
 		"theme": {
@@ -59,13 +80,15 @@ class CapabilityConfiguration:
 	})
 	schema: dict[str, Any] = field(default_factory=lambda: {
 		"type": "object",
-		"required": ["tenant_id", "gitops", "security", "automation", "change_management", "ui", "theme"],
+		"required": ["tenant_id", "gitops", "security", "automation", "change_management", "conf_agents", "observability", "ui", "theme"],
 		"properties": {
 			"tenant_id": {"type": "string", "minLength": 1},
 			"gitops": {"type": "object"},
 			"security": {"type": "object"},
 			"automation": {"type": "object"},
 			"change_management": {"type": "object"},
+			"conf_agents": {"type": "object"},
+			"observability": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -145,7 +168,7 @@ class CapabilityTheme:
 		"surface.panel": "#FFFFFF",
 		"text.primary": "#16302B",
 		"text.secondary": "#4B635D",
-		"border.radius": "10px",
+		"border.radius": "8px",
 		"density": "comfortable"
 	})
 	components: dict[str, dict[str, str]] = field(default_factory=lambda: {
@@ -171,6 +194,11 @@ class CapabilityTheme:
 			"icon": "wrench",
 			"status_indicator": "top-bar",
 			"variant": "governance"
+		},
+		"configuration_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "left-bar",
+			"variant": "automation"
 		},
 		"configuration_audit_timeline": {
 			"icon": "scroll-text",
@@ -272,6 +300,46 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "independent_drift_reviewer_required",
 				"required_action": "assign_independent_reviewer"
 			}
+		),
+		CapabilityRule(
+			name="bytewax_event_stream_required",
+			description="Configuration batch events must route through Bytewax event metadata.",
+			condition={"operation": "configuration_batch", "event_stream": "queue"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_event_stream_required",
+				"required_action": "route_to_bytewax_stream"
+			}
+		),
+		CapabilityRule(
+			name="conf_agent_runtime_supported",
+			description="Configuration agents must use a supported runtime.",
+			condition={"operation": "register_conf_agent", "runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "conf_agent_runtime_not_supported",
+				"required_action": "choose_supported_runtime"
+			}
+		),
+		CapabilityRule(
+			name="conf_agent_role_supported",
+			description="Configuration agents must use a supported role.",
+			condition={"operation": "register_conf_agent", "role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "conf_agent_role_not_supported",
+				"required_action": "choose_supported_role"
+			}
+		),
+		CapabilityRule(
+			name="conf_agent_privileged_action_requires_approval",
+			description="Configuration agents cannot autonomously approve or deploy privileged changes.",
+			condition={"operation": "conf_agent_action", "privileged_action": True, "human_approved": False},
+			effect={
+				"decision": "deny",
+				"reason": "conf_agent_human_approval_required",
+				"required_action": "record_human_approval"
+			}
 		)
 	]
 
@@ -288,6 +356,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("deployments", "/config/deployments", "ConfigurationDeploymentCenter", "conf:deploy", "Operations"),
 		CapabilityUIRoute("drift", "/config/drift", "ConfigurationDriftConsole", "conf:view", "Governance"),
 		CapabilityUIRoute("drift_remediation", "/config/drift/remediation", "ConfigurationDriftRemediationQueue", "conf:approve", "Governance"),
+		CapabilityUIRoute("agents", "/config/agents", "ConfigurationAgentRoster", "conf:approve", "Automation"),
 		CapabilityUIRoute("gitops", "/config/gitops", "ConfigurationGitOpsCenter", "conf:deploy", "Operations"),
 		CapabilityUIRoute("audit", "/config/audit", "ConfigurationAuditConsole", "conf:view", "Governance"),
 		CapabilityUIRoute("settings", "/config/settings", "ConfigurationSettings", "conf:admin", "Administration")
@@ -299,6 +368,25 @@ def ui_manifest() -> dict[str, Any]:
 		"routes": [route.__dict__ for route in routes],
 		"template_roots": ["blueprints/"],
 		"requires_theme": True
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return CONF lifecycle stream metadata."""
+	return {
+		"processor": "bytewax",
+		"event_stream": CONF_EVENT_STREAM,
+		"events": [
+			"configuration_record_created",
+			"configuration_change_requested",
+			"configuration_change_decided",
+			"configuration_change_deployed",
+			"configuration_drift_detected",
+			"configuration_drift_remediation_decided",
+			"configuration_agent_registered"
+		],
+		"delivery": "at_least_once",
+		"ordering_key": "tenant_id"
 	}
 
 
@@ -320,7 +408,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
-		}
+		},
+		"streaming": streaming_manifest(),
 	}
 
 

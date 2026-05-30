@@ -29,8 +29,10 @@ def test_package_contract_shape_is_valid():
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "conf"
 	assert contract["ui"]["routes"]
-	assert len(contract["ui"]["routes"]) >= 12
-	assert contract["theme"]["tokens"]["border.radius"]
+	assert len(contract["ui"]["routes"]) >= 13
+	assert contract["theme"]["tokens"]["border.radius"] == "8px"
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "conf_agents" in contract["configuration"]
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -46,3 +48,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "conf" in model["capabilities"]
 	assert "approvals" in model["capabilities"]["conf"]
+	assert model["capabilities"]["conf"]["streaming"]["processor"] == "bytewax"
+	assert "conf_agents" in model["capabilities"]["conf"]["provides"]

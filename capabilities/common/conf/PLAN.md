@@ -6,6 +6,10 @@ Implement the governed configuration promotion and drift remediation lifecycle a
 
 This advances CONF from a mostly aspirational production automation package to an executable APG foundation capability that generated applications can compose now.
 
+Current hardening extends that packet with first-class configuration agents,
+Bytewax lifecycle stream metadata, compact theme tokens, and a current
+source-of-truth capability specification.
+
 ## Implementation Steps
 
 1. Add package-local lifecycle models:
@@ -58,7 +62,15 @@ This advances CONF from a mostly aspirational production automation package to a
    - add tenant duplicate-ID isolation coverage
    - add API/view shared-state coverage
 
-8. Review and focused proof:
+8. Extend composition hardening:
+   - add CONF agent runtime and role configuration
+   - add CONF agent registration, API helper, view model, route, and tests
+   - add Bytewax stream metadata to contract, app semantic model, package
+     manifest, service validation, and tests
+   - align the UI border radius token with the current 8px APG standard
+   - replace legacy `cap_spec.md` claims with a pointer to this specification
+
+9. Review and focused proof:
    - py_compile package files
    - focused pytest package suite
    - implementation audit

@@ -26,9 +26,11 @@ def dashboard_model(
 		"changes": service.list_changes(tenant_id),
 		"deployments": service.list_deployments(tenant_id),
 		"drift_remediations": service.list_drift_remediations(tenant_id),
+		"agents": service.list_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"summary": service.governance_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -74,4 +76,18 @@ def audit_model(
 	return {
 		"tenant_id": tenant_id,
 		"events": service.list_audit_events(tenant_id),
+	}
+
+
+def agent_model(
+	service: ConfService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or api.SERVICE
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_agents(tenant_id),
+		"policy": contract["configuration"]["conf_agents"],
+		"route": "/config/agents",
 	}

@@ -1,7 +1,7 @@
 """
 Quantum Configuration Security - Post-Quantum Cryptographic Protection
 
-Revolutionary quantum-resistant security layer providing cryptographic verification,
+Production quantum-resistant security layer providing cryptographic verification,
 blockchain audit trails, and zero-trust configuration management.
 
 © 2025 Datacraft - www.datacraft.co.ke

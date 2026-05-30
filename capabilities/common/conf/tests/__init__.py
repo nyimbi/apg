@@ -1,7 +1,7 @@
 """
 APG Configuration Management Tests
 
-Comprehensive test suite for the revolutionary configuration management system
+Comprehensive test suite for the governed configuration management system
 ensuring >95% code coverage and APG quality standards compliance.
 
 © 2025 Datacraft - www.datacraft.co.ke

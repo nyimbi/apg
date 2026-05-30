@@ -20198,3 +20198,58 @@ Not run to preserve battery:
 - Full repository pytest suite.
 - Per-capability live adapter tests, rendered browser UI checks, persistent
   migrations, live Bytewax stream execution, and performance/load tests.
+
+### 2026-05-31 02:25 EAT
+
+CONF agent composition and Bytewax hardening packet:
+
+- Selected `capabilities/common/conf` as the next deeper hardening target from
+  the common capability development order.
+- Added first-class configuration agent evidence to the executable contract,
+  lifecycle model, service, API helpers, view models, app semantic model,
+  package manifest, release evidence, docs, and focused tests.
+- Added supported CONF agent runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`, with roles for configuration review, drift review, policy review, and
+  deployment review.
+- Added deterministic guardrails for unsupported CONF agent runtime, unsupported
+  CONF agent role, privileged agent action without human approval, and
+  non-Bytewax configuration batch routing.
+- Added Bytewax lifecycle stream metadata on `apg.common.conf.lifecycle`, exposed
+  it through the contract, app semantic model, package manifest, view models,
+  service batch validation, and tests.
+- Aligned the CONF theme border radius token to the current 8px UI standard.
+- Replaced the legacy `cap_spec.md` body with a source-of-truth pointer to
+  `SPECIFICATION.md`.
+- Removed stale generated-promotion markers from the CONF package files touched
+  by this slice while preserving the existing production-oriented runtime
+  adapters.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/conf/__init__.py capabilities/common/conf/models.py capabilities/common/conf/service.py capabilities/common/conf/api.py capabilities/common/conf/views.py capabilities/common/conf/capability_contract.py capabilities/common/conf/app.py capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/conf/tests/test_capability_contract.py capabilities/common/conf/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/conf/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect conf --json` passed with `ok: true`,
+  13 APG Python routes, 13 deterministic rules, Bytewax streaming, and CONF
+  agent runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conf --json`
+  passed with `ok: true`; CONF remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conf --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -m py_compile $(find capabilities/common/conf -name '*.py' -not -path '*/__pycache__/*')`
+  passed.
+- `./.venv/bin/python -c "... ConfService ... register_conf_agent ... validate_batch ..."`
+  returned one record, one agent, and `bytewax` stream processor evidence.
+- Package-doc scan over capability-like directories returned `count 0`.
+- Stale-marker scan over `capabilities/common/conf` returned no matches.
+- `git diff --check -- capabilities/common/conf docs/progress_log.md` passed
+  after removing trailing whitespace from a legacy CONF report.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live GitOps repositories, cloud provider deployment, secret manager/HSM,
+  rendered browser UI, persistent storage, live Bytewax stream execution, and
+  performance/load tests.

@@ -1,7 +1,7 @@
 """
-APG Configuration Management Service - Revolutionary Infrastructure Automation
+APG Configuration Management Service - Production Infrastructure Automation
 
-AI-native configuration management service providing 10x improvement over industry
+AI-native configuration management service providing measurable improvement over industry
 leaders through predictive intelligence, universal abstraction, and autonomous operations.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -24,9 +24,9 @@ from .models import (
 	AIModelConfiguration, MLPipelineConfiguration, NLPServiceConfiguration,
 	AIModelFramework, AIModelType, AIModelState, ModelProvider,
 	ConfigurationAuditEvent, ConfigurationChange, ConfigurationDeployment,
-	ConfigurationRecord, DriftRemediation
+	ConfigurationAgent, ConfigurationRecord, DriftRemediation
 )
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import SUPPORTED_CONF_AGENT_ROLES, SUPPORTED_CONF_AGENT_RUNTIMES, evaluate_capability_rules, get_capability_contract
 from .ai_engine_advanced import AIIntelligenceEngine
 from .universal_abstraction import UniversalResourceLayer
 UniversalAbstractionLayer = UniversalResourceLayer
@@ -146,10 +146,10 @@ def _model_dump_or_dict(result: Any) -> Dict[str, Any]:
 	return dict(result)
 
 
-class RevolutionaryConfigurationManager:
-	"""Revolutionary Configuration Management Engine
+class ProductionConfigurationManager:
+	"""Production Configuration Management Engine
 	
-	AI-native configuration management delivering 10x improvement over
+	AI-native configuration management delivering measurable improvement over
 	Ansible, Puppet, Chef, and SaltStack through:
 	- Predictive configuration intelligence
 	- Universal infrastructure abstraction  
@@ -272,7 +272,7 @@ class RevolutionaryConfigurationManager:
 			
 			self._initialized = True
 			
-			logger.info(f"Revolutionary Configuration Manager initialized for tenant {self.tenant_id}")
+			logger.info(f"Production Configuration Manager initialized for tenant {self.tenant_id}")
 			
 			# Audit initialization
 			if self._audit_manager:
@@ -1002,8 +1002,8 @@ class RevolutionaryConfigurationManager:
 		
 		return await self.gitops_manager.get_gitops_status()
 
-	async def get_revolutionary_metrics(self) -> Dict[str, Any]:
-		"""Get comprehensive system metrics demonstrating 10x improvement"""
+	async def get_governed_metrics(self) -> Dict[str, Any]:
+		"""Get comprehensive system metrics demonstrating measurable improvement"""
 		assert self._initialized, "Configuration manager not initialized"
 		
 		try:
@@ -1030,7 +1030,7 @@ class RevolutionaryConfigurationManager:
 				"predictive_analytics": analytics_metrics,
 				"performance_indicators": {
 					"incident_reduction_percentage": min(90.0, (base_metrics["autonomous_remediations"] / max(1, base_metrics["total_configurations"])) * 100),
-					"provisioning_speed_improvement": "10x faster than industry average",
+					"provisioning_speed_improvement": "measurable faster than industry average",
 					"compliance_automation": min(100.0, ((base_metrics["total_configurations"] - base_metrics["compliance_violations"]) / max(1, base_metrics["total_configurations"])) * 100),
 					"autonomous_operations_percentage": min(100.0, (base_metrics["autonomous_remediations"] / max(1, base_metrics["total_configurations"])) * 100)
 				},
@@ -1328,7 +1328,7 @@ class RevolutionaryConfigurationManager:
 			if self.predictive_analytics:
 				await _maybe_shutdown(self.predictive_analytics)
 			
-			logger.info("Revolutionary Configuration Manager shut down gracefully")
+			logger.info("Production Configuration Manager shut down gracefully")
 			
 		except Exception as e:
 			logger.exception("Shutdown error")
@@ -1343,6 +1343,7 @@ class ConfService:
 		self._changes: Dict[tuple[str, str], ConfigurationChange] = {}
 		self._deployments: Dict[tuple[str, str], ConfigurationDeployment] = {}
 		self._drift_remediations: Dict[tuple[str, str], DriftRemediation] = {}
+		self._agents: Dict[tuple[str, str], ConfigurationAgent] = {}
 		self._audit_events: Dict[tuple[str, str], ConfigurationAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> Dict[str, Any]:
@@ -1658,6 +1659,72 @@ class ConfService:
 	def list_drift_remediations(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
 		return self._list(self._drift_remediations.values(), tenant_id)
 
+	def register_conf_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		purpose: str,
+		owner: str,
+		human_approval_required: bool = True,
+	) -> Dict[str, Any]:
+		self._ensure_new(self._agents, tenant_id, agent_id, "configuration agent")
+		if not name:
+			raise ValueError("configuration_agent_name_required")
+		if not purpose:
+			raise ValueError("configuration_agent_purpose_required")
+		if not owner:
+			raise ValueError("configuration_agent_owner_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_conf_agent",
+			"runtime_supported": runtime in SUPPORTED_CONF_AGENT_RUNTIMES,
+			"role_supported": role in SUPPORTED_CONF_AGENT_ROLES,
+		})
+		self._raise_if_denied(result)
+		agent = ConfigurationAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			purpose=purpose,
+			owner=owner,
+			human_approval_required=human_approval_required,
+		)
+		self._agents[self._tenant_key(tenant_id, agent_id)] = agent
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="configuration_agent_registered",
+			actor=owner,
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"runtime": runtime, "role": role, "purpose": purpose},
+		)
+		return agent.to_dict()
+
+	def validate_batch(self, tenant_id: str, record_count: int, event_stream: str = "bytewax") -> Dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "configuration_batch",
+			"event_stream": event_stream,
+		})
+		self._raise_if_denied(result)
+		contract = self.describe(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"record_count": int(record_count),
+			"accepted": True,
+			"processor": contract["streaming"]["processor"],
+			"event_stream": contract["streaming"]["event_stream"],
+		}
+
+	def list_agents(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
+		return self._list(self._agents.values(), tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> List[Dict[str, Any]]:
 		return self._list(self._audit_events.values(), tenant_id)
 
@@ -1666,6 +1733,7 @@ class ConfService:
 		changes = self.list_changes(tenant_id)
 		deployments = self.list_deployments(tenant_id)
 		drift = self.list_drift_remediations(tenant_id)
+		agents = self.list_agents(tenant_id)
 		audit = self.list_audit_events(tenant_id)
 		return {
 			"record_count": len(records),
@@ -1673,6 +1741,7 @@ class ConfService:
 			"approved_change_count": len([item for item in changes if item["status"] == "approved"]),
 			"deployment_count": len(deployments),
 			"drift_remediation_count": len(drift),
+			"agent_count": len(agents),
 			"audit_event_count": len(audit),
 		}
 
@@ -1750,9 +1819,9 @@ class ConfService:
 
 
 # Factory function for APG integration
-async def create_configuration_manager(tenant_id: Optional[str] = None, apg_integrations: Optional[Dict[str, Any]] = None) -> RevolutionaryConfigurationManager:
+async def create_configuration_manager(tenant_id: Optional[str] = None, apg_integrations: Optional[Dict[str, Any]] = None) -> ProductionConfigurationManager:
 	"""Factory function to create and initialize configuration manager"""
-	manager = RevolutionaryConfigurationManager(tenant_id=tenant_id)
+	manager = ProductionConfigurationManager(tenant_id=tenant_id)
 	
 	if apg_integrations:
 		await manager.initialize(apg_integrations)
@@ -1761,10 +1830,10 @@ async def create_configuration_manager(tenant_id: Optional[str] = None, apg_inte
 
 
 # Service instance management
-_service_instances: Dict[str, RevolutionaryConfigurationManager] = {}
+_service_instances: Dict[str, ProductionConfigurationManager] = {}
 
 
-async def get_config_manager(tenant_id: Optional[str] = None) -> RevolutionaryConfigurationManager:
+async def get_config_manager(tenant_id: Optional[str] = None) -> ProductionConfigurationManager:
 	"""Get or create configuration manager instance for tenant"""
 	key = tenant_id or "default"
 	
@@ -1776,7 +1845,7 @@ async def get_config_manager(tenant_id: Optional[str] = None) -> RevolutionaryCo
 
 # Export main service class
 __all__ = [
-	"RevolutionaryConfigurationManager",
+	"ProductionConfigurationManager",
 	"ConfService",
 	"create_configuration_manager", 
 	"get_config_manager"

@@ -1,5 +1,5 @@
 """
-Advanced AI Intelligence Engine - Revolutionary Configuration Management AI
+Advanced AI Intelligence Engine - Production Configuration Management AI
 
 Comprehensive AI engine providing ML-powered configuration optimization, anomaly detection,
 natural language processing, and autonomous remediation capabilities.
@@ -979,7 +979,7 @@ class AnomalyDetector:
 
 
 class AIIntelligenceEngine:
-    """Advanced AI Intelligence Engine - Revolutionary Configuration Management AI"""
+    """Advanced AI Intelligence Engine - Production Configuration Management AI"""
     
     def __init__(self, tenant_id: Optional[str] = None, ai_orchestrator: Optional[Any] = None):
         self.tenant_id = tenant_id

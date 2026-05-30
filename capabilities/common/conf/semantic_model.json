@@ -1,5 +1,23 @@
 {
-  "agents": {},
+  "agents": {
+    "conf_review": {
+      "enabled": true,
+      "human_approval_required": true,
+      "max_autonomous_scope": "inspect_prepare_and_recommend",
+      "supported_roles": [
+        "configuration_reviewer",
+        "drift_reviewer",
+        "policy_reviewer",
+        "deployment_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Configuration Management package-backed APG capability",
     "entity_count": 0,
@@ -27,11 +45,36 @@
           "drift_remediation_requires_review": true,
           "production_requires_approval": true
         },
+        "conf_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "configuration_reviewer",
+            "drift_reviewer",
+            "policy_reviewer",
+            "deployment_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "gitops": {
           "auto_create_pull_requests": true,
           "default_branch": "main",
           "drift_detection_interval_seconds": 300,
           "enforce_signed_commits": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_change_events": true,
+          "emit_deployment_events": true,
+          "emit_record_events": true,
+          "event_stream": "apg.common.conf.lifecycle",
+          "stream_processor": "bytewax"
         },
         "security": {
           "record_audit_trail": true,
@@ -46,6 +89,7 @@
           "default_theme": "conf_control_room"
         },
         "ui": {
+          "enable_agents": true,
           "enable_audit_console": true,
           "enable_change_queue": true,
           "enable_drift_dashboard": true,
@@ -62,7 +106,8 @@
       "master_data": {},
       "name": "Configuration Management",
       "provides": [
-        "conf_operations"
+        "conf_operations",
+        "conf_agents"
       ],
       "requires": [],
       "rule_engine": {
@@ -182,6 +227,59 @@
               "required_action": "assign_independent_reviewer"
             },
             "name": "drift_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "event_stream": "queue",
+              "operation": "configuration_batch"
+            },
+            "description": "Configuration batch events must route through Bytewax event metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_to_bytewax_stream"
+            },
+            "name": "bytewax_event_stream_required"
+          },
+          {
+            "condition": {
+              "operation": "register_conf_agent",
+              "runtime_supported": false
+            },
+            "description": "Configuration agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "conf_agent_runtime_not_supported",
+              "required_action": "choose_supported_runtime"
+            },
+            "name": "conf_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_conf_agent",
+              "role_supported": false
+            },
+            "description": "Configuration agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "conf_agent_role_not_supported",
+              "required_action": "choose_supported_role"
+            },
+            "name": "conf_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approved": false,
+              "operation": "conf_agent_action",
+              "privileged_action": true
+            },
+            "description": "Configuration agents cannot autonomously approve or deploy privileged changes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "conf_agent_human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "conf_agent_privileged_action_requires_approval"
           }
         ],
         "type": "deterministic"
@@ -302,6 +400,59 @@
             "required_action": "assign_independent_reviewer"
           },
           "name": "drift_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "event_stream": "queue",
+            "operation": "configuration_batch"
+          },
+          "description": "Configuration batch events must route through Bytewax event metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_to_bytewax_stream"
+          },
+          "name": "bytewax_event_stream_required"
+        },
+        {
+          "condition": {
+            "operation": "register_conf_agent",
+            "runtime_supported": false
+          },
+          "description": "Configuration agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "conf_agent_runtime_not_supported",
+            "required_action": "choose_supported_runtime"
+          },
+          "name": "conf_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_conf_agent",
+            "role_supported": false
+          },
+          "description": "Configuration agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "conf_agent_role_not_supported",
+            "required_action": "choose_supported_role"
+          },
+          "name": "conf_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approved": false,
+            "operation": "conf_agent_action",
+            "privileged_action": true
+          },
+          "description": "Configuration agents cannot autonomously approve or deploy privileged changes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "conf_agent_human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "conf_agent_privileged_action_requires_approval"
         }
       ],
       "runtime": {
@@ -311,6 +462,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "ConfigurationAgentRoster",
+          "permission": "conf:approve",
+          "route": "/config/agents"
+        },
         "approvals": {
           "component": "ConfigurationApprovalQueue",
           "permission": "conf:approve",
@@ -372,13 +528,32 @@
           "route": "/config/templates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "delivery": "at_least_once",
+        "event_stream": "apg.common.conf.lifecycle",
+        "events": [
+          "configuration_record_created",
+          "configuration_change_requested",
+          "configuration_change_decided",
+          "configuration_change_deployed",
+          "configuration_drift_detected",
+          "configuration_drift_remediation_decided",
+          "configuration_agent_registered"
+        ],
+        "ordering_key": "tenant_id",
+        "processor": "bytewax"
+      },
       "theme": {
         "components": {
           "change_approval_queue": {
             "icon": "shield-check",
             "status_indicator": "left-bar",
             "variant": "review"
+          },
+          "configuration_agent_roster": {
+            "icon": "bot",
+            "status_indicator": "left-bar",
+            "variant": "automation"
           },
           "configuration_audit_timeline": {
             "icon": "scroll-text",
@@ -406,7 +581,7 @@
         },
         "name": "conf_control_room",
         "tokens": {
-          "border.radius": "10px",
+          "border.radius": "8px",
           "color.accent": "#A16207",
           "color.danger": "#B91C1C",
           "color.primary": "#0F766E",
@@ -488,6 +663,13 @@
             "permission": "conf:approve"
           },
           {
+            "component": "ConfigurationAgentRoster",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/config/agents",
+            "permission": "conf:approve"
+          },
+          {
             "component": "ConfigurationGitOpsCenter",
             "name": "gitops",
             "nav_group": "Operations",
@@ -517,7 +699,22 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "conf_review": {
+        "roles": [
+          "configuration_reviewer",
+          "drift_reviewer",
+          "policy_reviewer",
+          "deployment_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "conf": []
@@ -538,11 +735,36 @@
           "drift_remediation_requires_review": true,
           "production_requires_approval": true
         },
+        "conf_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "configuration_reviewer",
+            "drift_reviewer",
+            "policy_reviewer",
+            "deployment_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "gitops": {
           "auto_create_pull_requests": true,
           "default_branch": "main",
           "drift_detection_interval_seconds": 300,
           "enforce_signed_commits": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_change_events": true,
+          "emit_deployment_events": true,
+          "emit_record_events": true,
+          "event_stream": "apg.common.conf.lifecycle",
+          "stream_processor": "bytewax"
         },
         "security": {
           "record_audit_trail": true,
@@ -557,6 +779,7 @@
           "default_theme": "conf_control_room"
         },
         "ui": {
+          "enable_agents": true,
           "enable_audit_console": true,
           "enable_change_queue": true,
           "enable_drift_dashboard": true,
@@ -568,7 +791,8 @@
       },
       "id": "conf",
       "provides": [
-        "conf_operations"
+        "conf_operations",
+        "conf_agents"
       ],
       "requires": []
     }
@@ -603,6 +827,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_event_stream_required": {
+      "condition": {
+        "event_stream": "queue",
+        "operation": "configuration_batch"
+      },
+      "description": "Configuration batch events must route through Bytewax event metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_to_bytewax_stream"
+      },
+      "name": "bytewax_event_stream_required"
+    },
     "change_review_requires_independent_reviewer": {
       "condition": {
         "change_reviewer_same_as_requester": true,
@@ -615,6 +852,46 @@
         "required_action": "assign_independent_reviewer"
       },
       "name": "change_review_requires_independent_reviewer"
+    },
+    "conf_agent_privileged_action_requires_approval": {
+      "condition": {
+        "human_approved": false,
+        "operation": "conf_agent_action",
+        "privileged_action": true
+      },
+      "description": "Configuration agents cannot autonomously approve or deploy privileged changes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "conf_agent_human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "conf_agent_privileged_action_requires_approval"
+    },
+    "conf_agent_role_supported": {
+      "condition": {
+        "operation": "register_conf_agent",
+        "role_supported": false
+      },
+      "description": "Configuration agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "conf_agent_role_not_supported",
+        "required_action": "choose_supported_role"
+      },
+      "name": "conf_agent_role_supported"
+    },
+    "conf_agent_runtime_supported": {
+      "condition": {
+        "operation": "register_conf_agent",
+        "runtime_supported": false
+      },
+      "description": "Configuration agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "conf_agent_runtime_not_supported",
+        "required_action": "choose_supported_runtime"
+      },
+      "name": "conf_agent_runtime_supported"
     },
     "configuration_record_requires_owner": {
       "condition": {

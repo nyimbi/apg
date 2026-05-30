@@ -8,7 +8,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-# Create placeholder classes to avoid import errors
+# Create defined extension point classes to avoid import errors
 class PlaceholderAI:
     async def initialize(self): pass
     async def optimize_configuration(self, *args): return {'optimization': 'applied'}
@@ -28,13 +28,13 @@ class PlaceholderSecurity:
 # Import and monkey patch the service module
 import service
 
-# Replace the placeholder imports with our mocks
+# Replace the defined extension point imports with our mocks
 service.AIIntelligenceEngine = PlaceholderAI
 service.UniversalAbstractionLayer = PlaceholderLayer  
 service.QuantumSecurity = PlaceholderSecurity
 service.PredictiveConfigAnalytics = PlaceholderAI
 
-from service import RevolutionaryConfigurationManager
+from service import ProductionConfigurationManager
 from models import CMResource, ResourceType, CloudProvider, ConfigurationDSL
 import asyncio
 
@@ -46,7 +46,7 @@ async def test_configuration_management():
     
     # Initialize manager
     print("1. Testing Manager Initialization...")
-    manager = RevolutionaryConfigurationManager(tenant_id='test_tenant')
+    manager = ProductionConfigurationManager(tenant_id='test_tenant')
     await manager.initialize({})
     
     assert manager.tenant_id == 'test_tenant'
@@ -150,9 +150,9 @@ async def test_configuration_management():
     assert 'insights' in system_insights
     print("   ✓ System-wide insights generated")
     
-    # Test revolutionary metrics
-    print("\n8. Testing Revolutionary Metrics...")
-    metrics = await manager.get_revolutionary_metrics()
+    # Test governed metrics
+    print("\n8. Testing Production Metrics...")
+    metrics = await manager.get_governed_metrics()
     
     expected_metrics = [
         'system_metrics', 'ai_intelligence', 'universal_abstraction',
@@ -202,7 +202,7 @@ async def test_configuration_management():
     print(f"   • {len(manager.deployments)} deployments executed")  
     print(f"   • {len(manager.templates)} templates generated")
     print(f"   • {len(manager.policies)} policies enforced")
-    print("   • Revolutionary features validated: ✓")
+    print("   • Production features validated: ✓")
     print("   • APG integration confirmed: ✓")
     print("=" * 60)
 

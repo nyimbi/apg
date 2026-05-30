@@ -40,10 +40,12 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"security",
 		"automation",
 		"change_management",
+		"conf_agents",
+		"observability",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["rule_engine"]["rules"]) >= 13
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"resources",
@@ -54,14 +56,18 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"deployments",
 		"drift",
 		"drift_remediation",
+		"agents",
 		"gitops",
 		"audit",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/api/v1/config"
-	assert contract["theme"]["tokens"]["border.radius"] == "10px"
+	assert contract["theme"]["tokens"]["border.radius"] == "8px"
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["configuration"]["conf_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "change_approval_queue" in contract["theme"]["components"]
 	assert "drift_remediation_queue" in contract["theme"]["components"]
+	assert "configuration_agent_roster" in contract["theme"]["components"]
 	assert "configuration_audit_timeline" in contract["theme"]["components"]
 
 
@@ -88,6 +94,20 @@ def test_rule_engine_denies_unsafe_configuration_operations():
 		"operation": "approve_drift_remediation",
 		"drift_reviewer_same_as_detector": True,
 	})
+	batch_result = evaluate_capability_rules({
+		"operation": "configuration_batch",
+		"event_stream": "queue",
+	})
+	agent_result = evaluate_capability_rules({
+		"operation": "register_conf_agent",
+		"runtime_supported": False,
+		"role_supported": False,
+	})
+	agent_action_result = evaluate_capability_rules({
+		"operation": "conf_agent_action",
+		"privileged_action": True,
+		"human_approved": False,
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -101,6 +121,9 @@ def test_rule_engine_denies_unsafe_configuration_operations():
 	}
 	assert review_result["matched_rules"] == ["change_review_requires_independent_reviewer"]
 	assert drift_review_result["matched_rules"] == ["drift_review_requires_independent_reviewer"]
+	assert batch_result["matched_rules"] == ["bytewax_event_stream_required"]
+	assert set(agent_result["matched_rules"]) == {"conf_agent_runtime_supported", "conf_agent_role_supported"}
+	assert agent_action_result["matched_rules"] == ["conf_agent_privileged_action_requires_approval"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -111,9 +134,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["changes"] == "/config/changes"
 	assert registration["ui_components"]["approvals"] == "/config/approvals"
 	assert registration["ui_components"]["drift_remediation"] == "/config/drift/remediation"
+	assert registration["ui_components"]["agents"] == "/config/agents"
 	assert registration["ui_components"]["audit"] == "/config/audit"
 	assert "conf:approve" in registration["permissions"]
 	assert "conf:remediate" in registration["permissions"]
+	assert "conf:agent_manage" in registration["permissions"]
 
 
 def test_service_promotes_configuration_change_and_reviews_drift():
@@ -159,6 +184,15 @@ def test_service_promotes_configuration_change_and_reviews_drift():
 		decision="approved",
 		notes="Plan remediates only declared drift and preserves rollback.",
 	)
+	agent = service.register_conf_agent(
+		agent_id="agent-conf",
+		tenant_id="tenant-conf",
+		name="Configuration Reviewer",
+		runtime="codex",
+		role="configuration_reviewer",
+		purpose="review configuration changes",
+		owner="ops-reviewer",
+	)
 	model = views.dashboard_model(service, "tenant-conf")
 
 	assert deployment["status"] == "completed"
@@ -166,9 +200,12 @@ def test_service_promotes_configuration_change_and_reviews_drift():
 	assert service.list_records("tenant-conf")[0]["environment"] == "production"
 	assert service.list_records("tenant-conf")[0]["value"] == "postgresql://primary-prod"
 	assert approved_remediation["status"] == "approved"
+	assert agent["runtime"] == "codex"
 	assert service.governance_summary("tenant-conf")["audit_event_count"] >= 5
 	assert model["summary"]["deployment_count"] == 1
 	assert model["summary"]["drift_remediation_count"] == 1
+	assert model["summary"]["agent_count"] == 1
+	assert model["streaming"]["processor"] == "bytewax"
 
 
 def test_service_enforces_change_deployment_and_drift_guardrails():
@@ -294,6 +331,28 @@ def test_service_enforces_change_deployment_and_drift_guardrails():
 			drift_summary="Drift detected.",
 			remediation_plan="",
 		)
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch("tenant-conf", 1, "queue")
+	with pytest.raises(PermissionError, match="conf_agent_runtime_not_supported"):
+		service.register_conf_agent(
+			agent_id="bad-agent-runtime",
+			tenant_id="tenant-conf",
+			name="Bad Runtime",
+			runtime="unsupported",
+			role="configuration_reviewer",
+			purpose="review configuration",
+			owner="ops",
+		)
+	with pytest.raises(PermissionError, match="conf_agent_role_not_supported"):
+		service.register_conf_agent(
+			agent_id="bad-agent-role",
+			tenant_id="tenant-conf",
+			name="Bad Role",
+			runtime="codex",
+			role="unsupported",
+			purpose="review configuration",
+			owner="ops",
+		)
 	remediation = service.request_drift_remediation(
 		remediation_id="self-drift-review",
 		tenant_id="tenant-conf",
@@ -404,11 +463,30 @@ def test_api_helpers_and_view_models_share_default_state():
 		"change_id": change["id"],
 		"requested_by": "api-release",
 	})
+	agent = api.register_conf_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api",
+		"name": "API Configuration Reviewer",
+		"runtime": "claude_code",
+		"role": "deployment_reviewer",
+		"purpose": "review API-driven deployments",
+		"owner": "api-reviewer",
+	})
+	batch = api.validate_batch({
+		"tenant_id": "tenant-api",
+		"record_count": 1,
+		"event_stream": "bytewax",
+	})
 	model = views.dashboard_model(tenant_id="tenant-api")
 	queue = views.change_queue_model(tenant_id="tenant-api")
+	agents = views.agent_model(tenant_id="tenant-api")
 	audit = views.audit_model(tenant_id="tenant-api")
 
 	assert api.capability_status("tenant-api")["deployment_count"] == 1
+	assert api.capability_status("tenant-api")["agent_count"] == 1
 	assert model["summary"]["record_count"] == 1
 	assert queue["approved_changes"][0]["id"] == "api-change"
+	assert agent["role"] == "deployment_reviewer"
+	assert batch["processor"] == "bytewax"
+	assert agents["agents"][0]["id"] == "api-agent"
 	assert audit["events"]

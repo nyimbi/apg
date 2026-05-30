@@ -1,6 +1,6 @@
 """
 APG Configuration Management - Edge Computing & IoT Integration
-Revolutionary edge computing configuration management with intelligent orchestration.
+Production edge computing configuration management with intelligent orchestration.
 """
 
 import asyncio
@@ -141,7 +141,7 @@ class EdgeDeploymentExecution(BaseModel):
 
 
 class EdgeComputingManager:
-    """Revolutionary edge computing configuration manager"""
+    """Production edge computing configuration manager"""
     
     def __init__(self, tenant_id: str):
         self.tenant_id = tenant_id

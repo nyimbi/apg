@@ -52,7 +52,7 @@ def semantic_model() -> dict[str, Any]:
 			"conf": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["conf_operations"],
+				"provides": ["conf_operations", "conf_agents"],
 				"requires": [],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
@@ -74,14 +74,14 @@ def semantic_model() -> dict[str, Any]:
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"conf": {
 				"id": "conf",
 				"configuration": contract["configuration"],
-				"provides": ["conf_operations"],
+				"provides": ["conf_operations", "conf_agents"],
 				"requires": [],
 			}
 		},
@@ -92,7 +92,12 @@ def semantic_model() -> dict[str, Any]:
 		"composition": {
 			"capability_dependencies": {"conf": []},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"conf_review": {
+					"runtimes": contract["configuration"]["conf_agents"]["supported_runtimes"],
+					"roles": contract["configuration"]["conf_agents"]["supported_roles"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -116,7 +121,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"conf_review": contract["configuration"]["conf_agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -159,6 +164,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("component manifest semantic model interface mismatch")
 	if len(routes) < 12:
 		errors.append("CONF semantic model route manifest is stale")
+	if model.get("capabilities", {}).get("conf", {}).get("streaming", {}).get("processor") != "bytewax":
+		errors.append("CONF streaming metadata must use Bytewax")
+	if "conf_agents" not in model.get("capabilities", {}).get("conf", {}).get("provides", []):
+		errors.append("CONF agent provide is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

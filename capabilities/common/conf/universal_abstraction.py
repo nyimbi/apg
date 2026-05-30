@@ -1,7 +1,7 @@
 """
 APG Universal Infrastructure Abstraction Layer - Cloud-Agnostic Resource Management
 
-Revolutionary abstraction layer providing unified resource management across AWS, Azure, GCP,
+Production abstraction layer providing unified resource management across AWS, Azure, GCP,
 and on-premises infrastructure with intelligent provider selection and automated failover.
 
 © 2025 Datacraft - www.datacraft.co.ke

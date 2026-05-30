@@ -3,9 +3,11 @@
   "display_name": "Configuration Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
     "SPECIFICATION.md",
     "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
     "models.py",
     "service.py",
     "api.py",
@@ -19,5 +21,35 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "route_count": 13,
+  "rule_count": 13,
+  "streaming": {
+    "events": [
+      "configuration_record_created",
+      "configuration_change_requested",
+      "configuration_change_decided",
+      "configuration_change_deployed",
+      "configuration_drift_detected",
+      "configuration_drift_remediation_decided",
+      "configuration_agent_registered"
+    ],
+    "guardrails": [
+      "configuration_batch_requires_bytewax",
+      "production_change_requires_approval",
+      "secret_changes_require_encryption",
+      "conf_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "active",
+      "pending",
+      "approved",
+      "rejected",
+      "completed",
+      "drifted"
+    ],
+    "stream": "apg.common.conf.lifecycle"
+  },
   "version": "1.0.0"
 }

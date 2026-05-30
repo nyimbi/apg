@@ -1,7 +1,7 @@
 """
-Revolutionary Configuration Management Tests
+Production Configuration Management Tests
 
-Comprehensive test suite for the revolutionary configuration management system
+Comprehensive test suite for the governed configuration management system
 ensuring >95% code coverage and APG quality standards compliance.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -13,7 +13,7 @@ import asyncio
 from typing import Dict, Any
 from datetime import datetime
 
-from ..service import RevolutionaryConfigurationManager, create_configuration_manager
+from ..service import ProductionConfigurationManager, create_configuration_manager
 from ..models import (
 	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
 	ResourceState, DeploymentStatus, ResourceType, CloudProvider,
@@ -21,8 +21,8 @@ from ..models import (
 )
 
 
-class TestRevolutionaryConfigurationManager:
-	"""Test Revolutionary Configuration Management functionality"""
+class TestProductionConfigurationManager:
+	"""Test Production Configuration Management functionality"""
 	
 	@pytest.fixture
 	def event_loop(self):
@@ -189,13 +189,13 @@ class TestRevolutionaryConfigurationManager:
 		assert resource_insights["resource_id"] is None
 
 	@pytest.mark.asyncio
-	async def test_revolutionary_metrics(self, config_manager, sample_configuration):
+	async def test_governed_metrics(self, config_manager, sample_configuration):
 		"""Test comprehensive system metrics"""
 		# Create some test data
 		resource = await config_manager.create_configuration(sample_configuration)
 		
 		# Get metrics
-		metrics = await config_manager.get_revolutionary_metrics()
+		metrics = await config_manager.get_governed_metrics()
 		
 		# Verify metrics structure
 		assert isinstance(metrics, dict)
@@ -310,7 +310,7 @@ class TestRevolutionaryConfigurationManager:
 			await config_manager.deploy_configuration("invalid_id", "test_env")
 		
 		# Test uninitialized manager operations
-		uninitialized_manager = RevolutionaryConfigurationManager()
+		uninitialized_manager = ProductionConfigurationManager()
 		with pytest.raises(AssertionError):
 			await uninitialized_manager.create_configuration({"name": "test"})
 

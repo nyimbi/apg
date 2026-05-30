@@ -1,7 +1,7 @@
 """
-APG Configuration Management API - Revolutionary REST Interface
+APG Configuration Management API - Production REST Interface
 
-Comprehensive REST API providing access to all revolutionary configuration management
+Comprehensive REST API providing access to all governed configuration management
 features including AI-native automation, predictive analytics, and autonomous operations.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -55,7 +55,7 @@ import logging
 from uuid_extensions import uuid7str
 from pydantic import BaseModel, ValidationError
 
-from .service import ConfService, RevolutionaryConfigurationManager, get_config_manager
+from .service import ConfService, ProductionConfigurationManager, get_config_manager
 from .models import (
 	CMResource, CMTemplate, CMPolicy, CMEnvironment, CMDeployment,
 	ResourceState, DeploymentStatus, PolicyAction, ResourceType,
@@ -191,6 +191,27 @@ def decide_drift_remediation(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def register_conf_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.register_conf_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or ""),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "configuration_reviewer"),
+		purpose=str(payload.get("purpose") or ""),
+		owner=str(payload.get("owner") or ""),
+		human_approval_required=_payload_bool(payload, "human_approval_required", True),
+	)
+
+
+def validate_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.validate_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		record_count=int(payload.get("record_count") or 0),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+	)
+
+
 def list_records(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
 
@@ -205,6 +226,10 @@ def list_deployments(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 
 def list_drift_remediations(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return SERVICE.list_drift_remediations(tenant_id)
+
+
+def list_agents(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return SERVICE.list_agents(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> List[Dict[str, Any]]:
@@ -734,7 +759,7 @@ class MetricsAPI(Resource):
 		"""Get comprehensive system metrics"""
 		try:
 			manager = await self.get_manager()
-			metrics = await manager.get_revolutionary_metrics()
+			metrics = await manager.get_governed_metrics()
 			
 			return jsonify(APIResponse(
 				success=True,
@@ -787,8 +812,8 @@ class HealthCheckAPI(Resource):
 
 
 # API Application Factory
-class RevolutionaryConfigAPI:
-	"""Revolutionary Configuration Management API"""
+class ProductionConfigAPI:
+	"""Production Configuration Management API"""
 	
 	def __init__(self, app: Optional[Flask] = None):
 		self.app = app
@@ -894,11 +919,11 @@ class RevolutionaryConfigAPI:
 
 # Usage example
 def create_app(config: Optional[Dict[str, Any]] = None) -> Flask:
-	"""Create Flask app with Revolutionary Configuration API"""
+	"""Create Flask app with Production Configuration API"""
 	app = Flask(__name__)
 	
 	# Initialize API
-	config_api = RevolutionaryConfigAPI(app)
+	config_api = ProductionConfigAPI(app)
 	
 	return app
 
@@ -910,7 +935,7 @@ if __name__ == "__main__":
 
 # Export main components
 __all__ = [
-	"RevolutionaryConfigAPI",
+	"ProductionConfigAPI",
 	"ConfigurationResourceAPI",
 	"DeploymentAPI", 
 	"DriftDetectionAPI",

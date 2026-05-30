@@ -4,8 +4,10 @@
       "capability_contract": {
         "display_name": "Configuration Management",
         "errors": [],
-        "route_count": 12,
-        "rule_count": 9
+        "route_count": 13,
+        "rule_count": 13,
+        "streaming_processor": "bytewax",
+        "theme": "conf_control_room"
       }
     },
     "self_test": {

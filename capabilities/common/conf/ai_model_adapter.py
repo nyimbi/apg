@@ -1,6 +1,6 @@
 """
 APG Configuration Management - AI Model Configuration Adapter
-Revolutionary AI model configuration management integrating with common/nlpc services.
+Production AI model configuration management integrating with common/nlpc services.
 
 This adapter enables the configuration management system to store, version, 
 deploy and manage AI models through the established GitOps workflows.

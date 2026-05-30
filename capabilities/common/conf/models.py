@@ -1,5 +1,5 @@
 """
-APG Configuration Management Models - Revolutionary Data Structures
+APG Configuration Management Models - Production Data Structures
 
 Pydantic v2 models defining all data structures for AI-native configuration management
 with comprehensive validation, type safety, and APG integration patterns.
@@ -176,6 +176,34 @@ class DriftRemediation:
 			"decision": self.decision,
 			"reviewer": self.reviewer,
 			"notes": self.notes,
+		}
+
+
+@dataclass(frozen=True)
+class ConfigurationAgent:
+	"""Tenant-scoped configuration agent registration and guardrail evidence."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	purpose: str
+	owner: str
+	human_approval_required: bool = True
+	status: str = "active"
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"purpose": self.purpose,
+			"owner": self.owner,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
 		}
 
 

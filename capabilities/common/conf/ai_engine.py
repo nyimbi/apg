@@ -1,7 +1,7 @@
 """
 Configuration Intelligence Engine - AI-Native Configuration Management
 
-Revolutionary AI engine providing predictive intelligence, autonomous operations,
+Production AI engine providing predictive intelligence, autonomous operations,
 and natural language configuration capabilities for the APG Configuration Management system.
 
 © 2025 Datacraft - www.datacraft.co.ke
