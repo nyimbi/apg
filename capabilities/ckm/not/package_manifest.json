@@ -1,9 +1,15 @@
 {
   "base_target": "python",
-  "display_name": "Notification Capability - Revolutionary Specification",
+  "display_name": "Notification System",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
+    "lifecycle.py",
+    "test_capability_contract.py",
     "models.py",
     "service.py",
     "api.py",

@@ -16,6 +16,73 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 18:24 EAT
+
+CKM NOT notification lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the notification
+  capability, and replaced `cap_spec.md` with a pointer to the active packet
+  specification.
+- Expanded `capability_contract.py` with notification-agent, channel,
+  template, campaign, delivery, preference, governance, observability, adapter,
+  UI, theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, template channel content,
+  template variable schema, external-channel consent, recipient channel
+  preference, recipient suppression, quiet-hour deferral, audience policy, bulk
+  campaign approval, provider secret references, notification-agent
+  registration/runtime/role/scope/disclosure, audit-backed state changes, and
+  Bytewax batch notification mutation.
+- Added a dependency-light `lifecycle.py` surface with notification templates,
+  preferences, deliveries, providers, notification agents, audit events,
+  dashboard summary, and batch mutation validation.
+- Fixed CKM namespace import hygiene so the `not` capability directory can be
+  loaded with `importlib` despite the Python keyword.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract and lifecycle surfaces.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Added `test_capability_contract.py` for focused contract, rule, lifecycle,
+  app, semantic evidence, and documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/ckm/__init__.py
+  capabilities/ckm/not/__init__.py capabilities/ckm/not/capability_contract.py
+  capabilities/ckm/not/lifecycle.py capabilities/ckm/not/app.py
+  capabilities/ckm/not/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/ckm/not/test_capability_contract.py`
+  passed with 4 tests.
+- `./.venv/bin/python -c "import importlib; pkg =
+  importlib.import_module('capabilities.ckm.not'); service =
+  pkg.NotificationLifecycleService('tenant-proof');
+  service.register_provider('email-primary', 'Primary email', 'email',
+  'secret/not/email-primary'); print(service.dashboard_summary())"` passed and
+  confirmed provider registration plus Bytewax stream metadata in the lifecycle
+  summary.
+- `./.venv/bin/python -c "import importlib; ckm =
+  importlib.import_module('capabilities.ckm'); not_pkg = getattr(ckm, 'not');
+  print(not_pkg.APG_CAPABILITY_INFO['id'])"` passed and printed `ckm_not`.
+- `jq '.capabilities.ckm_not.streaming.processor,
+  .capabilities.ckm_not.configuration.notification_agents.supported_runtimes,
+  .capabilities.ckm_not.screens.agents.route,
+  (.capabilities.ckm_not.rules[] |
+  select(.name=="delivery_channel_must_be_allowed") | .effect.reason)'
+  capabilities/ckm/not/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/ckm-not/agents`, and
+  `notification_channel_not_allowed`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/ckm/not --json` passed with `ckm_not` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/ckm/not --json`
+  passed with `side_effect_free: true` and no warnings.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/ckm capabilities/ckm/not
+  docs/progress_log.md` passed.
+- Not run: legacy provider-heavy notification test suite, live provider
+  dispatch, durable SQLAlchemy migration checks, live scheduler, live Bytewax
+  topology, rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 18:12 EAT
 
 BKUP backup/restore lifecycle/guardrail packet:
