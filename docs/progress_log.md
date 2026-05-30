@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 20:26 EAT
+
+Common QUAN quantum-computing lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the QUAN
+  capability, and replaced `cap_spec.md` with a pointer to the active packet
+  specification.
+- Expanded `capability_contract.py` with QUAN-agent, backend, circuit, job,
+  experiment, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, backend approval,
+  external-provider credentials, qubit capacity, circuit owner/version/qubits/
+  gates/metadata, sensitive-input encryption, quota policy, submitter identity,
+  retry policy, shot count, large-job review, job Bytewax streams, experiment
+  hypothesis, post-quantum review, QUAN-agent registration/runtime/role/scope/
+  disclosure, audit-backed state changes, and Bytewax batch quantum mutation.
+- Added `QuanAgent` model support and extended `QuanService` with QUAN-agent
+  registration, listing, dashboard counts, normalized runtime/role tokens,
+  tenant-local state keys, job stream validation, and batch mutation
+  validation.
+- Extended API helpers and view models with QUAN-agent, audit trail, quantum
+  policy, and Bytewax metadata surfaces.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract, service, agent model, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded `test_capability_contract.py` for focused contract, rule, service,
+  API/view, tenant-isolation, agent, Bytewax, app, semantic evidence, and
+  documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/quan/__init__.py
+  capabilities/common/quan/capability_contract.py
+  capabilities/common/quan/models.py
+  capabilities/common/quan/quantum_runtime.py capabilities/common/quan/service.py
+  capabilities/common/quan/api.py capabilities/common/quan/views.py
+  capabilities/common/quan/app.py
+  capabilities/common/quan/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/quan/test_capability_contract.py`
+  passed with 8 tests and only pre-existing adjacent SQLAlchemy/Pydantic
+  deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.quan import QuanService;
+  service=QuanService(); service.register_quan_agent('tenant-proof',
+  'Proof agent', 'codex', 'job_reviewer', 'review quantum job gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  QUAN-agent registration plus Bytewax stream metadata in the lifecycle
+  summary. A basic OpenTelemetry warning was emitted by an adjacent optional
+  monitoring adapter.
+- `jq '.capabilities.quan.streaming.processor,
+  .capabilities.quan.configuration.quan_agents.supported_runtimes,
+  .capabilities.quan.screens.agents.route,
+  (.capabilities.quan.rules[] |
+  select(.name=="quan_agent_runtime_supported") | .effect.reason),
+  (.capabilities.quan.rules[] |
+  select(.name=="batch_quantum_mutation_requires_bytewax") | .effect.reason)'
+  capabilities/common/quan/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/quan/agents`,
+  `quan_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/quan --json` passed with `quan` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/quan --json`
+  passed with `side_effect_free: true`, no warnings, and Bytewax event-stream
+  metadata in the publish plan.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/quan docs/progress_log.md` passed.
+- Not run: live quantum provider execution, hardware access, credential vault
+  calls, encryption-provider calls, durable experiment stores, live Bytewax
+  topology, rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 20:16 EAT
 
 Common PLGN plugin and extension lifecycle/guardrail packet:

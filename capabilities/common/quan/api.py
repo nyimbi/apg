@@ -12,16 +12,13 @@ SERVICE = QuanService()
 
 def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 	contract = SERVICE.describe(tenant_id)
-	summary = SERVICE.dashboard_summary(tenant_id)
 	return {
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
-		"backend_count": summary["backend_count"],
-		"circuit_count": summary["circuit_count"],
-		"job_count": summary["job_count"],
+		**SERVICE.dashboard_summary(tenant_id),
 	}
 
 
@@ -80,6 +77,7 @@ def submit_job(payload: dict[str, Any]) -> dict[str, Any]:
 		shot_count=int(payload["shot_count"]),
 		job_review_recorded=bool(payload.get("job_review_recorded", False)),
 		retry_policy_attached=bool(payload.get("retry_policy_attached", True)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 		actor=str(payload.get("actor") or "quan"),
 	)
 
@@ -106,6 +104,22 @@ def create_experiment(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_quan_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_quan_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
+def validate_batch_quantum_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_quantum_mutation(event_stream)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -117,6 +131,14 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_quan_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_quan_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

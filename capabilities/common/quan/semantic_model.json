@@ -12,29 +12,77 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_orchestration": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.QuanService",
+          "key_management": "keym",
+          "monitoring": "moni",
+          "view_models": "views.py"
+        },
         "backends": {
           "backend_approval_required": true,
           "provider_credentials_managed_by_keym": true,
+          "qubit_capacity_required": true,
           "quota_policy_required": true,
           "simulator_fallback_enabled": true
         },
         "circuits": {
           "circuit_owner_required": true,
           "experiment_metadata_required": true,
+          "gate_validation_required": true,
           "sensitive_input_encryption_required": true,
           "versioning_required": true
         },
         "governance": {
           "audit_quantum_jobs": true,
+          "batch_event_stream": "bytewax",
           "cost_limit_required": true,
           "post_quantum_review_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
         },
         "jobs": {
+          "event_stream": "bytewax",
           "job_quota_required": true,
           "result_retention_days": 90,
           "retry_policy_required": true,
           "shot_limit": 10000
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "backend_metrics_required": true,
+          "event_stream": "bytewax",
+          "job_metrics_required": true,
+          "result_metrics_required": true
+        },
+        "quan_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "backend_reviewer",
+            "circuit_reviewer",
+            "job_reviewer",
+            "result_reviewer",
+            "cost_reviewer",
+            "post_quantum_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -42,8 +90,11 @@
           "default_theme": "quan_quantum_lab"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_backend_registry": true,
           "enable_circuit_library": true,
+          "enable_experiment_workbench": true,
           "enable_job_queue": true,
           "enable_result_viewer": true
         }
@@ -55,9 +106,19 @@
       "master_data": {},
       "name": "Quantum Computing",
       "provides": [
-        "quan_operations"
+        "quantum_backend_registry",
+        "circuit_management",
+        "quantum_job_orchestration",
+        "result_analysis",
+        "post_quantum_governance",
+        "quan_agents"
       ],
-      "requires": [],
+      "requires": [
+        "aicr",
+        "encr",
+        "keym",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +148,33 @@
           },
           {
             "condition": {
+              "credentials_ref_present": false,
+              "external_provider": true,
+              "operation": "register_backend"
+            },
+            "description": "External quantum backends require managed credentials.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_credentials_required",
+              "required_action": "attach_keym_credentials_reference"
+            },
+            "name": "backend_requires_credentials_reference"
+          },
+          {
+            "condition": {
+              "backend_qubit_count_lt": 1,
+              "operation": "register_backend"
+            },
+            "description": "Quantum backends require positive qubit capacity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backend_qubit_capacity_required",
+              "required_action": "set_backend_qubit_capacity"
+            },
+            "name": "backend_requires_qubit_capacity"
+          },
+          {
+            "condition": {
               "circuit_owner_assigned": false,
               "operation": "create_circuit"
             },
@@ -97,6 +185,45 @@
               "required_action": "assign_circuit_owner"
             },
             "name": "circuit_requires_owner"
+          },
+          {
+            "condition": {
+              "circuit_version_present": false,
+              "operation": "create_circuit"
+            },
+            "description": "Quantum circuits require explicit version.",
+            "effect": {
+              "decision": "deny",
+              "reason": "circuit_version_required",
+              "required_action": "version_quantum_circuit"
+            },
+            "name": "circuit_requires_version"
+          },
+          {
+            "condition": {
+              "circuit_qubits_required_lt": 1,
+              "operation": "create_circuit"
+            },
+            "description": "Quantum circuits require positive qubit requirement.",
+            "effect": {
+              "decision": "deny",
+              "reason": "circuit_qubit_requirement_required",
+              "required_action": "set_circuit_qubit_requirement"
+            },
+            "name": "circuit_requires_qubits"
+          },
+          {
+            "condition": {
+              "circuit_gates_present": false,
+              "operation": "create_circuit"
+            },
+            "description": "Quantum circuits require at least one gate.",
+            "effect": {
+              "decision": "deny",
+              "reason": "circuit_gates_required",
+              "required_action": "define_quantum_gates"
+            },
+            "name": "circuit_requires_gates"
           },
           {
             "condition": {
@@ -113,6 +240,19 @@
           },
           {
             "condition": {
+              "experiment_metadata_present": false,
+              "operation": "create_circuit"
+            },
+            "description": "Quantum circuits require experiment metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "experiment_metadata_required",
+              "required_action": "attach_experiment_metadata"
+            },
+            "name": "circuit_requires_experiment_metadata"
+          },
+          {
+            "condition": {
               "operation": "submit_job",
               "quota_policy_attached": false
             },
@@ -126,7 +266,47 @@
           },
           {
             "condition": {
+              "job_submitter_present": false,
+              "operation": "submit_job"
+            },
+            "description": "Quantum jobs require submitter identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "job_submitter_required",
+              "required_action": "set_job_submitter"
+            },
+            "name": "job_requires_submitter"
+          },
+          {
+            "condition": {
+              "operation": "submit_job",
+              "retry_policy_attached": false
+            },
+            "description": "Quantum jobs require retry policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retry_policy_required",
+              "required_action": "attach_retry_policy"
+            },
+            "name": "job_requires_retry_policy"
+          },
+          {
+            "condition": {
+              "operation": "submit_job",
+              "shot_count_lt": 1
+            },
+            "description": "Quantum jobs require positive shot count.",
+            "effect": {
+              "decision": "deny",
+              "reason": "job_shot_count_required",
+              "required_action": "set_job_shot_count"
+            },
+            "name": "job_requires_shot_count"
+          },
+          {
+            "condition": {
               "job_review_recorded": false,
+              "operation": "submit_job",
               "shot_count_gt": 10000
             },
             "description": "Large quantum jobs require review.",
@@ -136,6 +316,137 @@
               "required_action": "review_quantum_job"
             },
             "name": "large_job_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "submit_job"
+            },
+            "description": "Quantum job lifecycle events require Bytewax streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "job_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "hypothesis_present": false,
+              "operation": "create_experiment"
+            },
+            "description": "Quantum experiments require a hypothesis.",
+            "effect": {
+              "decision": "deny",
+              "reason": "experiment_hypothesis_required",
+              "required_action": "attach_experiment_hypothesis"
+            },
+            "name": "experiment_requires_hypothesis"
+          },
+          {
+            "condition": {
+              "operation": "create_experiment",
+              "post_quantum_review_recorded": false,
+              "post_quantum_scope": true
+            },
+            "description": "Post-quantum experiments require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "post_quantum_review_required",
+              "required_action": "review_post_quantum_experiment"
+            },
+            "name": "experiment_requires_post_quantum_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "quan_agent_present": true
+            },
+            "description": "AI quantum agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quan_agent_registration_required",
+              "required_action": "register_quan_agent"
+            },
+            "name": "quan_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "quan_agent_present": true
+            },
+            "description": "AI quantum agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quan_agent_runtime_not_supported",
+              "required_action": "choose_supported_quan_agent_runtime"
+            },
+            "name": "quan_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "quan_agent_present": true
+            },
+            "description": "AI quantum agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quan_agent_role_not_supported",
+              "required_action": "choose_supported_quan_agent_role"
+            },
+            "name": "quan_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "quan_agent_present": true
+            },
+            "description": "AI quantum agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quan_agent_scope_required",
+              "required_action": "set_quan_agent_scope"
+            },
+            "name": "quan_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "quan_agent_present": true
+            },
+            "description": "AI quantum-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quan_agent_disclosure_required",
+              "required_action": "disclose_quan_agent"
+            },
+            "name": "quan_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Quantum lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quan_audit_event_required",
+              "required_action": "record_quan_audit_event"
+            },
+            "name": "quan_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_quantum_mutation"
+            },
+            "description": "Batch quantum mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_quantum_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +479,33 @@
         },
         {
           "condition": {
+            "credentials_ref_present": false,
+            "external_provider": true,
+            "operation": "register_backend"
+          },
+          "description": "External quantum backends require managed credentials.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_credentials_required",
+            "required_action": "attach_keym_credentials_reference"
+          },
+          "name": "backend_requires_credentials_reference"
+        },
+        {
+          "condition": {
+            "backend_qubit_count_lt": 1,
+            "operation": "register_backend"
+          },
+          "description": "Quantum backends require positive qubit capacity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backend_qubit_capacity_required",
+            "required_action": "set_backend_qubit_capacity"
+          },
+          "name": "backend_requires_qubit_capacity"
+        },
+        {
+          "condition": {
             "circuit_owner_assigned": false,
             "operation": "create_circuit"
           },
@@ -178,6 +516,45 @@
             "required_action": "assign_circuit_owner"
           },
           "name": "circuit_requires_owner"
+        },
+        {
+          "condition": {
+            "circuit_version_present": false,
+            "operation": "create_circuit"
+          },
+          "description": "Quantum circuits require explicit version.",
+          "effect": {
+            "decision": "deny",
+            "reason": "circuit_version_required",
+            "required_action": "version_quantum_circuit"
+          },
+          "name": "circuit_requires_version"
+        },
+        {
+          "condition": {
+            "circuit_qubits_required_lt": 1,
+            "operation": "create_circuit"
+          },
+          "description": "Quantum circuits require positive qubit requirement.",
+          "effect": {
+            "decision": "deny",
+            "reason": "circuit_qubit_requirement_required",
+            "required_action": "set_circuit_qubit_requirement"
+          },
+          "name": "circuit_requires_qubits"
+        },
+        {
+          "condition": {
+            "circuit_gates_present": false,
+            "operation": "create_circuit"
+          },
+          "description": "Quantum circuits require at least one gate.",
+          "effect": {
+            "decision": "deny",
+            "reason": "circuit_gates_required",
+            "required_action": "define_quantum_gates"
+          },
+          "name": "circuit_requires_gates"
         },
         {
           "condition": {
@@ -194,6 +571,19 @@
         },
         {
           "condition": {
+            "experiment_metadata_present": false,
+            "operation": "create_circuit"
+          },
+          "description": "Quantum circuits require experiment metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "experiment_metadata_required",
+            "required_action": "attach_experiment_metadata"
+          },
+          "name": "circuit_requires_experiment_metadata"
+        },
+        {
+          "condition": {
             "operation": "submit_job",
             "quota_policy_attached": false
           },
@@ -207,7 +597,47 @@
         },
         {
           "condition": {
+            "job_submitter_present": false,
+            "operation": "submit_job"
+          },
+          "description": "Quantum jobs require submitter identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "job_submitter_required",
+            "required_action": "set_job_submitter"
+          },
+          "name": "job_requires_submitter"
+        },
+        {
+          "condition": {
+            "operation": "submit_job",
+            "retry_policy_attached": false
+          },
+          "description": "Quantum jobs require retry policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retry_policy_required",
+            "required_action": "attach_retry_policy"
+          },
+          "name": "job_requires_retry_policy"
+        },
+        {
+          "condition": {
+            "operation": "submit_job",
+            "shot_count_lt": 1
+          },
+          "description": "Quantum jobs require positive shot count.",
+          "effect": {
+            "decision": "deny",
+            "reason": "job_shot_count_required",
+            "required_action": "set_job_shot_count"
+          },
+          "name": "job_requires_shot_count"
+        },
+        {
+          "condition": {
             "job_review_recorded": false,
+            "operation": "submit_job",
             "shot_count_gt": 10000
           },
           "description": "Large quantum jobs require review.",
@@ -217,6 +647,137 @@
             "required_action": "review_quantum_job"
           },
           "name": "large_job_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "submit_job"
+          },
+          "description": "Quantum job lifecycle events require Bytewax streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "job_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "hypothesis_present": false,
+            "operation": "create_experiment"
+          },
+          "description": "Quantum experiments require a hypothesis.",
+          "effect": {
+            "decision": "deny",
+            "reason": "experiment_hypothesis_required",
+            "required_action": "attach_experiment_hypothesis"
+          },
+          "name": "experiment_requires_hypothesis"
+        },
+        {
+          "condition": {
+            "operation": "create_experiment",
+            "post_quantum_review_recorded": false,
+            "post_quantum_scope": true
+          },
+          "description": "Post-quantum experiments require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "post_quantum_review_required",
+            "required_action": "review_post_quantum_experiment"
+          },
+          "name": "experiment_requires_post_quantum_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "quan_agent_present": true
+          },
+          "description": "AI quantum agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quan_agent_registration_required",
+            "required_action": "register_quan_agent"
+          },
+          "name": "quan_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "quan_agent_present": true
+          },
+          "description": "AI quantum agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quan_agent_runtime_not_supported",
+            "required_action": "choose_supported_quan_agent_runtime"
+          },
+          "name": "quan_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "quan_agent_present": true
+          },
+          "description": "AI quantum agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quan_agent_role_not_supported",
+            "required_action": "choose_supported_quan_agent_role"
+          },
+          "name": "quan_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "quan_agent_present": true
+          },
+          "description": "AI quantum agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quan_agent_scope_required",
+            "required_action": "set_quan_agent_scope"
+          },
+          "name": "quan_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "quan_agent_present": true
+          },
+          "description": "AI quantum-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quan_agent_disclosure_required",
+            "required_action": "disclose_quan_agent"
+          },
+          "name": "quan_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Quantum lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quan_audit_event_required",
+            "required_action": "record_quan_audit_event"
+          },
+          "name": "quan_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_quantum_mutation"
+          },
+          "description": "Batch quantum mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_quantum_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,6 +787,16 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "QUANAgentPanel",
+          "permission": "quan:admin",
+          "route": "/quan/agents"
+        },
+        "audit": {
+          "component": "QuantumAuditTrail",
+          "permission": "quan:admin",
+          "route": "/quan/audit"
+        },
         "backends": {
           "component": "QuantumBackendRegistry",
           "permission": "quan:manage_backends",
@@ -267,9 +838,40 @@
           "route": "/quan/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_quantum_mutation_requires_bytewax",
+        "events": [
+          "quan_backend_registered",
+          "quan_quota_policy_attached",
+          "quan_circuit_created",
+          "quan_job_submitted",
+          "quan_result_recorded",
+          "quan_experiment_created",
+          "quan_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "backends",
+          "circuits",
+          "quota_policies",
+          "jobs",
+          "results",
+          "experiments",
+          "quan_agents",
+          "audit_events"
+        ],
+        "topic": "apg.quan.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "experiment-chip",
+            "visual": "event-timeline"
+          },
           "backend_card": {
             "icon": "cpu",
             "risk_style": "provider-band",
@@ -350,6 +952,20 @@
             "permission": "quan:view"
           },
           {
+            "component": "QUANAgentPanel",
+            "name": "agents",
+            "nav_group": "Operations",
+            "path": "/quan/agents",
+            "permission": "quan:admin"
+          },
+          {
+            "component": "QuantumAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/quan/audit",
+            "permission": "quan:admin"
+          },
+          {
             "component": "QuantumGovernance",
             "name": "governance",
             "nav_group": "Governance",
@@ -377,35 +993,88 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "quan": []
+      "quan": [
+        "aicr",
+        "encr",
+        "keym",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "quan": {
       "configuration": {
+        "adapters": {
+          "ai_orchestration": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.QuanService",
+          "key_management": "keym",
+          "monitoring": "moni",
+          "view_models": "views.py"
+        },
         "backends": {
           "backend_approval_required": true,
           "provider_credentials_managed_by_keym": true,
+          "qubit_capacity_required": true,
           "quota_policy_required": true,
           "simulator_fallback_enabled": true
         },
         "circuits": {
           "circuit_owner_required": true,
           "experiment_metadata_required": true,
+          "gate_validation_required": true,
           "sensitive_input_encryption_required": true,
           "versioning_required": true
         },
         "governance": {
           "audit_quantum_jobs": true,
+          "batch_event_stream": "bytewax",
           "cost_limit_required": true,
           "post_quantum_review_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
         },
         "jobs": {
+          "event_stream": "bytewax",
           "job_quota_required": true,
           "result_retention_days": 90,
           "retry_policy_required": true,
           "shot_limit": 10000
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "backend_metrics_required": true,
+          "event_stream": "bytewax",
+          "job_metrics_required": true,
+          "result_metrics_required": true
+        },
+        "quan_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "backend_reviewer",
+            "circuit_reviewer",
+            "job_reviewer",
+            "result_reviewer",
+            "cost_reviewer",
+            "post_quantum_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -413,17 +1082,30 @@
           "default_theme": "quan_quantum_lab"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_backend_registry": true,
           "enable_circuit_library": true,
+          "enable_experiment_workbench": true,
           "enable_job_queue": true,
           "enable_result_viewer": true
         }
       },
       "id": "quan",
       "provides": [
-        "quan_operations"
+        "quantum_backend_registry",
+        "circuit_management",
+        "quantum_job_orchestration",
+        "result_analysis",
+        "post_quantum_governance",
+        "quan_agents"
       ],
-      "requires": []
+      "requires": [
+        "aicr",
+        "encr",
+        "keym",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +1117,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -469,6 +1151,72 @@
       },
       "name": "backend_requires_approval"
     },
+    "backend_requires_credentials_reference": {
+      "condition": {
+        "credentials_ref_present": false,
+        "external_provider": true,
+        "operation": "register_backend"
+      },
+      "description": "External quantum backends require managed credentials.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_credentials_required",
+        "required_action": "attach_keym_credentials_reference"
+      },
+      "name": "backend_requires_credentials_reference"
+    },
+    "backend_requires_qubit_capacity": {
+      "condition": {
+        "backend_qubit_count_lt": 1,
+        "operation": "register_backend"
+      },
+      "description": "Quantum backends require positive qubit capacity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backend_qubit_capacity_required",
+        "required_action": "set_backend_qubit_capacity"
+      },
+      "name": "backend_requires_qubit_capacity"
+    },
+    "batch_quantum_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_quantum_mutation"
+      },
+      "description": "Batch quantum mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_quantum_mutation_requires_bytewax"
+    },
+    "circuit_requires_experiment_metadata": {
+      "condition": {
+        "experiment_metadata_present": false,
+        "operation": "create_circuit"
+      },
+      "description": "Quantum circuits require experiment metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "experiment_metadata_required",
+        "required_action": "attach_experiment_metadata"
+      },
+      "name": "circuit_requires_experiment_metadata"
+    },
+    "circuit_requires_gates": {
+      "condition": {
+        "circuit_gates_present": false,
+        "operation": "create_circuit"
+      },
+      "description": "Quantum circuits require at least one gate.",
+      "effect": {
+        "decision": "deny",
+        "reason": "circuit_gates_required",
+        "required_action": "define_quantum_gates"
+      },
+      "name": "circuit_requires_gates"
+    },
     "circuit_requires_owner": {
       "condition": {
         "circuit_owner_assigned": false,
@@ -481,6 +1229,72 @@
         "required_action": "assign_circuit_owner"
       },
       "name": "circuit_requires_owner"
+    },
+    "circuit_requires_qubits": {
+      "condition": {
+        "circuit_qubits_required_lt": 1,
+        "operation": "create_circuit"
+      },
+      "description": "Quantum circuits require positive qubit requirement.",
+      "effect": {
+        "decision": "deny",
+        "reason": "circuit_qubit_requirement_required",
+        "required_action": "set_circuit_qubit_requirement"
+      },
+      "name": "circuit_requires_qubits"
+    },
+    "circuit_requires_version": {
+      "condition": {
+        "circuit_version_present": false,
+        "operation": "create_circuit"
+      },
+      "description": "Quantum circuits require explicit version.",
+      "effect": {
+        "decision": "deny",
+        "reason": "circuit_version_required",
+        "required_action": "version_quantum_circuit"
+      },
+      "name": "circuit_requires_version"
+    },
+    "experiment_requires_hypothesis": {
+      "condition": {
+        "hypothesis_present": false,
+        "operation": "create_experiment"
+      },
+      "description": "Quantum experiments require a hypothesis.",
+      "effect": {
+        "decision": "deny",
+        "reason": "experiment_hypothesis_required",
+        "required_action": "attach_experiment_hypothesis"
+      },
+      "name": "experiment_requires_hypothesis"
+    },
+    "experiment_requires_post_quantum_review": {
+      "condition": {
+        "operation": "create_experiment",
+        "post_quantum_review_recorded": false,
+        "post_quantum_scope": true
+      },
+      "description": "Post-quantum experiments require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "post_quantum_review_required",
+        "required_action": "review_post_quantum_experiment"
+      },
+      "name": "experiment_requires_post_quantum_review"
+    },
+    "job_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "submit_job"
+      },
+      "description": "Quantum job lifecycle events require Bytewax streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "job_requires_bytewax_stream"
     },
     "job_requires_quota": {
       "condition": {
@@ -495,9 +1309,49 @@
       },
       "name": "job_requires_quota"
     },
+    "job_requires_retry_policy": {
+      "condition": {
+        "operation": "submit_job",
+        "retry_policy_attached": false
+      },
+      "description": "Quantum jobs require retry policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retry_policy_required",
+        "required_action": "attach_retry_policy"
+      },
+      "name": "job_requires_retry_policy"
+    },
+    "job_requires_shot_count": {
+      "condition": {
+        "operation": "submit_job",
+        "shot_count_lt": 1
+      },
+      "description": "Quantum jobs require positive shot count.",
+      "effect": {
+        "decision": "deny",
+        "reason": "job_shot_count_required",
+        "required_action": "set_job_shot_count"
+      },
+      "name": "job_requires_shot_count"
+    },
+    "job_requires_submitter": {
+      "condition": {
+        "job_submitter_present": false,
+        "operation": "submit_job"
+      },
+      "description": "Quantum jobs require submitter identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "job_submitter_required",
+        "required_action": "set_job_submitter"
+      },
+      "name": "job_requires_submitter"
+    },
     "large_job_requires_review": {
       "condition": {
         "job_review_recorded": false,
+        "operation": "submit_job",
         "shot_count_gt": 10000
       },
       "description": "Large quantum jobs require review.",
@@ -507,6 +1361,84 @@
         "required_action": "review_quantum_job"
       },
       "name": "large_job_requires_review"
+    },
+    "quan_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "quan_agent_present": true
+      },
+      "description": "AI quantum-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quan_agent_disclosure_required",
+        "required_action": "disclose_quan_agent"
+      },
+      "name": "quan_agent_requires_disclosure"
+    },
+    "quan_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "quan_agent_present": true
+      },
+      "description": "AI quantum agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quan_agent_registration_required",
+        "required_action": "register_quan_agent"
+      },
+      "name": "quan_agent_requires_registration"
+    },
+    "quan_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "quan_agent_present": true
+      },
+      "description": "AI quantum agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quan_agent_scope_required",
+        "required_action": "set_quan_agent_scope"
+      },
+      "name": "quan_agent_requires_scope"
+    },
+    "quan_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "quan_agent_present": true
+      },
+      "description": "AI quantum agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quan_agent_role_not_supported",
+        "required_action": "choose_supported_quan_agent_role"
+      },
+      "name": "quan_agent_role_supported"
+    },
+    "quan_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "quan_agent_present": true
+      },
+      "description": "AI quantum agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quan_agent_runtime_not_supported",
+        "required_action": "choose_supported_quan_agent_runtime"
+      },
+      "name": "quan_agent_runtime_supported"
+    },
+    "quan_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Quantum lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quan_audit_event_required",
+        "required_action": "record_quan_audit_event"
+      },
+      "name": "quan_state_change_requires_audit"
     },
     "sensitive_input_requires_encryption": {
       "condition": {

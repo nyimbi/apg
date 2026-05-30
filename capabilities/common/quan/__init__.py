@@ -5,12 +5,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_QUAN_AGENT_ROLES,
+	SUPPORTED_QUAN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+	streaming_manifest,
+)
+from .models import QuanAgent
+from .service import QuanService
 
 __version__ = "1.0.0"
 __capability_id__ = "quan"
 __capability_name__ = "Quantum Computing"
-__apg_dependencies__ = ["aicr", "encr", "keym"]
+__apg_dependencies__ = ["aicr", "encr", "keym", "audl"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "quan",
@@ -24,8 +32,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["quantum_backend_registry", "circuit_management", "quantum_job_orchestration", "result_analysis", "post_quantum_governance"],
-	"permissions": ["quan:view", "quan:experiment", "quan:run_jobs", "quan:manage_backends", "quan:admin"]
+	"provides": ["quantum_backend_registry", "circuit_management", "quantum_job_orchestration", "result_analysis", "post_quantum_governance", "quan_agents"],
+	"permissions": ["quan:view", "quan:experiment", "quan:run_jobs", "quan:manage_backends", "quan:admin"],
 }
 
 
@@ -40,6 +48,8 @@ def register_capability() -> dict[str, Any]:
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
 		"optional_dependencies": ["mlcm", "pred", "comp", "logt"],
+		"provides": contract["provides"],
+		"requires": contract["requires"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,14 +58,26 @@ def register_capability() -> dict[str, Any]:
 			"circuit_management": "Manage circuit definitions, owners, versions, and experiment metadata",
 			"quantum_job_orchestration": "Submit, monitor, retry, and audit quantum jobs",
 			"result_analysis": "Capture measurements, confidence, and AI-assisted experiment analysis",
+			"post_quantum_governance": "Govern cryptographic transition experiments and post-quantum review evidence",
+			"quan_agents": "Register scoped AI quantum agents for backend, circuit, job, result, cost, and post-quantum review",
 			"capability_rules": "Evaluate deterministic quantum-governance rules",
-			"visual_theming": "Apply quantum lab theme tokens and components"
+			"event_streaming": "Emit quantum lifecycle events through Bytewax",
+			"visual_theming": "Apply quantum lab theme tokens and components",
 		},
-		"endpoints": {"backends": "/quan/api/v1/backends", "circuits": "/quan/api/v1/circuits", "jobs": "/quan/api/v1/jobs", "experiments": "/quan/api/v1/experiments", "results": "/quan/api/v1/results"},
+		"endpoints": {
+			"backends": "/quan/api/v1/backends",
+			"circuits": "/quan/api/v1/circuits",
+			"jobs": "/quan/api/v1/jobs",
+			"experiments": "/quan/api/v1/experiments",
+			"results": "/quan/api/v1/results",
+			"agents": "/quan/api/v1/agents",
+			"audit": "/quan/api/v1/audit",
+		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
-		"permissions": capability_metadata["permissions"]
+		"streaming": contract["streaming"],
+		"permissions": capability_metadata["permissions"],
 	}
 
 
@@ -66,4 +88,19 @@ def get_capability_info() -> dict[str, Any]:
 	return info
 
 
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+	"QuanAgent",
+	"QuanService",
+	"SUPPORTED_QUAN_AGENT_ROLES",
+	"SUPPORTED_QUAN_AGENT_RUNTIMES",
+	"capability_metadata",
+	"evaluate_capability_rules",
+	"get_capability_contract",
+	"get_capability_info",
+	"register_capability",
+	"streaming_manifest",
+	"__apg_dependencies__",
+	"__capability_id__",
+	"__capability_name__",
+	"__version__",
+]

@@ -28,6 +28,7 @@ def dashboard_model(
 		"results": service.list_results(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -110,7 +111,53 @@ def governance_model(
 		"route": _route("governance", tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"audit_events": service.list_audit_events(tenant_id),
+		"streaming": contract["streaming"],
 		"permissions": sorted({route["permission"] for route in contract["ui"]["routes"]}),
+	}
+
+
+def quan_agent_model(
+	service: QuanService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or QuanService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("agents", tenant_id),
+		"quan_agents": service.list_quan_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["quan_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["quan_agents"]["allowed_roles"],
+		"permissions": ["quan:view", "quan:admin"],
+	}
+
+
+def audit_trail_model(
+	service: QuanService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or QuanService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("audit", tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["quan:admin"],
+	}
+
+
+def quantum_policy_model(
+	service: QuanService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or QuanService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("governance", tenant_id),
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"quota_policies": service.list_quota_policies(tenant_id),
 	}
 
 

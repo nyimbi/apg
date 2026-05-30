@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_QUAN_AGENT_ROLES,
+	SUPPORTED_QUAN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+)
 from .models import (
+	QuanAgent,
 	QuanAuditEvent,
 	QuantumBackend,
 	QuantumCircuit,
@@ -40,6 +47,7 @@ class QuanService:
 		self._results: dict[str, QuantumResult] = {}
 		self._experiments: dict[str, QuantumExperiment] = {}
 		self._audit_events: dict[str, QuanAuditEvent] = {}
+		self._agents: dict[str, QuanAgent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -68,12 +76,11 @@ class QuanService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "register_backend",
 			"backend_approved": bool(approved),
+			"external_provider": provider_value != "local",
+			"credentials_ref_present": bool(credentials_ref),
+			"backend_qubit_count": int(qubit_count),
 		})
 		self._raise_if_blocked(result)
-		if provider_value != "local" and not credentials_ref:
-			raise PermissionError("provider_credentials_required")
-		if int(qubit_count) < 1:
-			raise PermissionError("backend_qubit_capacity_required")
 		backend = QuantumBackend(
 			id=backend_id,
 			tenant_id=tenant_id,
@@ -87,7 +94,7 @@ class QuanService:
 			status="approved",
 			metadata=dict(metadata or {}),
 		)
-		self._backends[backend.id] = backend
+		self._backends[_state_key(tenant_id, backend.id)] = backend
 		self._record_audit(tenant_id, backend.id, "backend_registered", actor, "allow")
 		return backend.to_dict()
 
@@ -118,7 +125,7 @@ class QuanService:
 			cost_limit=round(float(cost_limit), 4),
 			retry_policy=normalize_retry_policy(retry_policy),
 		)
-		self._quota_policies[policy.id] = policy
+		self._quota_policies[_state_key(tenant_id, policy.id)] = policy
 		backend.quota_policy_attached = True
 		backend.updated_at = utc_now()
 		self._record_audit(tenant_id, policy.id, "quota_policy_attached", actor, "allow")
@@ -143,19 +150,15 @@ class QuanService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_circuit",
 			"circuit_owner_assigned": bool(owner),
+			"circuit_version_present": bool(version),
+			"circuit_qubits_required": int(qubits_required),
+			"circuit_gates_present": bool(normalize_gates(gates)),
 			"sensitive_input_present": bool(sensitive_input_present),
 			"encryption_applied": bool(encryption_applied),
+			"experiment_metadata_present": bool(experiment_metadata),
 		})
 		self._raise_if_blocked(result)
-		if not version:
-			raise PermissionError("circuit_version_required")
-		if int(qubits_required) < 1:
-			raise PermissionError("circuit_qubit_requirement_required")
 		normalized_gates = normalize_gates(gates)
-		if not normalized_gates:
-			raise PermissionError("circuit_gates_required")
-		if not experiment_metadata:
-			raise PermissionError("experiment_metadata_required")
 		circuit = QuantumCircuit(
 			id=circuit_id,
 			tenant_id=tenant_id,
@@ -169,7 +172,7 @@ class QuanService:
 			experiment_metadata=dict(experiment_metadata),
 			status="ready",
 		)
-		self._circuits[circuit.id] = circuit
+		self._circuits[_state_key(tenant_id, circuit.id)] = circuit
 		self._record_audit(tenant_id, circuit.id, "circuit_created", actor, "allow")
 		return circuit.to_dict()
 
@@ -183,6 +186,7 @@ class QuanService:
 		shot_count: int,
 		job_review_recorded: bool = False,
 		retry_policy_attached: bool = True,
+		event_stream: str = "bytewax",
 		actor: str = "quan",
 	) -> dict[str, Any]:
 		backend = self._require_backend(backend_id, tenant_id)
@@ -192,16 +196,13 @@ class QuanService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "submit_job",
 			"quota_policy_attached": policy is not None,
+			"job_submitter_present": bool(submitted_by),
 			"shot_count": int(shot_count),
 			"job_review_recorded": bool(job_review_recorded),
+			"retry_policy_attached": bool(retry_policy_attached),
+			"event_stream": event_stream_name(event_stream),
 		})
 		self._raise_if_blocked(result)
-		if not submitted_by:
-			raise PermissionError("job_submitter_required")
-		if not retry_policy_attached:
-			raise PermissionError("retry_policy_required")
-		if int(shot_count) < 1:
-			raise PermissionError("job_shot_count_required")
 		if policy and int(shot_count) > policy.max_shots_per_job:
 			raise PermissionError("job_shot_quota_exceeded")
 		if not validate_qubit_capacity(circuit.qubits_required, backend.qubit_count):
@@ -220,7 +221,7 @@ class QuanService:
 			job_review_recorded=bool(job_review_recorded),
 			retry_policy_attached=bool(retry_policy_attached),
 		)
-		self._jobs[job.id] = job
+		self._jobs[_state_key(tenant_id, job.id)] = job
 		self._record_audit(tenant_id, job.id, "job_submitted", actor, "allow")
 		return job.to_dict()
 
@@ -242,7 +243,7 @@ class QuanService:
 			confidence=result_confidence(measurements),
 			analysis_summary=result_summary(measurements),
 		)
-		self._results[result.id] = result
+		self._results[_state_key(tenant_id, result.id)] = result
 		job.status = "completed"
 		job.updated_at = utc_now()
 		self._record_audit(tenant_id, result.id, "result_recorded", actor, "allow")
@@ -260,10 +261,16 @@ class QuanService:
 		actor: str = "quan",
 	) -> dict[str, Any]:
 		circuit = self._require_circuit(circuit_id, tenant_id)
-		if not hypothesis:
-			raise PermissionError("experiment_hypothesis_required")
-		if "post-quantum" in hypothesis.lower() and not post_quantum_review_recorded:
-			raise PermissionError("post_quantum_review_required")
+		hypothesis_text = hypothesis or ""
+		post_quantum_scope = "post-quantum" in hypothesis_text.lower() or "post quantum" in hypothesis_text.lower()
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_experiment",
+			"hypothesis_present": bool(hypothesis_text),
+			"post_quantum_scope": post_quantum_scope,
+			"post_quantum_review_recorded": bool(post_quantum_review_recorded),
+		})
+		self._raise_if_blocked(result)
 		for job_id in job_ids:
 			self._require_job(job_id, tenant_id)
 		experiment = QuantumExperiment(
@@ -272,10 +279,10 @@ class QuanService:
 			name=name,
 			circuit_id=circuit.id,
 			job_ids=tuple(job_ids),
-			hypothesis=hypothesis,
+			hypothesis=hypothesis_text,
 			post_quantum_review_recorded=bool(post_quantum_review_recorded),
 		)
-		self._experiments[experiment.id] = experiment
+		self._experiments[_state_key(tenant_id, experiment.id)] = experiment
 		self._record_audit(tenant_id, experiment.id, "experiment_created", actor, "allow")
 		return experiment.to_dict()
 
@@ -323,18 +330,65 @@ class QuanService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def register_quan_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"quan_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_QUAN_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_QUAN_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_blocked(result)
+		agent = QuanAgent(
+			id=agent_id or f"quan-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=bool(contribution_disclosed),
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._record_audit(tenant_id, agent.id, "quan_agent_registered", name, result["decision"], metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def validate_batch_quantum_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_quantum_mutation",
+			"event_stream": event_stream_name(event_stream),
+		})
+
+	def list_quan_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		return {
 			"tenant_id": tenant_id,
 			"backend_count": len(self.list_backends(tenant_id)),
-			"approved_backend_count": sum(1 for item in self._backends.values() if item.tenant_id == tenant_id and item.approved),
+			"approved_backend_count": len([item for item in self.list_backends(tenant_id) if item["approved"]]),
 			"circuit_count": len(self.list_circuits(tenant_id)),
 			"quota_policy_count": len(self.list_quota_policies(tenant_id)),
 			"job_count": len(self.list_jobs(tenant_id)),
-			"completed_job_count": sum(1 for item in self._jobs.values() if item.tenant_id == tenant_id and item.status == "completed"),
+			"completed_job_count": len([item for item in self.list_jobs(tenant_id) if item["status"] == "completed"]),
 			"result_count": len(self.list_results(tenant_id)),
 			"experiment_count": len(self.list_experiments(tenant_id)),
+			"quan_agent_count": len(self.list_quan_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -342,19 +396,19 @@ class QuanService:
 		self._raise_if_blocked(result)
 
 	def _require_backend(self, backend_id: str, tenant_id: str) -> QuantumBackend:
-		backend = self._backends.get(backend_id)
+		backend = self._backends.get(_state_key(tenant_id, backend_id))
 		if backend is None or backend.tenant_id != tenant_id:
 			raise KeyError("quantum_backend_not_found")
 		return backend
 
 	def _require_circuit(self, circuit_id: str, tenant_id: str) -> QuantumCircuit:
-		circuit = self._circuits.get(circuit_id)
+		circuit = self._circuits.get(_state_key(tenant_id, circuit_id))
 		if circuit is None or circuit.tenant_id != tenant_id:
 			raise KeyError("quantum_circuit_not_found")
 		return circuit
 
 	def _require_job(self, job_id: str, tenant_id: str) -> QuantumJob:
-		job = self._jobs.get(job_id)
+		job = self._jobs.get(_state_key(tenant_id, job_id))
 		if job is None or job.tenant_id != tenant_id:
 			raise KeyError("quantum_job_not_found")
 		return job
@@ -378,6 +432,7 @@ class QuanService:
 		actor: str,
 		decision: str,
 		reasons: tuple[str, ...] = (),
+		metadata: dict[str, Any] | None = None,
 	) -> None:
 		event = QuanAuditEvent(
 			id=stable_id("audit", tenant_id, subject_id, event_type, len(self._audit_events)),
@@ -386,9 +441,10 @@ class QuanService:
 			subject_id=subject_id,
 			actor=actor,
 			decision=decision,
-			reasons=reasons,
+			reasons=tuple(reason for reason in reasons if reason),
+			metadata=dict(metadata or {}),
 		)
-		self._audit_events[event.id] = event
+		self._audit_events[_state_key(tenant_id, event.id)] = event
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		values = list(records.values())
@@ -398,3 +454,11 @@ class QuanService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "quantum_policy_blocked") for action in result["actions"])
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"
