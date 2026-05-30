@@ -24,11 +24,97 @@ from starlette.status import HTTP_429_TOO_MANY_REQUESTS
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 
-from .service import MDMService, MDMOperationType, MDMOperationContext
+from .service import (
+    MDMService,
+    MDMOperationType,
+    MDMOperationContext,
+    MdmCrossReferenceRecord,
+    MdmDuplicateCandidateRecord,
+    MdmEntityRecord,
+    MdmGoldenRecord,
+    MdmMergeRequestRecord,
+    MdmPublishRecord,
+    MdmQualityRecord,
+    MdmService,
+)
 from .models import (
     MdEntityCreate, MdEntityUpdate, MdDataQualityScore, MdDuplicateDetectionResult,
     EntityType, EntityStatus, DataQualityStatus
 )
+
+
+SERVICE = MdmService()
+
+
+def capability_status(tenant_id: str = "default") -> dict[str, Any]:
+    contract = SERVICE.describe(tenant_id)
+    return {
+        "capability": contract["capability"],
+        "display_name": contract["display_name"],
+        "tenant_id": tenant_id,
+        "route_count": len(contract["ui"]["routes"]),
+        "rule_count": len(contract["rule_engine"]["rules"]),
+        "record_count": len(SERVICE.list_records(tenant_id)),
+    }
+
+
+def register_entity_record(**kwargs: Any) -> MdmEntityRecord:
+    return SERVICE.register_entity(**kwargs)
+
+
+def assess_quality_record(**kwargs: Any) -> MdmQualityRecord:
+    return SERVICE.assess_quality(**kwargs)
+
+
+def create_duplicate_candidate_record(**kwargs: Any) -> MdmDuplicateCandidateRecord:
+    return SERVICE.create_duplicate_candidate(**kwargs)
+
+
+def review_duplicate_candidate_record(**kwargs: Any) -> MdmDuplicateCandidateRecord:
+    return SERVICE.review_duplicate_candidate(**kwargs)
+
+
+def create_golden_record(**kwargs: Any) -> MdmGoldenRecord:
+    return SERVICE.create_golden_record(**kwargs)
+
+
+def merge_golden_record(**kwargs: Any) -> MdmMergeRequestRecord:
+    return SERVICE.merge_golden_record(**kwargs)
+
+
+def update_cross_reference_record(**kwargs: Any) -> MdmCrossReferenceRecord:
+    return SERVICE.update_cross_reference(**kwargs)
+
+
+def publish_entity_record(**kwargs: Any) -> MdmPublishRecord:
+    return SERVICE.publish_entity(**kwargs)
+
+
+def create_record(payload: dict[str, Any]) -> dict[str, Any]:
+    return SERVICE.create_record(
+        record_id=str(payload["id"]),
+        tenant_id=str(payload.get("tenant_id") or "default"),
+        metadata=dict(payload.get("metadata") or {}),
+        status=str(payload.get("status") or "active"),
+    )
+
+
+def list_records(tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+    return SERVICE.list_records(tenant_id, record_type)
+
+
+def list_mdm(tenant_id: str | None = None) -> dict[str, Any]:
+    return {
+        "summary": SERVICE.dashboard_summary(tenant_id),
+        "entities": SERVICE.list_records(tenant_id, "entities"),
+        "quality_assessments": SERVICE.list_records(tenant_id, "quality_assessments"),
+        "duplicate_candidates": SERVICE.list_records(tenant_id, "duplicate_candidates"),
+        "golden_records": SERVICE.list_records(tenant_id, "golden_records"),
+        "merge_requests": SERVICE.list_records(tenant_id, "merge_requests"),
+        "cross_references": SERVICE.list_records(tenant_id, "cross_references"),
+        "publish_records": SERVICE.list_records(tenant_id, "publish_records"),
+        "audit_events": SERVICE.list_records(tenant_id, "audit_events"),
+    }
 
 
 # API Request/Response Models with Pydantic v2

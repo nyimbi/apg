@@ -20,39 +20,88 @@ class CapabilityConfiguration:
 	defaults: dict[str, Any] = field(default_factory=lambda: {
 		"tenant_id": "default",
 		"entities": {
-			"supported_entity_types": ["customer", "product", "supplier", "location", "asset"],
+			"supported_entity_types": [
+				"customer",
+				"product",
+				"supplier",
+				"employee",
+				"location",
+				"asset",
+				"account",
+				"contract",
+				"organization",
+				"custom"
+			],
 			"golden_record_required": True,
 			"version_history_enabled": True,
-			"cross_reference_tracking": True
+			"cross_reference_tracking": True,
+			"business_key_required": True,
+			"restricted_entity_types": ["customer", "employee", "account", "contract"]
 		},
 		"quality": {
 			"quality_assessment_enabled": True,
 			"minimum_quality_score": 80.0,
 			"block_publish_below_score": 60.0,
+			"assessment_required_before_publish": True,
+			"dimension_score_range": [0.0, 100.0],
 			"dimensions": ["completeness", "accuracy", "consistency", "validity", "uniqueness", "timeliness"]
 		},
 		"matching": {
 			"ai_matching_enabled": True,
 			"duplicate_detection_enabled": True,
 			"auto_merge_threshold": 95.0,
-			"manual_review_threshold": 70.0
+			"manual_review_threshold": 70.0,
+			"steward_review_required": True,
+			"conflict_review_required": True
+		},
+		"survivorship": {
+			"supported_policies": [
+				"most_recent",
+				"most_complete",
+				"most_trusted_source",
+				"highest_quality",
+				"custom_rules",
+				"ai_determined"
+			],
+			"policy_required_for_merge": True,
+			"independent_steward_required_for_conflicts": True
 		},
 		"governance": {
 			"require_tenant_context": True,
 			"steward_approval_required": True,
 			"audit_all_mutations": True,
-			"publish_requires_data_owner": True
+			"publish_requires_data_owner": True,
+			"review_notes_required": True,
+			"retire_requires_lineage_evidence": True,
+			"restricted_data_requires_classification_evidence": True
 		},
 		"integration": {
 			"emit_entity_events": True,
 			"use_cache": True,
-			"metadata_sync_enabled": True
+			"metadata_sync_enabled": True,
+			"source_system_evidence_required": True,
+			"event_stream_adapter": "bytewax"
+		},
+		"adapters": {
+			"database_runtime": "service.MDMService",
+			"generated_app_runtime": "service.MdmService",
+			"quality_engine": "adapter",
+			"matching_engine": "adapter",
+			"lineage_adapter": "adapter",
+			"event_stream": "bytewax",
+			"metadata_catalog": "adapter"
 		},
 		"ui": {
 			"enable_dashboard": True,
 			"enable_entity_workbench": True,
 			"enable_quality_console": True,
-			"enable_match_review": True
+			"enable_match_review": True,
+			"enable_stewardship_queue": True,
+			"enable_lineage_trace": True,
+			"enable_cross_reference_console": True,
+			"enable_publish_console": True,
+			"enable_audit_timeline": True,
+			"enable_adapter_health": True
 		},
 		"theme": {
 			"default_theme": "mdm_golden_record_console",
@@ -66,8 +115,10 @@ class CapabilityConfiguration:
 			"entities",
 			"quality",
 			"matching",
+			"survivorship",
 			"governance",
 			"integration",
+			"adapters",
 			"ui",
 			"theme"
 		],
@@ -76,8 +127,10 @@ class CapabilityConfiguration:
 			"entities": {"type": "object"},
 			"quality": {"type": "object"},
 			"matching": {"type": "object"},
+			"survivorship": {"type": "object"},
 			"governance": {"type": "object"},
 			"integration": {"type": "object"},
+			"adapters": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -179,6 +232,26 @@ class CapabilityTheme:
 		"entity_lineage_trace": {
 			"visual": "version-timeline",
 			"status_style": "mutation-marker"
+		},
+		"stewardship_decision_panel": {
+			"visual": "decision-queue",
+			"highlight": "review-chip"
+		},
+		"cross_reference_matrix": {
+			"visual": "source-system-grid",
+			"status_indicator": "mapping-state"
+		},
+		"publish_readiness_panel": {
+			"visual": "gate-checklist",
+			"status_style": "readiness-band"
+		},
+		"audit_decision_timeline": {
+			"visual": "decision-timeline",
+			"highlight": "matched-rule-chip"
+		},
+		"adapter_status_panel": {
+			"visual": "backend-grid",
+			"status_indicator": "adapter-state"
 		}
 	})
 
@@ -197,6 +270,36 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="entity_type_must_be_supported",
+			description="Entity registration is limited to configured master-data entity types.",
+			condition={"operation": "register_entity", "unsupported_entity_type": True},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_entity_type",
+				"required_action": "configure_entity_type"
+			}
+		),
+		CapabilityRule(
+			name="business_key_required_for_entity",
+			description="Every master-data entity requires a durable business key.",
+			condition={"operation": "register_entity", "business_key_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "business_key_required",
+				"required_action": "attach_business_key"
+			}
+		),
+		CapabilityRule(
+			name="restricted_entity_requires_data_owner",
+			description="Restricted master data requires an accountable data owner at registration.",
+			condition={"operation": "register_entity", "entity_classification": "restricted", "data_owner_assigned": False},
+			effect={
+				"decision": "deny",
+				"reason": "restricted_data_owner_required",
+				"required_action": "assign_data_owner"
+			}
+		),
+		CapabilityRule(
 			name="entity_publish_requires_data_owner",
 			description="Published master data requires an assigned data owner.",
 			condition={"operation": "publish_entity", "data_owner_assigned": False},
@@ -204,6 +307,16 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "data_owner_required",
 				"required_action": "assign_data_owner"
+			}
+		),
+		CapabilityRule(
+			name="publish_requires_latest_quality_assessment",
+			description="Entities need a current quality assessment before publish.",
+			condition={"operation": "publish_entity", "latest_quality_assessment_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "quality_assessment_required",
+				"required_action": "run_quality_assessment"
 			}
 		),
 		CapabilityRule(
@@ -217,6 +330,16 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="invalid_quality_score_blocks_assessment",
+			description="Quality score inputs must be within the configured score range.",
+			condition={"operation": "assess_quality", "quality_score_invalid": True},
+			effect={
+				"decision": "deny",
+				"reason": "invalid_quality_score",
+				"required_action": "normalize_quality_score"
+			}
+		),
+		CapabilityRule(
 			name="duplicate_candidates_require_review",
 			description="Likely duplicate entities require stewardship review.",
 			condition={"duplicate_confidence_gt": 70.0, "steward_review_recorded": False},
@@ -224,6 +347,16 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "require_review",
 				"reason": "duplicate_review_required",
 				"required_action": "complete_steward_review"
+			}
+		),
+		CapabilityRule(
+			name="auto_merge_requires_high_confidence",
+			description="Automated golden-record merges require configured high confidence.",
+			condition={"operation": "auto_merge_duplicate", "auto_merge_confidence_low": True},
+			effect={
+				"decision": "deny",
+				"reason": "auto_merge_confidence_too_low",
+				"required_action": "route_to_steward_review"
 			}
 		),
 		CapabilityRule(
@@ -237,6 +370,16 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="conflicted_merge_requires_independent_steward",
+			description="Conflicted merges require an independent steward decision.",
+			condition={"operation": "merge_golden_record", "conflict_present": True, "independent_steward_present": False},
+			effect={
+				"decision": "require_review",
+				"reason": "independent_steward_required",
+				"required_action": "assign_independent_steward"
+			}
+		),
+		CapabilityRule(
 			name="restricted_entity_requires_audit_trail",
 			description="Restricted master data requires mutation audit evidence.",
 			condition={"entity_classification": "restricted", "audit_evidence_present": False},
@@ -244,6 +387,46 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "audit_evidence_required",
 				"required_action": "record_audit_evidence"
+			}
+		),
+		CapabilityRule(
+			name="restricted_entity_requires_classification_evidence",
+			description="Restricted or sensitive attributes require classification evidence.",
+			condition={"restricted_attributes_present": True, "classification_evidence_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "classification_evidence_required",
+				"required_action": "attach_classification_evidence"
+			}
+		),
+		CapabilityRule(
+			name="cross_reference_requires_source_evidence",
+			description="Cross-reference mapping changes require source-system evidence.",
+			condition={"operation": "update_cross_reference", "source_system_evidence_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "source_system_evidence_required",
+				"required_action": "attach_source_system_evidence"
+			}
+		),
+		CapabilityRule(
+			name="retire_requires_lineage_evidence",
+			description="Retiring master data requires lineage and audit evidence.",
+			condition={"operation": "retire_entity", "lineage_evidence_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "lineage_evidence_required",
+				"required_action": "attach_lineage_evidence"
+			}
+		),
+		CapabilityRule(
+			name="review_decisions_require_notes",
+			description="Stewardship decisions require review notes.",
+			condition={"operation": "review", "review_notes_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "review_notes_required",
+				"required_action": "attach_review_notes"
 			}
 		)
 	]
@@ -258,7 +441,12 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("quality", "/mdm/quality", "QualityConsole", "mdm:view_quality", "Governance"),
 		CapabilityUIRoute("duplicates", "/mdm/duplicates", "DuplicateReviewQueue", "mdm:review_duplicates", "Governance"),
 		CapabilityUIRoute("stewardship", "/mdm/stewardship", "StewardshipQueue", "mdm:steward", "Governance"),
+		CapabilityUIRoute("lineage", "/mdm/lineage", "EntityLineageTrace", "mdm:view_lineage", "Governance"),
+		CapabilityUIRoute("cross_references", "/mdm/cross-references", "CrossReferenceConsole", "mdm:manage_cross_references", "Operations"),
+		CapabilityUIRoute("publish", "/mdm/publish", "PublishReadinessConsole", "mdm:publish", "Operations"),
 		CapabilityUIRoute("analytics", "/mdm/analytics", "MDMAnalytics", "mdm:view_analytics", "Intelligence"),
+		CapabilityUIRoute("audit", "/mdm/audit", "MDMAuditTimeline", "mdm:view_audit", "Governance"),
+		CapabilityUIRoute("adapters", "/mdm/adapters", "MDMAdapterHealth", "mdm:admin", "Administration"),
 		CapabilityUIRoute("settings", "/mdm/settings", "MDMSettings", "mdm:admin", "Administration")
 	]
 	return {

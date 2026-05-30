@@ -5,13 +5,141 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Master Data Management package-backed APG capability", "entity_count": 0, "name": "mdm", "version": "1.0.0"}, "capabilities": {"mdm": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"entities": {"cross_reference_tracking": true, "golden_record_required": true, "supported_entity_types": ["customer", "product", "supplier", "location", "asset"], "version_history_enabled": true}, "governance": {"audit_all_mutations": true, "publish_requires_data_owner": true, "require_tenant_context": true, "steward_approval_required": true}, "integration": {"emit_entity_events": true, "metadata_sync_enabled": true, "use_cache": true}, "matching": {"ai_matching_enabled": true, "auto_merge_threshold": 95.0, "duplicate_detection_enabled": true, "manual_review_threshold": 70.0}, "quality": {"block_publish_below_score": 60.0, "dimensions": ["completeness", "accuracy", "consistency", "validity", "uniqueness", "timeliness"], "minimum_quality_score": 80.0, "quality_assessment_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mdm_golden_record_console"}, "ui": {"enable_dashboard": true, "enable_entity_workbench": true, "enable_match_review": true, "enable_quality_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Master Data Management", "provides": ["mdm_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All MDM operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"data_owner_assigned": false, "operation": "publish_entity"}, "description": "Published master data requires an assigned data owner.", "effect": {"decision": "deny", "reason": "data_owner_required", "required_action": "assign_data_owner"}, "name": "entity_publish_requires_data_owner"}, {"condition": {"operation": "publish_entity", "quality_score_lt": 60.0}, "description": "Entities below minimum quality cannot be published.", "effect": {"decision": "deny", "reason": "quality_score_too_low", "required_action": "remediate_data_quality"}, "name": "low_quality_blocks_publish"}, {"condition": {"duplicate_confidence_gt": 70.0, "steward_review_recorded": false}, "description": "Likely duplicate entities require stewardship review.", "effect": {"decision": "require_review", "reason": "duplicate_review_required", "required_action": "complete_steward_review"}, "name": "duplicate_candidates_require_review"}, {"condition": {"operation": "merge_golden_record", "survivorship_policy_present": false}, "description": "Golden-record merges require a survivorship policy.", "effect": {"decision": "deny", "reason": "survivorship_policy_required", "required_action": "attach_survivorship_policy"}, "name": "golden_record_merge_requires_survivorship"}, {"condition": {"audit_evidence_present": false, "entity_classification": "restricted"}, "description": "Restricted master data requires mutation audit evidence.", "effect": {"decision": "deny", "reason": "audit_evidence_required", "required_action": "record_audit_evidence"}, "name": "restricted_entity_requires_audit_trail"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All MDM operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"data_owner_assigned": false, "operation": "publish_entity"}, "description": "Published master data requires an assigned data owner.", "effect": {"decision": "deny", "reason": "data_owner_required", "required_action": "assign_data_owner"}, "name": "entity_publish_requires_data_owner"}, {"condition": {"operation": "publish_entity", "quality_score_lt": 60.0}, "description": "Entities below minimum quality cannot be published.", "effect": {"decision": "deny", "reason": "quality_score_too_low", "required_action": "remediate_data_quality"}, "name": "low_quality_blocks_publish"}, {"condition": {"duplicate_confidence_gt": 70.0, "steward_review_recorded": false}, "description": "Likely duplicate entities require stewardship review.", "effect": {"decision": "require_review", "reason": "duplicate_review_required", "required_action": "complete_steward_review"}, "name": "duplicate_candidates_require_review"}, {"condition": {"operation": "merge_golden_record", "survivorship_policy_present": false}, "description": "Golden-record merges require a survivorship policy.", "effect": {"decision": "deny", "reason": "survivorship_policy_required", "required_action": "attach_survivorship_policy"}, "name": "golden_record_merge_requires_survivorship"}, {"condition": {"audit_evidence_present": false, "entity_classification": "restricted"}, "description": "Restricted master data requires mutation audit evidence.", "effect": {"decision": "deny", "reason": "audit_evidence_required", "required_action": "record_audit_evidence"}, "name": "restricted_entity_requires_audit_trail"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "MDMAnalytics", "permission": "mdm:view_analytics", "route": "/mdm/analytics"}, "dashboard": {"component": "MDMDashboard", "permission": "mdm:view", "route": "/mdm/dashboard"}, "duplicates": {"component": "DuplicateReviewQueue", "permission": "mdm:review_duplicates", "route": "/mdm/duplicates"}, "entities": {"component": "EntityWorkbench", "permission": "mdm:manage_entities", "route": "/mdm/entities"}, "golden_records": {"component": "GoldenRecordManager", "permission": "mdm:manage_golden_records", "route": "/mdm/golden-records"}, "quality": {"component": "QualityConsole", "permission": "mdm:view_quality", "route": "/mdm/quality"}, "settings": {"component": "MDMSettings", "permission": "mdm:admin", "route": "/mdm/settings"}, "stewardship": {"component": "StewardshipQueue", "permission": "mdm:steward", "route": "/mdm/stewardship"}}, "streaming": {}, "theme": {"components": {"duplicate_review_queue": {"highlight": "confidence-chip", "visual": "candidate-stack"}, "entity_lineage_trace": {"status_style": "mutation-marker", "visual": "version-timeline"}, "golden_record_card": {"icon": "badge-check", "risk_style": "quality-band", "status_indicator": "survivorship-pill"}, "quality_score_panel": {"threshold_style": "score-bands", "visual": "dimension-radar"}}, "name": "mdm_golden_record_console", "tokens": {"border.radius": "8px", "color.accent": "#EAC435", "color.danger": "#C53030", "color.primary": "#345995", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FB", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/mdm/api/v1", "requires_theme": true, "routes": [{"component": "MDMDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/mdm/dashboard", "permission": "mdm:view"}, {"component": "EntityWorkbench", "name": "entities", "nav_group": "Operations", "path": "/mdm/entities", "permission": "mdm:manage_entities"}, {"component": "GoldenRecordManager", "name": "golden_records", "nav_group": "Operations", "path": "/mdm/golden-records", "permission": "mdm:manage_golden_records"}, {"component": "QualityConsole", "name": "quality", "nav_group": "Governance", "path": "/mdm/quality", "permission": "mdm:view_quality"}, {"component": "DuplicateReviewQueue", "name": "duplicates", "nav_group": "Governance", "path": "/mdm/duplicates", "permission": "mdm:review_duplicates"}, {"component": "StewardshipQueue", "name": "stewardship", "nav_group": "Governance", "path": "/mdm/stewardship", "permission": "mdm:steward"}, {"component": "MDMAnalytics", "name": "analytics", "nav_group": "Intelligence", "path": "/mdm/analytics", "permission": "mdm:view_analytics"}, {"component": "MDMSettings", "name": "settings", "nav_group": "Administration", "path": "/mdm/settings", "permission": "mdm:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"mdm": []}}, "contracts": {"mdm": {"configuration": {"entities": {"cross_reference_tracking": true, "golden_record_required": true, "supported_entity_types": ["customer", "product", "supplier", "location", "asset"], "version_history_enabled": true}, "governance": {"audit_all_mutations": true, "publish_requires_data_owner": true, "require_tenant_context": true, "steward_approval_required": true}, "integration": {"emit_entity_events": true, "metadata_sync_enabled": true, "use_cache": true}, "matching": {"ai_matching_enabled": true, "auto_merge_threshold": 95.0, "duplicate_detection_enabled": true, "manual_review_threshold": 70.0}, "quality": {"block_publish_below_score": 60.0, "dimensions": ["completeness", "accuracy", "consistency", "validity", "uniqueness", "timeliness"], "minimum_quality_score": 80.0, "quality_assessment_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mdm_golden_record_console"}, "ui": {"enable_dashboard": true, "enable_entity_workbench": true, "enable_match_review": true, "enable_quality_console": true}}, "id": "mdm", "provides": ["mdm_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"mdm": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"duplicate_candidates_require_review": {"condition": {"duplicate_confidence_gt": 70.0, "steward_review_recorded": false}, "description": "Likely duplicate entities require stewardship review.", "effect": {"decision": "require_review", "reason": "duplicate_review_required", "required_action": "complete_steward_review"}, "name": "duplicate_candidates_require_review"}, "entity_publish_requires_data_owner": {"condition": {"data_owner_assigned": false, "operation": "publish_entity"}, "description": "Published master data requires an assigned data owner.", "effect": {"decision": "deny", "reason": "data_owner_required", "required_action": "assign_data_owner"}, "name": "entity_publish_requires_data_owner"}, "golden_record_merge_requires_survivorship": {"condition": {"operation": "merge_golden_record", "survivorship_policy_present": false}, "description": "Golden-record merges require a survivorship policy.", "effect": {"decision": "deny", "reason": "survivorship_policy_required", "required_action": "attach_survivorship_policy"}, "name": "golden_record_merge_requires_survivorship"}, "low_quality_blocks_publish": {"condition": {"operation": "publish_entity", "quality_score_lt": 60.0}, "description": "Entities below minimum quality cannot be published.", "effect": {"decision": "deny", "reason": "quality_score_too_low", "required_action": "remediate_data_quality"}, "name": "low_quality_blocks_publish"}, "restricted_entity_requires_audit_trail": {"condition": {"audit_evidence_present": false, "entity_classification": "restricted"}, "description": "Restricted master data requires mutation audit evidence.", "effect": {"decision": "deny", "reason": "audit_evidence_required", "required_action": "record_audit_evidence"}, "name": "restricted_entity_requires_audit_trail"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All MDM operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.mdm": {"file": "capability_contract.py", "id": "capability.mdm", "kind": "capability", "name": "Master Data Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("mdm_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "mdm",
+			"version": "1.0.0",
+			"description": "Master Data Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"mdm": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"mdm": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["mdm_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"duplicate_review": "MdmDuplicateCandidateRecord",
+					"golden_record_merge": "MdmMergeRequestRecord",
+					"publish_readiness": "MdmPublishRecord",
+				},
+				"mdm_lifecycle": {
+					"entity": "MdmEntityRecord",
+					"quality": "MdmQualityRecord",
+					"duplicate_candidate": "MdmDuplicateCandidateRecord",
+					"golden_record": "MdmGoldenRecord",
+					"merge_request": "MdmMergeRequestRecord",
+					"cross_reference": "MdmCrossReferenceRecord",
+					"publish": "MdmPublishRecord",
+					"audit": "MdmAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {
+					"engine": contract["configuration"]["integration"]["event_stream_adapter"],
+				},
+			}
+		},
+		"contracts": {
+			"mdm": {
+				"id": "mdm",
+				"configuration": contract["configuration"],
+				"provides": ["mdm_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"mdm": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.mdm": {
+				"id": "capability.mdm",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +164,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("mdm", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "mdm" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 13:
+		errors.append("MDM semantic model route manifest is stale")
+	if len(rules) < 15:
+		errors.append("MDM semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("MDM adapter manifest must use Bytewax for event streaming")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

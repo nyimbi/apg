@@ -16,6 +16,67 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 05:00 EAT
+
+MDM master-data lifecycle/guardrail packet:
+
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the MDM
+  capability packet, with executable entity, quality, duplicate, golden-record,
+  cross-reference, publish, audit, UI, theme, adapter, and non-goal boundaries.
+- Replaced the legacy `cap_spec.md` with current implementation scope and
+  removed stale aspirational claims from the primary package summary.
+- Expanded `capability_contract.py` with tenant-scoped entity, quality,
+  matching, survivorship, governance, integration, adapter, UI, and theme
+  configuration.
+- Expanded deterministic guardrails to cover tenant context, supported entity
+  type, business keys, restricted-data owner/audit/classification evidence,
+  publish quality gates, invalid quality scores, duplicate review, auto-merge
+  confidence, survivorship, conflicted merges, cross-reference evidence,
+  retirement lineage, and review notes.
+- Added dependency-light `MdmService` lifecycle records and control-plane
+  methods beside the existing async database-backed `MDMService`.
+- Added generated-application API helpers and `view_models.py` for dashboard,
+  entity workbench, quality, duplicate review, stewardship, golden records,
+  lineage, cross references, publish, analytics, audit, adapters, and settings.
+- Replaced static `app.py` semantic JSON with contract-derived semantic model
+  generation and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed the legacy materialized package test to `tests/test_package_contract.py`
+  and expanded regression coverage for rules, lifecycle behavior, generated UI
+  models, registration metadata, and publishable app evidence.
+- Focused review fixes: made the package tests independent of optional
+  `asyncpg`, removed duplicate `pytest.ini` `addopts`, and made MDM runtime
+  imports degrade cleanly when optional database dependencies are absent.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mdm/__init__.py
+  capabilities/common/mdm/capability_contract.py capabilities/common/mdm/service.py
+  capabilities/common/mdm/api.py
+  capabilities/common/mdm/view_models.py capabilities/common/mdm/app.py
+  capabilities/common/mdm/test_capability_contract.py
+  capabilities/common/mdm/tests/conftest.py
+  capabilities/common/mdm/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mdm/test_capability_contract.py
+  capabilities/common/mdm/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mdm --json` passed with MDM classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mdm --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- `./.venv/bin/python -c "from capabilities.common.mdm import MdmService;
+  service=MdmService(); print(service.dashboard_summary()['entity_count'])"`
+  passed and proved the generated-app service remains importable without
+  optional database dependencies.
+- Primary MDM stale-marker search returned no package-claim matches after
+  cleanup.
+- `git diff --check -- capabilities/common/mdm docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live database persistence, AI matching
+  engines, metadata sync, cache, Bytewax runtime flow execution, rendered
+  dashboard/browser behavior, and performance benchmarks.
+
 ### 2026-05-30 04:42 EAT
 
 HLTH health checks and diagnostics lifecycle/guardrail packet:

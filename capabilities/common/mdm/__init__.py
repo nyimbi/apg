@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 APG Master Data Management (MDM) Capability
-World-class Master Data Management with AI-powered intelligence and APG ecosystem integration
+Tenant-scoped master-data governance with generated-app composition hooks.
 
 This package provides comprehensive MDM capabilities including:
 - Entity lifecycle management with multi-tenant isolation
-- AI-powered data quality assessment with 6-dimensional scoring
-- Semantic duplicate detection with explainable confidence
-- Golden record management with automated survivorship
-- Real-time event streaming and APG ecosystem integration
+- Data quality assessment with 6-dimensional scoring
+- Duplicate detection evidence with steward review
+- Golden record management with survivorship policies
+- Bytewax-ready event streaming and APG ecosystem integration
 - Enterprise-grade security and comprehensive audit trails
 
 Author: Nyimbi Odero
@@ -18,11 +18,10 @@ Website: www.datacraft.co.ke
 Email: nyimbi@gmail.com
 
 Usage:
-    >>> from apg.capabilities.common.mdm import MDMService
-    >>> mdm_service = MDMService()
-    >>> await mdm_service.initialize()
-    >>> health = await mdm_service.health_check()
-    >>> print(f"MDM Status: {health['status']}")
+    >>> from apg.capabilities.common.mdm import MdmService
+    >>> mdm_service = MdmService()
+    >>> status = mdm_service.dashboard_summary()
+    >>> print(f"MDM entities: {status['entity_count']}")
 """
 
 __version__ = "1.0.0"
@@ -36,18 +35,26 @@ from .capability_contract import (
     evaluate_capability_rules
 )
 
-try:
-    # Core service and manager imports
-    from .service import (
-        MDMService,
-        EntityService,
-        QualityService,
-        MatchingService,
-        AuditService,
-        MDMOperationType,
-        MDMOperationContext
-    )
+from .service import (
+    MDMService,
+    MdmService,
+    EntityService,
+    QualityService,
+    MatchingService,
+    AuditService,
+    MDMOperationType,
+    MDMOperationContext,
+    MdmEntityRecord,
+    MdmQualityRecord,
+    MdmDuplicateCandidateRecord,
+    MdmGoldenRecord,
+    MdmMergeRequestRecord,
+    MdmCrossReferenceRecord,
+    MdmPublishRecord,
+    MdmAuditEventRecord
+)
 
+try:
     from .database import (
         MDMDatabaseManager,
         DatabaseHealthStatus
@@ -124,8 +131,6 @@ try:
     _RUNTIME_IMPORT_ERROR = None
 except ModuleNotFoundError as exc:
     _RUNTIME_IMPORT_ERROR = exc
-    MDMService = EntityService = QualityService = MatchingService = AuditService = None
-    MDMOperationType = MDMOperationContext = None
     MDMDatabaseManager = DatabaseHealthStatus = None
     MdEntity = MdEntityVersion = MdGoldenRecord = MdDataQualityAssessment = MdCrossReference = None
     MdEntityCreate = MdEntityUpdate = None
@@ -166,11 +171,11 @@ MDM_DEFAULT_CONFIG = {
         "minimum_match": 50.0
     },
     "performance_targets": {
-        "entity_creation_max_ms": 50,
-        "entity_retrieval_max_ms": 25,
-        "quality_assessment_max_ms": 100,
-        "duplicate_detection_max_ms": 500,
-        "batch_operation_min_per_second": 100
+        "measure_entity_creation_ms": True,
+        "measure_entity_retrieval_ms": True,
+        "measure_quality_assessment_ms": True,
+        "measure_duplicate_detection_ms": True,
+        "measure_batch_throughput": True
     }
 }
 
@@ -185,11 +190,20 @@ __all__ = [
     
     # Core services
     "MDMService",
+    "MdmService",
     "EntityService",
     "QualityService", 
     "MatchingService",
     "AuditService",
     "MDMDatabaseManager",
+    "MdmEntityRecord",
+    "MdmQualityRecord",
+    "MdmDuplicateCandidateRecord",
+    "MdmGoldenRecord",
+    "MdmMergeRequestRecord",
+    "MdmCrossReferenceRecord",
+    "MdmPublishRecord",
+    "MdmAuditEventRecord",
     
     # Models
     "MdEntity",
@@ -344,28 +358,13 @@ async def create_default_mdm_service(config: dict = None) -> MDMService:
         >>> health = await mdm.health_check()
         >>> print(f"Status: {health['status']}")
     """
-    if MDMService is None:
-        raise ModuleNotFoundError(
-            "MDM runtime requires optional database/UI dependencies such as asyncpg"
-        ) from _RUNTIME_IMPORT_ERROR
-
-    from .database import MDMDatabaseManager
-    from .integrations import APGIntegrationManager
-    
     # Merge provided config with defaults
     final_config = {**MDM_DEFAULT_CONFIG, **(config or {})}
-    
-    # Initialize components
-    db_manager = MDMDatabaseManager(final_config)
-    integration_manager = APGIntegrationManager(final_config)
-    
-    # Create and initialize service
+
     service = MDMService(
-        db_manager=db_manager,
-        integration_manager=integration_manager,
-        config=final_config
+        database_url=final_config.get("database_url"),
+        config=final_config,
     )
-    
     await service.initialize()
     return service
 

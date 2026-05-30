@@ -12,7 +12,7 @@ import json
 import hashlib
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set, Tuple, Union
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 import math
 from uuid_extensions import uuid7str
@@ -27,7 +27,13 @@ from .models import (
 	EntityType, EntityStatus, DataQualityStatus, MatchConfidence, SurvivorshipRule,
 	MdEntityCreate, MdEntityUpdate, MdDataQualityScore, MdDuplicateDetectionResult, MdMatchCandidate
 )
-from .database import MDMDatabaseManager
+try:
+	from .database import MDMDatabaseManager
+	_DATABASE_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	MDMDatabaseManager = None
+	_DATABASE_IMPORT_ERROR = exc
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 
 class MDMOperationType(str, Enum):
@@ -56,6 +62,151 @@ class MDMOperationContext:
 	source_system: Optional[str] = None
 	client_ip: Optional[str] = None
 	user_agent: Optional[str] = None
+
+
+@dataclass
+class MdmEntityRecord:
+	"""Dependency-light entity lifecycle record for generated applications."""
+
+	record_id: str
+	tenant_id: str
+	entity_id: str
+	entity_type: str
+	name: str
+	business_key: str
+	source_system: str
+	data_owner: str | None
+	classification: str
+	attributes: dict[str, Any] = field(default_factory=dict)
+	status: str = "active"
+	decision: str = "allow"
+	quality_score: float | None = None
+	latest_quality_assessment_id: str | None = None
+	duplicate_status: str = "not_checked"
+	golden_record_id: str | None = None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MdmQualityRecord:
+	"""Quality assessment evidence used by publish and stewardship gates."""
+
+	assessment_id: str
+	tenant_id: str
+	entity_id: str
+	overall_score: float
+	dimensions: dict[str, float]
+	assessor: str
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	issues: list[dict[str, Any]] = field(default_factory=list)
+	recommendations: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MdmDuplicateCandidateRecord:
+	"""Duplicate candidate and stewardship review record."""
+
+	candidate_id: str
+	tenant_id: str
+	entity_id: str
+	candidate_entity_id: str
+	confidence: float
+	reason: str
+	decision: str
+	status: str
+	steward_review_recorded: bool = False
+	steward: str | None = None
+	review_notes: str | None = None
+	review_decision: str | None = None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	reviewed_at: datetime | None = None
+
+
+@dataclass
+class MdmGoldenRecord:
+	"""Golden-record composition state."""
+
+	golden_record_id: str
+	tenant_id: str
+	entity_type: str
+	survivorship_policy: str
+	source_entity_ids: list[str]
+	status: str
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	attributes: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MdmMergeRequestRecord:
+	"""Golden-record merge decision state."""
+
+	merge_id: str
+	tenant_id: str
+	golden_record_id: str
+	source_entity_ids: list[str]
+	survivorship_policy: str | None
+	conflict_present: bool
+	independent_steward: str | None
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	review_notes: str | None = None
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MdmCrossReferenceRecord:
+	"""Source-system identifier mapping evidence."""
+
+	cross_reference_id: str
+	tenant_id: str
+	entity_id: str
+	source_system: str
+	source_identifier: str
+	evidence_reference: str | None
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MdmPublishRecord:
+	"""Publish readiness and release decision."""
+
+	publish_id: str
+	tenant_id: str
+	entity_id: str
+	channel: str
+	decision: str
+	status: str
+	quality_score: float | None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MdmAuditEventRecord:
+	"""Dependency-light MDM audit event."""
+
+	event_id: str
+	tenant_id: str
+	event_type: str
+	subject: str
+	actor: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	details: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
 class EntityService:
@@ -1324,6 +1475,10 @@ class MDMService:
 	"""Main MDM service orchestrator with AI/ML integration"""
 	
 	def __init__(self, database_url: str = None, config: Dict[str, Any] = None):
+		if MDMDatabaseManager is None:
+			raise ModuleNotFoundError(
+				"MDM database runtime requires optional dependency asyncpg"
+			) from _DATABASE_IMPORT_ERROR
 		self.config = config or {}
 		self.db_manager = MDMDatabaseManager(database_url, config)
 		
@@ -1368,8 +1523,497 @@ class MDMService:
 		)
 
 
+class MdmService:
+	"""Dependency-light MDM lifecycle and guardrail control plane.
+
+	This service is intentionally separate from the database-backed ``MDMService``.
+	Generated APG applications use it to compose MDM workflows, evaluate
+	guardrails, and build UI state without requiring PostgreSQL, Redis, AI
+	engines, or event-stream adapters to be running.
+	"""
+
+	def __init__(self, tenant_id: str = "default"):
+		self.tenant_id = tenant_id
+		self.contract = get_capability_contract(tenant_id)
+		self.entities: dict[str, MdmEntityRecord] = {}
+		self.quality_assessments: dict[str, MdmQualityRecord] = {}
+		self.duplicate_candidates: dict[str, MdmDuplicateCandidateRecord] = {}
+		self.golden_records: dict[str, MdmGoldenRecord] = {}
+		self.merge_requests: dict[str, MdmMergeRequestRecord] = {}
+		self.cross_references: dict[str, MdmCrossReferenceRecord] = {}
+		self.publish_records: dict[str, MdmPublishRecord] = {}
+		self.audit_events: list[MdmAuditEventRecord] = []
+		self.records: dict[str, dict[str, Any]] = {}
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return the current executable MDM contract."""
+		return get_capability_contract(tenant_id)
+
+	def create_record(
+		self,
+		*,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		"""Compatibility helper for older generated package tests."""
+		record_id = self._require_text(record_id, "record_id")
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		record = {
+			"id": record_id,
+			"tenant_id": tenant_id,
+			"metadata": dict(metadata or {}),
+			"status": status,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self.records[f"{tenant_id}:{record_id}"] = record
+		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		return record
+
+	def register_entity(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		entity_type: str,
+		name: str,
+		business_key: str,
+		source_system: str,
+		data_owner: str | None,
+		classification: str = "internal",
+		attributes: dict[str, Any] | None = None,
+		audit_evidence: str | None = None,
+		classification_evidence: str | None = None,
+	) -> MdmEntityRecord:
+		"""Register an entity after tenant, type, key, and restricted-data guardrails."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity_type = self._require_text(entity_type, "entity_type")
+		attributes = dict(attributes or {})
+		restricted = classification in {"restricted", "confidential", "sensitive"}
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_entity",
+			"unsupported_entity_type": entity_type not in self._supported_entity_types(tenant_id),
+			"business_key_present": bool(str(business_key or "").strip()),
+			"data_owner_assigned": bool(data_owner),
+			"entity_classification": "restricted" if restricted else classification,
+			"audit_evidence_present": bool(audit_evidence),
+			"restricted_attributes_present": restricted,
+			"classification_evidence_present": bool(classification_evidence),
+		}
+		decision = evaluate_capability_rules(context)
+		record = MdmEntityRecord(
+			record_id=uuid7str(),
+			tenant_id=tenant_id,
+			entity_id=self._require_text(entity_id, "entity_id"),
+			entity_type=entity_type,
+			name=self._require_text(name, "name"),
+			business_key=str(business_key or "").strip(),
+			source_system=self._require_text(source_system, "source_system"),
+			data_owner=data_owner.strip() if isinstance(data_owner, str) and data_owner.strip() else None,
+			classification=classification,
+			attributes=attributes,
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+		)
+		self.entities[self._entity_key(record.tenant_id, record.entity_id)] = record
+		self._audit(tenant_id, "entity.registered", record.entity_id, record.data_owner or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def assess_quality(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		overall_score: float,
+		dimensions: dict[str, float],
+		assessor: str,
+		issues: list[dict[str, Any]] | None = None,
+		recommendations: list[str] | None = None,
+	) -> MdmQualityRecord:
+		"""Record quality evidence and update entity publish readiness."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		invalid = overall_score < 0.0 or overall_score > 100.0 or any(
+			score < 0.0 or score > 100.0 for score in dimensions.values()
+		)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "assess_quality",
+			"quality_score_invalid": invalid,
+		}
+		decision = evaluate_capability_rules(context)
+		record = MdmQualityRecord(
+			assessment_id=uuid7str(),
+			tenant_id=tenant_id,
+			entity_id=entity.entity_id,
+			overall_score=overall_score,
+			dimensions=dict(dimensions),
+			assessor=self._require_text(assessor, "assessor"),
+			decision=decision["decision"],
+			status="accepted" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+			issues=list(issues or []),
+			recommendations=list(recommendations or []),
+		)
+		self.quality_assessments[record.assessment_id] = record
+		if decision["decision"] == "allow":
+			entity.quality_score = overall_score
+			entity.latest_quality_assessment_id = record.assessment_id
+			entity.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "quality.assessed", entity.entity_id, record.assessor, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def create_duplicate_candidate(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		candidate_entity_id: str,
+		confidence: float,
+		reason: str,
+		steward_review_recorded: bool = False,
+	) -> MdmDuplicateCandidateRecord:
+		"""Create a duplicate candidate and route likely matches to stewardship."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		candidate = self._require_entity(tenant_id, candidate_entity_id)
+		if confidence < 0.0 or confidence > 100.0:
+			raise ValueError("confidence must be between 0 and 100")
+		decision = evaluate_capability_rules({
+			"tenant_context_present": bool(tenant_id),
+			"duplicate_confidence": confidence,
+			"steward_review_recorded": steward_review_recorded,
+		})
+		record = MdmDuplicateCandidateRecord(
+			candidate_id=uuid7str(),
+			tenant_id=tenant_id,
+			entity_id=entity.entity_id,
+			candidate_entity_id=candidate.entity_id,
+			confidence=confidence,
+			reason=self._require_text(reason, "reason"),
+			decision=decision["decision"],
+			status="review_required" if decision["decision"] == "require_review" else "accepted",
+			steward_review_recorded=steward_review_recorded,
+			matched_rules=decision["matched_rules"],
+		)
+		self.duplicate_candidates[record.candidate_id] = record
+		entity.duplicate_status = record.status
+		self._audit(tenant_id, "duplicate.candidate.created", record.candidate_id, "system", decision["decision"], decision["matched_rules"], asdict(record))
+		return record
+
+	def review_duplicate_candidate(
+		self,
+		*,
+		candidate_id: str,
+		steward: str,
+		review_decision: str,
+		review_notes: str,
+	) -> MdmDuplicateCandidateRecord:
+		"""Record a stewardship decision for a duplicate candidate."""
+		if candidate_id not in self.duplicate_candidates:
+			raise KeyError(f"Duplicate candidate {candidate_id} not found")
+		record = self.duplicate_candidates[candidate_id]
+		review_decision = self._require_choice(review_decision, "review_decision", {"merge", "keep_separate", "defer"})
+		context = {
+			"tenant_context_present": bool(record.tenant_id),
+			"operation": "review",
+			"review_notes_present": bool(str(review_notes or "").strip()),
+		}
+		decision = evaluate_capability_rules(context)
+		record.steward = self._require_text(steward, "steward")
+		record.review_notes = str(review_notes or "").strip() or None
+		record.review_decision = review_decision
+		record.steward_review_recorded = decision["decision"] == "allow"
+		record.decision = review_decision if decision["decision"] == "allow" else decision["decision"]
+		record.status = "reviewed" if decision["decision"] == "allow" else "review_denied"
+		record.matched_rules = decision["matched_rules"]
+		record.reviewed_at = datetime.utcnow()
+		self._audit(record.tenant_id, "duplicate.candidate.reviewed", record.candidate_id, record.steward, record.decision, record.matched_rules, context)
+		return record
+
+	def create_golden_record(
+		self,
+		*,
+		tenant_id: str,
+		entity_type: str,
+		source_entity_ids: list[str],
+		survivorship_policy: str,
+		attributes: dict[str, Any] | None = None,
+	) -> MdmGoldenRecord:
+		"""Create a golden record shell from governed source entities."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity_type = self._require_text(entity_type, "entity_type")
+		survivorship_policy = self._require_choice(
+			survivorship_policy,
+			"survivorship_policy",
+			set(self.describe(tenant_id)["configuration"]["survivorship"]["supported_policies"]),
+		)
+		sources = [self._require_entity(tenant_id, entity_id) for entity_id in source_entity_ids]
+		record = MdmGoldenRecord(
+			golden_record_id=uuid7str(),
+			tenant_id=tenant_id,
+			entity_type=entity_type,
+			survivorship_policy=survivorship_policy,
+			source_entity_ids=[source.entity_id for source in sources],
+			status="active",
+			attributes=dict(attributes or {}),
+		)
+		self.golden_records[record.golden_record_id] = record
+		for source in sources:
+			source.golden_record_id = record.golden_record_id
+			source.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "golden_record.created", record.golden_record_id, "system", "allow", [], asdict(record))
+		return record
+
+	def merge_golden_record(
+		self,
+		*,
+		tenant_id: str,
+		golden_record_id: str,
+		source_entity_ids: list[str],
+		survivorship_policy: str | None,
+		conflict_present: bool = False,
+		independent_steward: str | None = None,
+		review_notes: str | None = None,
+	) -> MdmMergeRequestRecord:
+		"""Evaluate and record a golden-record merge request."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		if golden_record_id not in self.golden_records:
+			raise KeyError(f"Golden record {golden_record_id} not found")
+		for entity_id in source_entity_ids:
+			self._require_entity(tenant_id, entity_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "merge_golden_record",
+			"survivorship_policy_present": bool(survivorship_policy),
+			"conflict_present": conflict_present,
+			"independent_steward_present": bool(independent_steward),
+		}
+		decision = evaluate_capability_rules(context)
+		status = "merged" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"])
+		record = MdmMergeRequestRecord(
+			merge_id=uuid7str(),
+			tenant_id=tenant_id,
+			golden_record_id=golden_record_id,
+			source_entity_ids=list(source_entity_ids),
+			survivorship_policy=survivorship_policy,
+			conflict_present=conflict_present,
+			independent_steward=independent_steward,
+			review_notes=review_notes,
+			decision=decision["decision"],
+			status=status,
+			matched_rules=decision["matched_rules"],
+		)
+		self.merge_requests[record.merge_id] = record
+		if decision["decision"] == "allow":
+			golden_record = self.golden_records[golden_record_id]
+			golden_record.source_entity_ids = list(dict.fromkeys(golden_record.source_entity_ids + source_entity_ids))
+			golden_record.survivorship_policy = survivorship_policy or golden_record.survivorship_policy
+			golden_record.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "golden_record.merge_requested", record.merge_id, independent_steward or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def update_cross_reference(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		source_system: str,
+		source_identifier: str,
+		evidence_reference: str | None,
+	) -> MdmCrossReferenceRecord:
+		"""Attach a source-system identifier mapping with evidence."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "update_cross_reference",
+			"source_system_evidence_present": bool(evidence_reference),
+		}
+		decision = evaluate_capability_rules(context)
+		record = MdmCrossReferenceRecord(
+			cross_reference_id=uuid7str(),
+			tenant_id=tenant_id,
+			entity_id=entity.entity_id,
+			source_system=self._require_text(source_system, "source_system"),
+			source_identifier=self._require_text(source_identifier, "source_identifier"),
+			evidence_reference=evidence_reference,
+			decision=decision["decision"],
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+		)
+		self.cross_references[record.cross_reference_id] = record
+		self._audit(tenant_id, "cross_reference.updated", record.cross_reference_id, source_system, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def retire_entity(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		lineage_evidence: str | None,
+		actor: str,
+	) -> MdmEntityRecord:
+		"""Retire an entity only when lineage evidence is present."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_entity",
+			"lineage_evidence_present": bool(lineage_evidence),
+		}
+		decision = evaluate_capability_rules(context)
+		entity.decision = decision["decision"]
+		entity.matched_rules = decision["matched_rules"]
+		if decision["decision"] == "allow":
+			entity.status = "retired"
+			entity.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "entity.retired", entity.entity_id, self._require_text(actor, "actor"), decision["decision"], decision["matched_rules"], context)
+		return entity
+
+	def publish_entity(
+		self,
+		*,
+		tenant_id: str,
+		entity_id: str,
+		channel: str,
+	) -> MdmPublishRecord:
+		"""Evaluate publish readiness for a mastered entity."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		entity = self._require_entity(tenant_id, entity_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "publish_entity",
+			"data_owner_assigned": bool(entity.data_owner),
+			"latest_quality_assessment_present": bool(entity.latest_quality_assessment_id),
+			"quality_score": entity.quality_score if entity.quality_score is not None else 0.0,
+		}
+		decision = evaluate_capability_rules(context)
+		record = MdmPublishRecord(
+			publish_id=uuid7str(),
+			tenant_id=tenant_id,
+			entity_id=entity.entity_id,
+			channel=self._require_text(channel, "channel"),
+			decision=decision["decision"],
+			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			quality_score=entity.quality_score,
+			matched_rules=decision["matched_rules"],
+		)
+		self.publish_records[record.publish_id] = record
+		if decision["decision"] == "allow":
+			entity.status = "published"
+			entity.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "entity.publish_evaluated", record.publish_id, entity.data_owner or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		"""List generated-app records for a tenant."""
+		tenant_id = tenant_id or self.tenant_id
+		collections: dict[str, Any] = {
+			"entities": self.entities.values(),
+			"quality_assessments": self.quality_assessments.values(),
+			"duplicate_candidates": self.duplicate_candidates.values(),
+			"golden_records": self.golden_records.values(),
+			"merge_requests": self.merge_requests.values(),
+			"cross_references": self.cross_references.values(),
+			"publish_records": self.publish_records.values(),
+			"audit_events": self.audit_events,
+			"records": self.records.values(),
+		}
+		if record_type:
+			if record_type not in collections:
+				raise ValueError(f"Unsupported record_type {record_type}")
+			values = collections[record_type]
+		else:
+			values = []
+			for collection in collections.values():
+				values.extend(collection)
+		return [
+			dict(record) if isinstance(record, dict) else asdict(record)
+			for record in values
+			if (record.get("tenant_id") if isinstance(record, dict) else getattr(record, "tenant_id", None)) == tenant_id
+		]
+
+	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Return summary metrics for generated MDM dashboards."""
+		tenant_id = tenant_id or self.tenant_id
+		return {
+			"tenant_id": tenant_id,
+			"entity_count": len(self.list_records(tenant_id, "entities")),
+			"quality_assessment_count": len(self.list_records(tenant_id, "quality_assessments")),
+			"duplicate_review_count": sum(1 for row in self.list_records(tenant_id, "duplicate_candidates") if row["status"] == "review_required"),
+			"golden_record_count": len(self.list_records(tenant_id, "golden_records")),
+			"pending_merge_count": sum(1 for row in self.list_records(tenant_id, "merge_requests") if row["status"] == "pending_review"),
+			"published_entity_count": sum(1 for row in self.list_records(tenant_id, "entities") if row["status"] == "published"),
+			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
+		}
+
+	def _audit(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject: str,
+		actor: str,
+		decision: str,
+		matched_rules: list[str],
+		details: dict[str, Any],
+	) -> None:
+		self.audit_events.append(MdmAuditEventRecord(
+			event_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject=subject,
+			actor=actor,
+			decision=decision,
+			matched_rules=list(matched_rules),
+			details=details,
+		))
+
+	def _supported_entity_types(self, tenant_id: str) -> set[str]:
+		return set(self.describe(tenant_id)["configuration"]["entities"]["supported_entity_types"])
+
+	def _require_entity(self, tenant_id: str, entity_id: str) -> MdmEntityRecord:
+		entity_id = self._require_text(entity_id, "entity_id")
+		entity = self.entities.get(self._entity_key(tenant_id, entity_id))
+		if entity is None:
+			raise KeyError(f"Entity {entity_id} not found for tenant {tenant_id}")
+		if entity.status == "denied":
+			raise ValueError(f"Entity {entity_id} is denied and cannot continue lifecycle operations")
+		return entity
+
+	@staticmethod
+	def _status_for_decision(decision: str) -> str:
+		if decision == "require_review":
+			return "pending_review"
+		if decision == "deny":
+			return "denied"
+		return "active"
+
+	@staticmethod
+	def _require_text(value: str, field_name: str) -> str:
+		if not isinstance(value, str) or not value.strip():
+			raise ValueError(f"{field_name} is required")
+		return value.strip()
+
+	@staticmethod
+	def _require_choice(value: str, field_name: str, allowed: set[str]) -> str:
+		text = MdmService._require_text(value, field_name)
+		if text not in allowed:
+			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
+		return text
+
+	@staticmethod
+	def _entity_key(tenant_id: str, entity_id: str) -> str:
+		return f"{tenant_id}:{entity_id}"
+
+
 # Export main classes
 __all__ = [
-	'MDMService', 'EntityService', 'QualityService', 'MatchingService', 'AuditService',
-	'MDMOperationType', 'MDMOperationContext'
+	'MDMService', 'MdmService', 'EntityService', 'QualityService', 'MatchingService', 'AuditService',
+	'MDMOperationType', 'MDMOperationContext', 'MdmEntityRecord', 'MdmQualityRecord',
+	'MdmDuplicateCandidateRecord', 'MdmGoldenRecord', 'MdmMergeRequestRecord',
+	'MdmCrossReferenceRecord', 'MdmPublishRecord', 'MdmAuditEventRecord'
 ]

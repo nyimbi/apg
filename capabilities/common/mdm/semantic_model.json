@@ -8,19 +8,53 @@
   },
   "capabilities": {
     "mdm": {
-      "approvals": {},
+      "adapters": {
+        "database_runtime": "service.MDMService",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.MdmService",
+        "lineage_adapter": "adapter",
+        "matching_engine": "adapter",
+        "metadata_catalog": "adapter",
+        "quality_engine": "adapter"
+      },
+      "approvals": {
+        "duplicate_review": "MdmDuplicateCandidateRecord",
+        "golden_record_merge": "MdmMergeRequestRecord",
+        "publish_readiness": "MdmPublishRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "database_runtime": "service.MDMService",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MdmService",
+          "lineage_adapter": "adapter",
+          "matching_engine": "adapter",
+          "metadata_catalog": "adapter",
+          "quality_engine": "adapter"
+        },
         "entities": {
+          "business_key_required": true,
           "cross_reference_tracking": true,
           "golden_record_required": true,
+          "restricted_entity_types": [
+            "customer",
+            "employee",
+            "account",
+            "contract"
+          ],
           "supported_entity_types": [
             "customer",
             "product",
             "supplier",
+            "employee",
             "location",
-            "asset"
+            "asset",
+            "account",
+            "contract",
+            "organization",
+            "custom"
           ],
           "version_history_enabled": true
         },
@@ -28,21 +62,33 @@
           "audit_all_mutations": true,
           "publish_requires_data_owner": true,
           "require_tenant_context": true,
+          "restricted_data_requires_classification_evidence": true,
+          "retire_requires_lineage_evidence": true,
+          "review_notes_required": true,
           "steward_approval_required": true
         },
         "integration": {
           "emit_entity_events": true,
+          "event_stream_adapter": "bytewax",
           "metadata_sync_enabled": true,
+          "source_system_evidence_required": true,
           "use_cache": true
         },
         "matching": {
           "ai_matching_enabled": true,
           "auto_merge_threshold": 95.0,
+          "conflict_review_required": true,
           "duplicate_detection_enabled": true,
-          "manual_review_threshold": 70.0
+          "manual_review_threshold": 70.0,
+          "steward_review_required": true
         },
         "quality": {
+          "assessment_required_before_publish": true,
           "block_publish_below_score": 60.0,
+          "dimension_score_range": [
+            0.0,
+            100.0
+          ],
           "dimensions": [
             "completeness",
             "accuracy",
@@ -54,16 +100,34 @@
           "minimum_quality_score": 80.0,
           "quality_assessment_enabled": true
         },
+        "survivorship": {
+          "independent_steward_required_for_conflicts": true,
+          "policy_required_for_merge": true,
+          "supported_policies": [
+            "most_recent",
+            "most_complete",
+            "most_trusted_source",
+            "highest_quality",
+            "custom_rules",
+            "ai_determined"
+          ]
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "mdm_golden_record_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
+          "enable_cross_reference_console": true,
           "enable_dashboard": true,
           "enable_entity_workbench": true,
+          "enable_lineage_trace": true,
           "enable_match_review": true,
-          "enable_quality_console": true
+          "enable_publish_console": true,
+          "enable_quality_console": true,
+          "enable_stewardship_queue": true
         }
       },
       "erp_modules": [
@@ -71,6 +135,16 @@
       ],
       "i18n": {},
       "master_data": {},
+      "mdm_lifecycle": {
+        "audit": "MdmAuditEventRecord",
+        "cross_reference": "MdmCrossReferenceRecord",
+        "duplicate_candidate": "MdmDuplicateCandidateRecord",
+        "entity": "MdmEntityRecord",
+        "golden_record": "MdmGoldenRecord",
+        "merge_request": "MdmMergeRequestRecord",
+        "publish": "MdmPublishRecord",
+        "quality": "MdmQualityRecord"
+      },
       "name": "Master Data Management",
       "provides": [
         "mdm_operations"
@@ -92,6 +166,46 @@
           },
           {
             "condition": {
+              "operation": "register_entity",
+              "unsupported_entity_type": true
+            },
+            "description": "Entity registration is limited to configured master-data entity types.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_entity_type",
+              "required_action": "configure_entity_type"
+            },
+            "name": "entity_type_must_be_supported"
+          },
+          {
+            "condition": {
+              "business_key_present": false,
+              "operation": "register_entity"
+            },
+            "description": "Every master-data entity requires a durable business key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "business_key_required",
+              "required_action": "attach_business_key"
+            },
+            "name": "business_key_required_for_entity"
+          },
+          {
+            "condition": {
+              "data_owner_assigned": false,
+              "entity_classification": "restricted",
+              "operation": "register_entity"
+            },
+            "description": "Restricted master data requires an accountable data owner at registration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "restricted_data_owner_required",
+              "required_action": "assign_data_owner"
+            },
+            "name": "restricted_entity_requires_data_owner"
+          },
+          {
+            "condition": {
               "data_owner_assigned": false,
               "operation": "publish_entity"
             },
@@ -102,6 +216,19 @@
               "required_action": "assign_data_owner"
             },
             "name": "entity_publish_requires_data_owner"
+          },
+          {
+            "condition": {
+              "latest_quality_assessment_present": false,
+              "operation": "publish_entity"
+            },
+            "description": "Entities need a current quality assessment before publish.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_assessment_required",
+              "required_action": "run_quality_assessment"
+            },
+            "name": "publish_requires_latest_quality_assessment"
           },
           {
             "condition": {
@@ -118,6 +245,19 @@
           },
           {
             "condition": {
+              "operation": "assess_quality",
+              "quality_score_invalid": true
+            },
+            "description": "Quality score inputs must be within the configured score range.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invalid_quality_score",
+              "required_action": "normalize_quality_score"
+            },
+            "name": "invalid_quality_score_blocks_assessment"
+          },
+          {
+            "condition": {
               "duplicate_confidence_gt": 70.0,
               "steward_review_recorded": false
             },
@@ -128,6 +268,19 @@
               "required_action": "complete_steward_review"
             },
             "name": "duplicate_candidates_require_review"
+          },
+          {
+            "condition": {
+              "auto_merge_confidence_low": true,
+              "operation": "auto_merge_duplicate"
+            },
+            "description": "Automated golden-record merges require configured high confidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auto_merge_confidence_too_low",
+              "required_action": "route_to_steward_review"
+            },
+            "name": "auto_merge_requires_high_confidence"
           },
           {
             "condition": {
@@ -144,6 +297,20 @@
           },
           {
             "condition": {
+              "conflict_present": true,
+              "independent_steward_present": false,
+              "operation": "merge_golden_record"
+            },
+            "description": "Conflicted merges require an independent steward decision.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "independent_steward_required",
+              "required_action": "assign_independent_steward"
+            },
+            "name": "conflicted_merge_requires_independent_steward"
+          },
+          {
+            "condition": {
               "audit_evidence_present": false,
               "entity_classification": "restricted"
             },
@@ -154,6 +321,58 @@
               "required_action": "record_audit_evidence"
             },
             "name": "restricted_entity_requires_audit_trail"
+          },
+          {
+            "condition": {
+              "classification_evidence_present": false,
+              "restricted_attributes_present": true
+            },
+            "description": "Restricted or sensitive attributes require classification evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_evidence_required",
+              "required_action": "attach_classification_evidence"
+            },
+            "name": "restricted_entity_requires_classification_evidence"
+          },
+          {
+            "condition": {
+              "operation": "update_cross_reference",
+              "source_system_evidence_present": false
+            },
+            "description": "Cross-reference mapping changes require source-system evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_system_evidence_required",
+              "required_action": "attach_source_system_evidence"
+            },
+            "name": "cross_reference_requires_source_evidence"
+          },
+          {
+            "condition": {
+              "lineage_evidence_present": false,
+              "operation": "retire_entity"
+            },
+            "description": "Retiring master data requires lineage and audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lineage_evidence_required",
+              "required_action": "attach_lineage_evidence"
+            },
+            "name": "retire_requires_lineage_evidence"
+          },
+          {
+            "condition": {
+              "operation": "review",
+              "review_notes_present": false
+            },
+            "description": "Stewardship decisions require review notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "review_decisions_require_notes"
           }
         ],
         "type": "deterministic"
@@ -173,6 +392,46 @@
         },
         {
           "condition": {
+            "operation": "register_entity",
+            "unsupported_entity_type": true
+          },
+          "description": "Entity registration is limited to configured master-data entity types.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_entity_type",
+            "required_action": "configure_entity_type"
+          },
+          "name": "entity_type_must_be_supported"
+        },
+        {
+          "condition": {
+            "business_key_present": false,
+            "operation": "register_entity"
+          },
+          "description": "Every master-data entity requires a durable business key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "business_key_required",
+            "required_action": "attach_business_key"
+          },
+          "name": "business_key_required_for_entity"
+        },
+        {
+          "condition": {
+            "data_owner_assigned": false,
+            "entity_classification": "restricted",
+            "operation": "register_entity"
+          },
+          "description": "Restricted master data requires an accountable data owner at registration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "restricted_data_owner_required",
+            "required_action": "assign_data_owner"
+          },
+          "name": "restricted_entity_requires_data_owner"
+        },
+        {
+          "condition": {
             "data_owner_assigned": false,
             "operation": "publish_entity"
           },
@@ -183,6 +442,19 @@
             "required_action": "assign_data_owner"
           },
           "name": "entity_publish_requires_data_owner"
+        },
+        {
+          "condition": {
+            "latest_quality_assessment_present": false,
+            "operation": "publish_entity"
+          },
+          "description": "Entities need a current quality assessment before publish.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_assessment_required",
+            "required_action": "run_quality_assessment"
+          },
+          "name": "publish_requires_latest_quality_assessment"
         },
         {
           "condition": {
@@ -199,6 +471,19 @@
         },
         {
           "condition": {
+            "operation": "assess_quality",
+            "quality_score_invalid": true
+          },
+          "description": "Quality score inputs must be within the configured score range.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invalid_quality_score",
+            "required_action": "normalize_quality_score"
+          },
+          "name": "invalid_quality_score_blocks_assessment"
+        },
+        {
+          "condition": {
             "duplicate_confidence_gt": 70.0,
             "steward_review_recorded": false
           },
@@ -209,6 +494,19 @@
             "required_action": "complete_steward_review"
           },
           "name": "duplicate_candidates_require_review"
+        },
+        {
+          "condition": {
+            "auto_merge_confidence_low": true,
+            "operation": "auto_merge_duplicate"
+          },
+          "description": "Automated golden-record merges require configured high confidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auto_merge_confidence_too_low",
+            "required_action": "route_to_steward_review"
+          },
+          "name": "auto_merge_requires_high_confidence"
         },
         {
           "condition": {
@@ -225,6 +523,20 @@
         },
         {
           "condition": {
+            "conflict_present": true,
+            "independent_steward_present": false,
+            "operation": "merge_golden_record"
+          },
+          "description": "Conflicted merges require an independent steward decision.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "independent_steward_required",
+            "required_action": "assign_independent_steward"
+          },
+          "name": "conflicted_merge_requires_independent_steward"
+        },
+        {
+          "condition": {
             "audit_evidence_present": false,
             "entity_classification": "restricted"
           },
@@ -235,19 +547,86 @@
             "required_action": "record_audit_evidence"
           },
           "name": "restricted_entity_requires_audit_trail"
+        },
+        {
+          "condition": {
+            "classification_evidence_present": false,
+            "restricted_attributes_present": true
+          },
+          "description": "Restricted or sensitive attributes require classification evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_evidence_required",
+            "required_action": "attach_classification_evidence"
+          },
+          "name": "restricted_entity_requires_classification_evidence"
+        },
+        {
+          "condition": {
+            "operation": "update_cross_reference",
+            "source_system_evidence_present": false
+          },
+          "description": "Cross-reference mapping changes require source-system evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_system_evidence_required",
+            "required_action": "attach_source_system_evidence"
+          },
+          "name": "cross_reference_requires_source_evidence"
+        },
+        {
+          "condition": {
+            "lineage_evidence_present": false,
+            "operation": "retire_entity"
+          },
+          "description": "Retiring master data requires lineage and audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lineage_evidence_required",
+            "required_action": "attach_lineage_evidence"
+          },
+          "name": "retire_requires_lineage_evidence"
+        },
+        {
+          "condition": {
+            "operation": "review",
+            "review_notes_present": false
+          },
+          "description": "Stewardship decisions require review notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "review_decisions_require_notes"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "MDMAdapterHealth",
+          "permission": "mdm:admin",
+          "route": "/mdm/adapters"
+        },
         "analytics": {
           "component": "MDMAnalytics",
           "permission": "mdm:view_analytics",
           "route": "/mdm/analytics"
+        },
+        "audit": {
+          "component": "MDMAuditTimeline",
+          "permission": "mdm:view_audit",
+          "route": "/mdm/audit"
+        },
+        "cross_references": {
+          "component": "CrossReferenceConsole",
+          "permission": "mdm:manage_cross_references",
+          "route": "/mdm/cross-references"
         },
         "dashboard": {
           "component": "MDMDashboard",
@@ -269,6 +648,16 @@
           "permission": "mdm:manage_golden_records",
           "route": "/mdm/golden-records"
         },
+        "lineage": {
+          "component": "EntityLineageTrace",
+          "permission": "mdm:view_lineage",
+          "route": "/mdm/lineage"
+        },
+        "publish": {
+          "component": "PublishReadinessConsole",
+          "permission": "mdm:publish",
+          "route": "/mdm/publish"
+        },
         "quality": {
           "component": "QualityConsole",
           "permission": "mdm:view_quality",
@@ -285,9 +674,23 @@
           "route": "/mdm/stewardship"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "adapter_status_panel": {
+            "status_indicator": "adapter-state",
+            "visual": "backend-grid"
+          },
+          "audit_decision_timeline": {
+            "highlight": "matched-rule-chip",
+            "visual": "decision-timeline"
+          },
+          "cross_reference_matrix": {
+            "status_indicator": "mapping-state",
+            "visual": "source-system-grid"
+          },
           "duplicate_review_queue": {
             "highlight": "confidence-chip",
             "visual": "candidate-stack"
@@ -301,9 +704,17 @@
             "risk_style": "quality-band",
             "status_indicator": "survivorship-pill"
           },
+          "publish_readiness_panel": {
+            "status_style": "readiness-band",
+            "visual": "gate-checklist"
+          },
           "quality_score_panel": {
             "threshold_style": "score-bands",
             "visual": "dimension-radar"
+          },
+          "stewardship_decision_panel": {
+            "highlight": "review-chip",
+            "visual": "decision-queue"
           }
         },
         "name": "mdm_golden_record_console",
@@ -368,11 +779,46 @@
             "permission": "mdm:steward"
           },
           {
+            "component": "EntityLineageTrace",
+            "name": "lineage",
+            "nav_group": "Governance",
+            "path": "/mdm/lineage",
+            "permission": "mdm:view_lineage"
+          },
+          {
+            "component": "CrossReferenceConsole",
+            "name": "cross_references",
+            "nav_group": "Operations",
+            "path": "/mdm/cross-references",
+            "permission": "mdm:manage_cross_references"
+          },
+          {
+            "component": "PublishReadinessConsole",
+            "name": "publish",
+            "nav_group": "Operations",
+            "path": "/mdm/publish",
+            "permission": "mdm:publish"
+          },
+          {
             "component": "MDMAnalytics",
             "name": "analytics",
             "nav_group": "Intelligence",
             "path": "/mdm/analytics",
             "permission": "mdm:view_analytics"
+          },
+          {
+            "component": "MDMAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/mdm/audit",
+            "permission": "mdm:view_audit"
+          },
+          {
+            "component": "MDMAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Administration",
+            "path": "/mdm/adapters",
+            "permission": "mdm:admin"
           },
           {
             "component": "MDMSettings",
@@ -401,15 +847,36 @@
   "contracts": {
     "mdm": {
       "configuration": {
+        "adapters": {
+          "database_runtime": "service.MDMService",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MdmService",
+          "lineage_adapter": "adapter",
+          "matching_engine": "adapter",
+          "metadata_catalog": "adapter",
+          "quality_engine": "adapter"
+        },
         "entities": {
+          "business_key_required": true,
           "cross_reference_tracking": true,
           "golden_record_required": true,
+          "restricted_entity_types": [
+            "customer",
+            "employee",
+            "account",
+            "contract"
+          ],
           "supported_entity_types": [
             "customer",
             "product",
             "supplier",
+            "employee",
             "location",
-            "asset"
+            "asset",
+            "account",
+            "contract",
+            "organization",
+            "custom"
           ],
           "version_history_enabled": true
         },
@@ -417,21 +884,33 @@
           "audit_all_mutations": true,
           "publish_requires_data_owner": true,
           "require_tenant_context": true,
+          "restricted_data_requires_classification_evidence": true,
+          "retire_requires_lineage_evidence": true,
+          "review_notes_required": true,
           "steward_approval_required": true
         },
         "integration": {
           "emit_entity_events": true,
+          "event_stream_adapter": "bytewax",
           "metadata_sync_enabled": true,
+          "source_system_evidence_required": true,
           "use_cache": true
         },
         "matching": {
           "ai_matching_enabled": true,
           "auto_merge_threshold": 95.0,
+          "conflict_review_required": true,
           "duplicate_detection_enabled": true,
-          "manual_review_threshold": 70.0
+          "manual_review_threshold": 70.0,
+          "steward_review_required": true
         },
         "quality": {
+          "assessment_required_before_publish": true,
           "block_publish_below_score": 60.0,
+          "dimension_score_range": [
+            0.0,
+            100.0
+          ],
           "dimensions": [
             "completeness",
             "accuracy",
@@ -443,16 +922,34 @@
           "minimum_quality_score": 80.0,
           "quality_assessment_enabled": true
         },
+        "survivorship": {
+          "independent_steward_required_for_conflicts": true,
+          "policy_required_for_merge": true,
+          "supported_policies": [
+            "most_recent",
+            "most_complete",
+            "most_trusted_source",
+            "highest_quality",
+            "custom_rules",
+            "ai_determined"
+          ]
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "mdm_golden_record_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
+          "enable_cross_reference_console": true,
           "enable_dashboard": true,
           "enable_entity_workbench": true,
+          "enable_lineage_trace": true,
           "enable_match_review": true,
-          "enable_quality_console": true
+          "enable_publish_console": true,
+          "enable_quality_console": true,
+          "enable_stewardship_queue": true
         }
       },
       "id": "mdm",
@@ -492,6 +989,59 @@
   },
   "roles": {},
   "rules": {
+    "auto_merge_requires_high_confidence": {
+      "condition": {
+        "auto_merge_confidence_low": true,
+        "operation": "auto_merge_duplicate"
+      },
+      "description": "Automated golden-record merges require configured high confidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "auto_merge_confidence_too_low",
+        "required_action": "route_to_steward_review"
+      },
+      "name": "auto_merge_requires_high_confidence"
+    },
+    "business_key_required_for_entity": {
+      "condition": {
+        "business_key_present": false,
+        "operation": "register_entity"
+      },
+      "description": "Every master-data entity requires a durable business key.",
+      "effect": {
+        "decision": "deny",
+        "reason": "business_key_required",
+        "required_action": "attach_business_key"
+      },
+      "name": "business_key_required_for_entity"
+    },
+    "conflicted_merge_requires_independent_steward": {
+      "condition": {
+        "conflict_present": true,
+        "independent_steward_present": false,
+        "operation": "merge_golden_record"
+      },
+      "description": "Conflicted merges require an independent steward decision.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "independent_steward_required",
+        "required_action": "assign_independent_steward"
+      },
+      "name": "conflicted_merge_requires_independent_steward"
+    },
+    "cross_reference_requires_source_evidence": {
+      "condition": {
+        "operation": "update_cross_reference",
+        "source_system_evidence_present": false
+      },
+      "description": "Cross-reference mapping changes require source-system evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_system_evidence_required",
+        "required_action": "attach_source_system_evidence"
+      },
+      "name": "cross_reference_requires_source_evidence"
+    },
     "duplicate_candidates_require_review": {
       "condition": {
         "duplicate_confidence_gt": 70.0,
@@ -518,6 +1068,19 @@
       },
       "name": "entity_publish_requires_data_owner"
     },
+    "entity_type_must_be_supported": {
+      "condition": {
+        "operation": "register_entity",
+        "unsupported_entity_type": true
+      },
+      "description": "Entity registration is limited to configured master-data entity types.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_entity_type",
+        "required_action": "configure_entity_type"
+      },
+      "name": "entity_type_must_be_supported"
+    },
     "golden_record_merge_requires_survivorship": {
       "condition": {
         "operation": "merge_golden_record",
@@ -530,6 +1093,19 @@
         "required_action": "attach_survivorship_policy"
       },
       "name": "golden_record_merge_requires_survivorship"
+    },
+    "invalid_quality_score_blocks_assessment": {
+      "condition": {
+        "operation": "assess_quality",
+        "quality_score_invalid": true
+      },
+      "description": "Quality score inputs must be within the configured score range.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invalid_quality_score",
+        "required_action": "normalize_quality_score"
+      },
+      "name": "invalid_quality_score_blocks_assessment"
     },
     "low_quality_blocks_publish": {
       "condition": {
@@ -544,6 +1120,19 @@
       },
       "name": "low_quality_blocks_publish"
     },
+    "publish_requires_latest_quality_assessment": {
+      "condition": {
+        "latest_quality_assessment_present": false,
+        "operation": "publish_entity"
+      },
+      "description": "Entities need a current quality assessment before publish.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quality_assessment_required",
+        "required_action": "run_quality_assessment"
+      },
+      "name": "publish_requires_latest_quality_assessment"
+    },
     "restricted_entity_requires_audit_trail": {
       "condition": {
         "audit_evidence_present": false,
@@ -556,6 +1145,59 @@
         "required_action": "record_audit_evidence"
       },
       "name": "restricted_entity_requires_audit_trail"
+    },
+    "restricted_entity_requires_classification_evidence": {
+      "condition": {
+        "classification_evidence_present": false,
+        "restricted_attributes_present": true
+      },
+      "description": "Restricted or sensitive attributes require classification evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "classification_evidence_required",
+        "required_action": "attach_classification_evidence"
+      },
+      "name": "restricted_entity_requires_classification_evidence"
+    },
+    "restricted_entity_requires_data_owner": {
+      "condition": {
+        "data_owner_assigned": false,
+        "entity_classification": "restricted",
+        "operation": "register_entity"
+      },
+      "description": "Restricted master data requires an accountable data owner at registration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "restricted_data_owner_required",
+        "required_action": "assign_data_owner"
+      },
+      "name": "restricted_entity_requires_data_owner"
+    },
+    "retire_requires_lineage_evidence": {
+      "condition": {
+        "lineage_evidence_present": false,
+        "operation": "retire_entity"
+      },
+      "description": "Retiring master data requires lineage and audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "lineage_evidence_required",
+        "required_action": "attach_lineage_evidence"
+      },
+      "name": "retire_requires_lineage_evidence"
+    },
+    "review_decisions_require_notes": {
+      "condition": {
+        "operation": "review",
+        "review_notes_present": false
+      },
+      "description": "Stewardship decisions require review notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "review_decisions_require_notes"
     },
     "tenant_context_required": {
       "condition": {
