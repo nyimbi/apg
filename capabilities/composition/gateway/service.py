@@ -255,7 +255,7 @@ class ASMService:
 		}
 	
 	# =============================================================================
-	# Revolutionary AI-Powered Methods
+	# AI-assisted mesh policy methods
 	# =============================================================================
 	
 	async def create_natural_language_policy(
@@ -1664,3 +1664,348 @@ async def create_asm_service(db_session: AsyncSession, redis_url: str) -> ASMSer
 	"""Factory function to create ASM service with dependencies."""
 	redis_client = redis.from_url(redis_url)
 	return ASMService(db_session, redis_client)
+
+
+# =============================================================================
+# Dependency-light APG capability lifecycle facade
+# =============================================================================
+
+from .capability_contract import (
+	SUPPORTED_GATEWAY_AGENT_ROLES,
+	SUPPORTED_GATEWAY_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
+
+
+class CompositionGatewayService:
+	"""Small APG-facing service mesh lifecycle behind the capability contract."""
+
+	def __init__(self) -> None:
+		self._services: Dict[str, Dict[str, Any]] = {}
+		self._routes: Dict[str, Dict[str, Any]] = {}
+		self._policies: Dict[str, Dict[str, Any]] = {}
+		self._certificates: Dict[str, Dict[str, Any]] = {}
+		self._traffic_shifts: Dict[str, Dict[str, Any]] = {}
+		self._agents: Dict[str, Dict[str, Any]] = {}
+		self._audit_events: List[Dict[str, Any]] = []
+
+	def describe(self, tenant_id: str = "default") -> Dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: Dict[str, Any]) -> Dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def register_service(
+		self,
+		service_key: str,
+		tenant_id: str,
+		name: str,
+		owner_id: str,
+		endpoints: List[Dict[str, Any]],
+		health_check_path: str,
+		capability_id: str,
+		public_service: bool = False,
+		metadata: Optional[Dict[str, Any]] = None,
+	) -> Dict[str, Any]:
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "register_service",
+			"service_owner_assigned": bool(owner_id),
+			"endpoint_present": bool(endpoints),
+			"health_check_present": bool(health_check_path),
+		})
+		service_id = f"gateway_service_{uuid7str()}"
+		record = {
+			"id": service_id,
+			"tenant_id": tenant_id,
+			"service_key": service_key,
+			"name": name,
+			"owner_id": owner_id,
+			"endpoints": [dict(endpoint) for endpoint in endpoints],
+			"health_check_path": health_check_path,
+			"capability_id": capability_id,
+			"public_service": public_service,
+			"status": "active",
+			"health_status": "unknown",
+			"metadata": dict(metadata or {}),
+			"created_at": datetime.now(timezone.utc).isoformat(),
+		}
+		self._services[service_id] = record
+		self._audit(tenant_id, "service_registered", service_id, owner_id, {"capability_id": capability_id})
+		return dict(record)
+
+	def create_route(
+		self,
+		route_key: str,
+		tenant_id: str,
+		service_id: str,
+		path: str,
+		methods: List[str],
+		public_route: bool,
+		policy_id: Optional[str] = None,
+		approved_by: Optional[str] = None,
+		tls_enabled: bool = False,
+		event_stream: str = "bytewax",
+	) -> Dict[str, Any]:
+		service = self._get_service(service_id)
+		if service["tenant_id"] != tenant_id:
+			raise ValueError("service_tenant_mismatch")
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_route",
+			"public_route": public_route,
+			"route_policy_attached": bool(policy_id),
+			"approval_recorded": bool(approved_by),
+			"tls_enabled": tls_enabled,
+			"event_stream": event_stream,
+		})
+		if not path.startswith("/"):
+			raise ValueError("route_path_must_start_with_slash")
+		route_id = f"gateway_route_{uuid7str()}"
+		record = {
+			"id": route_id,
+			"tenant_id": tenant_id,
+			"route_key": route_key,
+			"service_id": service_id,
+			"path": path,
+			"methods": list(methods),
+			"public_route": public_route,
+			"policy_id": policy_id,
+			"approved_by": approved_by,
+			"tls_enabled": tls_enabled,
+			"event_stream": event_stream,
+			"status": "active",
+		}
+		self._routes[route_id] = record
+		self._audit(tenant_id, "route_created", route_id, approved_by or service["owner_id"], {"path": path, "event_stream": event_stream})
+		return dict(record)
+
+	def attach_policy(
+		self,
+		policy_key: str,
+		tenant_id: str,
+		service_id: str,
+		rate_limit_configured: bool,
+		circuit_breaker_configured: bool,
+		owner_id: str,
+	) -> Dict[str, Any]:
+		service = self._get_service(service_id)
+		if service["tenant_id"] != tenant_id:
+			raise ValueError("service_tenant_mismatch")
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "attach_policy",
+			"public_service": bool(service["public_service"]),
+			"rate_limit_configured": rate_limit_configured,
+			"circuit_breaker_configured": circuit_breaker_configured,
+		})
+		policy_id = f"gateway_policy_{uuid7str()}"
+		record = {
+			"id": policy_id,
+			"tenant_id": tenant_id,
+			"policy_key": policy_key,
+			"service_id": service_id,
+			"rate_limit_configured": rate_limit_configured,
+			"circuit_breaker_configured": circuit_breaker_configured,
+			"owner_id": owner_id,
+			"status": "active",
+		}
+		self._policies[policy_id] = record
+		self._audit(tenant_id, "policy_attached", policy_id, owner_id, {"service_id": service_id})
+		return dict(record)
+
+	def shift_traffic(
+		self,
+		shift_key: str,
+		tenant_id: str,
+		route_id: str,
+		weights: Dict[str, int],
+		actor_id: str,
+		canary_shift: bool = False,
+		canary_evidence: Optional[str] = None,
+		event_stream: str = "bytewax",
+	) -> Dict[str, Any]:
+		route = self._get_route(route_id)
+		if route["tenant_id"] != tenant_id:
+			raise ValueError("route_tenant_mismatch")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "shift_traffic",
+			"canary_shift": canary_shift,
+			"canary_evidence_present": bool(canary_evidence),
+			"event_stream": event_stream,
+		})
+		if result["decision"] == "deny" or (result["decision"] == "require_review" and not canary_evidence):
+			raise PermissionError(",".join(result["matched_rules"]))
+		shift_id = f"gateway_traffic_{uuid7str()}"
+		record = {
+			"id": shift_id,
+			"tenant_id": tenant_id,
+			"route_id": route_id,
+			"weights": dict(weights),
+			"actor_id": actor_id,
+			"canary_shift": canary_shift,
+			"canary_evidence": canary_evidence,
+			"event_stream": event_stream,
+			"status": "active",
+		}
+		self._traffic_shifts[shift_id] = record
+		self._audit(tenant_id, "traffic_shifted", shift_id, actor_id, {"route_id": route_id, "event_stream": event_stream})
+		return dict(record)
+
+	def register_certificate(
+		self,
+		certificate_key: str,
+		tenant_id: str,
+		domain: str,
+		owner_id: str,
+		secret_reference: str,
+		expires_at: str,
+	) -> Dict[str, Any]:
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_certificate",
+			"certificate_owner_assigned": bool(owner_id),
+			"secret_reference_present": bool(secret_reference),
+		})
+		certificate_id = f"gateway_certificate_{uuid7str()}"
+		record = {
+			"id": certificate_id,
+			"tenant_id": tenant_id,
+			"certificate_key": certificate_key,
+			"domain": domain,
+			"owner_id": owner_id,
+			"secret_reference": secret_reference,
+			"expires_at": expires_at,
+			"status": "active",
+		}
+		self._certificates[certificate_id] = record
+		self._audit(tenant_id, "certificate_registered", certificate_id, owner_id, {"domain": domain})
+		return dict(record)
+
+	def record_health(self, tenant_id: str, service_id: str, status: str, latency_ms: int, actor_id: str = "system") -> Dict[str, Any]:
+		service = self._get_service(service_id)
+		if service["tenant_id"] != tenant_id:
+			raise ValueError("service_tenant_mismatch")
+		service["health_status"] = status
+		service["last_latency_ms"] = latency_ms
+		self._audit(tenant_id, "health_recorded", service_id, actor_id, {"status": status, "latency_ms": latency_ms})
+		return dict(service)
+
+	def register_gateway_agent(self, tenant_id: str, name: str, runtime: str, role: str, instructions: str) -> Dict[str, Any]:
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_gateway_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_GATEWAY_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_GATEWAY_AGENT_ROLES,
+		})
+		agent_id = f"gateway_agent_{uuid7str()}"
+		record = {"id": agent_id, "tenant_id": tenant_id, "name": name, "runtime": runtime, "role": role, "instructions": instructions, "status": "active"}
+		self._agents[agent_id] = record
+		self._audit(tenant_id, "gateway_agent_registered", agent_id, name, {"runtime": runtime, "role": role})
+		return dict(record)
+
+	def validate_agent_gateway_action(self, tenant_id: str, agent_id: str, action: str, privileged_scope: bool, human_approval_recorded: bool) -> Dict[str, Any]:
+		agent = self._agents[agent_id]
+		if agent["tenant_id"] != tenant_id:
+			raise ValueError("agent_tenant_mismatch")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "agent_gateway_action",
+			"privileged_scope": privileged_scope,
+			"human_approval_recorded": human_approval_recorded,
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(",".join(result["matched_rules"]))
+		return {"tenant_id": tenant_id, "agent_id": agent_id, "action": action, "decision": result["decision"], "matched_rules": result["matched_rules"]}
+
+	def validate_batch_route_change(self, tenant_id: str, route_count: int, event_stream: str = "bytewax") -> Dict[str, Any]:
+		self._enforce({"tenant_context_present": bool(tenant_id), "operation": "batch_route_change", "event_stream": event_stream})
+		return {"tenant_id": tenant_id, "route_count": route_count, "event_stream": event_stream, "stream": event_stream_name(), "processor": "bytewax"}
+
+	def dashboard_summary(self, tenant_id: str = "default") -> Dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"service_count": len(self.list_services(tenant_id)),
+			"route_count": len(self.list_routes(tenant_id)),
+			"policy_count": len(self.list_policies(tenant_id)),
+			"certificate_count": len(self.list_certificates(tenant_id)),
+			"traffic_shift_count": len(self.list_traffic_shifts(tenant_id)),
+			"gateway_agent_count": len(self.list_gateway_agents(tenant_id)),
+			"audit_event_count": len(self.audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
+		}
+
+	def create_record(self, record_id: str, tenant_id: str, metadata: Optional[Dict[str, Any]] = None, status: str = "active") -> Dict[str, Any]:
+		service = self.register_service(
+			service_key=record_id,
+			tenant_id=tenant_id,
+			name=str((metadata or {}).get("name") or record_id),
+			owner_id=str((metadata or {}).get("owner_id") or "system"),
+			endpoints=list((metadata or {}).get("endpoints") or [{"host": "localhost", "port": 8080, "protocol": "http"}]),
+			health_check_path=str((metadata or {}).get("health_check_path") or "/health"),
+			capability_id=str((metadata or {}).get("capability_id") or "composition_gateway"),
+			metadata=metadata,
+		)
+		service["status"] = status
+		return service
+
+	def list_records(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self.list_services(tenant_id)
+
+	def list_services(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._services, tenant_id)
+
+	def list_routes(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._routes, tenant_id)
+
+	def list_policies(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._policies, tenant_id)
+
+	def list_certificates(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._certificates, tenant_id)
+
+	def list_traffic_shifts(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._traffic_shifts, tenant_id)
+
+	def list_gateway_agents(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def audit_events(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return [event for event in self._audit_events if tenant_id is None or event["tenant_id"] == tenant_id]
+
+	def _enforce(self, context: Dict[str, Any]) -> None:
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			raise PermissionError(",".join(result["matched_rules"]))
+
+	def _audit(self, tenant_id: str, event_type: str, entity_id: str, actor_id: str, metadata: Dict[str, Any]) -> None:
+		self._audit_events.append({
+			"id": f"gateway_audit_{uuid7str()}",
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"entity_id": entity_id,
+			"actor_id": actor_id,
+			"metadata": dict(metadata),
+			"created_at": datetime.now(timezone.utc).isoformat(),
+		})
+
+	def _list(self, records: Dict[str, Dict[str, Any]], tenant_id: Optional[str]) -> List[Dict[str, Any]]:
+		return [dict(record) for record in records.values() if tenant_id is None or record["tenant_id"] == tenant_id]
+
+	def _get_service(self, service_id: str) -> Dict[str, Any]:
+		try:
+			return self._services[service_id]
+		except KeyError as exc:
+			raise KeyError(f"unknown_service:{service_id}") from exc
+
+	def _get_route(self, route_id: str) -> Dict[str, Any]:
+		try:
+			return self._routes[route_id]
+		except KeyError as exc:
+			raise KeyError(f"unknown_route:{route_id}") from exc

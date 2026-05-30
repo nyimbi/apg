@@ -1,60 +1,120 @@
 {
   "agents": {},
   "app": {
-    "description": "API Service Mesh package-backed APG capability",
-    "entity_count": 0,
+    "description": "API service mesh package-backed APG capability",
+    "entity_count": 6,
     "name": "composition_gateway",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "composition_gateway": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Foundation Infrastructure > Composition Orchestration",
-          "enabled": true,
-          "id": "composition_gateway",
-          "name": "API Service Mesh",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/gateway/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "secrets": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "gateway_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_and_validate",
+          "supported_roles": [
+            "mesh_architect",
+            "route_reviewer",
+            "policy_reviewer",
+            "traffic_reviewer",
+            "certificate_reviewer",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privileged_route_changes_reviewed": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_policy_events": true,
+          "emit_route_events": true,
+          "emit_service_events": true,
+          "emit_traffic_events": true,
+          "event_stream": "apg.composition.gateway.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "routes": {
+          "approval_required_for_public": true,
+          "match_rule_required": true,
+          "policy_required_for_public": true,
+          "service_required": true
+        },
+        "security": {
+          "certificate_owner_required": true,
+          "m_tls_supported": true,
+          "secret_reference_required": true,
+          "tls_required_for_public": true
+        },
+        "services": {
+          "capability_binding_required": true,
+          "endpoint_required": true,
+          "health_check_required": true,
+          "owner_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_gateway_operations"
+          "default_theme": "composition_gateway_control"
+        },
+        "traffic": {
+          "canary_evidence_required": true,
+          "canary_supported": true,
+          "circuit_breaker_required": true,
+          "rate_limit_required_for_public": true
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_certificate_console": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_policy_center": true,
+          "enable_route_console": true,
+          "enable_service_registry": true,
+          "enable_settings": true,
+          "enable_traffic_console": true
         }
       },
-      "erp_modules": [
-        "composition"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "API Service Mesh",
       "provides": [
-        "composition_gateway_operations"
+        "service_mesh_registry",
+        "gateway_route_lifecycle",
+        "traffic_management",
+        "gateway_policy_enforcement",
+        "certificate_lifecycle",
+        "mesh_health_observability",
+        "gateway_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access",
+        "composition_events"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "API Service Mesh operations require tenant context.",
+            "description": "All gateway operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +127,241 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "API Service Mesh write operations require policy enforcement.",
+            "description": "Gateway write operations require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "gateway_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "register_service",
+              "service_owner_assigned": false
             },
-            "description": "High-risk API Service Mesh operations require review.",
+            "description": "Mesh services require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_owner_required",
+              "required_action": "assign_service_owner"
+            },
+            "name": "service_requires_owner"
+          },
+          {
+            "condition": {
+              "endpoint_present": false,
+              "operation": "register_service"
+            },
+            "description": "Mesh services require at least one endpoint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_endpoint_required",
+              "required_action": "attach_service_endpoint"
+            },
+            "name": "service_requires_endpoint"
+          },
+          {
+            "condition": {
+              "health_check_present": false,
+              "operation": "register_service"
+            },
+            "description": "Mesh services require health-check configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_health_check_required",
+              "required_action": "attach_health_check"
+            },
+            "name": "service_requires_health_check"
+          },
+          {
+            "condition": {
+              "operation": "create_route",
+              "public_route": true,
+              "route_policy_attached": false
+            },
+            "description": "Public routes require an attached policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "public_route_policy_required",
+              "required_action": "attach_route_policy"
+            },
+            "name": "public_route_requires_policy"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_route",
+              "public_route": true
+            },
+            "description": "Public routes require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "public_route_approval_required",
+              "required_action": "record_route_approval"
+            },
+            "name": "public_route_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "create_route",
+              "public_route": true,
+              "tls_enabled": false
+            },
+            "description": "Public routes require TLS.",
+            "effect": {
+              "decision": "deny",
+              "reason": "public_route_tls_required",
+              "required_action": "enable_tls"
+            },
+            "name": "public_route_requires_tls"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "create_route"
+            },
+            "description": "Route lifecycle events must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_gateway_lifecycle_to_bytewax"
+            },
+            "name": "route_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "canary_evidence_present": false,
+              "canary_shift": true,
+              "operation": "shift_traffic"
+            },
+            "description": "Canary traffic shifts require evidence.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "canary_evidence_required",
+              "required_action": "attach_canary_evidence"
             },
-            "name": "high_risk_requires_review"
+            "name": "traffic_shift_requires_canary_evidence"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "shift_traffic"
+            },
+            "description": "Traffic-shift events must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_traffic_shift_to_bytewax"
+            },
+            "name": "traffic_shift_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "attach_policy",
+              "public_service": true,
+              "rate_limit_configured": false
+            },
+            "description": "Public services require rate limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rate_limit_required",
+              "required_action": "configure_rate_limit"
+            },
+            "name": "public_service_requires_rate_limit"
+          },
+          {
+            "condition": {
+              "circuit_breaker_configured": false,
+              "operation": "attach_policy",
+              "public_service": true
+            },
+            "description": "Public services require circuit breakers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "circuit_breaker_required",
+              "required_action": "configure_circuit_breaker"
+            },
+            "name": "public_service_requires_circuit_breaker"
+          },
+          {
+            "condition": {
+              "certificate_owner_assigned": false,
+              "operation": "register_certificate"
+            },
+            "description": "Certificates require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "certificate_owner_required",
+              "required_action": "assign_certificate_owner"
+            },
+            "name": "certificate_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_certificate",
+              "secret_reference_present": false
+            },
+            "description": "Certificates require a secret reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "certificate_secret_reference_required",
+              "required_action": "attach_secret_reference"
+            },
+            "name": "certificate_requires_secret_reference"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_route_change"
+            },
+            "description": "Batch route changes require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_gateway_changes_to_bytewax"
+            },
+            "name": "batch_route_change_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "gateway_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "gateway_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_gateway_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged gateway actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_gateway_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +371,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "API Service Mesh operations require tenant context.",
+          "description": "All gateway operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +384,241 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "API Service Mesh write operations require policy enforcement.",
+          "description": "Gateway write operations require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "gateway_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "register_service",
+            "service_owner_assigned": false
           },
-          "description": "High-risk API Service Mesh operations require review.",
+          "description": "Mesh services require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_owner_required",
+            "required_action": "assign_service_owner"
+          },
+          "name": "service_requires_owner"
+        },
+        {
+          "condition": {
+            "endpoint_present": false,
+            "operation": "register_service"
+          },
+          "description": "Mesh services require at least one endpoint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_endpoint_required",
+            "required_action": "attach_service_endpoint"
+          },
+          "name": "service_requires_endpoint"
+        },
+        {
+          "condition": {
+            "health_check_present": false,
+            "operation": "register_service"
+          },
+          "description": "Mesh services require health-check configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_health_check_required",
+            "required_action": "attach_health_check"
+          },
+          "name": "service_requires_health_check"
+        },
+        {
+          "condition": {
+            "operation": "create_route",
+            "public_route": true,
+            "route_policy_attached": false
+          },
+          "description": "Public routes require an attached policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "public_route_policy_required",
+            "required_action": "attach_route_policy"
+          },
+          "name": "public_route_requires_policy"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_route",
+            "public_route": true
+          },
+          "description": "Public routes require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "public_route_approval_required",
+            "required_action": "record_route_approval"
+          },
+          "name": "public_route_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "create_route",
+            "public_route": true,
+            "tls_enabled": false
+          },
+          "description": "Public routes require TLS.",
+          "effect": {
+            "decision": "deny",
+            "reason": "public_route_tls_required",
+            "required_action": "enable_tls"
+          },
+          "name": "public_route_requires_tls"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "create_route"
+          },
+          "description": "Route lifecycle events must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_gateway_lifecycle_to_bytewax"
+          },
+          "name": "route_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "canary_evidence_present": false,
+            "canary_shift": true,
+            "operation": "shift_traffic"
+          },
+          "description": "Canary traffic shifts require evidence.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "canary_evidence_required",
+            "required_action": "attach_canary_evidence"
           },
-          "name": "high_risk_requires_review"
+          "name": "traffic_shift_requires_canary_evidence"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "shift_traffic"
+          },
+          "description": "Traffic-shift events must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_traffic_shift_to_bytewax"
+          },
+          "name": "traffic_shift_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "attach_policy",
+            "public_service": true,
+            "rate_limit_configured": false
+          },
+          "description": "Public services require rate limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rate_limit_required",
+            "required_action": "configure_rate_limit"
+          },
+          "name": "public_service_requires_rate_limit"
+        },
+        {
+          "condition": {
+            "circuit_breaker_configured": false,
+            "operation": "attach_policy",
+            "public_service": true
+          },
+          "description": "Public services require circuit breakers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "circuit_breaker_required",
+            "required_action": "configure_circuit_breaker"
+          },
+          "name": "public_service_requires_circuit_breaker"
+        },
+        {
+          "condition": {
+            "certificate_owner_assigned": false,
+            "operation": "register_certificate"
+          },
+          "description": "Certificates require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "certificate_owner_required",
+            "required_action": "assign_certificate_owner"
+          },
+          "name": "certificate_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_certificate",
+            "secret_reference_present": false
+          },
+          "description": "Certificates require a secret reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "certificate_secret_reference_required",
+            "required_action": "attach_secret_reference"
+          },
+          "name": "certificate_requires_secret_reference"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_route_change"
+          },
+          "description": "Batch route changes require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_gateway_changes_to_bytewax"
+          },
+          "name": "batch_route_change_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "gateway_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "gateway_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_gateway_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged gateway actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_gateway_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +628,105 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "GatewayAgentWorkbench",
+          "permission": "composition_gateway:admin",
+          "route": "/composition-gateway/agents"
+        },
+        "certificates": {
+          "component": "GatewayCertificateConsole",
+          "permission": "composition_gateway:admin",
+          "route": "/composition-gateway/certificates"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "GatewayDashboard",
           "permission": "composition_gateway:view",
           "route": "/composition-gateway/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "composition_gateway:operate",
-          "route": "/composition-gateway/operations"
-        },
-        "rules": {
-          "component": "CapabilityRules",
+        "policies": {
+          "component": "GatewayPolicyCenter",
           "permission": "composition_gateway:govern",
-          "route": "/composition-gateway/rules"
+          "route": "/composition-gateway/policies"
+        },
+        "routes": {
+          "component": "GatewayRouteConsole",
+          "permission": "composition_gateway:manage_routes",
+          "route": "/composition-gateway/routes"
+        },
+        "services": {
+          "component": "GatewayServiceRegistry",
+          "permission": "composition_gateway:manage_services",
+          "route": "/composition-gateway/services"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "GatewaySettings",
           "permission": "composition_gateway:admin",
           "route": "/composition-gateway/settings"
+        },
+        "traffic": {
+          "component": "GatewayTrafficConsole",
+          "permission": "composition_gateway:operate",
+          "route": "/composition-gateway/traffic"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "service_registered",
+          "route_created",
+          "policy_attached",
+          "traffic_shifted",
+          "certificate_registered",
+          "health_recorded",
+          "gateway_agent_registered"
+        ],
+        "guardrails": [
+          "route_requires_bytewax_stream",
+          "traffic_shift_requires_bytewax_stream",
+          "batch_route_change_requires_bytewax",
+          "privileged_agent_gateway_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "healthy",
+          "degraded",
+          "canary",
+          "blocked",
+          "retired"
+        ],
+        "stream": "apg.composition.gateway.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "certificate_console": {
+            "status_style": "expiry-chip",
+            "visual": "certificate-list"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "policy_center": {
+            "status_style": "guardrail-chip",
+            "visual": "policy-grid"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "route_console": {
+            "status_style": "route-chip",
+            "visual": "route-table"
+          },
+          "service_registry": {
+            "icon": "server",
+            "risk_style": "health-band",
+            "status_indicator": "service-pill"
+          },
+          "traffic_console": {
+            "status_style": "canary-chip",
+            "visual": "traffic-lanes"
           }
         },
-        "name": "composition_gateway_operations",
+        "name": "composition_gateway_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +746,56 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "GatewayDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/composition-gateway/dashboard",
             "permission": "composition_gateway:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/composition-gateway/operations",
-            "permission": "composition_gateway:operate"
+            "component": "GatewayServiceRegistry",
+            "name": "services",
+            "nav_group": "Services",
+            "path": "/composition-gateway/services",
+            "permission": "composition_gateway:manage_services"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "GatewayRouteConsole",
+            "name": "routes",
+            "nav_group": "Routes",
+            "path": "/composition-gateway/routes",
+            "permission": "composition_gateway:manage_routes"
+          },
+          {
+            "component": "GatewayPolicyCenter",
+            "name": "policies",
             "nav_group": "Governance",
-            "path": "/composition-gateway/rules",
+            "path": "/composition-gateway/policies",
             "permission": "composition_gateway:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "GatewayTrafficConsole",
+            "name": "traffic",
+            "nav_group": "Operations",
+            "path": "/composition-gateway/traffic",
+            "permission": "composition_gateway:operate"
+          },
+          {
+            "component": "GatewayCertificateConsole",
+            "name": "certificates",
+            "nav_group": "Security",
+            "path": "/composition-gateway/certificates",
+            "permission": "composition_gateway:admin"
+          },
+          {
+            "component": "GatewayAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/composition-gateway/agents",
+            "permission": "composition_gateway:admin"
+          },
+          {
+            "component": "GatewaySettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/composition-gateway/settings",
@@ -238,46 +812,137 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "api_service_mesh": {
+        "supported_roles": [
+          "mesh_architect",
+          "route_reviewer",
+          "policy_reviewer",
+          "traffic_reviewer",
+          "certificate_reviewer",
+          "incident_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "composition_gateway": []
+      "composition_gateway": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access",
+        "composition_events"
+      ]
     }
   },
   "contracts": {
     "composition_gateway": {
       "configuration": {
-        "capability": {
-          "category": "Foundation Infrastructure > Composition Orchestration",
-          "enabled": true,
-          "id": "composition_gateway",
-          "name": "API Service Mesh",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/gateway/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "secrets": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "gateway_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_and_validate",
+          "supported_roles": [
+            "mesh_architect",
+            "route_reviewer",
+            "policy_reviewer",
+            "traffic_reviewer",
+            "certificate_reviewer",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privileged_route_changes_reviewed": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_policy_events": true,
+          "emit_route_events": true,
+          "emit_service_events": true,
+          "emit_traffic_events": true,
+          "event_stream": "apg.composition.gateway.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "routes": {
+          "approval_required_for_public": true,
+          "match_rule_required": true,
+          "policy_required_for_public": true,
+          "service_required": true
+        },
+        "security": {
+          "certificate_owner_required": true,
+          "m_tls_supported": true,
+          "secret_reference_required": true,
+          "tls_required_for_public": true
+        },
+        "services": {
+          "capability_binding_required": true,
+          "endpoint_required": true,
+          "health_check_required": true,
+          "owner_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_gateway_operations"
+          "default_theme": "composition_gateway_control"
+        },
+        "traffic": {
+          "canary_evidence_required": true,
+          "canary_supported": true,
+          "circuit_breaker_required": true,
+          "rate_limit_required_for_public": true
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_certificate_console": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_policy_center": true,
+          "enable_route_console": true,
+          "enable_service_registry": true,
+          "enable_settings": true,
+          "enable_traffic_console": true
         }
       },
       "id": "composition_gateway",
       "provides": [
-        "composition_gateway_operations"
+        "service_mesh_registry",
+        "gateway_route_lifecycle",
+        "traffic_management",
+        "gateway_policy_enforcement",
+        "certificate_lifecycle",
+        "mesh_health_observability",
+        "gateway_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access",
+        "composition_events"
+      ]
     }
   },
   "deployment": {
@@ -289,89 +954,271 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "composition_gateway": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "batch_route_change_requires_bytewax": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "event_stream_ne": "bytewax",
+        "operation": "batch_route_change"
       },
-      "description": "High-risk API Service Mesh operations require review.",
+      "description": "Batch route changes require Bytewax coordination.",
       "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_gateway_changes_to_bytewax"
       },
-      "name": "high_risk_requires_review"
+      "name": "batch_route_change_requires_bytewax"
     },
-    "operation_policy_required": {
+    "certificate_requires_owner": {
+      "condition": {
+        "certificate_owner_assigned": false,
+        "operation": "register_certificate"
+      },
+      "description": "Certificates require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "certificate_owner_required",
+        "required_action": "assign_certificate_owner"
+      },
+      "name": "certificate_requires_owner"
+    },
+    "certificate_requires_secret_reference": {
+      "condition": {
+        "operation": "register_certificate",
+        "secret_reference_present": false
+      },
+      "description": "Certificates require a secret reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "certificate_secret_reference_required",
+        "required_action": "attach_secret_reference"
+      },
+      "name": "certificate_requires_secret_reference"
+    },
+    "gateway_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_gateway_agent"
+      },
+      "description": "Gateway agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "gateway_agent_role_supported"
+    },
+    "gateway_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_gateway_agent"
+      },
+      "description": "Gateway agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "gateway_agent_runtime_supported"
+    },
+    "gateway_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "API Service Mesh write operations require policy enforcement.",
+      "description": "Gateway write operations require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "gateway_write_requires_policy"
+    },
+    "privileged_agent_gateway_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_gateway_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged gateway actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_gateway_action_requires_human_approval"
+    },
+    "public_route_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "create_route",
+        "public_route": true
+      },
+      "description": "Public routes require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "public_route_approval_required",
+        "required_action": "record_route_approval"
+      },
+      "name": "public_route_requires_approval"
+    },
+    "public_route_requires_policy": {
+      "condition": {
+        "operation": "create_route",
+        "public_route": true,
+        "route_policy_attached": false
+      },
+      "description": "Public routes require an attached policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "public_route_policy_required",
+        "required_action": "attach_route_policy"
+      },
+      "name": "public_route_requires_policy"
+    },
+    "public_route_requires_tls": {
+      "condition": {
+        "operation": "create_route",
+        "public_route": true,
+        "tls_enabled": false
+      },
+      "description": "Public routes require TLS.",
+      "effect": {
+        "decision": "deny",
+        "reason": "public_route_tls_required",
+        "required_action": "enable_tls"
+      },
+      "name": "public_route_requires_tls"
+    },
+    "public_service_requires_circuit_breaker": {
+      "condition": {
+        "circuit_breaker_configured": false,
+        "operation": "attach_policy",
+        "public_service": true
+      },
+      "description": "Public services require circuit breakers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "circuit_breaker_required",
+        "required_action": "configure_circuit_breaker"
+      },
+      "name": "public_service_requires_circuit_breaker"
+    },
+    "public_service_requires_rate_limit": {
+      "condition": {
+        "operation": "attach_policy",
+        "public_service": true,
+        "rate_limit_configured": false
+      },
+      "description": "Public services require rate limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rate_limit_required",
+        "required_action": "configure_rate_limit"
+      },
+      "name": "public_service_requires_rate_limit"
+    },
+    "route_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "create_route"
+      },
+      "description": "Route lifecycle events must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_gateway_lifecycle_to_bytewax"
+      },
+      "name": "route_requires_bytewax_stream"
+    },
+    "service_requires_endpoint": {
+      "condition": {
+        "endpoint_present": false,
+        "operation": "register_service"
+      },
+      "description": "Mesh services require at least one endpoint.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_endpoint_required",
+        "required_action": "attach_service_endpoint"
+      },
+      "name": "service_requires_endpoint"
+    },
+    "service_requires_health_check": {
+      "condition": {
+        "health_check_present": false,
+        "operation": "register_service"
+      },
+      "description": "Mesh services require health-check configuration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_health_check_required",
+        "required_action": "attach_health_check"
+      },
+      "name": "service_requires_health_check"
+    },
+    "service_requires_owner": {
+      "condition": {
+        "operation": "register_service",
+        "service_owner_assigned": false
+      },
+      "description": "Mesh services require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_owner_required",
+        "required_action": "assign_service_owner"
+      },
+      "name": "service_requires_owner"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "API Service Mesh operations require tenant context.",
+      "description": "All gateway operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.composition_gateway": {
-      "file": "capability_contract.py",
-      "id": "capability.composition_gateway",
-      "kind": "capability",
-      "name": "API Service Mesh",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+    },
+    "traffic_shift_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "shift_traffic"
       },
-      "references": []
+      "description": "Traffic-shift events must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_traffic_shift_to_bytewax"
+      },
+      "name": "traffic_shift_requires_bytewax_stream"
+    },
+    "traffic_shift_requires_canary_evidence": {
+      "condition": {
+        "canary_evidence_present": false,
+        "canary_shift": true,
+        "operation": "shift_traffic"
+      },
+      "description": "Canary traffic shifts require evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "canary_evidence_required",
+        "required_action": "attach_canary_evidence"
+      },
+      "name": "traffic_shift_requires_canary_evidence"
     }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

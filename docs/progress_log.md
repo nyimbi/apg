@@ -16,6 +16,91 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:29 EAT
+
+Composition GATEWAY API service-mesh lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md` for the `composition_gateway`
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with service, route, traffic, security,
+  gateway-agent, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  service ownership, service endpoints, service health checks, public route
+  policy, public route approval, public route TLS, route Bytewax streams, canary
+  traffic evidence, traffic-shift Bytewax streams, public-service rate limits,
+  public-service circuit breakers, certificate ownership, certificate secret
+  references, batch route-change Bytewax streams, gateway-agent runtime/role,
+  and privileged agent-action approval.
+- Preserved the existing service-mesh internals while adding
+  `CompositionGatewayService`, a dependency-light APG lifecycle facade for
+  service registration, route creation, policy attachment, traffic shifting,
+  certificate registration, health evidence, gateway agents, batch validation,
+  dashboard summaries, audit events, and compatibility record helpers.
+- Replaced API, view, app, and package-registration entrypoints with
+  dependency-light APG surfaces that expose service registry, route console,
+  policy center, traffic console, certificate console, agent workbench,
+  dashboard, and Bytewax metadata.
+- Refreshed package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, service, route, policy, traffic, certificate,
+  health, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/composition/gateway/__init__.py
+  capabilities/composition/gateway/capability_contract.py
+  capabilities/composition/gateway/service.py
+  capabilities/composition/gateway/api.py
+  capabilities/composition/gateway/views.py
+  capabilities/composition/gateway/app.py
+  capabilities/composition/gateway/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/composition/gateway/tests/test_package_contract.py` passed with 5
+  tests and only adjacent Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities inspect composition_gateway --json | jq '.ok,
+  .summary.route_count, .summary.rule_count, .summary.theme'` confirmed `true`,
+  8 routes, 19 rules, and `composition_gateway_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/composition/gateway
+  --json | jq '.ok, .side_effect_free, .warnings, .errors,
+  (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'` confirmed
+  `true`, `true`, no warnings, no errors, `composition_gateway`, `bytewax`,
+  `bytewax`, and runtime evidence loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/composition/gateway --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "from capabilities.composition.gateway import
+  CompositionGatewayService; service=CompositionGatewayService();
+  service.register_gateway_agent('tenant-proof','Proof agent','codex',
+  'route_reviewer','review routes'); print(service.dashboard_summary(
+  'tenant-proof'))"` passed and confirmed gateway-agent registration, audit
+  event emission, and Bytewax stream metadata.
+- `jq '.capabilities.composition_gateway.streaming.processor,
+  .capabilities.composition_gateway.provides,
+  .capabilities.composition_gateway.requires,
+  .capabilities.composition_gateway.screens.agents.route,
+  (.capabilities.composition_gateway.rules[] |
+  select(.name=="gateway_agent_runtime_supported") | .effect.reason),
+  (.capabilities.composition_gateway.rules[] |
+  select(.name=="route_requires_bytewax_stream") | .effect.reason)'
+  capabilities/composition/gateway/semantic_model.json` confirmed `bytewax`,
+  gateway-agent provides, required services, `/composition-gateway/agents`,
+  `gateway_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/python capabilities/composition/gateway/app.py` passed package
+  self-test.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches after removing one stale comment in `service.py`.
+- `git diff --check -- capabilities/composition/gateway` passed before this
+  progress entry; rerun staged diff check before commit.
+- Not run: live ingress/proxy controllers, service discovery stores,
+  certificate managers, durable audit sinks, live Bytewax topology, rendered
+  browser UI, gateway performance/failover checks, and full repository tests.
+
 ### 2026-05-30 23:03 EAT
 
 Composition EVENTS event-streaming lifecycle/guardrail packet:
