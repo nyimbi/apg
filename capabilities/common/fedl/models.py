@@ -175,6 +175,34 @@ class FederatedModel:
 
 
 @dataclass(frozen=True)
+class FederatedModelRelease:
+	"""Release evidence linking a federated model to MLCM governance."""
+
+	id: str
+	tenant_id: str
+	model_id: str
+	federation_id: str
+	mlcm_model_ref: str
+	release_approval_ref: str
+	privacy_review_ref: str
+	artifact_ref: str = ""
+	status: str = "released"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"model_id": self.model_id,
+			"federation_id": self.federation_id,
+			"mlcm_model_ref": self.mlcm_model_ref,
+			"release_approval_ref": self.release_approval_ref,
+			"privacy_review_ref": self.privacy_review_ref,
+			"artifact_ref": self.artifact_ref,
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
 class FedlAuditEvent:
 	"""Governance event emitted by federated learning operations."""
 

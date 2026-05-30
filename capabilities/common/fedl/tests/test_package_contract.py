@@ -1,4 +1,4 @@
-"""FEDL package contract and runtime tests."""
+"""Package contract tests for FEDL."""
 
 from __future__ import annotations
 
@@ -24,18 +24,20 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
-	module = _load_module("materialized_contract_fedl", PACKAGE_DIR / "capability_contract.py")
+def test_package_contract_shape_is_valid():
+	module = _load_module("package_contract_fedl", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "fedl"
-	assert contract["ui"]["routes"]
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
-def test_materialized_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_fedl", PACKAGE_DIR / "app.py")
+def test_package_app_entrypoint_is_publishable():
+	module = _load_module("package_app_fedl", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -46,6 +48,8 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "fedl" in model["capabilities"]
+	assert model["capabilities"]["fedl"]["runtime"]["service"] == "service.FedlService"
+	assert model["capabilities"]["fedl"]["streaming"]["engine"] == "bytewax"
 
 
 def test_package_runtime_compatibility_surface_creates_federation():

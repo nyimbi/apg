@@ -9,6 +9,7 @@ from .federated_engine import FederatedLearningEngine
 from .models import (
 	AggregationResult,
 	FederatedModel,
+	FederatedModelRelease,
 	Federation,
 	FedlAuditEvent,
 	ModelUpdate,
@@ -27,6 +28,7 @@ class FedlService:
 		self._updates: dict[str, ModelUpdate] = {}
 		self._aggregations: dict[str, AggregationResult] = {}
 		self._models: dict[str, FederatedModel] = {}
+		self._releases: dict[str, FederatedModelRelease] = {}
 		self._audit_events: dict[str, FedlAuditEvent] = {}
 		self._engine = FederatedLearningEngine()
 
@@ -267,6 +269,82 @@ class FedlService:
 		)
 		return aggregation.to_dict()
 
+	def release_model(
+		self,
+		release_id: str,
+		tenant_id: str,
+		model_id: str,
+		mlcm_model_ref: str,
+		release_approval_ref: str,
+		privacy_review_ref: str,
+		artifact_ref: str = "",
+	) -> dict[str, Any]:
+		model = self._require_model(model_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "release_model",
+			"mlcm_model_ref_present": bool(mlcm_model_ref),
+			"release_approval_recorded": bool(release_approval_ref),
+			"privacy_review_recorded": bool(privacy_review_ref),
+		})
+		self._enforce_allow_result(result)
+		release = FederatedModelRelease(
+			id=release_id,
+			tenant_id=tenant_id,
+			model_id=model.id,
+			federation_id=model.federation_id,
+			mlcm_model_ref=mlcm_model_ref,
+			release_approval_ref=release_approval_ref,
+			privacy_review_ref=privacy_review_ref,
+			artifact_ref=artifact_ref,
+		)
+		self._releases[release_id] = release
+		self._record_audit(
+			tenant_id,
+			release_id,
+			"model_released",
+			model.federation_id,
+			result["decision"],
+			metadata={"model_id": model.id, "mlcm_model_ref": mlcm_model_ref},
+		)
+		return release.to_dict()
+
+	def retire_federation(
+		self,
+		federation_id: str,
+		tenant_id: str,
+		impact_review_ref: str,
+		retired_by: str = "",
+	) -> dict[str, Any]:
+		federation = self._require_federation(federation_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_federation",
+			"impact_review_recorded": bool(impact_review_ref),
+		})
+		self._enforce_allow_result(result)
+		retired = Federation(
+			id=federation.id,
+			tenant_id=federation.tenant_id,
+			name=federation.name,
+			coordinator=federation.coordinator,
+			model_family=federation.model_family,
+			objective_metric=federation.objective_metric,
+			privacy_epsilon_limit=federation.privacy_epsilon_limit,
+			data_residency_regions=federation.data_residency_regions,
+			status="retired",
+		)
+		self._federations[federation_id] = retired
+		self._record_audit(
+			tenant_id,
+			federation_id,
+			"federation_retired",
+			retired_by,
+			result["decision"],
+			metadata={"impact_review_ref": impact_review_ref},
+		)
+		return retired.to_dict()
+
 	def list_federations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._federations, tenant_id)
 
@@ -284,6 +362,9 @@ class FedlService:
 
 	def list_models(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._models, tenant_id)
+
+	def list_releases(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._releases, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
@@ -339,6 +420,7 @@ class FedlService:
 			"quarantined_update_count": len([item for item in updates if item["status"] == "quarantined"]),
 			"aggregation_count": len(self.list_aggregations(tenant_id)),
 			"model_count": len(self.list_models(tenant_id)),
+			"release_count": len(self.list_releases(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -381,6 +463,12 @@ class FedlService:
 		if round_model is None or round_model.tenant_id != tenant_id:
 			raise KeyError(f"unknown training round: {round_id}")
 		return round_model
+
+	def _require_model(self, model_id: str, tenant_id: str) -> FederatedModel:
+		model = self._models.get(model_id)
+		if model is None or model.tenant_id != tenant_id:
+			raise KeyError(f"unknown federated model: {model_id}")
+		return model
 
 	def _record_audit(
 		self,

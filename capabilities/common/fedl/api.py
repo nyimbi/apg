@@ -84,6 +84,27 @@ def aggregate_updates(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def release_model(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.release_model(
+		release_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		model_id=str(payload["model_id"]),
+		mlcm_model_ref=str(payload.get("mlcm_model_ref") or ""),
+		release_approval_ref=str(payload.get("release_approval_ref") or ""),
+		privacy_review_ref=str(payload.get("privacy_review_ref") or ""),
+		artifact_ref=str(payload.get("artifact_ref") or ""),
+	)
+
+
+def retire_federation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.retire_federation(
+		federation_id=str(payload["federation_id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		impact_review_ref=str(payload.get("impact_review_ref") or ""),
+		retired_by=str(payload.get("retired_by") or ""),
+	)
+
+
 def list_federations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_federations(tenant_id)
 
@@ -106,6 +127,10 @@ def list_aggregations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_models(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_models(tenant_id)
+
+
+def list_releases(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_releases(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

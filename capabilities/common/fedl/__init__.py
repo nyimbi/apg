@@ -13,7 +13,7 @@ from .capability_contract import (
 __version__ = "1.0.0"
 __capability_id__ = "fedl"
 __capability_name__ = "Federated Learning"
-__apg_dependencies__ = ["aicr", "mlcm", "encr", "mten"]
+__apg_dependencies__ = ["aicr", "mlcm", "encr", "mten", "auth", "audl", "moni"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "fedl",
@@ -34,6 +34,7 @@ capability_metadata: dict[str, Any] = {
 		"privacy_budgeting",
 		"training_round_monitoring",
 		"poisoning_defense",
+		"federated_model_release",
 		"federated_model_governance"
 	],
 	"composition_patterns": [
@@ -50,8 +51,13 @@ capability_metadata: dict[str, Any] = {
 		"main": "/fedl",
 		"federations": "/fedl/federations",
 		"participants": "/fedl/participants",
+		"attestation": "/fedl/attestation",
 		"rounds": "/fedl/rounds",
-		"privacy": "/fedl/privacy"
+		"updates": "/fedl/updates",
+		"aggregation": "/fedl/aggregation",
+		"privacy": "/fedl/privacy",
+		"release": "/fedl/release",
+		"audit": "/fedl/audit"
 	},
 	"permissions": [
 		"fedl:view",
@@ -61,6 +67,7 @@ capability_metadata: dict[str, Any] = {
 		"fedl:manage_privacy",
 		"fedl:manage_security",
 		"fedl:view_models",
+		"fedl:release_models",
 		"fedl:admin"
 	]
 }
@@ -86,6 +93,7 @@ def register_capability() -> dict[str, Any]:
 			"secure_aggregation": "Require privacy-preserving aggregation for model updates",
 			"privacy_budgeting": "Track and govern differential privacy budget thresholds",
 			"poisoning_defense": "Block aggregation when poisoning signals are detected",
+			"federated_model_release": "Release federated models through MLCM-linked approval and privacy review",
 			"capability_rules": "Evaluate deterministic federated learning governance rules",
 			"visual_theming": "Apply privacy-mesh theme tokens and components"
 		},
@@ -94,8 +102,11 @@ def register_capability() -> dict[str, Any]:
 			"participants": "/fedl/api/v1/participants",
 			"rounds": "/fedl/api/v1/rounds",
 			"aggregation": "/fedl/api/v1/aggregation",
-			"privacy": "/fedl/api/v1/privacy"
+			"privacy": "/fedl/api/v1/privacy",
+			"release": "/fedl/api/v1/release",
+			"audit": "/fedl/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]

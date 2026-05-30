@@ -8,24 +8,89 @@
   },
   "capabilities": {
     "fedl": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.FedlService",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "model_lifecycle": "mlcm",
+        "production_runtime": "service.FedlService",
+        "tenant_service": "mten"
+      },
+      "approvals": {
+        "aggregation": "AggregationResult",
+        "privacy": "TrainingRound",
+        "release": "FederatedModelRelease",
+        "retirement": "Federation",
+        "round": "TrainingRound"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.FedlService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.FedlService",
+          "tenant_service": "mten"
+        },
+        "aggregation": {
+          "aggregate_digest_required": true,
+          "lineage_required": true,
+          "quarantine_poisoned_updates": true,
+          "secure_aggregation_required": true
+        },
         "federation": {
           "coordinator_enabled": true,
+          "max_participants_per_federation": 1000,
           "minimum_participants": 3,
-          "participant_attestation_required": true
+          "participant_attestation_required": true,
+          "participant_contract_required": true
         },
         "governance": {
           "audit_rounds": true,
+          "auth_required": true,
+          "cross_tenant_participation_allowed": false,
           "data_residency_required": true,
+          "federation_retirement_review_required": true,
           "participant_contract_required": true,
           "require_tenant_context": true
         },
+        "model_release": {
+          "artifact_lineage_required": true,
+          "mlcm_registration_required": true,
+          "privacy_review_required": true,
+          "release_approval_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "participant_heartbeat_required": true,
+          "trace_required": true
+        },
+        "participants": {
+          "attestation_required": true,
+          "compute_profile_required": true,
+          "contract_required": true,
+          "data_residency_required": true,
+          "heartbeat_required": true
+        },
         "privacy": {
+          "budget_ledger_required": true,
           "differential_privacy_enabled": true,
           "max_privacy_epsilon": 8.0,
+          "privacy_review_required_above_epsilon": 8.0,
           "secure_aggregation_required": true
         },
         "tenant_id": "default",
@@ -34,20 +99,41 @@
           "default_theme": "fedl_privacy_mesh"
         },
         "training": {
+          "all_participant_updates_required": true,
+          "minimum_quality_score": 0.75,
           "model_update_validation": true,
           "poisoning_detection_enabled": true,
           "round_approval_required": true
         },
         "ui": {
+          "enable_aggregation_console": true,
+          "enable_attestation_center": true,
+          "enable_audit_timeline": true,
+          "enable_dashboard": true,
           "enable_federation_console": true,
+          "enable_model_registry": true,
           "enable_participant_map": true,
           "enable_privacy_budget": true,
-          "enable_round_monitor": true
+          "enable_release_console": true,
+          "enable_round_monitor": true,
+          "enable_security_console": true,
+          "enable_settings": true,
+          "enable_update_queue": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "federated_lifecycle": {
+        "aggregation": "AggregationResult",
+        "audit": "FedlAuditEvent",
+        "federation": "Federation",
+        "model": "FederatedModel",
+        "model_update": "ModelUpdate",
+        "participant": "Participant",
+        "release": "FederatedModelRelease",
+        "training_round": "TrainingRound"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Federated Learning",
@@ -71,6 +157,71 @@
           },
           {
             "condition": {
+              "coordinator_present": false,
+              "operation": "create_federation"
+            },
+            "description": "Federations require a coordinator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "coordinator_required",
+              "required_action": "assign_federation_coordinator"
+            },
+            "name": "federation_requires_coordinator"
+          },
+          {
+            "condition": {
+              "model_family_present": false,
+              "operation": "create_federation"
+            },
+            "description": "Federations require model-family metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_family_required",
+              "required_action": "attach_model_family"
+            },
+            "name": "federation_requires_model_family"
+          },
+          {
+            "condition": {
+              "objective_metric_present": false,
+              "operation": "create_federation"
+            },
+            "description": "Federations require an objective metric.",
+            "effect": {
+              "decision": "deny",
+              "reason": "objective_metric_required",
+              "required_action": "attach_objective_metric"
+            },
+            "name": "federation_requires_objective_metric"
+          },
+          {
+            "condition": {
+              "data_residency_present": false,
+              "operation": "create_federation"
+            },
+            "description": "Federations require data-residency regions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "data_residency_required",
+              "required_action": "attach_data_residency_regions"
+            },
+            "name": "federation_requires_data_residency"
+          },
+          {
+            "condition": {
+              "operation": "create_federation",
+              "privacy_budget_positive": false
+            },
+            "description": "Federation privacy budgets must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_budget_required",
+              "required_action": "set_privacy_epsilon_limit"
+            },
+            "name": "privacy_budget_must_be_positive"
+          },
+          {
+            "condition": {
               "operation": "join_federation",
               "participant_attested": false
             },
@@ -81,6 +232,45 @@
               "required_action": "complete_participant_attestation"
             },
             "name": "participant_requires_attestation"
+          },
+          {
+            "condition": {
+              "contract_ref_present": false,
+              "operation": "join_federation"
+            },
+            "description": "Participants require contract evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "participant_contract_required",
+              "required_action": "attach_participant_contract"
+            },
+            "name": "participant_requires_contract"
+          },
+          {
+            "condition": {
+              "operation": "join_federation",
+              "region_allowed": false
+            },
+            "description": "Participant regions must match federation residency rules.",
+            "effect": {
+              "decision": "deny",
+              "reason": "data_residency_required",
+              "required_action": "choose_allowed_region"
+            },
+            "name": "participant_region_must_be_allowed"
+          },
+          {
+            "condition": {
+              "compute_profile_present": false,
+              "operation": "join_federation"
+            },
+            "description": "Participants require compute-profile metadata.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "compute_profile_required",
+              "required_action": "attach_compute_profile"
+            },
+            "name": "participant_requires_compute_profile"
           },
           {
             "condition": {
@@ -97,16 +287,29 @@
           },
           {
             "condition": {
-              "operation": "aggregate_updates",
+              "approval_ref_present": false,
+              "operation": "start_round"
+            },
+            "description": "Training rounds require approval evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "round_approval_required",
+              "required_action": "record_round_approval"
+            },
+            "name": "round_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "start_round",
               "secure_aggregation_enabled": false
             },
-            "description": "Federated updates require secure aggregation.",
+            "description": "Training rounds require secure aggregation.",
             "effect": {
               "decision": "deny",
               "reason": "secure_aggregation_required",
               "required_action": "enable_secure_aggregation"
             },
-            "name": "secure_aggregation_required"
+            "name": "round_requires_secure_aggregation"
           },
           {
             "condition": {
@@ -123,6 +326,111 @@
           },
           {
             "condition": {
+              "operation": "start_round",
+              "privacy_within_limit": false
+            },
+            "description": "Round privacy budget cannot exceed federation limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_budget_exceeds_federation_limit",
+              "required_action": "lower_round_privacy_epsilon"
+            },
+            "name": "round_budget_must_fit_federation_limit"
+          },
+          {
+            "condition": {
+              "operation": "submit_update",
+              "round_running": false
+            },
+            "description": "Updates require a running round.",
+            "effect": {
+              "decision": "deny",
+              "reason": "round_not_running",
+              "required_action": "start_or_choose_running_round"
+            },
+            "name": "update_requires_round_running"
+          },
+          {
+            "condition": {
+              "operation": "submit_update",
+              "participant_in_round": false
+            },
+            "description": "Updates require a participant assigned to the round.",
+            "effect": {
+              "decision": "deny",
+              "reason": "participant_not_in_round",
+              "required_action": "assign_participant_to_round"
+            },
+            "name": "update_requires_round_participant"
+          },
+          {
+            "condition": {
+              "operation": "submit_update",
+              "sample_count_positive": false
+            },
+            "description": "Participant updates require positive sample counts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sample_count_required",
+              "required_action": "attach_sample_count"
+            },
+            "name": "update_requires_sample_count"
+          },
+          {
+            "condition": {
+              "operation": "submit_update",
+              "quality_score_in_range": false
+            },
+            "description": "Update quality scores must be in range.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_score_out_of_range",
+              "required_action": "submit_quality_score_between_zero_and_one"
+            },
+            "name": "update_quality_score_must_be_in_range"
+          },
+          {
+            "condition": {
+              "operation": "submit_update",
+              "quality_review_recorded": false,
+              "quality_score_lt": 0.75
+            },
+            "description": "Low-quality updates require review before aggregation.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "update_quality_review_required",
+              "required_action": "record_update_quality_review"
+            },
+            "name": "low_quality_update_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "aggregate_updates",
+              "secure_aggregation_enabled": false
+            },
+            "description": "Federated updates require secure aggregation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secure_aggregation_required",
+              "required_action": "enable_secure_aggregation"
+            },
+            "name": "secure_aggregation_required"
+          },
+          {
+            "condition": {
+              "operation": "aggregate_updates",
+              "participant_updates_complete": false
+            },
+            "description": "Aggregation requires accepted updates from all round participants.",
+            "effect": {
+              "decision": "deny",
+              "reason": "participant_updates_incomplete",
+              "required_action": "collect_remaining_updates"
+            },
+            "name": "aggregation_requires_complete_updates"
+          },
+          {
+            "condition": {
               "operation": "aggregate_updates",
               "poisoning_signal_detected": true
             },
@@ -133,6 +441,96 @@
               "required_action": "quarantine_suspicious_update"
             },
             "name": "poisoning_signal_blocks_round"
+          },
+          {
+            "condition": {
+              "aggregate_digest_present": false,
+              "operation": "aggregate_updates"
+            },
+            "description": "Aggregation results require aggregate digest evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aggregate_digest_required",
+              "required_action": "record_aggregate_digest"
+            },
+            "name": "aggregation_requires_digest"
+          },
+          {
+            "condition": {
+              "operation": "release_model",
+              "release_approval_recorded": false
+            },
+            "description": "Federated model release requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_release_approval_required",
+              "required_action": "record_model_release_approval"
+            },
+            "name": "model_release_requires_approval"
+          },
+          {
+            "condition": {
+              "mlcm_model_ref_present": false,
+              "operation": "release_model"
+            },
+            "description": "Federated models must be released through MLCM linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mlcm_model_ref_required",
+              "required_action": "link_mlcm_model"
+            },
+            "name": "model_release_requires_mlcm_registration"
+          },
+          {
+            "condition": {
+              "operation": "release_model",
+              "privacy_review_recorded": false
+            },
+            "description": "Federated model release requires privacy review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_release_privacy_review_required",
+              "required_action": "record_release_privacy_review"
+            },
+            "name": "model_release_requires_privacy_review"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_federation"
+            },
+            "description": "Federation retirement requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "federation_retirement_review_required",
+              "required_action": "record_retirement_impact"
+            },
+            "name": "federation_retirement_requires_review"
+          },
+          {
+            "condition": {
+              "cross_tenant_participation": true
+            },
+            "description": "Cross-tenant federation participation is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_participation_denied",
+              "required_action": "use_tenant_scoped_federation"
+            },
+            "name": "cross_tenant_participation_denied"
+          },
+          {
+            "condition": {
+              "event_stream": "kafka",
+              "operation": "configure_round_events"
+            },
+            "description": "Federated round event streams must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "bytewax_stream_required_for_round_events"
           }
         ],
         "type": "deterministic"
@@ -152,6 +550,71 @@
         },
         {
           "condition": {
+            "coordinator_present": false,
+            "operation": "create_federation"
+          },
+          "description": "Federations require a coordinator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "coordinator_required",
+            "required_action": "assign_federation_coordinator"
+          },
+          "name": "federation_requires_coordinator"
+        },
+        {
+          "condition": {
+            "model_family_present": false,
+            "operation": "create_federation"
+          },
+          "description": "Federations require model-family metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_family_required",
+            "required_action": "attach_model_family"
+          },
+          "name": "federation_requires_model_family"
+        },
+        {
+          "condition": {
+            "objective_metric_present": false,
+            "operation": "create_federation"
+          },
+          "description": "Federations require an objective metric.",
+          "effect": {
+            "decision": "deny",
+            "reason": "objective_metric_required",
+            "required_action": "attach_objective_metric"
+          },
+          "name": "federation_requires_objective_metric"
+        },
+        {
+          "condition": {
+            "data_residency_present": false,
+            "operation": "create_federation"
+          },
+          "description": "Federations require data-residency regions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "data_residency_required",
+            "required_action": "attach_data_residency_regions"
+          },
+          "name": "federation_requires_data_residency"
+        },
+        {
+          "condition": {
+            "operation": "create_federation",
+            "privacy_budget_positive": false
+          },
+          "description": "Federation privacy budgets must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_budget_required",
+            "required_action": "set_privacy_epsilon_limit"
+          },
+          "name": "privacy_budget_must_be_positive"
+        },
+        {
+          "condition": {
             "operation": "join_federation",
             "participant_attested": false
           },
@@ -162,6 +625,45 @@
             "required_action": "complete_participant_attestation"
           },
           "name": "participant_requires_attestation"
+        },
+        {
+          "condition": {
+            "contract_ref_present": false,
+            "operation": "join_federation"
+          },
+          "description": "Participants require contract evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "participant_contract_required",
+            "required_action": "attach_participant_contract"
+          },
+          "name": "participant_requires_contract"
+        },
+        {
+          "condition": {
+            "operation": "join_federation",
+            "region_allowed": false
+          },
+          "description": "Participant regions must match federation residency rules.",
+          "effect": {
+            "decision": "deny",
+            "reason": "data_residency_required",
+            "required_action": "choose_allowed_region"
+          },
+          "name": "participant_region_must_be_allowed"
+        },
+        {
+          "condition": {
+            "compute_profile_present": false,
+            "operation": "join_federation"
+          },
+          "description": "Participants require compute-profile metadata.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "compute_profile_required",
+            "required_action": "attach_compute_profile"
+          },
+          "name": "participant_requires_compute_profile"
         },
         {
           "condition": {
@@ -178,16 +680,29 @@
         },
         {
           "condition": {
-            "operation": "aggregate_updates",
+            "approval_ref_present": false,
+            "operation": "start_round"
+          },
+          "description": "Training rounds require approval evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "round_approval_required",
+            "required_action": "record_round_approval"
+          },
+          "name": "round_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "start_round",
             "secure_aggregation_enabled": false
           },
-          "description": "Federated updates require secure aggregation.",
+          "description": "Training rounds require secure aggregation.",
           "effect": {
             "decision": "deny",
             "reason": "secure_aggregation_required",
             "required_action": "enable_secure_aggregation"
           },
-          "name": "secure_aggregation_required"
+          "name": "round_requires_secure_aggregation"
         },
         {
           "condition": {
@@ -204,6 +719,111 @@
         },
         {
           "condition": {
+            "operation": "start_round",
+            "privacy_within_limit": false
+          },
+          "description": "Round privacy budget cannot exceed federation limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_budget_exceeds_federation_limit",
+            "required_action": "lower_round_privacy_epsilon"
+          },
+          "name": "round_budget_must_fit_federation_limit"
+        },
+        {
+          "condition": {
+            "operation": "submit_update",
+            "round_running": false
+          },
+          "description": "Updates require a running round.",
+          "effect": {
+            "decision": "deny",
+            "reason": "round_not_running",
+            "required_action": "start_or_choose_running_round"
+          },
+          "name": "update_requires_round_running"
+        },
+        {
+          "condition": {
+            "operation": "submit_update",
+            "participant_in_round": false
+          },
+          "description": "Updates require a participant assigned to the round.",
+          "effect": {
+            "decision": "deny",
+            "reason": "participant_not_in_round",
+            "required_action": "assign_participant_to_round"
+          },
+          "name": "update_requires_round_participant"
+        },
+        {
+          "condition": {
+            "operation": "submit_update",
+            "sample_count_positive": false
+          },
+          "description": "Participant updates require positive sample counts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sample_count_required",
+            "required_action": "attach_sample_count"
+          },
+          "name": "update_requires_sample_count"
+        },
+        {
+          "condition": {
+            "operation": "submit_update",
+            "quality_score_in_range": false
+          },
+          "description": "Update quality scores must be in range.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_score_out_of_range",
+            "required_action": "submit_quality_score_between_zero_and_one"
+          },
+          "name": "update_quality_score_must_be_in_range"
+        },
+        {
+          "condition": {
+            "operation": "submit_update",
+            "quality_review_recorded": false,
+            "quality_score_lt": 0.75
+          },
+          "description": "Low-quality updates require review before aggregation.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "update_quality_review_required",
+            "required_action": "record_update_quality_review"
+          },
+          "name": "low_quality_update_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "aggregate_updates",
+            "secure_aggregation_enabled": false
+          },
+          "description": "Federated updates require secure aggregation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secure_aggregation_required",
+            "required_action": "enable_secure_aggregation"
+          },
+          "name": "secure_aggregation_required"
+        },
+        {
+          "condition": {
+            "operation": "aggregate_updates",
+            "participant_updates_complete": false
+          },
+          "description": "Aggregation requires accepted updates from all round participants.",
+          "effect": {
+            "decision": "deny",
+            "reason": "participant_updates_incomplete",
+            "required_action": "collect_remaining_updates"
+          },
+          "name": "aggregation_requires_complete_updates"
+        },
+        {
+          "condition": {
             "operation": "aggregate_updates",
             "poisoning_signal_detected": true
           },
@@ -214,15 +834,120 @@
             "required_action": "quarantine_suspicious_update"
           },
           "name": "poisoning_signal_blocks_round"
+        },
+        {
+          "condition": {
+            "aggregate_digest_present": false,
+            "operation": "aggregate_updates"
+          },
+          "description": "Aggregation results require aggregate digest evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aggregate_digest_required",
+            "required_action": "record_aggregate_digest"
+          },
+          "name": "aggregation_requires_digest"
+        },
+        {
+          "condition": {
+            "operation": "release_model",
+            "release_approval_recorded": false
+          },
+          "description": "Federated model release requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_release_approval_required",
+            "required_action": "record_model_release_approval"
+          },
+          "name": "model_release_requires_approval"
+        },
+        {
+          "condition": {
+            "mlcm_model_ref_present": false,
+            "operation": "release_model"
+          },
+          "description": "Federated models must be released through MLCM linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mlcm_model_ref_required",
+            "required_action": "link_mlcm_model"
+          },
+          "name": "model_release_requires_mlcm_registration"
+        },
+        {
+          "condition": {
+            "operation": "release_model",
+            "privacy_review_recorded": false
+          },
+          "description": "Federated model release requires privacy review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_release_privacy_review_required",
+            "required_action": "record_release_privacy_review"
+          },
+          "name": "model_release_requires_privacy_review"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_federation"
+          },
+          "description": "Federation retirement requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "federation_retirement_review_required",
+            "required_action": "record_retirement_impact"
+          },
+          "name": "federation_retirement_requires_review"
+        },
+        {
+          "condition": {
+            "cross_tenant_participation": true
+          },
+          "description": "Cross-tenant federation participation is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_participation_denied",
+            "required_action": "use_tenant_scoped_federation"
+          },
+          "name": "cross_tenant_participation_denied"
+        },
+        {
+          "condition": {
+            "event_stream": "kafka",
+            "operation": "configure_round_events"
+          },
+          "description": "Federated round event streams must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "bytewax_stream_required_for_round_events"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "service": "service.FedlService",
         "views": "views.py"
       },
       "screens": {
+        "aggregation": {
+          "component": "SecureAggregationConsole",
+          "permission": "fedl:run_rounds",
+          "route": "/fedl/aggregation"
+        },
+        "attestation": {
+          "component": "ParticipantAttestation",
+          "permission": "fedl:manage_federations",
+          "route": "/fedl/attestation"
+        },
+        "audit": {
+          "component": "FEDLAuditTimeline",
+          "permission": "fedl:view",
+          "route": "/fedl/audit"
+        },
         "dashboard": {
           "component": "FEDLDashboard",
           "permission": "fedl:view",
@@ -248,6 +973,11 @@
           "permission": "fedl:manage_privacy",
           "route": "/fedl/privacy"
         },
+        "release": {
+          "component": "ModelReleaseConsole",
+          "permission": "fedl:release_models",
+          "route": "/fedl/release"
+        },
         "rounds": {
           "component": "TrainingRoundMonitor",
           "permission": "fedl:run_rounds",
@@ -262,11 +992,31 @@
           "component": "FEDLSettings",
           "permission": "fedl:admin",
           "route": "/fedl/settings"
+        },
+        "updates": {
+          "component": "ModelUpdateQueue",
+          "permission": "fedl:run_rounds",
+          "route": "/fedl/updates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "aggregation_console": {
+            "highlight": "digest-chip",
+            "visual": "secure-merge"
+          },
+          "attestation_panel": {
+            "icon": "shield-check",
+            "risk_style": "residency-band",
+            "status_indicator": "contract-chip"
+          },
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
           "federation_topology": {
             "edge_style": "secure-channel-line",
             "visual": "privacy-mesh"
@@ -280,9 +1030,17 @@
             "threshold_style": "epsilon-bands",
             "visual": "segmented-meter"
           },
+          "release_console": {
+            "status_style": "approval-chip",
+            "visual": "model-release-ladder"
+          },
           "training_round_timeline": {
             "highlight": "aggregation-chip",
             "visual": "round-checkpoints"
+          },
+          "update_queue": {
+            "status_style": "quality-chip",
+            "visual": "update-ledger"
           }
         },
         "name": "fedl_privacy_mesh",
@@ -326,10 +1084,31 @@
             "permission": "fedl:view_participants"
           },
           {
+            "component": "ParticipantAttestation",
+            "name": "attestation",
+            "nav_group": "Federations",
+            "path": "/fedl/attestation",
+            "permission": "fedl:manage_federations"
+          },
+          {
             "component": "TrainingRoundMonitor",
             "name": "rounds",
             "nav_group": "Training",
             "path": "/fedl/rounds",
+            "permission": "fedl:run_rounds"
+          },
+          {
+            "component": "ModelUpdateQueue",
+            "name": "updates",
+            "nav_group": "Training",
+            "path": "/fedl/updates",
+            "permission": "fedl:run_rounds"
+          },
+          {
+            "component": "SecureAggregationConsole",
+            "name": "aggregation",
+            "nav_group": "Training",
+            "path": "/fedl/aggregation",
             "permission": "fedl:run_rounds"
           },
           {
@@ -352,6 +1131,20 @@
             "nav_group": "Models",
             "path": "/fedl/models",
             "permission": "fedl:view_models"
+          },
+          {
+            "component": "ModelReleaseConsole",
+            "name": "release",
+            "nav_group": "Models",
+            "path": "/fedl/release",
+            "permission": "fedl:release_models"
+          },
+          {
+            "component": "FEDLAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/fedl/audit",
+            "permission": "fedl:view"
           },
           {
             "component": "FEDLSettings",
@@ -380,20 +1173,66 @@
   "contracts": {
     "fedl": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.FedlService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.FedlService",
+          "tenant_service": "mten"
+        },
+        "aggregation": {
+          "aggregate_digest_required": true,
+          "lineage_required": true,
+          "quarantine_poisoned_updates": true,
+          "secure_aggregation_required": true
+        },
         "federation": {
           "coordinator_enabled": true,
+          "max_participants_per_federation": 1000,
           "minimum_participants": 3,
-          "participant_attestation_required": true
+          "participant_attestation_required": true,
+          "participant_contract_required": true
         },
         "governance": {
           "audit_rounds": true,
+          "auth_required": true,
+          "cross_tenant_participation_allowed": false,
           "data_residency_required": true,
+          "federation_retirement_review_required": true,
           "participant_contract_required": true,
           "require_tenant_context": true
         },
+        "model_release": {
+          "artifact_lineage_required": true,
+          "mlcm_registration_required": true,
+          "privacy_review_required": true,
+          "release_approval_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "participant_heartbeat_required": true,
+          "trace_required": true
+        },
+        "participants": {
+          "attestation_required": true,
+          "compute_profile_required": true,
+          "contract_required": true,
+          "data_residency_required": true,
+          "heartbeat_required": true
+        },
         "privacy": {
+          "budget_ledger_required": true,
           "differential_privacy_enabled": true,
           "max_privacy_epsilon": 8.0,
+          "privacy_review_required_above_epsilon": 8.0,
           "secure_aggregation_required": true
         },
         "tenant_id": "default",
@@ -402,15 +1241,26 @@
           "default_theme": "fedl_privacy_mesh"
         },
         "training": {
+          "all_participant_updates_required": true,
+          "minimum_quality_score": 0.75,
           "model_update_validation": true,
           "poisoning_detection_enabled": true,
           "round_approval_required": true
         },
         "ui": {
+          "enable_aggregation_console": true,
+          "enable_attestation_center": true,
+          "enable_audit_timeline": true,
+          "enable_dashboard": true,
           "enable_federation_console": true,
+          "enable_model_registry": true,
           "enable_participant_map": true,
           "enable_privacy_budget": true,
-          "enable_round_monitor": true
+          "enable_release_console": true,
+          "enable_round_monitor": true,
+          "enable_security_console": true,
+          "enable_settings": true,
+          "enable_update_queue": true
         }
       },
       "id": "fedl",
@@ -450,6 +1300,188 @@
   },
   "roles": {},
   "rules": {
+    "aggregation_requires_complete_updates": {
+      "condition": {
+        "operation": "aggregate_updates",
+        "participant_updates_complete": false
+      },
+      "description": "Aggregation requires accepted updates from all round participants.",
+      "effect": {
+        "decision": "deny",
+        "reason": "participant_updates_incomplete",
+        "required_action": "collect_remaining_updates"
+      },
+      "name": "aggregation_requires_complete_updates"
+    },
+    "aggregation_requires_digest": {
+      "condition": {
+        "aggregate_digest_present": false,
+        "operation": "aggregate_updates"
+      },
+      "description": "Aggregation results require aggregate digest evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "aggregate_digest_required",
+        "required_action": "record_aggregate_digest"
+      },
+      "name": "aggregation_requires_digest"
+    },
+    "bytewax_stream_required_for_round_events": {
+      "condition": {
+        "event_stream": "kafka",
+        "operation": "configure_round_events"
+      },
+      "description": "Federated round event streams must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "bytewax_stream_required_for_round_events"
+    },
+    "cross_tenant_participation_denied": {
+      "condition": {
+        "cross_tenant_participation": true
+      },
+      "description": "Cross-tenant federation participation is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_participation_denied",
+        "required_action": "use_tenant_scoped_federation"
+      },
+      "name": "cross_tenant_participation_denied"
+    },
+    "federation_requires_coordinator": {
+      "condition": {
+        "coordinator_present": false,
+        "operation": "create_federation"
+      },
+      "description": "Federations require a coordinator.",
+      "effect": {
+        "decision": "deny",
+        "reason": "coordinator_required",
+        "required_action": "assign_federation_coordinator"
+      },
+      "name": "federation_requires_coordinator"
+    },
+    "federation_requires_data_residency": {
+      "condition": {
+        "data_residency_present": false,
+        "operation": "create_federation"
+      },
+      "description": "Federations require data-residency regions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "data_residency_required",
+        "required_action": "attach_data_residency_regions"
+      },
+      "name": "federation_requires_data_residency"
+    },
+    "federation_requires_model_family": {
+      "condition": {
+        "model_family_present": false,
+        "operation": "create_federation"
+      },
+      "description": "Federations require model-family metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_family_required",
+        "required_action": "attach_model_family"
+      },
+      "name": "federation_requires_model_family"
+    },
+    "federation_requires_objective_metric": {
+      "condition": {
+        "objective_metric_present": false,
+        "operation": "create_federation"
+      },
+      "description": "Federations require an objective metric.",
+      "effect": {
+        "decision": "deny",
+        "reason": "objective_metric_required",
+        "required_action": "attach_objective_metric"
+      },
+      "name": "federation_requires_objective_metric"
+    },
+    "federation_retirement_requires_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_federation"
+      },
+      "description": "Federation retirement requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "federation_retirement_review_required",
+        "required_action": "record_retirement_impact"
+      },
+      "name": "federation_retirement_requires_review"
+    },
+    "low_quality_update_requires_review": {
+      "condition": {
+        "operation": "submit_update",
+        "quality_review_recorded": false,
+        "quality_score_lt": 0.75
+      },
+      "description": "Low-quality updates require review before aggregation.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "update_quality_review_required",
+        "required_action": "record_update_quality_review"
+      },
+      "name": "low_quality_update_requires_review"
+    },
+    "model_release_requires_approval": {
+      "condition": {
+        "operation": "release_model",
+        "release_approval_recorded": false
+      },
+      "description": "Federated model release requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_release_approval_required",
+        "required_action": "record_model_release_approval"
+      },
+      "name": "model_release_requires_approval"
+    },
+    "model_release_requires_mlcm_registration": {
+      "condition": {
+        "mlcm_model_ref_present": false,
+        "operation": "release_model"
+      },
+      "description": "Federated models must be released through MLCM linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mlcm_model_ref_required",
+        "required_action": "link_mlcm_model"
+      },
+      "name": "model_release_requires_mlcm_registration"
+    },
+    "model_release_requires_privacy_review": {
+      "condition": {
+        "operation": "release_model",
+        "privacy_review_recorded": false
+      },
+      "description": "Federated model release requires privacy review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_release_privacy_review_required",
+        "required_action": "record_release_privacy_review"
+      },
+      "name": "model_release_requires_privacy_review"
+    },
+    "participant_region_must_be_allowed": {
+      "condition": {
+        "operation": "join_federation",
+        "region_allowed": false
+      },
+      "description": "Participant regions must match federation residency rules.",
+      "effect": {
+        "decision": "deny",
+        "reason": "data_residency_required",
+        "required_action": "choose_allowed_region"
+      },
+      "name": "participant_region_must_be_allowed"
+    },
     "participant_requires_attestation": {
       "condition": {
         "operation": "join_federation",
@@ -462,6 +1494,32 @@
         "required_action": "complete_participant_attestation"
       },
       "name": "participant_requires_attestation"
+    },
+    "participant_requires_compute_profile": {
+      "condition": {
+        "compute_profile_present": false,
+        "operation": "join_federation"
+      },
+      "description": "Participants require compute-profile metadata.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "compute_profile_required",
+        "required_action": "attach_compute_profile"
+      },
+      "name": "participant_requires_compute_profile"
+    },
+    "participant_requires_contract": {
+      "condition": {
+        "contract_ref_present": false,
+        "operation": "join_federation"
+      },
+      "description": "Participants require contract evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "participant_contract_required",
+        "required_action": "attach_participant_contract"
+      },
+      "name": "participant_requires_contract"
     },
     "poisoning_signal_blocks_round": {
       "condition": {
@@ -476,6 +1534,19 @@
       },
       "name": "poisoning_signal_blocks_round"
     },
+    "privacy_budget_must_be_positive": {
+      "condition": {
+        "operation": "create_federation",
+        "privacy_budget_positive": false
+      },
+      "description": "Federation privacy budgets must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privacy_budget_required",
+        "required_action": "set_privacy_epsilon_limit"
+      },
+      "name": "privacy_budget_must_be_positive"
+    },
     "privacy_budget_requires_review": {
       "condition": {
         "privacy_epsilon_gt": 8.0,
@@ -489,6 +1560,32 @@
       },
       "name": "privacy_budget_requires_review"
     },
+    "round_budget_must_fit_federation_limit": {
+      "condition": {
+        "operation": "start_round",
+        "privacy_within_limit": false
+      },
+      "description": "Round privacy budget cannot exceed federation limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privacy_budget_exceeds_federation_limit",
+        "required_action": "lower_round_privacy_epsilon"
+      },
+      "name": "round_budget_must_fit_federation_limit"
+    },
+    "round_requires_approval": {
+      "condition": {
+        "approval_ref_present": false,
+        "operation": "start_round"
+      },
+      "description": "Training rounds require approval evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "round_approval_required",
+        "required_action": "record_round_approval"
+      },
+      "name": "round_requires_approval"
+    },
     "round_requires_minimum_participants": {
       "condition": {
         "operation": "start_round",
@@ -501,6 +1598,19 @@
         "required_action": "add_participants"
       },
       "name": "round_requires_minimum_participants"
+    },
+    "round_requires_secure_aggregation": {
+      "condition": {
+        "operation": "start_round",
+        "secure_aggregation_enabled": false
+      },
+      "description": "Training rounds require secure aggregation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secure_aggregation_required",
+        "required_action": "enable_secure_aggregation"
+      },
+      "name": "round_requires_secure_aggregation"
     },
     "secure_aggregation_required": {
       "condition": {
@@ -526,6 +1636,58 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "update_quality_score_must_be_in_range": {
+      "condition": {
+        "operation": "submit_update",
+        "quality_score_in_range": false
+      },
+      "description": "Update quality scores must be in range.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quality_score_out_of_range",
+        "required_action": "submit_quality_score_between_zero_and_one"
+      },
+      "name": "update_quality_score_must_be_in_range"
+    },
+    "update_requires_round_participant": {
+      "condition": {
+        "operation": "submit_update",
+        "participant_in_round": false
+      },
+      "description": "Updates require a participant assigned to the round.",
+      "effect": {
+        "decision": "deny",
+        "reason": "participant_not_in_round",
+        "required_action": "assign_participant_to_round"
+      },
+      "name": "update_requires_round_participant"
+    },
+    "update_requires_round_running": {
+      "condition": {
+        "operation": "submit_update",
+        "round_running": false
+      },
+      "description": "Updates require a running round.",
+      "effect": {
+        "decision": "deny",
+        "reason": "round_not_running",
+        "required_action": "start_or_choose_running_round"
+      },
+      "name": "update_requires_round_running"
+    },
+    "update_requires_sample_count": {
+      "condition": {
+        "operation": "submit_update",
+        "sample_count_positive": false
+      },
+      "description": "Participant updates require positive sample counts.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sample_count_required",
+        "required_action": "attach_sample_count"
+      },
+      "name": "update_requires_sample_count"
     }
   },
   "security": {},

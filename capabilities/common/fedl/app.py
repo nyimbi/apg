@@ -5,13 +5,123 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Federated Learning package-backed APG capability", "entity_count": 0, "name": "fedl", "version": "1.0.0"}, "capabilities": {"fedl": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"federation": {"coordinator_enabled": true, "minimum_participants": 3, "participant_attestation_required": true}, "governance": {"audit_rounds": true, "data_residency_required": true, "participant_contract_required": true, "require_tenant_context": true}, "privacy": {"differential_privacy_enabled": true, "max_privacy_epsilon": 8.0, "secure_aggregation_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "fedl_privacy_mesh"}, "training": {"model_update_validation": true, "poisoning_detection_enabled": true, "round_approval_required": true}, "ui": {"enable_federation_console": true, "enable_participant_map": true, "enable_privacy_budget": true, "enable_round_monitor": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Federated Learning", "provides": ["fedl_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All federated learning operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "join_federation", "participant_attested": false}, "description": "Participants require attestation before joining.", "effect": {"decision": "deny", "reason": "participant_attestation_required", "required_action": "complete_participant_attestation"}, "name": "participant_requires_attestation"}, {"condition": {"operation": "start_round", "participant_count_lt": 3}, "description": "Training rounds require enough participants.", "effect": {"decision": "deny", "reason": "minimum_participants_required", "required_action": "add_participants"}, "name": "round_requires_minimum_participants"}, {"condition": {"operation": "aggregate_updates", "secure_aggregation_enabled": false}, "description": "Federated updates require secure aggregation.", "effect": {"decision": "deny", "reason": "secure_aggregation_required", "required_action": "enable_secure_aggregation"}, "name": "secure_aggregation_required"}, {"condition": {"privacy_epsilon_gt": 8.0, "privacy_review_recorded": false}, "description": "High privacy budget requires review.", "effect": {"decision": "require_review", "reason": "privacy_budget_review_required", "required_action": "record_privacy_review"}, "name": "privacy_budget_requires_review"}, {"condition": {"operation": "aggregate_updates", "poisoning_signal_detected": true}, "description": "Poisoning signals block model aggregation.", "effect": {"decision": "deny", "reason": "poisoning_signal_detected", "required_action": "quarantine_suspicious_update"}, "name": "poisoning_signal_blocks_round"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All federated learning operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "join_federation", "participant_attested": false}, "description": "Participants require attestation before joining.", "effect": {"decision": "deny", "reason": "participant_attestation_required", "required_action": "complete_participant_attestation"}, "name": "participant_requires_attestation"}, {"condition": {"operation": "start_round", "participant_count_lt": 3}, "description": "Training rounds require enough participants.", "effect": {"decision": "deny", "reason": "minimum_participants_required", "required_action": "add_participants"}, "name": "round_requires_minimum_participants"}, {"condition": {"operation": "aggregate_updates", "secure_aggregation_enabled": false}, "description": "Federated updates require secure aggregation.", "effect": {"decision": "deny", "reason": "secure_aggregation_required", "required_action": "enable_secure_aggregation"}, "name": "secure_aggregation_required"}, {"condition": {"privacy_epsilon_gt": 8.0, "privacy_review_recorded": false}, "description": "High privacy budget requires review.", "effect": {"decision": "require_review", "reason": "privacy_budget_review_required", "required_action": "record_privacy_review"}, "name": "privacy_budget_requires_review"}, {"condition": {"operation": "aggregate_updates", "poisoning_signal_detected": true}, "description": "Poisoning signals block model aggregation.", "effect": {"decision": "deny", "reason": "poisoning_signal_detected", "required_action": "quarantine_suspicious_update"}, "name": "poisoning_signal_blocks_round"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "FEDLDashboard", "permission": "fedl:view", "route": "/fedl/dashboard"}, "federations": {"component": "FederationConsole", "permission": "fedl:manage_federations", "route": "/fedl/federations"}, "models": {"component": "FederatedModelRegistry", "permission": "fedl:view_models", "route": "/fedl/models"}, "participants": {"component": "ParticipantMap", "permission": "fedl:view_participants", "route": "/fedl/participants"}, "privacy": {"component": "PrivacyBudgetConsole", "permission": "fedl:manage_privacy", "route": "/fedl/privacy"}, "rounds": {"component": "TrainingRoundMonitor", "permission": "fedl:run_rounds", "route": "/fedl/rounds"}, "security": {"component": "PoisoningDefense", "permission": "fedl:manage_security", "route": "/fedl/security"}, "settings": {"component": "FEDLSettings", "permission": "fedl:admin", "route": "/fedl/settings"}}, "streaming": {}, "theme": {"components": {"federation_topology": {"edge_style": "secure-channel-line", "visual": "privacy-mesh"}, "participant_node_card": {"icon": "nodes", "risk_style": "privacy-band", "status_indicator": "attestation-pill"}, "privacy_budget_meter": {"threshold_style": "epsilon-bands", "visual": "segmented-meter"}, "training_round_timeline": {"highlight": "aggregation-chip", "visual": "round-checkpoints"}}, "name": "fedl_privacy_mesh", "tokens": {"border.radius": "8px", "color.accent": "#9B5DE5", "color.danger": "#C53030", "color.primary": "#1E5F74", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/fedl/api/v1", "requires_theme": true, "routes": [{"component": "FEDLDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/fedl/dashboard", "permission": "fedl:view"}, {"component": "FederationConsole", "name": "federations", "nav_group": "Federations", "path": "/fedl/federations", "permission": "fedl:manage_federations"}, {"component": "ParticipantMap", "name": "participants", "nav_group": "Federations", "path": "/fedl/participants", "permission": "fedl:view_participants"}, {"component": "TrainingRoundMonitor", "name": "rounds", "nav_group": "Training", "path": "/fedl/rounds", "permission": "fedl:run_rounds"}, {"component": "PrivacyBudgetConsole", "name": "privacy", "nav_group": "Governance", "path": "/fedl/privacy", "permission": "fedl:manage_privacy"}, {"component": "PoisoningDefense", "name": "security", "nav_group": "Governance", "path": "/fedl/security", "permission": "fedl:manage_security"}, {"component": "FederatedModelRegistry", "name": "models", "nav_group": "Models", "path": "/fedl/models", "permission": "fedl:view_models"}, {"component": "FEDLSettings", "name": "settings", "nav_group": "Administration", "path": "/fedl/settings", "permission": "fedl:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"fedl": []}}, "contracts": {"fedl": {"configuration": {"federation": {"coordinator_enabled": true, "minimum_participants": 3, "participant_attestation_required": true}, "governance": {"audit_rounds": true, "data_residency_required": true, "participant_contract_required": true, "require_tenant_context": true}, "privacy": {"differential_privacy_enabled": true, "max_privacy_epsilon": 8.0, "secure_aggregation_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "fedl_privacy_mesh"}, "training": {"model_update_validation": true, "poisoning_detection_enabled": true, "round_approval_required": true}, "ui": {"enable_federation_console": true, "enable_participant_map": true, "enable_privacy_budget": true, "enable_round_monitor": true}}, "id": "fedl", "provides": ["fedl_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"fedl": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"participant_requires_attestation": {"condition": {"operation": "join_federation", "participant_attested": false}, "description": "Participants require attestation before joining.", "effect": {"decision": "deny", "reason": "participant_attestation_required", "required_action": "complete_participant_attestation"}, "name": "participant_requires_attestation"}, "poisoning_signal_blocks_round": {"condition": {"operation": "aggregate_updates", "poisoning_signal_detected": true}, "description": "Poisoning signals block model aggregation.", "effect": {"decision": "deny", "reason": "poisoning_signal_detected", "required_action": "quarantine_suspicious_update"}, "name": "poisoning_signal_blocks_round"}, "privacy_budget_requires_review": {"condition": {"privacy_epsilon_gt": 8.0, "privacy_review_recorded": false}, "description": "High privacy budget requires review.", "effect": {"decision": "require_review", "reason": "privacy_budget_review_required", "required_action": "record_privacy_review"}, "name": "privacy_budget_requires_review"}, "round_requires_minimum_participants": {"condition": {"operation": "start_round", "participant_count_lt": 3}, "description": "Training rounds require enough participants.", "effect": {"decision": "deny", "reason": "minimum_participants_required", "required_action": "add_participants"}, "name": "round_requires_minimum_participants"}, "secure_aggregation_required": {"condition": {"operation": "aggregate_updates", "secure_aggregation_enabled": false}, "description": "Federated updates require secure aggregation.", "effect": {"decision": "deny", "reason": "secure_aggregation_required", "required_action": "enable_secure_aggregation"}, "name": "secure_aggregation_required"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All federated learning operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.fedl": {"file": "capability_contract.py", "id": "capability.fedl", "kind": "capability", "name": "Federated Learning", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("fedl_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "fedl",
+			"version": "1.0.0",
+			"description": "Federated Learning package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"fedl": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"fedl": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["fedl_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.FedlService",
+					"views": "views.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"round": "TrainingRound",
+					"privacy": "TrainingRound",
+					"aggregation": "AggregationResult",
+					"release": "FederatedModelRelease",
+					"retirement": "Federation",
+				},
+				"federated_lifecycle": {
+					"federation": "Federation",
+					"participant": "Participant",
+					"training_round": "TrainingRound",
+					"model_update": "ModelUpdate",
+					"aggregation": "AggregationResult",
+					"model": "FederatedModel",
+					"release": "FederatedModelRelease",
+					"audit": "FedlAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"fedl": {
+				"id": "fedl",
+				"configuration": contract["configuration"],
+				"provides": ["fedl_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"fedl": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.fedl": {
+				"id": "capability.fedl",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +146,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("fedl", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "fedl" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("FEDL semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("FEDL semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("FEDL adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.FedlService":
+		errors.append("FEDL generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

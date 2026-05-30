@@ -14018,3 +14018,51 @@ Not run to preserve battery:
 - Rendered browser UI behavior.
 - Persistent database migrations.
 - Load, latency, token-cost, drift, and throughput benchmarks.
+
+### 2026-05-30 08:24 EAT
+
+FEDL lifecycle and guardrail packet:
+
+- Selected `capabilities/common/fedl` as the next common capability after MLCM
+  in the development order.
+- Added root `README.md` and replaced `SPECIFICATION.md`, `PLAN.md`, and
+  `cap_spec.md` to define the privacy-preserving federated learning lifecycle.
+- Expanded the FEDL contract to 30 deterministic guardrails, 13 UI routes,
+  federation/participant/privacy/training/aggregation/model-release/
+  governance/observability/adapter configuration, Bytewax event-stream adapter
+  evidence, and privacy-mesh console theme components.
+- Extended `service.FedlService` with federated model release to MLCM linkage,
+  privacy-review and release-approval checks, federation retirement after
+  impact review, release summaries, and list surfaces.
+- Extended `models.py`, `api.py`, and `views.py` with release, retirement,
+  attestation, update queue, aggregation, security, audit, and model-release
+  surfaces for generated applications.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed stale package tests from materialized wording to package-contract
+  wording and expanded focused tests for Bytewax, rule count, route count,
+  model release, retirement, and generated-app UI models.
+- Manual review found and fixed a guardrail test-flow issue where model-release
+  denials were checked before a successful federated model existed.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/fedl/__init__.py capabilities/common/fedl/capability_contract.py capabilities/common/fedl/models.py capabilities/common/fedl/federated_engine.py capabilities/common/fedl/service.py capabilities/common/fedl/api.py capabilities/common/fedl/views.py capabilities/common/fedl/app.py capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, 13 routes, 30 rules, Bytewax event stream, and `service.FedlService`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/fedl --json` passed with `ok: true`; FEDL remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/fedl --json` passed with 13 UI routes, 30 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/fedl/README.md capabilities/common/fedl/SPECIFICATION.md capabilities/common/fedl/PLAN.md capabilities/common/fedl/cap_spec.md capabilities/common/fedl/__init__.py capabilities/common/fedl/capability_contract.py capabilities/common/fedl/federated_engine.py capabilities/common/fedl/models.py capabilities/common/fedl/service.py capabilities/common/fedl/api.py capabilities/common/fedl/views.py capabilities/common/fedl/app.py capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py capabilities/common/fedl/package_manifest.json capabilities/common/fedl/release_report.json capabilities/common/fedl/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/fedl docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live distributed training.
+- Live secure multiparty computation or homomorphic encryption.
+- Live Bytewax stream execution.
+- External AICR, MLCM, ENCR, MTEN, AUTH, AUDL, and MONI adapters.
+- Rendered browser UI behavior.
+- Persistent database migrations.
+- Load, latency, convergence, poisoning, privacy, and throughput benchmarks.

@@ -3,8 +3,12 @@
   "display_name": "Federated Learning",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
     "models.py",
+    "federated_engine.py",
     "service.py",
     "api.py",
     "views.py",

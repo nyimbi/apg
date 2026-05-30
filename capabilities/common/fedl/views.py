@@ -28,6 +28,7 @@ def dashboard_model(
 		"updates": service.list_updates(tenant_id),
 		"aggregations": service.list_aggregations(tenant_id),
 		"models": service.list_models(tenant_id),
+		"releases": service.list_releases(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -55,6 +56,38 @@ def round_monitor_model(service: FedlService | None = None, tenant_id: str = "de
 	}
 
 
+def attestation_center_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	participants = service.list_participants(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"participants": participants,
+		"missing_attestation": [item for item in participants if not item["attested"]],
+		"route": "/fedl/attestation",
+	}
+
+
+def update_queue_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	updates = service.list_updates(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"updates": updates,
+		"quarantined": [item for item in updates if item["status"] == "quarantined"],
+		"route": "/fedl/updates",
+	}
+
+
+def aggregation_console_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	return {
+		"tenant_id": tenant_id,
+		"aggregations": service.list_aggregations(tenant_id),
+		"models": service.list_models(tenant_id),
+		"route": "/fedl/aggregation",
+	}
+
+
 def privacy_budget_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
 	service = service or FedlService()
 	return {
@@ -71,4 +104,34 @@ def model_registry_model(service: FedlService | None = None, tenant_id: str = "d
 		"tenant_id": tenant_id,
 		"models": service.list_models(tenant_id),
 		"aggregations": service.list_aggregations(tenant_id),
+	}
+
+
+def security_console_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	updates = service.list_updates(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"poisoning_signals": [item for item in updates if item["poisoning_signal"]],
+		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
+		"route": "/fedl/security",
+	}
+
+
+def release_console_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	return {
+		"tenant_id": tenant_id,
+		"models": service.list_models(tenant_id),
+		"releases": service.list_releases(tenant_id),
+		"route": "/fedl/release",
+	}
+
+
+def audit_timeline_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"route": "/fedl/audit",
 	}
