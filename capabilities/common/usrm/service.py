@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_USRM_AGENT_ROLES,
+	SUPPORTED_USRM_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .user_runtime import (
 	AccessReviewRecord,
 	BulkUserActionRecord,
 	DeprovisionRecord,
 	RoleAssignmentRecord,
+	UsrmAgentRecord,
 	UserAuditEventRecord,
 	UserInvitationRecord,
 	UserProfileRecord,
@@ -32,6 +40,7 @@ class UsrmService:
 		self.access_reviews: dict[str, AccessReviewRecord] = {}
 		self.deprovisions: dict[str, DeprovisionRecord] = {}
 		self.bulk_actions: dict[str, BulkUserActionRecord] = {}
+		self.usrm_agents: dict[str, UsrmAgentRecord] = {}
 		self.audit_events: dict[str, UserAuditEventRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -65,14 +74,12 @@ class UsrmService:
 			raise ValueError("display_name_required")
 		if not str(email or "").strip():
 			raise ValueError("email_required")
-		if not str(owner or "").strip():
-			raise ValueError("user_owner_required")
-		if not profile_validated:
-			raise PermissionError("profile_validation_required")
 		context = {
 			"tenant_context_present": True,
 			"operation": "create_user",
 			"unique_identity_present": True,
+			"user_owner_assigned": bool(str(owner or "").strip()),
+			"profile_validated": bool(profile_validated),
 			"privileged_user": bool(privileged_user),
 			"mfa_enabled": bool(mfa_enabled),
 		}
@@ -103,11 +110,20 @@ class UsrmService:
 		privacy_preferences: dict[str, str],
 		consent_notice_ref: str,
 		updated_by: str,
+		privacy_sync_recorded: bool = True,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		user = self._get_user(tenant_id, user_id)
 		if not str(consent_notice_ref or "").strip():
 			raise PermissionError("consent_notice_required")
+		context = {
+			"tenant_context_present": True,
+			"operation": "update_profile",
+			"privacy_sync_recorded": bool(privacy_sync_recorded),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		record = UserProfileRecord(
 			id=stable_id("usrm_profile", tenant_id, user.id),
 			tenant_id=tenant_id,
@@ -129,6 +145,7 @@ class UsrmService:
 		channel: str,
 		consent_notice_ref: str,
 		invited_by: str,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		user = self._get_user(tenant_id, user_id)
@@ -136,6 +153,7 @@ class UsrmService:
 			"tenant_context_present": True,
 			"operation": "invite_user",
 			"consent_notice_attached": bool(str(consent_notice_ref or "").strip()),
+			"event_stream": self._normalize_token(event_stream),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -151,7 +169,14 @@ class UsrmService:
 		self.invitations[record.id] = record
 		user.status = "invited"
 		user.updated_at = utc_now()
-		self._record_event(tenant_id, "user_invited", record.id, f"User invited: {user.display_name}", invited_by)
+		self._record_event(
+			tenant_id,
+			"user_invited",
+			record.id,
+			f"User invited: {user.display_name}",
+			invited_by,
+			metadata={"event_stream": self._normalize_token(event_stream)},
+		)
 		return record.to_dict()
 
 	def assign_role(
@@ -170,14 +195,15 @@ class UsrmService:
 			raise ValueError("role_required")
 		context = {
 			"tenant_context_present": True,
+			"operation": "assign_role",
 			"privileged_user": bool(privileged),
+			"privileged_role": bool(privileged),
 			"mfa_enabled": bool(mfa_enabled),
+			"role_approval_recorded": bool(str(approved_by or "").strip()),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if privileged and not str(approved_by or "").strip():
-			raise PermissionError("role_assignment_approval_required")
 		record = RoleAssignmentRecord(
 			id=stable_id("usrm_role", tenant_id, user.id, role, scope),
 			tenant_id=tenant_id,
@@ -205,7 +231,12 @@ class UsrmService:
 		self._require_tenant(tenant_id)
 		user = self._get_user(tenant_id, user_id)
 		if not str(reviewer or "").strip():
-			raise PermissionError("access_reviewer_required")
+			result = self.evaluate({
+				"tenant_context_present": True,
+				"operation": "record_access_review",
+				"access_reviewer_present": False,
+			})
+			self._raise_policy(result)
 		record = AccessReviewRecord(
 			id=stable_id("usrm_review", tenant_id, user.id, len(self.access_reviews)),
 			tenant_id=tenant_id,
@@ -225,6 +256,7 @@ class UsrmService:
 		actor: str,
 		access_revoked: bool,
 		evidence_ref: str,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		user = self._get_user(tenant_id, user_id)
@@ -232,12 +264,12 @@ class UsrmService:
 			"tenant_context_present": True,
 			"operation": "deprovision_user",
 			"access_revoked": bool(access_revoked),
+			"deprovision_evidence_present": bool(str(evidence_ref or "").strip()),
+			"event_stream": self._normalize_token(event_stream),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if not str(evidence_ref or "").strip():
-			raise PermissionError("deprovision_evidence_required")
 		record = DeprovisionRecord(
 			id=stable_id("usrm_deprovision", tenant_id, user.id, len(self.deprovisions)),
 			tenant_id=tenant_id,
@@ -252,7 +284,14 @@ class UsrmService:
 		self.deprovisions[record.id] = record
 		user.status = "deprovisioned"
 		user.updated_at = utc_now()
-		self._record_event(tenant_id, "user_deprovisioned", record.id, f"User deprovisioned: {user.display_name}", actor)
+		self._record_event(
+			tenant_id,
+			"user_deprovisioned",
+			record.id,
+			f"User deprovisioned: {user.display_name}",
+			actor,
+			metadata={"event_stream": self._normalize_token(event_stream)},
+		)
 		return record.to_dict()
 
 	def bulk_suspend_users(
@@ -261,16 +300,20 @@ class UsrmService:
 		user_ids: list[str],
 		actor: str,
 		bulk_review_recorded: bool = False,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		users = [self._get_user(tenant_id, user_id) for user_id in user_ids]
 		context = {
 			"tenant_context_present": True,
-			"operation": "bulk_suspend_users",
+			"operation": "bulk_user_action",
 			"affected_user_count": len(users),
 			"bulk_review_recorded": bool(bulk_review_recorded),
+			"event_stream": self._normalize_token(event_stream),
 		}
 		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		status = "review_required" if result["decision"] == "require_review" else "completed"
 		record = BulkUserActionRecord(
 			id=stable_id("usrm_bulk", tenant_id, "suspend", len(self.bulk_actions)),
@@ -287,8 +330,98 @@ class UsrmService:
 			for user in users:
 				user.status = "suspended"
 				user.updated_at = utc_now()
-		self._record_event(tenant_id, "bulk_suspend_users", record.id, f"Bulk suspend {status}: {len(users)} users", actor)
+		self._record_event(
+			tenant_id,
+			"bulk_suspend_users",
+			record.id,
+			f"Bulk suspend {status}: {len(users)} users",
+			actor,
+			metadata={"event_stream": self._normalize_token(event_stream)},
+		)
 		return record.to_dict()
+
+	def register_usrm_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str = "platform",
+		human_approval_required: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_usrm_agent",
+			"agent_runtime_supported": runtime_value in SUPPORTED_USRM_AGENT_RUNTIMES,
+			"agent_role_supported": role_value in SUPPORTED_USRM_AGENT_ROLES,
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		record = UsrmAgentRecord(
+			id=stable_id("usrm_agent", tenant_id, name, runtime_value, role_value),
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=scope,
+			owner=owner,
+			human_approval_required=bool(human_approval_required),
+		)
+		self.usrm_agents[record.id] = record
+		self._record_event(
+			tenant_id,
+			"usrm_agent_registered",
+			record.id,
+			f"User-management agent registered: {name}",
+			owner,
+			metadata={"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
+		)
+		return record.to_dict()
+
+	def validate_agent_user_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		action: str,
+		privileged_scope: bool = False,
+		human_approval_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent = self.usrm_agents.get(agent_id)
+		if agent is None or agent.tenant_id != tenant_id:
+			raise KeyError(f"usrm_agent_not_found:{agent_id}")
+		context = {
+			"tenant_context_present": True,
+			"operation": "agent_user_action",
+			"agent_id": agent_id,
+			"agent_role": agent.role,
+			"action": action,
+			"privileged_scope": bool(privileged_scope),
+			"human_approval_recorded": bool(str(human_approval_ref or "").strip()),
+		}
+		return self.evaluate(context)
+
+	def validate_batch_user_lifecycle(
+		self,
+		tenant_id: str,
+		affected_user_count: int,
+		event_stream: str = "bytewax",
+		bulk_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		context = {
+			"tenant_context_present": True,
+			"operation": "bulk_user_action",
+			"affected_user_count": int(affected_user_count),
+			"event_stream": self._normalize_token(event_stream),
+			"bulk_review_recorded": bool(bulk_review_recorded),
+		}
+		return self.evaluate(context)
 
 	def create_record(
 		self,
@@ -340,6 +473,9 @@ class UsrmService:
 	def list_bulk_actions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.bulk_actions, tenant_id)
 
+	def list_usrm_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.usrm_agents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -360,6 +496,9 @@ class UsrmService:
 			"access_review_count": len(self.list_access_reviews(tenant_id)),
 			"deprovision_count": len(self.list_deprovisions(tenant_id)),
 			"bulk_action_count": len(self.list_bulk_actions(tenant_id)),
+			"usrm_agent_count": len(self.list_usrm_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -390,6 +529,7 @@ class UsrmService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		record = UserAuditEventRecord(
 			id=stable_id("usrm_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -399,6 +539,7 @@ class UsrmService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			metadata=dict(metadata or {}),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -408,3 +549,6 @@ class UsrmService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

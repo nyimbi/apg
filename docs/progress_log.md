@@ -16,6 +16,82 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 21:26 EAT
+
+Common USRM user-management lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the USRM
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with USRM-agent, user, lifecycle, access,
+  governance, observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, unique identity, user
+  owner, profile validation, invitation consent, invitation Bytewax streams,
+  privacy preference sync, privileged MFA, privileged role approval, access
+  reviewer attribution, deprovision access revocation, deprovision evidence,
+  deprovision Bytewax streams, bulk user review, bulk user Bytewax streams,
+  USRM-agent runtime/role, and privileged agent-action approval.
+- Added `UsrmAgentRecord` and metadata-rich audit event support, then extended
+  `UsrmService` with agent registration, privileged agent-action validation,
+  batch user lifecycle validation, audit counts, Bytewax stream metadata, and
+  stronger user/profile/invitation/access/deprovision/bulk guardrails.
+- Extended API helpers and view models with USRM-agent, policy center,
+  dashboard, lifecycle, access, deprovisioning, settings, and Bytewax metadata
+  surfaces.
+- Updated package registration to expose USRM agents, policy endpoints,
+  required dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, bulk lifecycle, profile sync, role approval, and
+  deprovisioning guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/usrm/__init__.py
+  capabilities/common/usrm/capability_contract.py
+  capabilities/common/usrm/models.py capabilities/common/usrm/user_runtime.py
+  capabilities/common/usrm/service.py capabilities/common/usrm/api.py
+  capabilities/common/usrm/views.py capabilities/common/usrm/app.py
+  capabilities/common/usrm/test_capability_contract.py
+  capabilities/common/usrm/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/usrm/test_capability_contract.py
+  capabilities/common/usrm/tests/test_package_contract.py` passed with 10 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.usrm import UsrmService;
+  service=UsrmService(); service.register_usrm_agent('tenant-proof',
+  'Proof agent', 'codex', 'access_reviewer', 'review access gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  USRM-agent registration, audit event emission, and Bytewax stream metadata.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.usrm.streaming.processor,
+  .capabilities.usrm.provides, .capabilities.usrm.requires,
+  .capabilities.usrm.screens.agents.route,
+  (.capabilities.usrm.rules[] |
+  select(.name=="usrm_agent_runtime_supported") | .effect.reason),
+  (.capabilities.usrm.rules[] |
+  select(.name=="invite_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/usrm/semantic_model.json` confirmed `bytewax`, USRM-agent
+  provides, required services, `/usrm/agents`,
+  `usrm_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/usrm --json` passed with `usrm` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/usrm --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `usrm`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/usrm docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: live identity stores, RBAC providers, MFA providers, consent
+  registries, access-review workflows, deprovisioning automation, audit sinks,
+  live Bytewax topology, rendered browser UI, performance checks, and full
+  repository tests.
+
 ### 2026-05-30 21:18 EAT
 
 Common THEM UI/UX theming and branding lifecycle/guardrail packet:

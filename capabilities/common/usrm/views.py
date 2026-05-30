@@ -24,6 +24,7 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -64,6 +65,7 @@ def lifecycle_queue_model(
 		"invitations": service.list_invitations(tenant_id),
 		"deprovisions": service.list_deprovisions(tenant_id),
 		"bulk_actions": service.list_bulk_actions(tenant_id),
+		"streaming": service.describe(tenant_id)["streaming"],
 	}
 
 
@@ -78,6 +80,11 @@ def access_review_model(
 		"role_assignments": service.list_role_assignments(tenant_id),
 		"access_reviews": service.list_access_reviews(tenant_id),
 		"mfa_required_for_privileged": True,
+		"agent_guardrails": [
+			rule
+			for rule in service.describe(tenant_id)["rule_engine"]["rules"]
+			if "agent" in rule["name"] or "bytewax" in rule["name"]
+		],
 	}
 
 
@@ -104,6 +111,38 @@ def deprovisioning_model(
 		"tenant_id": tenant_id,
 		"deprovisions": service.list_deprovisions(tenant_id),
 		"access_revocation_required": True,
+		"streaming": service.describe(tenant_id)["streaming"],
+	}
+
+
+def agent_workbench_model(
+	service: UsrmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or UsrmService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/usrm/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_usrm_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["usrm_agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["usrm_agents"]["supported_roles"],
+		"human_approval_required": contract["configuration"]["usrm_agents"]["human_approval_required"],
+	}
+
+
+def policy_center_model(
+	service: UsrmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or UsrmService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/usrm/policy",
+		"tenant_id": tenant_id,
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"bulk_actions": service.list_bulk_actions(tenant_id),
 	}
 
 
@@ -114,4 +153,5 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}

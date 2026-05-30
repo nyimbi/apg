@@ -24,6 +24,9 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"privileged_user_count": summary["privileged_user_count"],
 		"access_review_count": summary["access_review_count"],
 		"deprovision_count": summary["deprovision_count"],
+		"usrm_agent_count": summary["usrm_agent_count"],
+		"audit_event_count": summary["audit_event_count"],
+		"streaming": summary["streaming"],
 	}
 
 
@@ -49,6 +52,7 @@ def update_profile(payload: dict[str, Any]) -> dict[str, Any]:
 		privacy_preferences=dict(payload.get("privacy_preferences") or {}),
 		consent_notice_ref=str(payload.get("consent_notice_ref") or ""),
 		updated_by=str(payload.get("updated_by") or ""),
+		privacy_sync_recorded=bool(payload.get("privacy_sync_recorded", True)),
 	)
 
 
@@ -59,6 +63,7 @@ def invite_user(payload: dict[str, Any]) -> dict[str, Any]:
 		channel=str(payload.get("channel") or "email"),
 		consent_notice_ref=str(payload.get("consent_notice_ref") or ""),
 		invited_by=str(payload.get("invited_by") or ""),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -91,6 +96,7 @@ def deprovision_user(payload: dict[str, Any]) -> dict[str, Any]:
 		actor=str(payload.get("actor") or ""),
 		access_revoked=bool(payload.get("access_revoked", False)),
 		evidence_ref=str(payload.get("evidence_ref") or ""),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -99,6 +105,38 @@ def bulk_suspend_users(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		user_ids=[str(item) for item in list(payload.get("user_ids") or [])],
 		actor=str(payload.get("actor") or ""),
+		bulk_review_recorded=bool(payload.get("bulk_review_recorded", False)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+	)
+
+
+def register_usrm_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_usrm_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or "platform"),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+	)
+
+
+def validate_agent_user_action(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_agent_user_action(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["agent_id"]),
+		action=str(payload.get("action") or "review"),
+		privileged_scope=bool(payload.get("privileged_scope", False)),
+		human_approval_ref=payload.get("human_approval_ref"),
+	)
+
+
+def validate_batch_user_lifecycle(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_user_lifecycle(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		affected_user_count=int(payload.get("affected_user_count", 0)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 		bulk_review_recorded=bool(payload.get("bulk_review_recorded", False)),
 	)
 
@@ -125,6 +163,7 @@ def list_user_management(tenant_id: str = "default") -> dict[str, Any]:
 		"access_reviews": SERVICE.list_access_reviews(tenant_id),
 		"deprovisions": SERVICE.list_deprovisions(tenant_id),
 		"bulk_actions": SERVICE.list_bulk_actions(tenant_id),
+		"usrm_agents": SERVICE.list_usrm_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

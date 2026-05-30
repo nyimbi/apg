@@ -16,19 +16,38 @@
           "least_privilege_policy_required": true,
           "periodic_access_review_required": true,
           "privileged_mfa_required": true,
+          "privileged_role_approval_required": true,
           "role_assignment_audit_required": true
+        },
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "consent": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "mfa": "adapter"
         },
         "governance": {
           "audit_user_changes": true,
           "identity_federation_supported": true,
           "privacy_preference_sync_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
         },
         "lifecycle": {
           "bulk_action_review_threshold": 25,
+          "bulk_action_stream_required": true,
           "deprovision_access_revocation_required": true,
+          "deprovision_evidence_required": true,
           "invite_consent_notice_required": true,
           "manager_approval_required": true
+        },
+        "observability": {
+          "emit_access_events": true,
+          "emit_lifecycle_events": true,
+          "emit_user_events": true,
+          "event_stream": "apg.usrm.lifecycle",
+          "stream_processor": "bytewax"
         },
         "tenant_id": "default",
         "theme": {
@@ -37,7 +56,9 @@
         },
         "ui": {
           "enable_access_review": true,
+          "enable_agent_workbench": true,
           "enable_lifecycle_queue": true,
+          "enable_policy_center": true,
           "enable_privacy_preferences": true,
           "enable_user_directory": true
         },
@@ -46,6 +67,26 @@
           "status_history_enabled": true,
           "unique_identity_required": true,
           "user_owner_required": true
+        },
+        "usrm_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "identity_reviewer",
+            "lifecycle_reviewer",
+            "access_reviewer",
+            "deprovision_reviewer",
+            "privacy_reviewer",
+            "entitlement_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         }
       },
       "erp_modules": [
@@ -55,9 +96,22 @@
       "master_data": {},
       "name": "User Management",
       "provides": [
-        "usrm_operations"
+        "user_directory",
+        "profile_management",
+        "consented_invitations",
+        "role_assignment_governance",
+        "access_review_workflows",
+        "deprovisioning_governance",
+        "user_audit_events",
+        "usrm_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "mfau",
+        "cons",
+        "audl",
+        "idfd"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +141,32 @@
           },
           {
             "condition": {
+              "operation": "create_user",
+              "user_owner_assigned": false
+            },
+            "description": "Users require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "user_owner_required",
+              "required_action": "assign_user_owner"
+            },
+            "name": "user_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_user",
+              "profile_validated": false
+            },
+            "description": "User creation requires profile validation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "profile_validation_required",
+              "required_action": "validate_user_profile"
+            },
+            "name": "user_requires_profile_validation"
+          },
+          {
+            "condition": {
               "consent_notice_attached": false,
               "operation": "invite_user"
             },
@@ -97,6 +177,32 @@
               "required_action": "attach_consent_notice"
             },
             "name": "invite_requires_consent_notice"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "invite_user"
+            },
+            "description": "User invitation lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_user_invitation_to_bytewax"
+            },
+            "name": "invite_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "update_profile",
+              "privacy_sync_recorded": false
+            },
+            "description": "Profile changes require privacy preference sync evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_preference_sync_required",
+              "required_action": "sync_privacy_preferences"
+            },
+            "name": "profile_requires_privacy_sync"
           },
           {
             "condition": {
@@ -113,6 +219,33 @@
           },
           {
             "condition": {
+              "operation": "assign_role",
+              "privileged_role": true,
+              "role_approval_recorded": false
+            },
+            "description": "Privileged role assignments require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "role_assignment_approval_required",
+              "required_action": "record_role_assignment_approval"
+            },
+            "name": "privileged_role_requires_approval"
+          },
+          {
+            "condition": {
+              "access_reviewer_present": false,
+              "operation": "record_access_review"
+            },
+            "description": "Access reviews require reviewer attribution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_reviewer_required",
+              "required_action": "assign_access_reviewer"
+            },
+            "name": "access_review_requires_reviewer"
+          },
+          {
+            "condition": {
               "access_revoked": false,
               "operation": "deprovision_user"
             },
@@ -126,6 +259,32 @@
           },
           {
             "condition": {
+              "deprovision_evidence_present": false,
+              "operation": "deprovision_user"
+            },
+            "description": "Deprovisioning requires a durable evidence reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deprovision_evidence_required",
+              "required_action": "attach_deprovision_evidence"
+            },
+            "name": "deprovision_requires_evidence"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "deprovision_user"
+            },
+            "description": "Deprovision lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_deprovision_lifecycle_to_bytewax"
+            },
+            "name": "deprovision_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "affected_user_count_gt": 25,
               "bulk_review_recorded": false
             },
@@ -136,6 +295,59 @@
               "required_action": "review_bulk_user_action"
             },
             "name": "bulk_user_action_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "bulk_user_action"
+            },
+            "description": "Bulk user lifecycle actions require Bytewax stream coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_bulk_user_action_to_bytewax"
+            },
+            "name": "bulk_user_action_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_usrm_agent"
+            },
+            "description": "User-management agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "usrm_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "usrm_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_usrm_agent"
+            },
+            "description": "User-management agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "usrm_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "usrm_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_user_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged user actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_user_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -168,6 +380,32 @@
         },
         {
           "condition": {
+            "operation": "create_user",
+            "user_owner_assigned": false
+          },
+          "description": "Users require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "user_owner_required",
+            "required_action": "assign_user_owner"
+          },
+          "name": "user_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_user",
+            "profile_validated": false
+          },
+          "description": "User creation requires profile validation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "profile_validation_required",
+            "required_action": "validate_user_profile"
+          },
+          "name": "user_requires_profile_validation"
+        },
+        {
+          "condition": {
             "consent_notice_attached": false,
             "operation": "invite_user"
           },
@@ -178,6 +416,32 @@
             "required_action": "attach_consent_notice"
           },
           "name": "invite_requires_consent_notice"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "invite_user"
+          },
+          "description": "User invitation lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_user_invitation_to_bytewax"
+          },
+          "name": "invite_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "update_profile",
+            "privacy_sync_recorded": false
+          },
+          "description": "Profile changes require privacy preference sync evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_preference_sync_required",
+            "required_action": "sync_privacy_preferences"
+          },
+          "name": "profile_requires_privacy_sync"
         },
         {
           "condition": {
@@ -194,6 +458,33 @@
         },
         {
           "condition": {
+            "operation": "assign_role",
+            "privileged_role": true,
+            "role_approval_recorded": false
+          },
+          "description": "Privileged role assignments require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "role_assignment_approval_required",
+            "required_action": "record_role_assignment_approval"
+          },
+          "name": "privileged_role_requires_approval"
+        },
+        {
+          "condition": {
+            "access_reviewer_present": false,
+            "operation": "record_access_review"
+          },
+          "description": "Access reviews require reviewer attribution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_reviewer_required",
+            "required_action": "assign_access_reviewer"
+          },
+          "name": "access_review_requires_reviewer"
+        },
+        {
+          "condition": {
             "access_revoked": false,
             "operation": "deprovision_user"
           },
@@ -207,6 +498,32 @@
         },
         {
           "condition": {
+            "deprovision_evidence_present": false,
+            "operation": "deprovision_user"
+          },
+          "description": "Deprovisioning requires a durable evidence reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deprovision_evidence_required",
+            "required_action": "attach_deprovision_evidence"
+          },
+          "name": "deprovision_requires_evidence"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "deprovision_user"
+          },
+          "description": "Deprovision lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_deprovision_lifecycle_to_bytewax"
+          },
+          "name": "deprovision_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "affected_user_count_gt": 25,
             "bulk_review_recorded": false
           },
@@ -217,6 +534,59 @@
             "required_action": "review_bulk_user_action"
           },
           "name": "bulk_user_action_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "bulk_user_action"
+          },
+          "description": "Bulk user lifecycle actions require Bytewax stream coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_bulk_user_action_to_bytewax"
+          },
+          "name": "bulk_user_action_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_usrm_agent"
+          },
+          "description": "User-management agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "usrm_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "usrm_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_usrm_agent"
+          },
+          "description": "User-management agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "usrm_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "usrm_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_user_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged user actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_user_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -230,6 +600,11 @@
           "component": "AccessReview",
           "permission": "usrm:review_access",
           "route": "/usrm/access"
+        },
+        "agents": {
+          "component": "USRMAgentWorkbench",
+          "permission": "usrm:admin",
+          "route": "/usrm/agents"
         },
         "dashboard": {
           "component": "USRMDashboard",
@@ -245,6 +620,11 @@
           "component": "LifecycleQueue",
           "permission": "usrm:manage_users",
           "route": "/usrm/lifecycle"
+        },
+        "policy": {
+          "component": "USRMPolicyCenter",
+          "permission": "usrm:admin",
+          "route": "/usrm/policy"
         },
         "privacy": {
           "component": "PrivacyPreferences",
@@ -267,16 +647,52 @@
           "route": "/usrm/users"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "user_created",
+          "profile_updated",
+          "user_invited",
+          "role_assigned",
+          "access_review_recorded",
+          "user_deprovisioned",
+          "bulk_suspend_users",
+          "usrm_agent_registered"
+        ],
+        "guardrails": [
+          "invite_requires_bytewax_stream",
+          "deprovision_requires_bytewax_stream",
+          "bulk_user_action_requires_bytewax",
+          "privileged_agent_user_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "active",
+          "invited",
+          "suspended",
+          "review_required",
+          "deprovisioned",
+          "blocked"
+        ],
+        "stream": "apg.usrm.lifecycle"
+      },
       "theme": {
         "components": {
           "access_review": {
             "status_style": "mfa-chip",
             "visual": "entitlement-matrix"
           },
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
+          },
           "lifecycle_queue": {
             "highlight": "stage-chip",
             "visual": "approval-list"
+          },
+          "policy_center": {
+            "status_style": "guardrail-chip",
+            "visual": "rule-grid"
           },
           "privacy_panel": {
             "status_style": "consent-chip",
@@ -357,6 +773,20 @@
             "permission": "usrm:deprovision"
           },
           {
+            "component": "USRMAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/usrm/agents",
+            "permission": "usrm:admin"
+          },
+          {
+            "component": "USRMPolicyCenter",
+            "name": "policy",
+            "nav_group": "Governance",
+            "path": "/usrm/policy",
+            "permission": "usrm:admin"
+          },
+          {
             "component": "USRMSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -377,7 +807,13 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "usrm": []
+      "usrm": [
+        "auth",
+        "mfau",
+        "cons",
+        "audl",
+        "idfd"
+      ]
     }
   },
   "contracts": {
@@ -387,19 +823,38 @@
           "least_privilege_policy_required": true,
           "periodic_access_review_required": true,
           "privileged_mfa_required": true,
+          "privileged_role_approval_required": true,
           "role_assignment_audit_required": true
+        },
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "consent": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "mfa": "adapter"
         },
         "governance": {
           "audit_user_changes": true,
           "identity_federation_supported": true,
           "privacy_preference_sync_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
         },
         "lifecycle": {
           "bulk_action_review_threshold": 25,
+          "bulk_action_stream_required": true,
           "deprovision_access_revocation_required": true,
+          "deprovision_evidence_required": true,
           "invite_consent_notice_required": true,
           "manager_approval_required": true
+        },
+        "observability": {
+          "emit_access_events": true,
+          "emit_lifecycle_events": true,
+          "emit_user_events": true,
+          "event_stream": "apg.usrm.lifecycle",
+          "stream_processor": "bytewax"
         },
         "tenant_id": "default",
         "theme": {
@@ -408,7 +863,9 @@
         },
         "ui": {
           "enable_access_review": true,
+          "enable_agent_workbench": true,
           "enable_lifecycle_queue": true,
+          "enable_policy_center": true,
           "enable_privacy_preferences": true,
           "enable_user_directory": true
         },
@@ -417,13 +874,46 @@
           "status_history_enabled": true,
           "unique_identity_required": true,
           "user_owner_required": true
+        },
+        "usrm_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "identity_reviewer",
+            "lifecycle_reviewer",
+            "access_reviewer",
+            "deprovision_reviewer",
+            "privacy_reviewer",
+            "entitlement_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         }
       },
       "id": "usrm",
       "provides": [
-        "usrm_operations"
+        "user_directory",
+        "profile_management",
+        "consented_invitations",
+        "role_assignment_governance",
+        "access_review_workflows",
+        "deprovisioning_governance",
+        "user_audit_events",
+        "usrm_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "mfau",
+        "cons",
+        "audl",
+        "idfd"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +925,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +946,32 @@
   },
   "roles": {},
   "rules": {
+    "access_review_requires_reviewer": {
+      "condition": {
+        "access_reviewer_present": false,
+        "operation": "record_access_review"
+      },
+      "description": "Access reviews require reviewer attribution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_reviewer_required",
+        "required_action": "assign_access_reviewer"
+      },
+      "name": "access_review_requires_reviewer"
+    },
+    "bulk_user_action_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "bulk_user_action"
+      },
+      "description": "Bulk user lifecycle actions require Bytewax stream coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_bulk_user_action_to_bytewax"
+      },
+      "name": "bulk_user_action_requires_bytewax"
+    },
     "bulk_user_action_requires_review": {
       "condition": {
         "affected_user_count_gt": 25,
@@ -482,6 +998,45 @@
       },
       "name": "deprovision_requires_access_revocation"
     },
+    "deprovision_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "deprovision_user"
+      },
+      "description": "Deprovision lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_deprovision_lifecycle_to_bytewax"
+      },
+      "name": "deprovision_requires_bytewax_stream"
+    },
+    "deprovision_requires_evidence": {
+      "condition": {
+        "deprovision_evidence_present": false,
+        "operation": "deprovision_user"
+      },
+      "description": "Deprovisioning requires a durable evidence reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deprovision_evidence_required",
+        "required_action": "attach_deprovision_evidence"
+      },
+      "name": "deprovision_requires_evidence"
+    },
+    "invite_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "invite_user"
+      },
+      "description": "User invitation lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_user_invitation_to_bytewax"
+      },
+      "name": "invite_requires_bytewax_stream"
+    },
     "invite_requires_consent_notice": {
       "condition": {
         "consent_notice_attached": false,
@@ -495,6 +1050,34 @@
       },
       "name": "invite_requires_consent_notice"
     },
+    "privileged_agent_user_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_user_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged user actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_user_action_requires_human_approval"
+    },
+    "privileged_role_requires_approval": {
+      "condition": {
+        "operation": "assign_role",
+        "privileged_role": true,
+        "role_approval_recorded": false
+      },
+      "description": "Privileged role assignments require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "role_assignment_approval_required",
+        "required_action": "record_role_assignment_approval"
+      },
+      "name": "privileged_role_requires_approval"
+    },
     "privileged_user_requires_mfa": {
       "condition": {
         "mfa_enabled": false,
@@ -507,6 +1090,19 @@
         "required_action": "enable_mfa"
       },
       "name": "privileged_user_requires_mfa"
+    },
+    "profile_requires_privacy_sync": {
+      "condition": {
+        "operation": "update_profile",
+        "privacy_sync_recorded": false
+      },
+      "description": "Profile changes require privacy preference sync evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privacy_preference_sync_required",
+        "required_action": "sync_privacy_preferences"
+      },
+      "name": "profile_requires_privacy_sync"
     },
     "tenant_context_required": {
       "condition": {
@@ -532,6 +1128,58 @@
         "required_action": "attach_unique_identity"
       },
       "name": "user_requires_identity"
+    },
+    "user_requires_owner": {
+      "condition": {
+        "operation": "create_user",
+        "user_owner_assigned": false
+      },
+      "description": "Users require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "user_owner_required",
+        "required_action": "assign_user_owner"
+      },
+      "name": "user_requires_owner"
+    },
+    "user_requires_profile_validation": {
+      "condition": {
+        "operation": "create_user",
+        "profile_validated": false
+      },
+      "description": "User creation requires profile validation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "profile_validation_required",
+        "required_action": "validate_user_profile"
+      },
+      "name": "user_requires_profile_validation"
+    },
+    "usrm_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_usrm_agent"
+      },
+      "description": "User-management agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "usrm_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "usrm_agent_role_supported"
+    },
+    "usrm_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_usrm_agent"
+      },
+      "description": "User-management agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "usrm_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "usrm_agent_runtime_supported"
     }
   },
   "security": {},
