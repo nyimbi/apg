@@ -22,6 +22,8 @@ from typing import Any, Dict, List, Optional, Union
 from functools import wraps
 import json
 
+from .imex_runtime import ImexService
+
 from flask import Flask, Blueprint, request, jsonify, Response
 try:
     from flask_cors import CORS
@@ -96,6 +98,7 @@ from database import DatabaseManager, DatabaseConfig
 from ai_intelligence import AIIntelligenceEngine
 
 logger = logging.getLogger(__name__)
+generated_imex_service = ImexService()
 
 # Pydantic Request/Response Models
 
@@ -911,6 +914,130 @@ def setup_websocket_events(socketio):
 		except Exception as e:
 			logger.error(f"Error getting job metrics: {e}")
 			emit('error', {'message': 'Failed to get job metrics'})
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return dependency-light IMEX generated-app status."""
+	contract = generated_imex_service.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		**generated_imex_service.dashboard_summary(tenant_id),
+	}
+
+
+def register_generated_endpoint(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.register_endpoint(
+		endpoint_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		endpoint_type=str(payload.get("endpoint_type") or "connection"),
+		conn_binding_ref=str(payload["conn_binding_ref"]),
+		owner=str(payload["owner"]),
+		external=_payload_bool(payload, "external", False),
+		approved=_payload_bool(payload, "approved", True),
+	)
+
+
+def create_generated_mapping_profile(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.create_mapping_profile(
+		mapping_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		source_profile_ref=str(payload["source_profile_ref"]),
+		mapping_ref=str(payload["mapping_ref"]),
+		quality_gate_ref=str(payload["quality_gate_ref"]),
+	)
+
+
+def create_generated_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.create_job(
+		job_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		direction=str(payload["direction"]),
+		source_endpoint_id=str(payload["source_endpoint_id"]),
+		destination_endpoint_id=str(payload["destination_endpoint_id"]),
+		format=str(payload["format"]),
+		owner=str(payload["owner"]),
+		environment=str(payload.get("environment") or "development"),
+		mapping_profile_id=str(payload["mapping_profile_id"]),
+		checksum=str(payload["checksum"]),
+		data_classification=str(payload.get("data_classification") or "internal"),
+		pii_detected=_payload_bool(payload, "pii_detected", False),
+		pii_policy_ref=str(payload.get("pii_policy_ref") or ""),
+		etlp_plan_ref=str(payload.get("etlp_plan_ref") or ""),
+		destination_approved=None if "destination_approved" not in payload else _payload_bool(payload, "destination_approved", True),
+	)
+
+
+def validate_generated_preview(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.validate_preview(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		job_id=str(payload["id"]),
+		quality_score=float(payload["quality_score"]),
+		invalid_records=int(payload.get("invalid_records") or 0),
+	)
+
+
+def execute_generated_job(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.execute_job(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		job_id=str(payload["job_id"]),
+		run_id=str(payload["id"]),
+		record_count=int(payload.get("record_count") or 0),
+		approval_recorded=_payload_bool(payload, "approval_recorded", False),
+		export_encrypted=_payload_bool(payload, "export_encrypted", True),
+		monitoring_enabled=_payload_bool(payload, "monitoring_enabled", True),
+		checkpointing_enabled=_payload_bool(payload, "checkpointing_enabled", True),
+		quality_review_recorded=_payload_bool(payload, "quality_review_recorded", False),
+		invalid_records_present=_payload_bool(payload, "invalid_records_present", False),
+		quarantine_enabled=_payload_bool(payload, "quarantine_enabled", True),
+		capacity_review_recorded=_payload_bool(payload, "capacity_review_recorded", False),
+	)
+
+
+def complete_generated_run(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.complete_run(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		run_id=str(payload["id"]),
+		records_processed=int(payload.get("records_processed") or 0),
+		quality_score=float(payload["quality_score"]),
+		audit_evidence_present=_payload_bool(payload, "audit_evidence_present", True),
+	)
+
+
+def publish_generated_artifact(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.publish_artifact(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		artifact_id=str(payload["id"]),
+		run_id=str(payload["run_id"]),
+		artifact_ref=str(payload["artifact_ref"]),
+		checksum=str(payload["checksum"]),
+		retention_policy=str(payload["retention_policy"]),
+	)
+
+
+def list_generated_jobs(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_imex_service.list_jobs(tenant_id)
+
+
+def list_generated_runs(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_imex_service.list_runs(tenant_id)
+
+
+def list_generated_artifacts(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_imex_service.list_artifacts(tenant_id)
+
+
+def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)
 
 
 # API Registry for APG Composition

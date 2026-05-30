@@ -8,13 +8,47 @@
   },
   "capabilities": {
     "imex": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "connector_control_plane": "conn",
+        "encryption_provider": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "imex_runtime.ImexService",
+        "http_api": "api.app",
+        "key_vault": "keym",
+        "metrics_sink": "moni",
+        "pipeline_engine": "etlp",
+        "production_runtime": "service.ImportExportService"
+      },
+      "approvals": {
+        "capacity": "ReviewRecord",
+        "destination": "ReviewRecord",
+        "owner_transfer": "ReviewRecord",
+        "purge": "ReviewRecord",
+        "quality": "ReviewRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "connector_control_plane": "conn",
+          "encryption_provider": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "imex_runtime.ImexService",
+          "http_api": "api.app",
+          "key_vault": "keym",
+          "metrics_sink": "moni",
+          "pipeline_engine": "etlp",
+          "production_runtime": "service.ImportExportService"
+        },
         "formats": {
+          "checksum_required": true,
           "format_conversion_enabled": true,
           "schema_mapping_required": true,
+          "source_profile_required": true,
           "supported_formats": [
             "csv",
             "json",
@@ -27,10 +61,19 @@
         "jobs": {
           "approval_required_for_production": true,
           "checkpointing_enabled": true,
+          "idempotency_required_for_replay": true,
           "max_concurrent_jobs": 25,
-          "owner_required": true
+          "owner_required": true,
+          "retention_days": 90
+        },
+        "observability": {
+          "audit_enabled": true,
+          "large_transfer_monitoring_required": true,
+          "large_transfer_record_threshold": 100000,
+          "metrics_required": true
         },
         "orchestration": {
+          "bytewax_events_enabled": true,
           "collaboration_enabled": true,
           "conn_integration_enabled": true,
           "etlp_integration_enabled": true,
@@ -39,6 +82,8 @@
         "security": {
           "audit_all_transfers": true,
           "destination_approval_required": true,
+          "destructive_purge_review_required": true,
+          "pii_policy_required": true,
           "require_tenant_context": true,
           "sensitive_exports_require_encryption": true
         },
@@ -48,16 +93,25 @@
           "default_theme": "imex_transfer_console"
         },
         "ui": {
+          "enable_approvals": true,
+          "enable_artifacts": true,
+          "enable_audit": true,
+          "enable_dashboard": true,
+          "enable_exports": true,
+          "enable_imports": true,
           "enable_job_designer": true,
           "enable_mapping_workbench": true,
+          "enable_retention": true,
+          "enable_settings": true,
           "enable_transfer_monitor": true,
           "enable_validation_console": true
         },
         "validation": {
           "data_validation_enabled": true,
-          "minimum_quality_score": 80.0,
+          "minimum_quality_score": 0.95,
           "preview_required_before_execute": true,
-          "quarantine_invalid_records": true
+          "quarantine_invalid_records": true,
+          "sample_size": 1000
         }
       },
       "erp_modules": [
@@ -86,43 +140,135 @@
           },
           {
             "condition": {
-              "operation": "execute_job",
+              "operation": "create_job",
               "owner_assigned": false
             },
-            "description": "Transfer jobs require an owner before execution.",
+            "description": "Transfer jobs require an accountable owner.",
             "effect": {
               "decision": "deny",
               "reason": "job_owner_required",
               "required_action": "assign_job_owner"
             },
-            "name": "job_execution_requires_owner"
+            "name": "job_requires_owner"
           },
           {
             "condition": {
-              "approval_recorded": false,
-              "environment": "production"
+              "direction_present": false,
+              "operation": "create_job"
             },
-            "description": "Production transfers require approval.",
+            "description": "Transfer jobs require import, export, or migration direction.",
             "effect": {
               "decision": "deny",
-              "reason": "production_approval_required",
-              "required_action": "record_transfer_approval"
+              "reason": "job_direction_required",
+              "required_action": "choose_transfer_direction"
             },
-            "name": "production_transfer_requires_approval"
+            "name": "job_requires_direction"
           },
           {
             "condition": {
-              "data_classification": "sensitive",
-              "export_encrypted": false,
-              "operation": "export"
+              "operation": "create_job",
+              "source_registered": false
             },
-            "description": "Sensitive exports require encryption.",
+            "description": "Transfer jobs require a source endpoint.",
             "effect": {
               "decision": "deny",
-              "reason": "export_encryption_required",
-              "required_action": "enable_export_encryption"
+              "reason": "source_endpoint_required",
+              "required_action": "register_source_endpoint"
             },
-            "name": "sensitive_export_requires_encryption"
+            "name": "job_requires_source"
+          },
+          {
+            "condition": {
+              "destination_registered": false,
+              "operation": "create_job"
+            },
+            "description": "Transfer jobs require a destination endpoint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "destination_endpoint_required",
+              "required_action": "register_destination_endpoint"
+            },
+            "name": "job_requires_destination"
+          },
+          {
+            "condition": {
+              "format_supported": false,
+              "operation": "create_job"
+            },
+            "description": "Transfer jobs require a supported file or stream format.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_transfer_format",
+              "required_action": "choose_supported_format"
+            },
+            "name": "format_must_be_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_job",
+              "source_profile_present": false
+            },
+            "description": "Import and migration jobs require source schema profile evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_profile_required",
+              "required_action": "profile_source_schema"
+            },
+            "name": "source_profile_required"
+          },
+          {
+            "condition": {
+              "checksum_present": false,
+              "operation": "create_job"
+            },
+            "description": "External transfer artifacts require checksum evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checksum_required",
+              "required_action": "attach_checksum"
+            },
+            "name": "checksum_required"
+          },
+          {
+            "condition": {
+              "mapping_present": false,
+              "operation": "create_job"
+            },
+            "description": "Transfers require schema mapping evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_mapping_required",
+              "required_action": "attach_schema_mapping"
+            },
+            "name": "mapping_required"
+          },
+          {
+            "condition": {
+              "operation": "create_job",
+              "pii_detected": true,
+              "pii_policy_attached": false
+            },
+            "description": "PII-bearing transfers require a data protection policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pii_policy_required",
+              "required_action": "attach_pii_policy"
+            },
+            "name": "pii_policy_required"
+          },
+          {
+            "condition": {
+              "destination_approved": false,
+              "external_destination": true,
+              "operation": "create_job"
+            },
+            "description": "External export destinations require destination approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "destination_approval_required",
+              "required_action": "record_destination_approval"
+            },
+            "name": "destination_approval_required"
           },
           {
             "condition": {
@@ -135,20 +281,250 @@
               "reason": "preview_validation_required",
               "required_action": "run_preview_validation"
             },
-            "name": "execution_requires_preview_validation"
+            "name": "preview_required_before_execute"
           },
           {
             "condition": {
-              "quality_review_recorded": false,
-              "quality_score_lt": 80.0
+              "approval_recorded": false,
+              "environment": "production",
+              "operation": "execute_job"
             },
-            "description": "Low quality transfer output requires review.",
+            "description": "Production transfers require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "production_approval_required",
+              "required_action": "record_transfer_approval"
+            },
+            "name": "production_transfer_requires_approval"
+          },
+          {
+            "condition": {
+              "data_classification": "sensitive",
+              "direction": "export",
+              "export_encrypted": false,
+              "operation": "execute_job"
+            },
+            "description": "Sensitive exports require encryption.",
+            "effect": {
+              "decision": "deny",
+              "reason": "export_encryption_required",
+              "required_action": "enable_export_encryption"
+            },
+            "name": "sensitive_export_requires_encryption"
+          },
+          {
+            "condition": {
+              "monitoring_enabled": false,
+              "operation": "execute_job",
+              "record_count_gt": 100000
+            },
+            "description": "Large transfers require monitoring.",
+            "effect": {
+              "decision": "deny",
+              "reason": "large_transfer_monitoring_required",
+              "required_action": "enable_monitoring"
+            },
+            "name": "large_transfer_requires_monitoring"
+          },
+          {
+            "condition": {
+              "checkpointing_enabled": false,
+              "operation": "execute_job"
+            },
+            "description": "Executable transfer jobs require checkpointing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "checkpointing_required",
+              "required_action": "enable_checkpointing"
+            },
+            "name": "checkpointing_required"
+          },
+          {
+            "condition": {
+              "operation": "execute_job",
+              "quality_review_recorded": false,
+              "quality_score_lt": 0.95
+            },
+            "description": "Low quality transfer previews require review.",
             "effect": {
               "decision": "require_review",
               "reason": "quality_review_required",
               "required_action": "record_quality_review"
             },
-            "name": "low_quality_transfer_requires_review"
+            "name": "quality_review_required"
+          },
+          {
+            "condition": {
+              "invalid_records_present": true,
+              "operation": "execute_job",
+              "quarantine_enabled": false
+            },
+            "description": "Invalid records require quarantine before execution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invalid_record_quarantine_required",
+              "required_action": "enable_quarantine"
+            },
+            "name": "invalid_records_require_quarantine"
+          },
+          {
+            "condition": {
+              "active_jobs_gt": 25,
+              "capacity_review_recorded": false,
+              "operation": "execute_job"
+            },
+            "description": "Tenant concurrency above the configured limit requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "capacity_review_required",
+              "required_action": "record_capacity_review"
+            },
+            "name": "concurrent_limit_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "retry_run",
+              "previous_run_failed": false
+            },
+            "description": "Retry operations require a failed run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "failed_run_required",
+              "required_action": "select_failed_run"
+            },
+            "name": "retry_requires_failure"
+          },
+          {
+            "condition": {
+              "idempotency_key_present": false,
+              "operation": "replay_run"
+            },
+            "description": "Replay operations require an idempotency key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "idempotency_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "replay_requires_idempotency"
+          },
+          {
+            "condition": {
+              "operation": "schedule_job",
+              "timezone_present": false
+            },
+            "description": "Scheduled transfers require timezone.",
+            "effect": {
+              "decision": "deny",
+              "reason": "timezone_required",
+              "required_action": "declare_schedule_timezone"
+            },
+            "name": "schedule_requires_timezone"
+          },
+          {
+            "condition": {
+              "checksum_present": false,
+              "operation": "publish_artifact"
+            },
+            "description": "Published artifacts require checksum evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_checksum_required",
+              "required_action": "attach_artifact_checksum"
+            },
+            "name": "artifact_publication_requires_checksum"
+          },
+          {
+            "condition": {
+              "operation": "publish_artifact",
+              "retention_policy_present": false
+            },
+            "description": "Transfer artifacts require retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_policy_required",
+              "required_action": "attach_retention_policy"
+            },
+            "name": "retention_policy_required"
+          },
+          {
+            "condition": {
+              "destructive": true,
+              "operation": "purge_artifact",
+              "purge_review_recorded": false
+            },
+            "description": "Destructive artifact purges require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "purge_review_required",
+              "required_action": "record_purge_review"
+            },
+            "name": "destructive_purge_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "transfer_owner",
+              "owner_transfer_review_recorded": false
+            },
+            "description": "Job owner transfer requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "owner_transfer_review_required",
+              "required_action": "record_owner_transfer_review"
+            },
+            "name": "owner_transfer_requires_review"
+          },
+          {
+            "condition": {
+              "direction": "migration",
+              "etlp_plan_present": false,
+              "operation": "create_job"
+            },
+            "description": "Migration jobs require ETLP plan linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "etlp_plan_required",
+              "required_action": "attach_etlp_plan"
+            },
+            "name": "migration_requires_etlp_plan"
+          },
+          {
+            "condition": {
+              "connector_binding_present": false,
+              "operation": "create_job"
+            },
+            "description": "Endpoint-backed transfers require CONN connection binding.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_binding_required",
+              "required_action": "attach_conn_binding"
+            },
+            "name": "connector_binding_required"
+          },
+          {
+            "condition": {
+              "audit_evidence_present": false,
+              "operation": "complete_run"
+            },
+            "description": "Executed transfers require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_evidence_required",
+              "required_action": "record_audit_evidence"
+            },
+            "name": "audit_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "complete_run",
+              "quality_score_present": false
+            },
+            "description": "Completed transfers require final quality score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_score_required",
+              "required_action": "record_quality_score"
+            },
+            "name": "completion_quality_required"
           }
         ],
         "type": "deterministic"
@@ -168,43 +544,135 @@
         },
         {
           "condition": {
-            "operation": "execute_job",
+            "operation": "create_job",
             "owner_assigned": false
           },
-          "description": "Transfer jobs require an owner before execution.",
+          "description": "Transfer jobs require an accountable owner.",
           "effect": {
             "decision": "deny",
             "reason": "job_owner_required",
             "required_action": "assign_job_owner"
           },
-          "name": "job_execution_requires_owner"
+          "name": "job_requires_owner"
         },
         {
           "condition": {
-            "approval_recorded": false,
-            "environment": "production"
+            "direction_present": false,
+            "operation": "create_job"
           },
-          "description": "Production transfers require approval.",
+          "description": "Transfer jobs require import, export, or migration direction.",
           "effect": {
             "decision": "deny",
-            "reason": "production_approval_required",
-            "required_action": "record_transfer_approval"
+            "reason": "job_direction_required",
+            "required_action": "choose_transfer_direction"
           },
-          "name": "production_transfer_requires_approval"
+          "name": "job_requires_direction"
         },
         {
           "condition": {
-            "data_classification": "sensitive",
-            "export_encrypted": false,
-            "operation": "export"
+            "operation": "create_job",
+            "source_registered": false
           },
-          "description": "Sensitive exports require encryption.",
+          "description": "Transfer jobs require a source endpoint.",
           "effect": {
             "decision": "deny",
-            "reason": "export_encryption_required",
-            "required_action": "enable_export_encryption"
+            "reason": "source_endpoint_required",
+            "required_action": "register_source_endpoint"
           },
-          "name": "sensitive_export_requires_encryption"
+          "name": "job_requires_source"
+        },
+        {
+          "condition": {
+            "destination_registered": false,
+            "operation": "create_job"
+          },
+          "description": "Transfer jobs require a destination endpoint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "destination_endpoint_required",
+            "required_action": "register_destination_endpoint"
+          },
+          "name": "job_requires_destination"
+        },
+        {
+          "condition": {
+            "format_supported": false,
+            "operation": "create_job"
+          },
+          "description": "Transfer jobs require a supported file or stream format.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_transfer_format",
+            "required_action": "choose_supported_format"
+          },
+          "name": "format_must_be_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_job",
+            "source_profile_present": false
+          },
+          "description": "Import and migration jobs require source schema profile evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_profile_required",
+            "required_action": "profile_source_schema"
+          },
+          "name": "source_profile_required"
+        },
+        {
+          "condition": {
+            "checksum_present": false,
+            "operation": "create_job"
+          },
+          "description": "External transfer artifacts require checksum evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checksum_required",
+            "required_action": "attach_checksum"
+          },
+          "name": "checksum_required"
+        },
+        {
+          "condition": {
+            "mapping_present": false,
+            "operation": "create_job"
+          },
+          "description": "Transfers require schema mapping evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_mapping_required",
+            "required_action": "attach_schema_mapping"
+          },
+          "name": "mapping_required"
+        },
+        {
+          "condition": {
+            "operation": "create_job",
+            "pii_detected": true,
+            "pii_policy_attached": false
+          },
+          "description": "PII-bearing transfers require a data protection policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pii_policy_required",
+            "required_action": "attach_pii_policy"
+          },
+          "name": "pii_policy_required"
+        },
+        {
+          "condition": {
+            "destination_approved": false,
+            "external_destination": true,
+            "operation": "create_job"
+          },
+          "description": "External export destinations require destination approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "destination_approval_required",
+            "required_action": "record_destination_approval"
+          },
+          "name": "destination_approval_required"
         },
         {
           "condition": {
@@ -217,85 +685,353 @@
             "reason": "preview_validation_required",
             "required_action": "run_preview_validation"
           },
-          "name": "execution_requires_preview_validation"
+          "name": "preview_required_before_execute"
         },
         {
           "condition": {
-            "quality_review_recorded": false,
-            "quality_score_lt": 80.0
+            "approval_recorded": false,
+            "environment": "production",
+            "operation": "execute_job"
           },
-          "description": "Low quality transfer output requires review.",
+          "description": "Production transfers require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "production_approval_required",
+            "required_action": "record_transfer_approval"
+          },
+          "name": "production_transfer_requires_approval"
+        },
+        {
+          "condition": {
+            "data_classification": "sensitive",
+            "direction": "export",
+            "export_encrypted": false,
+            "operation": "execute_job"
+          },
+          "description": "Sensitive exports require encryption.",
+          "effect": {
+            "decision": "deny",
+            "reason": "export_encryption_required",
+            "required_action": "enable_export_encryption"
+          },
+          "name": "sensitive_export_requires_encryption"
+        },
+        {
+          "condition": {
+            "monitoring_enabled": false,
+            "operation": "execute_job",
+            "record_count_gt": 100000
+          },
+          "description": "Large transfers require monitoring.",
+          "effect": {
+            "decision": "deny",
+            "reason": "large_transfer_monitoring_required",
+            "required_action": "enable_monitoring"
+          },
+          "name": "large_transfer_requires_monitoring"
+        },
+        {
+          "condition": {
+            "checkpointing_enabled": false,
+            "operation": "execute_job"
+          },
+          "description": "Executable transfer jobs require checkpointing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "checkpointing_required",
+            "required_action": "enable_checkpointing"
+          },
+          "name": "checkpointing_required"
+        },
+        {
+          "condition": {
+            "operation": "execute_job",
+            "quality_review_recorded": false,
+            "quality_score_lt": 0.95
+          },
+          "description": "Low quality transfer previews require review.",
           "effect": {
             "decision": "require_review",
             "reason": "quality_review_required",
             "required_action": "record_quality_review"
           },
-          "name": "low_quality_transfer_requires_review"
+          "name": "quality_review_required"
+        },
+        {
+          "condition": {
+            "invalid_records_present": true,
+            "operation": "execute_job",
+            "quarantine_enabled": false
+          },
+          "description": "Invalid records require quarantine before execution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invalid_record_quarantine_required",
+            "required_action": "enable_quarantine"
+          },
+          "name": "invalid_records_require_quarantine"
+        },
+        {
+          "condition": {
+            "active_jobs_gt": 25,
+            "capacity_review_recorded": false,
+            "operation": "execute_job"
+          },
+          "description": "Tenant concurrency above the configured limit requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "capacity_review_required",
+            "required_action": "record_capacity_review"
+          },
+          "name": "concurrent_limit_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "retry_run",
+            "previous_run_failed": false
+          },
+          "description": "Retry operations require a failed run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "failed_run_required",
+            "required_action": "select_failed_run"
+          },
+          "name": "retry_requires_failure"
+        },
+        {
+          "condition": {
+            "idempotency_key_present": false,
+            "operation": "replay_run"
+          },
+          "description": "Replay operations require an idempotency key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "idempotency_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "replay_requires_idempotency"
+        },
+        {
+          "condition": {
+            "operation": "schedule_job",
+            "timezone_present": false
+          },
+          "description": "Scheduled transfers require timezone.",
+          "effect": {
+            "decision": "deny",
+            "reason": "timezone_required",
+            "required_action": "declare_schedule_timezone"
+          },
+          "name": "schedule_requires_timezone"
+        },
+        {
+          "condition": {
+            "checksum_present": false,
+            "operation": "publish_artifact"
+          },
+          "description": "Published artifacts require checksum evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_checksum_required",
+            "required_action": "attach_artifact_checksum"
+          },
+          "name": "artifact_publication_requires_checksum"
+        },
+        {
+          "condition": {
+            "operation": "publish_artifact",
+            "retention_policy_present": false
+          },
+          "description": "Transfer artifacts require retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_policy_required",
+            "required_action": "attach_retention_policy"
+          },
+          "name": "retention_policy_required"
+        },
+        {
+          "condition": {
+            "destructive": true,
+            "operation": "purge_artifact",
+            "purge_review_recorded": false
+          },
+          "description": "Destructive artifact purges require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "purge_review_required",
+            "required_action": "record_purge_review"
+          },
+          "name": "destructive_purge_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "transfer_owner",
+            "owner_transfer_review_recorded": false
+          },
+          "description": "Job owner transfer requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "owner_transfer_review_required",
+            "required_action": "record_owner_transfer_review"
+          },
+          "name": "owner_transfer_requires_review"
+        },
+        {
+          "condition": {
+            "direction": "migration",
+            "etlp_plan_present": false,
+            "operation": "create_job"
+          },
+          "description": "Migration jobs require ETLP plan linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "etlp_plan_required",
+            "required_action": "attach_etlp_plan"
+          },
+          "name": "migration_requires_etlp_plan"
+        },
+        {
+          "condition": {
+            "connector_binding_present": false,
+            "operation": "create_job"
+          },
+          "description": "Endpoint-backed transfers require CONN connection binding.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_binding_required",
+            "required_action": "attach_conn_binding"
+          },
+          "name": "connector_binding_required"
+        },
+        {
+          "condition": {
+            "audit_evidence_present": false,
+            "operation": "complete_run"
+          },
+          "description": "Executed transfers require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_evidence_required",
+            "required_action": "record_audit_evidence"
+          },
+          "name": "audit_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "complete_run",
+            "quality_score_present": false
+          },
+          "description": "Completed transfers require final quality score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_score_required",
+            "required_action": "record_quality_score"
+          },
+          "name": "completion_quality_required"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "service": "imex_runtime.py",
+        "views": "view_models.py"
       },
       "screens": {
+        "approvals": {
+          "component": "TransferApprovalQueue",
+          "permission": "imex:approve",
+          "route": "/imex/approvals"
+        },
+        "artifacts": {
+          "component": "TransferArtifacts",
+          "permission": "imex:view",
+          "route": "/imex/artifacts"
+        },
+        "audit": {
+          "component": "TransferAuditTimeline",
+          "permission": "imex:view",
+          "route": "/imex/audit"
+        },
         "dashboard": {
           "component": "IMEXDashboard",
-          "permission": "imex.view",
+          "permission": "imex:view",
           "route": "/imex/dashboard"
         },
         "designer": {
           "component": "JobDesigner",
-          "permission": "imex.create",
+          "permission": "imex:create",
           "route": "/imex/designer"
+        },
+        "exports": {
+          "component": "ExportWorkbench",
+          "permission": "imex:create",
+          "route": "/imex/exports"
+        },
+        "imports": {
+          "component": "ImportWorkbench",
+          "permission": "imex:create",
+          "route": "/imex/imports"
         },
         "jobs": {
           "component": "TransferJobs",
-          "permission": "imex.view",
+          "permission": "imex:view",
           "route": "/imex/jobs"
         },
         "mappings": {
           "component": "SchemaMappingWorkbench",
-          "permission": "imex.manage",
+          "permission": "imex:manage",
           "route": "/imex/mappings"
         },
         "monitor": {
           "component": "TransferMonitor",
-          "permission": "imex.execute",
+          "permission": "imex:execute",
           "route": "/imex/monitor"
         },
         "settings": {
           "component": "IMEXSettings",
-          "permission": "imex.admin",
+          "permission": "imex:admin",
           "route": "/imex/settings"
         },
         "validation": {
           "component": "ValidationConsole",
-          "permission": "imex.manage",
+          "permission": "imex:manage",
           "route": "/imex/validation"
-        },
-        "workflows": {
-          "component": "MigrationWorkflows",
-          "permission": "imex.manage",
-          "route": "/imex/workflows"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
-          "migration_timeline": {
-            "status_style": "throughput-pill",
-            "visual": "checkpoint-timeline"
+          "approval_queue": {
+            "status_indicator": "risk-chip",
+            "visual": "review-list"
+          },
+          "artifact_browser": {
+            "status_indicator": "retention-chip",
+            "visual": "file-grid"
+          },
+          "audit_timeline": {
+            "status_style": "decision-pill",
+            "visual": "event-timeline"
+          },
+          "retention_console": {
+            "status_indicator": "expiry-chip",
+            "visual": "policy-table"
           },
           "schema_mapping_canvas": {
             "edge_style": "field-transform-line",
             "visual": "source-target-map"
           },
-          "transfer_job_card": {
+          "transfer_job_row": {
             "icon": "arrow-left-right",
             "risk_style": "quality-band",
             "status_indicator": "job-state-pill"
+          },
+          "transfer_timeline": {
+            "status_style": "throughput-pill",
+            "visual": "checkpoint-timeline"
           },
           "validation_result_panel": {
             "highlight": "invalid-record-chip",
@@ -305,7 +1041,7 @@
         "name": "imex_transfer_console",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#F4A261",
+          "color.accent": "#C86F2D",
           "color.danger": "#C53030",
           "color.primary": "#2D5D7B",
           "color.success": "#2F855A",
@@ -317,6 +1053,15 @@
           "text.secondary": "#52606D"
         }
       },
+      "transfer_lifecycle": {
+        "artifact": "TransferArtifact",
+        "audit": "TransferAuditEvent",
+        "endpoint": "TransferEndpoint",
+        "job": "TransferJob",
+        "mapping": "MappingProfile",
+        "review": "ReviewRecord",
+        "run": "TransferRun"
+      },
       "ui": {
         "api_prefix": "/imex/api/v1",
         "requires_theme": true,
@@ -326,56 +1071,84 @@
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/imex/dashboard",
-            "permission": "imex.view"
+            "permission": "imex:view"
           },
           {
             "component": "TransferJobs",
             "name": "jobs",
             "nav_group": "Operations",
             "path": "/imex/jobs",
-            "permission": "imex.view"
+            "permission": "imex:view"
           },
           {
             "component": "JobDesigner",
             "name": "designer",
             "nav_group": "Build",
             "path": "/imex/designer",
-            "permission": "imex.create"
+            "permission": "imex:create"
           },
           {
             "component": "SchemaMappingWorkbench",
             "name": "mappings",
             "nav_group": "Build",
             "path": "/imex/mappings",
-            "permission": "imex.manage"
+            "permission": "imex:manage"
           },
           {
             "component": "TransferMonitor",
             "name": "monitor",
             "nav_group": "Operations",
             "path": "/imex/monitor",
-            "permission": "imex.execute"
+            "permission": "imex:execute"
           },
           {
             "component": "ValidationConsole",
             "name": "validation",
             "nav_group": "Governance",
             "path": "/imex/validation",
-            "permission": "imex.manage"
+            "permission": "imex:manage"
           },
           {
-            "component": "MigrationWorkflows",
-            "name": "workflows",
-            "nav_group": "Orchestration",
-            "path": "/imex/workflows",
-            "permission": "imex.manage"
+            "component": "ImportWorkbench",
+            "name": "imports",
+            "nav_group": "Operations",
+            "path": "/imex/imports",
+            "permission": "imex:create"
+          },
+          {
+            "component": "ExportWorkbench",
+            "name": "exports",
+            "nav_group": "Operations",
+            "path": "/imex/exports",
+            "permission": "imex:create"
+          },
+          {
+            "component": "TransferApprovalQueue",
+            "name": "approvals",
+            "nav_group": "Governance",
+            "path": "/imex/approvals",
+            "permission": "imex:approve"
+          },
+          {
+            "component": "TransferArtifacts",
+            "name": "artifacts",
+            "nav_group": "Operations",
+            "path": "/imex/artifacts",
+            "permission": "imex:view"
+          },
+          {
+            "component": "TransferAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/imex/audit",
+            "permission": "imex:view"
           },
           {
             "component": "IMEXSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/imex/settings",
-            "permission": "imex.admin"
+            "permission": "imex:admin"
           }
         ],
         "shell": "apg_python",
@@ -383,7 +1156,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -397,9 +1170,24 @@
   "contracts": {
     "imex": {
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "connector_control_plane": "conn",
+          "encryption_provider": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "imex_runtime.ImexService",
+          "http_api": "api.app",
+          "key_vault": "keym",
+          "metrics_sink": "moni",
+          "pipeline_engine": "etlp",
+          "production_runtime": "service.ImportExportService"
+        },
         "formats": {
+          "checksum_required": true,
           "format_conversion_enabled": true,
           "schema_mapping_required": true,
+          "source_profile_required": true,
           "supported_formats": [
             "csv",
             "json",
@@ -412,10 +1200,19 @@
         "jobs": {
           "approval_required_for_production": true,
           "checkpointing_enabled": true,
+          "idempotency_required_for_replay": true,
           "max_concurrent_jobs": 25,
-          "owner_required": true
+          "owner_required": true,
+          "retention_days": 90
+        },
+        "observability": {
+          "audit_enabled": true,
+          "large_transfer_monitoring_required": true,
+          "large_transfer_record_threshold": 100000,
+          "metrics_required": true
         },
         "orchestration": {
+          "bytewax_events_enabled": true,
           "collaboration_enabled": true,
           "conn_integration_enabled": true,
           "etlp_integration_enabled": true,
@@ -424,6 +1221,8 @@
         "security": {
           "audit_all_transfers": true,
           "destination_approval_required": true,
+          "destructive_purge_review_required": true,
+          "pii_policy_required": true,
           "require_tenant_context": true,
           "sensitive_exports_require_encryption": true
         },
@@ -433,16 +1232,25 @@
           "default_theme": "imex_transfer_console"
         },
         "ui": {
+          "enable_approvals": true,
+          "enable_artifacts": true,
+          "enable_audit": true,
+          "enable_dashboard": true,
+          "enable_exports": true,
+          "enable_imports": true,
           "enable_job_designer": true,
           "enable_mapping_workbench": true,
+          "enable_retention": true,
+          "enable_settings": true,
           "enable_transfer_monitor": true,
           "enable_validation_console": true
         },
         "validation": {
           "data_validation_enabled": true,
-          "minimum_quality_score": 80.0,
+          "minimum_quality_score": 0.95,
           "preview_required_before_execute": true,
-          "quarantine_invalid_records": true
+          "quarantine_invalid_records": true,
+          "sample_size": 1000
         }
       },
       "id": "imex",
@@ -482,7 +1290,274 @@
   },
   "roles": {},
   "rules": {
-    "execution_requires_preview_validation": {
+    "artifact_publication_requires_checksum": {
+      "condition": {
+        "checksum_present": false,
+        "operation": "publish_artifact"
+      },
+      "description": "Published artifacts require checksum evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_checksum_required",
+        "required_action": "attach_artifact_checksum"
+      },
+      "name": "artifact_publication_requires_checksum"
+    },
+    "audit_evidence_required": {
+      "condition": {
+        "audit_evidence_present": false,
+        "operation": "complete_run"
+      },
+      "description": "Executed transfers require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_evidence_required",
+        "required_action": "record_audit_evidence"
+      },
+      "name": "audit_evidence_required"
+    },
+    "checkpointing_required": {
+      "condition": {
+        "checkpointing_enabled": false,
+        "operation": "execute_job"
+      },
+      "description": "Executable transfer jobs require checkpointing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "checkpointing_required",
+        "required_action": "enable_checkpointing"
+      },
+      "name": "checkpointing_required"
+    },
+    "checksum_required": {
+      "condition": {
+        "checksum_present": false,
+        "operation": "create_job"
+      },
+      "description": "External transfer artifacts require checksum evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "checksum_required",
+        "required_action": "attach_checksum"
+      },
+      "name": "checksum_required"
+    },
+    "completion_quality_required": {
+      "condition": {
+        "operation": "complete_run",
+        "quality_score_present": false
+      },
+      "description": "Completed transfers require final quality score.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quality_score_required",
+        "required_action": "record_quality_score"
+      },
+      "name": "completion_quality_required"
+    },
+    "concurrent_limit_requires_review": {
+      "condition": {
+        "active_jobs_gt": 25,
+        "capacity_review_recorded": false,
+        "operation": "execute_job"
+      },
+      "description": "Tenant concurrency above the configured limit requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "capacity_review_required",
+        "required_action": "record_capacity_review"
+      },
+      "name": "concurrent_limit_requires_review"
+    },
+    "connector_binding_required": {
+      "condition": {
+        "connector_binding_present": false,
+        "operation": "create_job"
+      },
+      "description": "Endpoint-backed transfers require CONN connection binding.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_binding_required",
+        "required_action": "attach_conn_binding"
+      },
+      "name": "connector_binding_required"
+    },
+    "destination_approval_required": {
+      "condition": {
+        "destination_approved": false,
+        "external_destination": true,
+        "operation": "create_job"
+      },
+      "description": "External export destinations require destination approval.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "destination_approval_required",
+        "required_action": "record_destination_approval"
+      },
+      "name": "destination_approval_required"
+    },
+    "destructive_purge_requires_review": {
+      "condition": {
+        "destructive": true,
+        "operation": "purge_artifact",
+        "purge_review_recorded": false
+      },
+      "description": "Destructive artifact purges require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "purge_review_required",
+        "required_action": "record_purge_review"
+      },
+      "name": "destructive_purge_requires_review"
+    },
+    "format_must_be_supported": {
+      "condition": {
+        "format_supported": false,
+        "operation": "create_job"
+      },
+      "description": "Transfer jobs require a supported file or stream format.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_transfer_format",
+        "required_action": "choose_supported_format"
+      },
+      "name": "format_must_be_supported"
+    },
+    "invalid_records_require_quarantine": {
+      "condition": {
+        "invalid_records_present": true,
+        "operation": "execute_job",
+        "quarantine_enabled": false
+      },
+      "description": "Invalid records require quarantine before execution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invalid_record_quarantine_required",
+        "required_action": "enable_quarantine"
+      },
+      "name": "invalid_records_require_quarantine"
+    },
+    "job_requires_destination": {
+      "condition": {
+        "destination_registered": false,
+        "operation": "create_job"
+      },
+      "description": "Transfer jobs require a destination endpoint.",
+      "effect": {
+        "decision": "deny",
+        "reason": "destination_endpoint_required",
+        "required_action": "register_destination_endpoint"
+      },
+      "name": "job_requires_destination"
+    },
+    "job_requires_direction": {
+      "condition": {
+        "direction_present": false,
+        "operation": "create_job"
+      },
+      "description": "Transfer jobs require import, export, or migration direction.",
+      "effect": {
+        "decision": "deny",
+        "reason": "job_direction_required",
+        "required_action": "choose_transfer_direction"
+      },
+      "name": "job_requires_direction"
+    },
+    "job_requires_owner": {
+      "condition": {
+        "operation": "create_job",
+        "owner_assigned": false
+      },
+      "description": "Transfer jobs require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "job_owner_required",
+        "required_action": "assign_job_owner"
+      },
+      "name": "job_requires_owner"
+    },
+    "job_requires_source": {
+      "condition": {
+        "operation": "create_job",
+        "source_registered": false
+      },
+      "description": "Transfer jobs require a source endpoint.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_endpoint_required",
+        "required_action": "register_source_endpoint"
+      },
+      "name": "job_requires_source"
+    },
+    "large_transfer_requires_monitoring": {
+      "condition": {
+        "monitoring_enabled": false,
+        "operation": "execute_job",
+        "record_count_gt": 100000
+      },
+      "description": "Large transfers require monitoring.",
+      "effect": {
+        "decision": "deny",
+        "reason": "large_transfer_monitoring_required",
+        "required_action": "enable_monitoring"
+      },
+      "name": "large_transfer_requires_monitoring"
+    },
+    "mapping_required": {
+      "condition": {
+        "mapping_present": false,
+        "operation": "create_job"
+      },
+      "description": "Transfers require schema mapping evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_mapping_required",
+        "required_action": "attach_schema_mapping"
+      },
+      "name": "mapping_required"
+    },
+    "migration_requires_etlp_plan": {
+      "condition": {
+        "direction": "migration",
+        "etlp_plan_present": false,
+        "operation": "create_job"
+      },
+      "description": "Migration jobs require ETLP plan linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "etlp_plan_required",
+        "required_action": "attach_etlp_plan"
+      },
+      "name": "migration_requires_etlp_plan"
+    },
+    "owner_transfer_requires_review": {
+      "condition": {
+        "operation": "transfer_owner",
+        "owner_transfer_review_recorded": false
+      },
+      "description": "Job owner transfer requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "owner_transfer_review_required",
+        "required_action": "record_owner_transfer_review"
+      },
+      "name": "owner_transfer_requires_review"
+    },
+    "pii_policy_required": {
+      "condition": {
+        "operation": "create_job",
+        "pii_detected": true,
+        "pii_policy_attached": false
+      },
+      "description": "PII-bearing transfers require a data protection policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pii_policy_required",
+        "required_action": "attach_pii_policy"
+      },
+      "name": "pii_policy_required"
+    },
+    "preview_required_before_execute": {
       "condition": {
         "operation": "execute_job",
         "preview_validated": false
@@ -493,38 +1568,13 @@
         "reason": "preview_validation_required",
         "required_action": "run_preview_validation"
       },
-      "name": "execution_requires_preview_validation"
-    },
-    "job_execution_requires_owner": {
-      "condition": {
-        "operation": "execute_job",
-        "owner_assigned": false
-      },
-      "description": "Transfer jobs require an owner before execution.",
-      "effect": {
-        "decision": "deny",
-        "reason": "job_owner_required",
-        "required_action": "assign_job_owner"
-      },
-      "name": "job_execution_requires_owner"
-    },
-    "low_quality_transfer_requires_review": {
-      "condition": {
-        "quality_review_recorded": false,
-        "quality_score_lt": 80.0
-      },
-      "description": "Low quality transfer output requires review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "quality_review_required",
-        "required_action": "record_quality_review"
-      },
-      "name": "low_quality_transfer_requires_review"
+      "name": "preview_required_before_execute"
     },
     "production_transfer_requires_approval": {
       "condition": {
         "approval_recorded": false,
-        "environment": "production"
+        "environment": "production",
+        "operation": "execute_job"
       },
       "description": "Production transfers require approval.",
       "effect": {
@@ -534,11 +1584,78 @@
       },
       "name": "production_transfer_requires_approval"
     },
+    "quality_review_required": {
+      "condition": {
+        "operation": "execute_job",
+        "quality_review_recorded": false,
+        "quality_score_lt": 0.95
+      },
+      "description": "Low quality transfer previews require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "quality_review_required",
+        "required_action": "record_quality_review"
+      },
+      "name": "quality_review_required"
+    },
+    "replay_requires_idempotency": {
+      "condition": {
+        "idempotency_key_present": false,
+        "operation": "replay_run"
+      },
+      "description": "Replay operations require an idempotency key.",
+      "effect": {
+        "decision": "deny",
+        "reason": "idempotency_required",
+        "required_action": "attach_idempotency_key"
+      },
+      "name": "replay_requires_idempotency"
+    },
+    "retention_policy_required": {
+      "condition": {
+        "operation": "publish_artifact",
+        "retention_policy_present": false
+      },
+      "description": "Transfer artifacts require retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retention_policy_required",
+        "required_action": "attach_retention_policy"
+      },
+      "name": "retention_policy_required"
+    },
+    "retry_requires_failure": {
+      "condition": {
+        "operation": "retry_run",
+        "previous_run_failed": false
+      },
+      "description": "Retry operations require a failed run.",
+      "effect": {
+        "decision": "deny",
+        "reason": "failed_run_required",
+        "required_action": "select_failed_run"
+      },
+      "name": "retry_requires_failure"
+    },
+    "schedule_requires_timezone": {
+      "condition": {
+        "operation": "schedule_job",
+        "timezone_present": false
+      },
+      "description": "Scheduled transfers require timezone.",
+      "effect": {
+        "decision": "deny",
+        "reason": "timezone_required",
+        "required_action": "declare_schedule_timezone"
+      },
+      "name": "schedule_requires_timezone"
+    },
     "sensitive_export_requires_encryption": {
       "condition": {
         "data_classification": "sensitive",
+        "direction": "export",
         "export_encrypted": false,
-        "operation": "export"
+        "operation": "execute_job"
       },
       "description": "Sensitive exports require encryption.",
       "effect": {
@@ -547,6 +1664,19 @@
         "required_action": "enable_export_encryption"
       },
       "name": "sensitive_export_requires_encryption"
+    },
+    "source_profile_required": {
+      "condition": {
+        "operation": "create_job",
+        "source_profile_present": false
+      },
+      "description": "Import and migration jobs require source schema profile evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_profile_required",
+        "required_action": "profile_source_schema"
+      },
+      "name": "source_profile_required"
     },
     "tenant_context_required": {
       "condition": {

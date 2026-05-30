@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""IMEX package contract tests."""
 
 from __future__ import annotations
 
@@ -22,18 +22,19 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
-	module = _load_module("materialized_contract_imex", PACKAGE_DIR / "capability_contract.py")
+def test_contract_shape_is_valid():
+	module = _load_module("imex_contract_for_package_test", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "imex"
-	assert contract["ui"]["routes"]
-	assert contract["theme"]["tokens"]["border.radius"]
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 
 
-def test_materialized_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_imex", PACKAGE_DIR / "app.py")
+def test_app_entrypoint_is_publishable():
+	module = _load_module("imex_app_for_package_test", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -43,4 +44,5 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
-	assert "imex" in model["capabilities"]
+	assert model["capabilities"]["imex"]["runtime"]["service"] == "imex_runtime.py"
+	assert model["capabilities"]["imex"]["streaming"]["engine"] == "bytewax"

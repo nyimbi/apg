@@ -5,13 +5,122 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Import/Export package-backed APG capability", "entity_count": 0, "name": "imex", "version": "1.0.0"}, "capabilities": {"imex": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"formats": {"format_conversion_enabled": true, "schema_mapping_required": true, "supported_formats": ["csv", "json", "parquet", "xlsx", "xml", "sql"]}, "jobs": {"approval_required_for_production": true, "checkpointing_enabled": true, "max_concurrent_jobs": 25, "owner_required": true}, "orchestration": {"collaboration_enabled": true, "conn_integration_enabled": true, "etlp_integration_enabled": true, "notification_enabled": true}, "security": {"audit_all_transfers": true, "destination_approval_required": true, "require_tenant_context": true, "sensitive_exports_require_encryption": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "imex_transfer_console"}, "ui": {"enable_job_designer": true, "enable_mapping_workbench": true, "enable_transfer_monitor": true, "enable_validation_console": true}, "validation": {"data_validation_enabled": true, "minimum_quality_score": 80.0, "preview_required_before_execute": true, "quarantine_invalid_records": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Import/Export", "provides": ["imex_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All import/export operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "execute_job", "owner_assigned": false}, "description": "Transfer jobs require an owner before execution.", "effect": {"decision": "deny", "reason": "job_owner_required", "required_action": "assign_job_owner"}, "name": "job_execution_requires_owner"}, {"condition": {"approval_recorded": false, "environment": "production"}, "description": "Production transfers require approval.", "effect": {"decision": "deny", "reason": "production_approval_required", "required_action": "record_transfer_approval"}, "name": "production_transfer_requires_approval"}, {"condition": {"data_classification": "sensitive", "export_encrypted": false, "operation": "export"}, "description": "Sensitive exports require encryption.", "effect": {"decision": "deny", "reason": "export_encryption_required", "required_action": "enable_export_encryption"}, "name": "sensitive_export_requires_encryption"}, {"condition": {"operation": "execute_job", "preview_validated": false}, "description": "Execution requires preview validation.", "effect": {"decision": "deny", "reason": "preview_validation_required", "required_action": "run_preview_validation"}, "name": "execution_requires_preview_validation"}, {"condition": {"quality_review_recorded": false, "quality_score_lt": 80.0}, "description": "Low quality transfer output requires review.", "effect": {"decision": "require_review", "reason": "quality_review_required", "required_action": "record_quality_review"}, "name": "low_quality_transfer_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All import/export operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "execute_job", "owner_assigned": false}, "description": "Transfer jobs require an owner before execution.", "effect": {"decision": "deny", "reason": "job_owner_required", "required_action": "assign_job_owner"}, "name": "job_execution_requires_owner"}, {"condition": {"approval_recorded": false, "environment": "production"}, "description": "Production transfers require approval.", "effect": {"decision": "deny", "reason": "production_approval_required", "required_action": "record_transfer_approval"}, "name": "production_transfer_requires_approval"}, {"condition": {"data_classification": "sensitive", "export_encrypted": false, "operation": "export"}, "description": "Sensitive exports require encryption.", "effect": {"decision": "deny", "reason": "export_encryption_required", "required_action": "enable_export_encryption"}, "name": "sensitive_export_requires_encryption"}, {"condition": {"operation": "execute_job", "preview_validated": false}, "description": "Execution requires preview validation.", "effect": {"decision": "deny", "reason": "preview_validation_required", "required_action": "run_preview_validation"}, "name": "execution_requires_preview_validation"}, {"condition": {"quality_review_recorded": false, "quality_score_lt": 80.0}, "description": "Low quality transfer output requires review.", "effect": {"decision": "require_review", "reason": "quality_review_required", "required_action": "record_quality_review"}, "name": "low_quality_transfer_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "IMEXDashboard", "permission": "imex.view", "route": "/imex/dashboard"}, "designer": {"component": "JobDesigner", "permission": "imex.create", "route": "/imex/designer"}, "jobs": {"component": "TransferJobs", "permission": "imex.view", "route": "/imex/jobs"}, "mappings": {"component": "SchemaMappingWorkbench", "permission": "imex.manage", "route": "/imex/mappings"}, "monitor": {"component": "TransferMonitor", "permission": "imex.execute", "route": "/imex/monitor"}, "settings": {"component": "IMEXSettings", "permission": "imex.admin", "route": "/imex/settings"}, "validation": {"component": "ValidationConsole", "permission": "imex.manage", "route": "/imex/validation"}, "workflows": {"component": "MigrationWorkflows", "permission": "imex.manage", "route": "/imex/workflows"}}, "streaming": {}, "theme": {"components": {"migration_timeline": {"status_style": "throughput-pill", "visual": "checkpoint-timeline"}, "schema_mapping_canvas": {"edge_style": "field-transform-line", "visual": "source-target-map"}, "transfer_job_card": {"icon": "arrow-left-right", "risk_style": "quality-band", "status_indicator": "job-state-pill"}, "validation_result_panel": {"highlight": "invalid-record-chip", "visual": "rule-stack"}}, "name": "imex_transfer_console", "tokens": {"border.radius": "8px", "color.accent": "#F4A261", "color.danger": "#C53030", "color.primary": "#2D5D7B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/imex/api/v1", "requires_theme": true, "routes": [{"component": "IMEXDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/imex/dashboard", "permission": "imex.view"}, {"component": "TransferJobs", "name": "jobs", "nav_group": "Operations", "path": "/imex/jobs", "permission": "imex.view"}, {"component": "JobDesigner", "name": "designer", "nav_group": "Build", "path": "/imex/designer", "permission": "imex.create"}, {"component": "SchemaMappingWorkbench", "name": "mappings", "nav_group": "Build", "path": "/imex/mappings", "permission": "imex.manage"}, {"component": "TransferMonitor", "name": "monitor", "nav_group": "Operations", "path": "/imex/monitor", "permission": "imex.execute"}, {"component": "ValidationConsole", "name": "validation", "nav_group": "Governance", "path": "/imex/validation", "permission": "imex.manage"}, {"component": "MigrationWorkflows", "name": "workflows", "nav_group": "Orchestration", "path": "/imex/workflows", "permission": "imex.manage"}, {"component": "IMEXSettings", "name": "settings", "nav_group": "Administration", "path": "/imex/settings", "permission": "imex.admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"imex": []}}, "contracts": {"imex": {"configuration": {"formats": {"format_conversion_enabled": true, "schema_mapping_required": true, "supported_formats": ["csv", "json", "parquet", "xlsx", "xml", "sql"]}, "jobs": {"approval_required_for_production": true, "checkpointing_enabled": true, "max_concurrent_jobs": 25, "owner_required": true}, "orchestration": {"collaboration_enabled": true, "conn_integration_enabled": true, "etlp_integration_enabled": true, "notification_enabled": true}, "security": {"audit_all_transfers": true, "destination_approval_required": true, "require_tenant_context": true, "sensitive_exports_require_encryption": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "imex_transfer_console"}, "ui": {"enable_job_designer": true, "enable_mapping_workbench": true, "enable_transfer_monitor": true, "enable_validation_console": true}, "validation": {"data_validation_enabled": true, "minimum_quality_score": 80.0, "preview_required_before_execute": true, "quarantine_invalid_records": true}}, "id": "imex", "provides": ["imex_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"imex": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"execution_requires_preview_validation": {"condition": {"operation": "execute_job", "preview_validated": false}, "description": "Execution requires preview validation.", "effect": {"decision": "deny", "reason": "preview_validation_required", "required_action": "run_preview_validation"}, "name": "execution_requires_preview_validation"}, "job_execution_requires_owner": {"condition": {"operation": "execute_job", "owner_assigned": false}, "description": "Transfer jobs require an owner before execution.", "effect": {"decision": "deny", "reason": "job_owner_required", "required_action": "assign_job_owner"}, "name": "job_execution_requires_owner"}, "low_quality_transfer_requires_review": {"condition": {"quality_review_recorded": false, "quality_score_lt": 80.0}, "description": "Low quality transfer output requires review.", "effect": {"decision": "require_review", "reason": "quality_review_required", "required_action": "record_quality_review"}, "name": "low_quality_transfer_requires_review"}, "production_transfer_requires_approval": {"condition": {"approval_recorded": false, "environment": "production"}, "description": "Production transfers require approval.", "effect": {"decision": "deny", "reason": "production_approval_required", "required_action": "record_transfer_approval"}, "name": "production_transfer_requires_approval"}, "sensitive_export_requires_encryption": {"condition": {"data_classification": "sensitive", "export_encrypted": false, "operation": "export"}, "description": "Sensitive exports require encryption.", "effect": {"decision": "deny", "reason": "export_encryption_required", "required_action": "enable_export_encryption"}, "name": "sensitive_export_requires_encryption"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All import/export operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.imex": {"file": "capability_contract.py", "id": "capability.imex", "kind": "capability", "name": "Import/Export", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("imex_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "imex",
+			"version": "1.0.0",
+			"description": "Import/Export package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"imex": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"imex": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["imex_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "imex_runtime.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"destination": "ReviewRecord",
+					"quality": "ReviewRecord",
+					"capacity": "ReviewRecord",
+					"purge": "ReviewRecord",
+					"owner_transfer": "ReviewRecord",
+				},
+				"transfer_lifecycle": {
+					"endpoint": "TransferEndpoint",
+					"mapping": "MappingProfile",
+					"job": "TransferJob",
+					"run": "TransferRun",
+					"artifact": "TransferArtifact",
+					"review": "ReviewRecord",
+					"audit": "TransferAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"imex": {
+				"id": "imex",
+				"configuration": contract["configuration"],
+				"provides": ["imex_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"imex": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.imex": {
+				"id": "capability.imex",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +145,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("imex", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "imex" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("IMEX semantic model route manifest is stale")
+	if len(rules) < 25:
+		errors.append("IMEX semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("IMEX adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "imex_runtime.py":
+		errors.append("IMEX generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

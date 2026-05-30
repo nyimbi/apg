@@ -1,13 +1,13 @@
 """Regression coverage for the IMEX executable capability contract."""
 
-from capabilities.common.imex import imex_capability, register_capability
-from capabilities.common.imex.capability_contract import (
-	evaluate_capability_rules,
-	get_capability_contract
-)
+import pytest
+
+from capabilities.common.imex import ImexService, imex_capability, register_capability
+from capabilities.common.imex.capability_contract import evaluate_capability_rules, get_capability_contract
+from capabilities.common.imex.view_models import dashboard_model, job_designer_model, transfer_monitor_model
 
 
-def test_contract_exposes_configuration_rules_ui_and_theme():
+def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	contract = get_capability_contract("tenant-transfer", {"jobs": {"max_concurrent_jobs": 5}})
 
 	assert contract["capability"] == "imex"
@@ -20,10 +20,14 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"validation",
 		"security",
 		"orchestration",
+		"observability",
+		"adapters",
 		"ui",
-		"theme"
+		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "imex_runtime.ImexService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"jobs",
@@ -31,48 +35,137 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"mappings",
 		"monitor",
 		"validation",
-		"workflows",
-		"settings"
+		"imports",
+		"exports",
+		"approvals",
+		"artifacts",
+		"audit",
+		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/imex/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert "schema_mapping_canvas" in contract["theme"]["components"]
+	assert "artifact_browser" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_transfer_guardrails():
 	result = evaluate_capability_rules({
 		"tenant_context_present": False,
 		"operation": "execute_job",
-		"owner_assigned": False,
+		"preview_validated": False,
 		"environment": "production",
 		"approval_recorded": False,
+		"direction": "export",
 		"data_classification": "sensitive",
 		"export_encrypted": False,
-		"preview_validated": False,
-		"quality_score": 55.0,
-		"quality_review_recorded": False
-	})
-	export_result = evaluate_capability_rules({
-		"tenant_context_present": True,
-		"operation": "export",
-		"data_classification": "sensitive",
-		"export_encrypted": False
+		"record_count": 200000,
+		"monitoring_enabled": False,
+		"checkpointing_enabled": False,
+		"quality_score": 0.5,
+		"quality_review_recorded": False,
+		"invalid_records_present": True,
+		"quarantine_enabled": False,
 	})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert set(result["matched_rules"]) >= {
 		"tenant_context_required",
-		"job_execution_requires_owner",
+		"preview_required_before_execute",
 		"production_transfer_requires_approval",
-		"execution_requires_preview_validation",
-		"low_quality_transfer_requires_review"
+		"sensitive_export_requires_encryption",
+		"large_transfer_requires_monitoring",
+		"checkpointing_required",
+		"quality_review_required",
+		"invalid_records_require_quarantine",
 	}
-	assert export_result["decision"] == "deny"
-	assert export_result["matched_rules"] == ["sensitive_export_requires_encryption"]
 
 
-def test_registration_includes_full_capability_contract():
+def test_imex_runtime_executes_transfer_lifecycle():
+	service = ImexService()
+	service.register_endpoint("source-crm", "tenant-a", "CRM", "connection", "conn://crm", "data")
+	service.register_endpoint("warehouse", "tenant-a", "Warehouse", "connection", "conn://warehouse", "data")
+	service.create_mapping_profile("crm-map", "tenant-a", "CRM Map", "profiles/crm.json", "maps/crm.json", "quality/crm")
+	job = service.create_job(
+		"crm-import",
+		"tenant-a",
+		"CRM Import",
+		"import",
+		"source-crm",
+		"warehouse",
+		"csv",
+		"data",
+		"development",
+		"crm-map",
+		"sha256:abc",
+	)
+	service.validate_preview("tenant-a", "crm-import", quality_score=0.99)
+	run = service.execute_job("tenant-a", "crm-import", "run-1", record_count=5000)
+	with pytest.raises(PermissionError, match="transfer_run_not_completed"):
+		service.publish_artifact("tenant-a", "early-artifact", "run-1", "s3://exports/early.csv", "sha256:early", "90d")
+	completed = service.complete_run("tenant-a", "run-1", records_processed=5000, quality_score=0.99)
+	artifact = service.publish_artifact("tenant-a", "artifact-1", "run-1", "s3://exports/crm.csv", "sha256:def", "90d")
+
+	assert job["status"] == "draft"
+	assert run["status"] == "running"
+	assert completed["status"] == "completed"
+	assert artifact["status"] == "published"
+	assert service.dashboard_summary("tenant-a")["completed_run_count"] == 1
+
+
+def test_imex_runtime_blocks_missing_evidence():
+	service = ImexService()
+
+	with pytest.raises(PermissionError, match="connector_binding_required"):
+		service.register_endpoint("source", "tenant-a", "Source", "connection", "", "data")
+
+	service.register_endpoint("source", "tenant-a", "Source", "connection", "conn://source", "data")
+	service.register_endpoint("target", "tenant-a", "Target", "connection", "conn://target", "data")
+	with pytest.raises(PermissionError, match="source_profile_required"):
+		service.create_mapping_profile("map", "tenant-a", "Map", "", "maps/file.json", "quality/file")
+
+	service.create_mapping_profile("map", "tenant-a", "Map", "profiles/file.json", "maps/file.json", "quality/file")
+	with pytest.raises(PermissionError, match="unsupported_transfer_format"):
+		service.create_job("bad", "tenant-a", "Bad", "import", "source", "target", "exe", "data", "development", "map", "sha256:abc")
+	with pytest.raises(PermissionError, match="preview_validation_required"):
+		service.create_job("job", "tenant-a", "Job", "import", "source", "target", "csv", "data", "development", "map", "sha256:abc")
+		service.execute_job("tenant-a", "job", "run", record_count=10)
+
+
+def test_imex_runtime_review_and_artifact_guardrails():
+	service = ImexService()
+	service.register_endpoint("source", "tenant-a", "Source", "connection", "conn://source", "data")
+	service.register_endpoint("external", "tenant-a", "External", "connection", "conn://external", "data", external=True, approved=False)
+	service.create_mapping_profile("map", "tenant-a", "Map", "profiles/file.json", "maps/file.json", "quality/file")
+	job = service.create_job("export", "tenant-a", "Export", "export", "source", "external", "json", "data", "production", "map", "sha256:abc", data_classification="sensitive", destination_approved=False)
+	assert job["status"] == "pending_review"
+	assert any(review["review_type"] == "destination" for review in service.list_reviews("tenant-a"))
+
+	service.validate_preview("tenant-a", "export", quality_score=0.99)
+	with pytest.raises(PermissionError, match="production_approval_required"):
+		service.execute_job("tenant-a", "export", "run", record_count=200000, export_encrypted=True)
+	with pytest.raises(PermissionError, match="large_transfer_monitoring_required"):
+		service.execute_job("tenant-a", "export", "run", record_count=200000, approval_recorded=True, monitoring_enabled=False)
+	run = service.execute_job("tenant-a", "export", "run", record_count=200000, approval_recorded=True, monitoring_enabled=True)
+	assert run["status"] == "running"
+	service.complete_run("tenant-a", "run", records_processed=200000, quality_score=0.99)
+	with pytest.raises(PermissionError, match="retention_policy_required"):
+		service.publish_artifact("tenant-a", "artifact", "run", "s3://exports/file.json", "sha256:def", "")
+	service.publish_artifact("tenant-a", "artifact", "run", "s3://exports/file.json", "sha256:def", "90d")
+	with pytest.raises(PermissionError, match="idempotency_required"):
+		service.replay_run("tenant-a", "run", "replay", "")
+	service.replay_run("tenant-a", "run", "replay", "idem-001")
+	with pytest.raises(PermissionError, match="purge_review_required"):
+		service.purge_artifact("tenant-a", "artifact", "data", False)
+	purged = service.purge_artifact("tenant-a", "artifact", "data", True)
+	assert purged["status"] == "purged"
+
+
+def test_registration_and_ui_models_are_composable():
 	registration = register_capability()
+	service = ImexService()
+	service.register_endpoint("source", "tenant-a", "Source", "connection", "conn://source", "data")
+	dashboard = dashboard_model(service, "tenant-a")
+	designer = job_designer_model(service, "tenant-a")
+	monitor = transfer_monitor_model(service, "tenant-a")
 
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
@@ -80,4 +173,7 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "imex_transfer_console"
 	assert registration["ui_components"]["mappings"] == "/imex/mappings"
 	assert "etlp" in registration["dependencies"]
+	assert dashboard["summary"]["endpoint_count"] == 1
+	assert "create_job" in designer["actions"]
+	assert monitor["runs"] == []
 	assert callable(imex_capability.health_check)

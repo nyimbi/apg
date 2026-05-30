@@ -13866,3 +13866,59 @@ Not run to preserve battery:
 - Rendered FastAPI/browser UI behavior.
 - Legacy enhancement module heavy tests.
 - Load, latency, throughput, and connector marketplace scale benchmarks.
+
+### 2026-05-30 07:45 EAT
+
+IMEX lifecycle and guardrail packet:
+
+- Selected `capabilities/common/imex` as the next common capability after CONN
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the governed
+  endpoint, mapping, job, preview, run, completion, artifact, replay, and purge
+  lifecycle.
+- Replaced the primary IMEX capability spec and overclaim-heavy summary docs
+  with current executable scope and a backlog for future enhancements.
+- Expanded the IMEX contract to 30 deterministic guardrails, 12 UI routes,
+  job/format/validation/security/orchestration/observability/adapter
+  configuration, Bytewax event-stream adapter evidence, and transfer-console
+  theme components.
+- Added `imex_runtime.ImexService` with dependency-light endpoint, mapping,
+  job, run, artifact, review, dashboard, replay, purge, and audit behavior for
+  generated applications.
+- Added generated-app API helper functions while preserving the existing Flask
+  API runtime surface.
+- Added `view_models.py` for dashboard, job designer, mapping workbench,
+  transfer monitor, validation, imports, exports, approvals, artifacts, audit,
+  and settings.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded focused tests for contract shape, Bytewax adapter evidence,
+  rule-engine denials, happy-path transfer lifecycle, missing evidence,
+  destination review, production approval, large-transfer monitoring, artifact
+  retention, replay idempotency, purge review, generated-app UI models, and
+  package evidence.
+- Manual review found and fixed generated API destination-approval default
+  handling and artifact publication from non-completed runs.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/imex/__init__.py capabilities/common/imex/capability_contract.py capabilities/common/imex/models.py capabilities/common/imex/imex_runtime.py capabilities/common/imex/api.py capabilities/common/imex/view_models.py capabilities/common/imex/app.py capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, 12 routes, 30 rules, Bytewax event stream, and `imex_runtime.ImexService`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/imex --json` passed with `ok: true`; IMEX remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/imex --json` passed with 12 UI routes, 30 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/imex/README.md capabilities/common/imex/SPECIFICATION.md capabilities/common/imex/PLAN.md capabilities/common/imex/cap_spec.md capabilities/common/imex/__init__.py capabilities/common/imex/capability_contract.py capabilities/common/imex/imex_runtime.py capabilities/common/imex/view_models.py capabilities/common/imex/app.py capabilities/common/imex/api.py capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py capabilities/common/imex/docs/IMPLEMENTATION_SUMMARY.md capabilities/common/imex/docs/WORLD_CLASS_IMPROVEMENTS.md capabilities/common/imex/docs/DEPLOYMENT_GUIDE.md capabilities/common/imex/docs/developer_guide.md capabilities/common/imex/docs/user_guide.md capabilities/common/imex/package_manifest.json capabilities/common/imex/release_report.json capabilities/common/imex/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/imex docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live file transfer execution.
+- Live ETLP pipeline execution.
+- Live Bytewax stream execution.
+- External CONN, vault, encryption, audit, monitoring, registry, and gateway
+  adapters.
+- Rendered Flask/browser UI behavior.
+- Legacy AI, database, security, performance, and deployment heavy tests.
+- Load, latency, throughput, and transfer-size benchmarks.
