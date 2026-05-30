@@ -11,6 +11,18 @@ from .capability_contract import (
 	get_capability_contract,
 	evaluate_capability_rules
 )
+from .service import (
+	ETLPAuditEventRecord,
+	ETLPDatasourceRecord,
+	ETLPExecutionRecord,
+	ETLPLifecycleService,
+	ETLPMappingRecord,
+	ETLPPipelineRecord,
+	ETLPPublishRecord,
+	ETLPQualityRecord,
+	ETLPReplayRecord,
+	ETLPScheduleRecord,
+)
 
 try:
 	from .models import *
@@ -74,14 +86,14 @@ APG_CAPABILITY_METADATA = {
 		"etlp:quality:read"
 	],
 	"features": [
-		"visual_pipeline_designer",
-		"ai_powered_optimization",
-		"real_time_collaboration",
-		"multi_modal_processing",
-		"self_healing_pipelines",
-		"federated_processing",
-		"intelligent_quality_engine",
-		"zero_config_governance"
+			"visual_pipeline_designer",
+			"pipeline_lifecycle_guardrails",
+			"datasource_approval",
+			"field_mapping",
+			"quality_gates",
+			"lineage_emission",
+			"retry_replay_backfill_controls",
+			"adapter_boundaries"
 	]
 }
 
@@ -105,6 +117,8 @@ def register_capability() -> dict:
 			"transformation_governance": "Control data transformations and mapping policies",
 			"quality_gates": "Apply quality rules before publish or downstream delivery",
 			"lineage_emission": "Emit metadata and lineage events for catalog integration",
+			"datasource_governance": "Approve and govern pipeline sources and targets",
+			"execution_controls": "Enforce approval, idempotency, retry, replay, and backfill controls",
 			"capability_rules": "Evaluate deterministic pipeline governance rules",
 			"visual_theming": "Apply pipeline-console theme tokens and components"
 		},

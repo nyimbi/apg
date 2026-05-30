@@ -15,7 +15,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from uuid_extensions import uuid7str
 
-from .service import ETLPService
+from .service import ETLPLifecycleService, ETLPService
 from .field_mapper import FieldMapperService, TableSchema, MappingConfiguration, FieldMapping
 from .models import Pipeline, Execution, Transformation, DataSource, QualityRule, PipelineStatus
 from .views import (
@@ -1434,6 +1434,85 @@ class ETLPAPIController:
 				break
 		
 		return min(format_score, 1.0)
+
+
+SERVICE = ETLPLifecycleService()
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return generated-application ETLP capability status."""
+	return {
+		"capability": "etlp",
+		"tenant_id": tenant_id,
+		"summary": SERVICE.dashboard_summary(tenant_id),
+		"contract": SERVICE.describe(tenant_id),
+	}
+
+
+def register_pipeline_record(**kwargs) -> Dict[str, Any]:
+	"""Register a pipeline through the dependency-light lifecycle service."""
+	return SERVICE.register_pipeline(**kwargs).__dict__
+
+
+def register_datasource_record(**kwargs) -> Dict[str, Any]:
+	"""Register a datasource through the dependency-light lifecycle service."""
+	return SERVICE.register_datasource(**kwargs).__dict__
+
+
+def register_mapping_record(**kwargs) -> Dict[str, Any]:
+	"""Register a field mapping through the dependency-light lifecycle service."""
+	return SERVICE.register_mapping(**kwargs).__dict__
+
+
+def execute_pipeline_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate and enqueue a pipeline execution request."""
+	return SERVICE.execute_pipeline(**kwargs).__dict__
+
+
+def assess_quality_record(**kwargs) -> Dict[str, Any]:
+	"""Record quality-gate evidence for an execution."""
+	return SERVICE.assess_quality(**kwargs).__dict__
+
+
+def schedule_pipeline_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate and record a pipeline schedule request."""
+	return SERVICE.schedule_pipeline(**kwargs).__dict__
+
+
+def publish_output_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate a publish request for transformed output."""
+	return SERVICE.publish_output(**kwargs).__dict__
+
+
+def retry_execution_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate an execution retry request."""
+	return SERVICE.retry_execution(**kwargs).__dict__
+
+
+def replay_execution_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate a replay or backfill request."""
+	return SERVICE.replay_execution(**kwargs).__dict__
+
+
+def retire_pipeline_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate a pipeline retirement request."""
+	return SERVICE.retire_pipeline(**kwargs).__dict__
+
+
+def list_records(tenant_id: str = "default", record_type: str | None = None) -> List[Dict[str, Any]]:
+	"""List dependency-light ETLP lifecycle records."""
+	return SERVICE.list_records(tenant_id, record_type)
+
+
+def list_metadata(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return ETLP metadata for generated application composition."""
+	return {
+		"status": capability_status(tenant_id),
+		"pipelines": SERVICE.list_records(tenant_id, "pipelines"),
+		"datasources": SERVICE.list_records(tenant_id, "datasources"),
+		"executions": SERVICE.list_records(tenant_id, "executions"),
+		"publish_reviews": SERVICE.list_records(tenant_id, "publish_reviews"),
+	}
 
 
 # Initialize API controller

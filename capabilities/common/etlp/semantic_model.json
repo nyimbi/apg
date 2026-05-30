@@ -8,15 +8,72 @@
   },
   "capabilities": {
     "etlp": {
-      "approvals": {},
+      "adapters": {
+        "connector_registry": "adapter",
+        "event_stream": "bytewax",
+        "execution_engine": "adapter",
+        "generated_app_runtime": "service.ETLPLifecycleService",
+        "lineage_emitter": "adapter",
+        "metadata_catalog": "meta",
+        "production_runtime": "service.ETLPService",
+        "quality_engine": "adapter",
+        "secret_store": "adapter"
+      },
+      "approvals": {
+        "datasource": "ETLPDatasourceRecord",
+        "execution": "ETLPExecutionRecord",
+        "publish": "ETLPPublishRecord",
+        "replay": "ETLPReplayRecord",
+        "schedule": "ETLPScheduleRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "connector_registry": "adapter",
+          "event_stream": "bytewax",
+          "execution_engine": "adapter",
+          "generated_app_runtime": "service.ETLPLifecycleService",
+          "lineage_emitter": "adapter",
+          "metadata_catalog": "meta",
+          "production_runtime": "service.ETLPService",
+          "quality_engine": "adapter",
+          "secret_store": "adapter"
+        },
+        "datasources": {
+          "approval_required": true,
+          "embedded_secret_denied": true,
+          "owner_required": true,
+          "secret_reference_required": true,
+          "supported_types": [
+            "database",
+            "file",
+            "api",
+            "stream",
+            "warehouse",
+            "lakehouse",
+            "object_store"
+          ]
+        },
+        "execution": {
+          "backfill_requires_review": true,
+          "default_retry_limit": 3,
+          "idempotency_key_required": true,
+          "max_replay_window_hours": 72,
+          "max_retry_limit": 5
+        },
         "governance": {
           "audit_all_executions": true,
+          "destructive_delete_review_required": true,
           "lineage_emission_required": true,
           "production_approval_required": true,
+          "publish_approval_required": true,
           "require_tenant_context": true
+        },
+        "mappings": {
+          "field_mapping_required": true,
+          "lineage_required": true,
+          "schema_validation_required": true
         },
         "optimization": {
           "ai_optimization_enabled": true,
@@ -25,13 +82,23 @@
           "self_healing_enabled": true
         },
         "pipelines": {
+          "default_status": "draft",
           "max_concurrent_executions": 10,
           "owner_required": true,
+          "retire_requires_impact_review": true,
           "schedule_required_for_production": true,
+          "supported_modes": [
+            "elt",
+            "etl",
+            "batch",
+            "streaming",
+            "hybrid"
+          ],
           "visual_designer_enabled": true
         },
         "processing": {
           "batch_enabled": true,
+          "bytewax_streams_enabled": true,
           "default_mode": "elt",
           "federated_processing_enabled": true,
           "streaming_enabled": true
@@ -39,7 +106,14 @@
         "quality": {
           "minimum_publish_score": 80.0,
           "quality_gate_enabled": true,
-          "quarantine_failed_records": true
+          "quarantine_failed_records": true,
+          "required_dimensions": [
+            "completeness",
+            "validity",
+            "freshness",
+            "lineage",
+            "mapping"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -47,10 +121,14 @@
           "default_theme": "etlp_pipeline_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
           "enable_execution_monitor": true,
           "enable_field_mapper": true,
           "enable_pipeline_designer": true,
-          "enable_quality_console": true
+          "enable_publish_review": true,
+          "enable_quality_console": true,
+          "enable_replay_console": true
         }
       },
       "erp_modules": [
@@ -59,6 +137,17 @@
       "i18n": {},
       "master_data": {},
       "name": "ETL/ELT Processing",
+      "pipeline_lifecycle": {
+        "audit": "ETLPAuditEventRecord",
+        "datasource": "ETLPDatasourceRecord",
+        "execution": "ETLPExecutionRecord",
+        "mapping": "ETLPMappingRecord",
+        "pipeline": "ETLPPipelineRecord",
+        "publish": "ETLPPublishRecord",
+        "quality": "ETLPQualityRecord",
+        "replay": "ETLPReplayRecord",
+        "schedule": "ETLPScheduleRecord"
+      },
       "provides": [
         "etlp_operations"
       ],
@@ -79,6 +168,32 @@
           },
           {
             "condition": {
+              "operation": "register_pipeline",
+              "owner_assigned": false
+            },
+            "description": "Pipeline registration requires an assigned owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pipeline_owner_required",
+              "required_action": "assign_pipeline_owner"
+            },
+            "name": "pipeline_registration_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_pipeline",
+              "unsupported_mode": true
+            },
+            "description": "Pipeline mode must be configured for the tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_pipeline_mode",
+              "required_action": "choose_supported_mode"
+            },
+            "name": "pipeline_mode_must_be_supported"
+          },
+          {
+            "condition": {
               "operation": "execute_pipeline",
               "owner_assigned": false
             },
@@ -93,7 +208,8 @@
           {
             "condition": {
               "approval_recorded": false,
-              "environment": "production"
+              "environment": "production",
+              "operation": "execute_pipeline"
             },
             "description": "Production executions require approval.",
             "effect": {
@@ -102,6 +218,110 @@
               "required_action": "record_execution_approval"
             },
             "name": "production_execution_requires_approval"
+          },
+          {
+            "condition": {
+              "idempotency_key_present": false,
+              "operation": "execute_pipeline"
+            },
+            "description": "Pipeline executions require idempotency evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "idempotency_key_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "execution_requires_idempotency_key"
+          },
+          {
+            "condition": {
+              "datasource_owner_assigned": false,
+              "operation": "register_datasource"
+            },
+            "description": "Data source registration requires an assigned owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "datasource_owner_required",
+              "required_action": "assign_datasource_owner"
+            },
+            "name": "datasource_registration_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_datasource",
+              "secret_reference_present": false
+            },
+            "description": "Data source registration requires a secret-store reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secret_reference_required",
+              "required_action": "attach_secret_reference"
+            },
+            "name": "datasource_requires_secret_reference"
+          },
+          {
+            "condition": {
+              "datasource_approved": false,
+              "operation": "register_datasource"
+            },
+            "description": "Data sources require approval before execution.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "datasource_approval_required",
+              "required_action": "approve_datasource"
+            },
+            "name": "datasource_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "register_datasource",
+              "unsupported_datasource_type": true
+            },
+            "description": "Data source type must be configured for the tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_datasource_type",
+              "required_action": "choose_supported_datasource_type"
+            },
+            "name": "datasource_type_must_be_supported"
+          },
+          {
+            "condition": {
+              "embedded_secret_present": true,
+              "operation": "register_datasource"
+            },
+            "description": "Data source secret material must use secret-store references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "embedded_secret_denied",
+              "required_action": "store_secret_reference"
+            },
+            "name": "datasource_secrets_must_use_reference"
+          },
+          {
+            "condition": {
+              "operation": "register_mapping",
+              "schema_validated": false
+            },
+            "description": "Field mappings require schema validation before use.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_validation_required",
+              "required_action": "validate_mapping_schema"
+            },
+            "name": "mapping_requires_schema_validation"
+          },
+          {
+            "condition": {
+              "operation": "register_mapping",
+              "source_and_target_registered": false
+            },
+            "description": "Field mappings require registered source and target data sources.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_datasources_required",
+              "required_action": "register_mapping_datasources"
+            },
+            "name": "mapping_requires_registered_datasources"
           },
           {
             "condition": {
@@ -118,7 +338,48 @@
           },
           {
             "condition": {
+              "operation": "publish_output",
+              "quality_score_lt": 80.0
+            },
+            "description": "Publishing transformed data requires the configured minimum quality score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "minimum_quality_required",
+              "required_action": "raise_quality_score"
+            },
+            "name": "publish_requires_minimum_quality"
+          },
+          {
+            "condition": {
+              "operation": "publish_output",
+              "publish_approval_recorded": false
+            },
+            "description": "Publishing production outputs requires an approval record.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publish_approval_required",
+              "required_action": "record_publish_approval"
+            },
+            "name": "publish_requires_approval"
+          },
+          {
+            "condition": {
+              "environment": "production",
+              "operation": "schedule_pipeline",
+              "schedule_review_recorded": false
+            },
+            "description": "Production schedules require current review evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "schedule_review_required",
+              "required_action": "record_schedule_review"
+            },
+            "name": "production_schedule_requires_review"
+          },
+          {
+            "condition": {
               "lineage_emitted": false,
+              "operation": "execute_pipeline",
               "transformation_present": true
             },
             "description": "Transformations require lineage emission.",
@@ -132,7 +393,8 @@
           {
             "condition": {
               "cost_review_recorded": false,
-              "estimated_cost_gt": 1000.0
+              "estimated_cost_gt": 1000.0,
+              "operation": "execute_pipeline"
             },
             "description": "High estimated execution cost requires review.",
             "effect": {
@@ -141,6 +403,60 @@
               "required_action": "record_cost_review"
             },
             "name": "high_cost_execution_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "retry_execution",
+              "retry_count_gt": 3,
+              "retry_review_recorded": false
+            },
+            "description": "Retry requests above tenant limits require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "retry_review_required",
+              "required_action": "record_retry_review"
+            },
+            "name": "retry_limit_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "replay_execution",
+              "reason_present": false
+            },
+            "description": "Replay and backfill requests require a business reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "replay_reason_required",
+              "required_action": "attach_replay_reason"
+            },
+            "name": "replay_requires_reason"
+          },
+          {
+            "condition": {
+              "operation": "replay_execution",
+              "replay_review_recorded": false,
+              "replay_window_hours_gt": 72
+            },
+            "description": "Replay windows above the tenant limit require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "replay_window_review_required",
+              "required_action": "record_replay_review"
+            },
+            "name": "replay_window_requires_review"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_pipeline"
+            },
+            "description": "Destructive pipeline deletion requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_review_required",
+              "required_action": "record_impact_review"
+            },
+            "name": "destructive_delete_requires_review"
           }
         ],
         "type": "deterministic"
@@ -160,6 +476,32 @@
         },
         {
           "condition": {
+            "operation": "register_pipeline",
+            "owner_assigned": false
+          },
+          "description": "Pipeline registration requires an assigned owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pipeline_owner_required",
+            "required_action": "assign_pipeline_owner"
+          },
+          "name": "pipeline_registration_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_pipeline",
+            "unsupported_mode": true
+          },
+          "description": "Pipeline mode must be configured for the tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_pipeline_mode",
+            "required_action": "choose_supported_mode"
+          },
+          "name": "pipeline_mode_must_be_supported"
+        },
+        {
+          "condition": {
             "operation": "execute_pipeline",
             "owner_assigned": false
           },
@@ -174,7 +516,8 @@
         {
           "condition": {
             "approval_recorded": false,
-            "environment": "production"
+            "environment": "production",
+            "operation": "execute_pipeline"
           },
           "description": "Production executions require approval.",
           "effect": {
@@ -183,6 +526,110 @@
             "required_action": "record_execution_approval"
           },
           "name": "production_execution_requires_approval"
+        },
+        {
+          "condition": {
+            "idempotency_key_present": false,
+            "operation": "execute_pipeline"
+          },
+          "description": "Pipeline executions require idempotency evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "idempotency_key_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "execution_requires_idempotency_key"
+        },
+        {
+          "condition": {
+            "datasource_owner_assigned": false,
+            "operation": "register_datasource"
+          },
+          "description": "Data source registration requires an assigned owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "datasource_owner_required",
+            "required_action": "assign_datasource_owner"
+          },
+          "name": "datasource_registration_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_datasource",
+            "secret_reference_present": false
+          },
+          "description": "Data source registration requires a secret-store reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secret_reference_required",
+            "required_action": "attach_secret_reference"
+          },
+          "name": "datasource_requires_secret_reference"
+        },
+        {
+          "condition": {
+            "datasource_approved": false,
+            "operation": "register_datasource"
+          },
+          "description": "Data sources require approval before execution.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "datasource_approval_required",
+            "required_action": "approve_datasource"
+          },
+          "name": "datasource_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "register_datasource",
+            "unsupported_datasource_type": true
+          },
+          "description": "Data source type must be configured for the tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_datasource_type",
+            "required_action": "choose_supported_datasource_type"
+          },
+          "name": "datasource_type_must_be_supported"
+        },
+        {
+          "condition": {
+            "embedded_secret_present": true,
+            "operation": "register_datasource"
+          },
+          "description": "Data source secret material must use secret-store references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "embedded_secret_denied",
+            "required_action": "store_secret_reference"
+          },
+          "name": "datasource_secrets_must_use_reference"
+        },
+        {
+          "condition": {
+            "operation": "register_mapping",
+            "schema_validated": false
+          },
+          "description": "Field mappings require schema validation before use.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_validation_required",
+            "required_action": "validate_mapping_schema"
+          },
+          "name": "mapping_requires_schema_validation"
+        },
+        {
+          "condition": {
+            "operation": "register_mapping",
+            "source_and_target_registered": false
+          },
+          "description": "Field mappings require registered source and target data sources.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_datasources_required",
+            "required_action": "register_mapping_datasources"
+          },
+          "name": "mapping_requires_registered_datasources"
         },
         {
           "condition": {
@@ -199,7 +646,48 @@
         },
         {
           "condition": {
+            "operation": "publish_output",
+            "quality_score_lt": 80.0
+          },
+          "description": "Publishing transformed data requires the configured minimum quality score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "minimum_quality_required",
+            "required_action": "raise_quality_score"
+          },
+          "name": "publish_requires_minimum_quality"
+        },
+        {
+          "condition": {
+            "operation": "publish_output",
+            "publish_approval_recorded": false
+          },
+          "description": "Publishing production outputs requires an approval record.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publish_approval_required",
+            "required_action": "record_publish_approval"
+          },
+          "name": "publish_requires_approval"
+        },
+        {
+          "condition": {
+            "environment": "production",
+            "operation": "schedule_pipeline",
+            "schedule_review_recorded": false
+          },
+          "description": "Production schedules require current review evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "schedule_review_required",
+            "required_action": "record_schedule_review"
+          },
+          "name": "production_schedule_requires_review"
+        },
+        {
+          "condition": {
             "lineage_emitted": false,
+            "operation": "execute_pipeline",
             "transformation_present": true
           },
           "description": "Transformations require lineage emission.",
@@ -213,7 +701,8 @@
         {
           "condition": {
             "cost_review_recorded": false,
-            "estimated_cost_gt": 1000.0
+            "estimated_cost_gt": 1000.0,
+            "operation": "execute_pipeline"
           },
           "description": "High estimated execution cost requires review.",
           "effect": {
@@ -222,15 +711,79 @@
             "required_action": "record_cost_review"
           },
           "name": "high_cost_execution_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "retry_execution",
+            "retry_count_gt": 3,
+            "retry_review_recorded": false
+          },
+          "description": "Retry requests above tenant limits require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "retry_review_required",
+            "required_action": "record_retry_review"
+          },
+          "name": "retry_limit_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "replay_execution",
+            "reason_present": false
+          },
+          "description": "Replay and backfill requests require a business reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "replay_reason_required",
+            "required_action": "attach_replay_reason"
+          },
+          "name": "replay_requires_reason"
+        },
+        {
+          "condition": {
+            "operation": "replay_execution",
+            "replay_review_recorded": false,
+            "replay_window_hours_gt": 72
+          },
+          "description": "Replay windows above the tenant limit require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "replay_window_review_required",
+            "required_action": "record_replay_review"
+          },
+          "name": "replay_window_requires_review"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_pipeline"
+          },
+          "description": "Destructive pipeline deletion requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_review_required",
+            "required_action": "record_impact_review"
+          },
+          "name": "destructive_delete_requires_review"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "ETLPAdapterHealth",
+          "permission": "etlp:admin",
+          "route": "/etlp/adapters"
+        },
+        "audit": {
+          "component": "ETLPAuditTimeline",
+          "permission": "etlp:audit:read",
+          "route": "/etlp/audit"
+        },
         "dashboard": {
           "component": "ETLPDashboard",
           "permission": "etlp:pipeline:read",
@@ -256,15 +809,35 @@
           "permission": "etlp:transformation:write",
           "route": "/etlp/field-mapper"
         },
+        "lineage": {
+          "component": "PipelineLineage",
+          "permission": "etlp:lineage:read",
+          "route": "/etlp/lineage"
+        },
         "pipelines": {
           "component": "PipelineWorkbench",
           "permission": "etlp:pipeline:read",
           "route": "/etlp/pipelines"
         },
+        "publish": {
+          "component": "PublishReviewQueue",
+          "permission": "etlp:publish:review",
+          "route": "/etlp/publish"
+        },
         "quality": {
           "component": "QualityGateConsole",
           "permission": "etlp:quality:read",
           "route": "/etlp/quality"
+        },
+        "replay": {
+          "component": "ReplayConsole",
+          "permission": "etlp:execution:replay",
+          "route": "/etlp/replay"
+        },
+        "schedules": {
+          "component": "ScheduleConsole",
+          "permission": "etlp:pipeline:write",
+          "route": "/etlp/schedules"
         },
         "settings": {
           "component": "ETLPSettings",
@@ -272,9 +845,23 @@
           "route": "/etlp/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "adapter_health_panel": {
+            "status_indicator": "health-pill",
+            "visual": "adapter-grid"
+          },
+          "audit_timeline": {
+            "status_style": "decision-pill",
+            "visual": "event-timeline"
+          },
+          "datasource_inventory": {
+            "status_indicator": "approval-pill",
+            "visual": "connector-table"
+          },
           "execution_timeline": {
             "status_style": "checkpoint-pill",
             "visual": "stage-timeline"
@@ -288,9 +875,17 @@
             "risk_style": "quality-band",
             "status_indicator": "run-state-pill"
           },
+          "publish_review_queue": {
+            "highlight": "gate-chip",
+            "visual": "quality-lineage-review"
+          },
           "quality_gate_panel": {
             "highlight": "score-chip",
             "visual": "rule-stack"
+          },
+          "replay_console": {
+            "status_style": "replay-state-pill",
+            "visual": "bounded-time-window"
           }
         },
         "name": "etlp_pipeline_console",
@@ -362,6 +957,48 @@
             "permission": "etlp:datasource:read"
           },
           {
+            "component": "ScheduleConsole",
+            "name": "schedules",
+            "nav_group": "Operations",
+            "path": "/etlp/schedules",
+            "permission": "etlp:pipeline:write"
+          },
+          {
+            "component": "PublishReviewQueue",
+            "name": "publish",
+            "nav_group": "Governance",
+            "path": "/etlp/publish",
+            "permission": "etlp:publish:review"
+          },
+          {
+            "component": "PipelineLineage",
+            "name": "lineage",
+            "nav_group": "Governance",
+            "path": "/etlp/lineage",
+            "permission": "etlp:lineage:read"
+          },
+          {
+            "component": "ReplayConsole",
+            "name": "replay",
+            "nav_group": "Operations",
+            "path": "/etlp/replay",
+            "permission": "etlp:execution:replay"
+          },
+          {
+            "component": "ETLPAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Administration",
+            "path": "/etlp/adapters",
+            "permission": "etlp:admin"
+          },
+          {
+            "component": "ETLPAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/etlp/audit",
+            "permission": "etlp:audit:read"
+          },
+          {
             "component": "ETLPSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -374,7 +1011,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -388,11 +1025,51 @@
   "contracts": {
     "etlp": {
       "configuration": {
+        "adapters": {
+          "connector_registry": "adapter",
+          "event_stream": "bytewax",
+          "execution_engine": "adapter",
+          "generated_app_runtime": "service.ETLPLifecycleService",
+          "lineage_emitter": "adapter",
+          "metadata_catalog": "meta",
+          "production_runtime": "service.ETLPService",
+          "quality_engine": "adapter",
+          "secret_store": "adapter"
+        },
+        "datasources": {
+          "approval_required": true,
+          "embedded_secret_denied": true,
+          "owner_required": true,
+          "secret_reference_required": true,
+          "supported_types": [
+            "database",
+            "file",
+            "api",
+            "stream",
+            "warehouse",
+            "lakehouse",
+            "object_store"
+          ]
+        },
+        "execution": {
+          "backfill_requires_review": true,
+          "default_retry_limit": 3,
+          "idempotency_key_required": true,
+          "max_replay_window_hours": 72,
+          "max_retry_limit": 5
+        },
         "governance": {
           "audit_all_executions": true,
+          "destructive_delete_review_required": true,
           "lineage_emission_required": true,
           "production_approval_required": true,
+          "publish_approval_required": true,
           "require_tenant_context": true
+        },
+        "mappings": {
+          "field_mapping_required": true,
+          "lineage_required": true,
+          "schema_validation_required": true
         },
         "optimization": {
           "ai_optimization_enabled": true,
@@ -401,13 +1078,23 @@
           "self_healing_enabled": true
         },
         "pipelines": {
+          "default_status": "draft",
           "max_concurrent_executions": 10,
           "owner_required": true,
+          "retire_requires_impact_review": true,
           "schedule_required_for_production": true,
+          "supported_modes": [
+            "elt",
+            "etl",
+            "batch",
+            "streaming",
+            "hybrid"
+          ],
           "visual_designer_enabled": true
         },
         "processing": {
           "batch_enabled": true,
+          "bytewax_streams_enabled": true,
           "default_mode": "elt",
           "federated_processing_enabled": true,
           "streaming_enabled": true
@@ -415,7 +1102,14 @@
         "quality": {
           "minimum_publish_score": 80.0,
           "quality_gate_enabled": true,
-          "quarantine_failed_records": true
+          "quarantine_failed_records": true,
+          "required_dimensions": [
+            "completeness",
+            "validity",
+            "freshness",
+            "lineage",
+            "mapping"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -423,10 +1117,14 @@
           "default_theme": "etlp_pipeline_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
           "enable_execution_monitor": true,
           "enable_field_mapper": true,
           "enable_pipeline_designer": true,
-          "enable_quality_console": true
+          "enable_publish_review": true,
+          "enable_quality_console": true,
+          "enable_replay_console": true
         }
       },
       "id": "etlp",
@@ -466,10 +1164,102 @@
   },
   "roles": {},
   "rules": {
+    "datasource_registration_requires_owner": {
+      "condition": {
+        "datasource_owner_assigned": false,
+        "operation": "register_datasource"
+      },
+      "description": "Data source registration requires an assigned owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "datasource_owner_required",
+        "required_action": "assign_datasource_owner"
+      },
+      "name": "datasource_registration_requires_owner"
+    },
+    "datasource_requires_approval": {
+      "condition": {
+        "datasource_approved": false,
+        "operation": "register_datasource"
+      },
+      "description": "Data sources require approval before execution.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "datasource_approval_required",
+        "required_action": "approve_datasource"
+      },
+      "name": "datasource_requires_approval"
+    },
+    "datasource_requires_secret_reference": {
+      "condition": {
+        "operation": "register_datasource",
+        "secret_reference_present": false
+      },
+      "description": "Data source registration requires a secret-store reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secret_reference_required",
+        "required_action": "attach_secret_reference"
+      },
+      "name": "datasource_requires_secret_reference"
+    },
+    "datasource_secrets_must_use_reference": {
+      "condition": {
+        "embedded_secret_present": true,
+        "operation": "register_datasource"
+      },
+      "description": "Data source secret material must use secret-store references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "embedded_secret_denied",
+        "required_action": "store_secret_reference"
+      },
+      "name": "datasource_secrets_must_use_reference"
+    },
+    "datasource_type_must_be_supported": {
+      "condition": {
+        "operation": "register_datasource",
+        "unsupported_datasource_type": true
+      },
+      "description": "Data source type must be configured for the tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_datasource_type",
+        "required_action": "choose_supported_datasource_type"
+      },
+      "name": "datasource_type_must_be_supported"
+    },
+    "destructive_delete_requires_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_pipeline"
+      },
+      "description": "Destructive pipeline deletion requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "impact_review_required",
+        "required_action": "record_impact_review"
+      },
+      "name": "destructive_delete_requires_review"
+    },
+    "execution_requires_idempotency_key": {
+      "condition": {
+        "idempotency_key_present": false,
+        "operation": "execute_pipeline"
+      },
+      "description": "Pipeline executions require idempotency evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "idempotency_key_required",
+        "required_action": "attach_idempotency_key"
+      },
+      "name": "execution_requires_idempotency_key"
+    },
     "high_cost_execution_requires_review": {
       "condition": {
         "cost_review_recorded": false,
-        "estimated_cost_gt": 1000.0
+        "estimated_cost_gt": 1000.0,
+        "operation": "execute_pipeline"
       },
       "description": "High estimated execution cost requires review.",
       "effect": {
@@ -482,6 +1272,7 @@
     "lineage_required_for_transformations": {
       "condition": {
         "lineage_emitted": false,
+        "operation": "execute_pipeline",
         "transformation_present": true
       },
       "description": "Transformations require lineage emission.",
@@ -491,6 +1282,32 @@
         "required_action": "emit_lineage_event"
       },
       "name": "lineage_required_for_transformations"
+    },
+    "mapping_requires_registered_datasources": {
+      "condition": {
+        "operation": "register_mapping",
+        "source_and_target_registered": false
+      },
+      "description": "Field mappings require registered source and target data sources.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_datasources_required",
+        "required_action": "register_mapping_datasources"
+      },
+      "name": "mapping_requires_registered_datasources"
+    },
+    "mapping_requires_schema_validation": {
+      "condition": {
+        "operation": "register_mapping",
+        "schema_validated": false
+      },
+      "description": "Field mappings require schema validation before use.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_validation_required",
+        "required_action": "validate_mapping_schema"
+      },
+      "name": "mapping_requires_schema_validation"
     },
     "pipeline_execution_requires_owner": {
       "condition": {
@@ -505,10 +1322,37 @@
       },
       "name": "pipeline_execution_requires_owner"
     },
+    "pipeline_mode_must_be_supported": {
+      "condition": {
+        "operation": "register_pipeline",
+        "unsupported_mode": true
+      },
+      "description": "Pipeline mode must be configured for the tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_pipeline_mode",
+        "required_action": "choose_supported_mode"
+      },
+      "name": "pipeline_mode_must_be_supported"
+    },
+    "pipeline_registration_requires_owner": {
+      "condition": {
+        "operation": "register_pipeline",
+        "owner_assigned": false
+      },
+      "description": "Pipeline registration requires an assigned owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pipeline_owner_required",
+        "required_action": "assign_pipeline_owner"
+      },
+      "name": "pipeline_registration_requires_owner"
+    },
     "production_execution_requires_approval": {
       "condition": {
         "approval_recorded": false,
-        "environment": "production"
+        "environment": "production",
+        "operation": "execute_pipeline"
       },
       "description": "Production executions require approval.",
       "effect": {
@@ -517,6 +1361,46 @@
         "required_action": "record_execution_approval"
       },
       "name": "production_execution_requires_approval"
+    },
+    "production_schedule_requires_review": {
+      "condition": {
+        "environment": "production",
+        "operation": "schedule_pipeline",
+        "schedule_review_recorded": false
+      },
+      "description": "Production schedules require current review evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "schedule_review_required",
+        "required_action": "record_schedule_review"
+      },
+      "name": "production_schedule_requires_review"
+    },
+    "publish_requires_approval": {
+      "condition": {
+        "operation": "publish_output",
+        "publish_approval_recorded": false
+      },
+      "description": "Publishing production outputs requires an approval record.",
+      "effect": {
+        "decision": "deny",
+        "reason": "publish_approval_required",
+        "required_action": "record_publish_approval"
+      },
+      "name": "publish_requires_approval"
+    },
+    "publish_requires_minimum_quality": {
+      "condition": {
+        "operation": "publish_output",
+        "quality_score_lt": 80.0
+      },
+      "description": "Publishing transformed data requires the configured minimum quality score.",
+      "effect": {
+        "decision": "deny",
+        "reason": "minimum_quality_required",
+        "required_action": "raise_quality_score"
+      },
+      "name": "publish_requires_minimum_quality"
     },
     "publish_requires_quality_gate": {
       "condition": {
@@ -530,6 +1414,47 @@
         "required_action": "resolve_quality_failures"
       },
       "name": "publish_requires_quality_gate"
+    },
+    "replay_requires_reason": {
+      "condition": {
+        "operation": "replay_execution",
+        "reason_present": false
+      },
+      "description": "Replay and backfill requests require a business reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "replay_reason_required",
+        "required_action": "attach_replay_reason"
+      },
+      "name": "replay_requires_reason"
+    },
+    "replay_window_requires_review": {
+      "condition": {
+        "operation": "replay_execution",
+        "replay_review_recorded": false,
+        "replay_window_hours_gt": 72
+      },
+      "description": "Replay windows above the tenant limit require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "replay_window_review_required",
+        "required_action": "record_replay_review"
+      },
+      "name": "replay_window_requires_review"
+    },
+    "retry_limit_requires_review": {
+      "condition": {
+        "operation": "retry_execution",
+        "retry_count_gt": 3,
+        "retry_review_recorded": false
+      },
+      "description": "Retry requests above tenant limits require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "retry_review_required",
+        "required_action": "record_retry_review"
+      },
+      "name": "retry_limit_requires_review"
     },
     "tenant_context_required": {
       "condition": {

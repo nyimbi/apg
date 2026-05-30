@@ -13577,3 +13577,53 @@ Known remaining ETLP packet work:
   refresh `semantic_model.json`, `package_manifest.json`, and
   `release_report.json`.
 - Add focused positive and negative lifecycle coverage for the expanded packet.
+
+### 2026-05-30 05:55 EAT
+
+ETLP lifecycle and guardrail packet:
+
+- Expanded the ETLP contract to 23 deterministic guardrails, 14 UI routes,
+  Bytewax event-stream adapter evidence, explicit generated-app runtime
+  configuration, datasource/mapping/execution/governance/adapter settings, and
+  lifecycle theme components.
+- Added `ETLPLifecycleService` with dependency-light pipeline, datasource,
+  mapping, execution, quality, schedule, publish, replay, and audit records.
+- Added generated-app API helpers for pipeline, datasource, mapping,
+  execution, quality, schedule, publish, retry, replay, retirement, status, and
+  metadata listing.
+- Added `view_models.py` for dashboard, pipeline workbench, datasource manager,
+  field mapper, execution monitor, quality console, schedule console, publish
+  review, replay console, lineage, audit, adapter health, and settings.
+- Replaced static `app.py` semantic evidence with contract-derived evidence
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Replaced stale overclaiming ETLP docs and dashboard text with practical
+  capability scope, validation scope, and adapter-backed improvement backlog.
+- Expanded tests to cover datasource secret denial, mapping registration,
+  execution approval/idempotency/cost guardrails, quality/publish behavior,
+  retry/replay/retirement/schedule review, dynamic package evidence, and
+  generated-app view-model composition.
+- Code review found and fixed mutable execution-status assertion coverage,
+  missing schedule lifecycle support, missing datasource owner/secret-reference
+  guardrails, and unsupported pipeline-mode decision recording after the
+  route/contract expansion.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/etlp/__init__.py capabilities/common/etlp/capability_contract.py capabilities/common/etlp/models.py capabilities/common/etlp/service.py capabilities/common/etlp/api.py capabilities/common/etlp/field_mapper.py capabilities/common/etlp/views.py capabilities/common/etlp/view_models.py capabilities/common/etlp/app.py capabilities/common/etlp/test_capability_contract.py capabilities/common/etlp/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/etlp/test_capability_contract.py capabilities/common/etlp/tests/test_package_contract.py` passed with 7 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "from capabilities.common.etlp import ETLPLifecycleService, get_capability_info; print(get_capability_info()['runtime_import_error']); print(ETLPLifecycleService().dashboard_summary()['pipeline_count'])"` returned `None` and `0`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/etlp --json` passed with `ok: true`; ETLP remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/etlp --json` passed with 14 UI routes, 23 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "materialized" -e "Materialized" -e "This package materializes" -e "mock data" -e "mock calculation" capabilities/common/etlp` returned no stale ETLP package markers.
+- `git diff --check -- capabilities/common/etlp docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live database persistence.
+- Physical connector execution.
+- Bytewax runtime flow execution.
+- External metadata, quality, lineage, secret-store, and monitoring adapters.
+- Rendered ETLP UI/browser behavior.
+- Load, latency, and cost benchmarks.

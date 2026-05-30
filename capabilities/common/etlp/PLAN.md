@@ -14,7 +14,7 @@ Known issues at packet start:
 - Primary docs contained overclaiming benchmark and final-validation language.
 - Package import reported an API setup error from a missing
   `ETLPAPIController.get_pipeline_logs` handler.
-- The package test still used materialized naming.
+- The package test still used stale generated-package naming.
 - `app.py` embeds static semantic JSON instead of deriving evidence from the
   contract.
 - Generated applications do not yet have a dependency-light lifecycle service.
@@ -32,7 +32,7 @@ Known issues at packet start:
    - Rename the legacy generated-package test file to
      `tests/test_package_contract.py`.
    - Update package description language.
-   - Remove stale materialized/static package markers.
+   - Remove stale generated/static package markers.
 
 3. Contract expansion
    - Add lifecycle configuration for datasources, mappings, execution,

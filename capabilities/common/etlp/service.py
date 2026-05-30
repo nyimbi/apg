@@ -10,15 +10,614 @@ Copyright: © 2025 Datacraft
 import asyncio
 import json
 import traceback
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union, AsyncGenerator
 from uuid_extensions import uuid7str
 
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
 	Pipeline, Transformation, Execution, DataSource, QualityRule, Schedule,
 	PipelineStatus, ExecutionMode, TransformationType, QualityRuleType,
 	PipelineMetrics, validate_pipeline_dependencies, calculate_pipeline_complexity
 )
+
+
+@dataclass
+class ETLPPipelineRecord:
+	record_id: str
+	tenant_id: str
+	pipeline_id: str
+	name: str
+	mode: str
+	owner: str | None
+	description: str = ""
+	status: str = "draft"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	tags: list[str] = field(default_factory=list)
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPDatasourceRecord:
+	datasource_id: str
+	tenant_id: str
+	name: str
+	datasource_type: str
+	owner: str | None
+	secret_ref: str | None
+	approved: bool
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPMappingRecord:
+	mapping_id: str
+	tenant_id: str
+	pipeline_id: str
+	source_datasource_id: str
+	target_datasource_id: str
+	field_mappings: list[dict[str, Any]]
+	schema_validated: bool
+	lineage_emitted: bool
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPExecutionRecord:
+	execution_id: str
+	tenant_id: str
+	pipeline_id: str
+	environment: str
+	triggered_by: str
+	idempotency_key: str | None
+	estimated_cost: float
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	mode: str = "elt"
+	records_processed: int = 0
+	records_failed: int = 0
+	logs: list[dict[str, Any]] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPQualityRecord:
+	quality_id: str
+	tenant_id: str
+	execution_id: str
+	pipeline_id: str
+	score: float
+	dimensions: dict[str, float]
+	gate_passed: bool
+	assessor: str
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPScheduleRecord:
+	schedule_id: str
+	tenant_id: str
+	pipeline_id: str
+	environment: str
+	schedule: str
+	owner: str
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPPublishRecord:
+	publish_id: str
+	tenant_id: str
+	execution_id: str
+	pipeline_id: str
+	requester: str
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	quality_score: float | None = None
+	review_notes: str | None = None
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPReplayRecord:
+	replay_id: str
+	tenant_id: str
+	execution_id: str
+	replay_type: str
+	reason: str | None
+	window_hours: int
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPAuditEventRecord:
+	event_id: str
+	tenant_id: str
+	event_type: str
+	subject: str
+	actor: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	details: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class ETLPLifecycleService:
+	"""Dependency-light ETLP lifecycle and guardrail control plane."""
+
+	def __init__(self, tenant_id: str = "default"):
+		self.tenant_id = tenant_id
+		self.pipelines: dict[str, ETLPPipelineRecord] = {}
+		self.datasources: dict[str, ETLPDatasourceRecord] = {}
+		self.mappings: dict[str, ETLPMappingRecord] = {}
+		self.executions: dict[str, ETLPExecutionRecord] = {}
+		self.quality_results: dict[str, ETLPQualityRecord] = {}
+		self.schedules: dict[str, ETLPScheduleRecord] = {}
+		self.publish_reviews: dict[str, ETLPPublishRecord] = {}
+		self.replay_requests: dict[str, ETLPReplayRecord] = {}
+		self.audit_events: list[ETLPAuditEventRecord] = []
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def register_pipeline(
+		self,
+		*,
+		tenant_id: str,
+		pipeline_id: str,
+		name: str,
+		mode: str,
+		owner: str | None,
+		description: str = "",
+		tags: list[str] | None = None,
+		metadata: dict[str, Any] | None = None,
+	) -> ETLPPipelineRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		mode = self._require_text(mode, "mode")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_pipeline",
+			"owner_assigned": bool(str(owner or "").strip()),
+			"unsupported_mode": mode not in set(self.describe(tenant_id)["configuration"]["pipelines"]["supported_modes"]),
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPPipelineRecord(
+			record_id=uuid7str(),
+			tenant_id=tenant_id,
+			pipeline_id=self._require_text(pipeline_id, "pipeline_id"),
+			name=self._require_text(name, "name"),
+			mode=mode,
+			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
+			description=description,
+			status="draft" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			tags=list(tags or []),
+			metadata=dict(metadata or {}),
+		)
+		self.pipelines[self._key(tenant_id, record.pipeline_id)] = record
+		self._audit(tenant_id, "pipeline.registered", record.pipeline_id, record.owner or "system", decision, context)
+		return record
+
+	def register_datasource(
+		self,
+		*,
+		tenant_id: str,
+		datasource_id: str,
+		name: str,
+		datasource_type: str,
+		owner: str | None,
+		secret_ref: str | None,
+		approved: bool,
+		embedded_secret_present: bool = False,
+		metadata: dict[str, Any] | None = None,
+	) -> ETLPDatasourceRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		supported = set(self.describe(tenant_id)["configuration"]["datasources"]["supported_types"])
+		datasource_type = self._require_text(datasource_type, "datasource_type")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_datasource",
+			"datasource_owner_assigned": bool(str(owner or "").strip()),
+			"secret_reference_present": bool(str(secret_ref or "").strip()),
+			"datasource_approved": approved,
+			"unsupported_datasource_type": datasource_type not in supported,
+			"embedded_secret_present": embedded_secret_present,
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPDatasourceRecord(
+			datasource_id=self._require_text(datasource_id, "datasource_id"),
+			tenant_id=tenant_id,
+			name=self._require_text(name, "name"),
+			datasource_type=datasource_type,
+			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
+			secret_ref=secret_ref.strip() if isinstance(secret_ref, str) and secret_ref.strip() else None,
+			approved=approved,
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			metadata=dict(metadata or {}),
+		)
+		self.datasources[self._key(tenant_id, record.datasource_id)] = record
+		self._audit(tenant_id, "datasource.registered", record.datasource_id, record.owner or "system", decision, context)
+		return record
+
+	def register_mapping(
+		self,
+		*,
+		tenant_id: str,
+		mapping_id: str,
+		pipeline_id: str,
+		source_datasource_id: str,
+		target_datasource_id: str,
+		field_mappings: list[dict[str, Any]],
+		schema_validated: bool,
+		lineage_emitted: bool,
+	) -> ETLPMappingRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		pipeline = self._require_pipeline(tenant_id, pipeline_id)
+		source_registered = self._key(tenant_id, source_datasource_id) in self.datasources
+		target_registered = self._key(tenant_id, target_datasource_id) in self.datasources
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_mapping",
+			"source_and_target_registered": source_registered and target_registered,
+			"schema_validated": schema_validated,
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPMappingRecord(
+			mapping_id=self._require_text(mapping_id, "mapping_id"),
+			tenant_id=tenant_id,
+			pipeline_id=pipeline.pipeline_id,
+			source_datasource_id=self._require_text(source_datasource_id, "source_datasource_id"),
+			target_datasource_id=self._require_text(target_datasource_id, "target_datasource_id"),
+			field_mappings=list(field_mappings),
+			schema_validated=schema_validated,
+			lineage_emitted=lineage_emitted,
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+		)
+		self.mappings[self._key(tenant_id, record.mapping_id)] = record
+		self._audit(tenant_id, "mapping.registered", record.mapping_id, pipeline.owner or "system", decision, context)
+		return record
+
+	def execute_pipeline(
+		self,
+		*,
+		tenant_id: str,
+		pipeline_id: str,
+		environment: str,
+		triggered_by: str,
+		idempotency_key: str | None,
+		approval_recorded: bool = False,
+		estimated_cost: float = 0.0,
+		cost_review_recorded: bool = False,
+	) -> ETLPExecutionRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		pipeline = self._require_pipeline(tenant_id, pipeline_id)
+		has_mapping = any(mapping.tenant_id == tenant_id and mapping.pipeline_id == pipeline.pipeline_id for mapping in self.mappings.values())
+		lineage_emitted = any(mapping.tenant_id == tenant_id and mapping.pipeline_id == pipeline.pipeline_id and mapping.lineage_emitted for mapping in self.mappings.values())
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "execute_pipeline",
+			"owner_assigned": bool(pipeline.owner),
+			"environment": self._require_text(environment, "environment"),
+			"approval_recorded": approval_recorded,
+			"idempotency_key_present": bool(str(idempotency_key or "").strip()),
+			"transformation_present": has_mapping,
+			"lineage_emitted": lineage_emitted,
+			"estimated_cost": estimated_cost,
+			"cost_review_recorded": cost_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPExecutionRecord(
+			execution_id=uuid7str(),
+			tenant_id=tenant_id,
+			pipeline_id=pipeline.pipeline_id,
+			environment=environment,
+			triggered_by=self._require_text(triggered_by, "triggered_by"),
+			idempotency_key=idempotency_key,
+			estimated_cost=estimated_cost,
+			status="queued" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			mode=pipeline.mode,
+		)
+		self.executions[self._key(tenant_id, record.execution_id)] = record
+		self._audit(tenant_id, "execution.requested", record.execution_id, record.triggered_by, decision, context)
+		return record
+
+	def assess_quality(
+		self,
+		*,
+		tenant_id: str,
+		execution_id: str,
+		score: float,
+		dimensions: dict[str, float],
+		assessor: str,
+	) -> ETLPQualityRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		execution = self._require_execution(tenant_id, execution_id)
+		if score < 0.0 or score > 100.0 or any(value < 0.0 or value > 100.0 for value in dimensions.values()):
+			raise ValueError("quality scores must be between 0 and 100")
+		minimum = self.describe(tenant_id)["configuration"]["quality"]["minimum_publish_score"]
+		record = ETLPQualityRecord(
+			quality_id=uuid7str(),
+			tenant_id=tenant_id,
+			execution_id=execution.execution_id,
+			pipeline_id=execution.pipeline_id,
+			score=score,
+			dimensions=dict(dimensions),
+			gate_passed=score >= minimum,
+			assessor=self._require_text(assessor, "assessor"),
+		)
+		self.quality_results[self._key(tenant_id, record.quality_id)] = record
+		self._audit(tenant_id, "quality.assessed", record.execution_id, record.assessor, {"decision": "allow", "matched_rules": []}, asdict(record))
+		return record
+
+	def schedule_pipeline(
+		self,
+		*,
+		tenant_id: str,
+		pipeline_id: str,
+		environment: str,
+		schedule: str,
+		owner: str,
+		schedule_review_recorded: bool = False,
+	) -> ETLPScheduleRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		pipeline = self._require_pipeline(tenant_id, pipeline_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "schedule_pipeline",
+			"environment": self._require_text(environment, "environment"),
+			"schedule_review_recorded": schedule_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPScheduleRecord(
+			schedule_id=uuid7str(),
+			tenant_id=tenant_id,
+			pipeline_id=pipeline.pipeline_id,
+			environment=environment,
+			schedule=self._require_text(schedule, "schedule"),
+			owner=self._require_text(owner, "owner"),
+			decision=decision["decision"],
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+		)
+		self.schedules[self._key(tenant_id, record.schedule_id)] = record
+		self._audit(tenant_id, "pipeline.scheduled", record.pipeline_id, record.owner, decision, context)
+		return record
+
+	def publish_output(
+		self,
+		*,
+		tenant_id: str,
+		execution_id: str,
+		requester: str,
+		publish_approval_recorded: bool,
+		review_notes: str | None = None,
+	) -> ETLPPublishRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		execution = self._require_execution(tenant_id, execution_id)
+		quality = self._latest_quality_for_execution(tenant_id, execution.execution_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "publish_output",
+			"quality_gate_passed": bool(quality and quality.gate_passed),
+			"quality_score": quality.score if quality else 0.0,
+			"publish_approval_recorded": publish_approval_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPPublishRecord(
+			publish_id=uuid7str(),
+			tenant_id=tenant_id,
+			execution_id=execution.execution_id,
+			pipeline_id=execution.pipeline_id,
+			requester=self._require_text(requester, "requester"),
+			decision=decision["decision"],
+			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+			quality_score=quality.score if quality else None,
+			review_notes=review_notes,
+		)
+		self.publish_reviews[self._key(tenant_id, record.publish_id)] = record
+		if decision["decision"] == "allow":
+			execution.status = "published"
+			execution.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "output.publish_evaluated", record.execution_id, record.requester, decision, context)
+		return record
+
+	def retry_execution(self, *, tenant_id: str, execution_id: str, retry_count: int, retry_review_recorded: bool = False) -> ETLPExecutionRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		execution = self._require_execution(tenant_id, execution_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retry_execution",
+			"retry_count": retry_count,
+			"retry_review_recorded": retry_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		execution.decision = decision["decision"]
+		execution.matched_rules = decision["matched_rules"]
+		execution.status = "retrying" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"])
+		execution.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "execution.retry_evaluated", execution.execution_id, execution.triggered_by, decision, context)
+		return execution
+
+	def replay_execution(
+		self,
+		*,
+		tenant_id: str,
+		execution_id: str,
+		replay_type: str,
+		reason: str | None,
+		window_hours: int,
+		replay_review_recorded: bool = False,
+	) -> ETLPReplayRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		self._require_execution(tenant_id, execution_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "replay_execution",
+			"reason_present": bool(str(reason or "").strip()),
+			"replay_window_hours": window_hours,
+			"replay_review_recorded": replay_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = ETLPReplayRecord(
+			replay_id=uuid7str(),
+			tenant_id=tenant_id,
+			execution_id=execution_id,
+			replay_type=self._require_text(replay_type, "replay_type"),
+			reason=str(reason or "").strip() or None,
+			window_hours=window_hours,
+			decision=decision["decision"],
+			status="queued" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+		)
+		self.replay_requests[self._key(tenant_id, record.replay_id)] = record
+		self._audit(tenant_id, "execution.replay_requested", record.execution_id, "system", decision, context)
+		return record
+
+	def retire_pipeline(self, *, tenant_id: str, pipeline_id: str, actor: str, impact_review_recorded: bool) -> ETLPPipelineRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		pipeline = self._require_pipeline(tenant_id, pipeline_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_pipeline",
+			"impact_review_recorded": impact_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		pipeline.decision = decision["decision"]
+		pipeline.matched_rules = decision["matched_rules"]
+		if decision["decision"] == "allow":
+			pipeline.status = "retired"
+			pipeline.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "pipeline.retire_evaluated", pipeline.pipeline_id, self._require_text(actor, "actor"), decision, context)
+		return pipeline
+
+	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		tenant_id = tenant_id or self.tenant_id
+		collections: dict[str, Any] = {
+			"pipelines": self.pipelines.values(),
+			"datasources": self.datasources.values(),
+			"mappings": self.mappings.values(),
+			"executions": self.executions.values(),
+			"quality_results": self.quality_results.values(),
+			"schedules": self.schedules.values(),
+			"publish_reviews": self.publish_reviews.values(),
+			"replay_requests": self.replay_requests.values(),
+			"audit_events": self.audit_events,
+		}
+		if record_type:
+			if record_type not in collections:
+				raise ValueError(f"Unsupported record_type {record_type}")
+			values = collections[record_type]
+		else:
+			values = []
+			for collection in collections.values():
+				values.extend(collection)
+		return [
+			asdict(record)
+			for record in values
+			if getattr(record, "tenant_id", None) == tenant_id
+		]
+
+	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		tenant_id = tenant_id or self.tenant_id
+		return {
+			"tenant_id": tenant_id,
+			"pipeline_count": len(self.list_records(tenant_id, "pipelines")),
+			"datasource_count": len(self.list_records(tenant_id, "datasources")),
+			"mapping_count": len(self.list_records(tenant_id, "mappings")),
+			"execution_count": len(self.list_records(tenant_id, "executions")),
+			"schedule_count": len(self.list_records(tenant_id, "schedules")),
+			"published_count": sum(1 for row in self.list_records(tenant_id, "publish_reviews") if row["status"] == "published"),
+			"review_count": sum(1 for record_type in ("datasources", "executions", "replay_requests") for row in self.list_records(tenant_id, record_type) if row["status"] == "pending_review"),
+			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
+		}
+
+	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: dict[str, Any], details: dict[str, Any]) -> None:
+		self.audit_events.append(ETLPAuditEventRecord(
+			event_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject=subject,
+			actor=actor,
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			details=details,
+		))
+
+	def _require_pipeline(self, tenant_id: str, pipeline_id: str) -> ETLPPipelineRecord:
+		pipeline_id = self._require_text(pipeline_id, "pipeline_id")
+		record = self.pipelines.get(self._key(tenant_id, pipeline_id))
+		if record is None:
+			raise KeyError(f"Pipeline {pipeline_id} not found for tenant {tenant_id}")
+		if record.status in {"denied", "retired"}:
+			raise ValueError(f"Pipeline {pipeline_id} is {record.status} and cannot continue lifecycle operations")
+		return record
+
+	def _require_execution(self, tenant_id: str, execution_id: str) -> ETLPExecutionRecord:
+		execution_id = self._require_text(execution_id, "execution_id")
+		record = self.executions.get(self._key(tenant_id, execution_id))
+		if record is None:
+			raise KeyError(f"Execution {execution_id} not found for tenant {tenant_id}")
+		return record
+
+	def _latest_quality_for_execution(self, tenant_id: str, execution_id: str) -> ETLPQualityRecord | None:
+		for record in reversed(list(self.quality_results.values())):
+			if record.tenant_id == tenant_id and record.execution_id == execution_id:
+				return record
+		return None
+
+	@staticmethod
+	def _status_for_decision(decision: str) -> str:
+		if decision == "require_review":
+			return "pending_review"
+		if decision == "deny":
+			return "denied"
+		return "active"
+
+	@staticmethod
+	def _require_text(value: str, field_name: str) -> str:
+		if not isinstance(value, str) or not value.strip():
+			raise ValueError(f"{field_name} is required")
+		return value.strip()
+
+	@staticmethod
+	def _require_choice(value: str, field_name: str, allowed: set[str]) -> str:
+		text = ETLPLifecycleService._require_text(value, field_name)
+		if text not in allowed:
+			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
+		return text
+
+	@staticmethod
+	def _key(tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
 
 
 class ETLPService:
