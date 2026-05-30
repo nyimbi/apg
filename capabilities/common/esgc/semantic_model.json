@@ -1,7 +1,7 @@
 {
   "agents": {},
   "app": {
-    "description": "ESG/Carbon Tracking package-backed APG capability",
+    "description": "ESG and Carbon Tracking package-backed APG capability",
     "entity_count": 0,
     "name": "esgc",
     "version": "1.0.0"
@@ -12,23 +12,72 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.EsgcService",
+          "geospatial": "geos",
+          "identity": "auth",
+          "metering": "iotd",
+          "prediction": "pred",
+          "view_models": "views.py"
+        },
         "data_sources": {
           "approved_factor_source_required": true,
+          "factor_versioning_required": true,
           "forecasting_enabled": true,
           "iot_metering_supported": true,
           "source_evidence_required": true
         },
         "emissions": {
           "activity_data_validation_required": true,
+          "activity_evidence_required": true,
           "geospatial_boundary_required": true,
           "organization_owner_required": true,
-          "scope_classification_required": true
+          "scope_classification_required": true,
+          "supported_scopes": [
+            "scope_1",
+            "scope_2",
+            "scope_3"
+          ]
+        },
+        "esgc_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "inventory_reviewer",
+            "factor_reviewer",
+            "activity_reviewer",
+            "report_reviewer",
+            "target_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "governance": {
           "anomaly_review_required": true,
           "audit_emission_changes": true,
+          "batch_event_stream": "bytewax",
           "factor_versioning_required": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "emissions_metrics_required": true,
+          "event_stream": "bytewax",
+          "target_metrics_required": true
         },
         "reporting": {
           "audit_evidence_required": true,
@@ -36,15 +85,24 @@
           "report_approval_required": true,
           "target_tracking_enabled": true
         },
+        "targets": {
+          "baseline_required": true,
+          "progress_calculation_required": true,
+          "target_year_required": true
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "esgc_sustainability_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
+          "enable_data_sources": true,
           "enable_emissions_dashboard": true,
           "enable_factor_library": true,
           "enable_report_builder": true,
+          "enable_rules": true,
           "enable_target_tracker": true
         }
       },
@@ -53,11 +111,24 @@
       ],
       "i18n": {},
       "master_data": {},
-      "name": "ESG/Carbon Tracking",
+      "name": "ESG and Carbon Tracking",
       "provides": [
-        "esgc_operations"
+        "emissions_inventory",
+        "factor_library",
+        "activity_emissions",
+        "sustainability_reporting",
+        "target_tracking",
+        "esg_evidence",
+        "esgc_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "conf",
+        "audl",
+        "geos",
+        "pred",
+        "comp"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +158,19 @@
           },
           {
             "condition": {
+              "boundary_present": false,
+              "operation": "create_inventory"
+            },
+            "description": "Emissions inventories require a reporting boundary.",
+            "effect": {
+              "decision": "deny",
+              "reason": "boundary_required",
+              "required_action": "attach_reporting_boundary"
+            },
+            "name": "inventory_requires_boundary"
+          },
+          {
+            "condition": {
               "factor_source_approved": false
             },
             "description": "Emission factors require approved sources.",
@@ -99,6 +183,32 @@
           },
           {
             "condition": {
+              "operation": "register_factor",
+              "source_evidence_present": false
+            },
+            "description": "Emission factors require source evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "factor_requires_source_evidence"
+          },
+          {
+            "condition": {
+              "factor_version_present": false,
+              "operation": "register_factor"
+            },
+            "description": "Emission factors require version metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "factor_version_required",
+              "required_action": "set_factor_version"
+            },
+            "name": "factor_requires_version"
+          },
+          {
+            "condition": {
               "geospatial_boundary_present": false
             },
             "description": "Emissions records require reporting boundary.",
@@ -108,6 +218,19 @@
               "required_action": "attach_reporting_boundary"
             },
             "name": "emission_requires_boundary"
+          },
+          {
+            "condition": {
+              "activity_evidence_present": false,
+              "operation": "record_activity"
+            },
+            "description": "Emission activity requires evidence reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "activity_evidence_required",
+              "required_action": "attach_activity_evidence"
+            },
+            "name": "activity_requires_evidence"
           },
           {
             "condition": {
@@ -124,6 +247,45 @@
           },
           {
             "condition": {
+              "compliance_mapping_present": false,
+              "operation": "publish_report"
+            },
+            "description": "ESG reports require compliance mapping.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_mapping_required",
+              "required_action": "attach_compliance_mapping"
+            },
+            "name": "report_requires_compliance_mapping"
+          },
+          {
+            "condition": {
+              "audit_evidence_present": false,
+              "operation": "publish_report"
+            },
+            "description": "ESG reports require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_evidence_required",
+              "required_action": "attach_audit_evidence"
+            },
+            "name": "report_requires_audit_evidence"
+          },
+          {
+            "condition": {
+              "baseline_present": false,
+              "operation": "create_target"
+            },
+            "description": "Reduction targets require a baseline.",
+            "effect": {
+              "decision": "deny",
+              "reason": "target_baseline_required",
+              "required_action": "attach_target_baseline"
+            },
+            "name": "target_requires_baseline"
+          },
+          {
+            "condition": {
               "anomaly_review_recorded": false,
               "emission_anomaly_detected": true
             },
@@ -134,6 +296,97 @@
               "required_action": "review_emission_anomaly"
             },
             "name": "emission_anomaly_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "esgc_agent_present": true
+            },
+            "description": "AI ESG agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgc_agent_registration_required",
+              "required_action": "register_esgc_agent"
+            },
+            "name": "esgc_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "esgc_agent_present": true
+            },
+            "description": "AI ESG agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgc_agent_runtime_not_supported",
+              "required_action": "choose_supported_esgc_agent_runtime"
+            },
+            "name": "esgc_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "esgc_agent_present": true
+            },
+            "description": "AI ESG agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgc_agent_role_not_supported",
+              "required_action": "choose_supported_esgc_agent_role"
+            },
+            "name": "esgc_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "esgc_agent_present": true
+            },
+            "description": "AI ESG agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgc_agent_scope_required",
+              "required_action": "set_esgc_agent_scope"
+            },
+            "name": "esgc_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "esgc_agent_present": true
+            },
+            "description": "AI ESG-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgc_agent_disclosure_required",
+              "required_action": "disclose_esgc_agent"
+            },
+            "name": "esgc_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "ESG lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgc_audit_event_required",
+              "required_action": "record_esgc_audit_event"
+            },
+            "name": "esgc_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_esgc_mutation"
+            },
+            "description": "Batch ESG mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_esgc_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -166,6 +419,19 @@
         },
         {
           "condition": {
+            "boundary_present": false,
+            "operation": "create_inventory"
+          },
+          "description": "Emissions inventories require a reporting boundary.",
+          "effect": {
+            "decision": "deny",
+            "reason": "boundary_required",
+            "required_action": "attach_reporting_boundary"
+          },
+          "name": "inventory_requires_boundary"
+        },
+        {
+          "condition": {
             "factor_source_approved": false
           },
           "description": "Emission factors require approved sources.",
@@ -178,6 +444,32 @@
         },
         {
           "condition": {
+            "operation": "register_factor",
+            "source_evidence_present": false
+          },
+          "description": "Emission factors require source evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "factor_requires_source_evidence"
+        },
+        {
+          "condition": {
+            "factor_version_present": false,
+            "operation": "register_factor"
+          },
+          "description": "Emission factors require version metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "factor_version_required",
+            "required_action": "set_factor_version"
+          },
+          "name": "factor_requires_version"
+        },
+        {
+          "condition": {
             "geospatial_boundary_present": false
           },
           "description": "Emissions records require reporting boundary.",
@@ -187,6 +479,19 @@
             "required_action": "attach_reporting_boundary"
           },
           "name": "emission_requires_boundary"
+        },
+        {
+          "condition": {
+            "activity_evidence_present": false,
+            "operation": "record_activity"
+          },
+          "description": "Emission activity requires evidence reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "activity_evidence_required",
+            "required_action": "attach_activity_evidence"
+          },
+          "name": "activity_requires_evidence"
         },
         {
           "condition": {
@@ -203,6 +508,45 @@
         },
         {
           "condition": {
+            "compliance_mapping_present": false,
+            "operation": "publish_report"
+          },
+          "description": "ESG reports require compliance mapping.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_mapping_required",
+            "required_action": "attach_compliance_mapping"
+          },
+          "name": "report_requires_compliance_mapping"
+        },
+        {
+          "condition": {
+            "audit_evidence_present": false,
+            "operation": "publish_report"
+          },
+          "description": "ESG reports require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_evidence_required",
+            "required_action": "attach_audit_evidence"
+          },
+          "name": "report_requires_audit_evidence"
+        },
+        {
+          "condition": {
+            "baseline_present": false,
+            "operation": "create_target"
+          },
+          "description": "Reduction targets require a baseline.",
+          "effect": {
+            "decision": "deny",
+            "reason": "target_baseline_required",
+            "required_action": "attach_target_baseline"
+          },
+          "name": "target_requires_baseline"
+        },
+        {
+          "condition": {
             "anomaly_review_recorded": false,
             "emission_anomaly_detected": true
           },
@@ -213,6 +557,97 @@
             "required_action": "review_emission_anomaly"
           },
           "name": "emission_anomaly_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "esgc_agent_present": true
+          },
+          "description": "AI ESG agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgc_agent_registration_required",
+            "required_action": "register_esgc_agent"
+          },
+          "name": "esgc_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "esgc_agent_present": true
+          },
+          "description": "AI ESG agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgc_agent_runtime_not_supported",
+            "required_action": "choose_supported_esgc_agent_runtime"
+          },
+          "name": "esgc_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "esgc_agent_present": true
+          },
+          "description": "AI ESG agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgc_agent_role_not_supported",
+            "required_action": "choose_supported_esgc_agent_role"
+          },
+          "name": "esgc_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "esgc_agent_present": true
+          },
+          "description": "AI ESG agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgc_agent_scope_required",
+            "required_action": "set_esgc_agent_scope"
+          },
+          "name": "esgc_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "esgc_agent_present": true
+          },
+          "description": "AI ESG-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgc_agent_disclosure_required",
+            "required_action": "disclose_esgc_agent"
+          },
+          "name": "esgc_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "ESG lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgc_audit_event_required",
+            "required_action": "record_esgc_audit_event"
+          },
+          "name": "esgc_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_esgc_mutation"
+          },
+          "description": "Batch ESG mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_esgc_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -222,18 +657,23 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "EsgcAgentPanel",
+          "permission": "esgc:govern",
+          "route": "/esgc/agents"
+        },
         "audit": {
-          "component": "ESGAuditEvidence",
+          "component": "EsgAuditEvidence",
           "permission": "esgc:approve",
           "route": "/esgc/audit"
         },
         "dashboard": {
-          "component": "ESGCDashboard",
+          "component": "EsgcDashboard",
           "permission": "esgc:view",
           "route": "/esgc/dashboard"
         },
         "data_sources": {
-          "component": "ESGDataSources",
+          "component": "EsgDataSources",
           "permission": "esgc:manage_data",
           "route": "/esgc/data-sources"
         },
@@ -252,8 +692,13 @@
           "permission": "esgc:report",
           "route": "/esgc/reports"
         },
+        "rules": {
+          "component": "EsgcRules",
+          "permission": "esgc:govern",
+          "route": "/esgc/rules"
+        },
         "settings": {
-          "component": "ESGCSettings",
+          "component": "EsgcSettings",
           "permission": "esgc:admin",
           "route": "/esgc/settings"
         },
@@ -263,13 +708,42 @@
           "route": "/esgc/targets"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_esgc_mutation_requires_bytewax",
+        "events": [
+          "esgc_inventory_created",
+          "esgc_factor_registered",
+          "esgc_activity_recorded",
+          "esgc_report_published",
+          "esgc_target_created",
+          "esgc_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "inventories",
+          "factors",
+          "activities",
+          "reports",
+          "targets",
+          "esgc_agents",
+          "audit_events"
+        ],
+        "topic": "apg.esgc.lifecycle"
+      },
       "theme": {
         "components": {
+          "audit": {
+            "status_style": "evidence-chip",
+            "visual": "event-ledger"
+          },
           "emissions_card": {
             "icon": "leaf",
             "risk_style": "carbon-band",
             "status_indicator": "scope-pill"
+          },
+          "esgc_agent_panel": {
+            "icon": "bot",
+            "status_indicator": "scope-chip"
           },
           "factor_library": {
             "highlight": "source-chip",
@@ -278,6 +752,10 @@
           "report_builder": {
             "status_style": "approval-chip",
             "visual": "evidence-checklist"
+          },
+          "stream_health": {
+            "status_style": "stream-chip",
+            "visual": "event-lane"
           },
           "target_tracker": {
             "status_style": "forecast-chip",
@@ -304,7 +782,7 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "ESGCDashboard",
+            "component": "EsgcDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/esgc/dashboard",
@@ -325,7 +803,7 @@
             "permission": "esgc:manage_data"
           },
           {
-            "component": "ESGDataSources",
+            "component": "EsgDataSources",
             "name": "data_sources",
             "nav_group": "Data",
             "path": "/esgc/data-sources",
@@ -346,14 +824,28 @@
             "permission": "esgc:view"
           },
           {
-            "component": "ESGAuditEvidence",
+            "component": "EsgcAgentPanel",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/esgc/agents",
+            "permission": "esgc:govern"
+          },
+          {
+            "component": "EsgcRules",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/esgc/rules",
+            "permission": "esgc:govern"
+          },
+          {
+            "component": "EsgAuditEvidence",
             "name": "audit",
             "nav_group": "Governance",
             "path": "/esgc/audit",
             "permission": "esgc:approve"
           },
           {
-            "component": "ESGCSettings",
+            "component": "EsgcSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/esgc/settings",
@@ -373,29 +865,85 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "esgc": []
+      "esgc": [
+        "auth",
+        "conf",
+        "audl",
+        "geos",
+        "pred",
+        "comp"
+      ]
     }
   },
   "contracts": {
     "esgc": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.EsgcService",
+          "geospatial": "geos",
+          "identity": "auth",
+          "metering": "iotd",
+          "prediction": "pred",
+          "view_models": "views.py"
+        },
         "data_sources": {
           "approved_factor_source_required": true,
+          "factor_versioning_required": true,
           "forecasting_enabled": true,
           "iot_metering_supported": true,
           "source_evidence_required": true
         },
         "emissions": {
           "activity_data_validation_required": true,
+          "activity_evidence_required": true,
           "geospatial_boundary_required": true,
           "organization_owner_required": true,
-          "scope_classification_required": true
+          "scope_classification_required": true,
+          "supported_scopes": [
+            "scope_1",
+            "scope_2",
+            "scope_3"
+          ]
+        },
+        "esgc_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "inventory_reviewer",
+            "factor_reviewer",
+            "activity_reviewer",
+            "report_reviewer",
+            "target_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "governance": {
           "anomaly_review_required": true,
           "audit_emission_changes": true,
+          "batch_event_stream": "bytewax",
           "factor_versioning_required": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "emissions_metrics_required": true,
+          "event_stream": "bytewax",
+          "target_metrics_required": true
         },
         "reporting": {
           "audit_evidence_required": true,
@@ -403,23 +951,45 @@
           "report_approval_required": true,
           "target_tracking_enabled": true
         },
+        "targets": {
+          "baseline_required": true,
+          "progress_calculation_required": true,
+          "target_year_required": true
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "esgc_sustainability_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
+          "enable_data_sources": true,
           "enable_emissions_dashboard": true,
           "enable_factor_library": true,
           "enable_report_builder": true,
+          "enable_rules": true,
           "enable_target_tracker": true
         }
       },
       "id": "esgc",
       "provides": [
-        "esgc_operations"
+        "emissions_inventory",
+        "factor_library",
+        "activity_emissions",
+        "sustainability_reporting",
+        "target_tracking",
+        "esg_evidence",
+        "esgc_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "conf",
+        "audl",
+        "geos",
+        "pred",
+        "comp"
+      ]
     }
   },
   "deployment": {
@@ -431,7 +1001,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
     },
@@ -452,6 +1022,32 @@
   },
   "roles": {},
   "rules": {
+    "activity_requires_evidence": {
+      "condition": {
+        "activity_evidence_present": false,
+        "operation": "record_activity"
+      },
+      "description": "Emission activity requires evidence reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "activity_evidence_required",
+        "required_action": "attach_activity_evidence"
+      },
+      "name": "activity_requires_evidence"
+    },
+    "batch_esgc_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_esgc_mutation"
+      },
+      "description": "Batch ESG mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_esgc_mutation_requires_bytewax"
+    },
     "emission_anomaly_requires_review": {
       "condition": {
         "anomaly_review_recorded": false,
@@ -477,6 +1073,84 @@
       },
       "name": "emission_requires_boundary"
     },
+    "esgc_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "esgc_agent_present": true
+      },
+      "description": "AI ESG-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgc_agent_disclosure_required",
+        "required_action": "disclose_esgc_agent"
+      },
+      "name": "esgc_agent_requires_disclosure"
+    },
+    "esgc_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "esgc_agent_present": true
+      },
+      "description": "AI ESG agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgc_agent_registration_required",
+        "required_action": "register_esgc_agent"
+      },
+      "name": "esgc_agent_requires_registration"
+    },
+    "esgc_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "esgc_agent_present": true
+      },
+      "description": "AI ESG agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgc_agent_scope_required",
+        "required_action": "set_esgc_agent_scope"
+      },
+      "name": "esgc_agent_requires_scope"
+    },
+    "esgc_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "esgc_agent_present": true
+      },
+      "description": "AI ESG agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgc_agent_role_not_supported",
+        "required_action": "choose_supported_esgc_agent_role"
+      },
+      "name": "esgc_agent_role_supported"
+    },
+    "esgc_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "esgc_agent_present": true
+      },
+      "description": "AI ESG agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgc_agent_runtime_not_supported",
+        "required_action": "choose_supported_esgc_agent_runtime"
+      },
+      "name": "esgc_agent_runtime_supported"
+    },
+    "esgc_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "ESG lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgc_audit_event_required",
+        "required_action": "record_esgc_audit_event"
+      },
+      "name": "esgc_state_change_requires_audit"
+    },
     "factor_requires_approved_source": {
       "condition": {
         "factor_source_approved": false
@@ -488,6 +1162,45 @@
         "required_action": "attach_approved_factor_source"
       },
       "name": "factor_requires_approved_source"
+    },
+    "factor_requires_source_evidence": {
+      "condition": {
+        "operation": "register_factor",
+        "source_evidence_present": false
+      },
+      "description": "Emission factors require source evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_evidence_required",
+        "required_action": "attach_source_evidence"
+      },
+      "name": "factor_requires_source_evidence"
+    },
+    "factor_requires_version": {
+      "condition": {
+        "factor_version_present": false,
+        "operation": "register_factor"
+      },
+      "description": "Emission factors require version metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "factor_version_required",
+        "required_action": "set_factor_version"
+      },
+      "name": "factor_requires_version"
+    },
+    "inventory_requires_boundary": {
+      "condition": {
+        "boundary_present": false,
+        "operation": "create_inventory"
+      },
+      "description": "Emissions inventories require a reporting boundary.",
+      "effect": {
+        "decision": "deny",
+        "reason": "boundary_required",
+        "required_action": "attach_reporting_boundary"
+      },
+      "name": "inventory_requires_boundary"
     },
     "inventory_requires_owner": {
       "condition": {
@@ -515,6 +1228,45 @@
       },
       "name": "report_requires_approval"
     },
+    "report_requires_audit_evidence": {
+      "condition": {
+        "audit_evidence_present": false,
+        "operation": "publish_report"
+      },
+      "description": "ESG reports require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_evidence_required",
+        "required_action": "attach_audit_evidence"
+      },
+      "name": "report_requires_audit_evidence"
+    },
+    "report_requires_compliance_mapping": {
+      "condition": {
+        "compliance_mapping_present": false,
+        "operation": "publish_report"
+      },
+      "description": "ESG reports require compliance mapping.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compliance_mapping_required",
+        "required_action": "attach_compliance_mapping"
+      },
+      "name": "report_requires_compliance_mapping"
+    },
+    "target_requires_baseline": {
+      "condition": {
+        "baseline_present": false,
+        "operation": "create_target"
+      },
+      "description": "Reduction targets require a baseline.",
+      "effect": {
+        "decision": "deny",
+        "reason": "target_baseline_required",
+        "required_action": "attach_target_baseline"
+      },
+      "name": "target_requires_baseline"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -537,7 +1289,7 @@
       "file": "capability_contract.py",
       "id": "capability.esgc",
       "kind": "capability",
-      "name": "ESG/Carbon Tracking",
+      "name": "ESG and Carbon Tracking",
       "range": {
         "end": {
           "character": 1,

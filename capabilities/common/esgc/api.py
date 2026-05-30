@@ -94,6 +94,22 @@ def create_target(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_esgc_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_esgc_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=payload.get("id"),
+	)
+
+
+def validate_batch_esgc_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_esgc_mutation(event_stream)
+
+
 def list_inventories(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_inventories(tenant_id)
 
@@ -112,6 +128,10 @@ def list_reports(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_targets(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_targets(tenant_id)
+
+
+def list_esgc_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_esgc_agents(tenant_id)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:

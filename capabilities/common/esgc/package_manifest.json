@@ -1,16 +1,21 @@
 {
   "base_target": "python",
-  "display_name": "ESG/Carbon Tracking",
+  "display_name": "ESG and Carbon Tracking",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
     "models.py",
     "service.py",
     "api.py",
     "views.py",
     "app.py",
     "semantic_model.json",
-    "release_report.json"
+    "release_report.json",
+    "test_capability_contract.py"
   ],
   "name": "esgc",
   "profile": "capability",

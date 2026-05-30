@@ -16891,3 +16891,61 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AICR, AUTH, WFLO, SBOX, AUDL, NLPC, RAGN, GRAG, MCHN, LOGT, or
   SECU adapters.
+
+### 2026-05-30 19:15 EAT
+
+ESGC lifecycle and guardrail packet:
+
+- Selected `capabilities/common/esgc` after AGNT because ESG and carbon
+  tracking had domain behavior but still needed the local documentation,
+  lifecycle guardrails, AI-agent registration surface, and generated evidence
+  expected from the current capability standard.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable ESGC contract to cover emissions inventories,
+  factor libraries, activity emissions, reporting, targets, ESGC agents,
+  audit events, governance, observability, APG adapters, UI routes, visual
+  theme tokens, and Bytewax event streaming.
+- Added deterministic guardrails for tenant context, inventory ownership,
+  reporting boundaries, approved factor sources, source evidence, factor
+  versions, activity evidence, report approval, compliance mapping, audit
+  evidence, target baselines, anomaly review, AI-agent registration, supported
+  AI-agent runtime, supported AI-agent role, agent scope, contribution
+  disclosure, audited state changes, and Bytewax-backed batch ESG mutation.
+- Added the `EsgcAgent` model and extended `EsgcService` with agent
+  registration, audit events, dashboard metadata, tenant-local lifecycle IDs,
+  and Bytewax batch-mutation validation.
+- Added API helper coverage for ESGC-agent registration and batch mutation
+  validation.
+- Added dashboard, data-source, report-builder, target-tracker, agent,
+  audit, and settings view-model fields so the UI contract can expose the
+  complete operating surface.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle rules, ESGC-agent guardrails,
+  report and factor enforcement, Bytewax batch policy, view metadata, and
+  publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/esgc/__init__.py capabilities/common/esgc/capability_contract.py capabilities/common/esgc/models.py capabilities/common/esgc/service.py capabilities/common/esgc/api.py capabilities/common/esgc/views.py capabilities/common/esgc/app.py capabilities/common/esgc/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/esgc/test_capability_contract.py`
+  passed with 8 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... EsgcService ... register_esgc_agent ... dashboard_summary ..."` returned dashboard evidence with one ESGC agent and `bytewax` streaming metadata; import emitted the existing optional OpenTelemetry warning.
+- `jq '.capabilities.esgc.streaming.processor, .capabilities.esgc.configuration.esgc_agents.supported_runtimes, .capabilities.esgc.screens.agents.route, ...' capabilities/common/esgc/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, `/esgc/agents`, `esgc_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/esgc --json` passed with `ok: true`; ESGC remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/esgc --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker,
+  and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/esgc docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live meter, geospatial, prediction, compliance filing, audit sink,
+  configuration, identity, durable ESG database, browser-rendered ESG UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, CONF, AUDL, GEOS, PRED, COMP, IOTD, AGNT, NLPC, or WFLO
+  adapters.

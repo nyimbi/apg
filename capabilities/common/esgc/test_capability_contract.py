@@ -2,12 +2,30 @@
 
 from __future__ import annotations
 
+import importlib.util
+import json
+from pathlib import Path
+import sys
+
 import pytest
 
 from capabilities.common.esgc import register_capability
 from capabilities.common.esgc.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.esgc.service import EsgcService
-from capabilities.common.esgc.views import dashboard_model
+from capabilities.common.esgc.views import dashboard_model, esgc_agent_model
+
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+
+def _load_module(name: str, path: Path):
+	spec = importlib.util.spec_from_file_location(name, path)
+	assert spec is not None
+	assert spec.loader is not None
+	module = importlib.util.module_from_spec(spec)
+	sys.modules[name] = module
+	spec.loader.exec_module(module)
+	return module
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
@@ -16,18 +34,49 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "esgc"
 	assert contract["configuration"]["tenant_id"] == "tenant-esgc"
 	assert contract["configuration"]["reporting"]["target_tracking_enabled"] is False
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "emissions", "data_sources", "reporting", "governance", "ui", "theme"]
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "emissions", "factors", "data_sources", "reports", "targets", "audit", "settings"}
+	assert contract["configuration_schema"]["required"] == [
+		"tenant_id",
+		"emissions",
+		"data_sources",
+		"reporting",
+		"targets",
+		"esgc_agents",
+		"governance",
+		"observability",
+		"adapters",
+		"ui",
+		"theme",
+	]
+	assert contract["provides"] == [
+		"emissions_inventory",
+		"factor_library",
+		"activity_emissions",
+		"sustainability_reporting",
+		"target_tracking",
+		"esg_evidence",
+		"esgc_agents",
+	]
+	assert contract["requires"] == ["auth", "conf", "audl", "geos", "pred", "comp"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["streaming"]["batch_mutation_guardrail"] == "batch_esgc_mutation_requires_bytewax"
+	assert contract["configuration"]["esgc_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "emissions", "factors", "data_sources", "reports", "targets", "agents", "rules", "audit", "settings"}
 	assert contract["theme"]["name"] == "esgc_sustainability_ops"
 
 
 def test_rule_engine_enforces_esgc_guardrails():
 	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "create_inventory", "organization_owner_assigned": False, "factor_source_approved": False, "geospatial_boundary_present": False, "emission_anomaly_detected": True, "anomaly_review_recorded": False})
 	report_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "publish_report", "approval_recorded": False, "factor_source_approved": True, "geospatial_boundary_present": True})
+	agent_result = evaluate_capability_rules({"esgc_agent_present": True, "agent_runtime_supported": False})
+	batch_result = evaluate_capability_rules({"requested_operation": "batch_esgc_mutation", "event_stream": "other-stream"})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "inventory_requires_owner", "factor_requires_approved_source", "emission_requires_boundary", "emission_anomaly_requires_review"}
 	assert report_result["matched_rules"] == ["report_requires_approval"]
+	assert agent_result["decision"] == "deny"
+	assert agent_result["matched_rules"] == ["esgc_agent_runtime_supported"]
+	assert batch_result["decision"] == "deny"
+	assert batch_result["matched_rules"] == ["batch_esgc_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -36,7 +85,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "esgc"
 	assert "comp" in registration["dependencies"]
 	assert registration["ui_components"]["reports"] == "/esgc/reports"
+	assert registration["ui_components"]["agents"] == "/esgc/agents"
 	assert "esgc:report" in registration["permissions"]
+	assert registration["streaming"]["processor"] == "bytewax"
 
 
 def test_emissions_factor_report_and_target_lifecycle():
@@ -94,6 +145,13 @@ def test_emissions_factor_report_and_target_lifecycle():
 		baseline_co2e_tonnes=10.0,
 		target_reduction_percent=50.0,
 	)
+	agent = service.register_esgc_agent(
+		tenant_id="tenant-esgc",
+		name="Report reviewer",
+		runtime="codex",
+		role="report_reviewer",
+		scope="review report evidence and compliance mapping",
+	)
 	model = dashboard_model(service, "tenant-esgc")
 
 	assert inventory["owner"] == "sustainability-lead"
@@ -103,8 +161,13 @@ def test_emissions_factor_report_and_target_lifecycle():
 	assert report["total_co2e_tonnes"] == 2.5
 	assert target["progress_percent"] == 100.0
 	assert target["status"] == "achieved"
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "report_reviewer"
 	assert model["summary"]["total_co2e_tonnes"] == 2.5
-	assert len(model["audit_events"]) == 5
+	assert model["summary"]["esgc_agent_count"] == 1
+	assert service.validate_batch_esgc_mutation("bytewax")["decision"] == "allow"
+	assert service.validate_batch_esgc_mutation("other-stream")["decision"] == "deny"
+	assert len(model["audit_events"]) == 6
 
 
 def test_inventory_and_factor_guardrails_block_missing_governance():
@@ -160,6 +223,15 @@ def test_inventory_and_factor_guardrails_block_missing_governance():
 			approved_source=False,
 		)
 
+	with pytest.raises(PermissionError, match="esgc_agent_runtime_not_supported"):
+		service.register_esgc_agent(
+			tenant_id="tenant-esgc",
+			name="Unsupported reviewer",
+			runtime="unsupported",
+			role="report_reviewer",
+			scope="review reports",
+		)
+
 
 def test_activity_report_and_anomaly_guardrails():
 	service = EsgcService()
@@ -205,3 +277,39 @@ def test_activity_report_and_anomaly_guardrails():
 			approved_by="",
 			approval_recorded=False,
 		)
+
+	service.register_esgc_agent("tenant-esgc", "Activity reviewer", "codex", "activity_reviewer", "review anomalies")
+	assert esgc_agent_model(service, "tenant-esgc")["esgc_agents"][0]["role"] == "activity_reviewer"
+
+
+def test_lifecycle_ids_are_tenant_scoped():
+	service = EsgcService()
+
+	for tenant_id, organization, quantity in (
+		("tenant-a", "Tenant A", 100.0),
+		("tenant-b", "Tenant B", 250.0),
+	):
+		service.create_inventory("shared-inventory", tenant_id, organization, "lead", 2026, "boundary", "geo", "GHG Protocol")
+		service.register_factor("shared-factor", tenant_id, "Electricity", "scope_2", "kwh", 0.001, "source", "evidence", "v1", True)
+		service.record_activity("shared-activity", tenant_id, "shared-inventory", "shared-factor", "electricity", quantity, "kwh", "invoice")
+		service.register_esgc_agent(tenant_id, "Reviewer", "codex", "activity_reviewer", "review anomalies", agent_id="shared-agent")
+
+	assert service.list_inventories("tenant-a")[0]["organization"] == "Tenant A"
+	assert service.list_inventories("tenant-b")[0]["organization"] == "Tenant B"
+	assert service.dashboard_summary("tenant-a")["total_co2e_tonnes"] == 0.1
+	assert service.dashboard_summary("tenant-b")["total_co2e_tonnes"] == 0.25
+	assert service.list_esgc_agents("tenant-a")[0]["id"] == "shared-agent"
+	assert service.list_esgc_agents("tenant-b")[0]["id"] == "shared-agent"
+
+
+def test_generated_evidence_and_docs_are_current():
+	app = _load_module("esgc_app_under_test", PACKAGE_DIR / "app.py")
+	model = app.semantic_model()
+	committed_model = json.loads((PACKAGE_DIR / "semantic_model.json").read_text(encoding="utf-8"))
+
+	assert app.self_test()["passed"] is True
+	assert model == committed_model
+	assert model["capabilities"]["esgc"]["streaming"]["processor"] == "bytewax"
+	assert model["capabilities"]["esgc"]["screens"]["agents"]["route"] == "/esgc/agents"
+	for name in ("README.md", "SPECIFICATION.md", "PLAN.md"):
+		assert (PACKAGE_DIR / name).exists()

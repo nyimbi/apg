@@ -27,6 +27,7 @@ def dashboard_model(
 		"activities": service.list_activities(tenant_id),
 		"reports": service.list_reports(tenant_id),
 		"targets": service.list_targets(tenant_id),
+		"esgc_agents": service.list_esgc_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -58,4 +59,16 @@ def target_tracker_model(service: EsgcService, tenant_id: str = "default") -> di
 		"tenant_id": tenant_id,
 		"targets": service.list_targets(tenant_id),
 		"total_co2e_tonnes": service.dashboard_summary(tenant_id)["total_co2e_tonnes"],
+	}
+
+
+def esgc_agent_model(service: EsgcService, tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"esgc_agents": service.list_esgc_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["esgc_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["esgc_agents"]["allowed_roles"],
+		"route": "/esgc/agents",
+		"permissions": ["esgc:view", "esgc:govern"],
 	}
