@@ -1,723 +1,152 @@
-"""
-APG Multi-Factor Authentication (MFA) - REST API Endpoints
+"""Dependency-light API helpers for the MFAU generated-app runtime."""
 
-Comprehensive REST API providing full MFA functionality with OpenAPI documentation,
-rate limiting, and APG ecosystem integration.
+from __future__ import annotations
 
-Copyright © 2025 Datacraft
-Author: Nyimbi Odero <nyimbi@gmail.com>
-Website: www.datacraft.co.ke
-"""
+from typing import Any
 
-import logging
-import os
-import inspect
-from typing import Optional, Dict, Any, List
-from datetime import datetime
-from flask import Flask, request, jsonify, current_app, g, session
-from flask_restx import Api, Resource, fields, Namespace
-from werkzeug.exceptions import BadRequest, Unauthorized, Forbidden, NotFound
-from functools import wraps
-import time
-
-from .models import MFAUserProfile, MFAMethod, MFAMethodType, AuthEvent
-from .service import MFAService
-from .integration import APGIntegrationRouter
+from .mfa_runtime import MfauGuardrailError, MfauService
 
 
-def _log_api_operation(operation: str, user_id: str, details: str = "") -> str:
-	"""Log API operations for debugging and audit"""
-	return f"[MFA API] {operation} for user {user_id}: {details}"
+def create_service(tenant_id: str = "default", configuration_overrides: dict[str, Any] | None = None) -> MfauService:
+	"""Create an MFAU runtime service for generated APG applications."""
+	return MfauService(tenant_id=tenant_id, configuration_overrides=configuration_overrides)
 
 
-def _clean_text(value: Any) -> Optional[str]:
-	if value is None:
-		return None
-	text = str(value).strip()
-	return text or None
+def health(service: MfauService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return a serializable health payload."""
+	summary = service.dashboard_summary(tenant_id)
+	return {
+		"status": "ok",
+		"capability": "mfau",
+		"tenant_id": tenant_id,
+		"rule_count": service.describe()["rule_count"],
+		"summary": summary,
+	}
 
 
-def _object_value(source: Any, name: str) -> Any:
-	if source is None:
-		return None
-	if isinstance(source, dict):
-		return source.get(name)
-	return getattr(source, name, None)
+def register_profile_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.create_user_profile(
+		profile_id=payload["profile_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		policy_id=payload["policy_id"],
+		primary_channel=payload["primary_channel"],
+		status=payload.get("status", "active"),
+	))
 
 
-def _first_text(candidates: List[Any], fallback: str) -> str:
-	for candidate in candidates:
-		text = _clean_text(candidate)
-		if text:
-			return text
-	return fallback
+def enroll_method_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.enroll_method(
+		method_id=payload["method_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		method_type=payload["method_type"],
+		channel_verified=payload.get("channel_verified", True),
+		biometric_consent_recorded=payload.get("biometric_consent_recorded", True),
+		template_encrypted=payload.get("template_encrypted", True),
+		secret_encrypted=payload.get("secret_encrypted", True),
+		device_id=payload.get("device_id", ""),
+		phishing_resistant=payload.get("phishing_resistant", False),
+		review_recorded=payload.get("review_recorded", False),
+	))
 
 
-def _resolve_current_user_id(fallback: str = "system") -> str:
-	current_user = (
-		_object_value(request, "current_user")
-		or _object_value(g, "current_user")
-		or _object_value(g, "user")
-		or _object_value(g, "auth_user")
-	)
-	return _first_text([
-		_object_value(current_user, "user_id"),
-		_object_value(current_user, "id"),
-		_object_value(current_user, "username"),
-		_object_value(request, "current_user_id"),
-		_object_value(g, "user_id"),
-		session.get("user_id"),
-		request.headers.get("X-User-ID"),
-		request.headers.get("X-APG-User-ID"),
-		request.args.get("user_id"),
-		os.getenv("APG_USER_ID"),
-	], os.getenv("APG_DEFAULT_USER_ID", fallback))
+def bind_device_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.bind_device(
+		device_id=payload["device_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		trust_score=payload["trust_score"],
+		reviewed=payload.get("reviewed", False),
+	))
 
 
-def _resolve_current_tenant_id(fallback: str = "default") -> str:
-	current_user = (
-		_object_value(request, "current_user")
-		or _object_value(g, "current_user")
-		or _object_value(g, "user")
-		or _object_value(g, "auth_user")
-	)
-	current_tenant = _object_value(g, "current_tenant")
-	return _first_text([
-		_object_value(current_user, "tenant_id"),
-		_object_value(request, "current_tenant_id"),
-		_object_value(g, "tenant_id"),
-		_object_value(current_tenant, "tenant_id"),
-		current_tenant,
-		session.get("tenant_id"),
-		request.headers.get("X-Tenant-ID"),
-		request.headers.get("X-APG-Tenant-ID"),
-		request.headers.get("X-Organization-ID"),
-		request.args.get("tenant_id"),
-		request.args.get("tenant"),
-		os.getenv("APG_TENANT_ID"),
-	], os.getenv("APG_DEFAULT_TENANT_ID", fallback))
+def assess_risk_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.assess_risk(
+		assessment_id=payload["assessment_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		risk_score=payload["risk_score"],
+		device_trust_score=payload["device_trust_score"],
+		external_signal=payload.get("external_signal", False),
+		review_recorded=payload.get("review_recorded", False),
+	))
 
 
-# Rate limiting decorator
-def rate_limit(max_requests: int = 100, window_seconds: int = 60):
-	"""Rate limiting decorator for API endpoints"""
-	def decorator(f):
-		if inspect.iscoroutinefunction(f):
-			@wraps(f)
-			async def async_decorated_function(*args, **kwargs):
-				# Simple in-memory rate limiting (use Redis in production)
-				client_ip = request.remote_addr
-				current_time = time.time()
-
-				# This would be implemented with Redis in production
-				# For now, skip rate limiting in development
-
-				return await f(*args, **kwargs)
-			return async_decorated_function
-
-		@wraps(f)
-		def decorated_function(*args, **kwargs):
-			# Simple in-memory rate limiting (use Redis in production)
-			client_ip = request.remote_addr
-			current_time = time.time()
-			
-			# This would be implemented with Redis in production
-			# For now, skip rate limiting in development
-			
-			return f(*args, **kwargs)
-		return decorated_function
-	return decorator
+def create_challenge_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.create_challenge(
+		challenge_id=payload["challenge_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		method_id=payload["method_id"],
+		assessment_id=payload["assessment_id"],
+		action_risk=payload.get("action_risk", "normal"),
+		step_up_completed=payload.get("step_up_completed", True),
+		phishing_resistant_factor_present=payload.get("phishing_resistant_factor_present", True),
+		token_unexpired=payload.get("token_unexpired", True),
+		token_reused=payload.get("token_reused", False),
+		verification_evidence=payload.get("verification_evidence", True),
+		failed_attempts=payload.get("failed_attempts", 0),
+		user_locked=payload.get("user_locked", False),
+		device_review_recorded=payload.get("device_review_recorded", False),
+		risk_override_approved=payload.get("risk_override_approved", False),
+	))
 
 
-# Authentication decorator
-def require_auth(f):
-	"""Require authentication for API endpoint"""
-	@wraps(f)
-	def decorated_function(*args, **kwargs):
-		# Extract token from Authorization header
-		auth_header = request.headers.get('Authorization', '')
-		
-		if not auth_header.startswith('Bearer '):
-			return {'error': 'Missing or invalid authorization header'}, 401
-		
-		token = auth_header.split(' ')[1]
-		
-		# Validate token (this would integrate with your auth system)
-		# For now, accept any non-empty token
-		if not token:
-			return {'error': 'Invalid token'}, 401
-		
-		# Add APG request context resolved from auth middleware/session/headers.
-		request.current_user_id = _resolve_current_user_id()
-		request.current_tenant_id = _resolve_current_tenant_id()
-		
-		return f(*args, **kwargs)
-	return decorated_function
+def complete_challenge_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.complete_challenge(
+		challenge_id=payload["challenge_id"],
+		tenant_id=payload["tenant_id"],
+		verification_evidence=payload.get("verification_evidence", True),
+	))
 
 
-# Create Flask-RESTX API
-def create_mfa_api(app: Flask, mfa_service: MFAService) -> Api:
-	"""Create and configure MFA REST API"""
-	
-	api = Api(
-		app,
-		version='1.0',
-		title='APG MFA API',
-		description='Multi-Factor Authentication API for APG Platform',
-		doc='/mfa/docs/',
-		prefix='/api/mfa'
-	)
-	
-	# Create namespaces
-	auth_ns = Namespace('auth', description='Authentication operations')
-	methods_ns = Namespace('methods', description='MFA method management')
-	users_ns = Namespace('users', description='User MFA management')
-	recovery_ns = Namespace('recovery', description='Account recovery')
-	admin_ns = Namespace('admin', description='Administrative operations')
-	
-	api.add_namespace(auth_ns, path='/auth')
-	api.add_namespace(methods_ns, path='/methods')
-	api.add_namespace(users_ns, path='/users')
-	api.add_namespace(recovery_ns, path='/recovery')
-	api.add_namespace(admin_ns, path='/admin')
-	
-	# Define models for documentation
-	auth_request_model = api.model('AuthRequest', {
-		'methods': fields.List(fields.Raw, required=True, description='Authentication methods'),
-		'context': fields.Raw(description='Authentication context')
-	})
-	
-	auth_response_model = api.model('AuthResponse', {
-		'success': fields.Boolean(required=True),
-		'authenticated': fields.Boolean(),
-		'trust_score': fields.Float(),
-		'token': fields.String(),
-		'expires_at': fields.String(),
-		'step_up_required': fields.Boolean(),
-		'error': fields.String()
-	})
-	
-	method_model = api.model('MFAMethod', {
-		'id': fields.String(required=True),
-		'type': fields.String(required=True),
-		'name': fields.String(),
-		'is_primary': fields.Boolean(),
-		'is_verified': fields.Boolean(),
-		'is_active': fields.Boolean(),
-		'created_at': fields.String()
-	})
-	
-	user_status_model = api.model('UserStatus', {
-		'mfa_enabled': fields.Boolean(required=True),
-		'methods': fields.List(fields.Nested(method_model)),
-		'trust_score': fields.Float(),
-		'is_locked_out': fields.Boolean(),
-		'backup_codes_available': fields.Boolean()
-	})
-	
-	enrollment_request_model = api.model('EnrollmentRequest', {
-		'method_type': fields.String(required=True),
-		'enrollment_data': fields.Raw(),
-		'context': fields.Raw()
-	})
-	
-	verification_request_model = api.model('VerificationRequest', {
-		'method_id': fields.String(required=True),
-		'verification_code': fields.String(),
-		'verification_data': fields.Raw()
-	})
-	
-	# Authentication endpoints
-	@auth_ns.route('/authenticate')
-	class AuthenticateResource(Resource):
-		@api.doc('authenticate_user')
-		@api.expect(auth_request_model)
-		@api.marshal_with(auth_response_model)
-		@rate_limit(max_requests=50, window_seconds=60)
-		async def post(self):
-			"""Authenticate user with MFA"""
-			try:
-				data = request.get_json()
-				
-				user_id = _resolve_current_user_id()
-				tenant_id = _resolve_current_tenant_id()
-				
-				# Build context
-				context = data.get('context', {})
-				context.update({
-					'ip_address': request.remote_addr,
-					'user_agent': request.headers.get('User-Agent', ''),
-					'timestamp': datetime.utcnow().isoformat()
-				})
-				
-				# Authenticate
-				result = await mfa_service.authenticate_user(
-					user_id=user_id,
-					tenant_id=tenant_id,
-					authentication_methods=data.get('methods', []),
-					context=context
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Authentication API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Authentication failed'}, 500
-	
-	@auth_ns.route('/verify')
-	class VerifyResource(Resource):
-		@api.doc('verify_method')
-		@api.expect(verification_request_model)
-		@require_auth
-		def post(self):
-			"""Verify MFA method"""
-			try:
-				data = request.get_json()
-				method_id = data.get('method_id')
-				verification_code = data.get('verification_code')
-				
-				# Mock verification for demo
-				if verification_code == '123456':
-					return {
-						'success': True,
-						'verified': True,
-						'message': 'Method verified successfully'
-					}
-				else:
-					return {
-						'success': False,
-						'verified': False,
-						'message': 'Invalid verification code'
-					}, 400
-					
-			except Exception as e:
-				logging.error(f"Verification API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Verification failed'}, 500
-	
-	@auth_ns.route('/step-up')
-	class StepUpResource(Resource):
-		@api.doc('step_up_auth')
-		@require_auth
-		async def post(self):
-			"""Perform step-up authentication"""
-			try:
-				data = request.get_json()
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				
-				result = await mfa_service.verify_step_up_authentication(
-					user_id=user_id,
-					tenant_id=tenant_id,
-					step_up_token=data.get('step_up_token'),
-					additional_methods=data.get('additional_methods', []),
-					context={'ip_address': request.remote_addr}
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Step-up authentication API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Step-up authentication failed'}, 500
-	
-	# Method management endpoints
-	@methods_ns.route('/')
-	class MethodsResource(Resource):
-		@api.doc('list_methods')
-		@api.marshal_list_with(method_model)
-		@require_auth
-		async def get(self):
-			"""Get user's MFA methods"""
-			try:
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				
-				status = await mfa_service.get_user_mfa_status(user_id, tenant_id)
-				return status.get('methods', [])
-				
-			except Exception as e:
-				logging.error(f"List methods API error: {str(e)}", exc_info=True)
-				return {'error': 'Failed to retrieve methods'}, 500
-		
-		@api.doc('enroll_method')
-		@api.expect(enrollment_request_model)
-		@require_auth
-		async def post(self):
-			"""Enroll new MFA method"""
-			try:
-				data = request.get_json()
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				
-				method_type = MFAMethodType(data.get('method_type'))
-				enrollment_data = data.get('enrollment_data', {})
-				context = data.get('context', {})
-				context.update({
-					'ip_address': request.remote_addr,
-					'user_agent': request.headers.get('User-Agent', '')
-				})
-				
-				result = await mfa_service.enroll_mfa_method(
-					user_id=user_id,
-					tenant_id=tenant_id,
-					method_type=method_type,
-					enrollment_data=enrollment_data,
-					context=context
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Enrollment API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Enrollment failed'}, 500
-	
-	@methods_ns.route('/<string:method_id>')
-	class MethodResource(Resource):
-		@api.doc('get_method')
-		@api.marshal_with(method_model)
-		@require_auth
-		def get(self, method_id):
-			"""Get specific MFA method"""
-			try:
-				# Mock method data
-				return {
-					'id': method_id,
-					'type': 'TOTP',
-					'name': 'Authenticator App',
-					'is_primary': True,
-					'is_verified': True,
-					'is_active': True,
-					'created_at': datetime.utcnow().isoformat()
-				}
-				
-			except Exception as e:
-				logging.error(f"Get method API error: {str(e)}", exc_info=True)
-				return {'error': 'Method not found'}, 404
-		
-		@api.doc('remove_method')
-		@require_auth
-		async def delete(self, method_id):
-			"""Remove MFA method"""
-			try:
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				context = {'ip_address': request.remote_addr}
-				
-				result = await mfa_service.remove_mfa_method(
-					user_id=user_id,
-					tenant_id=tenant_id,
-					method_id=method_id,
-					context=context
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Remove method API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Failed to remove method'}, 500
-	
-	@methods_ns.route('/<string:method_id>/primary')
-	class SetPrimaryResource(Resource):
-		@api.doc('set_primary_method')
-		@require_auth
-		def post(self, method_id):
-			"""Set method as primary"""
-			try:
-				# Mock implementation
-				return {
-					'success': True,
-					'message': 'Primary method updated successfully'
-				}
-				
-			except Exception as e:
-				logging.error(f"Set primary API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Failed to set primary method'}, 500
-	
-	@methods_ns.route('/<string:method_id>/test')
-	class TestMethodResource(Resource):
-		@api.doc('test_method')
-		@require_auth
-		def post(self, method_id):
-			"""Test MFA method"""
-			try:
-				# Mock test implementation
-				return {
-					'success': True,
-					'message': 'Method test successful'
-				}
-				
-			except Exception as e:
-				logging.error(f"Test method API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Method test failed'}, 500
-	
-	# User management endpoints
-	@users_ns.route('/status')
-	class UserStatusResource(Resource):
-		@api.doc('get_user_status')
-		@api.marshal_with(user_status_model)
-		@require_auth
-		async def get(self):
-			"""Get user MFA status"""
-			try:
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				
-				status = await mfa_service.get_user_mfa_status(user_id, tenant_id)
-				return status
-				
-			except Exception as e:
-				logging.error(f"User status API error: {str(e)}", exc_info=True)
-				return {'error': 'Failed to retrieve user status'}, 500
-	
-	@users_ns.route('/backup-codes')
-	class BackupCodesResource(Resource):
-		@api.doc('generate_backup_codes')
-		@require_auth
-		async def post(self):
-			"""Generate backup codes"""
-			try:
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				context = {'ip_address': request.remote_addr}
-				
-				result = await mfa_service.generate_backup_codes(
-					user_id=user_id,
-					tenant_id=tenant_id,
-					context=context
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Backup codes API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Failed to generate backup codes'}, 500
-	
-	@users_ns.route('/biometric/enroll')
-	class BiometricEnrollResource(Resource):
-		@api.doc('start_biometric_enrollment')
-		@require_auth
-		async def post(self):
-			"""Start biometric enrollment"""
-			try:
-				data = request.get_json()
-				user_id = request.current_user_id
-				tenant_id = request.current_tenant_id
-				
-				result = await mfa_service.start_biometric_enrollment(
-					user_id=user_id,
-					tenant_id=tenant_id,
-					biometric_types=data.get('biometric_types', []),
-					context={'ip_address': request.remote_addr}
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Biometric enrollment API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Biometric enrollment failed'}, 500
-	
-	# Recovery endpoints
-	@recovery_ns.route('/initiate')
-	class InitiateRecoveryResource(Resource):
-		@api.doc('initiate_recovery')
-		async def post(self):
-			"""Initiate account recovery"""
-			try:
-				data = request.get_json()
-				
-				result = await mfa_service.initiate_account_recovery(
-					user_id=data.get('user_id'),
-					tenant_id=data.get('tenant_id'),
-					recovery_type=data.get('recovery_type', 'mfa_reset'),
-					context={'ip_address': request.remote_addr}
-				)
-				
-				return result
-				
-			except Exception as e:
-				logging.error(f"Recovery initiation API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Recovery initiation failed'}, 500
-	
-	@recovery_ns.route('/<string:recovery_id>/verify')
-	class VerifyRecoveryResource(Resource):
-		@api.doc('verify_recovery')
-		def post(self, recovery_id):
-			"""Verify recovery method"""
-			try:
-				data = request.get_json()
-				
-				# Mock recovery verification
-				return {
-					'success': True,
-					'recovery_completed': False,
-					'remaining_methods': ['email_verification']
-				}
-				
-			except Exception as e:
-				logging.error(f"Recovery verification API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Recovery verification failed'}, 500
-	
-	# Administrative endpoints
-	@admin_ns.route('/metrics')
-	class MetricsResource(Resource):
-		@api.doc('get_metrics')
-		@require_auth
-		async def get(self):
-			"""Get MFA system metrics"""
-			try:
-				metrics = await mfa_service.get_service_metrics()
-				return metrics
-				
-			except Exception as e:
-				logging.error(f"Metrics API error: {str(e)}", exc_info=True)
-				return {'error': 'Failed to retrieve metrics'}, 500
-	
-	@admin_ns.route('/users/<string:user_id>/status')
-	class AdminUserStatusResource(Resource):
-		@api.doc('get_admin_user_status')
-		@require_auth
-		async def get(self, user_id):
-			"""Get user MFA status (admin view)"""
-			try:
-				tenant_id = _resolve_current_tenant_id()
-				
-				status = await mfa_service.get_user_mfa_status(user_id, tenant_id)
-				return status
-				
-			except Exception as e:
-				logging.error(f"Admin user status API error: {str(e)}", exc_info=True)
-				return {'error': 'Failed to retrieve user status'}, 500
-	
-	@admin_ns.route('/users/<string:user_id>/unlock')
-	class UnlockUserResource(Resource):
-		@api.doc('unlock_user')
-		@require_auth
-		def post(self, user_id):
-			"""Unlock user account"""
-			try:
-				# Mock unlock implementation
-				return {
-					'success': True,
-					'message': 'User account unlocked successfully'
-				}
-				
-			except Exception as e:
-				logging.error(f"Unlock user API error: {str(e)}", exc_info=True)
-				return {'success': False, 'error': 'Failed to unlock user'}, 500
-	
-	# Add error handlers
-	@api.errorhandler(BadRequest)
-	def handle_bad_request(error):
-		return {'error': 'Bad request', 'message': str(error)}, 400
-	
-	@api.errorhandler(Unauthorized)
-	def handle_unauthorized(error):
-		return {'error': 'Unauthorized', 'message': 'Authentication required'}, 401
-	
-	@api.errorhandler(Forbidden)
-	def handle_forbidden(error):
-		return {'error': 'Forbidden', 'message': 'Insufficient permissions'}, 403
-	
-	@api.errorhandler(NotFound)
-	def handle_not_found(error):
-		return {'error': 'Not found', 'message': 'Resource not found'}, 404
-	
-	@api.errorhandler(Exception)
-	def handle_internal_error(error):
-		logging.error(f"Internal API error: {str(error)}", exc_info=True)
-		return {'error': 'Internal server error', 'message': 'An unexpected error occurred'}, 500
-	
-	return api
+def recover_account_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.recover_account(
+		recovery_id=payload["recovery_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		verified_recovery_channel=payload.get("verified_recovery_channel", True),
+		audit_event_recorded=payload.get("audit_event_recorded", True),
+		admin_recovery=payload.get("admin_recovery", False),
+		admin_approval_recorded=payload.get("admin_approval_recorded", True),
+		recovery_evidence_present=payload.get("recovery_evidence_present", True),
+	))
 
 
-# WebSocket events for real-time communication
-class MFAWebSocketEvents:
-	"""WebSocket event handlers for real-time MFA communication"""
-	
-	def __init__(self, socketio, mfa_service: MFAService):
-		self.socketio = socketio
-		self.mfa_service = mfa_service
-		self.logger = logging.getLogger(__name__)
-		
-		# Register event handlers
-		self.socketio.on_event('connect', self.on_connect)
-		self.socketio.on_event('disconnect', self.on_disconnect)
-		self.socketio.on_event('join_mfa_room', self.on_join_mfa_room)
-		self.socketio.on_event('biometric_data', self.on_biometric_data)
-		self.socketio.on_event('enrollment_progress', self.on_enrollment_progress)
-	
-	def on_connect(self):
-		"""Handle client connection"""
-		self.logger.info(f"Client connected: {request.sid}")
-	
-	def on_disconnect(self):
-		"""Handle client disconnection"""
-		self.logger.info(f"Client disconnected: {request.sid}")
-	
-	def on_join_mfa_room(self, data):
-		"""Join user-specific MFA room for real-time updates"""
-		user_id = data.get('user_id')
-		if user_id:
-			room = f"mfa_user_{user_id}"
-			self.socketio.join_room(room)
-			self.socketio.emit('joined', {'room': room})
-			self.logger.info(f"Client {request.sid} joined MFA room: {room}")
-	
-	def on_biometric_data(self, data):
-		"""Handle real-time biometric data for enrollment/authentication"""
-		try:
-			user_id = data.get('user_id')
-			biometric_type = data.get('type')
-			biometric_data = data.get('data')
-			
-			# Process biometric data
-			result = self._process_biometric_data(user_id, biometric_type, biometric_data)
-			
-			# Send result back to client
-			self.socketio.emit('biometric_result', result)
-			
-		except Exception as e:
-			self.logger.error(f"Biometric data processing error: {str(e)}", exc_info=True)
-			self.socketio.emit('biometric_error', {'error': str(e)})
-	
-	def on_enrollment_progress(self, data):
-		"""Handle enrollment progress updates"""
-		try:
-			user_id = data.get('user_id')
-			progress = data.get('progress')
-			
-			# Broadcast progress to user's room
-			room = f"mfa_user_{user_id}"
-			self.socketio.emit('enrollment_update', {
-				'progress': progress,
-				'timestamp': datetime.utcnow().isoformat()
-			}, room=room)
-			
-		except Exception as e:
-			self.logger.error(f"Enrollment progress error: {str(e)}", exc_info=True)
-	
-	def _process_biometric_data(self, user_id: str, biometric_type: str, data: Any) -> Dict[str, Any]:
-		"""Process real-time biometric data"""
-		# This would integrate with the biometric service
-		return {
-			'quality_score': 0.85,
-			'enrollment_progress': 0.6,
-			'feedback': 'Move closer to camera'
-		}
-	
-	def broadcast_security_alert(self, user_id: str, alert_data: Dict[str, Any]):
-		"""Broadcast security alert to user"""
-		room = f"mfa_user_{user_id}"
-		self.socketio.emit('security_alert', alert_data, room=room)
-	
-	def broadcast_method_status_change(self, user_id: str, method_data: Dict[str, Any]):
-		"""Broadcast MFA method status change"""
-		room = f"mfa_user_{user_id}"
-		self.socketio.emit('method_status_change', method_data, room=room)
+def backup_codes_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.generate_backup_codes(
+		code_set_id=payload["code_set_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		code_count=payload.get("code_count", 10),
+	))
 
 
-__all__ = [
-	'create_mfa_api',
-	'MFAWebSocketEvents',
-	'require_auth',
-	'rate_limit'
-]
+def use_backup_code_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.use_backup_code(
+		code_set_id=payload["code_set_id"],
+		tenant_id=payload["tenant_id"],
+		user_id=payload["user_id"],
+		code_value=payload["code_value"],
+	))
+
+
+def policy_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.create_policy(
+		policy_id=payload["policy_id"],
+		tenant_id=payload["tenant_id"],
+		name=payload["name"],
+		audit_event_recorded=payload.get("audit_event_recorded", True),
+	))
+
+
+def dashboard_endpoint(service: MfauService, tenant_id: str) -> dict[str, Any]:
+	return {"ok": True, "data": service.package(tenant_id)}
+
+
+def _wrap(operation) -> dict[str, Any]:
+	try:
+		return {"ok": True, "data": operation()}
+	except MfauGuardrailError as exc:
+		return {"ok": False, "error": exc.result}

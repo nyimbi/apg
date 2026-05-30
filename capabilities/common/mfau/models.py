@@ -2,7 +2,7 @@
 APG Multi-Factor Authentication (MFA) - Data Models
 
 Core Pydantic v2 models with APG-compatible patterns, comprehensive validation,
-and multi-tenancy support for revolutionary MFA capability.
+and multi-tenancy support for adaptive MFA capability.
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero <nyimbi@gmail.com>

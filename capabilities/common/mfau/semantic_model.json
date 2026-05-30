@@ -8,33 +8,124 @@
   },
   "capabilities": {
     "mfau": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "biometric": "biop",
+        "cache": "cach",
+        "computer_vision": "cvsn",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "mfa_runtime.MfauService",
+        "helper_runtime": "mfa_runtime.py",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "notification": "ntfy",
+        "production_runtime": "service.MFAService",
+        "security_framework": "secu"
+      },
+      "approvals": {
+        "active_method_limit": "SecurityReview",
+        "admin_recovery": "AdminApproval",
+        "external_risk_signal": "RiskReview",
+        "low_trust_device": "DeviceTrustReview",
+        "policy_change": "AuditEvidence"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "biometric": "biop",
+          "cache": "cach",
+          "computer_vision": "cvsn",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "mfa_runtime.MfauService",
+          "helper_runtime": "mfa_runtime.py",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "notification": "ntfy",
+          "production_runtime": "service.MFAService",
+          "security_framework": "secu"
+        },
+        "backup_codes": {
+          "default_count": 10,
+          "regeneration_requires_recent_auth": true,
+          "single_use_required": true
+        },
+        "biometrics": {
+          "consent_required": true,
+          "liveness_check_required": true,
+          "template_encryption_required": true
+        },
+        "challenge": {
+          "code_required": true,
+          "max_attempts": 5,
+          "single_use_required": true,
+          "ttl_seconds": 300
+        },
+        "devices": {
+          "binding_required_for_device_methods": true,
+          "known_device_ttl_days": 90,
+          "review_low_trust_devices": true,
+          "trust_scoring_enabled": true
+        },
+        "enrollment": {
+          "biometric_consent_required": true,
+          "recent_auth_required": true,
+          "template_encryption_required": true,
+          "verification_required": true
+        },
         "governance": {
           "audit_challenges": true,
-          "biometric_consent_required": true,
+          "audit_enrollments": true,
+          "audit_profiles": true,
+          "audit_recovery": true,
           "require_tenant_context": true,
           "step_up_policy_required": true
         },
         "methods": {
           "biometric_methods_allowed": true,
+          "device_binding_required": true,
           "enabled": [
             "totp",
             "webauthn",
             "push",
             "email_otp",
             "sms_otp",
-            "backup_codes"
+            "backup_codes",
+            "hardware_key",
+            "biometric"
           ],
           "max_active_methods_per_user": 8,
           "phishing_resistant": [
             "webauthn",
             "hardware_key"
-          ]
+          ],
+          "verified_channel_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "policies": {
+          "audit_policy_changes": true,
+          "default_policy": "standard-mfa",
+          "privileged_actions_require_phishing_resistant": true
+        },
+        "profiles": {
+          "default_status": "active",
+          "lockout_minutes": 15,
+          "max_failed_attempts": 5,
+          "policy_required": true,
+          "user_required": true
         },
         "recovery": {
+          "admin_approval_required": true,
           "admin_assisted_recovery": true,
           "backup_codes_enabled": true,
           "recovery_audit_required": true,
@@ -43,8 +134,16 @@
         "risk": {
           "adaptive_step_up_enabled": true,
           "admin_actions_require_phishing_resistant": true,
+          "critical_risk_threshold": 0.9,
           "high_risk_threshold": 0.75,
           "low_trust_device_threshold": 0.4
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "factor_secret_encryption_required": true,
+          "lockout_enabled": true,
+          "rbac_required": true,
+          "token_replay_blocking": true
         },
         "tenant_id": "default",
         "theme": {
@@ -52,10 +151,19 @@
           "default_theme": "mfau_adaptive_auth_console"
         },
         "ui": {
-          "enable_auth_dashboard": true,
+          "enable_audit": true,
+          "enable_backup_codes": true,
+          "enable_challenges": true,
+          "enable_dashboard": true,
+          "enable_devices": true,
           "enable_enrollment_wizard": true,
+          "enable_governance": true,
+          "enable_methods": true,
+          "enable_policies": true,
+          "enable_profiles": true,
           "enable_recovery_center": true,
-          "enable_risk_console": true
+          "enable_risk_console": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -63,11 +171,26 @@
       ],
       "i18n": {},
       "master_data": {},
+      "mfa_lifecycle": {
+        "audit": "MFAAuditEvent",
+        "backup_codes": "BackupCodeSet",
+        "challenge": "MFAChallenge",
+        "device": "TrustedDevice",
+        "method": "MFAMethod",
+        "policy": "MFAPolicy",
+        "profile": "MFAUserProfile",
+        "recovery": "AccountRecovery",
+        "risk": "RiskAssessment"
+      },
       "name": "Multi-Factor Authentication",
       "provides": [
         "mfau_operations"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "secu",
+        "encr"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -84,6 +207,220 @@
           },
           {
             "condition": {
+              "operation": "register_profile",
+              "user_present": false
+            },
+            "description": "MFA profiles require users.",
+            "effect": {
+              "decision": "deny",
+              "reason": "user_required",
+              "required_action": "select_user"
+            },
+            "name": "profile_requires_user"
+          },
+          {
+            "condition": {
+              "operation": "register_profile",
+              "policy_present": false
+            },
+            "description": "MFA profiles require a policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_required",
+              "required_action": "select_policy"
+            },
+            "name": "profile_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_profile",
+              "profile_status_allowed": false
+            },
+            "description": "MFA profile status must be configured.",
+            "effect": {
+              "decision": "deny",
+              "reason": "profile_status_invalid",
+              "required_action": "choose_allowed_status"
+            },
+            "name": "profile_status_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "operation": "enroll_method",
+              "profile_present": false
+            },
+            "description": "MFA enrollment requires a user profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "profile_required",
+              "required_action": "register_profile"
+            },
+            "name": "enrollment_requires_profile"
+          },
+          {
+            "condition": {
+              "method_type_present": false,
+              "operation": "enroll_method"
+            },
+            "description": "MFA enrollment requires a method type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "method_type_required",
+              "required_action": "choose_method_type"
+            },
+            "name": "enrollment_requires_method_type"
+          },
+          {
+            "condition": {
+              "method_type_allowed": false,
+              "operation": "enroll_method"
+            },
+            "description": "MFA method type must be enabled.",
+            "effect": {
+              "decision": "deny",
+              "reason": "method_type_not_enabled",
+              "required_action": "choose_enabled_method"
+            },
+            "name": "method_type_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "channel_method": true,
+              "operation": "enroll_method",
+              "verified_channel": false
+            },
+            "description": "Channel-based methods require a verified channel.",
+            "effect": {
+              "decision": "deny",
+              "reason": "verified_channel_required",
+              "required_action": "verify_channel"
+            },
+            "name": "enrollment_requires_verified_channel"
+          },
+          {
+            "condition": {
+              "biometric_consent_recorded": false,
+              "method_type": "biometric",
+              "operation": "enroll_method"
+            },
+            "description": "Biometric MFA methods require explicit consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_required",
+              "required_action": "record_biometric_consent"
+            },
+            "name": "biometric_method_requires_consent"
+          },
+          {
+            "condition": {
+              "method_type": "biometric",
+              "operation": "enroll_method",
+              "template_encrypted": false
+            },
+            "description": "Biometric templates require encryption evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_encryption_required",
+              "required_action": "encrypt_template"
+            },
+            "name": "biometric_template_requires_encryption"
+          },
+          {
+            "condition": {
+              "device_binding_present": false,
+              "device_bound_method": true,
+              "operation": "enroll_method"
+            },
+            "description": "Device-bound methods require device binding.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_binding_required",
+              "required_action": "bind_device"
+            },
+            "name": "device_binding_required_for_method"
+          },
+          {
+            "condition": {
+              "active_method_count_gte": 8,
+              "operation": "enroll_method",
+              "review_recorded": false
+            },
+            "description": "High active method counts require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "active_method_limit_review_required",
+              "required_action": "review_active_method_count"
+            },
+            "name": "active_method_limit_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "enroll_method",
+              "secret_encrypted": false
+            },
+            "description": "Factor secrets require encryption evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "factor_secret_encryption_required",
+              "required_action": "encrypt_factor_secret"
+            },
+            "name": "factor_secret_requires_encryption"
+          },
+          {
+            "condition": {
+              "method_present": false,
+              "operation": "verify_challenge"
+            },
+            "description": "Challenge verification requires an enrolled method.",
+            "effect": {
+              "decision": "deny",
+              "reason": "method_required",
+              "required_action": "select_method"
+            },
+            "name": "verification_requires_method"
+          },
+          {
+            "condition": {
+              "operation": "verify_challenge",
+              "verification_evidence_present": false
+            },
+            "description": "Challenge verification requires code or assertion evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "verification_evidence_required",
+              "required_action": "attach_verification_evidence"
+            },
+            "name": "verification_requires_code_or_assertion"
+          },
+          {
+            "condition": {
+              "operation": "create_challenge",
+              "profile_present": false
+            },
+            "description": "Challenges require an MFA profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "profile_required",
+              "required_action": "register_profile"
+            },
+            "name": "challenge_requires_profile"
+          },
+          {
+            "condition": {
+              "active_method_present": false,
+              "operation": "create_challenge"
+            },
+            "description": "Challenges require an active method.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_method_required",
+              "required_action": "enroll_active_method"
+            },
+            "name": "challenge_requires_active_method"
+          },
+          {
+            "condition": {
+              "operation": "create_challenge",
               "risk_score_gt": 0.75,
               "step_up_completed": false
             },
@@ -97,16 +434,110 @@
           },
           {
             "condition": {
-              "biometric_consent_recorded": false,
-              "method_type": "biometric"
+              "operation": "create_challenge",
+              "risk_override_approved": false,
+              "risk_score_gte": 0.9
             },
-            "description": "Biometric MFA methods require explicit consent.",
+            "description": "Critical risk authentication is blocked.",
             "effect": {
               "decision": "deny",
-              "reason": "biometric_consent_required",
-              "required_action": "record_biometric_consent"
+              "reason": "critical_risk_blocked",
+              "required_action": "approve_risk_override"
             },
-            "name": "biometric_method_requires_consent"
+            "name": "critical_risk_requires_block"
+          },
+          {
+            "condition": {
+              "action_risk": "admin",
+              "operation": "create_challenge",
+              "phishing_resistant_factor_present": false
+            },
+            "description": "Privileged actions require phishing-resistant MFA.",
+            "effect": {
+              "decision": "deny",
+              "reason": "phishing_resistant_factor_required",
+              "required_action": "use_webauthn_or_hardware_key"
+            },
+            "name": "admin_action_requires_phishing_resistant_factor"
+          },
+          {
+            "condition": {
+              "device_review_recorded": false,
+              "device_trust_score_lt": 0.4,
+              "operation": "create_challenge"
+            },
+            "description": "Low-trust devices require additional review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_trust_device_review_required",
+              "required_action": "review_device_trust"
+            },
+            "name": "low_trust_device_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "create_challenge",
+              "profile_locked": true
+            },
+            "description": "Locked MFA profiles block challenges.",
+            "effect": {
+              "decision": "deny",
+              "reason": "profile_locked",
+              "required_action": "unlock_profile"
+            },
+            "name": "locked_profile_blocks_challenge"
+          },
+          {
+            "condition": {
+              "challenge_expired": true,
+              "operation": "verify_challenge"
+            },
+            "description": "Expired challenges block verification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "challenge_expired",
+              "required_action": "issue_new_challenge"
+            },
+            "name": "expired_challenge_blocks_verification"
+          },
+          {
+            "condition": {
+              "challenge_already_used": true,
+              "operation": "verify_challenge"
+            },
+            "description": "Used challenges may not be replayed.",
+            "effect": {
+              "decision": "deny",
+              "reason": "challenge_replay_blocked",
+              "required_action": "issue_new_challenge"
+            },
+            "name": "single_use_challenge_blocks_replay"
+          },
+          {
+            "condition": {
+              "failed_attempt_count_gte": 5,
+              "operation": "verify_challenge"
+            },
+            "description": "Too many failed attempts lock the profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "failed_attempt_limit_reached",
+              "required_action": "lock_profile"
+            },
+            "name": "failed_attempt_limit_blocks_profile"
+          },
+          {
+            "condition": {
+              "operation": "recover_account",
+              "profile_present": false
+            },
+            "description": "Account recovery requires an MFA profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "recovery_requires_profile"
           },
           {
             "condition": {
@@ -123,29 +554,159 @@
           },
           {
             "condition": {
-              "action_risk": "admin",
-              "phishing_resistant_factor_present": false
+              "operation": "recover_account",
+              "recovery_evidence_present": false
             },
-            "description": "Privileged actions require phishing-resistant MFA.",
+            "description": "Account recovery requires evidence.",
             "effect": {
               "decision": "deny",
-              "reason": "phishing_resistant_factor_required",
-              "required_action": "use_webauthn_or_hardware_key"
+              "reason": "recovery_evidence_required",
+              "required_action": "attach_recovery_evidence"
             },
-            "name": "admin_action_requires_phishing_resistant_factor"
+            "name": "recovery_requires_evidence"
           },
           {
             "condition": {
-              "device_review_recorded": false,
-              "device_trust_score_lt": 0.4
+              "admin_approval_recorded": false,
+              "admin_assisted": true,
+              "operation": "recover_account"
             },
-            "description": "Low-trust devices require additional review.",
+            "description": "Admin-assisted recovery requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "admin_recovery_approval_required",
+              "required_action": "record_admin_approval"
+            },
+            "name": "admin_recovery_requires_approval"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "operation": "recover_account"
+            },
+            "description": "Recovery state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recovery_audit_required",
+              "required_action": "record_recovery_audit"
+            },
+            "name": "recovery_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "backup_codes_remaining_lte": 0,
+              "operation": "use_backup_code"
+            },
+            "description": "Backup-code recovery requires an unused code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_code_unavailable",
+              "required_action": "regenerate_backup_codes"
+            },
+            "name": "backup_code_requires_remaining_code"
+          },
+          {
+            "condition": {
+              "backup_code_already_used": true,
+              "operation": "use_backup_code"
+            },
+            "description": "Backup codes may only be used once.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_code_replay_blocked",
+              "required_action": "use_unused_backup_code"
+            },
+            "name": "backup_code_single_use_required"
+          },
+          {
+            "condition": {
+              "alternative_method_present": false,
+              "operation": "disable_method"
+            },
+            "description": "Disabling a method requires another active method.",
+            "effect": {
+              "decision": "deny",
+              "reason": "alternative_method_required",
+              "required_action": "enroll_alternative_method"
+            },
+            "name": "method_disable_requires_alternative"
+          },
+          {
+            "condition": {
+              "operation": "rotate_method",
+              "recent_verification_present": false
+            },
+            "description": "Method rotation requires recent verification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recent_verification_required",
+              "required_action": "verify_current_method"
+            },
+            "name": "method_rotation_requires_recent_verification"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "operation": "change_policy"
+            },
+            "description": "MFA policy changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_audit_required",
+              "required_action": "record_policy_audit"
+            },
+            "name": "policy_change_requires_audit"
+          },
+          {
+            "condition": {
+              "external_risk_signal": true,
+              "review_recorded": false
+            },
+            "description": "External risk signals require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "low_trust_device_review_required",
-              "required_action": "review_device_trust"
+              "reason": "external_risk_signal_review_required",
+              "required_action": "review_external_signal"
             },
-            "name": "low_trust_device_requires_review"
+            "name": "external_risk_signal_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_mfa_mutation"
+            },
+            "description": "Batch MFA mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_mfa_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "MFA operations may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_mfa_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_mfa_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "MFA state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "mfa_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -165,6 +726,220 @@
         },
         {
           "condition": {
+            "operation": "register_profile",
+            "user_present": false
+          },
+          "description": "MFA profiles require users.",
+          "effect": {
+            "decision": "deny",
+            "reason": "user_required",
+            "required_action": "select_user"
+          },
+          "name": "profile_requires_user"
+        },
+        {
+          "condition": {
+            "operation": "register_profile",
+            "policy_present": false
+          },
+          "description": "MFA profiles require a policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_required",
+            "required_action": "select_policy"
+          },
+          "name": "profile_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_profile",
+            "profile_status_allowed": false
+          },
+          "description": "MFA profile status must be configured.",
+          "effect": {
+            "decision": "deny",
+            "reason": "profile_status_invalid",
+            "required_action": "choose_allowed_status"
+          },
+          "name": "profile_status_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "operation": "enroll_method",
+            "profile_present": false
+          },
+          "description": "MFA enrollment requires a user profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "profile_required",
+            "required_action": "register_profile"
+          },
+          "name": "enrollment_requires_profile"
+        },
+        {
+          "condition": {
+            "method_type_present": false,
+            "operation": "enroll_method"
+          },
+          "description": "MFA enrollment requires a method type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "method_type_required",
+            "required_action": "choose_method_type"
+          },
+          "name": "enrollment_requires_method_type"
+        },
+        {
+          "condition": {
+            "method_type_allowed": false,
+            "operation": "enroll_method"
+          },
+          "description": "MFA method type must be enabled.",
+          "effect": {
+            "decision": "deny",
+            "reason": "method_type_not_enabled",
+            "required_action": "choose_enabled_method"
+          },
+          "name": "method_type_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "channel_method": true,
+            "operation": "enroll_method",
+            "verified_channel": false
+          },
+          "description": "Channel-based methods require a verified channel.",
+          "effect": {
+            "decision": "deny",
+            "reason": "verified_channel_required",
+            "required_action": "verify_channel"
+          },
+          "name": "enrollment_requires_verified_channel"
+        },
+        {
+          "condition": {
+            "biometric_consent_recorded": false,
+            "method_type": "biometric",
+            "operation": "enroll_method"
+          },
+          "description": "Biometric MFA methods require explicit consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_required",
+            "required_action": "record_biometric_consent"
+          },
+          "name": "biometric_method_requires_consent"
+        },
+        {
+          "condition": {
+            "method_type": "biometric",
+            "operation": "enroll_method",
+            "template_encrypted": false
+          },
+          "description": "Biometric templates require encryption evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_encryption_required",
+            "required_action": "encrypt_template"
+          },
+          "name": "biometric_template_requires_encryption"
+        },
+        {
+          "condition": {
+            "device_binding_present": false,
+            "device_bound_method": true,
+            "operation": "enroll_method"
+          },
+          "description": "Device-bound methods require device binding.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_binding_required",
+            "required_action": "bind_device"
+          },
+          "name": "device_binding_required_for_method"
+        },
+        {
+          "condition": {
+            "active_method_count_gte": 8,
+            "operation": "enroll_method",
+            "review_recorded": false
+          },
+          "description": "High active method counts require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "active_method_limit_review_required",
+            "required_action": "review_active_method_count"
+          },
+          "name": "active_method_limit_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "enroll_method",
+            "secret_encrypted": false
+          },
+          "description": "Factor secrets require encryption evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "factor_secret_encryption_required",
+            "required_action": "encrypt_factor_secret"
+          },
+          "name": "factor_secret_requires_encryption"
+        },
+        {
+          "condition": {
+            "method_present": false,
+            "operation": "verify_challenge"
+          },
+          "description": "Challenge verification requires an enrolled method.",
+          "effect": {
+            "decision": "deny",
+            "reason": "method_required",
+            "required_action": "select_method"
+          },
+          "name": "verification_requires_method"
+        },
+        {
+          "condition": {
+            "operation": "verify_challenge",
+            "verification_evidence_present": false
+          },
+          "description": "Challenge verification requires code or assertion evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "verification_evidence_required",
+            "required_action": "attach_verification_evidence"
+          },
+          "name": "verification_requires_code_or_assertion"
+        },
+        {
+          "condition": {
+            "operation": "create_challenge",
+            "profile_present": false
+          },
+          "description": "Challenges require an MFA profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "profile_required",
+            "required_action": "register_profile"
+          },
+          "name": "challenge_requires_profile"
+        },
+        {
+          "condition": {
+            "active_method_present": false,
+            "operation": "create_challenge"
+          },
+          "description": "Challenges require an active method.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_method_required",
+            "required_action": "enroll_active_method"
+          },
+          "name": "challenge_requires_active_method"
+        },
+        {
+          "condition": {
+            "operation": "create_challenge",
             "risk_score_gt": 0.75,
             "step_up_completed": false
           },
@@ -178,16 +953,110 @@
         },
         {
           "condition": {
-            "biometric_consent_recorded": false,
-            "method_type": "biometric"
+            "operation": "create_challenge",
+            "risk_override_approved": false,
+            "risk_score_gte": 0.9
           },
-          "description": "Biometric MFA methods require explicit consent.",
+          "description": "Critical risk authentication is blocked.",
           "effect": {
             "decision": "deny",
-            "reason": "biometric_consent_required",
-            "required_action": "record_biometric_consent"
+            "reason": "critical_risk_blocked",
+            "required_action": "approve_risk_override"
           },
-          "name": "biometric_method_requires_consent"
+          "name": "critical_risk_requires_block"
+        },
+        {
+          "condition": {
+            "action_risk": "admin",
+            "operation": "create_challenge",
+            "phishing_resistant_factor_present": false
+          },
+          "description": "Privileged actions require phishing-resistant MFA.",
+          "effect": {
+            "decision": "deny",
+            "reason": "phishing_resistant_factor_required",
+            "required_action": "use_webauthn_or_hardware_key"
+          },
+          "name": "admin_action_requires_phishing_resistant_factor"
+        },
+        {
+          "condition": {
+            "device_review_recorded": false,
+            "device_trust_score_lt": 0.4,
+            "operation": "create_challenge"
+          },
+          "description": "Low-trust devices require additional review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_trust_device_review_required",
+            "required_action": "review_device_trust"
+          },
+          "name": "low_trust_device_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "create_challenge",
+            "profile_locked": true
+          },
+          "description": "Locked MFA profiles block challenges.",
+          "effect": {
+            "decision": "deny",
+            "reason": "profile_locked",
+            "required_action": "unlock_profile"
+          },
+          "name": "locked_profile_blocks_challenge"
+        },
+        {
+          "condition": {
+            "challenge_expired": true,
+            "operation": "verify_challenge"
+          },
+          "description": "Expired challenges block verification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "challenge_expired",
+            "required_action": "issue_new_challenge"
+          },
+          "name": "expired_challenge_blocks_verification"
+        },
+        {
+          "condition": {
+            "challenge_already_used": true,
+            "operation": "verify_challenge"
+          },
+          "description": "Used challenges may not be replayed.",
+          "effect": {
+            "decision": "deny",
+            "reason": "challenge_replay_blocked",
+            "required_action": "issue_new_challenge"
+          },
+          "name": "single_use_challenge_blocks_replay"
+        },
+        {
+          "condition": {
+            "failed_attempt_count_gte": 5,
+            "operation": "verify_challenge"
+          },
+          "description": "Too many failed attempts lock the profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "failed_attempt_limit_reached",
+            "required_action": "lock_profile"
+          },
+          "name": "failed_attempt_limit_blocks_profile"
+        },
+        {
+          "condition": {
+            "operation": "recover_account",
+            "profile_present": false
+          },
+          "description": "Account recovery requires an MFA profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "recovery_requires_profile"
         },
         {
           "condition": {
@@ -204,52 +1073,209 @@
         },
         {
           "condition": {
-            "action_risk": "admin",
-            "phishing_resistant_factor_present": false
+            "operation": "recover_account",
+            "recovery_evidence_present": false
           },
-          "description": "Privileged actions require phishing-resistant MFA.",
+          "description": "Account recovery requires evidence.",
           "effect": {
             "decision": "deny",
-            "reason": "phishing_resistant_factor_required",
-            "required_action": "use_webauthn_or_hardware_key"
+            "reason": "recovery_evidence_required",
+            "required_action": "attach_recovery_evidence"
           },
-          "name": "admin_action_requires_phishing_resistant_factor"
+          "name": "recovery_requires_evidence"
         },
         {
           "condition": {
-            "device_review_recorded": false,
-            "device_trust_score_lt": 0.4
+            "admin_approval_recorded": false,
+            "admin_assisted": true,
+            "operation": "recover_account"
           },
-          "description": "Low-trust devices require additional review.",
+          "description": "Admin-assisted recovery requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "admin_recovery_approval_required",
+            "required_action": "record_admin_approval"
+          },
+          "name": "admin_recovery_requires_approval"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "operation": "recover_account"
+          },
+          "description": "Recovery state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recovery_audit_required",
+            "required_action": "record_recovery_audit"
+          },
+          "name": "recovery_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "backup_codes_remaining_lte": 0,
+            "operation": "use_backup_code"
+          },
+          "description": "Backup-code recovery requires an unused code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_code_unavailable",
+            "required_action": "regenerate_backup_codes"
+          },
+          "name": "backup_code_requires_remaining_code"
+        },
+        {
+          "condition": {
+            "backup_code_already_used": true,
+            "operation": "use_backup_code"
+          },
+          "description": "Backup codes may only be used once.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_code_replay_blocked",
+            "required_action": "use_unused_backup_code"
+          },
+          "name": "backup_code_single_use_required"
+        },
+        {
+          "condition": {
+            "alternative_method_present": false,
+            "operation": "disable_method"
+          },
+          "description": "Disabling a method requires another active method.",
+          "effect": {
+            "decision": "deny",
+            "reason": "alternative_method_required",
+            "required_action": "enroll_alternative_method"
+          },
+          "name": "method_disable_requires_alternative"
+        },
+        {
+          "condition": {
+            "operation": "rotate_method",
+            "recent_verification_present": false
+          },
+          "description": "Method rotation requires recent verification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recent_verification_required",
+            "required_action": "verify_current_method"
+          },
+          "name": "method_rotation_requires_recent_verification"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "operation": "change_policy"
+          },
+          "description": "MFA policy changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_audit_required",
+            "required_action": "record_policy_audit"
+          },
+          "name": "policy_change_requires_audit"
+        },
+        {
+          "condition": {
+            "external_risk_signal": true,
+            "review_recorded": false
+          },
+          "description": "External risk signals require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "low_trust_device_review_required",
-            "required_action": "review_device_trust"
+            "reason": "external_risk_signal_review_required",
+            "required_action": "review_external_signal"
           },
-          "name": "low_trust_device_requires_review"
+          "name": "external_risk_signal_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_mfa_mutation"
+          },
+          "description": "Batch MFA mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_mfa_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "MFA operations may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_mfa_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_mfa_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "MFA state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "mfa_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "mfa_runtime.py",
+        "production_service": "service.MFAService",
+        "service": "mfa_runtime.MfauService",
         "views": "views.py"
       },
       "screens": {
         "audit": {
           "component": "MFAAuditTrail",
-          "permission": "mfau:view",
+          "permission": "mfau:audit",
           "route": "/mfau/audit"
+        },
+        "backup_codes": {
+          "component": "BackupCodeManager",
+          "permission": "mfau:recover",
+          "route": "/mfau/backup-codes"
+        },
+        "biometrics": {
+          "component": "MFABiometricConsent",
+          "permission": "mfau:manage_methods",
+          "route": "/mfau/biometrics"
+        },
+        "challenges": {
+          "component": "MFAChallengeConsole",
+          "permission": "mfau:challenge",
+          "route": "/mfau/challenges"
         },
         "dashboard": {
           "component": "MFAUDashboard",
           "permission": "mfau:view",
           "route": "/mfau/dashboard"
         },
+        "devices": {
+          "component": "MFADeviceTrust",
+          "permission": "mfau:challenge",
+          "route": "/mfau/devices"
+        },
         "enrollment": {
           "component": "MFAEnrollmentWizard",
           "permission": "mfau:enroll",
           "route": "/mfau/enrollment"
+        },
+        "governance": {
+          "component": "MFAUGovernance",
+          "permission": "mfau:admin",
+          "route": "/mfau/governance"
         },
         "methods": {
           "component": "MFAMethods",
@@ -260,6 +1286,11 @@
           "component": "MFAPolicyStudio",
           "permission": "mfau:admin",
           "route": "/mfau/policies"
+        },
+        "profiles": {
+          "component": "MFAProfileRegistry",
+          "permission": "mfau:view",
+          "route": "/mfau/profiles"
         },
         "recovery": {
           "component": "MFARecoveryCenter",
@@ -277,9 +1308,31 @@
           "route": "/mfau/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "security-chip",
+            "visual": "event-timeline"
+          },
+          "backup_code_panel": {
+            "status_style": "remaining-chip",
+            "visual": "single-use-code-list"
+          },
+          "biometric_consent": {
+            "status_style": "consent-chip",
+            "visual": "consent-evidence-panel"
+          },
+          "challenge_panel": {
+            "status_style": "attempt-chip",
+            "visual": "challenge-timeline"
+          },
+          "device_trust": {
+            "status_style": "trust-chip",
+            "visual": "device-list"
+          },
           "enrollment_wizard": {
             "status_style": "verification-chip",
             "visual": "method-stepper"
@@ -288,6 +1341,18 @@
             "icon": "shield-check",
             "risk_style": "step-up-band",
             "status_indicator": "factor-pill"
+          },
+          "method_card": {
+            "status_style": "verification-chip",
+            "visual": "factor-list"
+          },
+          "policy_editor": {
+            "status_style": "audit-chip",
+            "visual": "policy-rule-builder"
+          },
+          "profile_card": {
+            "status_style": "lock-chip",
+            "visual": "user-security-summary"
           },
           "recovery_timeline": {
             "status_style": "channel-chip",
@@ -301,7 +1366,7 @@
         "name": "mfau_adaptive_auth_console",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#D97706",
+          "color.accent": "#F2A541",
           "color.danger": "#C53030",
           "color.primary": "#1F4E5F",
           "color.success": "#2F855A",
@@ -325,6 +1390,13 @@
             "permission": "mfau:view"
           },
           {
+            "component": "MFAProfileRegistry",
+            "name": "profiles",
+            "nav_group": "Users",
+            "path": "/mfau/profiles",
+            "permission": "mfau:view"
+          },
+          {
             "component": "MFAMethods",
             "name": "methods",
             "nav_group": "Methods",
@@ -339,10 +1411,24 @@
             "permission": "mfau:enroll"
           },
           {
+            "component": "MFAChallengeConsole",
+            "name": "challenges",
+            "nav_group": "Challenges",
+            "path": "/mfau/challenges",
+            "permission": "mfau:challenge"
+          },
+          {
             "component": "MFARiskConsole",
             "name": "risk",
             "nav_group": "Risk",
             "path": "/mfau/risk",
+            "permission": "mfau:challenge"
+          },
+          {
+            "component": "MFADeviceTrust",
+            "name": "devices",
+            "nav_group": "Risk",
+            "path": "/mfau/devices",
             "permission": "mfau:challenge"
           },
           {
@@ -353,6 +1439,13 @@
             "permission": "mfau:recover"
           },
           {
+            "component": "BackupCodeManager",
+            "name": "backup_codes",
+            "nav_group": "Recovery",
+            "path": "/mfau/backup-codes",
+            "permission": "mfau:recover"
+          },
+          {
             "component": "MFAPolicyStudio",
             "name": "policies",
             "nav_group": "Governance",
@@ -360,11 +1453,25 @@
             "permission": "mfau:admin"
           },
           {
+            "component": "MFABiometricConsent",
+            "name": "biometrics",
+            "nav_group": "Methods",
+            "path": "/mfau/biometrics",
+            "permission": "mfau:manage_methods"
+          },
+          {
+            "component": "MFAUGovernance",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/mfau/governance",
+            "permission": "mfau:admin"
+          },
+          {
             "component": "MFAAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
             "path": "/mfau/audit",
-            "permission": "mfau:view"
+            "permission": "mfau:audit"
           },
           {
             "component": "MFAUSettings",
@@ -387,35 +1494,108 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "mfau": []
+      "mfau": [
+        "auth",
+        "secu",
+        "encr"
+      ]
     }
   },
   "contracts": {
     "mfau": {
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "biometric": "biop",
+          "cache": "cach",
+          "computer_vision": "cvsn",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "mfa_runtime.MfauService",
+          "helper_runtime": "mfa_runtime.py",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "notification": "ntfy",
+          "production_runtime": "service.MFAService",
+          "security_framework": "secu"
+        },
+        "backup_codes": {
+          "default_count": 10,
+          "regeneration_requires_recent_auth": true,
+          "single_use_required": true
+        },
+        "biometrics": {
+          "consent_required": true,
+          "liveness_check_required": true,
+          "template_encryption_required": true
+        },
+        "challenge": {
+          "code_required": true,
+          "max_attempts": 5,
+          "single_use_required": true,
+          "ttl_seconds": 300
+        },
+        "devices": {
+          "binding_required_for_device_methods": true,
+          "known_device_ttl_days": 90,
+          "review_low_trust_devices": true,
+          "trust_scoring_enabled": true
+        },
+        "enrollment": {
+          "biometric_consent_required": true,
+          "recent_auth_required": true,
+          "template_encryption_required": true,
+          "verification_required": true
+        },
         "governance": {
           "audit_challenges": true,
-          "biometric_consent_required": true,
+          "audit_enrollments": true,
+          "audit_profiles": true,
+          "audit_recovery": true,
           "require_tenant_context": true,
           "step_up_policy_required": true
         },
         "methods": {
           "biometric_methods_allowed": true,
+          "device_binding_required": true,
           "enabled": [
             "totp",
             "webauthn",
             "push",
             "email_otp",
             "sms_otp",
-            "backup_codes"
+            "backup_codes",
+            "hardware_key",
+            "biometric"
           ],
           "max_active_methods_per_user": 8,
           "phishing_resistant": [
             "webauthn",
             "hardware_key"
-          ]
+          ],
+          "verified_channel_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "policies": {
+          "audit_policy_changes": true,
+          "default_policy": "standard-mfa",
+          "privileged_actions_require_phishing_resistant": true
+        },
+        "profiles": {
+          "default_status": "active",
+          "lockout_minutes": 15,
+          "max_failed_attempts": 5,
+          "policy_required": true,
+          "user_required": true
         },
         "recovery": {
+          "admin_approval_required": true,
           "admin_assisted_recovery": true,
           "backup_codes_enabled": true,
           "recovery_audit_required": true,
@@ -424,8 +1604,16 @@
         "risk": {
           "adaptive_step_up_enabled": true,
           "admin_actions_require_phishing_resistant": true,
+          "critical_risk_threshold": 0.9,
           "high_risk_threshold": 0.75,
           "low_trust_device_threshold": 0.4
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "factor_secret_encryption_required": true,
+          "lockout_enabled": true,
+          "rbac_required": true,
+          "token_replay_blocking": true
         },
         "tenant_id": "default",
         "theme": {
@@ -433,17 +1621,30 @@
           "default_theme": "mfau_adaptive_auth_console"
         },
         "ui": {
-          "enable_auth_dashboard": true,
+          "enable_audit": true,
+          "enable_backup_codes": true,
+          "enable_challenges": true,
+          "enable_dashboard": true,
+          "enable_devices": true,
           "enable_enrollment_wizard": true,
+          "enable_governance": true,
+          "enable_methods": true,
+          "enable_policies": true,
+          "enable_profiles": true,
           "enable_recovery_center": true,
-          "enable_risk_console": true
+          "enable_risk_console": true,
+          "enable_settings": true
         }
       },
       "id": "mfau",
       "provides": [
         "mfau_operations"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "secu",
+        "encr"
+      ]
     }
   },
   "deployment": {
@@ -455,7 +1656,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -476,9 +1677,24 @@
   },
   "roles": {},
   "rules": {
+    "active_method_limit_requires_review": {
+      "condition": {
+        "active_method_count_gte": 8,
+        "operation": "enroll_method",
+        "review_recorded": false
+      },
+      "description": "High active method counts require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "active_method_limit_review_required",
+        "required_action": "review_active_method_count"
+      },
+      "name": "active_method_limit_requires_review"
+    },
     "admin_action_requires_phishing_resistant_factor": {
       "condition": {
         "action_risk": "admin",
+        "operation": "create_challenge",
         "phishing_resistant_factor_present": false
       },
       "description": "Privileged actions require phishing-resistant MFA.",
@@ -489,10 +1705,64 @@
       },
       "name": "admin_action_requires_phishing_resistant_factor"
     },
+    "admin_recovery_requires_approval": {
+      "condition": {
+        "admin_approval_recorded": false,
+        "admin_assisted": true,
+        "operation": "recover_account"
+      },
+      "description": "Admin-assisted recovery requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "admin_recovery_approval_required",
+        "required_action": "record_admin_approval"
+      },
+      "name": "admin_recovery_requires_approval"
+    },
+    "backup_code_requires_remaining_code": {
+      "condition": {
+        "backup_codes_remaining_lte": 0,
+        "operation": "use_backup_code"
+      },
+      "description": "Backup-code recovery requires an unused code.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_code_unavailable",
+        "required_action": "regenerate_backup_codes"
+      },
+      "name": "backup_code_requires_remaining_code"
+    },
+    "backup_code_single_use_required": {
+      "condition": {
+        "backup_code_already_used": true,
+        "operation": "use_backup_code"
+      },
+      "description": "Backup codes may only be used once.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_code_replay_blocked",
+        "required_action": "use_unused_backup_code"
+      },
+      "name": "backup_code_single_use_required"
+    },
+    "batch_mfa_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_mfa_mutation"
+      },
+      "description": "Batch MFA mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_mfa_mutation_requires_bytewax"
+    },
     "biometric_method_requires_consent": {
       "condition": {
         "biometric_consent_recorded": false,
-        "method_type": "biometric"
+        "method_type": "biometric",
+        "operation": "enroll_method"
       },
       "description": "Biometric MFA methods require explicit consent.",
       "effect": {
@@ -502,8 +1772,181 @@
       },
       "name": "biometric_method_requires_consent"
     },
+    "biometric_template_requires_encryption": {
+      "condition": {
+        "method_type": "biometric",
+        "operation": "enroll_method",
+        "template_encrypted": false
+      },
+      "description": "Biometric templates require encryption evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_encryption_required",
+        "required_action": "encrypt_template"
+      },
+      "name": "biometric_template_requires_encryption"
+    },
+    "challenge_requires_active_method": {
+      "condition": {
+        "active_method_present": false,
+        "operation": "create_challenge"
+      },
+      "description": "Challenges require an active method.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_method_required",
+        "required_action": "enroll_active_method"
+      },
+      "name": "challenge_requires_active_method"
+    },
+    "challenge_requires_profile": {
+      "condition": {
+        "operation": "create_challenge",
+        "profile_present": false
+      },
+      "description": "Challenges require an MFA profile.",
+      "effect": {
+        "decision": "deny",
+        "reason": "profile_required",
+        "required_action": "register_profile"
+      },
+      "name": "challenge_requires_profile"
+    },
+    "critical_risk_requires_block": {
+      "condition": {
+        "operation": "create_challenge",
+        "risk_override_approved": false,
+        "risk_score_gte": 0.9
+      },
+      "description": "Critical risk authentication is blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_risk_blocked",
+        "required_action": "approve_risk_override"
+      },
+      "name": "critical_risk_requires_block"
+    },
+    "cross_tenant_mfa_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "MFA operations may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_mfa_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_mfa_access_denied"
+    },
+    "device_binding_required_for_method": {
+      "condition": {
+        "device_binding_present": false,
+        "device_bound_method": true,
+        "operation": "enroll_method"
+      },
+      "description": "Device-bound methods require device binding.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_binding_required",
+        "required_action": "bind_device"
+      },
+      "name": "device_binding_required_for_method"
+    },
+    "enrollment_requires_method_type": {
+      "condition": {
+        "method_type_present": false,
+        "operation": "enroll_method"
+      },
+      "description": "MFA enrollment requires a method type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "method_type_required",
+        "required_action": "choose_method_type"
+      },
+      "name": "enrollment_requires_method_type"
+    },
+    "enrollment_requires_profile": {
+      "condition": {
+        "operation": "enroll_method",
+        "profile_present": false
+      },
+      "description": "MFA enrollment requires a user profile.",
+      "effect": {
+        "decision": "deny",
+        "reason": "profile_required",
+        "required_action": "register_profile"
+      },
+      "name": "enrollment_requires_profile"
+    },
+    "enrollment_requires_verified_channel": {
+      "condition": {
+        "channel_method": true,
+        "operation": "enroll_method",
+        "verified_channel": false
+      },
+      "description": "Channel-based methods require a verified channel.",
+      "effect": {
+        "decision": "deny",
+        "reason": "verified_channel_required",
+        "required_action": "verify_channel"
+      },
+      "name": "enrollment_requires_verified_channel"
+    },
+    "expired_challenge_blocks_verification": {
+      "condition": {
+        "challenge_expired": true,
+        "operation": "verify_challenge"
+      },
+      "description": "Expired challenges block verification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "challenge_expired",
+        "required_action": "issue_new_challenge"
+      },
+      "name": "expired_challenge_blocks_verification"
+    },
+    "external_risk_signal_requires_review": {
+      "condition": {
+        "external_risk_signal": true,
+        "review_recorded": false
+      },
+      "description": "External risk signals require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "external_risk_signal_review_required",
+        "required_action": "review_external_signal"
+      },
+      "name": "external_risk_signal_requires_review"
+    },
+    "factor_secret_requires_encryption": {
+      "condition": {
+        "operation": "enroll_method",
+        "secret_encrypted": false
+      },
+      "description": "Factor secrets require encryption evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "factor_secret_encryption_required",
+        "required_action": "encrypt_factor_secret"
+      },
+      "name": "factor_secret_requires_encryption"
+    },
+    "failed_attempt_limit_blocks_profile": {
+      "condition": {
+        "failed_attempt_count_gte": 5,
+        "operation": "verify_challenge"
+      },
+      "description": "Too many failed attempts lock the profile.",
+      "effect": {
+        "decision": "deny",
+        "reason": "failed_attempt_limit_reached",
+        "required_action": "lock_profile"
+      },
+      "name": "failed_attempt_limit_blocks_profile"
+    },
     "high_risk_requires_step_up": {
       "condition": {
+        "operation": "create_challenge",
         "risk_score_gt": 0.75,
         "step_up_completed": false
       },
@@ -515,10 +1958,24 @@
       },
       "name": "high_risk_requires_step_up"
     },
+    "locked_profile_blocks_challenge": {
+      "condition": {
+        "operation": "create_challenge",
+        "profile_locked": true
+      },
+      "description": "Locked MFA profiles block challenges.",
+      "effect": {
+        "decision": "deny",
+        "reason": "profile_locked",
+        "required_action": "unlock_profile"
+      },
+      "name": "locked_profile_blocks_challenge"
+    },
     "low_trust_device_requires_review": {
       "condition": {
         "device_review_recorded": false,
-        "device_trust_score_lt": 0.4
+        "device_trust_score_lt": 0.4,
+        "operation": "create_challenge"
       },
       "description": "Low-trust devices require additional review.",
       "effect": {
@@ -527,6 +1984,136 @@
         "required_action": "review_device_trust"
       },
       "name": "low_trust_device_requires_review"
+    },
+    "method_disable_requires_alternative": {
+      "condition": {
+        "alternative_method_present": false,
+        "operation": "disable_method"
+      },
+      "description": "Disabling a method requires another active method.",
+      "effect": {
+        "decision": "deny",
+        "reason": "alternative_method_required",
+        "required_action": "enroll_alternative_method"
+      },
+      "name": "method_disable_requires_alternative"
+    },
+    "method_rotation_requires_recent_verification": {
+      "condition": {
+        "operation": "rotate_method",
+        "recent_verification_present": false
+      },
+      "description": "Method rotation requires recent verification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recent_verification_required",
+        "required_action": "verify_current_method"
+      },
+      "name": "method_rotation_requires_recent_verification"
+    },
+    "method_type_requires_allowed_value": {
+      "condition": {
+        "method_type_allowed": false,
+        "operation": "enroll_method"
+      },
+      "description": "MFA method type must be enabled.",
+      "effect": {
+        "decision": "deny",
+        "reason": "method_type_not_enabled",
+        "required_action": "choose_enabled_method"
+      },
+      "name": "method_type_requires_allowed_value"
+    },
+    "mfa_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "MFA state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "mfa_state_change_requires_audit"
+    },
+    "policy_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "operation": "change_policy"
+      },
+      "description": "MFA policy changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_audit_required",
+        "required_action": "record_policy_audit"
+      },
+      "name": "policy_change_requires_audit"
+    },
+    "profile_requires_policy": {
+      "condition": {
+        "operation": "register_profile",
+        "policy_present": false
+      },
+      "description": "MFA profiles require a policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_required",
+        "required_action": "select_policy"
+      },
+      "name": "profile_requires_policy"
+    },
+    "profile_requires_user": {
+      "condition": {
+        "operation": "register_profile",
+        "user_present": false
+      },
+      "description": "MFA profiles require users.",
+      "effect": {
+        "decision": "deny",
+        "reason": "user_required",
+        "required_action": "select_user"
+      },
+      "name": "profile_requires_user"
+    },
+    "profile_status_requires_allowed_value": {
+      "condition": {
+        "operation": "register_profile",
+        "profile_status_allowed": false
+      },
+      "description": "MFA profile status must be configured.",
+      "effect": {
+        "decision": "deny",
+        "reason": "profile_status_invalid",
+        "required_action": "choose_allowed_status"
+      },
+      "name": "profile_status_requires_allowed_value"
+    },
+    "recovery_requires_evidence": {
+      "condition": {
+        "operation": "recover_account",
+        "recovery_evidence_present": false
+      },
+      "description": "Account recovery requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recovery_evidence_required",
+        "required_action": "attach_recovery_evidence"
+      },
+      "name": "recovery_requires_evidence"
+    },
+    "recovery_requires_profile": {
+      "condition": {
+        "operation": "recover_account",
+        "profile_present": false
+      },
+      "description": "Account recovery requires an MFA profile.",
+      "effect": {
+        "decision": "deny",
+        "reason": "profile_required",
+        "required_action": "select_profile"
+      },
+      "name": "recovery_requires_profile"
     },
     "recovery_requires_verified_channel": {
       "condition": {
@@ -541,6 +2128,32 @@
       },
       "name": "recovery_requires_verified_channel"
     },
+    "recovery_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "operation": "recover_account"
+      },
+      "description": "Recovery state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recovery_audit_required",
+        "required_action": "record_recovery_audit"
+      },
+      "name": "recovery_state_change_requires_audit"
+    },
+    "single_use_challenge_blocks_replay": {
+      "condition": {
+        "challenge_already_used": true,
+        "operation": "verify_challenge"
+      },
+      "description": "Used challenges may not be replayed.",
+      "effect": {
+        "decision": "deny",
+        "reason": "challenge_replay_blocked",
+        "required_action": "issue_new_challenge"
+      },
+      "name": "single_use_challenge_blocks_replay"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -552,11 +2165,42 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "verification_requires_code_or_assertion": {
+      "condition": {
+        "operation": "verify_challenge",
+        "verification_evidence_present": false
+      },
+      "description": "Challenge verification requires code or assertion evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "verification_evidence_required",
+        "required_action": "attach_verification_evidence"
+      },
+      "name": "verification_requires_code_or_assertion"
+    },
+    "verification_requires_method": {
+      "condition": {
+        "method_present": false,
+        "operation": "verify_challenge"
+      },
+      "description": "Challenge verification requires an enrolled method.",
+      "effect": {
+        "decision": "deny",
+        "reason": "method_required",
+        "required_action": "select_method"
+      },
+      "name": "verification_requires_method"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "mfa_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py"
   ],
   "symbols": {
     "capability.mfau": {

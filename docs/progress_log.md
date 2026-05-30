@@ -14662,3 +14662,65 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Load, latency, semantic-consistency, taxonomy-quality, authorization, and
   throughput benchmarks.
+
+### 2026-05-30 11:37 EAT
+
+MFAU lifecycle and guardrail packet:
+
+- Selected `capabilities/common/mfau` as the next common capability after ONTO
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the active packet docs.
+- Expanded the MFAU contract to cover profiles, methods, enrollment,
+  challenges, risk, devices, recovery, backup codes, policies, biometrics,
+  security, governance, observability, adapters, UI, and theme configuration.
+- Added 39 deterministic guardrails covering tenant context, profile
+  registration, method enrollment, biometric consent, encryption evidence,
+  device binding, risk-based step-up, privileged action phishing resistance,
+  challenge verification, replay prevention, failed-attempt lockout, account
+  recovery, backup codes, method disable/rotation, policy audit, external risk
+  signals, Bytewax batch mutation, cross-tenant access, and state-change audit.
+- Expanded UI metadata to 14 routes with adaptive-auth theme components for
+  dashboards, profiles, methods, enrollment, challenges, risk, device trust,
+  recovery, backup codes, policies, biometrics, governance, audit, and settings.
+- Added `mfa_runtime.py` with a dependency-light `MfauService` generated-app
+  runtime for tenant-scoped profiles, methods, devices, risk assessments,
+  challenges, recoveries, backup codes, policies, audit events, and dashboard
+  summaries.
+- Replaced framework-bound `api.py` with dependency-light API helper functions
+  that wrap the runtime and return serializable success/error payloads.
+- Replaced framework-bound `views.py` with dependency-light UI model helpers
+  that generated applications can compose without Flask-AppBuilder imports.
+- Replaced static package evidence with contract-derived `app.py` semantics and
+  refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Updated capability registration with richer endpoints, adapter evidence,
+  optional AUDL/NTFY/CVSN/BIOP/CACH/MONI adapters, MFA lifecycle capabilities,
+  and governance/audit permissions.
+- Renamed package tests from materialized-package language to package-contract
+  language and expanded focused coverage for route/rule counts, Bytewax,
+  lifecycle execution, guardrails, UI models, API helpers, package evidence,
+  and generated-app runtime metadata.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mfau/__init__.py capabilities/common/mfau/capability_contract.py capabilities/common/mfau/models.py capabilities/common/mfau/mfa_runtime.py capabilities/common/mfau/api.py capabilities/common/mfau/views.py capabilities/common/mfau/app.py capabilities/common/mfau/test_capability_contract.py capabilities/common/mfau/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mfau/test_capability_contract.py capabilities/common/mfau/tests/test_package_contract.py` passed with 8 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and MFAU capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mfau --json` passed with `ok: true`; MFAU remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mfau --json` passed with 14 UI routes, 39 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/mfau/README.md capabilities/common/mfau/SPECIFICATION.md capabilities/common/mfau/PLAN.md capabilities/common/mfau/cap_spec.md capabilities/common/mfau/__init__.py capabilities/common/mfau/capability_contract.py capabilities/common/mfau/models.py capabilities/common/mfau/mfa_runtime.py capabilities/common/mfau/api.py capabilities/common/mfau/views.py capabilities/common/mfau/app.py capabilities/common/mfau/test_capability_contract.py capabilities/common/mfau/tests/test_package_contract.py capabilities/common/mfau/package_manifest.json capabilities/common/mfau/release_report.json capabilities/common/mfau/semantic_model.json` returned no primary-slice stale markers.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Legacy deep MFA service, Flask, Flask-AppBuilder, biometric, notification,
+  token, anti-spoofing, and external APG integration modules.
+- Live WebAuthn, TOTP, push, SMS, email, hardware-key, biometric, liveness, or
+  computer-vision providers.
+- Live Bytewax stream execution.
+- External AUTH, SECU, ENCR, AUDL, NTFY, CVSN, BIOP, CACH, and MONI adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Load, latency, risk-quality, biometric-quality, authorization, recovery-abuse,
+  and throughput benchmarks.

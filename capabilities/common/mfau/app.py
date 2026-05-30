@@ -5,13 +5,126 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Multi-Factor Authentication package-backed APG capability", "entity_count": 0, "name": "mfau", "version": "1.0.0"}, "capabilities": {"mfau": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_challenges": true, "biometric_consent_required": true, "require_tenant_context": true, "step_up_policy_required": true}, "methods": {"biometric_methods_allowed": true, "enabled": ["totp", "webauthn", "push", "email_otp", "sms_otp", "backup_codes"], "max_active_methods_per_user": 8, "phishing_resistant": ["webauthn", "hardware_key"]}, "recovery": {"admin_assisted_recovery": true, "backup_codes_enabled": true, "recovery_audit_required": true, "verified_channel_required": true}, "risk": {"adaptive_step_up_enabled": true, "admin_actions_require_phishing_resistant": true, "high_risk_threshold": 0.75, "low_trust_device_threshold": 0.4}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mfau_adaptive_auth_console"}, "ui": {"enable_auth_dashboard": true, "enable_enrollment_wizard": true, "enable_recovery_center": true, "enable_risk_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Multi-Factor Authentication", "provides": ["mfau_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All MFA operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"risk_score_gt": 0.75, "step_up_completed": false}, "description": "High-risk authentication requires step-up.", "effect": {"decision": "deny", "reason": "step_up_required", "required_action": "complete_step_up_challenge"}, "name": "high_risk_requires_step_up"}, {"condition": {"biometric_consent_recorded": false, "method_type": "biometric"}, "description": "Biometric MFA methods require explicit consent.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_biometric_consent"}, "name": "biometric_method_requires_consent"}, {"condition": {"operation": "recover_account", "verified_recovery_channel": false}, "description": "Account recovery requires a verified channel.", "effect": {"decision": "deny", "reason": "verified_recovery_channel_required", "required_action": "verify_recovery_channel"}, "name": "recovery_requires_verified_channel"}, {"condition": {"action_risk": "admin", "phishing_resistant_factor_present": false}, "description": "Privileged actions require phishing-resistant MFA.", "effect": {"decision": "deny", "reason": "phishing_resistant_factor_required", "required_action": "use_webauthn_or_hardware_key"}, "name": "admin_action_requires_phishing_resistant_factor"}, {"condition": {"device_review_recorded": false, "device_trust_score_lt": 0.4}, "description": "Low-trust devices require additional review.", "effect": {"decision": "require_review", "reason": "low_trust_device_review_required", "required_action": "review_device_trust"}, "name": "low_trust_device_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All MFA operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"risk_score_gt": 0.75, "step_up_completed": false}, "description": "High-risk authentication requires step-up.", "effect": {"decision": "deny", "reason": "step_up_required", "required_action": "complete_step_up_challenge"}, "name": "high_risk_requires_step_up"}, {"condition": {"biometric_consent_recorded": false, "method_type": "biometric"}, "description": "Biometric MFA methods require explicit consent.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_biometric_consent"}, "name": "biometric_method_requires_consent"}, {"condition": {"operation": "recover_account", "verified_recovery_channel": false}, "description": "Account recovery requires a verified channel.", "effect": {"decision": "deny", "reason": "verified_recovery_channel_required", "required_action": "verify_recovery_channel"}, "name": "recovery_requires_verified_channel"}, {"condition": {"action_risk": "admin", "phishing_resistant_factor_present": false}, "description": "Privileged actions require phishing-resistant MFA.", "effect": {"decision": "deny", "reason": "phishing_resistant_factor_required", "required_action": "use_webauthn_or_hardware_key"}, "name": "admin_action_requires_phishing_resistant_factor"}, {"condition": {"device_review_recorded": false, "device_trust_score_lt": 0.4}, "description": "Low-trust devices require additional review.", "effect": {"decision": "require_review", "reason": "low_trust_device_review_required", "required_action": "review_device_trust"}, "name": "low_trust_device_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"audit": {"component": "MFAAuditTrail", "permission": "mfau:view", "route": "/mfau/audit"}, "dashboard": {"component": "MFAUDashboard", "permission": "mfau:view", "route": "/mfau/dashboard"}, "enrollment": {"component": "MFAEnrollmentWizard", "permission": "mfau:enroll", "route": "/mfau/enrollment"}, "methods": {"component": "MFAMethods", "permission": "mfau:manage_methods", "route": "/mfau/methods"}, "policies": {"component": "MFAPolicyStudio", "permission": "mfau:admin", "route": "/mfau/policies"}, "recovery": {"component": "MFARecoveryCenter", "permission": "mfau:recover", "route": "/mfau/recovery"}, "risk": {"component": "MFARiskConsole", "permission": "mfau:challenge", "route": "/mfau/risk"}, "settings": {"component": "MFAUSettings", "permission": "mfau:admin", "route": "/mfau/settings"}}, "streaming": {}, "theme": {"components": {"enrollment_wizard": {"status_style": "verification-chip", "visual": "method-stepper"}, "factor_stack": {"icon": "shield-check", "risk_style": "step-up-band", "status_indicator": "factor-pill"}, "recovery_timeline": {"status_style": "channel-chip", "visual": "audit-timeline"}, "risk_meter": {"highlight": "risk-threshold-chip", "visual": "trust-gauge"}}, "name": "mfau_adaptive_auth_console", "tokens": {"border.radius": "8px", "color.accent": "#D97706", "color.danger": "#C53030", "color.primary": "#1F4E5F", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F9F9", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/mfau/api/v1", "requires_theme": true, "routes": [{"component": "MFAUDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/mfau/dashboard", "permission": "mfau:view"}, {"component": "MFAMethods", "name": "methods", "nav_group": "Methods", "path": "/mfau/methods", "permission": "mfau:manage_methods"}, {"component": "MFAEnrollmentWizard", "name": "enrollment", "nav_group": "Methods", "path": "/mfau/enrollment", "permission": "mfau:enroll"}, {"component": "MFARiskConsole", "name": "risk", "nav_group": "Risk", "path": "/mfau/risk", "permission": "mfau:challenge"}, {"component": "MFARecoveryCenter", "name": "recovery", "nav_group": "Recovery", "path": "/mfau/recovery", "permission": "mfau:recover"}, {"component": "MFAPolicyStudio", "name": "policies", "nav_group": "Governance", "path": "/mfau/policies", "permission": "mfau:admin"}, {"component": "MFAAuditTrail", "name": "audit", "nav_group": "Governance", "path": "/mfau/audit", "permission": "mfau:view"}, {"component": "MFAUSettings", "name": "settings", "nav_group": "Administration", "path": "/mfau/settings", "permission": "mfau:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"mfau": []}}, "contracts": {"mfau": {"configuration": {"governance": {"audit_challenges": true, "biometric_consent_required": true, "require_tenant_context": true, "step_up_policy_required": true}, "methods": {"biometric_methods_allowed": true, "enabled": ["totp", "webauthn", "push", "email_otp", "sms_otp", "backup_codes"], "max_active_methods_per_user": 8, "phishing_resistant": ["webauthn", "hardware_key"]}, "recovery": {"admin_assisted_recovery": true, "backup_codes_enabled": true, "recovery_audit_required": true, "verified_channel_required": true}, "risk": {"adaptive_step_up_enabled": true, "admin_actions_require_phishing_resistant": true, "high_risk_threshold": 0.75, "low_trust_device_threshold": 0.4}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mfau_adaptive_auth_console"}, "ui": {"enable_auth_dashboard": true, "enable_enrollment_wizard": true, "enable_recovery_center": true, "enable_risk_console": true}}, "id": "mfau", "provides": ["mfau_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"mfau": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"admin_action_requires_phishing_resistant_factor": {"condition": {"action_risk": "admin", "phishing_resistant_factor_present": false}, "description": "Privileged actions require phishing-resistant MFA.", "effect": {"decision": "deny", "reason": "phishing_resistant_factor_required", "required_action": "use_webauthn_or_hardware_key"}, "name": "admin_action_requires_phishing_resistant_factor"}, "biometric_method_requires_consent": {"condition": {"biometric_consent_recorded": false, "method_type": "biometric"}, "description": "Biometric MFA methods require explicit consent.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_biometric_consent"}, "name": "biometric_method_requires_consent"}, "high_risk_requires_step_up": {"condition": {"risk_score_gt": 0.75, "step_up_completed": false}, "description": "High-risk authentication requires step-up.", "effect": {"decision": "deny", "reason": "step_up_required", "required_action": "complete_step_up_challenge"}, "name": "high_risk_requires_step_up"}, "low_trust_device_requires_review": {"condition": {"device_review_recorded": false, "device_trust_score_lt": 0.4}, "description": "Low-trust devices require additional review.", "effect": {"decision": "require_review", "reason": "low_trust_device_review_required", "required_action": "review_device_trust"}, "name": "low_trust_device_requires_review"}, "recovery_requires_verified_channel": {"condition": {"operation": "recover_account", "verified_recovery_channel": false}, "description": "Account recovery requires a verified channel.", "effect": {"decision": "deny", "reason": "verified_recovery_channel_required", "required_action": "verify_recovery_channel"}, "name": "recovery_requires_verified_channel"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All MFA operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.mfau": {"file": "capability_contract.py", "id": "capability.mfau", "kind": "capability", "name": "Multi-Factor Authentication", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("mfau_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "mfau",
+			"version": "1.0.0",
+			"description": "Multi-Factor Authentication package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"mfau": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"mfau": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["mfau_operations"],
+				"requires": ["auth", "secu", "encr"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"admin_recovery": "AdminApproval",
+					"external_risk_signal": "RiskReview",
+					"low_trust_device": "DeviceTrustReview",
+					"active_method_limit": "SecurityReview",
+					"policy_change": "AuditEvidence",
+				},
+				"mfa_lifecycle": {
+					"profile": "MFAUserProfile",
+					"method": "MFAMethod",
+					"device": "TrustedDevice",
+					"risk": "RiskAssessment",
+					"challenge": "MFAChallenge",
+					"recovery": "AccountRecovery",
+					"backup_codes": "BackupCodeSet",
+					"policy": "MFAPolicy",
+					"audit": "MFAAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"mfau": {
+				"id": "mfau",
+				"configuration": contract["configuration"],
+				"provides": ["mfau_operations"],
+				"requires": ["auth", "secu", "encr"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"mfau": ["auth", "secu", "encr"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 3},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "mfa_runtime.py", "service.py", "api.py", "views.py"],
+		"symbols": {
+			"capability.mfau": {
+				"id": "capability.mfau",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +149,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("mfau", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "mfau" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("MFAU semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("MFAU semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("MFAU adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "mfa_runtime.MfauService":
+		errors.append("MFAU generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
