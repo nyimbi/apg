@@ -69,6 +69,37 @@ class HelpArticle:
 
 
 @dataclass(slots=True)
+class HelpSource:
+	"""Approved source reference for help content."""
+
+	id: str
+	tenant_id: str
+	title: str
+	uri: str
+	owner_id: str
+	approved: bool = False
+	approved_by: str | None = None
+	visibility: ContentVisibility = ContentVisibility.INTERNAL
+	created_at: str = field(default_factory=utc_now_iso)
+	approved_at: str | None = None
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "source",
+			"tenant_id": self.tenant_id,
+			"title": self.title,
+			"uri": self.uri,
+			"owner_id": self.owner_id,
+			"approved": self.approved,
+			"approved_by": self.approved_by,
+			"visibility": self.visibility.value,
+			"created_at": self.created_at,
+			"approved_at": self.approved_at,
+		}
+
+
+@dataclass(slots=True)
 class HelpCitation:
 	"""Citation linking an answer back to an approved article."""
 
@@ -114,6 +145,41 @@ class HelpAnswer:
 
 
 @dataclass(slots=True)
+class HelpLocalization:
+	"""Localized article variant with translation ownership."""
+
+	id: str
+	tenant_id: str
+	article_id: str
+	locale: str
+	source_locale: str
+	title: str
+	body: str
+	translator_id: str
+	fallback_locale: str
+	status: str = "draft"
+	created_at: str = field(default_factory=utc_now_iso)
+	updated_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "localization",
+			"tenant_id": self.tenant_id,
+			"article_id": self.article_id,
+			"locale": self.locale,
+			"source_locale": self.source_locale,
+			"title": self.title,
+			"body": self.body,
+			"translator_id": self.translator_id,
+			"fallback_locale": self.fallback_locale,
+			"status": self.status,
+			"created_at": self.created_at,
+			"updated_at": self.updated_at,
+		}
+
+
+@dataclass(slots=True)
 class HelpFeedback:
 	"""User feedback for an article or answer."""
 
@@ -154,6 +220,7 @@ class HelpCurationItem:
 	reason: str
 	status: str = "open"
 	reviewer_id: str | None = None
+	evidence: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now_iso)
 	closed_at: str | None = None
 
@@ -166,6 +233,34 @@ class HelpCurationItem:
 			"reason": self.reason,
 			"status": self.status,
 			"reviewer_id": self.reviewer_id,
+			"evidence": list(self.evidence),
 			"created_at": self.created_at,
 			"closed_at": self.closed_at,
+		}
+
+
+@dataclass(slots=True)
+class HelpAuditEvent:
+	"""Audit event emitted by dependency-light HELP runtime operations."""
+
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	actor: str
+	severity: str = "low"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "audit_event",
+			"tenant_id": self.tenant_id,
+			"event_type": self.event_type,
+			"subject_id": self.subject_id,
+			"message": self.message,
+			"actor": self.actor,
+			"severity": self.severity,
+			"created_at": self.created_at,
 		}

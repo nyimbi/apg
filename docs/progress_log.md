@@ -16,6 +16,57 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 11:31 EAT
+
+HELP help-and-knowledge-base lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Expanded `capability_contract.py` with content, sources, answers, search,
+  feedback, localization, governance, observability, adapter, UI, theme, and
+  Bytewax event-stream configuration.
+- Expanded deterministic rules to cover tenant context, source owner/URI/
+  approval, article owner/title/body/publication/audit/freshness, answer query/
+  citation/confidence/unsafe-answer controls, search query/query logging/RBAC,
+  feedback user/rating/review, localization locale/translator/fallback,
+  curation reviewer/evidence, state-change audit, cross-tenant access, and
+  Bytewax batch mutation enforcement.
+- Added executable `HelpSource`, `HelpLocalization`, and `HelpAuditEvent`
+  models plus `HelpService` source registration/approval, article localization,
+  curation closure, audit event, and expanded dashboard/list support.
+- Updated API helpers, view models, registration metadata, permissions, and
+  generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) to match the expanded
+  contract.
+- Focused review cleanup: preserved require-review behavior for low-risk review
+  states while keeping publication freshness and curation evidence as enforced
+  runtime guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/help/__init__.py
+  capabilities/common/help/capability_contract.py capabilities/common/help/models.py
+  capabilities/common/help/help_runtime.py capabilities/common/help/service.py
+  capabilities/common/help/api.py capabilities/common/help/views.py
+  capabilities/common/help/app.py
+  capabilities/common/help/test_capability_contract.py
+  capabilities/common/help/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/help/test_capability_contract.py
+  capabilities/common/help/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.help import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/help --json` passed with `help` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/help --json`
+  passed with `side_effect_free: true` and no warnings.
+- Not run: full repository pytest suite, live RAG inference, live external
+  search index, production database, identity/notification/chat/audit provider
+  calls, live Bytewax topology, rendered browser UI, and performance/resilience
+  benchmarks.
+
 ### 2026-05-30 11:10 EAT
 
 VIDC video-conferencing lifecycle/guardrail packet:

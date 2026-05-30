@@ -16,7 +16,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "help",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware help center, articles, assisted answers, ticket deflection, curation, and support analytics",
+	"description": "Tenant-aware help center, source registry, knowledge articles, cited answers, localization, curation, audit, and support analytics",
 	"category": "collaboration_communication",
 	"subcategory": "help_knowledge_base",
 	"vendor": "Datacraft",
@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["help_center", "knowledge_articles", "assisted_answers", "content_curation", "support_analytics"],
-	"permissions": ["help:view", "help:ask", "help:edit_articles", "help:publish", "help:admin"]
+	"provides": ["help_center", "source_registry", "knowledge_articles", "assisted_answers", "article_localization", "content_curation", "support_analytics"],
+	"permissions": ["help:view", "help:ask", "help:edit_articles", "help:publish", "help:audit", "help:admin"]
 }
 
 
@@ -39,24 +39,29 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "chat", "ntfy"],
+		"optional_dependencies": ["auth", "audl", "chat", "ntfy", "them"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"help_center": "Expose tenant-scoped help center navigation and search",
+			"source_registry": "Register and approve governed source references for help content",
 			"knowledge_articles": "Create, curate, localize, and publish knowledge articles",
 			"assisted_answers": "Generate cited answers from approved help sources",
+			"article_localization": "Manage translated article variants with fallback locale controls",
 			"content_curation": "Review article quality, feedback, freshness, and ownership",
 			"capability_rules": "Evaluate deterministic help-center governance rules",
 			"visual_theming": "Apply support-knowledge theme tokens and components"
 		},
 		"endpoints": {
+			"sources": "/help/api/v1/sources",
 			"articles": "/help/api/v1/articles",
 			"search": "/help/api/v1/search",
 			"answers": "/help/api/v1/answers",
 			"feedback": "/help/api/v1/feedback",
-			"curation": "/help/api/v1/curation"
+			"localization": "/help/api/v1/localization",
+			"curation": "/help/api/v1/curation",
+			"audit": "/help/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],

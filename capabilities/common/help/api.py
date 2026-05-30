@@ -23,6 +23,25 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def register_source(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_source(
+		source_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		title=str(payload["title"]),
+		uri=str(payload["uri"]),
+		owner_id=str(payload["owner_id"]),
+		visibility=str(payload.get("visibility") or "internal"),
+	)
+
+
+def approve_source(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.approve_source(
+		source_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		approver_id=str(payload["approver_id"]),
+	)
+
+
 def create_article(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_article(
 		article_id=str(payload["id"]),
@@ -34,6 +53,7 @@ def create_article(payload: dict[str, Any]) -> dict[str, Any]:
 		locale=str(payload.get("locale") or "en"),
 		visibility=str(payload.get("visibility") or "internal"),
 		source_ids=list(payload.get("source_ids") or []),
+		source_approval_recorded=bool(payload.get("source_approval_recorded", True)),
 	)
 
 
@@ -85,6 +105,29 @@ def record_feedback(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def localize_article(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.localize_article(
+		localization_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		article_id=str(payload["article_id"]),
+		locale=str(payload["locale"]),
+		title=str(payload["title"]),
+		body=str(payload["body"]),
+		translator_id=str(payload["translator_id"]),
+		source_locale=str(payload.get("source_locale") or "en"),
+		fallback_locale=str(payload.get("fallback_locale") or "en"),
+	)
+
+
+def close_curation_item(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.close_curation_item(
+		curation_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		reviewer_id=str(payload["reviewer_id"]),
+		evidence=[str(item) for item in payload.get("evidence", [])],
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -96,6 +139,19 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def help_state(tenant_id: str = "default") -> dict[str, Any]:
+	return {
+		"sources": SERVICE.list_sources(tenant_id),
+		"articles": SERVICE.list_articles(tenant_id),
+		"answers": SERVICE.list_answers(tenant_id),
+		"feedback": SERVICE.list_feedback(tenant_id),
+		"localizations": SERVICE.list_localizations(tenant_id),
+		"curation": SERVICE.list_curation_items(tenant_id),
+		"audit_events": SERVICE.list_audit_events(tenant_id),
+		"summary": SERVICE.dashboard_summary(tenant_id),
+	}
 
 
 def dashboard_summary(tenant_id: str | None = None) -> dict[str, Any]:
