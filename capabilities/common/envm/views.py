@@ -27,6 +27,7 @@ def dashboard_model(
 		"promotion_runs": service.list_promotion_runs(tenant_id),
 		"drift_reports": service.list_drift_reports(tenant_id),
 		"secret_scopes": service.list_secret_scopes(tenant_id),
+		"envm_agents": service.list_envm_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -57,4 +58,16 @@ def drift_dashboard_model(service: EnvmService, tenant_id: str = "default") -> d
 			report for report in service.list_drift_reports(tenant_id)
 			if report["status"] == "review_required"
 		],
+	}
+
+
+def envm_agent_model(service: EnvmService, tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"envm_agents": service.list_envm_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["envm_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["envm_agents"]["allowed_roles"],
+		"route": "/envm/agents",
+		"permissions": ["envm:view", "envm:govern"],
 	}

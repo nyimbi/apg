@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	SUPPORTED_ENVM_AGENT_ROLES,
+	SUPPORTED_ENVM_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .environment_engine import EnvironmentEngine
-from .models import DriftReport, EnvmAuditEvent, EnvironmentDefinition, PromotionPath, PromotionRun, SecretScope
+from .models import DriftReport, EnvmAgent, EnvmAuditEvent, EnvironmentDefinition, PromotionPath, PromotionRun, SecretScope
 
 
 class EnvmService:
@@ -18,6 +24,7 @@ class EnvmService:
 		self._promotion_runs: dict[str, PromotionRun] = {}
 		self._drift_reports: dict[str, DriftReport] = {}
 		self._secret_scopes: dict[str, SecretScope] = {}
+		self._agents: dict[str, EnvmAgent] = {}
 		self._audit_events: dict[str, EnvmAuditEvent] = {}
 		self._engine = EnvironmentEngine()
 
@@ -46,17 +53,14 @@ class EnvmService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_environment",
 			"environment_owner_assigned": bool(owner),
+			"region_policy_present": bool(region),
+			"configuration_source_present": bool(configuration_source),
+			"rbac_policy_present": bool(rbac_policy),
 			"environment": stage,
 			"approval_recorded": bool(approval_recorded),
 		})
 		self._raise_if_denied(result)
 		self._require_stage(stage)
-		if not region:
-			raise PermissionError("region_policy_required")
-		if not configuration_source:
-			raise PermissionError("configuration_source_required")
-		if not rbac_policy:
-			raise PermissionError("rbac_policy_required")
 		if not secret_scope_policy:
 			raise PermissionError("secret_scope_policy_required")
 		fingerprint = self._engine.environment_fingerprint({
@@ -155,7 +159,8 @@ class EnvmService:
 		target = self._require_environment(path.target_environment_id, tenant_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
-			"operation": "promote",
+			"operation": "run_promotion",
+			"artifact_reference_present": bool(artifact_ref),
 			"promotion_path_attached": True,
 			"environment": target.stage,
 			"approval_recorded": bool(approval_recorded),
@@ -163,8 +168,6 @@ class EnvmService:
 		self._raise_if_denied(result)
 		if path.status == "blocked":
 			raise PermissionError("promotion_path_blocked")
-		if not artifact_ref:
-			raise PermissionError("deployment_link_required")
 		run = PromotionRun(
 			id=run_id,
 			tenant_id=tenant_id,
@@ -241,12 +244,10 @@ class EnvmService:
 			"tenant_context_present": bool(tenant_id),
 			"secret_scope_present": True,
 			"secret_policy_attached": bool(secret_policy_attached and policy_ref),
+			"secret_references_present": bool(secret_refs),
+			"access_roles_present": bool(access_roles),
 		})
 		self._raise_if_denied(result)
-		if not secret_refs:
-			raise PermissionError("secret_references_required")
-		if not access_roles:
-			raise PermissionError("access_roles_required")
 		scope = SecretScope(
 			id=scope_id,
 			tenant_id=tenant_id,
@@ -274,6 +275,49 @@ class EnvmService:
 
 	def list_secret_scopes(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._secret_scopes, tenant_id)
+
+	def register_envm_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"envm_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": _normalize_token(runtime) in SUPPORTED_ENVM_AGENT_RUNTIMES,
+			"agent_role_supported": _normalize_token(role) in SUPPORTED_ENVM_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		agent = EnvmAgent(
+			id=agent_id or f"envm-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=_normalize_token(runtime),
+			role=_normalize_token(role),
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+		)
+		self._agents[agent.id] = agent
+		self._record_audit(tenant_id, agent.id, "envm_agent_registered", name, result["decision"], metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def list_envm_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def validate_batch_environment_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_environment_mutation",
+			"event_stream": event_stream,
+		})
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
@@ -316,7 +360,9 @@ class EnvmService:
 			"drift_report_count": len(drifts),
 			"review_required_drift_count": len([item for item in drifts if item["status"] == "review_required"]),
 			"secret_scope_count": len(self.list_secret_scopes(tenant_id)),
+			"envm_agent_count": len(self.list_envm_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _list(self, values: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -369,3 +415,7 @@ class EnvmService:
 		if result["decision"] == "deny":
 			reasons = ", ".join(action.get("reason", "envm_policy_blocked") for action in result["actions"])
 			raise PermissionError(reasons or "envm_policy_blocked")
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")

@@ -90,6 +90,22 @@ def register_secret_scope(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_envm_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_envm_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=payload.get("id"),
+	)
+
+
+def validate_batch_environment_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_environment_mutation(event_stream)
+
+
 def list_environments(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_environments(tenant_id)
 
@@ -108,6 +124,10 @@ def list_drift_reports(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_secret_scopes(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_secret_scopes(tenant_id)
+
+
+def list_envm_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_envm_agents(tenant_id)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:

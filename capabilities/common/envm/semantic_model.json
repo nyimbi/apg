@@ -12,29 +12,85 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "deployment": "depl",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.EnvmService",
+          "identity": "auth",
+          "monitoring": "moni",
+          "secrets": "keym",
+          "view_models": "views.py"
+        },
         "drift": {
           "configuration_source_required": true,
           "drift_detection_enabled": true,
           "drift_threshold_percent": 5,
-          "remediation_supported": true
+          "remediation_supported": true,
+          "review_required_above_threshold": true
         },
         "environments": {
+          "configuration_source_required": true,
           "environment_owner_required": true,
           "production_locked_by_default": true,
           "region_policy_required": true,
-          "stage_policy_required": true
+          "stage_policy_required": true,
+          "supported_stages": [
+            "development",
+            "test",
+            "staging",
+            "production"
+          ]
+        },
+        "envm_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "environment_reviewer",
+            "promotion_reviewer",
+            "drift_reviewer",
+            "secret_scope_reviewer",
+            "policy_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "governance": {
           "audit_environment_changes": true,
+          "batch_event_stream": "bytewax",
           "rbac_policy_required": true,
           "require_tenant_context": true,
           "secret_scope_policy_required": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "drift_metrics_required": true,
+          "event_stream": "bytewax",
+          "promotion_metrics_required": true
+        },
         "promotion": {
           "approval_required": true,
+          "artifact_reference_required": true,
           "deployment_link_required": true,
           "promotion_path_required": true,
           "rollback_environment_required": true
+        },
+        "secrets": {
+          "access_roles_required": true,
+          "provider": "keym",
+          "secret_references_required": true,
+          "secret_scope_policy_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -42,9 +98,13 @@
           "default_theme": "envm_environment_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_drift_dashboard": true,
           "enable_environment_inventory": true,
           "enable_promotion_console": true,
+          "enable_rules": true,
           "enable_secret_scope_manager": true
         }
       },
@@ -55,9 +115,21 @@
       "master_data": {},
       "name": "Environment Management",
       "provides": [
-        "envm_operations"
+        "environment_inventory",
+        "environment_promotion",
+        "configuration_drift",
+        "secret_scopes",
+        "environment_policy",
+        "envm_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "conf",
+        "audl",
+        "depl",
+        "keym",
+        "moni"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +159,45 @@
           },
           {
             "condition": {
+              "operation": "create_environment",
+              "region_policy_present": false
+            },
+            "description": "Environments require region policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "region_policy_required",
+              "required_action": "attach_region_policy"
+            },
+            "name": "environment_requires_region_policy"
+          },
+          {
+            "condition": {
+              "configuration_source_present": false,
+              "operation": "create_environment"
+            },
+            "description": "Environments require declared configuration source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "configuration_source_required",
+              "required_action": "attach_configuration_source"
+            },
+            "name": "environment_requires_configuration_source"
+          },
+          {
+            "condition": {
+              "operation": "create_environment",
+              "rbac_policy_present": false
+            },
+            "description": "Environments require RBAC policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rbac_policy_required",
+              "required_action": "attach_rbac_policy"
+            },
+            "name": "environment_requires_rbac_policy"
+          },
+          {
+            "condition": {
               "approval_recorded": false,
               "environment": "production"
             },
@@ -113,6 +224,19 @@
           },
           {
             "condition": {
+              "artifact_reference_present": false,
+              "operation": "run_promotion"
+            },
+            "description": "Promotion requires artifact reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_reference_required",
+              "required_action": "attach_artifact_reference"
+            },
+            "name": "promotion_requires_artifact_reference"
+          },
+          {
+            "condition": {
               "secret_policy_attached": false,
               "secret_scope_present": true
             },
@@ -126,6 +250,32 @@
           },
           {
             "condition": {
+              "secret_references_present": false,
+              "secret_scope_present": true
+            },
+            "description": "Environment secret scopes require secret references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secret_references_required",
+              "required_action": "attach_secret_references"
+            },
+            "name": "secret_scope_requires_references"
+          },
+          {
+            "condition": {
+              "access_roles_present": false,
+              "secret_scope_present": true
+            },
+            "description": "Environment secret scopes require access roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_roles_required",
+              "required_action": "attach_access_roles"
+            },
+            "name": "secret_scope_requires_access_roles"
+          },
+          {
+            "condition": {
               "drift_percent_gt": 5,
               "drift_review_recorded": false
             },
@@ -136,6 +286,97 @@
               "required_action": "review_drift"
             },
             "name": "high_drift_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "envm_agent_present": true
+            },
+            "description": "AI environment agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envm_agent_registration_required",
+              "required_action": "register_envm_agent"
+            },
+            "name": "envm_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "envm_agent_present": true
+            },
+            "description": "AI environment agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envm_agent_runtime_not_supported",
+              "required_action": "choose_supported_envm_agent_runtime"
+            },
+            "name": "envm_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "envm_agent_present": true
+            },
+            "description": "AI environment agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envm_agent_role_not_supported",
+              "required_action": "choose_supported_envm_agent_role"
+            },
+            "name": "envm_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "envm_agent_present": true
+            },
+            "description": "AI environment agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envm_agent_scope_required",
+              "required_action": "set_envm_agent_scope"
+            },
+            "name": "envm_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "envm_agent_present": true
+            },
+            "description": "AI environment-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envm_agent_disclosure_required",
+              "required_action": "disclose_envm_agent"
+            },
+            "name": "envm_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Environment lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "environment_audit_event_required",
+              "required_action": "record_environment_audit_event"
+            },
+            "name": "environment_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_environment_mutation"
+            },
+            "description": "Batch environment mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_environment_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +409,45 @@
         },
         {
           "condition": {
+            "operation": "create_environment",
+            "region_policy_present": false
+          },
+          "description": "Environments require region policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "region_policy_required",
+            "required_action": "attach_region_policy"
+          },
+          "name": "environment_requires_region_policy"
+        },
+        {
+          "condition": {
+            "configuration_source_present": false,
+            "operation": "create_environment"
+          },
+          "description": "Environments require declared configuration source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "configuration_source_required",
+            "required_action": "attach_configuration_source"
+          },
+          "name": "environment_requires_configuration_source"
+        },
+        {
+          "condition": {
+            "operation": "create_environment",
+            "rbac_policy_present": false
+          },
+          "description": "Environments require RBAC policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rbac_policy_required",
+            "required_action": "attach_rbac_policy"
+          },
+          "name": "environment_requires_rbac_policy"
+        },
+        {
+          "condition": {
             "approval_recorded": false,
             "environment": "production"
           },
@@ -194,6 +474,19 @@
         },
         {
           "condition": {
+            "artifact_reference_present": false,
+            "operation": "run_promotion"
+          },
+          "description": "Promotion requires artifact reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_reference_required",
+            "required_action": "attach_artifact_reference"
+          },
+          "name": "promotion_requires_artifact_reference"
+        },
+        {
+          "condition": {
             "secret_policy_attached": false,
             "secret_scope_present": true
           },
@@ -207,6 +500,32 @@
         },
         {
           "condition": {
+            "secret_references_present": false,
+            "secret_scope_present": true
+          },
+          "description": "Environment secret scopes require secret references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secret_references_required",
+            "required_action": "attach_secret_references"
+          },
+          "name": "secret_scope_requires_references"
+        },
+        {
+          "condition": {
+            "access_roles_present": false,
+            "secret_scope_present": true
+          },
+          "description": "Environment secret scopes require access roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_roles_required",
+            "required_action": "attach_access_roles"
+          },
+          "name": "secret_scope_requires_access_roles"
+        },
+        {
+          "condition": {
             "drift_percent_gt": 5,
             "drift_review_recorded": false
           },
@@ -217,6 +536,97 @@
             "required_action": "review_drift"
           },
           "name": "high_drift_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "envm_agent_present": true
+          },
+          "description": "AI environment agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envm_agent_registration_required",
+            "required_action": "register_envm_agent"
+          },
+          "name": "envm_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "envm_agent_present": true
+          },
+          "description": "AI environment agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envm_agent_runtime_not_supported",
+            "required_action": "choose_supported_envm_agent_runtime"
+          },
+          "name": "envm_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "envm_agent_present": true
+          },
+          "description": "AI environment agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envm_agent_role_not_supported",
+            "required_action": "choose_supported_envm_agent_role"
+          },
+          "name": "envm_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "envm_agent_present": true
+          },
+          "description": "AI environment agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envm_agent_scope_required",
+            "required_action": "set_envm_agent_scope"
+          },
+          "name": "envm_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "envm_agent_present": true
+          },
+          "description": "AI environment-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envm_agent_disclosure_required",
+            "required_action": "disclose_envm_agent"
+          },
+          "name": "envm_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Environment lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "environment_audit_event_required",
+            "required_action": "record_environment_audit_event"
+          },
+          "name": "environment_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_environment_mutation"
+          },
+          "description": "Batch environment mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_environment_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,13 +636,23 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "EnvmAgentPanel",
+          "permission": "envm:govern",
+          "route": "/envm/agents"
+        },
         "analytics": {
           "component": "EnvironmentAnalytics",
           "permission": "envm:view",
           "route": "/envm/analytics"
         },
+        "audit": {
+          "component": "EnvironmentAudit",
+          "permission": "envm:view",
+          "route": "/envm/audit"
+        },
         "dashboard": {
-          "component": "ENVMDashboard",
+          "component": "EnvmDashboard",
           "permission": "envm:view",
           "route": "/envm/dashboard"
         },
@@ -256,20 +676,50 @@
           "permission": "envm:promote",
           "route": "/envm/promotion"
         },
+        "rules": {
+          "component": "EnvmRules",
+          "permission": "envm:govern",
+          "route": "/envm/rules"
+        },
         "secrets": {
           "component": "SecretScopes",
           "permission": "envm:manage_secrets",
           "route": "/envm/secrets"
         },
         "settings": {
-          "component": "ENVMSettings",
+          "component": "EnvmSettings",
           "permission": "envm:admin",
           "route": "/envm/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_environment_mutation_requires_bytewax",
+        "events": [
+          "environment_registered",
+          "promotion_path_created",
+          "environment_promoted",
+          "drift_recorded",
+          "secret_scope_registered",
+          "envm_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "environments",
+          "promotion_paths",
+          "promotion_runs",
+          "drift_reports",
+          "secret_scopes",
+          "envm_agents",
+          "audit_events"
+        ],
+        "topic": "apg.envm.lifecycle"
+      },
       "theme": {
         "components": {
+          "audit": {
+            "status_style": "decision-chip",
+            "visual": "event-ledger"
+          },
           "drift_dashboard": {
             "status_style": "drift-chip",
             "visual": "diff-summary"
@@ -279,6 +729,10 @@
             "risk_style": "policy-band",
             "status_indicator": "stage-pill"
           },
+          "envm_agent_panel": {
+            "icon": "bot",
+            "status_indicator": "scope-chip"
+          },
           "promotion_flow": {
             "highlight": "approval-chip",
             "visual": "stage-pipeline"
@@ -286,12 +740,16 @@
           "secret_scope": {
             "status_style": "access-chip",
             "visual": "scope-list"
+          },
+          "stream_health": {
+            "status_style": "stream-chip",
+            "visual": "event-lane"
           }
         },
         "name": "envm_environment_ops",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#805AD5",
+          "color.accent": "#2A9D8F",
           "color.danger": "#C53030",
           "color.primary": "#28536B",
           "color.success": "#2F855A",
@@ -308,7 +766,7 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "ENVMDashboard",
+            "component": "EnvmDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/envm/dashboard",
@@ -343,11 +801,25 @@
             "permission": "envm:manage_secrets"
           },
           {
+            "component": "EnvmAgentPanel",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/envm/agents",
+            "permission": "envm:govern"
+          },
+          {
             "component": "EnvironmentPolicies",
             "name": "policies",
             "nav_group": "Governance",
             "path": "/envm/policies",
             "permission": "envm:admin"
+          },
+          {
+            "component": "EnvmRules",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/envm/rules",
+            "permission": "envm:govern"
           },
           {
             "component": "EnvironmentAnalytics",
@@ -357,7 +829,14 @@
             "permission": "envm:view"
           },
           {
-            "component": "ENVMSettings",
+            "component": "EnvironmentAudit",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/envm/audit",
+            "permission": "envm:view"
+          },
+          {
+            "component": "EnvmSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/envm/settings",
@@ -377,35 +856,98 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "envm": []
+      "envm": [
+        "auth",
+        "conf",
+        "audl",
+        "depl",
+        "keym",
+        "moni"
+      ]
     }
   },
   "contracts": {
     "envm": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "deployment": "depl",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.EnvmService",
+          "identity": "auth",
+          "monitoring": "moni",
+          "secrets": "keym",
+          "view_models": "views.py"
+        },
         "drift": {
           "configuration_source_required": true,
           "drift_detection_enabled": true,
           "drift_threshold_percent": 5,
-          "remediation_supported": true
+          "remediation_supported": true,
+          "review_required_above_threshold": true
         },
         "environments": {
+          "configuration_source_required": true,
           "environment_owner_required": true,
           "production_locked_by_default": true,
           "region_policy_required": true,
-          "stage_policy_required": true
+          "stage_policy_required": true,
+          "supported_stages": [
+            "development",
+            "test",
+            "staging",
+            "production"
+          ]
+        },
+        "envm_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "environment_reviewer",
+            "promotion_reviewer",
+            "drift_reviewer",
+            "secret_scope_reviewer",
+            "policy_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "governance": {
           "audit_environment_changes": true,
+          "batch_event_stream": "bytewax",
           "rbac_policy_required": true,
           "require_tenant_context": true,
           "secret_scope_policy_required": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "drift_metrics_required": true,
+          "event_stream": "bytewax",
+          "promotion_metrics_required": true
+        },
         "promotion": {
           "approval_required": true,
+          "artifact_reference_required": true,
           "deployment_link_required": true,
           "promotion_path_required": true,
           "rollback_environment_required": true
+        },
+        "secrets": {
+          "access_roles_required": true,
+          "provider": "keym",
+          "secret_references_required": true,
+          "secret_scope_policy_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -413,17 +955,33 @@
           "default_theme": "envm_environment_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_drift_dashboard": true,
           "enable_environment_inventory": true,
           "enable_promotion_console": true,
+          "enable_rules": true,
           "enable_secret_scope_manager": true
         }
       },
       "id": "envm",
       "provides": [
-        "envm_operations"
+        "environment_inventory",
+        "environment_promotion",
+        "configuration_drift",
+        "secret_scopes",
+        "environment_policy",
+        "envm_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "conf",
+        "audl",
+        "depl",
+        "keym",
+        "moni"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +993,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +1014,32 @@
   },
   "roles": {},
   "rules": {
+    "batch_environment_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_environment_mutation"
+      },
+      "description": "Batch environment mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_environment_mutation_requires_bytewax"
+    },
+    "environment_requires_configuration_source": {
+      "condition": {
+        "configuration_source_present": false,
+        "operation": "create_environment"
+      },
+      "description": "Environments require declared configuration source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "configuration_source_required",
+        "required_action": "attach_configuration_source"
+      },
+      "name": "environment_requires_configuration_source"
+    },
     "environment_requires_owner": {
       "condition": {
         "environment_owner_assigned": false,
@@ -468,6 +1052,110 @@
         "required_action": "assign_environment_owner"
       },
       "name": "environment_requires_owner"
+    },
+    "environment_requires_rbac_policy": {
+      "condition": {
+        "operation": "create_environment",
+        "rbac_policy_present": false
+      },
+      "description": "Environments require RBAC policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rbac_policy_required",
+        "required_action": "attach_rbac_policy"
+      },
+      "name": "environment_requires_rbac_policy"
+    },
+    "environment_requires_region_policy": {
+      "condition": {
+        "operation": "create_environment",
+        "region_policy_present": false
+      },
+      "description": "Environments require region policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "region_policy_required",
+        "required_action": "attach_region_policy"
+      },
+      "name": "environment_requires_region_policy"
+    },
+    "environment_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Environment lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "environment_audit_event_required",
+        "required_action": "record_environment_audit_event"
+      },
+      "name": "environment_state_change_requires_audit"
+    },
+    "envm_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "envm_agent_present": true
+      },
+      "description": "AI environment-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envm_agent_disclosure_required",
+        "required_action": "disclose_envm_agent"
+      },
+      "name": "envm_agent_requires_disclosure"
+    },
+    "envm_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "envm_agent_present": true
+      },
+      "description": "AI environment agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envm_agent_registration_required",
+        "required_action": "register_envm_agent"
+      },
+      "name": "envm_agent_requires_registration"
+    },
+    "envm_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "envm_agent_present": true
+      },
+      "description": "AI environment agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envm_agent_scope_required",
+        "required_action": "set_envm_agent_scope"
+      },
+      "name": "envm_agent_requires_scope"
+    },
+    "envm_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "envm_agent_present": true
+      },
+      "description": "AI environment agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envm_agent_role_not_supported",
+        "required_action": "choose_supported_envm_agent_role"
+      },
+      "name": "envm_agent_role_supported"
+    },
+    "envm_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "envm_agent_present": true
+      },
+      "description": "AI environment agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envm_agent_runtime_not_supported",
+        "required_action": "choose_supported_envm_agent_runtime"
+      },
+      "name": "envm_agent_runtime_supported"
     },
     "high_drift_requires_review": {
       "condition": {
@@ -495,6 +1183,19 @@
       },
       "name": "production_change_requires_approval"
     },
+    "promotion_requires_artifact_reference": {
+      "condition": {
+        "artifact_reference_present": false,
+        "operation": "run_promotion"
+      },
+      "description": "Promotion requires artifact reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_reference_required",
+        "required_action": "attach_artifact_reference"
+      },
+      "name": "promotion_requires_artifact_reference"
+    },
     "promotion_requires_path": {
       "condition": {
         "operation": "promote",
@@ -508,6 +1209,19 @@
       },
       "name": "promotion_requires_path"
     },
+    "secret_scope_requires_access_roles": {
+      "condition": {
+        "access_roles_present": false,
+        "secret_scope_present": true
+      },
+      "description": "Environment secret scopes require access roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_roles_required",
+        "required_action": "attach_access_roles"
+      },
+      "name": "secret_scope_requires_access_roles"
+    },
     "secret_scope_requires_policy": {
       "condition": {
         "secret_policy_attached": false,
@@ -520,6 +1234,19 @@
         "required_action": "attach_secret_policy"
       },
       "name": "secret_scope_requires_policy"
+    },
+    "secret_scope_requires_references": {
+      "condition": {
+        "secret_references_present": false,
+        "secret_scope_present": true
+      },
+      "description": "Environment secret scopes require secret references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secret_references_required",
+        "required_action": "attach_secret_references"
+      },
+      "name": "secret_scope_requires_references"
     },
     "tenant_context_required": {
       "condition": {

@@ -16,6 +16,75 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 19:07 EAT
+
+Common ENVM environment-management lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the ENVM
+  capability, and replaced `cap_spec.md` with a pointer to the active packet
+  specification.
+- Expanded `capability_contract.py` with ENVM-agent, environment, promotion,
+  drift, secret, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, environment owner, region
+  policy, configuration source, RBAC policy, production approval, promotion
+  path, promotion artifact reference, secret-scope policy, secret references,
+  access roles, drift review, ENVM-agent registration/runtime/role/scope/
+  disclosure, audit-backed state changes, and Bytewax batch environment
+  mutation.
+- Added `EnvmAgent` model support and extended `EnvmService` with ENVM-agent
+  registration, listing, dashboard counts, normalized runtime/role tokens, and
+  batch mutation validation.
+- Extended API helpers and view models with ENVM-agent and batch mutation
+  surfaces.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract, service, agent model, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded `test_capability_contract.py` for focused contract, rule, service,
+  API/view, agent, Bytewax, app, semantic evidence, and documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/envm/__init__.py
+  capabilities/common/envm/capability_contract.py
+  capabilities/common/envm/models.py capabilities/common/envm/service.py
+  capabilities/common/envm/api.py capabilities/common/envm/views.py
+  capabilities/common/envm/app.py
+  capabilities/common/envm/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/envm/test_capability_contract.py`
+  passed with 7 tests and only pre-existing adjacent SQLAlchemy/Pydantic
+  deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.envm import EnvmService;
+  service = EnvmService(); service.register_envm_agent('tenant-proof',
+  'Proof agent', 'codex', 'drift_reviewer', 'review drift');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  ENVM-agent registration plus Bytewax stream metadata in the lifecycle summary.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.envm.streaming.processor,
+  .capabilities.envm.configuration.envm_agents.supported_runtimes,
+  .capabilities.envm.screens.agents.route,
+  (.capabilities.envm.rules[] |
+  select(.name=="envm_agent_runtime_supported") | .effect.reason),
+  (.capabilities.envm.rules[] |
+  select(.name=="batch_environment_mutation_requires_bytewax") |
+  .effect.reason)' capabilities/common/envm/semantic_model.json` confirmed
+  `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, `/envm/agents`,
+  `envm_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/envm --json` passed with `envm` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/envm --json`
+  passed with `side_effect_free: true` and no warnings.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/envm docs/progress_log.md` passed.
+- Not run: live deployment provider integration, durable configuration stores,
+  secret vault calls, runtime identity enforcement beyond metadata contracts,
+  live Bytewax topology, rendered browser UI, performance checks, and full
+  repository tests.
+
 ### 2026-05-30 18:59 EAT
 
 Common EDGE edge-computing lifecycle/guardrail packet:

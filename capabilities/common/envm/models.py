@@ -149,6 +149,34 @@ class SecretScope:
 
 
 @dataclass(frozen=True)
+class EnvmAgent:
+	"""Registered AI agent allowed to assist environment operations."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = True
+	status: str = "active"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
 class EnvmAuditEvent:
 	"""Governance event emitted by environment-management operations."""
 
