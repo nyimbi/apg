@@ -8,15 +8,123 @@
   },
   "capabilities": {
     "colb": {
-      "approvals": {},
+      "adapters": {
+        "api_helpers": "package_api.py",
+        "audit_sink": "audl",
+        "authentication": "auth",
+        "cache": "cach",
+        "chat": "chat",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "collaboration_runtime.CollaborationRuntime",
+        "helper_runtime": "collaboration_runtime.py",
+        "message_bus": "mqeb",
+        "multi_tenancy": "mten",
+        "nlp": "nlpc",
+        "notification": "ntfy",
+        "production_api": "api.py",
+        "production_app": "production_app.py",
+        "production_service": "service.py",
+        "production_views": "views.py",
+        "security": "secu",
+        "video": "vidc",
+        "view_models": "view_models.py",
+        "workflow": "wflo"
+      },
+      "agent_collaboration": {
+        "agent_collaboration_enabled": true,
+        "agent_contribution_disclosure_required": true,
+        "agent_registration_required": true,
+        "agent_scope_required": true,
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "external_access_review": "ExternalAccessReview",
+        "workspace_export": "WorkspaceExportApproval",
+        "workspace_membership_review": "WorkspaceMembershipReview"
+      },
       "business_rules": [],
+      "collaboration_lifecycle": {
+        "annotation": "AnnotationRecord",
+        "artifact": "ArtifactRecord",
+        "audit": "CollaborationAuditEventRecord",
+        "decision": "DecisionRecord",
+        "presence": "PresenceRecord",
+        "session": "SessionRecord",
+        "workspace": "WorkspaceRecord"
+      },
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "package_api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "chat": "chat",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "collaboration_runtime.CollaborationRuntime",
+          "helper_runtime": "collaboration_runtime.py",
+          "message_bus": "mqeb",
+          "multi_tenancy": "mten",
+          "nlp": "nlpc",
+          "notification": "ntfy",
+          "production_api": "api.py",
+          "production_app": "production_app.py",
+          "production_service": "service.py",
+          "production_views": "views.py",
+          "security": "secu",
+          "video": "vidc",
+          "view_models": "view_models.py",
+          "workflow": "wflo"
+        },
+        "ai_agents": {
+          "agent_collaboration_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_scope_required": true,
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "annotations": {
+          "annotation_author_required": true,
+          "decision_records_enabled": true,
+          "resolution_evidence_required": true,
+          "threaded_annotations_enabled": true
+        },
+        "artifacts": {
+          "artifact_policy_required": true,
+          "external_share_dlp_required": true,
+          "lock_timeout_minutes": 30,
+          "shared_artifacts_enabled": true,
+          "version_history_required": true
+        },
         "governance": {
           "audit_collaboration_events": true,
+          "decision_evidence_required": true,
           "external_collaboration_policy_required": true,
           "require_tenant_context": true,
           "retention_policy_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "protocol_health_required": true,
+          "session_metrics_required": true,
+          "workspace_metrics_required": true
+        },
+        "presence": {
+          "cursor_presence_enabled": true,
+          "presence_required": true,
+          "presence_ttl_seconds": 90,
+          "typing_presence_enabled": true
         },
         "protocols": {
           "enabled": [
@@ -25,14 +133,30 @@
             "mqtt",
             "grpc"
           ],
+          "event_stream": "bytewax",
           "fallback_protocol_enabled": true,
           "protocol_health_required": true,
           "secure_transport_required": true
+        },
+        "retention": {
+          "default_policy": "retain-180-days",
+          "export_requires_approval": true,
+          "session_recording_retention_required": true,
+          "workspace_retention_required": true
+        },
+        "security": {
+          "audit_collaboration_events": true,
+          "authenticated_actor_required": true,
+          "external_share_dlp_required": true,
+          "secret_redaction_required": true,
+          "tenant_isolation_required": true
         },
         "sessions": {
           "conflict_resolution": "operational_transform",
           "presence_required": true,
           "realtime_sync_enabled": true,
+          "secure_transport_required": true,
+          "session_owner_required": true,
           "session_recording_supported": true
         },
         "tenant_id": "default",
@@ -41,15 +165,25 @@
           "default_theme": "colb_collaboration_workspace"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
           "enable_annotation_panel": true,
+          "enable_artifact_board": true,
+          "enable_audit": true,
+          "enable_decision_log": true,
+          "enable_presence_panel": true,
           "enable_protocol_monitor": true,
           "enable_session_console": true,
-          "enable_workspace_dashboard": true
+          "enable_settings": true,
+          "enable_workspace_dashboard": true,
+          "enable_workspace_manager": true
         },
         "workspaces": {
           "artifact_policy_required": true,
+          "external_collaboration_policy_required": true,
           "guest_access_supported": true,
           "max_participants_per_workspace": 1000,
+          "membership_review_threshold": 1000,
           "workspace_owner_required": true
         }
       },
@@ -62,7 +196,11 @@
       "provides": [
         "colb_operations"
       ],
-      "requires": [],
+      "requires": [
+        "chat",
+        "ntfy",
+        "auth"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -92,6 +230,45 @@
           },
           {
             "condition": {
+              "operation": "create_workspace",
+              "workspace_name_present": false
+            },
+            "description": "Workspaces require a readable name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_name_required",
+              "required_action": "name_workspace"
+            },
+            "name": "workspace_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "create_workspace",
+              "participant_present": false
+            },
+            "description": "Workspaces require at least one participant or owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_participant_required",
+              "required_action": "add_workspace_participant"
+            },
+            "name": "workspace_requires_participant"
+          },
+          {
+            "condition": {
+              "operation": "create_workspace",
+              "retention_policy_attached": false
+            },
+            "description": "Workspaces require retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_policy_required",
+              "required_action": "attach_retention_policy"
+            },
+            "name": "workspace_requires_retention"
+          },
+          {
+            "condition": {
               "external_participant_present": true,
               "external_policy_attached": false
             },
@@ -105,29 +282,16 @@
           },
           {
             "condition": {
-              "realtime_session": true,
-              "secure_transport": false
+              "external_access_expiry_present": false,
+              "external_participant_present": true
             },
-            "description": "Realtime protocols require secure transport.",
+            "description": "External participants require access expiry.",
             "effect": {
-              "decision": "deny",
-              "reason": "secure_transport_required",
-              "required_action": "enable_secure_transport"
+              "decision": "require_review",
+              "reason": "external_access_expiry_required",
+              "required_action": "set_external_access_expiry"
             },
-            "name": "secure_transport_required"
-          },
-          {
-            "condition": {
-              "artifact_policy_attached": false,
-              "shared_artifact_present": true
-            },
-            "description": "Shared artifacts require an artifact policy.",
-            "effect": {
-              "decision": "deny",
-              "reason": "artifact_policy_required",
-              "required_action": "attach_artifact_policy"
-            },
-            "name": "artifact_policy_required"
+            "name": "external_collaboration_requires_expiry"
           },
           {
             "condition": {
@@ -141,6 +305,369 @@
               "required_action": "review_workspace_membership"
             },
             "name": "large_workspace_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "start_session",
+              "workspace_present": false
+            },
+            "description": "Realtime sessions require a tenant-local workspace.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_required",
+              "required_action": "select_workspace"
+            },
+            "name": "session_requires_workspace"
+          },
+          {
+            "condition": {
+              "operation": "start_session",
+              "session_owner_assigned": false
+            },
+            "description": "Realtime sessions require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "session_owner_required",
+              "required_action": "assign_session_owner"
+            },
+            "name": "session_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "start_session",
+              "session_owner_is_member": false
+            },
+            "description": "Realtime session owners must belong to the workspace.",
+            "effect": {
+              "decision": "deny",
+              "reason": "session_owner_not_workspace_member",
+              "required_action": "add_session_owner_to_workspace"
+            },
+            "name": "session_owner_membership_required"
+          },
+          {
+            "condition": {
+              "operation": "start_session",
+              "workspace_active": false
+            },
+            "description": "Realtime sessions require active workspaces.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_not_active",
+              "required_action": "activate_workspace"
+            },
+            "name": "session_requires_active_workspace"
+          },
+          {
+            "condition": {
+              "realtime_session": true,
+              "secure_transport": false
+            },
+            "description": "Realtime sessions require secure transport.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secure_transport_required",
+              "required_action": "enable_secure_transport"
+            },
+            "name": "session_requires_secure_transport"
+          },
+          {
+            "condition": {
+              "protocol_health": "unhealthy",
+              "realtime_session": true
+            },
+            "description": "Realtime sessions require healthy protocols.",
+            "effect": {
+              "decision": "deny",
+              "reason": "protocol_unhealthy",
+              "required_action": "restore_or_fallback_protocol"
+            },
+            "name": "session_requires_protocol_health"
+          },
+          {
+            "condition": {
+              "event_bus_present": false,
+              "realtime_session": true
+            },
+            "description": "Realtime sessions require event bus evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_bus_required",
+              "required_action": "attach_event_bus"
+            },
+            "name": "session_requires_event_bus"
+          },
+          {
+            "condition": {
+              "operation": "join_session",
+              "participant_is_member": false
+            },
+            "description": "Session participants must belong to the workspace.",
+            "effect": {
+              "decision": "deny",
+              "reason": "participant_not_workspace_member",
+              "required_action": "add_workspace_member"
+            },
+            "name": "participant_membership_required"
+          },
+          {
+            "condition": {
+              "operation": "update_presence",
+              "session_active": false
+            },
+            "description": "Presence updates require an active collaboration session.",
+            "effect": {
+              "decision": "deny",
+              "reason": "session_not_active",
+              "required_action": "start_or_join_session"
+            },
+            "name": "presence_requires_session"
+          },
+          {
+            "condition": {
+              "operation": "update_presence",
+              "participant_is_member": false
+            },
+            "description": "Presence updates require a session participant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "presence_participant_required",
+              "required_action": "join_session"
+            },
+            "name": "presence_requires_participant"
+          },
+          {
+            "condition": {
+              "artifact_policy_attached": false,
+              "operation": "share_artifact"
+            },
+            "description": "Shared artifacts require an artifact policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_policy_required",
+              "required_action": "attach_artifact_policy"
+            },
+            "name": "artifact_policy_required"
+          },
+          {
+            "condition": {
+              "operation": "share_artifact",
+              "version_history_enabled": false
+            },
+            "description": "Shared artifacts require version history.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_version_history_required",
+              "required_action": "enable_version_history"
+            },
+            "name": "artifact_requires_version_history"
+          },
+          {
+            "condition": {
+              "dlp_check_completed": false,
+              "external_share_requested": true
+            },
+            "description": "Externally shared artifacts require DLP review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_check_required",
+              "required_action": "run_dlp_check"
+            },
+            "name": "external_artifact_requires_dlp"
+          },
+          {
+            "condition": {
+              "artifact_present": false,
+              "operation": "add_annotation"
+            },
+            "description": "Annotations require a shared artifact.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_required",
+              "required_action": "select_artifact"
+            },
+            "name": "annotation_requires_artifact"
+          },
+          {
+            "condition": {
+              "annotation_author_present": false,
+              "operation": "add_annotation"
+            },
+            "description": "Annotations require an author.",
+            "effect": {
+              "decision": "deny",
+              "reason": "annotation_author_required",
+              "required_action": "identify_annotation_author"
+            },
+            "name": "annotation_requires_author"
+          },
+          {
+            "condition": {
+              "annotation_body_present": false,
+              "operation": "add_annotation"
+            },
+            "description": "Annotations require content.",
+            "effect": {
+              "decision": "deny",
+              "reason": "annotation_body_required",
+              "required_action": "enter_annotation_body"
+            },
+            "name": "annotation_requires_body"
+          },
+          {
+            "condition": {
+              "annotation_present": false,
+              "operation": "record_decision"
+            },
+            "description": "Decision records require an annotation thread.",
+            "effect": {
+              "decision": "deny",
+              "reason": "annotation_required",
+              "required_action": "select_annotation"
+            },
+            "name": "decision_requires_annotation"
+          },
+          {
+            "condition": {
+              "decision_owner_present": false,
+              "operation": "record_decision"
+            },
+            "description": "Decision records require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "decision_owner_required",
+              "required_action": "assign_decision_owner"
+            },
+            "name": "decision_requires_owner"
+          },
+          {
+            "condition": {
+              "decision_evidence_present": false,
+              "operation": "record_decision"
+            },
+            "description": "Decision records require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "decision_evidence_required",
+              "required_action": "attach_decision_evidence"
+            },
+            "name": "decision_requires_evidence"
+          },
+          {
+            "condition": {
+              "recording_requested": true,
+              "recording_retention_policy_attached": false
+            },
+            "description": "Session recordings require retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recording_retention_required",
+              "required_action": "attach_recording_retention"
+            },
+            "name": "recording_requires_retention"
+          },
+          {
+            "condition": {
+              "export_approved": false,
+              "operation": "export_workspace"
+            },
+            "description": "Workspace exports require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workspace_export_approval_required",
+              "required_action": "approve_workspace_export"
+            },
+            "name": "export_requires_approval"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "ai_agent_participant": true
+            },
+            "description": "AI collaborators must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_agent_registration_required",
+              "required_action": "register_ai_agent"
+            },
+            "name": "ai_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "ai_agent_participant": true
+            },
+            "description": "AI collaborators require explicit workspace scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_agent_scope_required",
+              "required_action": "set_agent_scope"
+            },
+            "name": "ai_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "ai_agent_participant": true,
+              "ai_contribution_disclosed": false
+            },
+            "description": "AI collaborator contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_contribution_disclosure_required",
+              "required_action": "disclose_ai_contribution"
+            },
+            "name": "ai_contribution_requires_disclosure"
+          },
+          {
+            "condition": {
+              "duplicate_artifact_id": true,
+              "operation": "share_artifact"
+            },
+            "description": "Duplicate artifact IDs are blocked within a tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "duplicate_artifact_id",
+              "required_action": "reuse_existing_artifact"
+            },
+            "name": "duplicate_artifact_id_blocked"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Collaboration state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "collaboration_audit_event_required",
+              "required_action": "record_collaboration_audit"
+            },
+            "name": "collaboration_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Collaboration records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_collaboration_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_collaboration_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_collaboration_mutation"
+            },
+            "description": "Batch collaboration mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_collaboration_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -173,6 +700,45 @@
         },
         {
           "condition": {
+            "operation": "create_workspace",
+            "workspace_name_present": false
+          },
+          "description": "Workspaces require a readable name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_name_required",
+            "required_action": "name_workspace"
+          },
+          "name": "workspace_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "create_workspace",
+            "participant_present": false
+          },
+          "description": "Workspaces require at least one participant or owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_participant_required",
+            "required_action": "add_workspace_participant"
+          },
+          "name": "workspace_requires_participant"
+        },
+        {
+          "condition": {
+            "operation": "create_workspace",
+            "retention_policy_attached": false
+          },
+          "description": "Workspaces require retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_policy_required",
+            "required_action": "attach_retention_policy"
+          },
+          "name": "workspace_requires_retention"
+        },
+        {
+          "condition": {
             "external_participant_present": true,
             "external_policy_attached": false
           },
@@ -186,29 +752,16 @@
         },
         {
           "condition": {
-            "realtime_session": true,
-            "secure_transport": false
+            "external_access_expiry_present": false,
+            "external_participant_present": true
           },
-          "description": "Realtime protocols require secure transport.",
+          "description": "External participants require access expiry.",
           "effect": {
-            "decision": "deny",
-            "reason": "secure_transport_required",
-            "required_action": "enable_secure_transport"
+            "decision": "require_review",
+            "reason": "external_access_expiry_required",
+            "required_action": "set_external_access_expiry"
           },
-          "name": "secure_transport_required"
-        },
-        {
-          "condition": {
-            "artifact_policy_attached": false,
-            "shared_artifact_present": true
-          },
-          "description": "Shared artifacts require an artifact policy.",
-          "effect": {
-            "decision": "deny",
-            "reason": "artifact_policy_required",
-            "required_action": "attach_artifact_policy"
-          },
-          "name": "artifact_policy_required"
+          "name": "external_collaboration_requires_expiry"
         },
         {
           "condition": {
@@ -222,15 +775,385 @@
             "required_action": "review_workspace_membership"
           },
           "name": "large_workspace_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "start_session",
+            "workspace_present": false
+          },
+          "description": "Realtime sessions require a tenant-local workspace.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_required",
+            "required_action": "select_workspace"
+          },
+          "name": "session_requires_workspace"
+        },
+        {
+          "condition": {
+            "operation": "start_session",
+            "session_owner_assigned": false
+          },
+          "description": "Realtime sessions require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "session_owner_required",
+            "required_action": "assign_session_owner"
+          },
+          "name": "session_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "start_session",
+            "session_owner_is_member": false
+          },
+          "description": "Realtime session owners must belong to the workspace.",
+          "effect": {
+            "decision": "deny",
+            "reason": "session_owner_not_workspace_member",
+            "required_action": "add_session_owner_to_workspace"
+          },
+          "name": "session_owner_membership_required"
+        },
+        {
+          "condition": {
+            "operation": "start_session",
+            "workspace_active": false
+          },
+          "description": "Realtime sessions require active workspaces.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_not_active",
+            "required_action": "activate_workspace"
+          },
+          "name": "session_requires_active_workspace"
+        },
+        {
+          "condition": {
+            "realtime_session": true,
+            "secure_transport": false
+          },
+          "description": "Realtime sessions require secure transport.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secure_transport_required",
+            "required_action": "enable_secure_transport"
+          },
+          "name": "session_requires_secure_transport"
+        },
+        {
+          "condition": {
+            "protocol_health": "unhealthy",
+            "realtime_session": true
+          },
+          "description": "Realtime sessions require healthy protocols.",
+          "effect": {
+            "decision": "deny",
+            "reason": "protocol_unhealthy",
+            "required_action": "restore_or_fallback_protocol"
+          },
+          "name": "session_requires_protocol_health"
+        },
+        {
+          "condition": {
+            "event_bus_present": false,
+            "realtime_session": true
+          },
+          "description": "Realtime sessions require event bus evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_bus_required",
+            "required_action": "attach_event_bus"
+          },
+          "name": "session_requires_event_bus"
+        },
+        {
+          "condition": {
+            "operation": "join_session",
+            "participant_is_member": false
+          },
+          "description": "Session participants must belong to the workspace.",
+          "effect": {
+            "decision": "deny",
+            "reason": "participant_not_workspace_member",
+            "required_action": "add_workspace_member"
+          },
+          "name": "participant_membership_required"
+        },
+        {
+          "condition": {
+            "operation": "update_presence",
+            "session_active": false
+          },
+          "description": "Presence updates require an active collaboration session.",
+          "effect": {
+            "decision": "deny",
+            "reason": "session_not_active",
+            "required_action": "start_or_join_session"
+          },
+          "name": "presence_requires_session"
+        },
+        {
+          "condition": {
+            "operation": "update_presence",
+            "participant_is_member": false
+          },
+          "description": "Presence updates require a session participant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "presence_participant_required",
+            "required_action": "join_session"
+          },
+          "name": "presence_requires_participant"
+        },
+        {
+          "condition": {
+            "artifact_policy_attached": false,
+            "operation": "share_artifact"
+          },
+          "description": "Shared artifacts require an artifact policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_policy_required",
+            "required_action": "attach_artifact_policy"
+          },
+          "name": "artifact_policy_required"
+        },
+        {
+          "condition": {
+            "operation": "share_artifact",
+            "version_history_enabled": false
+          },
+          "description": "Shared artifacts require version history.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_version_history_required",
+            "required_action": "enable_version_history"
+          },
+          "name": "artifact_requires_version_history"
+        },
+        {
+          "condition": {
+            "dlp_check_completed": false,
+            "external_share_requested": true
+          },
+          "description": "Externally shared artifacts require DLP review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_check_required",
+            "required_action": "run_dlp_check"
+          },
+          "name": "external_artifact_requires_dlp"
+        },
+        {
+          "condition": {
+            "artifact_present": false,
+            "operation": "add_annotation"
+          },
+          "description": "Annotations require a shared artifact.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_required",
+            "required_action": "select_artifact"
+          },
+          "name": "annotation_requires_artifact"
+        },
+        {
+          "condition": {
+            "annotation_author_present": false,
+            "operation": "add_annotation"
+          },
+          "description": "Annotations require an author.",
+          "effect": {
+            "decision": "deny",
+            "reason": "annotation_author_required",
+            "required_action": "identify_annotation_author"
+          },
+          "name": "annotation_requires_author"
+        },
+        {
+          "condition": {
+            "annotation_body_present": false,
+            "operation": "add_annotation"
+          },
+          "description": "Annotations require content.",
+          "effect": {
+            "decision": "deny",
+            "reason": "annotation_body_required",
+            "required_action": "enter_annotation_body"
+          },
+          "name": "annotation_requires_body"
+        },
+        {
+          "condition": {
+            "annotation_present": false,
+            "operation": "record_decision"
+          },
+          "description": "Decision records require an annotation thread.",
+          "effect": {
+            "decision": "deny",
+            "reason": "annotation_required",
+            "required_action": "select_annotation"
+          },
+          "name": "decision_requires_annotation"
+        },
+        {
+          "condition": {
+            "decision_owner_present": false,
+            "operation": "record_decision"
+          },
+          "description": "Decision records require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "decision_owner_required",
+            "required_action": "assign_decision_owner"
+          },
+          "name": "decision_requires_owner"
+        },
+        {
+          "condition": {
+            "decision_evidence_present": false,
+            "operation": "record_decision"
+          },
+          "description": "Decision records require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "decision_evidence_required",
+            "required_action": "attach_decision_evidence"
+          },
+          "name": "decision_requires_evidence"
+        },
+        {
+          "condition": {
+            "recording_requested": true,
+            "recording_retention_policy_attached": false
+          },
+          "description": "Session recordings require retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recording_retention_required",
+            "required_action": "attach_recording_retention"
+          },
+          "name": "recording_requires_retention"
+        },
+        {
+          "condition": {
+            "export_approved": false,
+            "operation": "export_workspace"
+          },
+          "description": "Workspace exports require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workspace_export_approval_required",
+            "required_action": "approve_workspace_export"
+          },
+          "name": "export_requires_approval"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "ai_agent_participant": true
+          },
+          "description": "AI collaborators must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_agent_registration_required",
+            "required_action": "register_ai_agent"
+          },
+          "name": "ai_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "ai_agent_participant": true
+          },
+          "description": "AI collaborators require explicit workspace scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_agent_scope_required",
+            "required_action": "set_agent_scope"
+          },
+          "name": "ai_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "ai_agent_participant": true,
+            "ai_contribution_disclosed": false
+          },
+          "description": "AI collaborator contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_contribution_disclosure_required",
+            "required_action": "disclose_ai_contribution"
+          },
+          "name": "ai_contribution_requires_disclosure"
+        },
+        {
+          "condition": {
+            "duplicate_artifact_id": true,
+            "operation": "share_artifact"
+          },
+          "description": "Duplicate artifact IDs are blocked within a tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "duplicate_artifact_id",
+            "required_action": "reuse_existing_artifact"
+          },
+          "name": "duplicate_artifact_id_blocked"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Collaboration state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "collaboration_audit_event_required",
+            "required_action": "record_collaboration_audit"
+          },
+          "name": "collaboration_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Collaboration records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_collaboration_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_collaboration_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_collaboration_mutation"
+          },
+          "description": "Batch collaboration mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_collaboration_mutation_requires_bytewax"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "package_api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "helper_runtime": "collaboration_runtime.py",
+        "production_app": "production_app.py",
+        "service": "collaboration_runtime.CollaborationRuntime",
+        "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "AgentCollaborators",
+          "permission": "colb:manage_sessions",
+          "route": "/colb/agents"
+        },
         "analytics": {
           "component": "CollaborationAnalytics",
           "permission": "colb:view",
@@ -241,10 +1164,25 @@
           "permission": "colb:collaborate",
           "route": "/colb/annotations"
         },
+        "artifacts": {
+          "component": "ArtifactBoard",
+          "permission": "colb:collaborate",
+          "route": "/colb/artifacts"
+        },
+        "audit": {
+          "component": "CollaborationAuditTrail",
+          "permission": "colb:audit",
+          "route": "/colb/audit"
+        },
         "dashboard": {
           "component": "COLBDashboard",
           "permission": "colb:view",
           "route": "/colb/dashboard"
+        },
+        "decisions": {
+          "component": "DecisionLog",
+          "permission": "colb:collaborate",
+          "route": "/colb/decisions"
         },
         "presence": {
           "component": "PresenceSync",
@@ -272,12 +1210,30 @@
           "route": "/colb/workspaces"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
           "annotation_panel": {
             "status_style": "decision-chip",
             "visual": "threaded-comments"
+          },
+          "artifact_board": {
+            "status_style": "artifact-chip",
+            "visual": "kanban-board"
+          },
+          "audit_timeline": {
+            "status_style": "collaboration-chip",
+            "visual": "event-timeline"
+          },
+          "decision_log": {
+            "status_style": "evidence-chip",
+            "visual": "decision-table"
           },
           "protocol_monitor": {
             "status_style": "transport-chip",
@@ -341,11 +1297,32 @@
             "permission": "colb:view"
           },
           {
+            "component": "ArtifactBoard",
+            "name": "artifacts",
+            "nav_group": "Artifacts",
+            "path": "/colb/artifacts",
+            "permission": "colb:collaborate"
+          },
+          {
             "component": "AnnotationThreads",
             "name": "annotations",
             "nav_group": "Artifacts",
             "path": "/colb/annotations",
             "permission": "colb:collaborate"
+          },
+          {
+            "component": "DecisionLog",
+            "name": "decisions",
+            "nav_group": "Artifacts",
+            "path": "/colb/decisions",
+            "permission": "colb:collaborate"
+          },
+          {
+            "component": "AgentCollaborators",
+            "name": "agents",
+            "nav_group": "Realtime",
+            "path": "/colb/agents",
+            "permission": "colb:manage_sessions"
           },
           {
             "component": "ProtocolMonitor",
@@ -362,6 +1339,13 @@
             "permission": "colb:view"
           },
           {
+            "component": "CollaborationAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/colb/audit",
+            "permission": "colb:audit"
+          },
+          {
             "component": "COLBSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -374,7 +1358,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -382,17 +1366,82 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "colb": []
+      "colb": [
+        "chat",
+        "ntfy",
+        "auth"
+      ]
     }
   },
   "contracts": {
     "colb": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "package_api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "chat": "chat",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "collaboration_runtime.CollaborationRuntime",
+          "helper_runtime": "collaboration_runtime.py",
+          "message_bus": "mqeb",
+          "multi_tenancy": "mten",
+          "nlp": "nlpc",
+          "notification": "ntfy",
+          "production_api": "api.py",
+          "production_app": "production_app.py",
+          "production_service": "service.py",
+          "production_views": "views.py",
+          "security": "secu",
+          "video": "vidc",
+          "view_models": "view_models.py",
+          "workflow": "wflo"
+        },
+        "ai_agents": {
+          "agent_collaboration_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_scope_required": true,
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "annotations": {
+          "annotation_author_required": true,
+          "decision_records_enabled": true,
+          "resolution_evidence_required": true,
+          "threaded_annotations_enabled": true
+        },
+        "artifacts": {
+          "artifact_policy_required": true,
+          "external_share_dlp_required": true,
+          "lock_timeout_minutes": 30,
+          "shared_artifacts_enabled": true,
+          "version_history_required": true
+        },
         "governance": {
           "audit_collaboration_events": true,
+          "decision_evidence_required": true,
           "external_collaboration_policy_required": true,
           "require_tenant_context": true,
           "retention_policy_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "protocol_health_required": true,
+          "session_metrics_required": true,
+          "workspace_metrics_required": true
+        },
+        "presence": {
+          "cursor_presence_enabled": true,
+          "presence_required": true,
+          "presence_ttl_seconds": 90,
+          "typing_presence_enabled": true
         },
         "protocols": {
           "enabled": [
@@ -401,14 +1450,30 @@
             "mqtt",
             "grpc"
           ],
+          "event_stream": "bytewax",
           "fallback_protocol_enabled": true,
           "protocol_health_required": true,
           "secure_transport_required": true
+        },
+        "retention": {
+          "default_policy": "retain-180-days",
+          "export_requires_approval": true,
+          "session_recording_retention_required": true,
+          "workspace_retention_required": true
+        },
+        "security": {
+          "audit_collaboration_events": true,
+          "authenticated_actor_required": true,
+          "external_share_dlp_required": true,
+          "secret_redaction_required": true,
+          "tenant_isolation_required": true
         },
         "sessions": {
           "conflict_resolution": "operational_transform",
           "presence_required": true,
           "realtime_sync_enabled": true,
+          "secure_transport_required": true,
+          "session_owner_required": true,
           "session_recording_supported": true
         },
         "tenant_id": "default",
@@ -417,15 +1482,25 @@
           "default_theme": "colb_collaboration_workspace"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
           "enable_annotation_panel": true,
+          "enable_artifact_board": true,
+          "enable_audit": true,
+          "enable_decision_log": true,
+          "enable_presence_panel": true,
           "enable_protocol_monitor": true,
           "enable_session_console": true,
-          "enable_workspace_dashboard": true
+          "enable_settings": true,
+          "enable_workspace_dashboard": true,
+          "enable_workspace_manager": true
         },
         "workspaces": {
           "artifact_policy_required": true,
+          "external_collaboration_policy_required": true,
           "guest_access_supported": true,
           "max_participants_per_workspace": 1000,
+          "membership_review_threshold": 1000,
           "workspace_owner_required": true
         }
       },
@@ -433,7 +1508,11 @@
       "provides": [
         "colb_operations"
       ],
-      "requires": []
+      "requires": [
+        "chat",
+        "ntfy",
+        "auth"
+      ]
     }
   },
   "deployment": {
@@ -445,7 +1524,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -466,10 +1545,88 @@
   },
   "roles": {},
   "rules": {
+    "ai_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "ai_agent_participant": true
+      },
+      "description": "AI collaborators must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_agent_registration_required",
+        "required_action": "register_ai_agent"
+      },
+      "name": "ai_agent_requires_registration"
+    },
+    "ai_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "ai_agent_participant": true
+      },
+      "description": "AI collaborators require explicit workspace scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_agent_scope_required",
+        "required_action": "set_agent_scope"
+      },
+      "name": "ai_agent_requires_scope"
+    },
+    "ai_contribution_requires_disclosure": {
+      "condition": {
+        "ai_agent_participant": true,
+        "ai_contribution_disclosed": false
+      },
+      "description": "AI collaborator contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_contribution_disclosure_required",
+        "required_action": "disclose_ai_contribution"
+      },
+      "name": "ai_contribution_requires_disclosure"
+    },
+    "annotation_requires_artifact": {
+      "condition": {
+        "artifact_present": false,
+        "operation": "add_annotation"
+      },
+      "description": "Annotations require a shared artifact.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_required",
+        "required_action": "select_artifact"
+      },
+      "name": "annotation_requires_artifact"
+    },
+    "annotation_requires_author": {
+      "condition": {
+        "annotation_author_present": false,
+        "operation": "add_annotation"
+      },
+      "description": "Annotations require an author.",
+      "effect": {
+        "decision": "deny",
+        "reason": "annotation_author_required",
+        "required_action": "identify_annotation_author"
+      },
+      "name": "annotation_requires_author"
+    },
+    "annotation_requires_body": {
+      "condition": {
+        "annotation_body_present": false,
+        "operation": "add_annotation"
+      },
+      "description": "Annotations require content.",
+      "effect": {
+        "decision": "deny",
+        "reason": "annotation_body_required",
+        "required_action": "enter_annotation_body"
+      },
+      "name": "annotation_requires_body"
+    },
     "artifact_policy_required": {
       "condition": {
         "artifact_policy_attached": false,
-        "shared_artifact_present": true
+        "operation": "share_artifact"
       },
       "description": "Shared artifacts require an artifact policy.",
       "effect": {
@@ -478,6 +1635,148 @@
         "required_action": "attach_artifact_policy"
       },
       "name": "artifact_policy_required"
+    },
+    "artifact_requires_version_history": {
+      "condition": {
+        "operation": "share_artifact",
+        "version_history_enabled": false
+      },
+      "description": "Shared artifacts require version history.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_version_history_required",
+        "required_action": "enable_version_history"
+      },
+      "name": "artifact_requires_version_history"
+    },
+    "batch_collaboration_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_collaboration_mutation"
+      },
+      "description": "Batch collaboration mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_collaboration_mutation_requires_bytewax"
+    },
+    "collaboration_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Collaboration state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "collaboration_audit_event_required",
+        "required_action": "record_collaboration_audit"
+      },
+      "name": "collaboration_state_change_requires_audit"
+    },
+    "cross_tenant_collaboration_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Collaboration records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_collaboration_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_collaboration_access_denied"
+    },
+    "decision_requires_annotation": {
+      "condition": {
+        "annotation_present": false,
+        "operation": "record_decision"
+      },
+      "description": "Decision records require an annotation thread.",
+      "effect": {
+        "decision": "deny",
+        "reason": "annotation_required",
+        "required_action": "select_annotation"
+      },
+      "name": "decision_requires_annotation"
+    },
+    "decision_requires_evidence": {
+      "condition": {
+        "decision_evidence_present": false,
+        "operation": "record_decision"
+      },
+      "description": "Decision records require evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "decision_evidence_required",
+        "required_action": "attach_decision_evidence"
+      },
+      "name": "decision_requires_evidence"
+    },
+    "decision_requires_owner": {
+      "condition": {
+        "decision_owner_present": false,
+        "operation": "record_decision"
+      },
+      "description": "Decision records require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "decision_owner_required",
+        "required_action": "assign_decision_owner"
+      },
+      "name": "decision_requires_owner"
+    },
+    "duplicate_artifact_id_blocked": {
+      "condition": {
+        "duplicate_artifact_id": true,
+        "operation": "share_artifact"
+      },
+      "description": "Duplicate artifact IDs are blocked within a tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "duplicate_artifact_id",
+        "required_action": "reuse_existing_artifact"
+      },
+      "name": "duplicate_artifact_id_blocked"
+    },
+    "export_requires_approval": {
+      "condition": {
+        "export_approved": false,
+        "operation": "export_workspace"
+      },
+      "description": "Workspace exports require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workspace_export_approval_required",
+        "required_action": "approve_workspace_export"
+      },
+      "name": "export_requires_approval"
+    },
+    "external_artifact_requires_dlp": {
+      "condition": {
+        "dlp_check_completed": false,
+        "external_share_requested": true
+      },
+      "description": "Externally shared artifacts require DLP review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_check_required",
+        "required_action": "run_dlp_check"
+      },
+      "name": "external_artifact_requires_dlp"
+    },
+    "external_collaboration_requires_expiry": {
+      "condition": {
+        "external_access_expiry_present": false,
+        "external_participant_present": true
+      },
+      "description": "External participants require access expiry.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "external_access_expiry_required",
+        "required_action": "set_external_access_expiry"
+      },
+      "name": "external_collaboration_requires_expiry"
     },
     "external_collaboration_requires_policy": {
       "condition": {
@@ -505,18 +1804,148 @@
       },
       "name": "large_workspace_requires_review"
     },
-    "secure_transport_required": {
+    "participant_membership_required": {
+      "condition": {
+        "operation": "join_session",
+        "participant_is_member": false
+      },
+      "description": "Session participants must belong to the workspace.",
+      "effect": {
+        "decision": "deny",
+        "reason": "participant_not_workspace_member",
+        "required_action": "add_workspace_member"
+      },
+      "name": "participant_membership_required"
+    },
+    "presence_requires_participant": {
+      "condition": {
+        "operation": "update_presence",
+        "participant_is_member": false
+      },
+      "description": "Presence updates require a session participant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "presence_participant_required",
+        "required_action": "join_session"
+      },
+      "name": "presence_requires_participant"
+    },
+    "presence_requires_session": {
+      "condition": {
+        "operation": "update_presence",
+        "session_active": false
+      },
+      "description": "Presence updates require an active collaboration session.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_not_active",
+        "required_action": "start_or_join_session"
+      },
+      "name": "presence_requires_session"
+    },
+    "recording_requires_retention": {
+      "condition": {
+        "recording_requested": true,
+        "recording_retention_policy_attached": false
+      },
+      "description": "Session recordings require retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recording_retention_required",
+        "required_action": "attach_recording_retention"
+      },
+      "name": "recording_requires_retention"
+    },
+    "session_owner_membership_required": {
+      "condition": {
+        "operation": "start_session",
+        "session_owner_is_member": false
+      },
+      "description": "Realtime session owners must belong to the workspace.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_owner_not_workspace_member",
+        "required_action": "add_session_owner_to_workspace"
+      },
+      "name": "session_owner_membership_required"
+    },
+    "session_requires_active_workspace": {
+      "condition": {
+        "operation": "start_session",
+        "workspace_active": false
+      },
+      "description": "Realtime sessions require active workspaces.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workspace_not_active",
+        "required_action": "activate_workspace"
+      },
+      "name": "session_requires_active_workspace"
+    },
+    "session_requires_event_bus": {
+      "condition": {
+        "event_bus_present": false,
+        "realtime_session": true
+      },
+      "description": "Realtime sessions require event bus evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_bus_required",
+        "required_action": "attach_event_bus"
+      },
+      "name": "session_requires_event_bus"
+    },
+    "session_requires_owner": {
+      "condition": {
+        "operation": "start_session",
+        "session_owner_assigned": false
+      },
+      "description": "Realtime sessions require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_owner_required",
+        "required_action": "assign_session_owner"
+      },
+      "name": "session_requires_owner"
+    },
+    "session_requires_protocol_health": {
+      "condition": {
+        "protocol_health": "unhealthy",
+        "realtime_session": true
+      },
+      "description": "Realtime sessions require healthy protocols.",
+      "effect": {
+        "decision": "deny",
+        "reason": "protocol_unhealthy",
+        "required_action": "restore_or_fallback_protocol"
+      },
+      "name": "session_requires_protocol_health"
+    },
+    "session_requires_secure_transport": {
       "condition": {
         "realtime_session": true,
         "secure_transport": false
       },
-      "description": "Realtime protocols require secure transport.",
+      "description": "Realtime sessions require secure transport.",
       "effect": {
         "decision": "deny",
         "reason": "secure_transport_required",
         "required_action": "enable_secure_transport"
       },
-      "name": "secure_transport_required"
+      "name": "session_requires_secure_transport"
+    },
+    "session_requires_workspace": {
+      "condition": {
+        "operation": "start_session",
+        "workspace_present": false
+      },
+      "description": "Realtime sessions require a tenant-local workspace.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workspace_required",
+        "required_action": "select_workspace"
+      },
+      "name": "session_requires_workspace"
     },
     "tenant_context_required": {
       "condition": {
@@ -530,6 +1959,19 @@
       },
       "name": "tenant_context_required"
     },
+    "workspace_requires_name": {
+      "condition": {
+        "operation": "create_workspace",
+        "workspace_name_present": false
+      },
+      "description": "Workspaces require a readable name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workspace_name_required",
+        "required_action": "name_workspace"
+      },
+      "name": "workspace_requires_name"
+    },
     "workspace_requires_owner": {
       "condition": {
         "operation": "create_workspace",
@@ -542,11 +1984,41 @@
         "required_action": "assign_workspace_owner"
       },
       "name": "workspace_requires_owner"
+    },
+    "workspace_requires_participant": {
+      "condition": {
+        "operation": "create_workspace",
+        "participant_present": false
+      },
+      "description": "Workspaces require at least one participant or owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workspace_participant_required",
+        "required_action": "add_workspace_participant"
+      },
+      "name": "workspace_requires_participant"
+    },
+    "workspace_requires_retention": {
+      "condition": {
+        "operation": "create_workspace",
+        "retention_policy_attached": false
+      },
+      "description": "Workspaces require retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retention_policy_required",
+        "required_action": "attach_retention_policy"
+      },
+      "name": "workspace_requires_retention"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "collaboration_runtime.py",
+    "package_api.py",
+    "view_models.py",
+    "app.py"
   ],
   "symbols": {
     "capability.colb": {

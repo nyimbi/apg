@@ -15057,6 +15057,7 @@ COMP lifecycle and guardrail packet:
   and generated runtime metadata.
 - Refreshed `semantic_model.json`, `release_report.json`, and
   `package_manifest.json` from the live contract.
+- Removed stale promotional wording from the preserved production app metadata.
 - Renamed the focused package test away from stale package-test terminology and
   expanded coverage for API helpers, view models, tenant-local IDs, report
   publication blocks, and guardrail failures.
@@ -15210,3 +15211,63 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External NTFY, MQEB, AUTH, MTEN, AUDL, NLPC, COLB, SECU, or CACH adapters.
+
+### 2026-05-30 13:43 EAT
+
+COLB lifecycle and guardrail packet:
+
+- Selected `capabilities/common/colb` as the next common capability after CHAT.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Preserved the existing heavy FastAPI/WebRTC application by moving it from
+  `app.py` to `production_app.py`, then made `app.py` the dependency-light
+  generated-application entrypoint.
+- Expanded the executable COLB contract to cover workspaces, realtime sessions,
+  shared artifacts, annotations, decision records, presence, protocol health,
+  AI collaborators, security, governance, retention, observability, Bytewax
+  event streaming, APG adapters, UI routes, and visual theme tokens.
+- Expanded deterministic guardrails to 36 rules covering tenant context,
+  workspace owner/name/participant/retention/external-policy/external-expiry
+  and large-workspace review, session workspace/owner/owner-membership/active
+  workspace/secure transport/protocol health/event bus/recording retention and
+  participant membership, presence session and participant checks, artifact
+  policy/version history/DLP/duplicate ID checks, annotation artifact/author/body
+  checks, decision annotation/owner/evidence checks, workspace export approval,
+  AI collaborator registration/scope/disclosure, audit evidence, tenant
+  isolation, and Bytewax batch mutation.
+- Added a dependency-light `CollaborationRuntime` with tenant-qualified
+  workspace, session, artifact, annotation, decision, presence, and audit state.
+- Added `package_api.py` helper coverage for the generated runtime.
+- Added dashboard, workspace, session, artifact, agent, analytics, audit, and
+  settings view models.
+- Replaced embedded semantic evidence with a contract-derived semantic model
+  and self-test that checks route count, rule count, Bytewax event streaming,
+  generated runtime metadata, and production app preservation.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale package-test terminology and
+  expanded coverage for API helpers, view models, tenant-local IDs, session
+  owner membership, external collaboration, protocol health, artifact DLP,
+  decisions, duplicate artifact IDs, AI collaborator controls, large-workspace
+  review, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/colb/__init__.py capabilities/common/colb/capability_contract.py capabilities/common/colb/collaboration_runtime.py capabilities/common/colb/package_api.py capabilities/common/colb/view_models.py capabilities/common/colb/app.py capabilities/common/colb/production_app.py capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and COLB capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/colb --json` passed with `ok: true`; COLB remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/colb --json` passed with 12 UI routes, 36 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/colb/README.md capabilities/common/colb/SPECIFICATION.md capabilities/common/colb/PLAN.md capabilities/common/colb/cap_spec.md capabilities/common/colb/__init__.py capabilities/common/colb/capability_contract.py capabilities/common/colb/collaboration_runtime.py capabilities/common/colb/package_api.py capabilities/common/colb/view_models.py capabilities/common/colb/app.py capabilities/common/colb/production_app.py capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py capabilities/common/colb/package_manifest.json capabilities/common/colb/release_report.json capabilities/common/colb/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/colb docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live FastAPI/WebRTC/WebSocket servers, MQTT/gRPC/RTMP/SIP/XMPP transports,
+  databases, DLP services, external AI-agent CLIs, browser-rendered UI behavior,
+  session recording, protocol interoperability, and load/performance benchmarks.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External CHAT, NTFY, AUTH, MQEB, MTEN, AUDL, WFLO, VIDC, NLPC, SECU, or CACH
+  adapters.
