@@ -1,54 +1,96 @@
-"""Publishable APG capability package entrypoint for Enterprise Asset Management (EAM)."""
+"""Publishable APG capability package entrypoint for Enterprise Asset Management."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
+from pathlib import Path
+import sys
 from typing import Any
 
-
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Enterprise Asset Management (EAM) package-backed APG capability", "entity_count": 0, "name": "eam_ast", "version": "1.0.0"}, "capabilities": {"eam_ast": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"capability": {"category": "Eam", "enabled": true, "id": "eam_ast", "name": "Enterprise Asset Management (EAM)", "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/eam/ast/cap_spec.md", "version": "1.0.0"}, "execution": {"async_supported": true, "audit_operations": true, "policy_enforced": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "eam_ast_operations"}, "ui": {"enable_dashboard": true, "enable_operations": true, "enable_rules": true, "enable_settings": true}}, "erp_modules": ["eam"], "i18n": {}, "master_data": {}, "name": "Enterprise Asset Management (EAM)", "provides": ["eam_ast_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "Enterprise Asset Management (EAM) operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation_type": "write", "policy_attached": false}, "description": "Enterprise Asset Management (EAM) write operations require policy enforcement.", "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"}, "name": "operation_policy_required"}, {"condition": {"review_recorded": false, "risk_level": "high"}, "description": "High-risk Enterprise Asset Management (EAM) operations require review.", "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"}, "name": "high_risk_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "Enterprise Asset Management (EAM) operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation_type": "write", "policy_attached": false}, "description": "Enterprise Asset Management (EAM) write operations require policy enforcement.", "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"}, "name": "operation_policy_required"}, {"condition": {"review_recorded": false, "risk_level": "high"}, "description": "High-risk Enterprise Asset Management (EAM) operations require review.", "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"}, "name": "high_risk_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "CapabilityDashboard", "permission": "eam_ast:view", "route": "/eam-ast/dashboard"}, "operations": {"component": "CapabilityOperations", "permission": "eam_ast:operate", "route": "/eam-ast/operations"}, "rules": {"component": "CapabilityRules", "permission": "eam_ast:govern", "route": "/eam-ast/rules"}, "settings": {"component": "CapabilitySettings", "permission": "eam_ast:admin", "route": "/eam-ast/settings"}}, "streaming": {}, "theme": {"components": {"dashboard": {"icon": "layout-dashboard", "risk_style": "policy-band", "status_indicator": "health-pill"}, "operations": {"status_style": "sla-chip", "visual": "work-queue"}, "rules": {"status_style": "decision-chip", "visual": "rule-list"}, "settings": {"density": "compact", "visual": "settings-panel"}}, "name": "eam_ast_operations", "tokens": {"border.radius": "8px", "color.accent": "#C44536", "color.danger": "#C53030", "color.primary": "#28536B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/eam-ast/api/v1", "requires_theme": true, "routes": [{"component": "CapabilityDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/eam-ast/dashboard", "permission": "eam_ast:view"}, {"component": "CapabilityOperations", "name": "operations", "nav_group": "Operations", "path": "/eam-ast/operations", "permission": "eam_ast:operate"}, {"component": "CapabilityRules", "name": "rules", "nav_group": "Governance", "path": "/eam-ast/rules", "permission": "eam_ast:govern"}, {"component": "CapabilitySettings", "name": "settings", "nav_group": "Administration", "path": "/eam-ast/settings", "permission": "eam_ast:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"eam_ast": []}}, "contracts": {"eam_ast": {"configuration": {"capability": {"category": "Eam", "enabled": true, "id": "eam_ast", "name": "Enterprise Asset Management (EAM)", "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/eam/ast/cap_spec.md", "version": "1.0.0"}, "execution": {"async_supported": true, "audit_operations": true, "policy_enforced": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "eam_ast_operations"}, "ui": {"enable_dashboard": true, "enable_operations": true, "enable_rules": true, "enable_settings": true}}, "id": "eam_ast", "provides": ["eam_ast_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"eam_ast": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"high_risk_requires_review": {"condition": {"review_recorded": false, "risk_level": "high"}, "description": "High-risk Enterprise Asset Management (EAM) operations require review.", "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"}, "name": "high_risk_requires_review"}, "operation_policy_required": {"condition": {"operation_type": "write", "policy_attached": false}, "description": "Enterprise Asset Management (EAM) write operations require policy enforcement.", "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"}, "name": "operation_policy_required"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "Enterprise Asset Management (EAM) operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.eam_ast": {"file": "capability_contract.py", "id": "capability.eam_ast", "kind": "capability", "name": "Enterprise Asset Management (EAM)", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:
+	_contract_path = Path(__file__).resolve().parent / "capability_contract.py"
+	_spec = importlib.util.spec_from_file_location("eam_ast_capability_contract", _contract_path)
+	if _spec is None or _spec.loader is None:
+		raise
+	_module = importlib.util.module_from_spec(_spec)
+	sys.modules[_spec.name] = _module
+	_spec.loader.exec_module(_module)
+	get_capability_contract = _module.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	contract = get_capability_contract()
+	capability_id = contract["capability"]
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {"name": capability_id, "description": "Enterprise asset management package-backed APG capability", "version": "2.1.0", "entity_count": 8},
+		"capabilities": {
+			capability_id: {
+				"name": contract["display_name"],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"configuration": contract["configuration"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": {route["name"]: {"route": route["path"], "component": route["component"], "permission": route["permission"]} for route in contract["ui"]["routes"]},
+				"theme": contract["theme"],
+				"streaming": contract["streaming"],
+				"runtime": {"entrypoint": "app.py", "service": "service.py", "api": "api.py", "views": "views.py"},
+			}
+		},
+		"composition": {
+			"capability_dependencies": {capability_id: contract["requires"]},
+			"agent_teams": {
+				"enterprise_asset_management": {
+					"supported_runtimes": contract["configuration"]["eam_agents"]["supported_runtimes"],
+					"supported_roles": contract["configuration"]["eam_agents"]["supported_roles"],
+				}
+			},
+		},
+		"contracts": {capability_id: {"id": capability_id, "provides": contract["provides"], "requires": contract["requires"], "configuration": contract["configuration"]}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"packages": {capability_id: {"entrypoint": "app.py", "profile": "capability"}},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"agents": {},
+		"flows": {},
+		"graphs": {"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])}},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
-	"""Return the APG component manifest for this capability package."""
 	return {
 		"format": "apg.component-manifest.v1",
 		"kind": "apg.generated_application",
 		"name": "eam_ast",
-		"display_name": "Enterprise Asset Management (EAM)",
+		"display_name": "Enterprise Asset Management",
 		"target": "python",
-		"interfaces": {
-			"health": "/health",
-			"self_test": "/self-test",
-			"semantic_model": "/semantic-model.json",
-		},
+		"interfaces": {"health": "/health", "self_test": "/self-test", "semantic_model": "/semantic-model.json"},
 		"capabilities": ["eam_ast"],
 	}
 
 
 def self_test() -> dict[str, Any]:
-	"""Run a dependency-light package self-test."""
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("eam_ast", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
-	if "eam_ast" not in model.get("capabilities", {}):
+	if not capability:
 		errors.append("capability missing from semantic model")
+	if capability.get("streaming", {}).get("processor") != "bytewax":
+		errors.append("streaming processor mismatch")
+	if "eam_agents" not in capability.get("provides", []):
+		errors.append("agent capability missing")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	return {
-		"passed": not errors,
-		"status": "ok" if not errors else "failed",
-		"errors": errors,
-		"routes": ["/health", "/self-test", "/component.json", "/semantic-model.json"],
-		"capability": "eam_ast",
-	}
+	return {"passed": not errors, "status": "ok" if not errors else "failed", "errors": errors, "routes": ["/health", "/self-test", "/component.json", "/semantic-model.json"], "capability": "eam_ast"}
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Enterprise Asset Management (EAM)",
+  "display_name": "Enterprise Asset Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,38 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 10,
+  "rule_count": 32,
+  "streaming": {
+    "events": [
+      "location_registered",
+      "asset_registered",
+      "maintenance_plan_created",
+      "work_order_opened",
+      "work_order_completed",
+      "inspection_recorded",
+      "condition_reading_recorded",
+      "inventory_reservation_created",
+      "eam_agent_registered"
+    ],
+    "guardrails": [
+      "eam_batch_import_requires_bytewax",
+      "eam_event_requires_bytewax",
+      "privileged_agent_eam_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "in_service",
+      "maintenance_due",
+      "work_open",
+      "work_complete",
+      "degraded",
+      "retired"
+    ],
+    "stream": "apg.eam.ast.lifecycle"
+  },
+  "version": "2.1.0"
 }

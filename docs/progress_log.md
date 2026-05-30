@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:07 EAT
+
+EAM AST enterprise asset lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the `eam_ast`
+  capability, and replaced `cap_spec.md` with the active package summary.
+- Replaced the generic contract with explicit location, asset, criticality,
+  maintenance-plan, work-order, inspection, condition-reading, inventory,
+  EAM-agent, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  location type, asset owner/category/location/criticality, capital asset
+  fixed-asset reference, health-score bounds, maintenance strategy and
+  interval, predictive condition source, work-order asset/priority/safety
+  plan/critical approval, completion outcome, inspection result, condition
+  metric/value/review, inventory part/quantity, EAM import/event Bytewax
+  streams, EAM-agent runtime/role, and privileged agent-action approval.
+- Replaced dependency-heavy service/API/view surfaces with dependency-light
+  EAM lifecycle helpers for locations, assets, maintenance plans, work orders,
+  inspections, condition readings, inventory reservations, import validation,
+  lifecycle-event validation, EAM-agent registration, dashboard summaries,
+  reliability summaries, audit events, API helpers, and screen models.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, location, asset, maintenance-plan, work-order,
+  inspection, condition-reading, inventory, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/eam/ast/__init__.py
+  capabilities/eam/ast/capability_contract.py capabilities/eam/ast/service.py
+  capabilities/eam/ast/api.py capabilities/eam/ast/views.py
+  capabilities/eam/ast/app.py
+  capabilities/eam/ast/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/eam/ast/tests/test_package_contract.py`
+  passed with 5 tests.
+- `./.venv/bin/python capabilities/eam/ast/app.py` passed package self-test.
+- `./.venv/bin/apg capabilities inspect eam_ast --json` confirmed `ok: true`,
+  10 routes, 32 rules, and `eam_ast_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/eam/ast --json`
+  confirmed side-effect-free publish planning with Bytewax stream metadata and
+  no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/eam/ast --json` passed with `domain_specific` implementation
+  level and 0 baseline markers.
+- `./.venv/bin/python -c "from capabilities.eam.ast import
+  EnterpriseAssetManagementService; service=EnterpriseAssetManagementService();
+  location=service.register_location('plant','tenant-proof','Plant','site');
+  asset=service.register_asset('pump','tenant-proof','Pump','owner','equipment',
+  location['location_id'],'medium'); service.register_eam_agent('tenant-proof',
+  'Proof agent','codex','maintenance_planner','review maintenance');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  EAM-agent registration, audit event emission, and Bytewax stream metadata.
+- `jq '.capabilities.eam_ast.streaming.processor,
+  .capabilities.eam_ast.provides, .capabilities.eam_ast.requires,
+  .capabilities.eam_ast.screens.agents.route,
+  (.capabilities.eam_ast.rules[] |
+  select(.name=="eam_agent_runtime_supported") | .effect.reason),
+  (.capabilities.eam_ast.rules[] |
+  select(.name=="eam_batch_import_requires_bytewax") | .effect.reason)'
+  capabilities/eam/ast/semantic_model.json` confirmed `bytewax`, EAM-agent
+  provides, required services, `/eam-ast/agents`,
+  `eam_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/eam/ast` passed after trimming the package
+  summary EOF.
+- Not run: durable asset stores, live fixed-asset/procurement/audit/admission
+  adapters, durable Bytewax topology, rendered browser UI, EAM
+  performance/failover checks, and full repository tests.
+
 ### 2026-05-30 22:54 EAT
 
 CRM ADV advanced CRM analytics lifecycle/guardrail packet:
