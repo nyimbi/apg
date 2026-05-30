@@ -8,38 +8,114 @@
   },
   "capabilities": {
     "regy": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache_store": "cach",
+        "event_stream": "bytewax",
+        "gateway_sync": "apig",
+        "generated_app_runtime": "registry_runtime.RegistryService",
+        "http_api": "api.registry_bp",
+        "metrics_sink": "moni",
+        "production_runtime": "service.ServiceRegistryService",
+        "service_discovery": "conf"
+      },
+      "approvals": {
+        "compatibility_review": "RegistryReviewRecord",
+        "discovery_limit_review": "RegistryReviewRecord",
+        "production_registration": "RegistryReviewRecord",
+        "service_retirement": "RegistryServiceRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache_store": "cach",
+          "event_stream": "bytewax",
+          "gateway_sync": "apig",
+          "generated_app_runtime": "registry_runtime.RegistryService",
+          "http_api": "api.registry_bp",
+          "metrics_sink": "moni",
+          "production_runtime": "service.ServiceRegistryService",
+          "service_discovery": "conf"
+        },
+        "contracts": {
+          "breaking_change_review_required": true,
+          "deprecation_plan_required": true,
+          "migration_notes_required": true,
+          "schema_required": true,
+          "version_required": true
+        },
         "discovery": {
           "cache_ttl_seconds": 60,
           "cross_tenant_discovery_allowed": false,
+          "max_results_without_review": 1000,
           "prefer_healthy_instances": true,
           "service_discovery_enabled": true
         },
         "governance": {
           "audit_registration_events": true,
-          "breaking_change_review_required": true,
           "duplicate_service_names_blocked": true,
-          "require_tenant_context": true
+          "owner_transfer_review_required": true,
+          "production_registration_review_required": true,
+          "require_tenant_context": true,
+          "retirement_impact_review_required": true
         },
         "health": {
           "active_health_checks_enabled": true,
           "default_interval_seconds": 30,
           "degraded_blocks_gateway_publish": true,
-          "failure_threshold": 3
+          "failure_threshold": 3,
+          "minimum_interval_seconds": 5
+        },
+        "instances": {
+          "allowed_regions": [
+            "local",
+            "edge-africa",
+            "edge-eu",
+            "edge-east",
+            "edge-west"
+          ],
+          "endpoint_required": true,
+          "health_probe_required": true,
+          "owner_required": true,
+          "region_required": true,
+          "weight_required": true
+        },
+        "observability": {
+          "audit_events_required": true,
+          "lineage_capture_required": true,
+          "metrics_required": true,
+          "traces_required_for_production": true
         },
         "registration": {
+          "allowed_protocols": [
+            "http",
+            "https",
+            "grpc",
+            "websocket",
+            "amqp",
+            "mqtt"
+          ],
           "api_version_required": true,
           "contract_schema_required": true,
           "health_endpoint_required": true,
+          "max_services_per_tenant": 10000,
           "owner_required": true
         },
         "routing": {
           "circuit_breaking_enabled": true,
           "gateway_sync_enabled": true,
-          "load_balancing_metadata_required": true
+          "load_balancing_metadata_required": true,
+          "publish_requires_healthy_instance": true,
+          "supported_strategies": [
+            "round_robin",
+            "weighted",
+            "least_latency",
+            "failover"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -47,9 +123,16 @@
           "default_theme": "regy_service_catalog"
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_contract_review": true,
           "enable_discovery_console": true,
+          "enable_gateway_sync": true,
           "enable_health_dashboard": true,
+          "enable_instance_manager": true,
+          "enable_registration_console": true,
+          "enable_retirement_reviews": true,
           "enable_service_catalog": true,
+          "enable_settings": true,
           "enable_version_manager": true
         }
       },
@@ -62,6 +145,14 @@
       "provides": [
         "regy_operations"
       ],
+      "registry_lifecycle": {
+        "audit": "RegistryAuditEvent",
+        "gateway_publication": "RegistryGatewayPublication",
+        "instance": "RegistryInstanceRecord",
+        "review": "RegistryReviewRecord",
+        "service": "RegistryServiceRecord",
+        "version": "RegistryVersionRecord"
+      },
       "requires": [],
       "rule_engine": {
         "rules": [
@@ -82,7 +173,7 @@
               "operation": "register_service",
               "owner_assigned": false
             },
-            "description": "Service registration requires an owner.",
+            "description": "Service registration requires an accountable owner.",
             "effect": {
               "decision": "deny",
               "reason": "service_owner_required",
@@ -105,7 +196,34 @@
           },
           {
             "condition": {
-              "duplicate_service_name": true
+              "api_version_present": false,
+              "operation": "register_service"
+            },
+            "description": "Service registration requires an API version.",
+            "effect": {
+              "decision": "deny",
+              "reason": "api_version_required",
+              "required_action": "declare_api_version"
+            },
+            "name": "service_registration_requires_api_version"
+          },
+          {
+            "condition": {
+              "contract_schema_present": false,
+              "operation": "register_service"
+            },
+            "description": "Service registration requires API or service contract schema evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_schema_required",
+              "required_action": "attach_contract_schema"
+            },
+            "name": "service_registration_requires_contract_schema"
+          },
+          {
+            "condition": {
+              "duplicate_service_name": true,
+              "operation": "register_service"
             },
             "description": "Duplicate service names are blocked within tenant scope.",
             "effect": {
@@ -117,8 +235,154 @@
           },
           {
             "condition": {
+              "environment": "production",
+              "operation": "register_service",
+              "production_review_recorded": false
+            },
+            "description": "Production service registration requires review evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "production_registration_review_required",
+              "required_action": "record_production_registration_review"
+            },
+            "name": "production_registration_requires_review"
+          },
+          {
+            "condition": {
+              "endpoint_present": false,
+              "operation": "register_instance"
+            },
+            "description": "Service instances require endpoint metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instance_endpoint_required",
+              "required_action": "attach_instance_endpoint"
+            },
+            "name": "instance_requires_endpoint"
+          },
+          {
+            "condition": {
+              "health_probe_present": false,
+              "operation": "register_instance"
+            },
+            "description": "Service instances require health probe evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instance_health_probe_required",
+              "required_action": "attach_instance_health_probe"
+            },
+            "name": "instance_requires_health_probe"
+          },
+          {
+            "condition": {
+              "allowed_region": false,
+              "operation": "register_instance"
+            },
+            "description": "Service instances must target an allowed region.",
+            "effect": {
+              "decision": "deny",
+              "reason": "allowed_region_required",
+              "required_action": "choose_allowed_region"
+            },
+            "name": "instance_requires_allowed_region"
+          },
+          {
+            "condition": {
+              "operation": "register_instance",
+              "positive_weight": false
+            },
+            "description": "Load-balancing weights must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_weight_required",
+              "required_action": "set_positive_instance_weight"
+            },
+            "name": "instance_requires_positive_weight"
+          },
+          {
+            "condition": {
+              "cross_tenant_discovery": true,
+              "operation": "discover_services"
+            },
+            "description": "Cross-tenant discovery is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_discovery_denied",
+              "required_action": "use_tenant_scoped_discovery"
+            },
+            "name": "discovery_cross_tenant_denied"
+          },
+          {
+            "condition": {
+              "discovery_review_recorded": false,
+              "operation": "discover_services",
+              "requested_result_limit_gt": 1000
+            },
+            "description": "Large discovery result limits require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "discovery_limit_review_required",
+              "required_action": "record_discovery_limit_review"
+            },
+            "name": "discovery_high_result_limit_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "publish_to_gateway",
+              "service_registered": false
+            },
+            "description": "Gateway publication requires a registered service.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_service_required",
+              "required_action": "register_service_first"
+            },
+            "name": "gateway_publish_requires_registered_service"
+          },
+          {
+            "condition": {
+              "operation": "publish_to_gateway",
+              "service_review_complete": false
+            },
+            "description": "Gateway publication requires completed service review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_review_required",
+              "required_action": "complete_service_review"
+            },
+            "name": "gateway_publish_requires_reviewed_service"
+          },
+          {
+            "condition": {
+              "healthy_instance_present": false,
+              "operation": "publish_to_gateway"
+            },
+            "description": "Gateway publication requires at least one healthy instance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "healthy_instance_required",
+              "required_action": "restore_or_register_healthy_instance"
+            },
+            "name": "gateway_publish_requires_healthy_instance"
+          },
+          {
+            "condition": {
+              "operation": "publish_to_gateway",
+              "routing_metadata_present": false
+            },
+            "description": "Gateway publication requires load-balancing and route metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "routing_metadata_required",
+              "required_action": "attach_routing_metadata"
+            },
+            "name": "gateway_publish_requires_routing_metadata"
+          },
+          {
+            "condition": {
               "breaking_change_detected": true,
-              "compatibility_review_recorded": false
+              "compatibility_review_recorded": false,
+              "operation": "record_version"
             },
             "description": "Breaking API changes require compatibility review.",
             "effect": {
@@ -130,15 +394,95 @@
           },
           {
             "condition": {
-              "cross_tenant_discovery": true
+              "migration_notes_present": false,
+              "operation": "deprecate_version"
             },
-            "description": "Cross-tenant discovery is denied by default.",
+            "description": "Deprecated versions require migration notes.",
             "effect": {
               "decision": "deny",
-              "reason": "cross_tenant_discovery_denied",
-              "required_action": "use_tenant_scoped_discovery"
+              "reason": "migration_notes_required",
+              "required_action": "attach_migration_notes"
             },
-            "name": "cross_tenant_discovery_denied"
+            "name": "deprecation_requires_migration_notes"
+          },
+          {
+            "condition": {
+              "future_eol_date": false,
+              "operation": "deprecate_version"
+            },
+            "description": "Deprecated versions require a future end-of-life date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "future_eol_required",
+              "required_action": "choose_future_eol_date"
+            },
+            "name": "deprecation_requires_future_eol"
+          },
+          {
+            "condition": {
+              "incident_reference_present": false,
+              "operation": "override_health"
+            },
+            "description": "Manual health overrides require an incident or change reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_reference_required",
+              "required_action": "attach_incident_reference"
+            },
+            "name": "health_override_requires_incident_reference"
+          },
+          {
+            "condition": {
+              "operation": "transfer_owner",
+              "owner_transfer_review_recorded": false
+            },
+            "description": "Service ownership transfer requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "owner_transfer_review_required",
+              "required_action": "record_owner_transfer_review"
+            },
+            "name": "owner_transfer_requires_review"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_service"
+            },
+            "description": "Retiring a service requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_review_required",
+              "required_action": "record_retirement_impact_review"
+            },
+            "name": "service_retirement_requires_impact_review"
+          },
+          {
+            "condition": {
+              "gateway_unpublish_recorded": false,
+              "operation": "retire_service"
+            },
+            "description": "Retiring a service requires gateway unpublish evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_unpublish_required",
+              "required_action": "record_gateway_unpublish"
+            },
+            "name": "service_retirement_requires_gateway_unpublish"
+          },
+          {
+            "condition": {
+              "environment": "production",
+              "operation": "register_service",
+              "trace_propagation_configured": false
+            },
+            "description": "Production services require trace propagation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "trace_propagation_required",
+              "required_action": "configure_trace_propagation"
+            },
+            "name": "production_requires_tracing"
           }
         ],
         "type": "deterministic"
@@ -161,7 +505,7 @@
             "operation": "register_service",
             "owner_assigned": false
           },
-          "description": "Service registration requires an owner.",
+          "description": "Service registration requires an accountable owner.",
           "effect": {
             "decision": "deny",
             "reason": "service_owner_required",
@@ -184,7 +528,34 @@
         },
         {
           "condition": {
-            "duplicate_service_name": true
+            "api_version_present": false,
+            "operation": "register_service"
+          },
+          "description": "Service registration requires an API version.",
+          "effect": {
+            "decision": "deny",
+            "reason": "api_version_required",
+            "required_action": "declare_api_version"
+          },
+          "name": "service_registration_requires_api_version"
+        },
+        {
+          "condition": {
+            "contract_schema_present": false,
+            "operation": "register_service"
+          },
+          "description": "Service registration requires API or service contract schema evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_schema_required",
+            "required_action": "attach_contract_schema"
+          },
+          "name": "service_registration_requires_contract_schema"
+        },
+        {
+          "condition": {
+            "duplicate_service_name": true,
+            "operation": "register_service"
           },
           "description": "Duplicate service names are blocked within tenant scope.",
           "effect": {
@@ -196,8 +567,154 @@
         },
         {
           "condition": {
+            "environment": "production",
+            "operation": "register_service",
+            "production_review_recorded": false
+          },
+          "description": "Production service registration requires review evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "production_registration_review_required",
+            "required_action": "record_production_registration_review"
+          },
+          "name": "production_registration_requires_review"
+        },
+        {
+          "condition": {
+            "endpoint_present": false,
+            "operation": "register_instance"
+          },
+          "description": "Service instances require endpoint metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instance_endpoint_required",
+            "required_action": "attach_instance_endpoint"
+          },
+          "name": "instance_requires_endpoint"
+        },
+        {
+          "condition": {
+            "health_probe_present": false,
+            "operation": "register_instance"
+          },
+          "description": "Service instances require health probe evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instance_health_probe_required",
+            "required_action": "attach_instance_health_probe"
+          },
+          "name": "instance_requires_health_probe"
+        },
+        {
+          "condition": {
+            "allowed_region": false,
+            "operation": "register_instance"
+          },
+          "description": "Service instances must target an allowed region.",
+          "effect": {
+            "decision": "deny",
+            "reason": "allowed_region_required",
+            "required_action": "choose_allowed_region"
+          },
+          "name": "instance_requires_allowed_region"
+        },
+        {
+          "condition": {
+            "operation": "register_instance",
+            "positive_weight": false
+          },
+          "description": "Load-balancing weights must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_weight_required",
+            "required_action": "set_positive_instance_weight"
+          },
+          "name": "instance_requires_positive_weight"
+        },
+        {
+          "condition": {
+            "cross_tenant_discovery": true,
+            "operation": "discover_services"
+          },
+          "description": "Cross-tenant discovery is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_discovery_denied",
+            "required_action": "use_tenant_scoped_discovery"
+          },
+          "name": "discovery_cross_tenant_denied"
+        },
+        {
+          "condition": {
+            "discovery_review_recorded": false,
+            "operation": "discover_services",
+            "requested_result_limit_gt": 1000
+          },
+          "description": "Large discovery result limits require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "discovery_limit_review_required",
+            "required_action": "record_discovery_limit_review"
+          },
+          "name": "discovery_high_result_limit_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "publish_to_gateway",
+            "service_registered": false
+          },
+          "description": "Gateway publication requires a registered service.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_service_required",
+            "required_action": "register_service_first"
+          },
+          "name": "gateway_publish_requires_registered_service"
+        },
+        {
+          "condition": {
+            "operation": "publish_to_gateway",
+            "service_review_complete": false
+          },
+          "description": "Gateway publication requires completed service review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_review_required",
+            "required_action": "complete_service_review"
+          },
+          "name": "gateway_publish_requires_reviewed_service"
+        },
+        {
+          "condition": {
+            "healthy_instance_present": false,
+            "operation": "publish_to_gateway"
+          },
+          "description": "Gateway publication requires at least one healthy instance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "healthy_instance_required",
+            "required_action": "restore_or_register_healthy_instance"
+          },
+          "name": "gateway_publish_requires_healthy_instance"
+        },
+        {
+          "condition": {
+            "operation": "publish_to_gateway",
+            "routing_metadata_present": false
+          },
+          "description": "Gateway publication requires load-balancing and route metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "routing_metadata_required",
+            "required_action": "attach_routing_metadata"
+          },
+          "name": "gateway_publish_requires_routing_metadata"
+        },
+        {
+          "condition": {
             "breaking_change_detected": true,
-            "compatibility_review_recorded": false
+            "compatibility_review_recorded": false,
+            "operation": "record_version"
           },
           "description": "Breaking API changes require compatibility review.",
           "effect": {
@@ -209,75 +726,201 @@
         },
         {
           "condition": {
-            "cross_tenant_discovery": true
+            "migration_notes_present": false,
+            "operation": "deprecate_version"
           },
-          "description": "Cross-tenant discovery is denied by default.",
+          "description": "Deprecated versions require migration notes.",
           "effect": {
             "decision": "deny",
-            "reason": "cross_tenant_discovery_denied",
-            "required_action": "use_tenant_scoped_discovery"
+            "reason": "migration_notes_required",
+            "required_action": "attach_migration_notes"
           },
-          "name": "cross_tenant_discovery_denied"
+          "name": "deprecation_requires_migration_notes"
+        },
+        {
+          "condition": {
+            "future_eol_date": false,
+            "operation": "deprecate_version"
+          },
+          "description": "Deprecated versions require a future end-of-life date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "future_eol_required",
+            "required_action": "choose_future_eol_date"
+          },
+          "name": "deprecation_requires_future_eol"
+        },
+        {
+          "condition": {
+            "incident_reference_present": false,
+            "operation": "override_health"
+          },
+          "description": "Manual health overrides require an incident or change reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_reference_required",
+            "required_action": "attach_incident_reference"
+          },
+          "name": "health_override_requires_incident_reference"
+        },
+        {
+          "condition": {
+            "operation": "transfer_owner",
+            "owner_transfer_review_recorded": false
+          },
+          "description": "Service ownership transfer requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "owner_transfer_review_required",
+            "required_action": "record_owner_transfer_review"
+          },
+          "name": "owner_transfer_requires_review"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_service"
+          },
+          "description": "Retiring a service requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_review_required",
+            "required_action": "record_retirement_impact_review"
+          },
+          "name": "service_retirement_requires_impact_review"
+        },
+        {
+          "condition": {
+            "gateway_unpublish_recorded": false,
+            "operation": "retire_service"
+          },
+          "description": "Retiring a service requires gateway unpublish evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_unpublish_required",
+            "required_action": "record_gateway_unpublish"
+          },
+          "name": "service_retirement_requires_gateway_unpublish"
+        },
+        {
+          "condition": {
+            "environment": "production",
+            "operation": "register_service",
+            "trace_propagation_configured": false
+          },
+          "description": "Production services require trace propagation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "trace_propagation_required",
+            "required_action": "configure_trace_propagation"
+          },
+          "name": "production_requires_tracing"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "service": "registry_runtime.py",
+        "views": "view_models.py"
       },
       "screens": {
+        "audit": {
+          "component": "RegistryAuditTimeline",
+          "permission": "registry:view_events",
+          "route": "/regy/audit"
+        },
+        "contracts": {
+          "component": "ContractReviewQueue",
+          "permission": "registry:update_service",
+          "route": "/regy/contracts"
+        },
         "dashboard": {
           "component": "RegistryDashboard",
-          "permission": "regy:view",
+          "permission": "registry:view_statistics",
           "route": "/regy/dashboard"
         },
         "discovery": {
           "component": "DiscoveryConsole",
-          "permission": "regy:discover",
+          "permission": "registry:discover_services",
           "route": "/regy/discovery"
         },
         "gateway_sync": {
-          "component": "GatewaySyncView",
-          "permission": "regy:sync_gateway",
+          "component": "GatewaySyncPanel",
+          "permission": "registry:update_service",
           "route": "/regy/gateway-sync"
         },
         "health": {
           "component": "ServiceHealthDashboard",
-          "permission": "regy:view_health",
+          "permission": "registry:view_health",
           "route": "/regy/health"
         },
+        "instances": {
+          "component": "ServiceInstanceManager",
+          "permission": "registry:update_service",
+          "route": "/regy/instances"
+        },
         "register": {
-          "component": "ServiceRegistration",
-          "permission": "regy:register_service",
+          "component": "ServiceRegistrationConsole",
+          "permission": "registry:register_service",
           "route": "/regy/register"
+        },
+        "retirements": {
+          "component": "RetirementReviewPanel",
+          "permission": "registry:deregister_service",
+          "route": "/regy/retirements"
         },
         "services": {
           "component": "ServiceCatalog",
-          "permission": "regy:view_services",
+          "permission": "registry:list_services",
           "route": "/regy/services"
         },
         "settings": {
           "component": "RegistrySettings",
-          "permission": "regy:admin",
+          "permission": "registry:update_service",
           "route": "/regy/settings"
         },
         "versions": {
           "component": "ServiceVersionManager",
-          "permission": "regy:manage_versions",
+          "permission": "registry:update_service",
           "route": "/regy/versions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "decision-pill",
+            "visual": "event-timeline"
+          },
+          "contract_review_queue": {
+            "highlight": "schema-chip",
+            "visual": "review-list"
+          },
           "discovery_result_card": {
             "highlight": "endpoint-chip",
             "visual": "instance-stack"
           },
+          "gateway_sync_panel": {
+            "status_indicator": "publish-chip",
+            "visual": "gateway-link"
+          },
           "health_check_timeline": {
             "status_style": "failure-threshold",
             "visual": "probe-timeline"
+          },
+          "instance_manager": {
+            "status_indicator": "region-pill",
+            "visual": "endpoint-table"
+          },
+          "registration_console": {
+            "status_indicator": "guardrail-chip",
+            "visual": "service-form"
+          },
+          "retirement_review_panel": {
+            "status_indicator": "retirement-chip",
+            "visual": "impact-list"
           },
           "service_catalog_row": {
             "icon": "network",
@@ -292,20 +935,20 @@
         "name": "regy_service_catalog",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#6D597A",
+          "color.accent": "#C86F2D",
           "color.danger": "#C53030",
-          "color.primary": "#355070",
+          "color.primary": "#1F5E5A",
           "color.success": "#2F855A",
           "color.warning": "#B7791F",
           "density": "compact",
-          "surface.canvas": "#F7F8FA",
+          "surface.canvas": "#F6F8F7",
           "surface.panel": "#FFFFFF",
           "text.primary": "#172033",
           "text.secondary": "#52606D"
         }
       },
       "ui": {
-        "api_prefix": "/regy/api/v1",
+        "api_prefix": "/api/regy/v1",
         "requires_theme": true,
         "routes": [
           {
@@ -313,56 +956,84 @@
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/regy/dashboard",
-            "permission": "regy:view"
+            "permission": "registry:view_statistics"
           },
           {
             "component": "ServiceCatalog",
             "name": "services",
             "nav_group": "Catalog",
             "path": "/regy/services",
-            "permission": "regy:view_services"
+            "permission": "registry:list_services"
           },
           {
-            "component": "ServiceRegistration",
+            "component": "ServiceRegistrationConsole",
             "name": "register",
             "nav_group": "Catalog",
             "path": "/regy/register",
-            "permission": "regy:register_service"
+            "permission": "registry:register_service"
+          },
+          {
+            "component": "ServiceInstanceManager",
+            "name": "instances",
+            "nav_group": "Catalog",
+            "path": "/regy/instances",
+            "permission": "registry:update_service"
           },
           {
             "component": "DiscoveryConsole",
             "name": "discovery",
             "nav_group": "Discovery",
             "path": "/regy/discovery",
-            "permission": "regy:discover"
+            "permission": "registry:discover_services"
           },
           {
             "component": "ServiceHealthDashboard",
             "name": "health",
             "nav_group": "Reliability",
             "path": "/regy/health",
-            "permission": "regy:view_health"
+            "permission": "registry:view_health"
           },
           {
             "component": "ServiceVersionManager",
             "name": "versions",
             "nav_group": "Governance",
             "path": "/regy/versions",
-            "permission": "regy:manage_versions"
+            "permission": "registry:update_service"
           },
           {
-            "component": "GatewaySyncView",
+            "component": "ContractReviewQueue",
+            "name": "contracts",
+            "nav_group": "Governance",
+            "path": "/regy/contracts",
+            "permission": "registry:update_service"
+          },
+          {
+            "component": "GatewaySyncPanel",
             "name": "gateway_sync",
             "nav_group": "Integration",
             "path": "/regy/gateway-sync",
-            "permission": "regy:sync_gateway"
+            "permission": "registry:update_service"
+          },
+          {
+            "component": "RetirementReviewPanel",
+            "name": "retirements",
+            "nav_group": "Governance",
+            "path": "/regy/retirements",
+            "permission": "registry:deregister_service"
+          },
+          {
+            "component": "RegistryAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/regy/audit",
+            "permission": "registry:view_events"
           },
           {
             "component": "RegistrySettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/regy/settings",
-            "permission": "regy:admin"
+            "permission": "registry:update_service"
           }
         ],
         "shell": "apg_python",
@@ -370,7 +1041,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -384,34 +1055,93 @@
   "contracts": {
     "regy": {
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache_store": "cach",
+          "event_stream": "bytewax",
+          "gateway_sync": "apig",
+          "generated_app_runtime": "registry_runtime.RegistryService",
+          "http_api": "api.registry_bp",
+          "metrics_sink": "moni",
+          "production_runtime": "service.ServiceRegistryService",
+          "service_discovery": "conf"
+        },
+        "contracts": {
+          "breaking_change_review_required": true,
+          "deprecation_plan_required": true,
+          "migration_notes_required": true,
+          "schema_required": true,
+          "version_required": true
+        },
         "discovery": {
           "cache_ttl_seconds": 60,
           "cross_tenant_discovery_allowed": false,
+          "max_results_without_review": 1000,
           "prefer_healthy_instances": true,
           "service_discovery_enabled": true
         },
         "governance": {
           "audit_registration_events": true,
-          "breaking_change_review_required": true,
           "duplicate_service_names_blocked": true,
-          "require_tenant_context": true
+          "owner_transfer_review_required": true,
+          "production_registration_review_required": true,
+          "require_tenant_context": true,
+          "retirement_impact_review_required": true
         },
         "health": {
           "active_health_checks_enabled": true,
           "default_interval_seconds": 30,
           "degraded_blocks_gateway_publish": true,
-          "failure_threshold": 3
+          "failure_threshold": 3,
+          "minimum_interval_seconds": 5
+        },
+        "instances": {
+          "allowed_regions": [
+            "local",
+            "edge-africa",
+            "edge-eu",
+            "edge-east",
+            "edge-west"
+          ],
+          "endpoint_required": true,
+          "health_probe_required": true,
+          "owner_required": true,
+          "region_required": true,
+          "weight_required": true
+        },
+        "observability": {
+          "audit_events_required": true,
+          "lineage_capture_required": true,
+          "metrics_required": true,
+          "traces_required_for_production": true
         },
         "registration": {
+          "allowed_protocols": [
+            "http",
+            "https",
+            "grpc",
+            "websocket",
+            "amqp",
+            "mqtt"
+          ],
           "api_version_required": true,
           "contract_schema_required": true,
           "health_endpoint_required": true,
+          "max_services_per_tenant": 10000,
           "owner_required": true
         },
         "routing": {
           "circuit_breaking_enabled": true,
           "gateway_sync_enabled": true,
-          "load_balancing_metadata_required": true
+          "load_balancing_metadata_required": true,
+          "publish_requires_healthy_instance": true,
+          "supported_strategies": [
+            "round_robin",
+            "weighted",
+            "least_latency",
+            "failover"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -419,9 +1149,16 @@
           "default_theme": "regy_service_catalog"
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_contract_review": true,
           "enable_discovery_console": true,
+          "enable_gateway_sync": true,
           "enable_health_dashboard": true,
+          "enable_instance_manager": true,
+          "enable_registration_console": true,
+          "enable_retirement_reviews": true,
           "enable_service_catalog": true,
+          "enable_settings": true,
           "enable_version_manager": true
         }
       },
@@ -465,7 +1202,8 @@
     "breaking_change_requires_review": {
       "condition": {
         "breaking_change_detected": true,
-        "compatibility_review_recorded": false
+        "compatibility_review_recorded": false,
+        "operation": "record_version"
       },
       "description": "Breaking API changes require compatibility review.",
       "effect": {
@@ -475,9 +1213,36 @@
       },
       "name": "breaking_change_requires_review"
     },
-    "cross_tenant_discovery_denied": {
+    "deprecation_requires_future_eol": {
       "condition": {
-        "cross_tenant_discovery": true
+        "future_eol_date": false,
+        "operation": "deprecate_version"
+      },
+      "description": "Deprecated versions require a future end-of-life date.",
+      "effect": {
+        "decision": "deny",
+        "reason": "future_eol_required",
+        "required_action": "choose_future_eol_date"
+      },
+      "name": "deprecation_requires_future_eol"
+    },
+    "deprecation_requires_migration_notes": {
+      "condition": {
+        "migration_notes_present": false,
+        "operation": "deprecate_version"
+      },
+      "description": "Deprecated versions require migration notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "migration_notes_required",
+        "required_action": "attach_migration_notes"
+      },
+      "name": "deprecation_requires_migration_notes"
+    },
+    "discovery_cross_tenant_denied": {
+      "condition": {
+        "cross_tenant_discovery": true,
+        "operation": "discover_services"
       },
       "description": "Cross-tenant discovery is denied by default.",
       "effect": {
@@ -485,11 +1250,26 @@
         "reason": "cross_tenant_discovery_denied",
         "required_action": "use_tenant_scoped_discovery"
       },
-      "name": "cross_tenant_discovery_denied"
+      "name": "discovery_cross_tenant_denied"
+    },
+    "discovery_high_result_limit_requires_review": {
+      "condition": {
+        "discovery_review_recorded": false,
+        "operation": "discover_services",
+        "requested_result_limit_gt": 1000
+      },
+      "description": "Large discovery result limits require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "discovery_limit_review_required",
+        "required_action": "record_discovery_limit_review"
+      },
+      "name": "discovery_high_result_limit_requires_review"
     },
     "duplicate_service_name_blocked": {
       "condition": {
-        "duplicate_service_name": true
+        "duplicate_service_name": true,
+        "operation": "register_service"
       },
       "description": "Duplicate service names are blocked within tenant scope.",
       "effect": {
@@ -498,6 +1278,190 @@
         "required_action": "choose_unique_service_name"
       },
       "name": "duplicate_service_name_blocked"
+    },
+    "gateway_publish_requires_healthy_instance": {
+      "condition": {
+        "healthy_instance_present": false,
+        "operation": "publish_to_gateway"
+      },
+      "description": "Gateway publication requires at least one healthy instance.",
+      "effect": {
+        "decision": "deny",
+        "reason": "healthy_instance_required",
+        "required_action": "restore_or_register_healthy_instance"
+      },
+      "name": "gateway_publish_requires_healthy_instance"
+    },
+    "gateway_publish_requires_registered_service": {
+      "condition": {
+        "operation": "publish_to_gateway",
+        "service_registered": false
+      },
+      "description": "Gateway publication requires a registered service.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_service_required",
+        "required_action": "register_service_first"
+      },
+      "name": "gateway_publish_requires_registered_service"
+    },
+    "gateway_publish_requires_reviewed_service": {
+      "condition": {
+        "operation": "publish_to_gateway",
+        "service_review_complete": false
+      },
+      "description": "Gateway publication requires completed service review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_review_required",
+        "required_action": "complete_service_review"
+      },
+      "name": "gateway_publish_requires_reviewed_service"
+    },
+    "gateway_publish_requires_routing_metadata": {
+      "condition": {
+        "operation": "publish_to_gateway",
+        "routing_metadata_present": false
+      },
+      "description": "Gateway publication requires load-balancing and route metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "routing_metadata_required",
+        "required_action": "attach_routing_metadata"
+      },
+      "name": "gateway_publish_requires_routing_metadata"
+    },
+    "health_override_requires_incident_reference": {
+      "condition": {
+        "incident_reference_present": false,
+        "operation": "override_health"
+      },
+      "description": "Manual health overrides require an incident or change reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_reference_required",
+        "required_action": "attach_incident_reference"
+      },
+      "name": "health_override_requires_incident_reference"
+    },
+    "instance_requires_allowed_region": {
+      "condition": {
+        "allowed_region": false,
+        "operation": "register_instance"
+      },
+      "description": "Service instances must target an allowed region.",
+      "effect": {
+        "decision": "deny",
+        "reason": "allowed_region_required",
+        "required_action": "choose_allowed_region"
+      },
+      "name": "instance_requires_allowed_region"
+    },
+    "instance_requires_endpoint": {
+      "condition": {
+        "endpoint_present": false,
+        "operation": "register_instance"
+      },
+      "description": "Service instances require endpoint metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "instance_endpoint_required",
+        "required_action": "attach_instance_endpoint"
+      },
+      "name": "instance_requires_endpoint"
+    },
+    "instance_requires_health_probe": {
+      "condition": {
+        "health_probe_present": false,
+        "operation": "register_instance"
+      },
+      "description": "Service instances require health probe evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "instance_health_probe_required",
+        "required_action": "attach_instance_health_probe"
+      },
+      "name": "instance_requires_health_probe"
+    },
+    "instance_requires_positive_weight": {
+      "condition": {
+        "operation": "register_instance",
+        "positive_weight": false
+      },
+      "description": "Load-balancing weights must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "positive_weight_required",
+        "required_action": "set_positive_instance_weight"
+      },
+      "name": "instance_requires_positive_weight"
+    },
+    "owner_transfer_requires_review": {
+      "condition": {
+        "operation": "transfer_owner",
+        "owner_transfer_review_recorded": false
+      },
+      "description": "Service ownership transfer requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "owner_transfer_review_required",
+        "required_action": "record_owner_transfer_review"
+      },
+      "name": "owner_transfer_requires_review"
+    },
+    "production_registration_requires_review": {
+      "condition": {
+        "environment": "production",
+        "operation": "register_service",
+        "production_review_recorded": false
+      },
+      "description": "Production service registration requires review evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "production_registration_review_required",
+        "required_action": "record_production_registration_review"
+      },
+      "name": "production_registration_requires_review"
+    },
+    "production_requires_tracing": {
+      "condition": {
+        "environment": "production",
+        "operation": "register_service",
+        "trace_propagation_configured": false
+      },
+      "description": "Production services require trace propagation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "trace_propagation_required",
+        "required_action": "configure_trace_propagation"
+      },
+      "name": "production_requires_tracing"
+    },
+    "service_registration_requires_api_version": {
+      "condition": {
+        "api_version_present": false,
+        "operation": "register_service"
+      },
+      "description": "Service registration requires an API version.",
+      "effect": {
+        "decision": "deny",
+        "reason": "api_version_required",
+        "required_action": "declare_api_version"
+      },
+      "name": "service_registration_requires_api_version"
+    },
+    "service_registration_requires_contract_schema": {
+      "condition": {
+        "contract_schema_present": false,
+        "operation": "register_service"
+      },
+      "description": "Service registration requires API or service contract schema evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "contract_schema_required",
+        "required_action": "attach_contract_schema"
+      },
+      "name": "service_registration_requires_contract_schema"
     },
     "service_registration_requires_health_endpoint": {
       "condition": {
@@ -517,13 +1481,39 @@
         "operation": "register_service",
         "owner_assigned": false
       },
-      "description": "Service registration requires an owner.",
+      "description": "Service registration requires an accountable owner.",
       "effect": {
         "decision": "deny",
         "reason": "service_owner_required",
         "required_action": "assign_service_owner"
       },
       "name": "service_registration_requires_owner"
+    },
+    "service_retirement_requires_gateway_unpublish": {
+      "condition": {
+        "gateway_unpublish_recorded": false,
+        "operation": "retire_service"
+      },
+      "description": "Retiring a service requires gateway unpublish evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_unpublish_required",
+        "required_action": "record_gateway_unpublish"
+      },
+      "name": "service_retirement_requires_gateway_unpublish"
+    },
+    "service_retirement_requires_impact_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_service"
+      },
+      "description": "Retiring a service requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "impact_review_required",
+        "required_action": "record_retirement_impact_review"
+      },
+      "name": "service_retirement_requires_impact_review"
     },
     "tenant_context_required": {
       "condition": {

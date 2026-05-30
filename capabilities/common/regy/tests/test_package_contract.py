@@ -28,9 +28,12 @@ def test_registry_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "regy"
-	assert contract["ui"]["routes"]
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 20
 	assert contract["theme"]["tokens"]["border.radius"]
 	assert contract["configuration"]["registration"]["health_endpoint_required"] is True
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "registry_runtime.RegistryService"
 	assert contract["rule_engine"]["type"] == "deterministic"
 
 
@@ -48,3 +51,7 @@ def test_registry_app_entrypoint_is_publishable():
 	assert "regy" in model["capabilities"]
 	assert "service_registration_requires_health_endpoint" in model["rules"]
 	assert model["capabilities"]["regy"]["theme"]["name"] == "regy_service_catalog"
+	assert model["capabilities"]["regy"]["runtime"]["service"] == "registry_runtime.py"
+	assert model["capabilities"]["regy"]["runtime"]["views"] == "view_models.py"
+	assert model["capabilities"]["regy"]["registry_lifecycle"]["service"] == "RegistryServiceRecord"
+	assert model["capabilities"]["regy"]["streaming"]["engine"] == "bytewax"

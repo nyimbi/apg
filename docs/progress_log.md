@@ -13759,3 +13759,55 @@ Not run to preserve battery:
 - External metadata, quality, lineage, secret-store, and monitoring adapters.
 - Rendered ETLP UI/browser behavior.
 - Load, latency, and cost benchmarks.
+
+### 2026-05-30 07:09 EAT
+
+REGY lifecycle and guardrail packet:
+
+- Selected `capabilities/common/regy` as the next common capability after APIG
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md` describing the
+  current API/service registry scope, generated-app runtime, adapter
+  boundaries, focused verification, and usage examples.
+- Replaced primary REGY package docs with practical lifecycle scope and removed
+  stale speculative production-roadmap language from the active docs.
+- Expanded the REGY contract to 25 deterministic guardrails, 12 UI routes,
+  service/instance/contract/discovery/routing/governance/observability/adapter
+  configuration, Bytewax event-stream adapter evidence, and richer theme
+  components.
+- Added `registry_runtime.RegistryService` with dependency-light service,
+  instance, discovery, version, gateway publication, health override,
+  retirement, review, summary, and audit records.
+- Added generated-app API helper functions while preserving the existing Flask
+  REST blueprint surface.
+- Added `view_models.py` for dashboard, catalog, registration, discovery,
+  health, versions, contract reviews, gateway sync, retirements, audit, and
+  settings.
+- Replaced static `app.py` semantic evidence with contract-derived evidence
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded focused tests for contract shape, Bytewax adapter evidence,
+  positive service/instance/discovery/publication flow, missing-evidence
+  denials, review records, retirement guardrails, package evidence, and UI
+  model composition.
+- Code review found and fixed API prefix/permission namespace inconsistency,
+  production-review bypass before gateway publication, missing discovery-limit
+  review persistence, missing owner-transfer workflow, and a misplaced
+  module-level API export.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/regy/__init__.py capabilities/common/regy/capability_contract.py capabilities/common/regy/models.py capabilities/common/regy/registry_runtime.py capabilities/common/regy/api.py capabilities/common/regy/view_models.py capabilities/common/regy/app.py capabilities/common/regy/test_capability_contract.py capabilities/common/regy/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/regy/test_capability_contract.py capabilities/common/regy/tests/test_package_contract.py` passed with 9 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "from capabilities.common.regy.app import self_test; import json; print(json.dumps(self_test(), sort_keys=True))"` returned `passed: true`; importing the package emitted the existing optional OpenTelemetry fallback warning.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/regy --json` passed with `ok: true`; REGY remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/regy --json` passed with 12 UI routes, 25 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "materialized" -e "Materialized" -e "This package materializes" -e "mock data" -e "mock calculation" -e "placeholder" capabilities/common/regy/README.md capabilities/common/regy/SPECIFICATION.md capabilities/common/regy/PLAN.md capabilities/common/regy/cap_spec.md capabilities/common/regy/app.py capabilities/common/regy/api.py capabilities/common/regy/registry_runtime.py capabilities/common/regy/view_models.py capabilities/common/regy/test_capability_contract.py capabilities/common/regy/tests/test_package_contract.py capabilities/common/regy/package_manifest.json capabilities/common/regy/release_report.json capabilities/common/regy/semantic_model.json capabilities/common/regy/__init__.py capabilities/common/regy/capability_contract.py capabilities/common/regy/docs/ADMIN_GUIDE.md capabilities/common/regy/docs/DEPLOYMENT_GUIDE.md capabilities/common/regy/docs/USER_GUIDE.md capabilities/common/regy/docs/decisions_log.md capabilities/common/regy/docs/implementation_plan.md` returned no primary-slice stale markers.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live service mesh, gateway, cache, monitoring, audit, and Bytewax adapters.
+- Rendered Flask-AppBuilder UI/browser behavior.
+- Advanced legacy enhancement modules and their dedicated heavy tests.
+- Load, latency, and service-discovery scale benchmarks.

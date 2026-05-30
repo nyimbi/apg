@@ -5,13 +5,140 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "API/Service Registry package-backed APG capability", "entity_count": 0, "name": "regy", "version": "1.0.0"}, "capabilities": {"regy": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"discovery": {"cache_ttl_seconds": 60, "cross_tenant_discovery_allowed": false, "prefer_healthy_instances": true, "service_discovery_enabled": true}, "governance": {"audit_registration_events": true, "breaking_change_review_required": true, "duplicate_service_names_blocked": true, "require_tenant_context": true}, "health": {"active_health_checks_enabled": true, "default_interval_seconds": 30, "degraded_blocks_gateway_publish": true, "failure_threshold": 3}, "registration": {"api_version_required": true, "contract_schema_required": true, "health_endpoint_required": true, "owner_required": true}, "routing": {"circuit_breaking_enabled": true, "gateway_sync_enabled": true, "load_balancing_metadata_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "regy_service_catalog"}, "ui": {"enable_discovery_console": true, "enable_health_dashboard": true, "enable_service_catalog": true, "enable_version_manager": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "API/Service Registry", "provides": ["regy_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All registry operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "register_service", "owner_assigned": false}, "description": "Service registration requires an owner.", "effect": {"decision": "deny", "reason": "service_owner_required", "required_action": "assign_service_owner"}, "name": "service_registration_requires_owner"}, {"condition": {"health_endpoint_present": false, "operation": "register_service"}, "description": "Service registration requires health endpoint metadata.", "effect": {"decision": "deny", "reason": "health_endpoint_required", "required_action": "attach_health_endpoint"}, "name": "service_registration_requires_health_endpoint"}, {"condition": {"duplicate_service_name": true}, "description": "Duplicate service names are blocked within tenant scope.", "effect": {"decision": "deny", "reason": "duplicate_service_name", "required_action": "choose_unique_service_name"}, "name": "duplicate_service_name_blocked"}, {"condition": {"breaking_change_detected": true, "compatibility_review_recorded": false}, "description": "Breaking API changes require compatibility review.", "effect": {"decision": "require_review", "reason": "compatibility_review_required", "required_action": "record_compatibility_review"}, "name": "breaking_change_requires_review"}, {"condition": {"cross_tenant_discovery": true}, "description": "Cross-tenant discovery is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_discovery_denied", "required_action": "use_tenant_scoped_discovery"}, "name": "cross_tenant_discovery_denied"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All registry operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "register_service", "owner_assigned": false}, "description": "Service registration requires an owner.", "effect": {"decision": "deny", "reason": "service_owner_required", "required_action": "assign_service_owner"}, "name": "service_registration_requires_owner"}, {"condition": {"health_endpoint_present": false, "operation": "register_service"}, "description": "Service registration requires health endpoint metadata.", "effect": {"decision": "deny", "reason": "health_endpoint_required", "required_action": "attach_health_endpoint"}, "name": "service_registration_requires_health_endpoint"}, {"condition": {"duplicate_service_name": true}, "description": "Duplicate service names are blocked within tenant scope.", "effect": {"decision": "deny", "reason": "duplicate_service_name", "required_action": "choose_unique_service_name"}, "name": "duplicate_service_name_blocked"}, {"condition": {"breaking_change_detected": true, "compatibility_review_recorded": false}, "description": "Breaking API changes require compatibility review.", "effect": {"decision": "require_review", "reason": "compatibility_review_required", "required_action": "record_compatibility_review"}, "name": "breaking_change_requires_review"}, {"condition": {"cross_tenant_discovery": true}, "description": "Cross-tenant discovery is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_discovery_denied", "required_action": "use_tenant_scoped_discovery"}, "name": "cross_tenant_discovery_denied"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "RegistryDashboard", "permission": "regy:view", "route": "/regy/dashboard"}, "discovery": {"component": "DiscoveryConsole", "permission": "regy:discover", "route": "/regy/discovery"}, "gateway_sync": {"component": "GatewaySyncView", "permission": "regy:sync_gateway", "route": "/regy/gateway-sync"}, "health": {"component": "ServiceHealthDashboard", "permission": "regy:view_health", "route": "/regy/health"}, "register": {"component": "ServiceRegistration", "permission": "regy:register_service", "route": "/regy/register"}, "services": {"component": "ServiceCatalog", "permission": "regy:view_services", "route": "/regy/services"}, "settings": {"component": "RegistrySettings", "permission": "regy:admin", "route": "/regy/settings"}, "versions": {"component": "ServiceVersionManager", "permission": "regy:manage_versions", "route": "/regy/versions"}}, "streaming": {}, "theme": {"components": {"discovery_result_card": {"highlight": "endpoint-chip", "visual": "instance-stack"}, "health_check_timeline": {"status_style": "failure-threshold", "visual": "probe-timeline"}, "service_catalog_row": {"icon": "network", "risk_style": "version-band", "status_indicator": "health-pill"}, "version_compatibility_panel": {"highlight": "breaking-change-chip", "visual": "version-matrix"}}, "name": "regy_service_catalog", "tokens": {"border.radius": "8px", "color.accent": "#6D597A", "color.danger": "#C53030", "color.primary": "#355070", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/regy/api/v1", "requires_theme": true, "routes": [{"component": "RegistryDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/regy/dashboard", "permission": "regy:view"}, {"component": "ServiceCatalog", "name": "services", "nav_group": "Catalog", "path": "/regy/services", "permission": "regy:view_services"}, {"component": "ServiceRegistration", "name": "register", "nav_group": "Catalog", "path": "/regy/register", "permission": "regy:register_service"}, {"component": "DiscoveryConsole", "name": "discovery", "nav_group": "Discovery", "path": "/regy/discovery", "permission": "regy:discover"}, {"component": "ServiceHealthDashboard", "name": "health", "nav_group": "Reliability", "path": "/regy/health", "permission": "regy:view_health"}, {"component": "ServiceVersionManager", "name": "versions", "nav_group": "Governance", "path": "/regy/versions", "permission": "regy:manage_versions"}, {"component": "GatewaySyncView", "name": "gateway_sync", "nav_group": "Integration", "path": "/regy/gateway-sync", "permission": "regy:sync_gateway"}, {"component": "RegistrySettings", "name": "settings", "nav_group": "Administration", "path": "/regy/settings", "permission": "regy:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"regy": []}}, "contracts": {"regy": {"configuration": {"discovery": {"cache_ttl_seconds": 60, "cross_tenant_discovery_allowed": false, "prefer_healthy_instances": true, "service_discovery_enabled": true}, "governance": {"audit_registration_events": true, "breaking_change_review_required": true, "duplicate_service_names_blocked": true, "require_tenant_context": true}, "health": {"active_health_checks_enabled": true, "default_interval_seconds": 30, "degraded_blocks_gateway_publish": true, "failure_threshold": 3}, "registration": {"api_version_required": true, "contract_schema_required": true, "health_endpoint_required": true, "owner_required": true}, "routing": {"circuit_breaking_enabled": true, "gateway_sync_enabled": true, "load_balancing_metadata_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "regy_service_catalog"}, "ui": {"enable_discovery_console": true, "enable_health_dashboard": true, "enable_service_catalog": true, "enable_version_manager": true}}, "id": "regy", "provides": ["regy_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"regy": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"breaking_change_requires_review": {"condition": {"breaking_change_detected": true, "compatibility_review_recorded": false}, "description": "Breaking API changes require compatibility review.", "effect": {"decision": "require_review", "reason": "compatibility_review_required", "required_action": "record_compatibility_review"}, "name": "breaking_change_requires_review"}, "cross_tenant_discovery_denied": {"condition": {"cross_tenant_discovery": true}, "description": "Cross-tenant discovery is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_discovery_denied", "required_action": "use_tenant_scoped_discovery"}, "name": "cross_tenant_discovery_denied"}, "duplicate_service_name_blocked": {"condition": {"duplicate_service_name": true}, "description": "Duplicate service names are blocked within tenant scope.", "effect": {"decision": "deny", "reason": "duplicate_service_name", "required_action": "choose_unique_service_name"}, "name": "duplicate_service_name_blocked"}, "service_registration_requires_health_endpoint": {"condition": {"health_endpoint_present": false, "operation": "register_service"}, "description": "Service registration requires health endpoint metadata.", "effect": {"decision": "deny", "reason": "health_endpoint_required", "required_action": "attach_health_endpoint"}, "name": "service_registration_requires_health_endpoint"}, "service_registration_requires_owner": {"condition": {"operation": "register_service", "owner_assigned": false}, "description": "Service registration requires an owner.", "effect": {"decision": "deny", "reason": "service_owner_required", "required_action": "assign_service_owner"}, "name": "service_registration_requires_owner"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All registry operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.regy": {"file": "capability_contract.py", "id": "capability.regy", "kind": "capability", "name": "API/Service Registry", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("regy_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "regy",
+			"version": "1.0.0",
+			"description": "API/Service Registry package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"regy": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"regy": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["regy_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "registry_runtime.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"production_registration": "RegistryReviewRecord",
+					"compatibility_review": "RegistryReviewRecord",
+					"discovery_limit_review": "RegistryReviewRecord",
+					"service_retirement": "RegistryServiceRecord",
+				},
+				"registry_lifecycle": {
+					"service": "RegistryServiceRecord",
+					"instance": "RegistryInstanceRecord",
+					"version": "RegistryVersionRecord",
+					"gateway_publication": "RegistryGatewayPublication",
+					"review": "RegistryReviewRecord",
+					"audit": "RegistryAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {
+					"engine": contract["configuration"]["adapters"]["event_stream"],
+				},
+			}
+		},
+		"contracts": {
+			"regy": {
+				"id": "regy",
+				"configuration": contract["configuration"],
+				"provides": ["regy_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"regy": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.regy": {
+				"id": "capability.regy",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +163,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("regy", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "regy" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("REGY semantic model route manifest is stale")
+	if len(rules) < 20:
+		errors.append("REGY semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("REGY adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "registry_runtime.py":
+		errors.append("REGY generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

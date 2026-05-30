@@ -162,6 +162,7 @@ except ImportError:
 from werkzeug.exceptions import BadRequest, NotFound, Unauthorized, Forbidden, HTTPException
 
 from .service import ServiceRegistryService
+from .registry_runtime import RegistryService as GeneratedRegistryService
 from .models import (
 	ServiceRegistration, ServiceDiscoveryQuery, ServiceDiscoveryResult,
 	ServiceHealthStatus, ServiceEvent, ServiceMetrics, ServiceStatus,
@@ -249,6 +250,7 @@ health_status_model = health_ns.model('ServiceHealthStatus', {
 
 # Global registry service instance
 registry_service: Optional[ServiceRegistryService] = None
+generated_registry_service = GeneratedRegistryService()
 
 def get_registry_service() -> ServiceRegistryService:
 	"""Get the registry service instance."""
@@ -833,5 +835,130 @@ def handle_internal_error(error):
 		'status_code': 500
 	}, 500
 
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return dependency-light REGY generated-app status."""
+	contract = generated_registry_service.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		**generated_registry_service.registry_summary(tenant_id),
+	}
+
+
+def register_generated_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Register a service through the generated-app control plane."""
+	return generated_registry_service.register_service(
+		service_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload["owner"]),
+		service_type=str(payload.get("service_type") or "api"),
+		environment=str(payload.get("environment") or "development"),
+		api_version=str(payload["api_version"]),
+		contract_schema_ref=str(payload["contract_schema_ref"]),
+		health_endpoint=str(payload["health_endpoint"]),
+		routing_metadata=dict(payload.get("routing_metadata") or {}),
+		labels=dict(payload.get("labels") or {}),
+		production_review_recorded=_payload_bool(payload, "production_review_recorded", False),
+		trace_propagation_configured=_payload_bool(payload, "trace_propagation_configured", True),
+	)
+
+
+def register_generated_instance(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Register a service instance through the generated-app control plane."""
+	return generated_registry_service.register_instance(
+		instance_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		service_id=str(payload["service_id"]),
+		endpoint=str(payload["endpoint"]),
+		region=str(payload.get("region") or "local"),
+		health_probe=str(payload["health_probe"]),
+		weight=int(payload.get("weight") or 100),
+		health=str(payload.get("health") or "healthy"),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
+def discover_generated_services(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Discover services through the generated-app control plane."""
+	return generated_registry_service.discover_services(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		service_name=payload.get("service_name"),
+		healthy_only=_payload_bool(payload, "healthy_only", True),
+		requested_result_limit=int(payload.get("requested_result_limit") or 100),
+		target_tenant_id=payload.get("target_tenant_id"),
+		discovery_review_recorded=_payload_bool(payload, "discovery_review_recorded", False),
+	)
+
+
+def record_generated_version(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Record a service version through the generated-app control plane."""
+	return generated_registry_service.record_version(
+		version_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		service_id=str(payload["service_id"]),
+		version=str(payload["version"]),
+		contract_schema_ref=str(payload["contract_schema_ref"]),
+		breaking_change_detected=_payload_bool(payload, "breaking_change_detected", False),
+		compatibility_review_recorded=_payload_bool(payload, "compatibility_review_recorded", False),
+	)
+
+
+def publish_generated_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Publish a registered service to gateway adapters."""
+	return generated_registry_service.publish_to_gateway(
+		publication_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		service_id=str(payload["service_id"]),
+		route_path=str(payload["route_path"]),
+		strategy=str(payload.get("strategy") or "weighted"),
+	)
+
+
+def transfer_generated_owner(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Transfer a service owner through the generated-app control plane."""
+	return generated_registry_service.transfer_owner(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		service_id=str(payload["id"]),
+		new_owner=str(payload["new_owner"]),
+		actor=str(payload["actor"]),
+		owner_transfer_review_recorded=_payload_bool(payload, "owner_transfer_review_recorded", False),
+	)
+
+
+def retire_generated_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Retire a service through the generated-app control plane."""
+	return generated_registry_service.retire_service(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		service_id=str(payload["id"]),
+		actor=str(payload["actor"]),
+		impact_review_recorded=_payload_bool(payload, "impact_review_recorded", False),
+		gateway_unpublish_recorded=_payload_bool(payload, "gateway_unpublish_recorded", False),
+	)
+
+
+def list_generated_services(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_registry_service.list_services(tenant_id)
+
+
+def list_generated_instances(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_registry_service.list_instances(tenant_id)
+
+
+def list_generated_audit_events(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_registry_service.list_audit_events(tenant_id)
+
+
+def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)
+
+
 # Export the blueprint for APG integration
-__all__ = ['registry_bp', 'api']
+__all__ = ['registry_bp', 'api', 'capability_status']

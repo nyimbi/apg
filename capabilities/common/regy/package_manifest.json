@@ -3,11 +3,16 @@
   "display_name": "API/Service Registry",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
     "models.py",
+    "registry_runtime.py",
     "service.py",
     "api.py",
     "views.py",
+    "view_models.py",
     "app.py",
     "semantic_model.json",
     "release_report.json"

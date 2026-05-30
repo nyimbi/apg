@@ -17,13 +17,14 @@ from .capability_contract import (
 	get_capability_contract,
 	evaluate_capability_rules
 )
+from .registry_runtime import RegistryService
 
 __version__ = "1.0.0"
 __capability_name__ = "Registry (regy)"
 __capability_description__ = "API/Service Registry with intelligent service discovery"
 __apg_capability_id__ = "regy"
 __apg_capability_type__ = "integration"
-__apg_dependencies__ = ["auth", "conf", "moni", "audl"]
+__apg_dependencies__ = ["auth", "conf", "moni", "audl", "apig", "cach"]
 
 # APG Capability Metadata for Composition Engine
 APG_CAPABILITY_METADATA = {
@@ -38,7 +39,8 @@ APG_CAPABILITY_METADATA = {
 		"conf",      # Configuration management
 		"moni",      # Monitoring and observability
 		"audl",      # Audit logging
-		"apig"       # API Gateway integration
+		"apig",      # API Gateway integration
+		"cach"       # Discovery cache adapters
 	],
 	"provides": [
 		"service_discovery",
@@ -105,18 +107,23 @@ def register_capability() -> dict:
 		"capabilities": {
 			"service_registration": "Register tenant-scoped services and API contracts",
 			"service_discovery": "Discover healthy service instances for callers and gateway sync",
+			"instance_management": "Register endpoint, region, weight, and health metadata for service instances",
 			"health_monitoring": "Track active health checks and registration status",
 			"api_versioning": "Govern compatible and breaking service versions",
+			"gateway_publication": "Publish healthy registered services to API gateway adapters",
+			"retirement_governance": "Retire services only with impact and gateway unpublish evidence",
 			"capability_rules": "Evaluate deterministic registry governance rules",
 			"visual_theming": "Apply service-catalog theme tokens and components"
 		},
 		"endpoints": {
-			"services": "/regy/api/v1/services",
-			"registration": "/regy/api/v1/register",
-			"discovery": "/regy/api/v1/discover",
-			"health": "/regy/api/v1/health",
-			"versions": "/regy/api/v1/versions",
-			"gateway_sync": "/regy/api/v1/gateway-sync"
+			"services": "/api/regy/v1/services",
+			"registration": "/api/regy/v1/register",
+			"instances": "/api/regy/v1/instances",
+			"discovery": "/api/regy/v1/discover",
+			"health": "/api/regy/v1/health",
+			"versions": "/api/regy/v1/versions",
+			"contracts": "/api/regy/v1/contracts",
+			"gateway_sync": "/api/regy/v1/gateway-sync"
 		},
 		"ui_components": {
 			route["name"]: route["path"]
@@ -125,14 +132,18 @@ def register_capability() -> dict:
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
 		"permissions": [
-			"regy:view",
-			"regy:view_services",
-			"regy:register_service",
-			"regy:discover",
-			"regy:view_health",
-			"regy:manage_versions",
-			"regy:sync_gateway",
-			"regy:admin"
+			"registry:list_services",
+			"registry:get_service",
+			"registry:register_service",
+			"registry:update_service",
+			"registry:deregister_service",
+			"registry:discover_services",
+			"registry:view_health",
+			"registry:update_health",
+			"registry:trigger_health_check",
+			"registry:view_metrics",
+			"registry:view_statistics",
+			"registry:view_events"
 		]
 	}
 

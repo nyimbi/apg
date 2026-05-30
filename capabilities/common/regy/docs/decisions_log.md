@@ -1,66 +1,46 @@
-# APG Registry Revolutionary Enhancements - Decisions Log
+# REGY Decisions Log
 
-**Project**: APG Registry Production-Grade Revolutionary Enhancements  
-**Created**: 2025-01-15  
-**Author**: APG Platform Team  
+## Decision 001: Separate Generated-App Runtime From Production Runtime
 
-## Decision Log
+**Decision**: Add `registry_runtime.py` as a dependency-light lifecycle runtime
+while keeping `service.py`, `api.py`, and `views.py` available for production
+and legacy integration.
 
-### Decision 001: Complete Implementation Approach
-**Date**: 2025-01-15  
-**Decision**: Complete rewrite of revolutionary_enhancements.py removing all placeholders  
-**Rationale**: Current implementation contains ~80% placeholder code that doesn't meet production standards  
-**Alternatives Considered**: 
-- Incremental enhancement of existing code
-- Selective replacement of critical sections
-**Selected Approach**: Complete rewrite with production-grade algorithms  
-**Impact**: Ensures zero placeholder code and production readiness  
-**Status**: Approved  
+**Rationale**: Generated APG applications need executable registry behavior
+without optional service mesh, gateway, monitor, audit, cache, or Bytewax
+dependencies.
 
-### Decision 002: Mathematical Foundation Selection
-**Date**: 2025-01-15  
-**Decision**: Use established mathematical libraries (NumPy, SciPy) for complex computations  
-**Rationale**: Ensures mathematical accuracy and performance optimization  
-**Alternatives Considered**: 
-- Pure Python implementation
-- Custom mathematical libraries
-**Selected Approach**: Leverage proven mathematical libraries  
-**Impact**: Higher accuracy, better performance, reduced implementation risk  
-**Status**: Approved  
+**Impact**: Package tests can prove lifecycle behavior cheaply, and production
+adapters can remain replaceable.
 
-### Decision 003: Testing Strategy
-**Date**: 2025-01-15  
-**Decision**: Implement comprehensive test suite with ≥95% coverage requirement  
-**Rationale**: Production-grade code requires thorough validation  
-**Alternatives Considered**: 
-- Minimal testing focused on happy paths
-- Integration testing only
-**Selected Approach**: Comprehensive unit and integration testing  
-**Impact**: Ensures reliability and maintainability  
-**Status**: Approved  
+## Decision 002: Keep Guardrails Deterministic
 
-### Decision 004: Documentation Standards
-**Date**: 2025-01-15  
-**Decision**: Google-style docstrings for all public APIs with executable examples  
-**Rationale**: Provides consistent, comprehensive documentation  
-**Alternatives Considered**: 
-- NumPy-style docstrings
-- Sphinx reStructuredText
-**Selected Approach**: Google-style with mandatory examples  
-**Impact**: Improved developer experience and code maintainability  
-**Status**: Approved  
+**Decision**: Use explicit deterministic rule conditions and effects for
+registry decisions.
 
-### Decision 005: Performance Benchmarking
-**Date**: 2025-01-15  
-**Decision**: Establish quantitative 10x improvement benchmarks vs industry leaders  
-**Rationale**: Claims must be measurable and verifiable  
-**Alternatives Considered**: 
-- Qualitative performance assessments
-- Theoretical performance analysis
-**Selected Approach**: Empirical benchmarking with specific metrics  
-**Impact**: Validates revolutionary enhancement claims  
-**Status**: Approved  
+**Rationale**: Capability composition needs reproducible `allow`, `deny`, and
+`require_review` outcomes with matched rules and required actions.
 
----
+**Impact**: Future optimization, AI ranking, or external policy engines must
+honor these decisions before side effects.
 
-*This log will be updated with all major technical decisions and their rationale throughout the implementation process.*
+## Decision 003: Treat Bytewax As The Event Stream Adapter
+
+**Decision**: The REGY adapter manifest names Bytewax for event streaming.
+
+**Rationale**: APG should avoid Kafka for this platform direction and keep
+registry lifecycle events routed through Bytewax-compatible flows.
+
+**Impact**: Production stream work belongs in adapters; generated-app runtime
+only emits audit/event records.
+
+## Decision 004: Replace Overclaiming Docs With Executable Scope
+
+**Decision**: Primary docs describe implemented lifecycle behavior and adapter
+boundaries instead of broad market or speculative technology claims.
+
+**Rationale**: Capability packets should make current executable behavior clear
+so new contributors can advance the platform from a reliable baseline.
+
+**Impact**: Ambitious future work can be reintroduced as specific specs, tests,
+and adapter implementations.
