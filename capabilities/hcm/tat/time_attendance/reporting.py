@@ -1,7 +1,7 @@
 """
 APG Time & Attendance Capability - Advanced Reporting & Data Export Engine
 
-Revolutionary reporting system with AI-powered insights, predictive analytics,
+Governed reporting system with AI-powered insights, predictive analytics,
 automated compliance reporting, and multi-format data export capabilities.
 
 Copyright © 2025 Datacraft
@@ -942,7 +942,7 @@ class ReportGenerator:
 				th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
 				th {{ background-color: #366092; color: white; }}
 				tr:nth-child(even) {{ background-color: #f2f2f2; }}
-				.chart-placeholder {{ background: #f9f9f9; padding: 20px; margin: 10px 0; text-align: center; }}
+				.chart-chart-slot {{ background: #f9f9f9; padding: 20px; margin: 10px 0; text-align: center; }}
 			</style>
 		</head>
 		<body>
@@ -968,11 +968,11 @@ class ReportGenerator:
 				html += f'<li>{insight}</li>'
 			html += '</ul></div>'
 		
-		# Charts placeholder
+		# Charts chart-slot
 		if charts:
 			html += '<h2>Visualizations</h2>'
 			for chart_name, chart_data in charts.items():
-				html += f'<div class="chart-placeholder">Chart: {chart_name.replace("_", " ").title()}</div>'
+				html += f'<div class="chart-chart-slot">Chart: {chart_name.replace("_", " ").title()}</div>'
 		
 		# Data table
 		records = data.get("records", [])

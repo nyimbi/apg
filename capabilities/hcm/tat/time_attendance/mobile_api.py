@@ -2,7 +2,7 @@
 Time & Attendance Mobile API
 
 Mobile-optimized endpoints with push notifications, offline support,
-and enhanced user experience for the revolutionary APG Time & Attendance capability.
+and enhanced user experience for the governed APG Time & Attendance capability.
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero

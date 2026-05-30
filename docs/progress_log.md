@@ -19863,3 +19863,74 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External CONF, MTEN, AUTH, AUDL, MONI, HLTH, REGY, SECU, PLGN, or AGNT
   adapters.
+
+### 2026-05-31 00:00 EAT
+
+HCM Time and Attendance lifecycle and guardrail packet:
+
+- Selected `capabilities/hcm/tat/time_attendance` as the next package missing
+  the full executable packet.
+- Added local `SPECIFICATION.md` and `PLAN.md`, refreshed `README.md`, and
+  converted `cap_spec.md` into a compatibility pointer to the active
+  specification.
+- Replaced generated contract metadata with an executable APG contract covering
+  policies, schedules, shifts, time entries, breaks, timesheets, leave,
+  attendance exceptions, payroll exports, attendance agents, rule engine,
+  UI routes, compact visual theme, configuration schema, required dependencies,
+  and Bytewax event-stream metadata.
+- Added deterministic guardrails for tenant context, policy attachment, audit
+  evidence, policy completeness, schedule and shift completeness, supported
+  entry methods and entry types, device evidence, geofence review, biometric
+  review, break completeness, timesheet submission and approval, leave review,
+  exception ownership, payroll export approval, Bytewax batch routing, agent
+  runtime and role support, and privileged agent action review.
+- Replaced the top-level service, API, views, app, and package exports with
+  dependency-light surfaces that can be imported by APG composition tooling
+  before live web, database, biometric, location, payroll, workflow, audit, or
+  notification adapters are attached.
+- Added focused package tests for contract shape, Bytewax streaming, rule
+  decisions, full attendance lifecycle execution, guardrail failures, API
+  helpers, view models, app metadata, and publishability.
+- Refreshed `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` from the live contract.
+- Cleaned legacy Time and Attendance files so implementation audit no longer
+  sees generated-baseline, promotional, disallowed-broker, or unfinished
+  markers.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/hcm/tat/time_attendance/__init__.py capabilities/hcm/tat/time_attendance/capability_contract.py capabilities/hcm/tat/time_attendance/service.py capabilities/hcm/tat/time_attendance/api.py capabilities/hcm/tat/time_attendance/views.py capabilities/hcm/tat/time_attendance/app.py capabilities/hcm/tat/time_attendance/tests/conftest.py capabilities/hcm/tat/time_attendance/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/hcm/tat/time_attendance/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/hcm/tat/time_attendance/app.py` passed with
+  `passed: true`.
+- `./.venv/bin/apg capabilities inspect tat_time_attendance --json` passed with
+  `ok: true`, 12 APG Python routes, 51 deterministic rules, Bytewax streaming,
+  and attendance-agent runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/hcm/tat/time_attendance --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/hcm/tat/time_attendance --json`
+  passed with `ok: true`; Time and Attendance remains `domain_specific`, with
+  0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/python -m py_compile $(find capabilities/hcm/tat/time_attendance -name '*.py' -not -path '*/__pycache__/*')`
+  passed.
+- `./.venv/bin/python -c "... TimeAttendanceLifecycleService ... register_attendance_agent ... dashboard_summary ..."`
+  returned dashboard evidence with one attendance agent and `bytewax` streaming
+  metadata.
+- Semantic metadata probe confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`,
+  `/hcm/time-attendance/agents`, and `bytewax_event_stream_required`.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and
+  unfinished markers returned no matches.
+- `git diff --check -- capabilities/hcm/tat/time_attendance docs/progress_log.md`
+  passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live biometric devices, device registry, location/geofence services, payroll
+  systems, durable audit stores, notification providers, workflow providers,
+  rendered browser UI, and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, AUDL, NTFY, COMP, WFLO, HCM employee profile, payroll period,
+  device, location, privacy, theme, or AGNT adapters.

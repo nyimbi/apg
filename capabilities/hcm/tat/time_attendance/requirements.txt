@@ -1,5 +1,5 @@
 # Time & Attendance Capability Dependencies
-# Revolutionary APG Time & Attendance capability with AI-powered features
+# Governed APG Time & Attendance capability with AI-powered features
 
 # Core framework dependencies
 pydantic>=2.5.0,<3.0.0           # Data validation and models with v2 features

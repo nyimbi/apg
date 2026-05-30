@@ -1,8 +1,8 @@
 """
-Time & Attendance Capability - Revolutionary Data Models
+Time & Attendance Capability - Governed Data Models
 
-APG-compatible Pydantic v2 data models for the revolutionary time & attendance capability
-delivering 10x superior performance through AI-powered accuracy, predictive analytics, 
+APG-compatible Pydantic v2 data models for the governed time & attendance capability
+delivering measurable superior performance through AI-powered accuracy, predictive analytics,
 biometric integration, and seamless APG ecosystem connectivity.
 
 Copyright © 2025 Datacraft
@@ -356,7 +356,7 @@ class TAEmployee(TABaseModel):
 
 class TATimeEntry(TABaseModel):
 	"""
-	Revolutionary Time Entry Model
+	Governed Time Entry Model
 	
 	AI-powered time entry with fraud detection, biometric verification,
 	real-time validation, and predictive analytics integration.
@@ -1030,7 +1030,7 @@ class TAComplianceRule(TABaseModel):
 
 class TARemoteWorker(TABaseModel):
 	"""
-	Revolutionary Remote Worker Model
+	Governed Remote Worker Model
 	
 	Advanced remote work tracking with productivity analytics, wellbeing monitoring,
 	and intelligent workspace optimization for the distributed workforce.
@@ -1142,7 +1142,7 @@ class TARemoteWorker(TABaseModel):
 
 class TAAIAgent(TABaseModel):
 	"""
-	Revolutionary AI Agent Workforce Model
+	Governed AI Agent Workforce Model
 	
 	Comprehensive AI agent management with resource tracking, performance analytics,
 	and human-AI collaboration optimization for the hybrid workforce.
@@ -1249,7 +1249,7 @@ class TAAIAgent(TABaseModel):
 		if human_equivalent_cost == 0:
 			return 0.0
 		
-		return min(human_equivalent_cost / agent_cost, 10.0)  # Cap at 10x efficiency
+		return min(human_equivalent_cost / agent_cost, 10.0)  # Cap at measurable efficiency
 	
 	@computed_field
 	@property
@@ -1404,7 +1404,7 @@ __all__ = [
 	'TAFraudDetection', 'TABiometricAuthentication', 'TAPredictiveAnalytics',
 	'TAComplianceRule',
 	
-	# Revolutionary Workforce Models
+	# Governed Workforce Models
 	'TARemoteWorker', 'TAAIAgent', 'TAHybridCollaboration',
 	
 	# Validation functions (for testing)

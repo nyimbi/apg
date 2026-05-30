@@ -1,7 +1,7 @@
 """
 Time & Attendance Capability Configuration
 
-Comprehensive configuration management for the revolutionary APG Time & Attendance
+Comprehensive configuration management for the governed APG Time & Attendance
 capability with multi-tenant support, AI model settings, and integration parameters.
 
 Copyright © 2025 Datacraft

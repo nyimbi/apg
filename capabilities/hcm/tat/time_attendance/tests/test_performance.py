@@ -1,8 +1,8 @@
 """
 APG Time & Attendance Capability - Performance Test Suite
 
-Comprehensive performance testing and benchmarking for the revolutionary
-Time & Attendance capability, validating 10x superior performance claims.
+Comprehensive performance testing and benchmarking for the governed
+Time & Attendance capability, validating measurable superior performance claims.
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero
@@ -640,9 +640,9 @@ class BenchmarkComparison:
         print(f"\n🎯 OVERALL PERFORMANCE ADVANTAGE:")
         print(f"APG Time & Attendance is {overall_improvement:.1f}x better than industry average")
         
-        # Verify 10x claim
+        # Verify measurable claim
         if overall_improvement >= 10.0:
-            print("✅ CONFIRMED: APG Time & Attendance is 10x+ better than competitors!")
+            print("✅ CONFIRMED: APG Time & Attendance is measurable+ better than competitors!")
         elif overall_improvement >= 5.0:
             print("✅ EXCELLENT: APG Time & Attendance is 5x+ better than competitors!")
         else:

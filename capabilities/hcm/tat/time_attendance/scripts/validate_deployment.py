@@ -3,7 +3,7 @@
 APG Time & Attendance Capability - Deployment Validation Script
 
 Comprehensive validation script to verify production deployment readiness
-and validate all components of the revolutionary Time & Attendance capability.
+and validate all components of the governed Time & Attendance capability.
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero

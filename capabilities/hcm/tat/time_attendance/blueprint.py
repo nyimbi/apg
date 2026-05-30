@@ -1,7 +1,7 @@
 """
 Time & Attendance Capability Blueprint
 
-Flask-AppBuilder blueprint providing comprehensive API endpoints for the revolutionary
+Flask-AppBuilder blueprint providing comprehensive API endpoints for the governed
 APG Time & Attendance capability with full support for traditional, remote, and AI workers.
 
 Copyright 2025 Datacraft

@@ -1,7 +1,7 @@
 """
 APG Time & Attendance Capability - Comprehensive Monitoring & Alerting
 
-Revolutionary monitoring system with AI-powered anomaly detection,
+Governed monitoring system with AI-powered anomaly detection,
 predictive analytics, and intelligent alerting for proactive system management.
 
 Copyright © 2025 Datacraft

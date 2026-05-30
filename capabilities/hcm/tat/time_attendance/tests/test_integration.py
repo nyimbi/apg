@@ -1,7 +1,7 @@
 """
 APG Time & Attendance Capability - Integration Test Suite
 
-Comprehensive integration tests for the revolutionary Time & Attendance capability
+Comprehensive integration tests for the governed Time & Attendance capability
 testing all components, APIs, and APG ecosystem integration.
 
 Copyright © 2025 Datacraft

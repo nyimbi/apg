@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Time & Attendance",
+  "display_name": "Time and Attendance",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,41 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 12,
+  "rule_count": 51,
+  "streaming": {
+    "events": [
+      "attendance_policy_created",
+      "attendance_schedule_created",
+      "attendance_shift_created",
+      "time_entry_recorded",
+      "break_recorded",
+      "timesheet_submitted",
+      "timesheet_approved",
+      "leave_requested",
+      "attendance_exception_recorded",
+      "attendance_payroll_export_created",
+      "attendance_agent_registered"
+    ],
+    "guardrails": [
+      "attendance_batch_requires_bytewax",
+      "attendance_export_requires_approved_timesheets",
+      "privileged_attendance_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "active",
+      "planned",
+      "recorded",
+      "submitted",
+      "approved",
+      "requested",
+      "open",
+      "ready",
+      "blocked"
+    ],
+    "stream": "apg.hcm.tat.time_attendance.lifecycle"
+  },
+  "version": "2.1.0"
 }

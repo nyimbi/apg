@@ -2,7 +2,7 @@
 Time & Attendance Capability Database Configuration
 
 PostgreSQL database setup with multi-tenant isolation, comprehensive indexing,
-and APG ecosystem integration for the revolutionary Time & Attendance capability.
+and APG ecosystem integration for the governed Time & Attendance capability.
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero

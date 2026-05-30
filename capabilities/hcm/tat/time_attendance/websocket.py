@@ -2,7 +2,7 @@
 Time & Attendance Capability WebSocket Manager
 
 Real-time communication for live dashboards, instant notifications,
-and collaborative features in the revolutionary APG Time & Attendance capability.
+and collaborative features in the governed APG Time & Attendance capability.
 
 Copyright © 2025 Datacraft
 Author: Nyimbi Odero
