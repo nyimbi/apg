@@ -24,13 +24,27 @@ class CapabilityConfiguration:
 			"logs_enabled": True,
 			"traces_enabled": True,
 			"tenant_label_required": True,
+			"source_registration_required": True,
+			"disabled_sources_block_ingestion": True,
 			"max_cardinality_per_metric": 10000
+		},
+		"slo": {
+			"default_window_minutes": 60,
+			"alert_route_required": True,
+			"owner_required": True,
+			"burn_rate_alerting_enabled": True
 		},
 		"alerts": {
 			"default_severity": "medium",
 			"critical_alert_route_required": True,
 			"deduplication_window_minutes": 5,
-			"notification_capability": "ntfy"
+			"notification_capability": "ntfy",
+			"critical_incident_owner_required": True
+		},
+		"incidents": {
+			"auto_open_from_critical_alerts": True,
+			"owner_required": True,
+			"postmortem_required_for_severity": ["critical"]
 		},
 		"analytics": {
 			"anomaly_detection_enabled": True,
@@ -46,18 +60,34 @@ class CapabilityConfiguration:
 		"remediation": {
 			"autonomous_remediation_enabled": True,
 			"require_approval_for_production": True,
-			"runbook_required": True
+			"runbook_required": True,
+			"require_independent_reviewer": True,
+			"review_notes_required": True
+		},
+		"adapters": {
+			"supported_collectors": ["opentelemetry", "prometheus", "apg_native"],
+			"metrics_store": "adapter",
+			"log_store": "adapter",
+			"trace_store": "adapter",
+			"notification_adapter_required_for_critical": True
 		},
 		"security": {
 			"require_tenant_context": True,
 			"block_pii_in_logs": True,
-			"audit_rule_changes": True
+			"audit_rule_changes": True,
+			"record_lifecycle_audit": True
 		},
 		"ui": {
 			"enable_dashboard": True,
+			"enable_source_inventory": True,
 			"enable_alert_center": True,
+			"enable_log_explorer": True,
 			"enable_trace_explorer": True,
-			"enable_remediation_console": True
+			"enable_slo_console": True,
+			"enable_incident_console": True,
+			"enable_remediation_console": True,
+			"enable_adapter_health": True,
+			"enable_audit_timeline": True
 		},
 		"theme": {
 			"default_theme": "moni_signal_console",
@@ -69,10 +99,13 @@ class CapabilityConfiguration:
 		"required": [
 			"tenant_id",
 			"collection",
+			"slo",
 			"alerts",
+			"incidents",
 			"analytics",
 			"retention",
 			"remediation",
+			"adapters",
 			"security",
 			"ui",
 			"theme"
@@ -80,10 +113,13 @@ class CapabilityConfiguration:
 		"properties": {
 			"tenant_id": {"type": "string", "minLength": 1},
 			"collection": {"type": "object"},
+			"slo": {"type": "object"},
 			"alerts": {"type": "object"},
+			"incidents": {"type": "object"},
 			"analytics": {"type": "object"},
 			"retention": {"type": "object"},
 			"remediation": {"type": "object"},
+			"adapters": {"type": "object"},
 			"security": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -186,6 +222,26 @@ class CapabilityTheme:
 		"remediation_runbook_trace": {
 			"visual": "step-timeline",
 			"status_style": "approval-gate"
+		},
+		"source_health_panel": {
+			"visual": "source-grid",
+			"status_indicator": "source-state"
+		},
+		"slo_burn_rate_panel": {
+			"visual": "burn-rate-chart",
+			"threshold_style": "budget-lines"
+		},
+		"incident_timeline": {
+			"visual": "event-timeline",
+			"highlight": "severity-chip"
+		},
+		"adapter_status_panel": {
+			"visual": "backend-grid",
+			"status_indicator": "adapter-state"
+		},
+		"audit_decision_timeline": {
+			"visual": "decision-timeline",
+			"highlight": "matched-rule-chip"
 		}
 	})
 
@@ -214,6 +270,46 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="signal_requires_registered_source",
+			description="Signal ingestion requires a registered source.",
+			condition={"operation": "ingest_signal", "source_registered": False},
+			effect={
+				"decision": "deny",
+				"reason": "source_registration_required",
+				"required_action": "register_signal_source"
+			}
+		),
+		CapabilityRule(
+			name="disabled_source_blocks_ingestion",
+			description="Disabled sources cannot emit telemetry signals.",
+			condition={"operation": "ingest_signal", "source_status": "disabled"},
+			effect={
+				"decision": "deny",
+				"reason": "source_disabled",
+				"required_action": "reactivate_or_select_source"
+			}
+		),
+		CapabilityRule(
+			name="trace_requires_trace_id",
+			description="Trace ingestion requires a trace identifier.",
+			condition={"signal_type": "trace", "trace_id_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "trace_id_required",
+				"required_action": "attach_trace_id"
+			}
+		),
+		CapabilityRule(
+			name="trace_requires_service_name",
+			description="Trace ingestion requires service name evidence.",
+			condition={"signal_type": "trace", "service_name_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "service_name_required",
+				"required_action": "attach_service_name"
+			}
+		),
+		CapabilityRule(
 			name="critical_alert_requires_route",
 			description="Critical alerts require an escalation route.",
 			condition={"alert_severity": "critical", "notification_route_configured": False},
@@ -221,6 +317,26 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "critical_alert_route_required",
 				"required_action": "configure_alert_route"
+			}
+		),
+		CapabilityRule(
+			name="critical_alert_requires_owner",
+			description="Critical alerts require an assigned owner.",
+			condition={"alert_severity": "critical", "alert_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "alert_owner_required",
+				"required_action": "assign_alert_owner"
+			}
+		),
+		CapabilityRule(
+			name="critical_incident_requires_owner",
+			description="Critical incidents require an assigned owner.",
+			condition={"incident_severity": "critical", "incident_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "incident_owner_required",
+				"required_action": "assign_incident_owner"
 			}
 		),
 		CapabilityRule(
@@ -234,6 +350,16 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="slo_requires_alert_route",
+			description="SLO definitions require alert route evidence.",
+			condition={"operation": "create_slo", "notification_route_configured": False},
+			effect={
+				"decision": "deny",
+				"reason": "slo_alert_route_required",
+				"required_action": "configure_slo_alert_route"
+			}
+		),
+		CapabilityRule(
 			name="high_cardinality_metric_requires_review",
 			description="High-cardinality metrics require review before ingestion.",
 			condition={"metric_cardinality_gt": 10000, "cardinality_exception_recorded": False},
@@ -241,6 +367,16 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "require_review",
 				"reason": "cardinality_review_required",
 				"required_action": "record_cardinality_exception"
+			}
+		),
+		CapabilityRule(
+			name="retention_above_limit_requires_review",
+			description="Telemetry retention above tenant limits requires review.",
+			condition={"retention_above_limit": True, "retention_exception_recorded": False},
+			effect={
+				"decision": "require_review",
+				"reason": "retention_review_required",
+				"required_action": "record_retention_exception"
 			}
 		),
 		CapabilityRule(
@@ -252,6 +388,26 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "approved_runbook_required",
 				"required_action": "approve_remediation_runbook"
 			}
+		),
+		CapabilityRule(
+			name="remediation_review_requires_independent_reviewer",
+			description="Remediation approvals require independent review.",
+			condition={"reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="review_notes_required",
+			description="Remediation and exception reviews require notes.",
+			condition={"review_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "review_notes_required",
+				"required_action": "attach_review_notes"
+			}
 		)
 	]
 
@@ -260,17 +416,23 @@ def ui_manifest() -> dict[str, Any]:
 	"""Return MONI UI surface manifest."""
 	routes = [
 		CapabilityUIRoute("dashboard", "/moni/dashboard", "MonitoringDashboard", "moni:view", "Overview"),
+		CapabilityUIRoute("sources", "/moni/sources", "SignalSourceInventory", "moni:manage_sources", "Signals"),
 		CapabilityUIRoute("metrics", "/moni/metrics", "MetricExplorer", "moni:view_metrics", "Signals"),
+		CapabilityUIRoute("logs", "/moni/logs", "LogExplorer", "moni:view_logs", "Signals"),
 		CapabilityUIRoute("alerts", "/moni/alerts", "AlertCenter", "moni:manage_alerts", "Signals"),
 		CapabilityUIRoute("traces", "/moni/traces", "TraceExplorer", "moni:view_traces", "Signals"),
+		CapabilityUIRoute("slos", "/moni/slos", "SLOConsole", "moni:manage_slos", "Reliability"),
+		CapabilityUIRoute("incidents", "/moni/incidents", "IncidentConsole", "moni:manage_incidents", "Reliability"),
 		CapabilityUIRoute("analytics", "/moni/analytics", "ObservabilityAnalytics", "moni:view_analytics", "Intelligence"),
 		CapabilityUIRoute("rules", "/moni/rules", "MonitoringRuleManager", "moni:manage_rules", "Governance"),
 		CapabilityUIRoute("remediation", "/moni/remediation", "RemediationConsole", "moni:remediate", "Reliability"),
+		CapabilityUIRoute("audit", "/moni/audit", "MonitoringAuditTimeline", "moni:admin", "Governance"),
+		CapabilityUIRoute("adapters", "/moni/adapters", "MonitoringAdapterHealth", "moni:admin", "Runtime"),
 		CapabilityUIRoute("settings", "/moni/settings", "MonitoringSettings", "moni:admin", "Administration")
 	]
 	return {
 		"shell": "apg_python",
-		"view_module": "views.py",
+		"view_module": "view_models.py",
 		"api_prefix": "/moni/api/v1",
 		"routes": [route.__dict__ for route in routes],
 		"template_roots": ["templates/", "static/"],

@@ -5,13 +5,135 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Monitoring and Observability package-backed APG capability", "entity_count": 0, "name": "moni", "version": "1.0.0"}, "capabilities": {"moni": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"alerts": {"critical_alert_route_required": true, "deduplication_window_minutes": 5, "default_severity": "medium", "notification_capability": "ntfy"}, "analytics": {"anomaly_detection_enabled": true, "business_impact_correlation": true, "predictive_issue_prevention_enabled": true}, "collection": {"logs_enabled": true, "max_cardinality_per_metric": 10000, "metrics_enabled": true, "tenant_label_required": true, "traces_enabled": true}, "remediation": {"autonomous_remediation_enabled": true, "require_approval_for_production": true, "runbook_required": true}, "retention": {"compliance_evidence_days": 2555, "logs_days": 30, "metrics_days": 90, "traces_days": 14}, "security": {"audit_rule_changes": true, "block_pii_in_logs": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "moni_signal_console"}, "ui": {"enable_alert_center": true, "enable_dashboard": true, "enable_remediation_console": true, "enable_trace_explorer": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Monitoring and Observability", "provides": ["moni_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All observability events require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "ingest_metric", "source_present": false}, "description": "Metric ingestion requires an explicit source identifier.", "effect": {"decision": "deny", "reason": "metric_source_required", "required_action": "attach_metric_source"}, "name": "metric_ingestion_requires_source"}, {"condition": {"alert_severity": "critical", "notification_route_configured": false}, "description": "Critical alerts require an escalation route.", "effect": {"decision": "deny", "reason": "critical_alert_route_required", "required_action": "configure_alert_route"}, "name": "critical_alert_requires_route"}, {"condition": {"log_contains_pii": true, "pii_redacted": false}, "description": "Logs containing PII are blocked unless redacted.", "effect": {"decision": "deny", "reason": "pii_redaction_required", "required_action": "redact_or_drop_log_event"}, "name": "pii_logs_blocked"}, {"condition": {"cardinality_exception_recorded": false, "metric_cardinality_gt": 10000}, "description": "High-cardinality metrics require review before ingestion.", "effect": {"decision": "require_review", "reason": "cardinality_review_required", "required_action": "record_cardinality_exception"}, "name": "high_cardinality_metric_requires_review"}, {"condition": {"environment": "production", "remediation_requested": true, "runbook_approved": false}, "description": "Production remediation requires an approved runbook.", "effect": {"decision": "deny", "reason": "approved_runbook_required", "required_action": "approve_remediation_runbook"}, "name": "production_remediation_requires_runbook"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All observability events require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "ingest_metric", "source_present": false}, "description": "Metric ingestion requires an explicit source identifier.", "effect": {"decision": "deny", "reason": "metric_source_required", "required_action": "attach_metric_source"}, "name": "metric_ingestion_requires_source"}, {"condition": {"alert_severity": "critical", "notification_route_configured": false}, "description": "Critical alerts require an escalation route.", "effect": {"decision": "deny", "reason": "critical_alert_route_required", "required_action": "configure_alert_route"}, "name": "critical_alert_requires_route"}, {"condition": {"log_contains_pii": true, "pii_redacted": false}, "description": "Logs containing PII are blocked unless redacted.", "effect": {"decision": "deny", "reason": "pii_redaction_required", "required_action": "redact_or_drop_log_event"}, "name": "pii_logs_blocked"}, {"condition": {"cardinality_exception_recorded": false, "metric_cardinality_gt": 10000}, "description": "High-cardinality metrics require review before ingestion.", "effect": {"decision": "require_review", "reason": "cardinality_review_required", "required_action": "record_cardinality_exception"}, "name": "high_cardinality_metric_requires_review"}, {"condition": {"environment": "production", "remediation_requested": true, "runbook_approved": false}, "description": "Production remediation requires an approved runbook.", "effect": {"decision": "deny", "reason": "approved_runbook_required", "required_action": "approve_remediation_runbook"}, "name": "production_remediation_requires_runbook"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"alerts": {"component": "AlertCenter", "permission": "moni:manage_alerts", "route": "/moni/alerts"}, "analytics": {"component": "ObservabilityAnalytics", "permission": "moni:view_analytics", "route": "/moni/analytics"}, "dashboard": {"component": "MonitoringDashboard", "permission": "moni:view", "route": "/moni/dashboard"}, "metrics": {"component": "MetricExplorer", "permission": "moni:view_metrics", "route": "/moni/metrics"}, "remediation": {"component": "RemediationConsole", "permission": "moni:remediate", "route": "/moni/remediation"}, "rules": {"component": "MonitoringRuleManager", "permission": "moni:manage_rules", "route": "/moni/rules"}, "settings": {"component": "MonitoringSettings", "permission": "moni:admin", "route": "/moni/settings"}, "traces": {"component": "TraceExplorer", "permission": "moni:view_traces", "route": "/moni/traces"}}, "streaming": {}, "theme": {"components": {"alert_correlation_stack": {"highlight": "incident-chip", "visual": "grouped-alert-list"}, "metric_query_panel": {"threshold_style": "slo-lines", "visual": "time-series-grid"}, "remediation_runbook_trace": {"status_style": "approval-gate", "visual": "step-timeline"}, "signal_overview_card": {"icon": "activity", "risk_style": "burn-rate-band", "status_indicator": "slo-pill"}}, "name": "moni_signal_console", "tokens": {"border.radius": "8px", "color.accent": "#5FA8D3", "color.danger": "#C53030", "color.primary": "#1B4965", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F5F8FA", "surface.panel": "#FFFFFF", "text.primary": "#13293D", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/moni/api/v1", "requires_theme": true, "routes": [{"component": "MonitoringDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/moni/dashboard", "permission": "moni:view"}, {"component": "MetricExplorer", "name": "metrics", "nav_group": "Signals", "path": "/moni/metrics", "permission": "moni:view_metrics"}, {"component": "AlertCenter", "name": "alerts", "nav_group": "Signals", "path": "/moni/alerts", "permission": "moni:manage_alerts"}, {"component": "TraceExplorer", "name": "traces", "nav_group": "Signals", "path": "/moni/traces", "permission": "moni:view_traces"}, {"component": "ObservabilityAnalytics", "name": "analytics", "nav_group": "Intelligence", "path": "/moni/analytics", "permission": "moni:view_analytics"}, {"component": "MonitoringRuleManager", "name": "rules", "nav_group": "Governance", "path": "/moni/rules", "permission": "moni:manage_rules"}, {"component": "RemediationConsole", "name": "remediation", "nav_group": "Reliability", "path": "/moni/remediation", "permission": "moni:remediate"}, {"component": "MonitoringSettings", "name": "settings", "nav_group": "Administration", "path": "/moni/settings", "permission": "moni:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"moni": []}}, "contracts": {"moni": {"configuration": {"alerts": {"critical_alert_route_required": true, "deduplication_window_minutes": 5, "default_severity": "medium", "notification_capability": "ntfy"}, "analytics": {"anomaly_detection_enabled": true, "business_impact_correlation": true, "predictive_issue_prevention_enabled": true}, "collection": {"logs_enabled": true, "max_cardinality_per_metric": 10000, "metrics_enabled": true, "tenant_label_required": true, "traces_enabled": true}, "remediation": {"autonomous_remediation_enabled": true, "require_approval_for_production": true, "runbook_required": true}, "retention": {"compliance_evidence_days": 2555, "logs_days": 30, "metrics_days": 90, "traces_days": 14}, "security": {"audit_rule_changes": true, "block_pii_in_logs": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "moni_signal_console"}, "ui": {"enable_alert_center": true, "enable_dashboard": true, "enable_remediation_console": true, "enable_trace_explorer": true}}, "id": "moni", "provides": ["moni_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"moni": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"critical_alert_requires_route": {"condition": {"alert_severity": "critical", "notification_route_configured": false}, "description": "Critical alerts require an escalation route.", "effect": {"decision": "deny", "reason": "critical_alert_route_required", "required_action": "configure_alert_route"}, "name": "critical_alert_requires_route"}, "high_cardinality_metric_requires_review": {"condition": {"cardinality_exception_recorded": false, "metric_cardinality_gt": 10000}, "description": "High-cardinality metrics require review before ingestion.", "effect": {"decision": "require_review", "reason": "cardinality_review_required", "required_action": "record_cardinality_exception"}, "name": "high_cardinality_metric_requires_review"}, "metric_ingestion_requires_source": {"condition": {"operation": "ingest_metric", "source_present": false}, "description": "Metric ingestion requires an explicit source identifier.", "effect": {"decision": "deny", "reason": "metric_source_required", "required_action": "attach_metric_source"}, "name": "metric_ingestion_requires_source"}, "pii_logs_blocked": {"condition": {"log_contains_pii": true, "pii_redacted": false}, "description": "Logs containing PII are blocked unless redacted.", "effect": {"decision": "deny", "reason": "pii_redaction_required", "required_action": "redact_or_drop_log_event"}, "name": "pii_logs_blocked"}, "production_remediation_requires_runbook": {"condition": {"environment": "production", "remediation_requested": true, "runbook_approved": false}, "description": "Production remediation requires an approved runbook.", "effect": {"decision": "deny", "reason": "approved_runbook_required", "required_action": "approve_remediation_runbook"}, "name": "production_remediation_requires_runbook"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All observability events require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.moni": {"file": "capability_contract.py", "id": "capability.moni", "kind": "capability", "name": "Monitoring and Observability", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("moni_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "moni",
+			"version": "1.0.0",
+			"description": "Monitoring and Observability package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"moni": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"moni": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["moni_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"remediation": "RemediationRequestRecord",
+				},
+				"observability_lifecycle": {
+					"source": "SignalSourceRecord",
+					"signal": "SignalRecord",
+					"slo": "SloRecord",
+					"alert": "AlertRecord",
+					"incident": "IncidentRecord",
+					"audit": "MoniAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"moni": {
+				"id": "moni",
+				"configuration": contract["configuration"],
+				"provides": ["moni_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"moni": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.moni": {
+				"id": "capability.moni",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +158,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("moni", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "moni" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 14:
+		errors.append("MONI semantic model route manifest is stale")
+	if len(rules) < 16:
+		errors.append("MONI semantic model rule manifest is stale")
+	if "opentelemetry" not in adapters.get("supported_collectors", []):
+		errors.append("MONI adapter manifest must include OpenTelemetry collector boundary")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

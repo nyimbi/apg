@@ -4,7 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .service import MoniService
+from .service import (
+	AlertRecord,
+	IncidentRecord,
+	MoniService,
+	RemediationRequestRecord,
+	SignalRecord,
+	SignalSourceRecord,
+	SloRecord,
+)
 
 
 SERVICE = MoniService()
@@ -22,6 +30,34 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def register_source_record(**kwargs: Any) -> SignalSourceRecord:
+	return SERVICE.register_source(**kwargs)
+
+
+def ingest_signal_record(**kwargs: Any) -> SignalRecord:
+	return SERVICE.ingest_signal(**kwargs)
+
+
+def create_slo_record(**kwargs: Any) -> SloRecord:
+	return SERVICE.create_slo(**kwargs)
+
+
+def create_alert_record(**kwargs: Any) -> AlertRecord:
+	return SERVICE.create_alert(**kwargs)
+
+
+def create_incident_record(**kwargs: Any) -> IncidentRecord:
+	return SERVICE.create_incident(**kwargs)
+
+
+def request_remediation(**kwargs: Any) -> RemediationRequestRecord:
+	return SERVICE.request_remediation(**kwargs)
+
+
+def decide_remediation(**kwargs: Any) -> RemediationRequestRecord:
+	return SERVICE.decide_remediation(**kwargs)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -31,5 +67,18 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
-def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
-	return SERVICE.list_records(tenant_id)
+def list_records(tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_records(tenant_id, record_type)
+
+
+def list_observability(tenant_id: str | None = None) -> dict[str, Any]:
+	return {
+		"summary": SERVICE.dashboard_summary(tenant_id),
+		"sources": SERVICE.list_records(tenant_id, "sources"),
+		"signals": SERVICE.list_records(tenant_id, "signals"),
+		"slos": SERVICE.list_records(tenant_id, "slos"),
+		"alerts": SERVICE.list_records(tenant_id, "alerts"),
+		"incidents": SERVICE.list_records(tenant_id, "incidents"),
+		"remediation_requests": SERVICE.list_records(tenant_id, "remediation_requests"),
+		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
+	}

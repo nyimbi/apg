@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 APG Monitoring and Observability (MONI) - Core Service
-Revolutionary monitoring service with intelligent analytics and APG integration
+Monitoring runtime and dependency-light control plane with APG integration
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
@@ -11,7 +11,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set, Tuple, Union
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from collections import defaultdict, deque
 import json
 import statistics
@@ -23,6 +23,7 @@ from .models import (
 	MonitoringQuery, MonitoringTarget, MetricType, AlertSeverity, AlertStatus,
 	AlertConditionType, DashboardType, DataRetentionPolicy, MonitoringScope
 )
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 
 @dataclass
@@ -57,10 +58,140 @@ class MonitoringServiceConfig:
 	baseline_learning_days: int = 7
 
 
+@dataclass
+class SignalSourceRecord:
+	"""Tenant-scoped telemetry source registration."""
+
+	source_record_id: str
+	tenant_id: str
+	source_id: str
+	service_name: str
+	environment: str
+	owner: str
+	allowed_signal_types: list[str] = field(default_factory=lambda: ["metric", "log", "trace"])
+	notification_route: str | None = None
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class SignalRecord:
+	"""Governed metric, log, or trace signal metadata."""
+
+	signal_id: str
+	tenant_id: str
+	source_id: str
+	signal_type: str
+	name: str
+	decision: str
+	status: str
+	value: Any | None = None
+	labels: dict[str, Any] = field(default_factory=dict)
+	severity: str = "info"
+	trace_id: str | None = None
+	service_name: str | None = None
+	cardinality: int = 0
+	contains_pii: bool = False
+	pii_redacted: bool = True
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class SloRecord:
+	"""Service-level objective definition."""
+
+	slo_id: str
+	tenant_id: str
+	service_name: str
+	objective: str
+	threshold: float
+	window_minutes: int
+	owner: str
+	notification_route: str
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class AlertRecord:
+	"""Alert lifecycle record."""
+
+	alert_id: str
+	tenant_id: str
+	source_id: str
+	severity: str
+	title: str
+	decision: str
+	status: str
+	notification_route: str | None = None
+	owner: str | None = None
+	incident_id: str | None = None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	acknowledged_at: datetime | None = None
+	resolved_at: datetime | None = None
+
+
+@dataclass
+class IncidentRecord:
+	"""Incident correlation and ownership record."""
+
+	incident_id: str
+	tenant_id: str
+	title: str
+	severity: str
+	owner: str | None
+	notification_route: str | None
+	status: str
+	alert_ids: list[str] = field(default_factory=list)
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	resolved_at: datetime | None = None
+
+
+@dataclass
+class RemediationRequestRecord:
+	"""Runbook-backed remediation request and review state."""
+
+	request_id: str
+	tenant_id: str
+	incident_id: str
+	requester: str
+	environment: str
+	runbook_id: str
+	runbook_approved: bool
+	proposed_action: str
+	reason: str
+	decision: str = "pending"
+	status: str = "pending_review"
+	reviewer: str | None = None
+	review_notes: str | None = None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	decided_at: datetime | None = None
+
+
+@dataclass
+class MoniAuditEventRecord:
+	"""Dependency-light MONI audit event."""
+
+	event_id: str
+	tenant_id: str
+	event_type: str
+	subject: str
+	actor: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	details: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
 class MonitoringService:
 	"""
-	Revolutionary monitoring service with intelligent analytics
-	Central nervous system for APG platform observability
+	Monitoring service with intelligent analytics.
+	Central runtime for APG platform observability adapters.
 	"""
 
 	def __init__(self, config: MonitoringServiceConfig):
@@ -88,7 +219,7 @@ class MonitoringService:
 		# Background tasks
 		self._background_tasks: Set[asyncio.Task] = set()
 		
-		# APG integration placeholders (would be injected in real implementation)
+		# APG integration handles injected by runtime adapters.
 		self._auth_service = None
 		self._audit_service = None
 		self._cache_service = None
@@ -1651,5 +1782,471 @@ async def create_monitoring_service(config: Optional[MonitoringServiceConfig] = 
 	return service
 
 
+class MoniService:
+	"""Dependency-light MONI lifecycle and guardrail control plane."""
+
+	def __init__(self, tenant_id: str = "default"):
+		self.tenant_id = tenant_id
+		self.contract = get_capability_contract(tenant_id)
+		self.sources: dict[str, SignalSourceRecord] = {}
+		self.signals: dict[str, SignalRecord] = {}
+		self.slos: dict[str, SloRecord] = {}
+		self.alerts: dict[str, AlertRecord] = {}
+		self.incidents: dict[str, IncidentRecord] = {}
+		self.remediation_requests: dict[str, RemediationRequestRecord] = {}
+		self.audit_events: list[MoniAuditEventRecord] = []
+		self.records: dict[str, dict[str, Any]] = {}
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		"""Return the current executable MONI contract."""
+		return get_capability_contract(tenant_id)
+
+	def create_record(
+		self,
+		*,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		"""Compatibility helper for older generated package tests."""
+		record_id = self._require_text(record_id, "record_id")
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		record = {
+			"id": record_id,
+			"tenant_id": tenant_id,
+			"metadata": dict(metadata or {}),
+			"status": status,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self.records[f"{tenant_id}:{record_id}"] = record
+		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		return record
+
+	def register_source(
+		self,
+		*,
+		tenant_id: str,
+		source_id: str,
+		service_name: str,
+		environment: str,
+		owner: str,
+		allowed_signal_types: list[str] | None = None,
+		notification_route: str | None = None,
+		status: str = "active",
+	) -> SignalSourceRecord:
+		"""Register a tenant-scoped telemetry source."""
+		if status not in {"active", "disabled", "retiring"}:
+			raise ValueError("status must be active, disabled, or retiring")
+		record = SignalSourceRecord(
+			source_record_id=uuid_like(),
+			tenant_id=self._require_text(tenant_id, "tenant_id"),
+			source_id=self._require_text(source_id, "source_id"),
+			service_name=self._require_text(service_name, "service_name"),
+			environment=self._require_text(environment, "environment"),
+			owner=self._require_text(owner, "owner"),
+			allowed_signal_types=allowed_signal_types or ["metric", "log", "trace"],
+			notification_route=notification_route,
+			status=status,
+		)
+		self.sources[self._source_key(record.tenant_id, record.source_id)] = record
+		self._audit(record.tenant_id, "source.registered", record.source_id, record.owner, "allow", [], asdict(record))
+		return record
+
+	def ingest_signal(
+		self,
+		*,
+		tenant_id: str,
+		source_id: str,
+		signal_type: str,
+		name: str,
+		value: Any | None = None,
+		labels: dict[str, Any] | None = None,
+		severity: str = "info",
+		trace_id: str | None = None,
+		service_name: str | None = None,
+		cardinality: int = 0,
+		contains_pii: bool = False,
+		pii_redacted: bool = True,
+		cardinality_exception_recorded: bool = False,
+	) -> SignalRecord:
+		"""Ingest governed telemetry metadata after rule evaluation."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source_id = self._require_text(source_id, "source_id")
+		signal_type = self._require_choice(signal_type, "signal_type", {"metric", "log", "trace"})
+		name = self._require_text(name, "name")
+		if cardinality < 0:
+			raise ValueError("cardinality cannot be negative")
+		source = self.sources.get(self._source_key(tenant_id, source_id))
+		if source and signal_type not in source.allowed_signal_types:
+			raise ValueError(f"signal_type {signal_type} is not allowed for source {source_id}")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "ingest_signal",
+			"source_registered": source is not None,
+			"source_status": source.status if source else "missing",
+			"source_present": bool(source_id),
+			"signal_type": signal_type,
+			"trace_id_present": bool(trace_id),
+			"service_name_present": bool(service_name or (source.service_name if source else None)),
+			"log_contains_pii": contains_pii,
+			"pii_redacted": pii_redacted,
+			"metric_cardinality": cardinality,
+			"cardinality_exception_recorded": cardinality_exception_recorded,
+		}
+		if signal_type == "metric":
+			context["operation"] = "ingest_metric"
+			context["source_registered"] = source is not None
+		elif signal_type == "log":
+			context["operation"] = "ingest_log"
+			context["source_registered"] = source is not None
+		elif signal_type == "trace":
+			context["operation"] = "ingest_trace"
+			context["source_registered"] = source is not None
+		generic_context = dict(context)
+		generic_context["operation"] = "ingest_signal"
+		decision = self._merge_decisions(
+			evaluate_capability_rules(generic_context),
+			evaluate_capability_rules(context),
+		)
+		status = "accepted" if decision["decision"] == "allow" else (
+			"pending_review" if decision["decision"] == "require_review" else "denied"
+		)
+		record = SignalRecord(
+			signal_id=uuid_like(),
+			tenant_id=tenant_id,
+			source_id=source_id,
+			signal_type=signal_type,
+			name=name,
+			value=value,
+			labels=dict(labels or {}),
+			severity=severity,
+			trace_id=trace_id,
+			service_name=service_name or (source.service_name if source else None),
+			cardinality=cardinality,
+			contains_pii=contains_pii,
+			pii_redacted=pii_redacted,
+			decision=decision["decision"],
+			status=status,
+			matched_rules=decision["matched_rules"],
+		)
+		self.signals[record.signal_id] = record
+		self._audit(tenant_id, "signal.ingested", name, source_id, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def create_slo(
+		self,
+		*,
+		tenant_id: str,
+		service_name: str,
+		objective: str,
+		threshold: float,
+		window_minutes: int,
+		owner: str,
+		notification_route: str | None,
+	) -> SloRecord:
+		"""Create a governed SLO definition."""
+		if threshold <= 0:
+			raise ValueError("threshold must be positive")
+		if window_minutes <= 0:
+			raise ValueError("window_minutes must be positive")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_slo",
+			"notification_route_configured": bool(notification_route),
+		}
+		decision = evaluate_capability_rules(context)
+		if decision["decision"] == "deny":
+			raise ValueError(";".join(decision["matched_rules"]))
+		record = SloRecord(
+			slo_id=uuid_like(),
+			tenant_id=self._require_text(tenant_id, "tenant_id"),
+			service_name=self._require_text(service_name, "service_name"),
+			objective=self._require_text(objective, "objective"),
+			threshold=threshold,
+			window_minutes=window_minutes,
+			owner=self._require_text(owner, "owner"),
+			notification_route=self._require_text(notification_route or "", "notification_route"),
+		)
+		self.slos[record.slo_id] = record
+		self._audit(record.tenant_id, "slo.created", record.slo_id, record.owner, "allow", [], asdict(record))
+		return record
+
+	def create_alert(
+		self,
+		*,
+		tenant_id: str,
+		source_id: str,
+		severity: str,
+		title: str,
+		notification_route: str | None = None,
+		owner: str | None = None,
+	) -> AlertRecord:
+		"""Create an alert and auto-open critical incident records."""
+		severity = self._require_choice(severity, "severity", {"info", "low", "medium", "high", "critical"})
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"alert_severity": severity,
+			"notification_route_configured": bool(notification_route),
+			"alert_owner_present": bool(owner),
+		}
+		decision = evaluate_capability_rules(context)
+		status = "open" if decision["decision"] == "allow" else "denied"
+		incident_id = None
+		alert_id = uuid_like()
+		if severity == "critical" and status == "open":
+			incident = self.create_incident(
+				tenant_id=tenant_id,
+				title=title,
+				severity=severity,
+				owner=owner,
+				notification_route=notification_route,
+				alert_ids=[alert_id],
+			)
+			incident_id = incident.incident_id if incident.status != "denied" else None
+		record = AlertRecord(
+			alert_id=alert_id,
+			tenant_id=self._require_text(tenant_id, "tenant_id"),
+			source_id=self._require_text(source_id, "source_id"),
+			severity=severity,
+			title=self._require_text(title, "title"),
+			notification_route=notification_route,
+			owner=owner,
+			incident_id=incident_id,
+			decision=decision["decision"],
+			status=status,
+			matched_rules=decision["matched_rules"],
+		)
+		self.alerts[record.alert_id] = record
+		self._audit(record.tenant_id, "alert.created", record.alert_id, record.owner or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def create_incident(
+		self,
+		*,
+		tenant_id: str,
+		title: str,
+		severity: str,
+		owner: str | None,
+		notification_route: str | None,
+		alert_ids: list[str] | None = None,
+	) -> IncidentRecord:
+		"""Create an incident correlation record."""
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"incident_severity": severity,
+			"incident_owner_present": bool(owner),
+			"notification_route_configured": bool(notification_route),
+		}
+		decision = evaluate_capability_rules(context)
+		record = IncidentRecord(
+			incident_id=uuid_like(),
+			tenant_id=self._require_text(tenant_id, "tenant_id"),
+			title=self._require_text(title, "title"),
+			severity=self._require_choice(severity, "severity", {"info", "low", "medium", "high", "critical"}),
+			owner=owner,
+			notification_route=notification_route,
+			status="open" if decision["decision"] == "allow" else "denied",
+			alert_ids=list(alert_ids or []),
+			matched_rules=decision["matched_rules"],
+		)
+		self.incidents[record.incident_id] = record
+		self._audit(record.tenant_id, "incident.created", record.incident_id, owner or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def request_remediation(
+		self,
+		*,
+		tenant_id: str,
+		incident_id: str,
+		requester: str,
+		environment: str,
+		runbook_id: str,
+		runbook_approved: bool,
+		proposed_action: str,
+		reason: str,
+	) -> RemediationRequestRecord:
+		"""Request runbook-backed remediation."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		incident_id = self._require_text(incident_id, "incident_id")
+		incident = self.incidents.get(incident_id)
+		if incident is None:
+			raise ValueError("incident_id must reference an existing incident")
+		if incident.tenant_id != tenant_id:
+			raise ValueError("incident_id must belong to the requesting tenant")
+		if incident.status == "denied":
+			raise ValueError("incident_id must reference an active incident")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"environment": environment,
+			"remediation_requested": True,
+			"runbook_approved": runbook_approved,
+		}
+		decision = evaluate_capability_rules(context)
+		record = RemediationRequestRecord(
+			request_id=uuid_like(),
+			tenant_id=tenant_id,
+			incident_id=incident_id,
+			requester=self._require_text(requester, "requester"),
+			environment=self._require_text(environment, "environment"),
+			runbook_id=self._require_text(runbook_id, "runbook_id"),
+			runbook_approved=runbook_approved,
+			proposed_action=self._require_text(proposed_action, "proposed_action"),
+			reason=self._require_text(reason, "reason"),
+			decision=decision["decision"],
+			status="pending_review" if decision["decision"] != "deny" else "denied",
+			matched_rules=decision["matched_rules"],
+		)
+		self.remediation_requests[record.request_id] = record
+		self._audit(record.tenant_id, "remediation.requested", record.request_id, record.requester, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def decide_remediation(
+		self,
+		*,
+		request_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> RemediationRequestRecord:
+		"""Approve or reject a remediation request."""
+		if request_id not in self.remediation_requests:
+			raise KeyError(f"Remediation request {request_id} not found")
+		record = self.remediation_requests[request_id]
+		reviewer = self._require_text(reviewer, "reviewer")
+		notes = self._require_text(notes, "notes")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("decision must be approved or rejected")
+		context = {
+			"tenant_context_present": bool(record.tenant_id),
+			"operation": "review",
+			"reviewer_same_as_requester": reviewer == record.requester,
+			"review_notes_attached": bool(notes),
+		}
+		rule_decision = evaluate_capability_rules(context)
+		if rule_decision["decision"] == "deny":
+			record.decision = "denied"
+			record.status = "review_denied"
+		else:
+			record.decision = decision
+			record.status = decision
+		record.reviewer = reviewer
+		record.review_notes = notes
+		record.decided_at = datetime.utcnow()
+		record.matched_rules = rule_decision["matched_rules"]
+		self._audit(record.tenant_id, "remediation.decided", request_id, reviewer, record.decision, record.matched_rules, context)
+		return record
+
+	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		"""List generated-app records for a tenant."""
+		tenant_id = tenant_id or self.tenant_id
+		collections: dict[str, Any] = {
+			"sources": self.sources.values(),
+			"signals": self.signals.values(),
+			"slos": self.slos.values(),
+			"alerts": self.alerts.values(),
+			"incidents": self.incidents.values(),
+			"remediation_requests": self.remediation_requests.values(),
+			"audit_events": self.audit_events,
+			"records": self.records.values(),
+		}
+		if record_type:
+			if record_type not in collections:
+				raise ValueError(f"Unsupported record_type {record_type}")
+			values = collections[record_type]
+		else:
+			values = []
+			for collection in collections.values():
+				values.extend(collection)
+		return [
+			dict(record) if isinstance(record, dict) else asdict(record)
+			for record in values
+			if (record.get("tenant_id") if isinstance(record, dict) else getattr(record, "tenant_id", None)) == tenant_id
+		]
+
+	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Return summary metrics for generated MONI dashboards."""
+		tenant_id = tenant_id or self.tenant_id
+		return {
+			"tenant_id": tenant_id,
+			"source_count": len(self.list_records(tenant_id, "sources")),
+			"signal_count": len(self.list_records(tenant_id, "signals")),
+			"slo_count": len(self.list_records(tenant_id, "slos")),
+			"open_alert_count": sum(1 for row in self.list_records(tenant_id, "alerts") if row["status"] == "open"),
+			"open_incident_count": sum(1 for row in self.list_records(tenant_id, "incidents") if row["status"] == "open"),
+			"pending_remediation_count": sum(1 for row in self.list_records(tenant_id, "remediation_requests") if row["status"] == "pending_review"),
+			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
+		}
+
+	def _audit(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject: str,
+		actor: str,
+		decision: str,
+		matched_rules: list[str],
+		details: dict[str, Any],
+	) -> None:
+		self.audit_events.append(MoniAuditEventRecord(
+			event_id=uuid_like(),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject=subject,
+			actor=actor,
+			decision=decision,
+			matched_rules=list(matched_rules),
+			details=details,
+		))
+
+	@staticmethod
+	def _merge_decisions(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+		decision = "allow"
+		if "deny" in {first["decision"], second["decision"]}:
+			decision = "deny"
+		elif "require_review" in {first["decision"], second["decision"]}:
+			decision = "require_review"
+		return {
+			"decision": decision,
+			"matched_rules": list(dict.fromkeys(first["matched_rules"] + second["matched_rules"])),
+			"actions": first["actions"] + second["actions"],
+			"context": {**first["context"], **second["context"]},
+		}
+
+	@staticmethod
+	def _require_text(value: str, field_name: str) -> str:
+		if not isinstance(value, str) or not value.strip():
+			raise ValueError(f"{field_name} is required")
+		return value.strip()
+
+	@staticmethod
+	def _require_choice(value: str, field_name: str, allowed: set[str]) -> str:
+		text = MoniService._require_text(value, field_name)
+		if text not in allowed:
+			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
+		return text
+
+	@staticmethod
+	def _source_key(tenant_id: str, source_id: str) -> str:
+		return f"{tenant_id}:{source_id}"
+
+
+def uuid_like() -> str:
+	"""Return a sortable enough local identifier without adding dependencies."""
+	return f"moni-{time.time_ns()}"
+
+
 # Export main components
-__all__ = ['MonitoringService', 'MonitoringServiceConfig', 'create_monitoring_service']
+__all__ = [
+	'MonitoringService',
+	'MonitoringServiceConfig',
+	'MoniService',
+	'SignalSourceRecord',
+	'SignalRecord',
+	'SloRecord',
+	'AlertRecord',
+	'IncidentRecord',
+	'RemediationRequestRecord',
+	'MoniAuditEventRecord',
+	'create_monitoring_service',
+]

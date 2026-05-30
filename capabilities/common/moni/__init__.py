@@ -1,25 +1,33 @@
 #!/usr/bin/env python3
 """
 APG Monitoring and Observability (MONI) Capability
-Revolutionary monitoring platform that is 10x better than industry leaders
+Tenant-scoped monitoring, observability, incident, and remediation control plane
 
 This capability provides:
-- Predictive Issue Prevention with ML-powered failure prediction
-- Contextual Intelligence Engine with business impact correlation
-- Zero-Configuration Observability with intelligent auto-discovery
-- Unified Multi-Dimensional Analytics across metrics, logs, traces
-- Autonomous Remediation Engine with self-healing capabilities
-- Intelligent Alert Orchestration with smart correlation
-- Real-Time Root Cause Analysis with dependency mapping
-- Performance Optimization Advisor with AI recommendations
-- Developer Experience Integration with code-level insights
-- Business Impact Correlation with executive dashboards
+- Telemetry source registration
+- Governed metric, log, and trace signal metadata
+- SLO, alert, and incident lifecycle records
+- Runbook-backed remediation approval workflows
+- Deterministic observability guardrails
+- Generated-application UI and theme metadata
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 """
 
-from .service import MonitoringService, MonitoringServiceConfig, create_monitoring_service
+from .service import (
+	AlertRecord,
+	IncidentRecord,
+	MoniAuditEventRecord,
+	MoniService,
+	MonitoringService,
+	MonitoringServiceConfig,
+	RemediationRequestRecord,
+	SignalRecord,
+	SignalSourceRecord,
+	SloRecord,
+	create_monitoring_service,
+)
 from .models import (
 	MonitoringMetric, MonitoringAlert, MonitoringRule, MonitoringDashboard,
 	MonitoringQuery, MonitoringTarget, MetricType, AlertSeverity, AlertStatus,
@@ -33,7 +41,7 @@ from .capability_contract import (
 # Capability metadata for APG composition engine
 __capability_name__ = "moni"
 __capability_version__ = "1.0.0"
-__capability_description__ = "Revolutionary monitoring and observability platform"
+__capability_description__ = "Tenant-scoped monitoring, observability, incident, and remediation governance"
 __capability_dependencies__ = ["auth", "audl", "mten", "conf"]
 __capability_optional_dependencies__ = ["aicr", "pred", "ntfy", "cach"]
 
@@ -64,6 +72,14 @@ __all__ = [
 	# Service components
 	'MonitoringService',
 	'MonitoringServiceConfig',
+	'MoniService',
+	'SignalSourceRecord',
+	'SignalRecord',
+	'SloRecord',
+	'AlertRecord',
+	'IncidentRecord',
+	'RemediationRequestRecord',
+	'MoniAuditEventRecord',
 	'create_monitoring_service',
 	
 	# Data models
@@ -135,6 +151,9 @@ def register_capability() -> dict:
 			"metrics_collection": "Track tenant-aware metrics from APG capabilities",
 			"log_observability": "Ingest and govern structured logs",
 			"trace_exploration": "Expose distributed trace navigation surfaces",
+			"source_lifecycle": "Register and govern tenant telemetry sources",
+			"slo_lifecycle": "Define SLOs with owner and route evidence",
+			"incident_lifecycle": "Correlate alerts into owned incident records",
 			"alert_orchestration": "Create, route, deduplicate, and correlate alerts",
 			"autonomous_remediation": "Coordinate runbook-backed remediation workflows",
 			"capability_rules": "Evaluate deterministic observability governance rules",
@@ -142,10 +161,16 @@ def register_capability() -> dict:
 		},
 		"endpoints": {
 			"metrics": "/moni/api/v1/metrics",
+			"sources": "/moni/api/v1/sources",
 			"logs": "/moni/api/v1/logs",
 			"traces": "/moni/api/v1/traces",
+			"slos": "/moni/api/v1/slos",
 			"alerts": "/moni/api/v1/alerts",
+			"incidents": "/moni/api/v1/incidents",
 			"rules": "/moni/api/v1/rules",
+			"remediation": "/moni/api/v1/remediation",
+			"audit": "/moni/api/v1/audit",
+			"adapters": "/moni/api/v1/adapters",
 			"analytics": "/moni/api/v1/analytics"
 		},
 		"ui_components": {
@@ -156,9 +181,13 @@ def register_capability() -> dict:
 		"theme": contract["theme"],
 		"permissions": [
 			"moni:view",
+			"moni:manage_sources",
 			"moni:view_metrics",
+			"moni:view_logs",
 			"moni:view_traces",
+			"moni:manage_slos",
 			"moni:manage_alerts",
+			"moni:manage_incidents",
 			"moni:manage_rules",
 			"moni:view_analytics",
 			"moni:remediate",
@@ -173,12 +202,12 @@ def get_capability_info() -> dict:
 		"metadata": CAPABILITY_METADATA,
 		"contract": get_capability_contract(),
 		"features": [
-			"Predictive issue prevention",
-			"Contextual business impact correlation",
-			"Unified metrics, logs, and traces",
-			"Intelligent alert orchestration",
-			"Autonomous remediation workflow support",
-			"Performance optimization advisor"
+			"Tenant-aware telemetry source registration",
+			"Governed metrics, logs, and traces",
+			"SLO and alert route evidence",
+			"Incident ownership and correlation",
+			"Runbook-backed remediation review",
+			"Backend-neutral observability adapter boundaries"
 		]
 	}
 

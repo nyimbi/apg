@@ -8,12 +8,37 @@
   },
   "capabilities": {
     "moni": {
-      "approvals": {},
+      "adapters": {
+        "log_store": "adapter",
+        "metrics_store": "adapter",
+        "notification_adapter_required_for_critical": true,
+        "supported_collectors": [
+          "opentelemetry",
+          "prometheus",
+          "apg_native"
+        ],
+        "trace_store": "adapter"
+      },
+      "approvals": {
+        "remediation": "RemediationRequestRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "log_store": "adapter",
+          "metrics_store": "adapter",
+          "notification_adapter_required_for_critical": true,
+          "supported_collectors": [
+            "opentelemetry",
+            "prometheus",
+            "apg_native"
+          ],
+          "trace_store": "adapter"
+        },
         "alerts": {
           "critical_alert_route_required": true,
+          "critical_incident_owner_required": true,
           "deduplication_window_minutes": 5,
           "default_severity": "medium",
           "notification_capability": "ntfy"
@@ -24,15 +49,26 @@
           "predictive_issue_prevention_enabled": true
         },
         "collection": {
+          "disabled_sources_block_ingestion": true,
           "logs_enabled": true,
           "max_cardinality_per_metric": 10000,
           "metrics_enabled": true,
+          "source_registration_required": true,
           "tenant_label_required": true,
           "traces_enabled": true
+        },
+        "incidents": {
+          "auto_open_from_critical_alerts": true,
+          "owner_required": true,
+          "postmortem_required_for_severity": [
+            "critical"
+          ]
         },
         "remediation": {
           "autonomous_remediation_enabled": true,
           "require_approval_for_production": true,
+          "require_independent_reviewer": true,
+          "review_notes_required": true,
           "runbook_required": true
         },
         "retention": {
@@ -44,7 +80,14 @@
         "security": {
           "audit_rule_changes": true,
           "block_pii_in_logs": true,
+          "record_lifecycle_audit": true,
           "require_tenant_context": true
+        },
+        "slo": {
+          "alert_route_required": true,
+          "burn_rate_alerting_enabled": true,
+          "default_window_minutes": 60,
+          "owner_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -52,9 +95,15 @@
           "default_theme": "moni_signal_console"
         },
         "ui": {
+          "enable_adapter_health": true,
           "enable_alert_center": true,
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
+          "enable_incident_console": true,
+          "enable_log_explorer": true,
           "enable_remediation_console": true,
+          "enable_slo_console": true,
+          "enable_source_inventory": true,
           "enable_trace_explorer": true
         }
       },
@@ -64,6 +113,14 @@
       "i18n": {},
       "master_data": {},
       "name": "Monitoring and Observability",
+      "observability_lifecycle": {
+        "alert": "AlertRecord",
+        "audit": "MoniAuditEventRecord",
+        "incident": "IncidentRecord",
+        "signal": "SignalRecord",
+        "slo": "SloRecord",
+        "source": "SignalSourceRecord"
+      },
       "provides": [
         "moni_operations"
       ],
@@ -97,6 +154,58 @@
           },
           {
             "condition": {
+              "operation": "ingest_signal",
+              "source_registered": false
+            },
+            "description": "Signal ingestion requires a registered source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_registration_required",
+              "required_action": "register_signal_source"
+            },
+            "name": "signal_requires_registered_source"
+          },
+          {
+            "condition": {
+              "operation": "ingest_signal",
+              "source_status": "disabled"
+            },
+            "description": "Disabled sources cannot emit telemetry signals.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_disabled",
+              "required_action": "reactivate_or_select_source"
+            },
+            "name": "disabled_source_blocks_ingestion"
+          },
+          {
+            "condition": {
+              "signal_type": "trace",
+              "trace_id_present": false
+            },
+            "description": "Trace ingestion requires a trace identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "trace_id_required",
+              "required_action": "attach_trace_id"
+            },
+            "name": "trace_requires_trace_id"
+          },
+          {
+            "condition": {
+              "service_name_present": false,
+              "signal_type": "trace"
+            },
+            "description": "Trace ingestion requires service name evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_name_required",
+              "required_action": "attach_service_name"
+            },
+            "name": "trace_requires_service_name"
+          },
+          {
+            "condition": {
               "alert_severity": "critical",
               "notification_route_configured": false
             },
@@ -107,6 +216,32 @@
               "required_action": "configure_alert_route"
             },
             "name": "critical_alert_requires_route"
+          },
+          {
+            "condition": {
+              "alert_owner_present": false,
+              "alert_severity": "critical"
+            },
+            "description": "Critical alerts require an assigned owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "alert_owner_required",
+              "required_action": "assign_alert_owner"
+            },
+            "name": "critical_alert_requires_owner"
+          },
+          {
+            "condition": {
+              "incident_owner_present": false,
+              "incident_severity": "critical"
+            },
+            "description": "Critical incidents require an assigned owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_owner_required",
+              "required_action": "assign_incident_owner"
+            },
+            "name": "critical_incident_requires_owner"
           },
           {
             "condition": {
@@ -123,6 +258,19 @@
           },
           {
             "condition": {
+              "notification_route_configured": false,
+              "operation": "create_slo"
+            },
+            "description": "SLO definitions require alert route evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "slo_alert_route_required",
+              "required_action": "configure_slo_alert_route"
+            },
+            "name": "slo_requires_alert_route"
+          },
+          {
+            "condition": {
               "cardinality_exception_recorded": false,
               "metric_cardinality_gt": 10000
             },
@@ -133,6 +281,19 @@
               "required_action": "record_cardinality_exception"
             },
             "name": "high_cardinality_metric_requires_review"
+          },
+          {
+            "condition": {
+              "retention_above_limit": true,
+              "retention_exception_recorded": false
+            },
+            "description": "Telemetry retention above tenant limits requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "retention_review_required",
+              "required_action": "record_retention_exception"
+            },
+            "name": "retention_above_limit_requires_review"
           },
           {
             "condition": {
@@ -147,6 +308,30 @@
               "required_action": "approve_remediation_runbook"
             },
             "name": "production_remediation_requires_runbook"
+          },
+          {
+            "condition": {
+              "reviewer_same_as_requester": true
+            },
+            "description": "Remediation approvals require independent review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "remediation_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "review_notes_attached": false
+            },
+            "description": "Remediation and exception reviews require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "review_notes_required"
           }
         ],
         "type": "deterministic"
@@ -179,6 +364,58 @@
         },
         {
           "condition": {
+            "operation": "ingest_signal",
+            "source_registered": false
+          },
+          "description": "Signal ingestion requires a registered source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_registration_required",
+            "required_action": "register_signal_source"
+          },
+          "name": "signal_requires_registered_source"
+        },
+        {
+          "condition": {
+            "operation": "ingest_signal",
+            "source_status": "disabled"
+          },
+          "description": "Disabled sources cannot emit telemetry signals.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_disabled",
+            "required_action": "reactivate_or_select_source"
+          },
+          "name": "disabled_source_blocks_ingestion"
+        },
+        {
+          "condition": {
+            "signal_type": "trace",
+            "trace_id_present": false
+          },
+          "description": "Trace ingestion requires a trace identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "trace_id_required",
+            "required_action": "attach_trace_id"
+          },
+          "name": "trace_requires_trace_id"
+        },
+        {
+          "condition": {
+            "service_name_present": false,
+            "signal_type": "trace"
+          },
+          "description": "Trace ingestion requires service name evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_name_required",
+            "required_action": "attach_service_name"
+          },
+          "name": "trace_requires_service_name"
+        },
+        {
+          "condition": {
             "alert_severity": "critical",
             "notification_route_configured": false
           },
@@ -189,6 +426,32 @@
             "required_action": "configure_alert_route"
           },
           "name": "critical_alert_requires_route"
+        },
+        {
+          "condition": {
+            "alert_owner_present": false,
+            "alert_severity": "critical"
+          },
+          "description": "Critical alerts require an assigned owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "alert_owner_required",
+            "required_action": "assign_alert_owner"
+          },
+          "name": "critical_alert_requires_owner"
+        },
+        {
+          "condition": {
+            "incident_owner_present": false,
+            "incident_severity": "critical"
+          },
+          "description": "Critical incidents require an assigned owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_owner_required",
+            "required_action": "assign_incident_owner"
+          },
+          "name": "critical_incident_requires_owner"
         },
         {
           "condition": {
@@ -205,6 +468,19 @@
         },
         {
           "condition": {
+            "notification_route_configured": false,
+            "operation": "create_slo"
+          },
+          "description": "SLO definitions require alert route evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "slo_alert_route_required",
+            "required_action": "configure_slo_alert_route"
+          },
+          "name": "slo_requires_alert_route"
+        },
+        {
+          "condition": {
             "cardinality_exception_recorded": false,
             "metric_cardinality_gt": 10000
           },
@@ -215,6 +491,19 @@
             "required_action": "record_cardinality_exception"
           },
           "name": "high_cardinality_metric_requires_review"
+        },
+        {
+          "condition": {
+            "retention_above_limit": true,
+            "retention_exception_recorded": false
+          },
+          "description": "Telemetry retention above tenant limits requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "retention_review_required",
+            "required_action": "record_retention_exception"
+          },
+          "name": "retention_above_limit_requires_review"
         },
         {
           "condition": {
@@ -229,15 +518,44 @@
             "required_action": "approve_remediation_runbook"
           },
           "name": "production_remediation_requires_runbook"
+        },
+        {
+          "condition": {
+            "reviewer_same_as_requester": true
+          },
+          "description": "Remediation approvals require independent review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "remediation_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "review_notes_attached": false
+          },
+          "description": "Remediation and exception reviews require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "review_notes_required"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "MonitoringAdapterHealth",
+          "permission": "moni:admin",
+          "route": "/moni/adapters"
+        },
         "alerts": {
           "component": "AlertCenter",
           "permission": "moni:manage_alerts",
@@ -248,10 +566,25 @@
           "permission": "moni:view_analytics",
           "route": "/moni/analytics"
         },
+        "audit": {
+          "component": "MonitoringAuditTimeline",
+          "permission": "moni:admin",
+          "route": "/moni/audit"
+        },
         "dashboard": {
           "component": "MonitoringDashboard",
           "permission": "moni:view",
           "route": "/moni/dashboard"
+        },
+        "incidents": {
+          "component": "IncidentConsole",
+          "permission": "moni:manage_incidents",
+          "route": "/moni/incidents"
+        },
+        "logs": {
+          "component": "LogExplorer",
+          "permission": "moni:view_logs",
+          "route": "/moni/logs"
         },
         "metrics": {
           "component": "MetricExplorer",
@@ -273,6 +606,16 @@
           "permission": "moni:admin",
           "route": "/moni/settings"
         },
+        "slos": {
+          "component": "SLOConsole",
+          "permission": "moni:manage_slos",
+          "route": "/moni/slos"
+        },
+        "sources": {
+          "component": "SignalSourceInventory",
+          "permission": "moni:manage_sources",
+          "route": "/moni/sources"
+        },
         "traces": {
           "component": "TraceExplorer",
           "permission": "moni:view_traces",
@@ -282,9 +625,21 @@
       "streaming": {},
       "theme": {
         "components": {
+          "adapter_status_panel": {
+            "status_indicator": "adapter-state",
+            "visual": "backend-grid"
+          },
           "alert_correlation_stack": {
             "highlight": "incident-chip",
             "visual": "grouped-alert-list"
+          },
+          "audit_decision_timeline": {
+            "highlight": "matched-rule-chip",
+            "visual": "decision-timeline"
+          },
+          "incident_timeline": {
+            "highlight": "severity-chip",
+            "visual": "event-timeline"
           },
           "metric_query_panel": {
             "threshold_style": "slo-lines",
@@ -298,6 +653,14 @@
             "icon": "activity",
             "risk_style": "burn-rate-band",
             "status_indicator": "slo-pill"
+          },
+          "slo_burn_rate_panel": {
+            "threshold_style": "budget-lines",
+            "visual": "burn-rate-chart"
+          },
+          "source_health_panel": {
+            "status_indicator": "source-state",
+            "visual": "source-grid"
           }
         },
         "name": "moni_signal_console",
@@ -327,11 +690,25 @@
             "permission": "moni:view"
           },
           {
+            "component": "SignalSourceInventory",
+            "name": "sources",
+            "nav_group": "Signals",
+            "path": "/moni/sources",
+            "permission": "moni:manage_sources"
+          },
+          {
             "component": "MetricExplorer",
             "name": "metrics",
             "nav_group": "Signals",
             "path": "/moni/metrics",
             "permission": "moni:view_metrics"
+          },
+          {
+            "component": "LogExplorer",
+            "name": "logs",
+            "nav_group": "Signals",
+            "path": "/moni/logs",
+            "permission": "moni:view_logs"
           },
           {
             "component": "AlertCenter",
@@ -346,6 +723,20 @@
             "nav_group": "Signals",
             "path": "/moni/traces",
             "permission": "moni:view_traces"
+          },
+          {
+            "component": "SLOConsole",
+            "name": "slos",
+            "nav_group": "Reliability",
+            "path": "/moni/slos",
+            "permission": "moni:manage_slos"
+          },
+          {
+            "component": "IncidentConsole",
+            "name": "incidents",
+            "nav_group": "Reliability",
+            "path": "/moni/incidents",
+            "permission": "moni:manage_incidents"
           },
           {
             "component": "ObservabilityAnalytics",
@@ -369,6 +760,20 @@
             "permission": "moni:remediate"
           },
           {
+            "component": "MonitoringAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/moni/audit",
+            "permission": "moni:admin"
+          },
+          {
+            "component": "MonitoringAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Runtime",
+            "path": "/moni/adapters",
+            "permission": "moni:admin"
+          },
+          {
             "component": "MonitoringSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -381,7 +786,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -395,8 +800,20 @@
   "contracts": {
     "moni": {
       "configuration": {
+        "adapters": {
+          "log_store": "adapter",
+          "metrics_store": "adapter",
+          "notification_adapter_required_for_critical": true,
+          "supported_collectors": [
+            "opentelemetry",
+            "prometheus",
+            "apg_native"
+          ],
+          "trace_store": "adapter"
+        },
         "alerts": {
           "critical_alert_route_required": true,
+          "critical_incident_owner_required": true,
           "deduplication_window_minutes": 5,
           "default_severity": "medium",
           "notification_capability": "ntfy"
@@ -407,15 +824,26 @@
           "predictive_issue_prevention_enabled": true
         },
         "collection": {
+          "disabled_sources_block_ingestion": true,
           "logs_enabled": true,
           "max_cardinality_per_metric": 10000,
           "metrics_enabled": true,
+          "source_registration_required": true,
           "tenant_label_required": true,
           "traces_enabled": true
+        },
+        "incidents": {
+          "auto_open_from_critical_alerts": true,
+          "owner_required": true,
+          "postmortem_required_for_severity": [
+            "critical"
+          ]
         },
         "remediation": {
           "autonomous_remediation_enabled": true,
           "require_approval_for_production": true,
+          "require_independent_reviewer": true,
+          "review_notes_required": true,
           "runbook_required": true
         },
         "retention": {
@@ -427,7 +855,14 @@
         "security": {
           "audit_rule_changes": true,
           "block_pii_in_logs": true,
+          "record_lifecycle_audit": true,
           "require_tenant_context": true
+        },
+        "slo": {
+          "alert_route_required": true,
+          "burn_rate_alerting_enabled": true,
+          "default_window_minutes": 60,
+          "owner_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -435,9 +870,15 @@
           "default_theme": "moni_signal_console"
         },
         "ui": {
+          "enable_adapter_health": true,
           "enable_alert_center": true,
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
+          "enable_incident_console": true,
+          "enable_log_explorer": true,
           "enable_remediation_console": true,
+          "enable_slo_console": true,
+          "enable_source_inventory": true,
           "enable_trace_explorer": true
         }
       },
@@ -478,6 +919,19 @@
   },
   "roles": {},
   "rules": {
+    "critical_alert_requires_owner": {
+      "condition": {
+        "alert_owner_present": false,
+        "alert_severity": "critical"
+      },
+      "description": "Critical alerts require an assigned owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "alert_owner_required",
+        "required_action": "assign_alert_owner"
+      },
+      "name": "critical_alert_requires_owner"
+    },
     "critical_alert_requires_route": {
       "condition": {
         "alert_severity": "critical",
@@ -490,6 +944,32 @@
         "required_action": "configure_alert_route"
       },
       "name": "critical_alert_requires_route"
+    },
+    "critical_incident_requires_owner": {
+      "condition": {
+        "incident_owner_present": false,
+        "incident_severity": "critical"
+      },
+      "description": "Critical incidents require an assigned owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_owner_required",
+        "required_action": "assign_incident_owner"
+      },
+      "name": "critical_incident_requires_owner"
+    },
+    "disabled_source_blocks_ingestion": {
+      "condition": {
+        "operation": "ingest_signal",
+        "source_status": "disabled"
+      },
+      "description": "Disabled sources cannot emit telemetry signals.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_disabled",
+        "required_action": "reactivate_or_select_source"
+      },
+      "name": "disabled_source_blocks_ingestion"
     },
     "high_cardinality_metric_requires_review": {
       "condition": {
@@ -544,6 +1024,69 @@
       },
       "name": "production_remediation_requires_runbook"
     },
+    "remediation_review_requires_independent_reviewer": {
+      "condition": {
+        "reviewer_same_as_requester": true
+      },
+      "description": "Remediation approvals require independent review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "remediation_review_requires_independent_reviewer"
+    },
+    "retention_above_limit_requires_review": {
+      "condition": {
+        "retention_above_limit": true,
+        "retention_exception_recorded": false
+      },
+      "description": "Telemetry retention above tenant limits requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "retention_review_required",
+        "required_action": "record_retention_exception"
+      },
+      "name": "retention_above_limit_requires_review"
+    },
+    "review_notes_required": {
+      "condition": {
+        "review_notes_attached": false
+      },
+      "description": "Remediation and exception reviews require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "review_notes_required"
+    },
+    "signal_requires_registered_source": {
+      "condition": {
+        "operation": "ingest_signal",
+        "source_registered": false
+      },
+      "description": "Signal ingestion requires a registered source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_registration_required",
+        "required_action": "register_signal_source"
+      },
+      "name": "signal_requires_registered_source"
+    },
+    "slo_requires_alert_route": {
+      "condition": {
+        "notification_route_configured": false,
+        "operation": "create_slo"
+      },
+      "description": "SLO definitions require alert route evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "slo_alert_route_required",
+        "required_action": "configure_slo_alert_route"
+      },
+      "name": "slo_requires_alert_route"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -555,6 +1098,32 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "trace_requires_service_name": {
+      "condition": {
+        "service_name_present": false,
+        "signal_type": "trace"
+      },
+      "description": "Trace ingestion requires service name evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_name_required",
+        "required_action": "attach_service_name"
+      },
+      "name": "trace_requires_service_name"
+    },
+    "trace_requires_trace_id": {
+      "condition": {
+        "signal_type": "trace",
+        "trace_id_present": false
+      },
+      "description": "Trace ingestion requires a trace identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "trace_id_required",
+        "required_action": "attach_trace_id"
+      },
+      "name": "trace_requires_trace_id"
     }
   },
   "security": {},

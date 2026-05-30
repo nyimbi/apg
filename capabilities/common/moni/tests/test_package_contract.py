@@ -1,4 +1,4 @@
-"""Materialized capability package tests."""
+"""Package contract tests for MONI."""
 
 from __future__ import annotations
 
@@ -22,18 +22,27 @@ def _load_module(name: str, path: Path):
 	return module
 
 
-def test_materialized_contract_shape_is_valid():
-	module = _load_module("materialized_contract_moni", PACKAGE_DIR / "capability_contract.py")
+def test_package_contract_shape_is_valid():
+	module = _load_module("package_contract_moni", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "moni"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert len(contract["rule_engine"]["rules"]) >= 16
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {
+		"sources",
+		"logs",
+		"slos",
+		"incidents",
+		"audit",
+		"adapters",
+	}
 
 
-def test_materialized_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_moni", PACKAGE_DIR / "app.py")
+def test_package_app_entrypoint_is_publishable():
+	module = _load_module("package_app_moni", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -44,3 +53,6 @@ def test_materialized_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "moni" in model["capabilities"]
+	assert model["capabilities"]["moni"]["runtime"]["views"] == "view_models.py"
+	assert model["capabilities"]["moni"]["approvals"]["remediation"] == "RemediationRequestRecord"
+	assert "opentelemetry" in model["capabilities"]["moni"]["adapters"]["supported_collectors"]

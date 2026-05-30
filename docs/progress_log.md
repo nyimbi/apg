@@ -16,6 +16,56 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 04:20 EAT
+
+MONI monitoring and observability lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md`, `PLAN.md`, and `README.md` for the MONI
+  capability packet, with explicit source, signal, SLO, alert, incident,
+  remediation, UI, theme, adapter, and non-goal boundaries.
+- Replaced overclaiming package summary text in `cap_spec.md` with the current
+  executable scope and adapter boundaries.
+- Expanded `capability_contract.py` with tenant-scoped configuration, 16
+  deterministic guardrail rules, 14 generated-application routes, signal-console
+  theme tokens, and UI component metadata.
+- Added a dependency-light `MoniService` control plane beside the existing async
+  monitoring runtime for telemetry source registration, signal ingestion,
+  SLOs, alerts, incidents, remediation review, audit events, listing, summaries,
+  and compatibility records.
+- Extended `api.py`, `__init__.py`, `app.py`, `semantic_model.json`,
+  `release_report.json`, and `package_manifest.json` so MONI publishes current
+  contract-derived composition evidence.
+- Added `view_models.py` for generated dashboard, source inventory, signal
+  explorer, SLO, alert, incident, remediation, analytics, adapter, audit, and
+  settings screens.
+- Replaced the legacy package contract test with `tests/test_package_contract.py`
+  and expanded regression coverage for lifecycle guardrails, view models,
+  registration metadata, publishable app evidence, and remediation incident
+  references.
+- Focused review fix: remediation requests now fail closed when the incident ID
+  is missing, belongs to another tenant, or points at a denied incident.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/moni/capability_contract.py
+  capabilities/common/moni/service.py capabilities/common/moni/api.py
+  capabilities/common/moni/view_models.py capabilities/common/moni/app.py
+  capabilities/common/moni/tests/test_capability_contract.py
+  capabilities/common/moni/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/moni/tests/test_capability_contract.py
+  capabilities/common/moni/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/moni --json` passed with MONI classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/moni --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- Primary MONI stale-marker search returned no matches after cleanup.
+- `git diff --check -- capabilities/common/moni docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live telemetry adapters, production
+  persistence, rendered dashboard/browser behavior, and performance benchmarks.
+
 ### 2026-05-29 20:55 EAT
 
 Broad tooling and local hygiene closure slice:
