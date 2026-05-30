@@ -16,6 +16,67 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 14:20 EAT
+
+NCOD no-code/low-code builder lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Expanded `capability_contract.py` with app, builder, extension, AI builder
+  agent, deployment, governance, observability, adapter, UI, theme, and Bytewax
+  event-stream configuration.
+- Expanded deterministic rules to cover tenant context, app owner/name/theme/
+  RBAC/data-residency policy, screen routes, screen relationship metadata,
+  component screen placement, interactive accessibility labels, data models,
+  data bindings, workflow trigger/reference/policy, publish approval,
+  validation, script and connector policies, production review, deployment
+  target/approval/rollback, AI builder-agent registration/runtime/scope/
+  disclosure, state-change reason/audit, cross-tenant access, and Bytewax batch
+  mutation enforcement.
+- Added executable `DataModelDefinition`, `ThemeVariant`, `BuilderAgent`, and
+  `DeploymentRecord` models, plus workflow policy references and expanded
+  runtime validation helpers.
+- Extended `NcodService` with data model definition, theme variants, AI builder
+  agent registration, publish validation gating, release deployment, state
+  changes, dashboard/list support, and audit events.
+- Updated API helpers, view models, registration metadata, permissions, and
+  generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) to match the expanded
+  contract.
+- Renamed the package test to `tests/test_package_contract.py` and expanded
+  tests for Bytewax, AI builder agents, data models, workflows, deployment,
+  UI models, and guardrail failures.
+- Focused review cleanup: converted unsupported AI builder-agent runtimes and
+  deployment targets into explicit NCOD policy errors instead of leaking raw
+  normalization failures.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ncod/__init__.py
+  capabilities/common/ncod/models.py capabilities/common/ncod/builder_runtime.py
+  capabilities/common/ncod/service.py capabilities/common/ncod/api.py
+  capabilities/common/ncod/views.py
+  capabilities/common/ncod/capability_contract.py capabilities/common/ncod/app.py
+  capabilities/common/ncod/test_capability_contract.py
+  capabilities/common/ncod/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/ncod/test_capability_contract.py
+  capabilities/common/ncod/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.ncod import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/ncod --json` passed with `ncod` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ncod --json`
+  passed with `side_effect_free: true` and no warnings.
+- NCOD stale-marker and banned stream search returned no matches for old package
+  markers, unsupported overclaims, placeholders, TODOs, or Kafka references.
+- Not run: full repository pytest suite, rendered browser UI, live connector
+  execution, live external AI-agent CLI invocation, production database,
+  production WFLO/SCPT/AUTH/AUDL/THEM/ACCS/MONI adapters, live Bytewax topology,
+  and performance/resilience benchmarks.
+
 ### 2026-05-30 11:31 EAT
 
 HELP help-and-knowledge-base lifecycle/guardrail packet:

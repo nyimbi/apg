@@ -111,6 +111,34 @@ class BuilderComponent:
 
 
 @dataclass
+class DataModelDefinition:
+	"""Business entity model created in the no-code builder."""
+
+	id: str
+	tenant_id: str
+	app_id: str
+	name: str
+	fields: list[dict[str, Any]] = field(default_factory=list)
+	policy_ref: str = ""
+	validated: bool = False
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"app_id": self.app_id,
+			"name": self.name,
+			"fields": [dict(field) for field in self.fields],
+			"policy_ref": self.policy_ref,
+			"validated": self.validated,
+			"metadata": dict(self.metadata),
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
 class DataBinding:
 	"""Data source binding exposed to app pages and components."""
 
@@ -149,6 +177,7 @@ class WorkflowBinding:
 	app_id: str
 	trigger: str
 	workflow_ref: str
+	policy_ref: str = ""
 	enabled: bool = True
 	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: str = field(default_factory=utc_now_iso)
@@ -160,8 +189,35 @@ class WorkflowBinding:
 			"app_id": self.app_id,
 			"trigger": self.trigger,
 			"workflow_ref": self.workflow_ref,
+			"policy_ref": self.policy_ref,
 			"enabled": self.enabled,
 			"metadata": dict(self.metadata),
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class ThemeVariant:
+	"""Tenant-approved visual theme variant for a builder app."""
+
+	id: str
+	tenant_id: str
+	app_id: str
+	name: str
+	tokens: dict[str, Any] = field(default_factory=dict)
+	policy_ref: str = ""
+	approved: bool = False
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"app_id": self.app_id,
+			"name": self.name,
+			"tokens": dict(self.tokens),
+			"policy_ref": self.policy_ref,
+			"approved": self.approved,
 			"created_at": self.created_at,
 		}
 
@@ -223,6 +279,40 @@ class ConnectorBinding:
 
 
 @dataclass
+class BuilderAgent:
+	"""First-class AI agent configured to assist with app composition."""
+
+	id: str
+	tenant_id: str
+	app_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = False
+	policy_ref: str = ""
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"app_id": self.app_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"policy_ref": self.policy_ref,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
 class ValidationResult:
 	"""Readiness validation result for an application version."""
 
@@ -272,6 +362,40 @@ class PublishRelease:
 			"change_review_recorded": self.change_review_recorded,
 			"status": self.status,
 			"approval_ref": self.approval_ref,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class DeploymentRecord:
+	"""Governed deployment of a published application release."""
+
+	id: str
+	tenant_id: str
+	app_id: str
+	release_id: str
+	target_environment: str
+	target_runtime: str
+	target_ref: str
+	approval_recorded: bool
+	rollback_plan_ref: str
+	status: str = "deployed"
+	approval_ref: str = ""
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"app_id": self.app_id,
+			"release_id": self.release_id,
+			"target_environment": self.target_environment,
+			"target_runtime": self.target_runtime,
+			"target_ref": self.target_ref,
+			"approval_recorded": self.approval_recorded,
+			"approval_ref": self.approval_ref,
+			"rollback_plan_ref": self.rollback_plan_ref,
+			"status": self.status,
 			"created_at": self.created_at,
 		}
 

@@ -7,13 +7,19 @@ from capabilities.common.ncod.capability_contract import evaluate_capability_rul
 from capabilities.common.ncod.service import NcodService
 from capabilities.common.ncod.views import (
 	app_library_model,
+	analytics_model,
+	audit_trail_model,
+	builder_agents_model,
 	builder_model,
 	component_catalog_model,
 	connector_bindings_model,
+	data_modeler_model,
+	deployment_center_model,
 	dashboard_model,
 	page_composer_model,
 	publish_center_model,
 	settings_model,
+	workflow_designer_model,
 )
 
 
@@ -23,31 +29,43 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "ncod"
 	assert contract["configuration"]["tenant_id"] == "tenant-builder"
 	assert contract["configuration"]["apps"]["publish_approval_required"] is False
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "apps", "builder", "extensions", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "apps", "builder", "pages", "components", "publishing", "connectors", "settings"}
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "apps", "builder", "extensions", "ai_builder_agents", "deployments", "governance", "observability", "adapters", "ui", "theme"]
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "apps", "builder", "pages", "data_models", "components", "workflows", "publishing", "deployments", "connectors", "agents", "audit", "analytics", "settings"}
 	assert contract["ui"]["api_prefix"] == "/ncod/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "page_composer" in contract["theme"]["components"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["ai_builder_agents"]["supported_runtimes"]
 
 
 def test_rule_engine_enforces_no_code_guardrails():
 	result = evaluate_capability_rules({
 		"tenant_context_present": False,
-		"operation": "create_app",
-		"app_owner_assigned": False,
-		"approval_recorded": False,
 		"script_extension_present": True,
 		"script_policy_attached": False,
 		"external_connector_present": True,
 		"connector_policy_attached": False,
+		"ai_builder_agent_present": True,
+		"agent_registered": False,
+		"agent_runtime_supported": False,
+		"agent_scope_present": False,
+		"agent_contribution_disclosed": False,
+		"operation": "batch_builder_mutation",
+		"event_stream": "memory",
 		"production_change": True,
 		"change_review_recorded": False
+	})
+	create_app_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "create_app",
+		"app_owner_assigned": False,
 	})
 	publish_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "publish_app", "approval_recorded": False})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {"tenant_context_required", "app_requires_owner", "script_extension_requires_policy", "external_connector_requires_policy", "production_change_requires_review"}
+	assert set(result["matched_rules"]) == {"tenant_context_required", "script_extension_requires_policy", "external_connector_requires_policy", "production_change_requires_review", "ai_builder_agent_requires_registration", "ai_builder_agent_runtime_supported", "ai_builder_agent_requires_scope", "ai_builder_agent_requires_disclosure", "batch_builder_mutation_requires_bytewax"}
+	assert create_app_result["matched_rules"] == ["app_requires_owner"]
 	assert publish_result["matched_rules"] == ["publish_requires_approval"]
 
 
@@ -59,9 +77,13 @@ def test_registration_includes_full_capability_contract():
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "ncod_app_builder"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert registration["ui_components"]["builder"] == "/ncod/builder"
+	assert registration["ui_components"]["agents"] == "/ncod/agents"
 	assert "scpt" in registration["dependencies"]
+	assert "app_deployment" in registration["capabilities"]
 	assert "ncod:build" in registration["permissions"]
+	assert "ncod:deploy" in registration["permissions"]
 
 
 def test_ncod_lifecycle_is_executable():
@@ -85,6 +107,7 @@ def test_ncod_lifecycle_is_executable():
 		name="Work Orders",
 		route="work-orders",
 		layout="dashboard",
+		metadata={"relationships": [{"parent": "dashboard", "child": "work-order-table"}]},
 	)
 	component = service.add_component(
 		component_id="work-order-table",
@@ -96,6 +119,18 @@ def test_ncod_lifecycle_is_executable():
 		bindings={"rows": "work_orders"},
 		accessibility_label="Work orders table",
 		order=10,
+	)
+	data_model = service.define_data_model(
+		model_id="work-order-model",
+		tenant_id=tenant_id,
+		app_id=app["id"],
+		name="Work Order",
+		fields=[
+			{"name": "id", "type": "text", "required": True},
+			{"name": "status", "type": "text", "required": True},
+			{"name": "assignee", "type": "text"},
+		],
+		policy_ref="data-model-policy:work-orders",
 	)
 	data_binding = service.bind_data_source(
 		binding_id="work-orders-data",
@@ -113,6 +148,21 @@ def test_ncod_lifecycle_is_executable():
 		app_id=app["id"],
 		trigger="on_dispatch",
 		workflow_ref="wflo:dispatch-technician",
+		policy_ref="workflow-policy:dispatch",
+	)
+	theme = service.create_theme_variant(
+		theme_id="field-service-theme",
+		tenant_id=tenant_id,
+		app_id=app["id"],
+		name="Field Service Theme",
+		tokens={
+			"color.primary": "#2C5282",
+			"color.accent": "#38A169",
+			"surface.canvas": "#F7F8FA",
+			"text.primary": "#172033",
+		},
+		policy_ref="theme-policy:field-service",
+		approved=True,
 	)
 	script = service.add_script_extension(
 		extension_id="validate-dispatch",
@@ -132,6 +182,17 @@ def test_ncod_lifecycle_is_executable():
 		policy_ref="connector-policy:maps",
 		scopes=["geocode"],
 	)
+	agent = service.register_builder_agent(
+		agent_id="codex-builder",
+		tenant_id=tenant_id,
+		app_id=app["id"],
+		name="Codex Builder",
+		runtime="codex",
+		role="app_architect",
+		scope="screens,workflows,rules",
+		contribution_disclosed=True,
+		policy_ref="agent-policy:builders",
+	)
 	validation = service.validate_app(
 		validation_id="validate-field-service",
 		tenant_id=tenant_id,
@@ -146,30 +207,54 @@ def test_ncod_lifecycle_is_executable():
 		approval_ref="approval:field-service",
 		change_review_recorded=True,
 	)
+	deployment = service.deploy_release(
+		deployment_id="deploy-field-service-prod",
+		tenant_id=tenant_id,
+		release_id=release["id"],
+		target_runtime="python",
+		target_ref="apg://apps/field-service",
+		approval_recorded=True,
+		approval_ref="approval:deploy-field-service",
+		rollback_plan_ref="rollback:field-service",
+	)
 
 	assert page["route"] == "/work-orders"
 	assert component["component_type"] == "table"
+	assert data_model["validated"] is True
 	assert data_binding["validated"] is True
 	assert workflow["enabled"] is True
+	assert workflow["policy_ref"] == "workflow-policy:dispatch"
+	assert theme["approved"] is True
 	assert script["status"] == "approved"
 	assert connector["scopes"] == ["geocode"]
+	assert agent["runtime"] == "codex"
 	assert validation["passed"] is True
 	assert release["status"] == "production"
-	assert service.list_apps(tenant_id)[0]["status"] == "published"
+	assert deployment["status"] == "deployed"
+	assert service.list_apps(tenant_id)[0]["status"] == "deployed"
 
 	summary = service.dashboard_summary(tenant_id)
 	assert summary["app_count"] == 1
 	assert summary["published_app_count"] == 1
 	assert summary["component_count"] == 1
+	assert summary["data_model_count"] == 1
+	assert summary["builder_agent_count"] == 1
 	assert summary["release_count"] == 1
+	assert summary["deployment_count"] == 1
 
 	assert dashboard_model(service, tenant_id)["summary"]["app_count"] == 1
 	assert app_library_model(service, tenant_id)["apps"][0]["id"] == "field-service"
+	assert data_modeler_model(service, tenant_id)["data_models"][0]["name"] == "Work Order"
 	assert builder_model(service, tenant_id)["workflow_bindings"][0]["workflow_ref"] == "wflo:dispatch-technician"
 	assert page_composer_model(service, tenant_id)["components"][0]["id"] == "work-order-table"
 	assert component_catalog_model(service, tenant_id)["components"][0]["accessibility_label"] == "Work orders table"
+	assert workflow_designer_model(service, tenant_id)["workflow_bindings"][0]["policy_ref"] == "workflow-policy:dispatch"
 	assert publish_center_model(service, tenant_id)["releases"][0]["approval_recorded"] is True
+	assert deployment_center_model(service, tenant_id)["deployments"][0]["target_runtime"] == "python"
 	assert connector_bindings_model(service, tenant_id)["connector_bindings"][0]["connector_ref"] == "conn:maps"
+	assert builder_agents_model(service, tenant_id)["builder_agents"][0]["role"] == "app_architect"
+	assert audit_trail_model(service, tenant_id)["audit_events"]
+	assert analytics_model(service, tenant_id)["summary"]["deployment_count"] == 1
 	assert settings_model(service, tenant_id)["audit_events"]
 
 
@@ -227,22 +312,75 @@ def test_ncod_service_enforces_policy_guardrails():
 		name="Good Input",
 		accessibility_label="Good input",
 	)
-	service.bind_data_source(
-		binding_id="invalid-data",
+	with pytest.raises(PermissionError, match="data_binding_schema_required"):
+		service.bind_data_source(
+			binding_id="invalid-data",
+			tenant_id=tenant_id,
+			app_id=app["id"],
+			name="Invalid Data",
+			source_type="entity",
+			source_ref="bad.source",
+			schema={"bad": "schema"},
+		)
+
+	with pytest.raises(PermissionError, match="data_model_fields_required"):
+		service.define_data_model(
+			model_id="bad-model",
+			tenant_id=tenant_id,
+			app_id=app["id"],
+			name="Bad Model",
+			fields=[],
+			policy_ref="data-model-policy:bad",
+		)
+
+	with pytest.raises(PermissionError, match="workflow_policy_required"):
+		service.attach_workflow(
+			binding_id="unsafe-flow",
+			tenant_id=tenant_id,
+			app_id=app["id"],
+			trigger="on_submit",
+			workflow_ref="wflo:unsafe",
+			policy_ref="",
+		)
+
+	with pytest.raises(PermissionError, match="ai_builder_agent_disclosure_required"):
+		service.register_builder_agent(
+			agent_id="undisclosed-agent",
+			tenant_id=tenant_id,
+			app_id=app["id"],
+			name="Undisclosed Agent",
+			runtime="codex",
+			role="rule_author",
+			scope="rules",
+			contribution_disclosed=False,
+		)
+
+	with pytest.raises(PermissionError, match="ai_builder_agent_runtime_not_supported"):
+		service.register_builder_agent(
+			agent_id="unsupported-agent",
+			tenant_id=tenant_id,
+			app_id=app["id"],
+			name="Unsupported Agent",
+			runtime="unknown_agent",
+			role="rule_author",
+			scope="rules",
+			contribution_disclosed=True,
+		)
+
+	service.define_data_model(
+		model_id="valid-model",
 		tenant_id=tenant_id,
 		app_id=app["id"],
-		name="Invalid Data",
-		source_type="entity",
-		source_ref="bad.source",
-		schema={"bad": "schema"},
+		name="Valid Model",
+		fields=[{"name": "id", "type": "text"}],
+		policy_ref="data-model-policy:valid",
 	)
 	validation = service.validate_app(
-		validation_id="validate-bad-data",
+		validation_id="validate-good-app",
 		tenant_id=tenant_id,
 		app_id=app["id"],
 	)
-	assert validation["passed"] is False
-	assert "data_bindings_valid" in validation["issues"]
+	assert validation["passed"] is True
 
 	with pytest.raises(PermissionError, match="script_policy_required"):
 		service.add_script_extension(
@@ -299,6 +437,14 @@ def test_ncod_service_enforces_policy_guardrails():
 		name="Clean Button",
 		accessibility_label="Clean button",
 	)
+	service.define_data_model(
+		model_id="clean-model",
+		tenant_id=tenant_id,
+		app_id=clean["id"],
+		name="Clean Model",
+		fields=[{"name": "id", "type": "text"}],
+		policy_ref="data-model-policy:clean",
+	)
 	service.validate_app(
 		validation_id="validate-clean",
 		tenant_id=tenant_id,
@@ -320,6 +466,24 @@ def test_ncod_service_enforces_policy_guardrails():
 			target_environment="production",
 			approval_recorded=True,
 			change_review_recorded=False,
+		)
+
+	release = service.publish_app(
+		release_id="publish-clean",
+		tenant_id=tenant_id,
+		app_id=clean["id"],
+		target_environment="staging",
+		approval_recorded=True,
+	)
+	with pytest.raises(PermissionError, match="deployment_target_required"):
+		service.deploy_release(
+			deployment_id="deploy-unsupported",
+			tenant_id=tenant_id,
+			release_id=release["id"],
+			target_runtime="unknown_runtime",
+			target_ref="apg://apps/clean",
+			approval_recorded=True,
+			rollback_plan_ref="rollback:clean",
 		)
 
 	with pytest.raises(LookupError, match="builder_app_not_found"):

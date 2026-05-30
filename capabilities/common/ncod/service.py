@@ -8,8 +8,13 @@ from .builder_runtime import (
 	binding_schema_valid,
 	bump_patch_version,
 	component_accessible,
+	data_model_fields_valid,
+	theme_tokens_valid,
 	normalize_app_status,
+	normalize_agent_role,
+	normalize_agent_runtime,
 	normalize_component_type,
+	normalize_deployment_target,
 	normalize_layout,
 	normalize_route,
 	normalize_source_type,
@@ -20,13 +25,17 @@ from .builder_runtime import (
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
 	BuilderApp,
+	BuilderAgent,
 	BuilderComponent,
 	BuilderPage,
 	ConnectorBinding,
 	DataBinding,
+	DataModelDefinition,
+	DeploymentRecord,
 	NcodAuditEvent,
 	PublishRelease,
 	ScriptExtension,
+	ThemeVariant,
 	ValidationResult,
 	WorkflowBinding,
 	utc_now_iso,
@@ -40,12 +49,16 @@ class NcodService:
 		self._apps: dict[str, BuilderApp] = {}
 		self._pages: dict[str, BuilderPage] = {}
 		self._components: dict[str, BuilderComponent] = {}
+		self._data_models: dict[str, DataModelDefinition] = {}
 		self._data_bindings: dict[str, DataBinding] = {}
 		self._workflow_bindings: dict[str, WorkflowBinding] = {}
+		self._theme_variants: dict[str, ThemeVariant] = {}
 		self._script_extensions: dict[str, ScriptExtension] = {}
 		self._connector_bindings: dict[str, ConnectorBinding] = {}
+		self._builder_agents: dict[str, BuilderAgent] = {}
 		self._validations: dict[str, ValidationResult] = {}
 		self._releases: dict[str, PublishRelease] = {}
+		self._deployments: dict[str, DeploymentRecord] = {}
 		self._audit_events: dict[str, NcodAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -72,6 +85,10 @@ class NcodService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_app",
 			"app_owner_assigned": bool(owner),
+			"app_name_present": bool(name.strip()),
+			"theme_selected": bool(theme.strip()),
+			"rbac_policy_present": bool(rbac_policy_ref.strip()),
+			"data_residency_policy_present": bool(data_residency_policy_ref.strip()),
 		})
 		self._raise_if_denied(result)
 		app = BuilderApp(
@@ -102,6 +119,13 @@ class NcodService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		app = self._require_app(app_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "add_page",
+			"route_present": bool(route.strip()),
+			"element_relationships_declared": bool((metadata or {}).get("relationships")),
+		})
+		self._raise_if_denied(result)
 		page = BuilderPage(
 			id=page_id,
 			tenant_id=tenant_id,
@@ -131,8 +155,15 @@ class NcodService:
 		self._require_tenant(tenant_id)
 		page = self._require_page(page_id, tenant_id)
 		normalized_type = normalize_component_type(component_type)
-		if not component_accessible(normalized_type, accessibility_label, dict(props or {})):
-			raise PermissionError("accessibility_label_required")
+		accessible = component_accessible(normalized_type, accessibility_label, dict(props or {}))
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "add_component",
+			"screen_present": bool(page),
+			"interactive_component": normalized_type in {"input", "select", "button", "chart", "table", "workflow_action"},
+			"accessibility_label_present": accessible,
+		})
+		self._raise_if_denied(result)
 		component = BuilderComponent(
 			id=component_id,
 			tenant_id=tenant_id,
@@ -150,6 +181,42 @@ class NcodService:
 		self._audit(tenant_id, "component_added", component.id, f"Added component {name}")
 		return component.to_dict()
 
+	def define_data_model(
+		self,
+		model_id: str,
+		tenant_id: str,
+		app_id: str,
+		name: str,
+		fields: list[dict[str, Any]],
+		policy_ref: str,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		valid_fields = data_model_fields_valid(fields)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "define_data_model",
+			"data_model_name_present": bool(name.strip()),
+			"data_model_fields_present": valid_fields,
+			"data_model_policy_present": bool(policy_ref.strip()),
+		})
+		self._raise_if_denied(result)
+		model = DataModelDefinition(
+			id=model_id,
+			tenant_id=tenant_id,
+			app_id=app.id,
+			name=name,
+			fields=[dict(field) for field in fields],
+			policy_ref=policy_ref,
+			validated=valid_fields,
+			metadata=dict(metadata or {}),
+		)
+		self._data_models[model.id] = model
+		self._touch_app(app)
+		self._audit(tenant_id, "data_model_defined", model.id, f"Defined data model {name}")
+		return model.to_dict()
+
 	def bind_data_source(
 		self,
 		binding_id: str,
@@ -163,6 +230,13 @@ class NcodService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		app = self._require_app(app_id, tenant_id)
+		schema_valid = binding_schema_valid(schema)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "bind_data_source",
+			"binding_schema_valid": schema_valid,
+		})
+		self._raise_if_denied(result)
 		binding = DataBinding(
 			id=binding_id,
 			tenant_id=tenant_id,
@@ -171,7 +245,7 @@ class NcodService:
 			source_type=normalize_source_type(source_type),
 			source_ref=source_ref,
 			schema=dict(schema),
-			validated=binding_schema_valid(schema),
+			validated=schema_valid,
 			policy_ref=policy_ref,
 		)
 		self._data_bindings[binding.id] = binding
@@ -186,17 +260,27 @@ class NcodService:
 		app_id: str,
 		trigger: str,
 		workflow_ref: str,
+		policy_ref: str = "",
 		enabled: bool = True,
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		app = self._require_app(app_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "attach_workflow",
+			"workflow_trigger_present": bool(trigger.strip()),
+			"workflow_ref_present": bool(workflow_ref.strip()),
+			"workflow_policy_attached": bool(policy_ref.strip()),
+		})
+		self._raise_if_denied(result)
 		binding = WorkflowBinding(
 			id=binding_id,
 			tenant_id=tenant_id,
 			app_id=app.id,
 			trigger=trigger,
 			workflow_ref=workflow_ref,
+			policy_ref=policy_ref,
 			enabled=enabled,
 			metadata=dict(metadata or {}),
 		)
@@ -204,6 +288,36 @@ class NcodService:
 		self._touch_app(app)
 		self._audit(tenant_id, "workflow_attached", binding.id, f"Attached workflow {workflow_ref}")
 		return binding.to_dict()
+
+	def create_theme_variant(
+		self,
+		theme_id: str,
+		tenant_id: str,
+		app_id: str,
+		name: str,
+		tokens: dict[str, Any],
+		policy_ref: str,
+		approved: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		if not theme_tokens_valid(tokens):
+			raise PermissionError("theme_tokens_required")
+		if not policy_ref.strip():
+			raise PermissionError("theme_policy_required")
+		variant = ThemeVariant(
+			id=theme_id,
+			tenant_id=tenant_id,
+			app_id=app.id,
+			name=name,
+			tokens=dict(tokens),
+			policy_ref=policy_ref,
+			approved=approved,
+		)
+		self._theme_variants[variant.id] = variant
+		self._touch_app(app)
+		self._audit(tenant_id, "theme_variant_created", variant.id, f"Created theme variant {name}")
+		return variant.to_dict()
 
 	def add_script_extension(
 		self,
@@ -269,6 +383,52 @@ class NcodService:
 		self._audit(tenant_id, "connector_bound", binding.id, f"Bound connector {name}")
 		return binding.to_dict()
 
+	def register_builder_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		app_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		try:
+			normalized_runtime = normalize_agent_runtime(runtime)
+		except ValueError as exc:
+			raise PermissionError("ai_builder_agent_runtime_not_supported") from exc
+		normalized_role = normalize_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"ai_builder_agent_present": True,
+			"agent_registered": registered,
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		agent = BuilderAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			app_id=app.id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+		)
+		self._builder_agents[agent.id] = agent
+		self._touch_app(app)
+		self._audit(tenant_id, "ai_builder_agent_registered", agent.id, f"Registered AI builder agent {name}")
+		return agent.to_dict()
+
 	def validate_app(self, validation_id: str, tenant_id: str, app_id: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		app = self._require_app(app_id, tenant_id)
@@ -276,9 +436,13 @@ class NcodService:
 			app.to_dict(),
 			self._page_dicts(app.id, tenant_id),
 			self._component_dicts(app.id, tenant_id),
+			self._data_model_dicts(app.id, tenant_id),
 			self._data_binding_dicts(app.id, tenant_id),
+			self._workflow_binding_dicts(app.id, tenant_id),
 			self._script_extension_dicts(app.id, tenant_id),
 			self._connector_binding_dicts(app.id, tenant_id),
+			self._builder_agent_dicts(app.id, tenant_id),
+			self._theme_variant_dicts(app.id, tenant_id),
 		)
 		result = ValidationResult(
 			id=validation_id,
@@ -307,10 +471,12 @@ class NcodService:
 		self._require_tenant(tenant_id)
 		app = self._require_app(app_id, tenant_id)
 		target = target_environment.strip().lower()
+		latest_validation = self._latest_validation(app.id, tenant_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "publish_app",
 			"approval_recorded": approval_recorded,
+			"validation_passed": bool(latest_validation and latest_validation.passed),
 			"production_change": target == "production",
 			"change_review_recorded": change_review_recorded,
 			"script_extension_present": bool(self._script_extension_dicts(app.id, tenant_id)),
@@ -320,7 +486,6 @@ class NcodService:
 		})
 		self._raise_if_denied(result)
 		self._raise_if_review_required(result)
-		latest_validation = self._latest_validation(app.id, tenant_id)
 		status = publish_status(target, bool(latest_validation and latest_validation.passed))
 		if status == "blocked":
 			raise PermissionError("app_validation_required")
@@ -342,6 +507,72 @@ class NcodService:
 		self._audit(tenant_id, "app_published", release.id, f"Published app to {target}")
 		return release.to_dict()
 
+	def deploy_release(
+		self,
+		deployment_id: str,
+		tenant_id: str,
+		release_id: str,
+		target_runtime: str,
+		target_ref: str,
+		approval_recorded: bool,
+		rollback_plan_ref: str,
+		approval_ref: str = "",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		release = self._require_release(release_id, tenant_id)
+		app = self._require_app(release.app_id, tenant_id)
+		try:
+			normalized_runtime = normalize_deployment_target(target_runtime)
+		except ValueError as exc:
+			raise PermissionError("deployment_target_required") from exc
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "deploy_release",
+			"deployment_target_supported": bool(normalized_runtime and target_ref.strip()),
+			"deployment_approval_recorded": approval_recorded,
+			"rollback_plan_present": bool(rollback_plan_ref.strip()),
+		})
+		self._raise_if_denied(result)
+		deployment = DeploymentRecord(
+			id=deployment_id,
+			tenant_id=tenant_id,
+			app_id=app.id,
+			release_id=release.id,
+			target_environment=release.target_environment,
+			target_runtime=normalized_runtime,
+			target_ref=target_ref,
+			approval_recorded=approval_recorded,
+			approval_ref=approval_ref,
+			rollback_plan_ref=rollback_plan_ref,
+		)
+		self._deployments[deployment.id] = deployment
+		app.status = "deployed"
+		self._touch_app(app)
+		self._audit(tenant_id, "release_deployed", deployment.id, f"Deployed release {release.id}")
+		return deployment.to_dict()
+
+	def change_app_state(
+		self,
+		tenant_id: str,
+		app_id: str,
+		status: str,
+		reason: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		app = self._require_app(app_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": audit_recorded,
+		})
+		self._raise_if_denied(result)
+		app.status = normalize_app_status(status)
+		self._touch_app(app)
+		self._audit(tenant_id, "app_state_changed", app.id, reason)
+		return app.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -358,8 +589,8 @@ class NcodService:
 			description=str(metadata.get("description") or ""),
 			theme=str(metadata.get("theme") or "ncod_app_builder"),
 			accessibility_checked=bool(metadata.get("accessibility_checked", False)),
-			rbac_policy_ref=str(metadata.get("rbac_policy_ref") or ""),
-			data_residency_policy_ref=str(metadata.get("data_residency_policy_ref") or ""),
+			rbac_policy_ref=str(metadata.get("rbac_policy_ref") or "rbac:compatibility"),
+			data_residency_policy_ref=str(metadata.get("data_residency_policy_ref") or "residency:compatibility"),
 			metadata=metadata | {"compatibility_status": status or "active"},
 		)
 
@@ -375,11 +606,17 @@ class NcodService:
 	def list_components(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._components, tenant_id)
 
+	def list_data_models(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._data_models, tenant_id)
+
 	def list_data_bindings(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._data_bindings, tenant_id)
 
 	def list_workflow_bindings(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._workflow_bindings, tenant_id)
+
+	def list_theme_variants(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._theme_variants, tenant_id)
 
 	def list_script_extensions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._script_extensions, tenant_id)
@@ -387,11 +624,17 @@ class NcodService:
 	def list_connector_bindings(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._connector_bindings, tenant_id)
 
+	def list_builder_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._builder_agents, tenant_id)
+
 	def list_validations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._validations, tenant_id)
 
 	def list_releases(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._releases, tenant_id)
+
+	def list_deployments(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._deployments, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
@@ -402,14 +645,18 @@ class NcodService:
 		return {
 			"tenant_id": tenant_id,
 			"app_count": len(apps),
-			"published_app_count": sum(1 for item in apps if item.status == "published"),
+			"published_app_count": sum(1 for item in apps if item.status in {"published", "deployed"}),
 			"page_count": len(self.list_pages(tenant_id)),
 			"component_count": len(self.list_components(tenant_id)),
+			"data_model_count": len(self.list_data_models(tenant_id)),
 			"data_binding_count": len(self.list_data_bindings(tenant_id)),
 			"workflow_binding_count": len(self.list_workflow_bindings(tenant_id)),
+			"theme_variant_count": len(self.list_theme_variants(tenant_id)),
 			"script_extension_count": len(self.list_script_extensions(tenant_id)),
 			"connector_binding_count": len(self.list_connector_bindings(tenant_id)),
+			"builder_agent_count": len(self.list_builder_agents(tenant_id)),
 			"release_count": len(self.list_releases(tenant_id)),
+			"deployment_count": len(self.list_deployments(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -429,6 +676,12 @@ class NcodService:
 			raise LookupError("builder_page_not_found")
 		return page
 
+	def _require_release(self, release_id: str, tenant_id: str) -> PublishRelease:
+		release = self._releases.get(release_id)
+		if release is None or release.tenant_id != tenant_id:
+			raise LookupError("builder_release_not_found")
+		return release
+
 	def _latest_validation(self, app_id: str, tenant_id: str) -> ValidationResult | None:
 		validations = [
 			item
@@ -443,6 +696,9 @@ class NcodService:
 	def _component_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
 		return [item.to_dict() for item in self._components.values() if item.app_id == app_id and item.tenant_id == tenant_id]
 
+	def _data_model_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
+		return [item.to_dict() for item in self._data_models.values() if item.app_id == app_id and item.tenant_id == tenant_id]
+
 	def _data_binding_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
 		return [item.to_dict() for item in self._data_bindings.values() if item.app_id == app_id and item.tenant_id == tenant_id]
 
@@ -451,6 +707,15 @@ class NcodService:
 
 	def _connector_binding_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
 		return [item.to_dict() for item in self._connector_bindings.values() if item.app_id == app_id and item.tenant_id == tenant_id]
+
+	def _workflow_binding_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
+		return [item.to_dict() for item in self._workflow_bindings.values() if item.app_id == app_id and item.tenant_id == tenant_id]
+
+	def _builder_agent_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
+		return [item.to_dict() for item in self._builder_agents.values() if item.app_id == app_id and item.tenant_id == tenant_id]
+
+	def _theme_variant_dicts(self, app_id: str, tenant_id: str) -> list[dict[str, Any]]:
+		return [item.to_dict() for item in self._theme_variants.values() if item.app_id == app_id and item.tenant_id == tenant_id]
 
 	def _touch_app(self, app: BuilderApp) -> None:
 		app.status = normalize_app_status(app.status)

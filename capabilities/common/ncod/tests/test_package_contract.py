@@ -24,7 +24,7 @@ def _load_module(name: str, path: Path):
 
 
 def test_ncod_contract_shape_is_valid():
-	module = _load_module("materialized_contract_ncod", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_ncod", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
@@ -34,7 +34,7 @@ def test_ncod_contract_shape_is_valid():
 
 
 def test_ncod_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_ncod", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_ncod", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()

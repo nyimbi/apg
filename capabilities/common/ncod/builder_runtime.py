@@ -6,10 +6,26 @@ from hashlib import sha256
 from typing import Any
 
 
-APP_STATUSES = ("draft", "validated", "published", "retired")
+APP_STATUSES = ("draft", "validated", "reviewed", "published", "deployed", "retired")
 PAGE_LAYOUTS = ("responsive_grid", "form", "dashboard", "wizard", "detail")
-COMPONENT_TYPES = ("text", "input", "select", "table", "chart", "button", "form", "metric", "workflow_action")
+COMPONENT_TYPES = (
+	"text",
+	"input",
+	"select",
+	"table",
+	"chart",
+	"button",
+	"form",
+	"metric",
+	"workflow_action",
+	"agent_panel",
+	"kanban",
+	"timeline",
+)
 SOURCE_TYPES = ("entity", "query", "api", "event", "file")
+AI_RUNTIMES = ("codex", "claude_code", "opencode", "pi")
+AGENT_ROLES = ("app_architect", "screen_designer", "workflow_designer", "rule_author", "theme_designer", "test_builder")
+DEPLOYMENT_TARGETS = ("python", "container", "apg_runtime", "edge_worker")
 
 
 def stable_id(prefix: str, *parts: object) -> str:
@@ -47,6 +63,27 @@ def normalize_source_type(source_type: str | None) -> str:
 	return value
 
 
+def normalize_agent_runtime(runtime: str | None) -> str:
+	value = (runtime or "").strip().lower()
+	if value not in AI_RUNTIMES:
+		raise ValueError(f"unsupported_ai_builder_runtime:{value}")
+	return value
+
+
+def normalize_agent_role(role: str | None) -> str:
+	value = (role or "").strip().lower()
+	if value not in AGENT_ROLES:
+		raise ValueError(f"unsupported_ai_builder_role:{value}")
+	return value
+
+
+def normalize_deployment_target(target: str | None) -> str:
+	value = (target or "").strip().lower()
+	if value not in DEPLOYMENT_TARGETS:
+		raise ValueError(f"unsupported_deployment_target:{value}")
+	return value
+
+
 def normalize_route(route: str) -> str:
 	value = route.strip()
 	if not value:
@@ -73,25 +110,49 @@ def binding_schema_valid(schema: dict[str, Any]) -> bool:
 	return isinstance(fields, list) and all(isinstance(field, str) and field for field in fields)
 
 
+def data_model_fields_valid(fields: list[dict[str, Any]]) -> bool:
+	return bool(fields) and all(
+		isinstance(field, dict)
+		and bool(str(field.get("name") or "").strip())
+		and bool(str(field.get("type") or "").strip())
+		for field in fields
+	)
+
+
+def theme_tokens_valid(tokens: dict[str, Any]) -> bool:
+	required = {"color.primary", "color.accent", "surface.canvas", "text.primary"}
+	return required.issubset(set(tokens))
+
+
 def validation_checks(
 	app: dict[str, Any],
 	pages: list[dict[str, Any]],
 	components: list[dict[str, Any]],
+	data_models: list[dict[str, Any]],
 	bindings: list[dict[str, Any]],
+	workflows: list[dict[str, Any]],
 	scripts: list[dict[str, Any]],
 	connectors: list[dict[str, Any]],
+	agents: list[dict[str, Any]],
+	theme_variants: list[dict[str, Any]],
 ) -> tuple[dict[str, bool], list[str]]:
 	checks = {
 		"has_owner": bool(app.get("owner")),
 		"has_page": bool(pages),
 		"has_component": bool(components),
+		"has_data_model": bool(data_models),
 		"theme_selected": bool(app.get("theme")),
 		"accessibility_checked": bool(app.get("accessibility_checked")),
 		"rbac_policy_present": bool(app.get("rbac_policy_ref")),
 		"data_residency_policy_present": bool(app.get("data_residency_policy_ref")),
+		"data_models_valid": all(item.get("validated") for item in data_models),
 		"data_bindings_valid": all(binding.get("validated") for binding in bindings),
+		"workflows_policy_attached": all(bool(workflow.get("policy_ref")) for workflow in workflows),
 		"scripts_policy_attached": all(bool(script.get("policy_ref")) for script in scripts),
 		"connectors_policy_attached": all(bool(connector.get("policy_ref")) for connector in connectors),
+		"ai_agents_registered": all(agent.get("registered") for agent in agents),
+		"ai_agents_disclosed": all(agent.get("contribution_disclosed") for agent in agents),
+		"theme_variants_approved": all(theme.get("approved") for theme in theme_variants),
 	}
 	issues = [name for name, passed in checks.items() if not passed]
 	return checks, issues

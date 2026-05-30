@@ -22,6 +22,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"app_count": summary["app_count"],
 		"published_app_count": summary["published_app_count"],
 		"release_count": summary["release_count"],
+		"deployment_count": summary["deployment_count"],
+		"builder_agent_count": summary["builder_agent_count"],
 	}
 
 
@@ -79,6 +81,18 @@ def bind_data_source(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def define_data_model(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.define_data_model(
+		model_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		app_id=str(payload["app_id"]),
+		name=str(payload["name"]),
+		fields=list(payload.get("fields") or []),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
 def attach_workflow(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.attach_workflow(
 		binding_id=str(payload["id"]),
@@ -86,8 +100,21 @@ def attach_workflow(payload: dict[str, Any]) -> dict[str, Any]:
 		app_id=str(payload["app_id"]),
 		trigger=str(payload["trigger"]),
 		workflow_ref=str(payload["workflow_ref"]),
+		policy_ref=str(payload.get("policy_ref") or ""),
 		enabled=bool(payload.get("enabled", True)),
 		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
+def create_theme_variant(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.create_theme_variant(
+		theme_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		app_id=str(payload["app_id"]),
+		name=str(payload["name"]),
+		tokens=dict(payload.get("tokens") or {}),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		approved=bool(payload.get("approved")),
 	)
 
 
@@ -115,11 +142,49 @@ def add_connector_binding(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_builder_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_builder_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		app_id=str(payload["app_id"]),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed")),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+	)
+
+
 def validate_app(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.validate_app(
 		validation_id=str(payload["id"]),
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		app_id=str(payload["app_id"]),
+	)
+
+
+def deploy_release(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.deploy_release(
+		deployment_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		release_id=str(payload["release_id"]),
+		target_runtime=str(payload.get("target_runtime") or "python"),
+		target_ref=str(payload.get("target_ref") or ""),
+		approval_recorded=bool(payload.get("approval_recorded")),
+		rollback_plan_ref=str(payload.get("rollback_plan_ref") or ""),
+		approval_ref=str(payload.get("approval_ref") or ""),
+	)
+
+
+def change_app_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_app_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		app_id=str(payload["app_id"]),
+		status=str(payload["status"]),
+		reason=str(payload.get("reason") or ""),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
 	)
 
 
