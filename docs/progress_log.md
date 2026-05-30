@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 16:22 EAT
+
+SCRP scraper/data-harvesting lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Expanded `capability_contract.py` with harvest-agent, governance,
+  observability, adapter, UI, theme, and Bytewax lifecycle-stream
+  configuration.
+- Expanded deterministic rules to cover tenant context, source ownership,
+  source terms, credential vault references, robots/terms policy, rate limits,
+  extractor schema, pipeline handoff target, DLP scan evidence, PII policy,
+  sensitive-source review, AI harvest-agent registration/runtime/role/scope/
+  disclosure, state-change reason/audit, cross-tenant access, and Bytewax batch
+  mutation enforcement.
+- Added first-class `HarvestAgent` model support and extended `ScrpService`
+  with tenant-safe harvest-agent registration, guarded harvest-job state
+  changes, agent listing, and audit-event dashboard counts.
+- Extended API helpers and view models with harvest-agent, audit, analytics,
+  job-state, listing, settings, and Bytewax stream surfaces.
+- Updated registration metadata with harvest-agent and audit capabilities,
+  SCRP audit permission, agent/audit endpoints, optional Bytewax/AUDL/MONI
+  adapters, and streaming metadata.
+- Expanded focused tests for generated semantic evidence, AI harvest agents,
+  duplicate agent IDs across tenants, state-change guardrails, Bytewax stream
+  metadata, API/view surfaces, and policy failures.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/scrp/__init__.py
+  capabilities/common/scrp/capability_contract.py capabilities/common/scrp/models.py
+  capabilities/common/scrp/harvest_runtime.py capabilities/common/scrp/service.py
+  capabilities/common/scrp/api.py capabilities/common/scrp/views.py
+  capabilities/common/scrp/app.py capabilities/common/scrp/test_capability_contract.py
+  capabilities/common/scrp/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/scrp/test_capability_contract.py
+  capabilities/common/scrp/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.scrp import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.scrp.streaming.processor,
+  .capabilities.scrp.configuration.harvest_agents.supported_runtimes,
+  .capabilities.scrp.screens.agents.route'
+  capabilities/common/scrp/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/scrp/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/scrp --json` passed with `scrp` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/scrp --json`
+  passed with `side_effect_free: true` and no warnings.
+- SCRP stale-marker and banned stream search returned no matches for old
+  package markers, unsupported overclaims, unfinished scaffolding, TODOs, or
+  unsupported stream-provider references.
+- `git diff --check -- capabilities/common/scrp docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live website/browser/API harvesting,
+  production credential-vault, scheduler, DLP, ETL, AUDL/MONI/NLPC adapters,
+  live Bytewax topology, rendered browser UI, and performance/resilience
+  checks.
+
 ### 2026-05-30 16:10 EAT
 
 GEOS geo-spatial lifecycle/guardrail packet:

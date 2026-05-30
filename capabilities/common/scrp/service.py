@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_HARVEST_AGENT_ROLES,
+	SUPPORTED_HARVEST_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .harvest_runtime import (
 	classify_dlp_status,
 	normalize_extractor_type,
@@ -17,7 +22,7 @@ from .harvest_runtime import (
 	summarize_decision,
 	utc_now,
 )
-from .models import ExtractorProfile, HarvestJob, HarvestResult, HarvestRun, HarvestSource, PipelineHandoff, ScrpAuditEvent
+from .models import ExtractorProfile, HarvestAgent, HarvestJob, HarvestResult, HarvestRun, HarvestSource, PipelineHandoff, ScrpAuditEvent
 
 
 class ScrpService:
@@ -30,6 +35,7 @@ class ScrpService:
 		self._runs: dict[str, HarvestRun] = {}
 		self._results: dict[str, HarvestResult] = {}
 		self._handoffs: dict[str, PipelineHandoff] = {}
+		self._agents: dict[str, HarvestAgent] = {}
 		self._audit_events: list[ScrpAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -58,18 +64,15 @@ class ScrpService:
 		self._require_tenant(tenant_id)
 		if not endpoint:
 			raise ValueError("source_endpoint_required")
-		if not credential_vault_ref:
-			raise PermissionError("credential_vault_required")
-		if rate_limit_per_minute <= 0:
-			raise ValueError("rate_limit_required")
-		if not robots_policy_attached:
-			raise PermissionError("robots_policy_required")
 		source_type = normalize_source_type(source_type)
 		policy_context = {
 			"tenant_context_present": True,
 			"operation": "register_source",
 			"source_owner_assigned": bool(owner),
 			"terms_evidence_present": bool(terms_evidence),
+			"credential_vault_present": bool(credential_vault_ref),
+			"rate_limit_per_minute": int(rate_limit_per_minute),
+			"robots_policy_attached": bool(robots_policy_attached),
 			"pii_expected": pii_expected,
 			"pii_policy_attached": pii_policy_attached,
 			"sensitive_source": sensitive_source,
@@ -114,8 +117,13 @@ class ScrpService:
 		self._require_tenant(tenant_id)
 		if not owner:
 			raise PermissionError("extractor_owner_required")
-		if not schema:
-			raise ValueError("schema_validation_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "create_extractor",
+			"schema_present": bool(schema),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
 		extractor = ExtractorProfile(
 			id=stable_id("ext", tenant_id, name, extractor_type),
 			tenant_id=tenant_id,
@@ -149,8 +157,13 @@ class ScrpService:
 		self._require_owned(self._sources, source_id, tenant_id, "source_not_found")
 		self._require_owned(self._extractors, extractor_profile_id, tenant_id, "extractor_not_found")
 		mode = normalize_harvest_mode(mode)
-		if not pipeline_target:
-			raise PermissionError("pipeline_handoff_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "create_harvest_job",
+			"pipeline_target_present": bool(pipeline_target),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
 		job = HarvestJob(
 			id=stable_id("job", tenant_id, name, source_id, extractor_profile_id),
 			tenant_id=tenant_id,
@@ -222,6 +235,14 @@ class ScrpService:
 		job = self._require_owned(self._jobs, run.job_id, tenant_id, "harvest_job_not_found")
 		if records_extracted < 0 or error_count < 0 or dlp_violations < 0:
 			raise ValueError("harvest_counts_must_be_non_negative")
+		result_policy = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "complete_harvest_run",
+			"pii_expected": source.pii_expected,
+			"dlp_scanned": bool(dlp_scanned),
+		})
+		if result_policy["decision"] != "allow":
+			raise PermissionError(summarize_decision(result_policy))
 		run.records_extracted = records_extracted
 		run.error_count = error_count
 		run.dlp_status = classify_dlp_status(source.pii_expected, dlp_scanned, dlp_violations)
@@ -252,6 +273,74 @@ class ScrpService:
 			self._handoffs[handoff.id] = handoff
 		self._record_event(tenant_id, "harvest_run_completed", run.id, f"Harvest completed with status {run.status}.", run.requested_by, "warning" if run.status != "succeeded" else "info")
 		return run.to_dict() | {"result": result.to_dict()}
+
+	def register_harvest_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_harvest_agent_runtime(runtime)
+		normalized_role = _normalize_harvest_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"harvest_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_role_supported": bool(normalized_role),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
+		agent_key = stable_id("agent", tenant_id, agent_id)
+		if agent_key in self._agents:
+			raise ValueError("harvest_agent_already_registered")
+		agent = HarvestAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref or None,
+			created_at=utc_now(),
+		)
+		self._agents[agent_key] = agent
+		self._record_event(tenant_id, "harvest_agent_registered", agent.id, f"Harvest agent {agent.name} registered.", agent.name)
+		return agent.to_dict()
+
+	def change_harvest_job_state(
+		self,
+		tenant_id: str,
+		job_id: str,
+		enabled: bool,
+		reason: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		job = self._require_owned(self._jobs, job_id, tenant_id, "harvest_job_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
+		job.enabled = bool(enabled)
+		job.updated_at = utc_now()
+		self._record_event(tenant_id, "harvest_job_state_changed", job.id, reason, job.owner)
+		return job.to_dict()
 
 	def create_record(
 		self,
@@ -298,6 +387,9 @@ class ScrpService:
 	def list_handoffs(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._handoffs, tenant_id)
 
+	def list_harvest_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
 		if tenant_id is not None:
@@ -317,6 +409,8 @@ class ScrpService:
 			"blocked_run_count": sum(1 for item in runs if item["status"] == "blocked"),
 			"result_count": len(self.list_results(tenant_id)),
 			"pipeline_handoff_count": len(self.list_handoffs(tenant_id)),
+			"agent_count": len(self.list_harvest_agents(tenant_id)),
+			"audit_event_count": len(self.audit_events(tenant_id)),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -351,3 +445,13 @@ class ScrpService:
 		if tenant_id is not None:
 			values = [value for value in values if value.tenant_id == tenant_id]
 		return [value.to_dict() for value in values]
+
+
+def _normalize_harvest_agent_runtime(runtime: str) -> str:
+	value = (runtime or "").strip().lower()
+	return value if value in SUPPORTED_HARVEST_AGENT_RUNTIMES else ""
+
+
+def _normalize_harvest_agent_role(role: str) -> str:
+	value = (role or "").strip().lower()
+	return value if value in SUPPORTED_HARVEST_AGENT_ROLES else ""

@@ -16,7 +16,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "scrp",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant data-source harvesting, extraction jobs, compliance controls, scheduling, and pipeline handoff",
+	"description": "Tenant data-source harvesting, extraction jobs, scoped AI harvest agents, compliance controls, audit events, scheduling, and pipeline handoff",
 	"category": "data_platform",
 	"subcategory": "data_harvesting",
 	"vendor": "Datacraft",
@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["source_registry", "harvest_jobs", "extractor_profiles", "compliance_controls", "pipeline_handoff"],
-	"permissions": ["scrp:view", "scrp:configure_sources", "scrp:run_jobs", "scrp:approve_harvests", "scrp:admin"]
+	"provides": ["source_registry", "harvest_jobs", "extractor_profiles", "compliance_controls", "pipeline_handoff", "harvest_agents", "harvest_audit"],
+	"permissions": ["scrp:view", "scrp:configure_sources", "scrp:run_jobs", "scrp:approve_harvests", "scrp:audit", "scrp:admin"]
 }
 
 
@@ -39,7 +39,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["i18n", "nlpc", "schd", "dlpd"],
+		"optional_dependencies": ["i18n", "nlpc", "schd", "dlpd", "bytewax", "audl", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,13 +48,17 @@ def register_capability() -> dict[str, Any]:
 			"harvest_jobs": "Schedule and execute governed data-harvesting jobs",
 			"extractor_profiles": "Configure extraction rules, parsers, schemas, and output mappings",
 			"compliance_controls": "Enforce consent, terms, PII handling, rate limits, and audit policy",
+			"harvest_agents": "Register scoped AI harvest agents across Codex, Claude Code, OpenCode, Pi, and compatible runtimes",
+			"harvest_audit": "Record lifecycle events, state-change reasons, and compliance evidence",
+			"bytewax_streaming": "Declare Bytewax lifecycle streams for harvest batch and state events",
 			"capability_rules": "Evaluate deterministic harvesting-governance rules",
 			"visual_theming": "Apply data-harvesting theme tokens and components"
 		},
-		"endpoints": {"sources": "/scrp/api/v1/sources", "jobs": "/scrp/api/v1/jobs", "extractors": "/scrp/api/v1/extractors", "results": "/scrp/api/v1/results", "compliance": "/scrp/api/v1/compliance"},
+		"endpoints": {"sources": "/scrp/api/v1/sources", "jobs": "/scrp/api/v1/jobs", "extractors": "/scrp/api/v1/extractors", "results": "/scrp/api/v1/results", "agents": "/scrp/api/v1/agents", "audit": "/scrp/api/v1/audit", "compliance": "/scrp/api/v1/compliance"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

@@ -10,18 +10,24 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "scrp"
 	assert contract["configuration"]["tenant_id"] == "tenant-scrp"
 	assert contract["configuration"]["extraction"]["result_retention_days"] == 14
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "sources", "extraction", "compliance", "governance", "ui", "theme"]
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "sources", "jobs", "extractors", "pipelines", "compliance", "results", "settings"}
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "sources", "extraction", "compliance", "harvest_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["configuration"]["harvest_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "sources", "jobs", "extractors", "pipelines", "compliance", "results", "agents", "audit", "analytics", "settings"}
 	assert contract["theme"]["name"] == "scrp_harvest_ops"
+	assert contract["streaming"]["processor"] == "bytewax"
 
 
 def test_rule_engine_enforces_scrp_guardrails():
 	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "register_source", "source_owner_assigned": False, "terms_evidence_present": False, "pii_expected": True, "pii_policy_attached": False, "sensitive_source": True, "source_review_recorded": False})
 	job_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "run_harvest", "schedule_policy_attached": False, "terms_evidence_present": True})
+	agent_result = evaluate_capability_rules({"tenant_context_present": True, "harvest_agent_present": True, "agent_registered": True, "agent_runtime_supported": False, "agent_role_supported": True, "agent_scope_present": True, "agent_contribution_disclosed": True})
+	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_harvest_mutation", "event_stream": "custom"})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "source_requires_owner", "source_terms_required", "pii_requires_handling_policy", "sensitive_source_requires_review"}
 	assert job_result["matched_rules"] == ["harvest_requires_schedule_policy"]
+	assert agent_result["matched_rules"] == ["harvest_agent_runtime_supported"]
+	assert stream_result["matched_rules"] == ["batch_harvest_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -29,5 +35,9 @@ def test_registration_includes_full_capability_contract():
 
 	assert registration["name"] == "scrp"
 	assert "etlp" in registration["dependencies"]
+	assert "bytewax" in registration["optional_dependencies"]
 	assert registration["ui_components"]["extractors"] == "/scrp/extractors"
+	assert registration["ui_components"]["agents"] == "/scrp/agents"
 	assert "scrp:run_jobs" in registration["permissions"]
+	assert "scrp:audit" in registration["permissions"]
+	assert registration["streaming"]["processor"] == "bytewax"
