@@ -1,60 +1,203 @@
 {
-  "agents": {},
   "app": {
-    "description": "Governance, Risk & Compliance - Revolutionary package-backed APG capability",
-    "entity_count": 0,
+    "description": "Risk and Compliance Management package-backed APG capability",
+    "entity_count": 9,
     "name": "grc_rcm",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "grc_rcm": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Grc",
-          "enabled": true,
-          "id": "grc_rcm",
-          "name": "Governance, Risk & Compliance - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/grc/rcm/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "policy_management": "adapter",
+          "theme": "adapter",
+          "workflow_orchestration": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "assessments": {
+          "assessor_required": true,
+          "control_required": true,
+          "ineffective_control_opens_issue_workflow": true,
+          "ineffective_control_requires_evidence": true,
+          "supported_results": [
+            "effective",
+            "partially_effective",
+            "ineffective"
+          ]
+        },
+        "controls": {
+          "control_type_required": true,
+          "mapped_risk_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_control_types": [
+            "preventive",
+            "detective",
+            "corrective",
+            "directive"
+          ],
+          "test_frequency_required": true
+        },
+        "evidence": {
+          "encryption_required": true,
+          "linked_record_required": true,
+          "minimum_retention_days": 365,
+          "source_required": true
+        },
+        "exceptions": {
+          "approval_required": true,
+          "exception_type_required": true,
+          "expiration_required": true,
+          "supported_exception_types": [
+            "risk_acceptance",
+            "policy_exception",
+            "control_waiver",
+            "deadline_extension"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "governance_decisions": {
+          "approver_required": true,
+          "linked_risk_review_required": true,
+          "rationale_required": true,
+          "title_required": true
+        },
+        "issues": {
+          "high_severity_review_required": true,
+          "owner_required": true,
+          "remediation_plan_required": true,
+          "severity_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title_required": true
+        },
+        "obligations": {
+          "due_date_required": true,
+          "framework_required": true,
+          "jurisdiction_required": true,
+          "mapped_control_required": true,
+          "owner_required": true,
+          "requirement_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_assessment_events": true,
+          "emit_control_events": true,
+          "emit_evidence_events": true,
+          "emit_governance_events": true,
+          "emit_issue_events": true,
+          "emit_obligation_events": true,
+          "emit_risk_events": true,
+          "event_stream": "apg.grc.rcm.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "rcm_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "risk_reviewer",
+            "control_reviewer",
+            "compliance_reviewer",
+            "evidence_reviewer",
+            "issue_reviewer",
+            "governance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "risks": {
+          "category_required": true,
+          "high_risk_review_required": true,
+          "impact_range": [
+            0,
+            1
+          ],
+          "likelihood_range": [
+            0,
+            1
+          ],
+          "owner_required": true,
+          "supported_categories": [
+            "operational",
+            "financial",
+            "technology",
+            "regulatory",
+            "third_party",
+            "strategic",
+            "security",
+            "privacy"
+          ],
+          "title_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "grc_rcm_operations"
+          "default_theme": "grc_rcm_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_assessments": true,
+          "enable_controls": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_evidence": true,
+          "enable_exceptions": true,
+          "enable_governance": true,
+          "enable_issues": true,
+          "enable_obligations": true,
+          "enable_risks": true,
           "enable_settings": true
         }
       },
-      "erp_modules": [
-        "grc"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Governance, Risk & Compliance - Revolutionary",
+      "name": "Risk and Compliance Management",
       "provides": [
-        "grc_rcm_operations"
+        "risk_register_lifecycle",
+        "control_library_lifecycle",
+        "compliance_obligation_lifecycle",
+        "control_assessment_workflow",
+        "evidence_management_workflow",
+        "issue_remediation_workflow",
+        "governance_decision_workflow",
+        "exception_management_workflow",
+        "rcm_dashboard_service",
+        "rcm_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_management",
+        "business_intelligence",
+        "workflow_orchestration",
+        "policy_management"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Governance, Risk & Compliance - Revolutionary operations require tenant context.",
+            "description": "RCM operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +210,590 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Governance, Risk & Compliance - Revolutionary write operations require policy enforcement.",
+            "description": "RCM writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "rcm_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "register_risk",
+              "title_present": false
             },
-            "description": "High-risk Governance, Risk & Compliance - Revolutionary operations require review.",
+            "description": "Risks require title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_title_required",
+              "required_action": "set_risk_title"
+            },
+            "name": "risk_requires_title"
+          },
+          {
+            "condition": {
+              "operation": "register_risk",
+              "owner_present": false
+            },
+            "description": "Risks require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_owner_required",
+              "required_action": "assign_risk_owner"
+            },
+            "name": "risk_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_risk",
+              "risk_category_supported": false
+            },
+            "description": "Risk category must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_category_not_supported",
+              "required_action": "select_supported_risk_category"
+            },
+            "name": "risk_category_supported"
+          },
+          {
+            "condition": {
+              "likelihood_in_range": false,
+              "operation": "register_risk"
+            },
+            "description": "Risk likelihood must be 0..1.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_likelihood_out_of_range",
+              "required_action": "set_likelihood_range"
+            },
+            "name": "risk_likelihood_in_range"
+          },
+          {
+            "condition": {
+              "impact_in_range": false,
+              "operation": "register_risk"
+            },
+            "description": "Risk impact must be 0..1.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_impact_out_of_range",
+              "required_action": "set_impact_range"
+            },
+            "name": "risk_impact_in_range"
+          },
+          {
+            "condition": {
+              "high_risk": true,
+              "operation": "register_risk",
+              "review_recorded": false
+            },
+            "description": "High or critical risk requires review.",
             "effect": {
               "decision": "require_review",
               "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "required_action": "record_risk_review"
             },
             "name": "high_risk_requires_review"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "register_control"
+            },
+            "description": "Controls require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_name_required",
+              "required_action": "set_control_name"
+            },
+            "name": "control_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "register_control",
+              "owner_present": false
+            },
+            "description": "Controls require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_owner_required",
+              "required_action": "assign_control_owner"
+            },
+            "name": "control_requires_owner"
+          },
+          {
+            "condition": {
+              "control_type_supported": false,
+              "operation": "register_control"
+            },
+            "description": "Control type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_type_not_supported",
+              "required_action": "select_supported_control_type"
+            },
+            "name": "control_type_supported"
+          },
+          {
+            "condition": {
+              "mapped_risk_present": false,
+              "operation": "register_control"
+            },
+            "description": "Controls require mapped risk.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mapped_risk_required",
+              "required_action": "map_control_to_risk"
+            },
+            "name": "control_requires_mapped_risk"
+          },
+          {
+            "condition": {
+              "operation": "register_control",
+              "test_frequency_days_lte": 0
+            },
+            "description": "Control test frequency must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_test_frequency_required",
+              "required_action": "set_test_frequency"
+            },
+            "name": "control_frequency_positive"
+          },
+          {
+            "condition": {
+              "framework_present": false,
+              "operation": "register_obligation"
+            },
+            "description": "Obligations require framework.",
+            "effect": {
+              "decision": "deny",
+              "reason": "framework_required",
+              "required_action": "set_framework"
+            },
+            "name": "obligation_requires_framework"
+          },
+          {
+            "condition": {
+              "operation": "register_obligation",
+              "requirement_present": false
+            },
+            "description": "Obligations require requirement.",
+            "effect": {
+              "decision": "deny",
+              "reason": "requirement_required",
+              "required_action": "set_requirement"
+            },
+            "name": "obligation_requires_requirement"
+          },
+          {
+            "condition": {
+              "operation": "register_obligation",
+              "owner_present": false
+            },
+            "description": "Obligations require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_owner_required",
+              "required_action": "assign_obligation_owner"
+            },
+            "name": "obligation_requires_owner"
+          },
+          {
+            "condition": {
+              "jurisdiction_present": false,
+              "operation": "register_obligation"
+            },
+            "description": "Obligations require jurisdiction.",
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_jurisdiction_required",
+              "required_action": "set_jurisdiction"
+            },
+            "name": "obligation_requires_jurisdiction"
+          },
+          {
+            "condition": {
+              "due_date_present": false,
+              "operation": "register_obligation"
+            },
+            "description": "Obligations require due date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_due_date_required",
+              "required_action": "set_due_date"
+            },
+            "name": "obligation_requires_due_date"
+          },
+          {
+            "condition": {
+              "mapped_control_present": false,
+              "operation": "register_obligation"
+            },
+            "description": "Obligations require mapped control.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mapped_control_required",
+              "required_action": "map_obligation_to_control"
+            },
+            "name": "obligation_requires_control"
+          },
+          {
+            "condition": {
+              "control_present": false,
+              "operation": "assess_control"
+            },
+            "description": "Assessments require control.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_required",
+              "required_action": "select_control"
+            },
+            "name": "assessment_requires_control"
+          },
+          {
+            "condition": {
+              "assessor_present": false,
+              "operation": "assess_control"
+            },
+            "description": "Assessments require assessor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "assessor_required",
+              "required_action": "assign_assessor"
+            },
+            "name": "assessment_requires_assessor"
+          },
+          {
+            "condition": {
+              "assessment_result_supported": false,
+              "operation": "assess_control"
+            },
+            "description": "Assessment result must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "assessment_result_not_supported",
+              "required_action": "select_supported_assessment_result"
+            },
+            "name": "assessment_result_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "failed_assessment": true,
+              "operation": "assess_control"
+            },
+            "description": "Ineffective assessments require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "failed_assessment_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "failed_assessment_requires_evidence"
+          },
+          {
+            "condition": {
+              "operation": "collect_evidence",
+              "source_present": false
+            },
+            "description": "Evidence requires source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_source_required",
+              "required_action": "set_evidence_source"
+            },
+            "name": "evidence_requires_source"
+          },
+          {
+            "condition": {
+              "linked_record_present": false,
+              "operation": "collect_evidence"
+            },
+            "description": "Evidence requires linked record.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_link_required",
+              "required_action": "link_evidence"
+            },
+            "name": "evidence_requires_link"
+          },
+          {
+            "condition": {
+              "encrypted": false,
+              "operation": "collect_evidence"
+            },
+            "description": "Evidence must be encrypted.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_encryption_required",
+              "required_action": "encrypt_evidence"
+            },
+            "name": "evidence_requires_encryption"
+          },
+          {
+            "condition": {
+              "operation": "collect_evidence",
+              "retention_days_lt": 365
+            },
+            "description": "Evidence retention must meet minimum.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_retention_too_short",
+              "required_action": "increase_retention"
+            },
+            "name": "evidence_retention_minimum"
+          },
+          {
+            "condition": {
+              "operation": "open_issue",
+              "title_present": false
+            },
+            "description": "Issues require title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "issue_title_required",
+              "required_action": "set_issue_title"
+            },
+            "name": "issue_requires_title"
+          },
+          {
+            "condition": {
+              "issue_severity_supported": false,
+              "operation": "open_issue"
+            },
+            "description": "Issue severity must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "issue_severity_not_supported",
+              "required_action": "select_supported_severity"
+            },
+            "name": "issue_severity_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_issue",
+              "owner_present": false
+            },
+            "description": "Issues require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "issue_owner_required",
+              "required_action": "assign_issue_owner"
+            },
+            "name": "issue_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "open_issue",
+              "remediation_plan_present": false
+            },
+            "description": "Issues require remediation plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "remediation_plan_required",
+              "required_action": "add_remediation_plan"
+            },
+            "name": "issue_requires_remediation_plan"
+          },
+          {
+            "condition": {
+              "high_severity": true,
+              "operation": "open_issue",
+              "review_recorded": false
+            },
+            "description": "High severity issue requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "issue_review_required",
+              "required_action": "record_issue_review"
+            },
+            "name": "high_severity_issue_requires_review"
+          },
+          {
+            "condition": {
+              "issue_present": false,
+              "operation": "remediate_issue"
+            },
+            "description": "Issue remediation requires issue.",
+            "effect": {
+              "decision": "deny",
+              "reason": "issue_required",
+              "required_action": "select_issue"
+            },
+            "name": "issue_remediation_requires_issue"
+          },
+          {
+            "condition": {
+              "operation": "remediate_issue",
+              "remediation_evidence_present": false
+            },
+            "description": "Issue remediation requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "remediation_evidence_required",
+              "required_action": "attach_remediation_evidence"
+            },
+            "name": "issue_remediation_requires_evidence"
+          },
+          {
+            "condition": {
+              "operation": "record_governance_decision",
+              "title_present": false
+            },
+            "description": "Governance decisions require title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "governance_title_required",
+              "required_action": "set_governance_title"
+            },
+            "name": "governance_requires_title"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "record_governance_decision"
+            },
+            "description": "Governance decisions require approver.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approver_required",
+              "required_action": "assign_approver"
+            },
+            "name": "governance_requires_approver"
+          },
+          {
+            "condition": {
+              "operation": "record_governance_decision",
+              "rationale_present": false
+            },
+            "description": "Governance decisions require rationale.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rationale_required",
+              "required_action": "record_rationale"
+            },
+            "name": "governance_requires_rationale"
+          },
+          {
+            "condition": {
+              "high_risk": true,
+              "operation": "record_governance_decision",
+              "review_recorded": false
+            },
+            "description": "High-risk governance decisions require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "governance_review_required",
+              "required_action": "record_governance_review"
+            },
+            "name": "high_risk_governance_requires_review"
+          },
+          {
+            "condition": {
+              "exception_type_supported": false,
+              "operation": "register_exception"
+            },
+            "description": "Exception type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "exception_type_not_supported",
+              "required_action": "select_supported_exception_type"
+            },
+            "name": "exception_type_supported"
+          },
+          {
+            "condition": {
+              "expiration_present": false,
+              "operation": "register_exception"
+            },
+            "description": "Exceptions require expiration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "exception_expiration_required",
+              "required_action": "set_exception_expiration"
+            },
+            "name": "exception_requires_expiration"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "register_exception"
+            },
+            "description": "Exceptions require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "exception_approval_required",
+              "required_action": "record_exception_approval"
+            },
+            "name": "exception_requires_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "rcm_batch"
+            },
+            "description": "RCM batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_rcm_batch_to_bytewax"
+            },
+            "name": "rcm_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "rcm_event"
+            },
+            "description": "RCM events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_rcm_event_to_bytewax"
+            },
+            "name": "rcm_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_rcm_agent"
+            },
+            "description": "RCM agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rcm_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "rcm_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_rcm_agent"
+            },
+            "description": "RCM agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rcm_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "rcm_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "rcm_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged RCM actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_rcm_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +803,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Governance, Risk & Compliance - Revolutionary operations require tenant context.",
+          "description": "RCM operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +816,590 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Governance, Risk & Compliance - Revolutionary write operations require policy enforcement.",
+          "description": "RCM writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "rcm_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "register_risk",
+            "title_present": false
           },
-          "description": "High-risk Governance, Risk & Compliance - Revolutionary operations require review.",
+          "description": "Risks require title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_title_required",
+            "required_action": "set_risk_title"
+          },
+          "name": "risk_requires_title"
+        },
+        {
+          "condition": {
+            "operation": "register_risk",
+            "owner_present": false
+          },
+          "description": "Risks require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_owner_required",
+            "required_action": "assign_risk_owner"
+          },
+          "name": "risk_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_risk",
+            "risk_category_supported": false
+          },
+          "description": "Risk category must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_category_not_supported",
+            "required_action": "select_supported_risk_category"
+          },
+          "name": "risk_category_supported"
+        },
+        {
+          "condition": {
+            "likelihood_in_range": false,
+            "operation": "register_risk"
+          },
+          "description": "Risk likelihood must be 0..1.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_likelihood_out_of_range",
+            "required_action": "set_likelihood_range"
+          },
+          "name": "risk_likelihood_in_range"
+        },
+        {
+          "condition": {
+            "impact_in_range": false,
+            "operation": "register_risk"
+          },
+          "description": "Risk impact must be 0..1.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_impact_out_of_range",
+            "required_action": "set_impact_range"
+          },
+          "name": "risk_impact_in_range"
+        },
+        {
+          "condition": {
+            "high_risk": true,
+            "operation": "register_risk",
+            "review_recorded": false
+          },
+          "description": "High or critical risk requires review.",
           "effect": {
             "decision": "require_review",
             "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "required_action": "record_risk_review"
           },
           "name": "high_risk_requires_review"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "register_control"
+          },
+          "description": "Controls require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_name_required",
+            "required_action": "set_control_name"
+          },
+          "name": "control_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "register_control",
+            "owner_present": false
+          },
+          "description": "Controls require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_owner_required",
+            "required_action": "assign_control_owner"
+          },
+          "name": "control_requires_owner"
+        },
+        {
+          "condition": {
+            "control_type_supported": false,
+            "operation": "register_control"
+          },
+          "description": "Control type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_type_not_supported",
+            "required_action": "select_supported_control_type"
+          },
+          "name": "control_type_supported"
+        },
+        {
+          "condition": {
+            "mapped_risk_present": false,
+            "operation": "register_control"
+          },
+          "description": "Controls require mapped risk.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mapped_risk_required",
+            "required_action": "map_control_to_risk"
+          },
+          "name": "control_requires_mapped_risk"
+        },
+        {
+          "condition": {
+            "operation": "register_control",
+            "test_frequency_days_lte": 0
+          },
+          "description": "Control test frequency must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_test_frequency_required",
+            "required_action": "set_test_frequency"
+          },
+          "name": "control_frequency_positive"
+        },
+        {
+          "condition": {
+            "framework_present": false,
+            "operation": "register_obligation"
+          },
+          "description": "Obligations require framework.",
+          "effect": {
+            "decision": "deny",
+            "reason": "framework_required",
+            "required_action": "set_framework"
+          },
+          "name": "obligation_requires_framework"
+        },
+        {
+          "condition": {
+            "operation": "register_obligation",
+            "requirement_present": false
+          },
+          "description": "Obligations require requirement.",
+          "effect": {
+            "decision": "deny",
+            "reason": "requirement_required",
+            "required_action": "set_requirement"
+          },
+          "name": "obligation_requires_requirement"
+        },
+        {
+          "condition": {
+            "operation": "register_obligation",
+            "owner_present": false
+          },
+          "description": "Obligations require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_owner_required",
+            "required_action": "assign_obligation_owner"
+          },
+          "name": "obligation_requires_owner"
+        },
+        {
+          "condition": {
+            "jurisdiction_present": false,
+            "operation": "register_obligation"
+          },
+          "description": "Obligations require jurisdiction.",
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_jurisdiction_required",
+            "required_action": "set_jurisdiction"
+          },
+          "name": "obligation_requires_jurisdiction"
+        },
+        {
+          "condition": {
+            "due_date_present": false,
+            "operation": "register_obligation"
+          },
+          "description": "Obligations require due date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_due_date_required",
+            "required_action": "set_due_date"
+          },
+          "name": "obligation_requires_due_date"
+        },
+        {
+          "condition": {
+            "mapped_control_present": false,
+            "operation": "register_obligation"
+          },
+          "description": "Obligations require mapped control.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mapped_control_required",
+            "required_action": "map_obligation_to_control"
+          },
+          "name": "obligation_requires_control"
+        },
+        {
+          "condition": {
+            "control_present": false,
+            "operation": "assess_control"
+          },
+          "description": "Assessments require control.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_required",
+            "required_action": "select_control"
+          },
+          "name": "assessment_requires_control"
+        },
+        {
+          "condition": {
+            "assessor_present": false,
+            "operation": "assess_control"
+          },
+          "description": "Assessments require assessor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "assessor_required",
+            "required_action": "assign_assessor"
+          },
+          "name": "assessment_requires_assessor"
+        },
+        {
+          "condition": {
+            "assessment_result_supported": false,
+            "operation": "assess_control"
+          },
+          "description": "Assessment result must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "assessment_result_not_supported",
+            "required_action": "select_supported_assessment_result"
+          },
+          "name": "assessment_result_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "failed_assessment": true,
+            "operation": "assess_control"
+          },
+          "description": "Ineffective assessments require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "failed_assessment_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "failed_assessment_requires_evidence"
+        },
+        {
+          "condition": {
+            "operation": "collect_evidence",
+            "source_present": false
+          },
+          "description": "Evidence requires source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_source_required",
+            "required_action": "set_evidence_source"
+          },
+          "name": "evidence_requires_source"
+        },
+        {
+          "condition": {
+            "linked_record_present": false,
+            "operation": "collect_evidence"
+          },
+          "description": "Evidence requires linked record.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_link_required",
+            "required_action": "link_evidence"
+          },
+          "name": "evidence_requires_link"
+        },
+        {
+          "condition": {
+            "encrypted": false,
+            "operation": "collect_evidence"
+          },
+          "description": "Evidence must be encrypted.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_encryption_required",
+            "required_action": "encrypt_evidence"
+          },
+          "name": "evidence_requires_encryption"
+        },
+        {
+          "condition": {
+            "operation": "collect_evidence",
+            "retention_days_lt": 365
+          },
+          "description": "Evidence retention must meet minimum.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_retention_too_short",
+            "required_action": "increase_retention"
+          },
+          "name": "evidence_retention_minimum"
+        },
+        {
+          "condition": {
+            "operation": "open_issue",
+            "title_present": false
+          },
+          "description": "Issues require title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "issue_title_required",
+            "required_action": "set_issue_title"
+          },
+          "name": "issue_requires_title"
+        },
+        {
+          "condition": {
+            "issue_severity_supported": false,
+            "operation": "open_issue"
+          },
+          "description": "Issue severity must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "issue_severity_not_supported",
+            "required_action": "select_supported_severity"
+          },
+          "name": "issue_severity_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_issue",
+            "owner_present": false
+          },
+          "description": "Issues require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "issue_owner_required",
+            "required_action": "assign_issue_owner"
+          },
+          "name": "issue_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "open_issue",
+            "remediation_plan_present": false
+          },
+          "description": "Issues require remediation plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "remediation_plan_required",
+            "required_action": "add_remediation_plan"
+          },
+          "name": "issue_requires_remediation_plan"
+        },
+        {
+          "condition": {
+            "high_severity": true,
+            "operation": "open_issue",
+            "review_recorded": false
+          },
+          "description": "High severity issue requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "issue_review_required",
+            "required_action": "record_issue_review"
+          },
+          "name": "high_severity_issue_requires_review"
+        },
+        {
+          "condition": {
+            "issue_present": false,
+            "operation": "remediate_issue"
+          },
+          "description": "Issue remediation requires issue.",
+          "effect": {
+            "decision": "deny",
+            "reason": "issue_required",
+            "required_action": "select_issue"
+          },
+          "name": "issue_remediation_requires_issue"
+        },
+        {
+          "condition": {
+            "operation": "remediate_issue",
+            "remediation_evidence_present": false
+          },
+          "description": "Issue remediation requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "remediation_evidence_required",
+            "required_action": "attach_remediation_evidence"
+          },
+          "name": "issue_remediation_requires_evidence"
+        },
+        {
+          "condition": {
+            "operation": "record_governance_decision",
+            "title_present": false
+          },
+          "description": "Governance decisions require title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "governance_title_required",
+            "required_action": "set_governance_title"
+          },
+          "name": "governance_requires_title"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "record_governance_decision"
+          },
+          "description": "Governance decisions require approver.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approver_required",
+            "required_action": "assign_approver"
+          },
+          "name": "governance_requires_approver"
+        },
+        {
+          "condition": {
+            "operation": "record_governance_decision",
+            "rationale_present": false
+          },
+          "description": "Governance decisions require rationale.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rationale_required",
+            "required_action": "record_rationale"
+          },
+          "name": "governance_requires_rationale"
+        },
+        {
+          "condition": {
+            "high_risk": true,
+            "operation": "record_governance_decision",
+            "review_recorded": false
+          },
+          "description": "High-risk governance decisions require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "governance_review_required",
+            "required_action": "record_governance_review"
+          },
+          "name": "high_risk_governance_requires_review"
+        },
+        {
+          "condition": {
+            "exception_type_supported": false,
+            "operation": "register_exception"
+          },
+          "description": "Exception type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "exception_type_not_supported",
+            "required_action": "select_supported_exception_type"
+          },
+          "name": "exception_type_supported"
+        },
+        {
+          "condition": {
+            "expiration_present": false,
+            "operation": "register_exception"
+          },
+          "description": "Exceptions require expiration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "exception_expiration_required",
+            "required_action": "set_exception_expiration"
+          },
+          "name": "exception_requires_expiration"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "register_exception"
+          },
+          "description": "Exceptions require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "exception_approval_required",
+            "required_action": "record_exception_approval"
+          },
+          "name": "exception_requires_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "rcm_batch"
+          },
+          "description": "RCM batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_rcm_batch_to_bytewax"
+          },
+          "name": "rcm_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "rcm_event"
+          },
+          "description": "RCM events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_rcm_event_to_bytewax"
+          },
+          "name": "rcm_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_rcm_agent"
+          },
+          "description": "RCM agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rcm_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "rcm_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_rcm_agent"
+          },
+          "description": "RCM agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rcm_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "rcm_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "rcm_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged RCM actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_rcm_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,55 +1409,143 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "RcmAgentWorkbench",
+          "permission": "grc_rcm:admin",
+          "route": "/grc-rcm/agents"
+        },
+        "assessments": {
+          "component": "ControlAssessmentWorkbench",
+          "permission": "grc_rcm:assess_controls",
+          "route": "/grc-rcm/assessments"
+        },
+        "controls": {
+          "component": "ControlLibraryWorkbench",
+          "permission": "grc_rcm:manage_controls",
+          "route": "/grc-rcm/controls"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "RcmDashboard",
           "permission": "grc_rcm:view",
           "route": "/grc-rcm/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "grc_rcm:operate",
-          "route": "/grc-rcm/operations"
+        "evidence": {
+          "component": "EvidenceVault",
+          "permission": "grc_rcm:manage_evidence",
+          "route": "/grc-rcm/evidence"
         },
-        "rules": {
-          "component": "CapabilityRules",
+        "exceptions": {
+          "component": "ExceptionWorkbench",
+          "permission": "grc_rcm:manage_exceptions",
+          "route": "/grc-rcm/exceptions"
+        },
+        "governance": {
+          "component": "GovernanceDecisionBoard",
           "permission": "grc_rcm:govern",
-          "route": "/grc-rcm/rules"
+          "route": "/grc-rcm/governance"
+        },
+        "issues": {
+          "component": "IssueRemediationBoard",
+          "permission": "grc_rcm:manage_issues",
+          "route": "/grc-rcm/issues"
+        },
+        "obligations": {
+          "component": "ComplianceObligationWorkbench",
+          "permission": "grc_rcm:manage_obligations",
+          "route": "/grc-rcm/obligations"
+        },
+        "risks": {
+          "component": "RiskRegisterWorkbench",
+          "permission": "grc_rcm:manage_risks",
+          "route": "/grc-rcm/risks"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "RcmSettings",
           "permission": "grc_rcm:admin",
           "route": "/grc-rcm/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "risk_registered",
+          "control_registered",
+          "obligation_registered",
+          "control_assessed",
+          "evidence_collected",
+          "issue_opened",
+          "issue_remediated",
+          "governance_decision_recorded",
+          "exception_registered",
+          "rcm_agent_registered"
+        ],
+        "guardrails": [
+          "rcm_batch_requires_bytewax",
+          "rcm_event_requires_bytewax",
+          "privileged_rcm_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "review",
+          "effective",
+          "ineffective",
+          "open",
+          "remediated",
+          "approved",
+          "expired",
+          "blocked"
+        ],
+        "stream": "apg.grc.rcm.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "assessments": {
+            "status_style": "test-chip",
+            "visual": "assessment-queue"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "controls": {
+            "status_style": "control-chip",
+            "visual": "control-grid"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "evidence": {
+            "status_style": "retention-chip",
+            "visual": "evidence-vault"
+          },
+          "exceptions": {
+            "status_style": "expiry-chip",
+            "visual": "exception-register"
+          },
+          "governance": {
+            "status_style": "approval-chip",
+            "visual": "decision-ledger"
+          },
+          "issues": {
+            "status_style": "severity-chip",
+            "visual": "remediation-board"
+          },
+          "obligations": {
+            "status_style": "deadline-chip",
+            "visual": "obligation-list"
+          },
+          "risks": {
+            "icon": "shield-alert",
+            "risk_style": "heat-band",
+            "status_indicator": "risk-pill"
           }
         },
-        "name": "grc_rcm_operations",
+        "name": "grc_rcm_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
-          "color.danger": "#C53030",
-          "color.primary": "#28536B",
-          "color.success": "#2F855A",
+          "color.accent": "#B7791F",
+          "color.danger": "#B42318",
+          "color.primary": "#2F4A60",
+          "color.success": "#237A57",
           "color.warning": "#B7791F",
           "density": "compact",
           "surface.canvas": "#F7F8FA",
@@ -200,28 +1559,77 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "RcmDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/grc-rcm/dashboard",
             "permission": "grc_rcm:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/grc-rcm/operations",
-            "permission": "grc_rcm:operate"
+            "component": "RiskRegisterWorkbench",
+            "name": "risks",
+            "nav_group": "Risk",
+            "path": "/grc-rcm/risks",
+            "permission": "grc_rcm:manage_risks"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "ControlLibraryWorkbench",
+            "name": "controls",
+            "nav_group": "Controls",
+            "path": "/grc-rcm/controls",
+            "permission": "grc_rcm:manage_controls"
+          },
+          {
+            "component": "ComplianceObligationWorkbench",
+            "name": "obligations",
+            "nav_group": "Compliance",
+            "path": "/grc-rcm/obligations",
+            "permission": "grc_rcm:manage_obligations"
+          },
+          {
+            "component": "ControlAssessmentWorkbench",
+            "name": "assessments",
+            "nav_group": "Controls",
+            "path": "/grc-rcm/assessments",
+            "permission": "grc_rcm:assess_controls"
+          },
+          {
+            "component": "EvidenceVault",
+            "name": "evidence",
+            "nav_group": "Compliance",
+            "path": "/grc-rcm/evidence",
+            "permission": "grc_rcm:manage_evidence"
+          },
+          {
+            "component": "IssueRemediationBoard",
+            "name": "issues",
+            "nav_group": "Remediation",
+            "path": "/grc-rcm/issues",
+            "permission": "grc_rcm:manage_issues"
+          },
+          {
+            "component": "GovernanceDecisionBoard",
+            "name": "governance",
             "nav_group": "Governance",
-            "path": "/grc-rcm/rules",
+            "path": "/grc-rcm/governance",
             "permission": "grc_rcm:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ExceptionWorkbench",
+            "name": "exceptions",
+            "nav_group": "Governance",
+            "path": "/grc-rcm/exceptions",
+            "permission": "grc_rcm:manage_exceptions"
+          },
+          {
+            "component": "RcmAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/grc-rcm/agents",
+            "permission": "grc_rcm:admin"
+          },
+          {
+            "component": "RcmSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/grc-rcm/settings",
@@ -234,50 +1642,230 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "rcm_governance_review": {
+        "roles": [
+          "risk_reviewer",
+          "control_reviewer",
+          "compliance_reviewer",
+          "evidence_reviewer",
+          "issue_reviewer",
+          "governance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "grc_rcm": []
+      "grc_rcm": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_management",
+        "business_intelligence",
+        "workflow_orchestration",
+        "policy_management"
+      ]
     }
   },
   "contracts": {
     "grc_rcm": {
       "configuration": {
-        "capability": {
-          "category": "Grc",
-          "enabled": true,
-          "id": "grc_rcm",
-          "name": "Governance, Risk & Compliance - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/grc/rcm/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "policy_management": "adapter",
+          "theme": "adapter",
+          "workflow_orchestration": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "assessments": {
+          "assessor_required": true,
+          "control_required": true,
+          "ineffective_control_opens_issue_workflow": true,
+          "ineffective_control_requires_evidence": true,
+          "supported_results": [
+            "effective",
+            "partially_effective",
+            "ineffective"
+          ]
+        },
+        "controls": {
+          "control_type_required": true,
+          "mapped_risk_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_control_types": [
+            "preventive",
+            "detective",
+            "corrective",
+            "directive"
+          ],
+          "test_frequency_required": true
+        },
+        "evidence": {
+          "encryption_required": true,
+          "linked_record_required": true,
+          "minimum_retention_days": 365,
+          "source_required": true
+        },
+        "exceptions": {
+          "approval_required": true,
+          "exception_type_required": true,
+          "expiration_required": true,
+          "supported_exception_types": [
+            "risk_acceptance",
+            "policy_exception",
+            "control_waiver",
+            "deadline_extension"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "governance_decisions": {
+          "approver_required": true,
+          "linked_risk_review_required": true,
+          "rationale_required": true,
+          "title_required": true
+        },
+        "issues": {
+          "high_severity_review_required": true,
+          "owner_required": true,
+          "remediation_plan_required": true,
+          "severity_required": true,
+          "supported_severities": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title_required": true
+        },
+        "obligations": {
+          "due_date_required": true,
+          "framework_required": true,
+          "jurisdiction_required": true,
+          "mapped_control_required": true,
+          "owner_required": true,
+          "requirement_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_assessment_events": true,
+          "emit_control_events": true,
+          "emit_evidence_events": true,
+          "emit_governance_events": true,
+          "emit_issue_events": true,
+          "emit_obligation_events": true,
+          "emit_risk_events": true,
+          "event_stream": "apg.grc.rcm.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "rcm_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "risk_reviewer",
+            "control_reviewer",
+            "compliance_reviewer",
+            "evidence_reviewer",
+            "issue_reviewer",
+            "governance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "risks": {
+          "category_required": true,
+          "high_risk_review_required": true,
+          "impact_range": [
+            0,
+            1
+          ],
+          "likelihood_range": [
+            0,
+            1
+          ],
+          "owner_required": true,
+          "supported_categories": [
+            "operational",
+            "financial",
+            "technology",
+            "regulatory",
+            "third_party",
+            "strategic",
+            "security",
+            "privacy"
+          ],
+          "title_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "grc_rcm_operations"
+          "default_theme": "grc_rcm_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_assessments": true,
+          "enable_controls": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_evidence": true,
+          "enable_exceptions": true,
+          "enable_governance": true,
+          "enable_issues": true,
+          "enable_obligations": true,
+          "enable_risks": true,
           "enable_settings": true
         }
       },
       "id": "grc_rcm",
       "provides": [
-        "grc_rcm_operations"
+        "risk_register_lifecycle",
+        "control_library_lifecycle",
+        "compliance_obligation_lifecycle",
+        "control_assessment_workflow",
+        "evidence_management_workflow",
+        "issue_remediation_workflow",
+        "governance_decision_workflow",
+        "exception_management_workflow",
+        "rcm_dashboard_service",
+        "rcm_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_management",
+        "business_intelligence",
+        "workflow_orchestration",
+        "policy_management"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1873,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 9,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "grc_rcm": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Governance, Risk & Compliance - Revolutionary operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Governance, Risk & Compliance - Revolutionary write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Governance, Risk & Compliance - Revolutionary operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.grc_rcm": {
-      "file": "capability_contract.py",
-      "id": "capability.grc_rcm",
-      "kind": "capability",
-      "name": "Governance, Risk & Compliance - Revolutionary",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

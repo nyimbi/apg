@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Governance, Risk & Compliance - Revolutionary",
+  "display_name": "Risk and Compliance Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,41 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 11,
+  "rule_count": 46,
+  "streaming": {
+    "events": [
+      "risk_registered",
+      "control_registered",
+      "obligation_registered",
+      "control_assessed",
+      "evidence_collected",
+      "issue_opened",
+      "issue_remediated",
+      "governance_decision_recorded",
+      "exception_registered",
+      "rcm_agent_registered"
+    ],
+    "guardrails": [
+      "rcm_batch_requires_bytewax",
+      "rcm_event_requires_bytewax",
+      "privileged_rcm_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "review",
+      "effective",
+      "ineffective",
+      "open",
+      "remediated",
+      "approved",
+      "expired",
+      "blocked"
+    ],
+    "stream": "apg.grc.rcm.lifecycle"
+  },
+  "version": "2.1.0"
 }

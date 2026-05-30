@@ -1,79 +1,109 @@
-"""Dependency-light view models for the APG RCM capability package."""
+"""Screen-model helpers for the Risk and Compliance Management capability."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from .service import GrcRcmService
+try:
+	from .capability_contract import get_capability_contract
+	from .service import GrcRcmService
+except ImportError:  # pragma: no cover - supports direct file loading in tests
+	from capability_contract import get_capability_contract  # type: ignore
+	from service import GrcRcmService  # type: ignore
 
 
-def capability_routes(tenant_id: str = "default") -> list[dict[str, Any]]:
-	"""Return route metadata from the executable capability contract."""
-	contract = GrcRcmService().describe(tenant_id)
-	return list(contract["ui"]["routes"])
+NAVIGATION = [
+	{"name": "Dashboard", "route": "/grc-rcm/dashboard", "icon": "layout-dashboard"},
+	{"name": "Risks", "route": "/grc-rcm/risks", "icon": "shield-alert"},
+	{"name": "Controls", "route": "/grc-rcm/controls", "icon": "list-checks"},
+	{"name": "Obligations", "route": "/grc-rcm/obligations", "icon": "scroll-text"},
+	{"name": "Assessments", "route": "/grc-rcm/assessments", "icon": "clipboard-check"},
+	{"name": "Evidence", "route": "/grc-rcm/evidence", "icon": "archive"},
+	{"name": "Issues", "route": "/grc-rcm/issues", "icon": "octagon-alert"},
+	{"name": "Governance", "route": "/grc-rcm/governance", "icon": "landmark"},
+	{"name": "Exceptions", "route": "/grc-rcm/exceptions", "icon": "file-warning"},
+	{"name": "Agents", "route": "/grc-rcm/agents", "icon": "bot"},
+	{"name": "Settings", "route": "/grc-rcm/settings", "icon": "settings"},
+]
 
 
-def dashboard_model(service: GrcRcmService | None = None, tenant_id: str | None = None) -> dict[str, Any]:
-	"""Return a compact executive RCM dashboard view model."""
-	svc = service or GrcRcmService()
-	contract = svc.describe(tenant_id or "default")
-	return {
-		"title": "Governance, Risk, and Compliance",
-		"theme": contract["theme"],
-		"summary": svc.dashboard_summary(tenant_id),
-		"routes": contract["ui"]["routes"],
-		"panels": [
-			{"id": "risk_heatmap", "title": "Risk Heatmap", "count": len(svc.list_risks(tenant_id))},
-			{"id": "control_testing", "title": "Control Testing", "count": len(svc.list_assessments(tenant_id))},
-			{"id": "compliance_obligations", "title": "Compliance Obligations", "count": len(svc.list_obligations(tenant_id))},
-			{"id": "governance_decisions", "title": "Governance Decisions", "count": len(svc.list_decisions(tenant_id))},
-		],
+def capability_routes(tenant_id: str = "default") -> list[dict[str, str]]:
+	return list(get_capability_contract(tenant_id)["ui"]["routes"])
+
+
+def _base(screen: str, tenant_id: str) -> dict[str, Any]:
+	return {"screen": screen, "tenant_id": tenant_id, "navigation": NAVIGATION}
+
+
+def dashboard_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("dashboard", tenant_id)
+	model["summary"] = service.dashboard_summary(tenant_id)
+	model["work_queue"] = {
+		"high_risks": len([record for record in service.risks.values() if record["tenant_id"] == tenant_id and record["risk_level"] in {"high", "critical"}]),
+		"open_issues": len([record for record in service.issues.values() if record["tenant_id"] == tenant_id and record["status"] == "open"]),
+		"expiring_exceptions": len([record for record in service.exceptions.values() if record["tenant_id"] == tenant_id and record["status"] == "approved"]),
 	}
+	return model
 
 
-def risk_register_model(service: GrcRcmService | None = None, tenant_id: str | None = None) -> dict[str, Any]:
-	"""Return risk register rows grouped for a workbench screen."""
-	svc = service or GrcRcmService()
-	risks = svc.list_risks(tenant_id)
-	return {
-		"title": "Risk Register",
-		"rows": risks,
-		"high_priority": [risk for risk in risks if risk["risk_level"] in {"high", "critical"}],
-		"columns": ["title", "category", "owner_id", "residual_score", "risk_level", "status"],
-	}
+def risk_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("risks", tenant_id)
+	model["records"] = service.list_records("risks", tenant_id)
+	model["columns"] = ["title", "category", "owner_id", "likelihood", "impact", "risk_level", "status"]
+	return model
 
 
-def control_testing_model(service: GrcRcmService | None = None, tenant_id: str | None = None) -> dict[str, Any]:
-	"""Return control and assessment state for testing queues."""
-	svc = service or GrcRcmService()
-	return {
-		"title": "Control Testing",
-		"controls": svc.list_controls(tenant_id),
-		"assessments": svc.list_assessments(tenant_id),
-		"evidence": svc.list_evidence(tenant_id),
-	}
+def control_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("controls", tenant_id)
+	model["records"] = service.list_records("controls", tenant_id)
+	model["columns"] = ["name", "owner_id", "control_type", "mapped_risk_ids", "test_frequency_days", "last_assessment_result", "status"]
+	return model
 
 
-def compliance_workbench_model(service: GrcRcmService | None = None, tenant_id: str | None = None) -> dict[str, Any]:
-	"""Return obligations and evidence for compliance workbench screens."""
-	svc = service or GrcRcmService()
-	return {
-		"title": "Compliance Workbench",
-		"obligations": svc.list_obligations(tenant_id),
-		"evidence": svc.list_evidence(tenant_id),
-		"failed_assessments": [
-			item for item in svc.list_assessments(tenant_id)
-			if item["status"] in {"non_compliant", "partially_compliant"}
-		],
-	}
+def obligation_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("obligations", tenant_id)
+	model["records"] = service.list_records("obligations", tenant_id)
+	model["columns"] = ["framework", "requirement", "owner_id", "jurisdiction", "due_date", "status"]
+	return model
 
 
-def governance_board_model(service: GrcRcmService | None = None, tenant_id: str | None = None) -> dict[str, Any]:
-	"""Return governance decisions and policy evidence for board review."""
-	svc = service or GrcRcmService()
-	return {
-		"title": "Governance Board",
-		"decisions": svc.list_decisions(tenant_id),
-		"audit_events": svc.list_audit_events(tenant_id),
-		"summary": svc.dashboard_summary(tenant_id),
-	}
+def assessment_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("assessments", tenant_id)
+	model["records"] = service.list_records("assessments", tenant_id)
+	model["columns"] = ["control_id", "assessor_id", "result", "evidence_ids", "findings", "status"]
+	return model
+
+
+def evidence_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("evidence", tenant_id)
+	model["records"] = service.list_records("evidence", tenant_id)
+	model["columns"] = ["source", "linked_record_type", "linked_record_id", "encrypted", "retention_days", "status"]
+	return model
+
+
+def issue_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("issues", tenant_id)
+	model["records"] = service.list_records("issues", tenant_id)
+	model["columns"] = ["title", "severity", "owner_id", "remediation_plan", "linked_assessment_id", "status"]
+	return model
+
+
+def governance_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("governance", tenant_id)
+	model["records"] = service.list_records("governance_decisions", tenant_id)
+	model["columns"] = ["title", "approver_id", "related_risk_ids", "reviewed_by", "status"]
+	return model
+
+
+def exception_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("exceptions", tenant_id)
+	model["records"] = service.list_records("exceptions", tenant_id)
+	model["columns"] = ["exception_type", "linked_risk_id", "expiration_date", "approved_by", "status"]
+	return model
+
+
+def agent_workbench_model(service: GrcRcmService, tenant_id: str) -> dict[str, Any]:
+	model = _base("agents", tenant_id)
+	model["records"] = service.list_records("agents", tenant_id)
+	model["actions"] = ["review_risk", "review_control", "review_evidence", "review_issue", "review_governance_decision"]
+	return model

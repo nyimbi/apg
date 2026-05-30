@@ -1,7 +1,7 @@
 """
 APG GRC Governance Orchestration Engine
 
-Revolutionary governance workflow orchestration with AI-powered decision support,
+Advanced governance workflow orchestration with AI-powered decision support,
 stakeholder collaboration, and intelligent policy management.
 
 © 2025 Datacraft. All rights reserved.

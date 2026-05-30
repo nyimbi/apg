@@ -1,7 +1,7 @@
 """
 APG GRC Compliance Automation Engine
 
-Revolutionary compliance automation with AI-powered regulatory monitoring,
+Advanced compliance automation with AI-powered regulatory monitoring,
 automated control testing, and intelligent exception management.
 
 © 2025 Datacraft. All rights reserved.
@@ -1047,13 +1047,13 @@ class ComplianceEngine:
 	async def _get_tenant_regulations(self, tenant_id: str) -> List[GRCRegulation]:
 		"""Get regulations for a specific tenant"""
 		# In production, this would query the database
-		# For now, return mock data
+		# For now, return sample data
 		return []
 	
 	async def _get_tenant_controls(self, tenant_id: str) -> List[GRCControl]:
 		"""Get controls for a specific tenant"""
 		# In production, this would query the database
-		# For now, return mock data
+		# For now, return sample data
 		return []
 	
 	async def _execute_bulk_control_testing(self, controls: List[GRCControl]) -> Dict[str, Any]:

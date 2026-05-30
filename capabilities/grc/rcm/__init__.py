@@ -1,44 +1,49 @@
-"""
-Governance, Risk, & Compliance (GRC) Sub-Capability
+"""Risk and Compliance Management APG capability package."""
 
-Identifies, assesses, and mitigates business risks, and ensures compliance
-with internal policies and external regulations.
-"""
+from __future__ import annotations
 
-from typing import Dict, List, Any
+from .api import (
+	assess_control,
+	capability_status,
+	collect_evidence,
+	create_record,
+	dashboard_summary,
+	list_records,
+	open_issue,
+	record_governance_decision,
+	register_control,
+	register_exception,
+	register_obligation,
+	register_rcm_agent,
+	register_risk,
+	remediate_issue,
+	service,
+)
+from .capability_contract import CAPABILITY_ID, CAPABILITY_NAME, CAPABILITY_VERSION, evaluate_capability_rules, get_capability_contract
+from .service import GrcRcmService, RCMService
 
-# Sub-capability metadata
-SUBCAPABILITY_META = {
-	'name': 'Governance, Risk, & Compliance (GRC)',
-	'code': 'GR',
-	'version': '1.0.0',
-	'capability': 'general_cross_functional',
-	'description': 'Identifies, assesses, and mitigates business risks, and ensures compliance with internal policies and external regulations',
-	'industry_focus': 'All Industries (especially regulated)',
-	'dependencies': [],
-	'optional_dependencies': ['document_management', 'workflow_business_process_mgmt', 'business_intelligence_analytics'],
-	'database_tables': [
-		'gc_gr_policy',
-		'gc_gr_risk_register',
-		'gc_gr_control',
-		'gc_gr_compliance_requirement',
-		'gc_gr_audit',
-		'gc_gr_incident',
-		'gc_gr_assessment',
-		'gc_gr_remediation_plan'
-	],
-	'configuration': {
-		'enable_risk_scoring': True,
-		'enable_continuous_monitoring': True,
-		'risk_assessment_frequency_days': 90,
-		'enable_policy_attestation': True,
-		'enable_audit_trails': True,
-		'auto_compliance_reporting': True,
-		'enable_third_party_risk_mgmt': True,
-		'default_risk_appetite': 'moderate'
-	}
-}
 
-def get_subcapability_info() -> Dict[str, Any]:
-	"""Get sub-capability information"""
-	return SUBCAPABILITY_META
+__all__ = [
+	"CAPABILITY_ID",
+	"CAPABILITY_NAME",
+	"CAPABILITY_VERSION",
+	"GrcRcmService",
+	"RCMService",
+	"assess_control",
+	"capability_status",
+	"collect_evidence",
+	"create_record",
+	"dashboard_summary",
+	"evaluate_capability_rules",
+	"get_capability_contract",
+	"list_records",
+	"open_issue",
+	"record_governance_decision",
+	"register_control",
+	"register_exception",
+	"register_obligation",
+	"register_rcm_agent",
+	"register_risk",
+	"remediate_issue",
+	"service",
+]

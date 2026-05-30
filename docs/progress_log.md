@@ -16,6 +16,80 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 00:51 EAT
+
+GRC risk and compliance management lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md`, `PLAN.md`, and `README.md` for
+  `capabilities/grc/rcm`, and refreshed `cap_spec.md` to describe the active
+  Risk and Compliance Management lifecycle.
+- Replaced the generated contract wrapper with explicit risk, control,
+  obligation, assessment, evidence, issue, governance-decision, exception,
+  RCM-agent, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added 46 deterministic guardrails for tenant context, policy attachment,
+  risk title/owner/category/likelihood/impact/high-risk review, control
+  name/owner/type/mapped risk/frequency, obligation framework/requirement/
+  owner/due date/mapped control, assessment control/assessor/result/evidence,
+  evidence source/link/encryption/retention, issue title/severity/owner/
+  remediation plan/review/remediation evidence, governance approver/rationale/
+  high-risk review, exception type/expiration/approval, Bytewax event routing,
+  RCM-agent runtime/role, and privileged agent-action approval.
+- Replaced dependency-heavy public surfaces with dependency-light lifecycle
+  helpers for risks, controls, obligations, assessments, evidence, issues,
+  remediations, governance decisions, exceptions, agent registration, agent
+  action validation, batch validation, dashboard summaries, API helpers, screen
+  models, semantic model, component manifest, and package self-test.
+- Added first-class RCM agent composition metadata for Codex, Claude Code,
+  OpenCode, and Pi runtimes across risk, control, compliance, evidence, issue,
+  and governance review roles.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the executable app surface.
+- Replaced the old generated package test with focused contract, rule, service,
+  guardrail, API/view, app, semantic, Bytewax, and agent tests.
+- Removed stale generated planning material and cleaned stale marker wording in
+  RCM helper modules and evidence files.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/grc/rcm/__init__.py
+  capabilities/grc/rcm/capability_contract.py
+  capabilities/grc/rcm/service.py
+  capabilities/grc/rcm/api.py
+  capabilities/grc/rcm/views.py
+  capabilities/grc/rcm/app.py
+  capabilities/grc/rcm/tests/test_package_contract.py` passed.
+- Syntax-only compile for touched legacy helpers (`ai_engine.py`,
+  `compliance_engine.py`, `governance_engine.py`, and
+  `monitoring_service.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/grc/rcm/tests/test_package_contract.py` passed with 6 tests.
+- `./.venv/bin/python capabilities/grc/rcm/app.py` passed package self-test.
+- `./.venv/bin/apg capabilities inspect grc_rcm --json` confirmed `ok: true`,
+  11 routes, 46 rules, and `grc_rcm_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/grc/rcm --json`
+  confirmed side-effect-free publish planning with Bytewax stream metadata and
+  no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/grc/rcm --json` passed with `domain_specific` implementation
+  level and 0 baseline markers.
+- Semantic metadata probe confirmed `bytewax`, `rcm_agents`, the agents route,
+  supported-agent runtime guardrail, Bytewax batch guardrail, and failed
+  assessment evidence guardrail.
+- Service smoke executed risk -> control -> evidence -> obligation ->
+  assessment -> issue -> remediation evidence -> remediation -> governance
+  decision -> exception -> RCM agent and produced 11 audit events.
+- RCM stale-marker scan returned no matches.
+- `git diff --check -- capabilities/grc/rcm docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, browser UI rendering, durable persistence,
+  live auth/audit/notification/document/BI/policy/workflow adapters, durable
+  Bytewax topology, regulatory-content feeds, performance checks, or failover
+  checks during this battery-conscious slice.
+
 ### 2026-05-31 00:39 EAT
 
 Fintech gateway lifecycle/guardrail packet:

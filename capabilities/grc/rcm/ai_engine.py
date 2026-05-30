@@ -1,5 +1,5 @@
 """
-APG GRC AI Engine - Revolutionary Intelligence Platform
+APG GRC AI Engine - Advanced Intelligence Platform
 
 Advanced AI/ML engine providing predictive risk intelligence, automated compliance
 monitoring, and intelligent governance decision support with federated learning.
@@ -191,7 +191,7 @@ class ComplianceAnomalyDetector(nn.Module):
 # ==============================================================================
 
 class GRCAIEngine(AIBaseEngine):
-	"""Revolutionary GRC AI Engine with Advanced ML Capabilities"""
+	"""Advanced GRC AI Engine with Advanced ML Capabilities"""
 	
 	def __init__(self, config: Optional[GRCAIConfig] = None):
 		super().__init__()

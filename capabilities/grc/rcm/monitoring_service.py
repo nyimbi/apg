@@ -1,7 +1,7 @@
 """
 APG GRC Real-Time Monitoring & Alerting Service
 
-Revolutionary real-time monitoring with predictive alerting, intelligent thresholds,
+Advanced real-time monitoring with predictive alerting, intelligent thresholds,
 and automated response orchestration for comprehensive GRC oversight.
 
 © 2025 Datacraft. All rights reserved.

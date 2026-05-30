@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
-        "display_name": "Governance, Risk & Compliance - Revolutionary",
+        "display_name": "Risk and Compliance Management",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 11,
+        "rule_count": 46,
+        "streaming_processor": "bytewax",
+        "theme": "grc_rcm_control"
       }
     },
     "self_test": {
       "capability": "grc_rcm",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
