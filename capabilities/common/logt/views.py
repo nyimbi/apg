@@ -33,6 +33,7 @@ def dashboard_model(
 		"service_map": service.service_map(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -83,4 +84,34 @@ def analytics_model(service: LogtService, tenant_id: str = "default") -> dict[st
 			log for log in service.list_logs(tenant_id)
 			if log["severity"] in {"error", "critical"}
 		],
+	}
+
+
+def logt_agent_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/logt/agents",
+		"logt_agents": service.list_logt_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["logt_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["logt_agents"]["allowed_roles"],
+		"permissions": ["logt:view", "logt:admin"],
+	}
+
+
+def audit_trail_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/logt/audit",
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["logt:admin"],
+	}
+
+
+def diagnostic_policy_model(service: LogtService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/logt/settings",
+		"rules": contract["rule_engine"]["rules"],
+		"retention_policies": service.list_retention_policies(tenant_id),
+		"streaming": contract["streaming"],
+		"configuration": contract["configuration"],
 	}

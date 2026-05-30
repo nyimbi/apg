@@ -17064,3 +17064,60 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, ENCR, AUDL, CONF, EDGE, DTWN, LOGT, MONI, AGNT, or WFLO
   adapters.
+
+### 2026-05-30 19:50 EAT
+
+LOGT lifecycle and guardrail packet:
+
+- Selected `capabilities/common/logt` after IOTD because it was the next
+  capability with an existing `cap_spec.md` but missing the local README,
+  specification, and plan packet.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable LOGT contract to cover diagnostic pipelines,
+  structured logs, distributed traces, spans, diagnostic queries, approved
+  exports, retention policy, LOGT agents, observability, APG adapters, UI
+  routes, visual theme tokens, and Bytewax event streaming.
+- Added deterministic guardrails for tenant context, pipeline ownership,
+  schema reference, Bytewax ingestion stream, sampling policy, trace context,
+  trace identifier, span service, span duration, sensitive-log redaction, log
+  service, query actor, large-query review, export approval and approval
+  reference, AI-agent registration, supported AI-agent runtime and role, agent
+  scope, contribution disclosure, audited state changes, and Bytewax-backed
+  batch diagnostic mutation.
+- Added the `LogtAgent` model and extended `LogtService` with tenant-local
+  lifecycle IDs, LOGT-agent registration, Bytewax ingestion enforcement,
+  batch-mutation validation, stronger pipeline/log/trace/span/query/export
+  guardrails, and dashboard streaming metadata.
+- Added API helpers for LOGT-agent registration, audit listing, and batch
+  mutation validation.
+- Added dashboard streaming metadata plus AI-agent, audit-trail, and
+  diagnostic-policy view models.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle rules, LOGT-agent guardrails,
+  tenant-local IDs, Bytewax ingestion and batch policy, generated evidence,
+  and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/logt/__init__.py capabilities/common/logt/capability_contract.py capabilities/common/logt/models.py capabilities/common/logt/observability_runtime.py capabilities/common/logt/service.py capabilities/common/logt/api.py capabilities/common/logt/views.py capabilities/common/logt/app.py capabilities/common/logt/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/logt/test_capability_contract.py`
+  passed with 7 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... LogtService ... register_logt_agent ... dashboard_summary ..."` returned dashboard evidence with one LOGT agent and `bytewax` streaming metadata; import emitted the existing optional OpenTelemetry warning.
+- `jq '.capabilities.logt.streaming.processor, .capabilities.logt.configuration.logt_agents.supported_runtimes, .capabilities.logt.screens.agents.route, ...' capabilities/common/logt/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, `/logt/agents`, `logt_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/logt --json` passed with `ok: true`; LOGT remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/logt --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker,
+  and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/logt docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live log collectors, trace collectors, search engines, monitoring backends,
+  durable audit stores, compliance exporters, rendered browser UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External MONI, CONF, AUDL, SRCH, ANOM, COMP, AGNT, or WFLO adapters.

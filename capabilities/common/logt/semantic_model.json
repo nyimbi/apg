@@ -12,20 +12,67 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "anomaly_detection": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.LogtService",
+          "monitoring": "moni",
+          "search": "srch",
+          "view_models": "views.py"
+        },
         "governance": {
           "audit_query_access": true,
+          "batch_event_stream": "bytewax",
           "configuration_policy_required": true,
           "monitoring_integration_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
         },
         "ingestion": {
-          "event_bus_required": true,
+          "event_stream": "bytewax",
+          "event_stream_required": true,
           "max_batch_size": 10000,
           "pipeline_owner_required": true,
           "schema_validation_required": true
         },
+        "logt_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "pipeline_reviewer",
+            "log_reviewer",
+            "trace_reviewer",
+            "incident_reviewer",
+            "privacy_reviewer",
+            "retention_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "log_metrics_required": true,
+          "trace_metrics_required": true
+        },
         "privacy": {
           "export_approval_required": true,
+          "export_reference_required": true,
           "pii_redaction_required": true,
           "restricted_log_filtering": true,
           "retention_policy_required": true
@@ -38,10 +85,14 @@
         "tracing": {
           "sampling_policy_required": true,
           "service_map_enabled": true,
+          "span_duration_validation_required": true,
           "span_retention_days": 30,
           "trace_context_required": true
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_log_search": true,
           "enable_pipeline_manager": true,
           "enable_retention_center": true,
@@ -55,9 +106,19 @@
       "master_data": {},
       "name": "Logging and Tracing",
       "provides": [
-        "logt_operations"
+        "structured_logging",
+        "distributed_tracing",
+        "trace_correlation",
+        "log_search",
+        "diagnostic_retention",
+        "diagnostic_exports",
+        "logt_agents"
       ],
-      "requires": [],
+      "requires": [
+        "moni",
+        "conf",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +148,45 @@
           },
           {
             "condition": {
+              "operation": "create_pipeline",
+              "schema_ref_present": false
+            },
+            "description": "Ingestion pipelines require schema validation reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_validation_required",
+              "required_action": "attach_schema_reference"
+            },
+            "name": "pipeline_requires_schema"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "create_pipeline"
+            },
+            "description": "Diagnostic ingestion pipelines require Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "pipeline_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "create_pipeline",
+              "sampling_policy_present": false
+            },
+            "description": "Ingestion pipelines require sampling policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sampling_policy_required",
+              "required_action": "attach_sampling_policy"
+            },
+            "name": "pipeline_requires_sampling_policy"
+          },
+          {
+            "condition": {
               "operation": "ingest_trace",
               "trace_context_present": false
             },
@@ -97,6 +197,45 @@
               "required_action": "attach_trace_context"
             },
             "name": "trace_context_required"
+          },
+          {
+            "condition": {
+              "operation": "ingest_trace",
+              "trace_id_present": false
+            },
+            "description": "Trace ingestion requires trace identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "trace_id_required",
+              "required_action": "set_trace_id"
+            },
+            "name": "trace_requires_identifier"
+          },
+          {
+            "condition": {
+              "operation": "record_span",
+              "span_service_present": false
+            },
+            "description": "Spans require service identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "span_service_required",
+              "required_action": "set_span_service"
+            },
+            "name": "span_requires_service"
+          },
+          {
+            "condition": {
+              "operation": "record_span",
+              "span_duration_valid": false
+            },
+            "description": "Spans require non-negative duration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "span_duration_invalid",
+              "required_action": "fix_span_duration"
+            },
+            "name": "span_requires_valid_duration"
           },
           {
             "condition": {
@@ -113,16 +252,29 @@
           },
           {
             "condition": {
-              "approval_recorded": false,
-              "operation": "export_logs"
+              "operation": "ingest_log",
+              "service_name_present": false
             },
-            "description": "Diagnostic exports require approval.",
+            "description": "Logs require service identity.",
             "effect": {
               "decision": "deny",
-              "reason": "export_approval_required",
-              "required_action": "record_export_approval"
+              "reason": "service_name_required",
+              "required_action": "set_service_name"
             },
-            "name": "log_export_requires_approval"
+            "name": "log_requires_service"
+          },
+          {
+            "condition": {
+              "operation": "search_logs",
+              "query_actor_present": false
+            },
+            "description": "Diagnostic queries require requester identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "query_actor_required",
+              "required_action": "set_query_actor"
+            },
+            "name": "query_requires_actor"
           },
           {
             "condition": {
@@ -136,6 +288,123 @@
               "required_action": "review_query_scope"
             },
             "name": "large_query_requires_review"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "export_logs"
+            },
+            "description": "Diagnostic exports require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "export_approval_required",
+              "required_action": "record_export_approval"
+            },
+            "name": "log_export_requires_approval"
+          },
+          {
+            "condition": {
+              "approval_ref_present": false,
+              "operation": "export_logs"
+            },
+            "description": "Diagnostic exports require approval reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "export_approval_reference_required",
+              "required_action": "attach_export_approval_reference"
+            },
+            "name": "log_export_requires_approval_reference"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "logt_agent_present": true
+            },
+            "description": "AI observability agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "logt_agent_registration_required",
+              "required_action": "register_logt_agent"
+            },
+            "name": "logt_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "logt_agent_present": true
+            },
+            "description": "AI observability agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "logt_agent_runtime_not_supported",
+              "required_action": "choose_supported_logt_agent_runtime"
+            },
+            "name": "logt_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "logt_agent_present": true
+            },
+            "description": "AI observability agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "logt_agent_role_not_supported",
+              "required_action": "choose_supported_logt_agent_role"
+            },
+            "name": "logt_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "logt_agent_present": true
+            },
+            "description": "AI observability agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "logt_agent_scope_required",
+              "required_action": "set_logt_agent_scope"
+            },
+            "name": "logt_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "logt_agent_present": true
+            },
+            "description": "AI observability-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "logt_agent_disclosure_required",
+              "required_action": "disclose_logt_agent"
+            },
+            "name": "logt_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Diagnostic lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "logt_audit_event_required",
+              "required_action": "record_logt_audit_event"
+            },
+            "name": "logt_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_diagnostic_mutation"
+            },
+            "description": "Batch diagnostic mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_diagnostic_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +437,45 @@
         },
         {
           "condition": {
+            "operation": "create_pipeline",
+            "schema_ref_present": false
+          },
+          "description": "Ingestion pipelines require schema validation reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_validation_required",
+            "required_action": "attach_schema_reference"
+          },
+          "name": "pipeline_requires_schema"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "create_pipeline"
+          },
+          "description": "Diagnostic ingestion pipelines require Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "pipeline_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "create_pipeline",
+            "sampling_policy_present": false
+          },
+          "description": "Ingestion pipelines require sampling policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sampling_policy_required",
+            "required_action": "attach_sampling_policy"
+          },
+          "name": "pipeline_requires_sampling_policy"
+        },
+        {
+          "condition": {
             "operation": "ingest_trace",
             "trace_context_present": false
           },
@@ -178,6 +486,45 @@
             "required_action": "attach_trace_context"
           },
           "name": "trace_context_required"
+        },
+        {
+          "condition": {
+            "operation": "ingest_trace",
+            "trace_id_present": false
+          },
+          "description": "Trace ingestion requires trace identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "trace_id_required",
+            "required_action": "set_trace_id"
+          },
+          "name": "trace_requires_identifier"
+        },
+        {
+          "condition": {
+            "operation": "record_span",
+            "span_service_present": false
+          },
+          "description": "Spans require service identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "span_service_required",
+            "required_action": "set_span_service"
+          },
+          "name": "span_requires_service"
+        },
+        {
+          "condition": {
+            "operation": "record_span",
+            "span_duration_valid": false
+          },
+          "description": "Spans require non-negative duration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "span_duration_invalid",
+            "required_action": "fix_span_duration"
+          },
+          "name": "span_requires_valid_duration"
         },
         {
           "condition": {
@@ -194,16 +541,29 @@
         },
         {
           "condition": {
-            "approval_recorded": false,
-            "operation": "export_logs"
+            "operation": "ingest_log",
+            "service_name_present": false
           },
-          "description": "Diagnostic exports require approval.",
+          "description": "Logs require service identity.",
           "effect": {
             "decision": "deny",
-            "reason": "export_approval_required",
-            "required_action": "record_export_approval"
+            "reason": "service_name_required",
+            "required_action": "set_service_name"
           },
-          "name": "log_export_requires_approval"
+          "name": "log_requires_service"
+        },
+        {
+          "condition": {
+            "operation": "search_logs",
+            "query_actor_present": false
+          },
+          "description": "Diagnostic queries require requester identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "query_actor_required",
+            "required_action": "set_query_actor"
+          },
+          "name": "query_requires_actor"
         },
         {
           "condition": {
@@ -217,6 +577,123 @@
             "required_action": "review_query_scope"
           },
           "name": "large_query_requires_review"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "export_logs"
+          },
+          "description": "Diagnostic exports require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "export_approval_required",
+            "required_action": "record_export_approval"
+          },
+          "name": "log_export_requires_approval"
+        },
+        {
+          "condition": {
+            "approval_ref_present": false,
+            "operation": "export_logs"
+          },
+          "description": "Diagnostic exports require approval reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "export_approval_reference_required",
+            "required_action": "attach_export_approval_reference"
+          },
+          "name": "log_export_requires_approval_reference"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "logt_agent_present": true
+          },
+          "description": "AI observability agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "logt_agent_registration_required",
+            "required_action": "register_logt_agent"
+          },
+          "name": "logt_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "logt_agent_present": true
+          },
+          "description": "AI observability agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "logt_agent_runtime_not_supported",
+            "required_action": "choose_supported_logt_agent_runtime"
+          },
+          "name": "logt_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "logt_agent_present": true
+          },
+          "description": "AI observability agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "logt_agent_role_not_supported",
+            "required_action": "choose_supported_logt_agent_role"
+          },
+          "name": "logt_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "logt_agent_present": true
+          },
+          "description": "AI observability agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "logt_agent_scope_required",
+            "required_action": "set_logt_agent_scope"
+          },
+          "name": "logt_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "logt_agent_present": true
+          },
+          "description": "AI observability-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "logt_agent_disclosure_required",
+            "required_action": "disclose_logt_agent"
+          },
+          "name": "logt_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Diagnostic lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "logt_audit_event_required",
+            "required_action": "record_logt_audit_event"
+          },
+          "name": "logt_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_diagnostic_mutation"
+          },
+          "description": "Batch diagnostic mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_diagnostic_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,10 +703,20 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "LOGTAgentPanel",
+          "permission": "logt:admin",
+          "route": "/logt/agents"
+        },
         "analytics": {
           "component": "TraceAnalytics",
           "permission": "logt:view",
           "route": "/logt/analytics"
+        },
+        "audit": {
+          "component": "DiagnosticAuditTrail",
+          "permission": "logt:admin",
+          "route": "/logt/audit"
         },
         "dashboard": {
           "component": "LOGTDashboard",
@@ -267,9 +754,41 @@
           "route": "/logt/traces"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_diagnostic_mutation_requires_bytewax",
+        "events": [
+          "logt_pipeline_created",
+          "logt_log_ingested",
+          "logt_trace_ingested",
+          "logt_span_recorded",
+          "logt_query_executed",
+          "logt_export_created",
+          "logt_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "pipelines",
+          "logs",
+          "traces",
+          "spans",
+          "queries",
+          "exports",
+          "retention_policies",
+          "logt_agents",
+          "audit_events"
+        ],
+        "topic": "apg.logt.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "diagnostic-chip",
+            "visual": "event-timeline"
+          },
           "log_table": {
             "highlight": "redaction-chip",
             "visual": "structured-log-grid"
@@ -350,11 +869,25 @@
             "permission": "logt:manage_retention"
           },
           {
+            "component": "LOGTAgentPanel",
+            "name": "agents",
+            "nav_group": "Operations",
+            "path": "/logt/agents",
+            "permission": "logt:admin"
+          },
+          {
             "component": "TraceAnalytics",
             "name": "analytics",
             "nav_group": "Operations",
             "path": "/logt/analytics",
             "permission": "logt:view"
+          },
+          {
+            "component": "DiagnosticAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/logt/audit",
+            "permission": "logt:admin"
           },
           {
             "component": "LOGTSettings",
@@ -377,26 +910,77 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "logt": []
+      "logt": [
+        "moni",
+        "conf",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "logt": {
       "configuration": {
+        "adapters": {
+          "anomaly_detection": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.LogtService",
+          "monitoring": "moni",
+          "search": "srch",
+          "view_models": "views.py"
+        },
         "governance": {
           "audit_query_access": true,
+          "batch_event_stream": "bytewax",
           "configuration_policy_required": true,
           "monitoring_integration_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
         },
         "ingestion": {
-          "event_bus_required": true,
+          "event_stream": "bytewax",
+          "event_stream_required": true,
           "max_batch_size": 10000,
           "pipeline_owner_required": true,
           "schema_validation_required": true
         },
+        "logt_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "pipeline_reviewer",
+            "log_reviewer",
+            "trace_reviewer",
+            "incident_reviewer",
+            "privacy_reviewer",
+            "retention_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "log_metrics_required": true,
+          "trace_metrics_required": true
+        },
         "privacy": {
           "export_approval_required": true,
+          "export_reference_required": true,
           "pii_redaction_required": true,
           "restricted_log_filtering": true,
           "retention_policy_required": true
@@ -409,10 +993,14 @@
         "tracing": {
           "sampling_policy_required": true,
           "service_map_enabled": true,
+          "span_duration_validation_required": true,
           "span_retention_days": 30,
           "trace_context_required": true
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_log_search": true,
           "enable_pipeline_manager": true,
           "enable_retention_center": true,
@@ -421,9 +1009,19 @@
       },
       "id": "logt",
       "provides": [
-        "logt_operations"
+        "structured_logging",
+        "distributed_tracing",
+        "trace_correlation",
+        "log_search",
+        "diagnostic_retention",
+        "diagnostic_exports",
+        "logt_agents"
       ],
-      "requires": []
+      "requires": [
+        "moni",
+        "conf",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +1033,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +1054,19 @@
   },
   "roles": {},
   "rules": {
+    "batch_diagnostic_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_diagnostic_mutation"
+      },
+      "description": "Batch diagnostic mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_diagnostic_mutation_requires_bytewax"
+    },
     "large_query_requires_review": {
       "condition": {
         "query_review_recorded": false,
@@ -482,6 +1093,123 @@
       },
       "name": "log_export_requires_approval"
     },
+    "log_export_requires_approval_reference": {
+      "condition": {
+        "approval_ref_present": false,
+        "operation": "export_logs"
+      },
+      "description": "Diagnostic exports require approval reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "export_approval_reference_required",
+        "required_action": "attach_export_approval_reference"
+      },
+      "name": "log_export_requires_approval_reference"
+    },
+    "log_requires_service": {
+      "condition": {
+        "operation": "ingest_log",
+        "service_name_present": false
+      },
+      "description": "Logs require service identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_name_required",
+        "required_action": "set_service_name"
+      },
+      "name": "log_requires_service"
+    },
+    "logt_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "logt_agent_present": true
+      },
+      "description": "AI observability-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "logt_agent_disclosure_required",
+        "required_action": "disclose_logt_agent"
+      },
+      "name": "logt_agent_requires_disclosure"
+    },
+    "logt_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "logt_agent_present": true
+      },
+      "description": "AI observability agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "logt_agent_registration_required",
+        "required_action": "register_logt_agent"
+      },
+      "name": "logt_agent_requires_registration"
+    },
+    "logt_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "logt_agent_present": true
+      },
+      "description": "AI observability agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "logt_agent_scope_required",
+        "required_action": "set_logt_agent_scope"
+      },
+      "name": "logt_agent_requires_scope"
+    },
+    "logt_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "logt_agent_present": true
+      },
+      "description": "AI observability agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "logt_agent_role_not_supported",
+        "required_action": "choose_supported_logt_agent_role"
+      },
+      "name": "logt_agent_role_supported"
+    },
+    "logt_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "logt_agent_present": true
+      },
+      "description": "AI observability agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "logt_agent_runtime_not_supported",
+        "required_action": "choose_supported_logt_agent_runtime"
+      },
+      "name": "logt_agent_runtime_supported"
+    },
+    "logt_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Diagnostic lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "logt_audit_event_required",
+        "required_action": "record_logt_audit_event"
+      },
+      "name": "logt_state_change_requires_audit"
+    },
+    "pipeline_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "create_pipeline"
+      },
+      "description": "Diagnostic ingestion pipelines require Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "pipeline_requires_bytewax_stream"
+    },
     "pipeline_requires_owner": {
       "condition": {
         "operation": "create_pipeline",
@@ -495,6 +1223,45 @@
       },
       "name": "pipeline_requires_owner"
     },
+    "pipeline_requires_sampling_policy": {
+      "condition": {
+        "operation": "create_pipeline",
+        "sampling_policy_present": false
+      },
+      "description": "Ingestion pipelines require sampling policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sampling_policy_required",
+        "required_action": "attach_sampling_policy"
+      },
+      "name": "pipeline_requires_sampling_policy"
+    },
+    "pipeline_requires_schema": {
+      "condition": {
+        "operation": "create_pipeline",
+        "schema_ref_present": false
+      },
+      "description": "Ingestion pipelines require schema validation reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_validation_required",
+        "required_action": "attach_schema_reference"
+      },
+      "name": "pipeline_requires_schema"
+    },
+    "query_requires_actor": {
+      "condition": {
+        "operation": "search_logs",
+        "query_actor_present": false
+      },
+      "description": "Diagnostic queries require requester identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "query_actor_required",
+        "required_action": "set_query_actor"
+      },
+      "name": "query_requires_actor"
+    },
     "sensitive_log_requires_redaction": {
       "condition": {
         "redaction_applied": false,
@@ -507,6 +1274,32 @@
         "required_action": "apply_log_redaction"
       },
       "name": "sensitive_log_requires_redaction"
+    },
+    "span_requires_service": {
+      "condition": {
+        "operation": "record_span",
+        "span_service_present": false
+      },
+      "description": "Spans require service identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "span_service_required",
+        "required_action": "set_span_service"
+      },
+      "name": "span_requires_service"
+    },
+    "span_requires_valid_duration": {
+      "condition": {
+        "operation": "record_span",
+        "span_duration_valid": false
+      },
+      "description": "Spans require non-negative duration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "span_duration_invalid",
+        "required_action": "fix_span_duration"
+      },
+      "name": "span_requires_valid_duration"
     },
     "tenant_context_required": {
       "condition": {
@@ -532,6 +1325,19 @@
         "required_action": "attach_trace_context"
       },
       "name": "trace_context_required"
+    },
+    "trace_requires_identifier": {
+      "condition": {
+        "operation": "ingest_trace",
+        "trace_id_present": false
+      },
+      "description": "Trace ingestion requires trace identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "trace_id_required",
+        "required_action": "set_trace_id"
+      },
+      "name": "trace_requires_identifier"
     }
   },
   "security": {},

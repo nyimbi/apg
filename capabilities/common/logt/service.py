@@ -4,8 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
-from .models import DiagnosticExport, DiagnosticQuery, IngestionPipeline, LogEvent, LogtAuditEvent, RetentionPolicy, SpanRecord, TraceRecord
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	SUPPORTED_LOGT_AGENT_ROLES,
+	SUPPORTED_LOGT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+)
+from .models import DiagnosticExport, DiagnosticQuery, IngestionPipeline, LogEvent, LogtAgent, LogtAuditEvent, RetentionPolicy, SpanRecord, TraceRecord
 from .observability_runtime import ObservabilityRuntime
 
 
@@ -21,6 +28,7 @@ class LogtService:
 		self._exports: dict[str, DiagnosticExport] = {}
 		self._retention_policies: dict[str, RetentionPolicy] = {}
 		self._audit_events: dict[str, LogtAuditEvent] = {}
+		self._agents: dict[str, LogtAgent] = {}
 		self._runtime = ObservabilityRuntime()
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -54,7 +62,7 @@ class LogtService:
 			redaction_required=redaction_required,
 			export_approval_required=export_approval_required,
 		)
-		self._retention_policies[policy_id] = policy
+		self._retention_policies[_state_key(tenant_id, policy_id)] = policy
 		self._audit(tenant_id, policy_id, "retention_policy_created", "system", "allow", metadata={"log_days": log_retention_days, "span_days": span_days})
 		return policy.to_dict()
 
@@ -74,14 +82,11 @@ class LogtService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_pipeline",
 			"pipeline_owner_assigned": bool(owner),
+			"schema_ref_present": bool(schema_ref),
+			"event_stream": event_stream_name(event_bus_ref),
+			"sampling_policy_present": bool(sampling_policy),
 		})
 		self._raise_if_denied(result)
-		if not schema_ref:
-			raise PermissionError("schema_validation_required")
-		if not event_bus_ref:
-			raise PermissionError("event_bus_required")
-		if not sampling_policy:
-			raise PermissionError("sampling_policy_required")
 		self._require_retention_policy(retention_policy_id, tenant_id)
 		pipeline = IngestionPipeline(
 			id=pipeline_id,
@@ -94,7 +99,7 @@ class LogtService:
 			retention_policy_id=retention_policy_id,
 			status=status,
 		)
-		self._pipelines[pipeline_id] = pipeline
+		self._pipelines[_state_key(tenant_id, pipeline_id)] = pipeline
 		self._audit(tenant_id, pipeline_id, "pipeline_created", owner, result["decision"], reasons=self._reasons(result))
 		return pipeline.to_dict()
 
@@ -115,12 +120,12 @@ class LogtService:
 		pipeline = self._require_pipeline(pipeline_id, tenant_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": "ingest_log",
+			"service_name_present": bool(service_name),
 			"sensitive_log_content": bool(sensitive_log_content),
 			"redaction_applied": bool(redaction_applied),
 		})
 		self._raise_if_denied(result)
-		if not service_name:
-			raise PermissionError("service_name_required")
 		severity_value = self._runtime.normalize_severity(severity)
 		log = LogEvent(
 			id=log_id,
@@ -135,7 +140,7 @@ class LogtService:
 			sensitive_log_content=sensitive_log_content,
 			redaction_applied=redaction_applied,
 		)
-		self._logs[log_id] = log
+		self._logs[_state_key(tenant_id, log_id)] = log
 		self._audit(tenant_id, log_id, "log_ingested", pipeline.owner, result["decision"], reasons=self._reasons(result), metadata={"severity": severity_value, "service": service_name})
 		return log.to_dict()
 
@@ -156,10 +161,9 @@ class LogtService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "ingest_trace",
 			"trace_context_present": bool(trace_context),
+			"trace_id_present": bool(trace_id),
 		})
 		self._raise_if_denied(result)
-		if not trace_id:
-			raise PermissionError("trace_id_required")
 		if not root_service:
 			raise PermissionError("root_service_required")
 		trace = TraceRecord(
@@ -173,7 +177,7 @@ class LogtService:
 			sampling_policy=sampling_policy or pipeline.sampling_policy,
 			status=status,
 		)
-		self._traces[trace_record_id] = trace
+		self._traces[_state_key(tenant_id, trace_record_id)] = trace
 		self._audit(tenant_id, trace_record_id, "trace_ingested", pipeline.owner, result["decision"], metadata={"trace_id": trace_id, "root_service": root_service})
 		return trace.to_dict()
 
@@ -193,10 +197,13 @@ class LogtService:
 		self._require_trace_by_trace_id(trace_id, tenant_id)
 		if not span_id:
 			raise PermissionError("span_id_required")
-		if not service_name:
-			raise PermissionError("span_service_required")
-		if duration_ms < 0:
-			raise PermissionError("span_duration_invalid")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_span",
+			"span_service_present": bool(service_name),
+			"span_duration_valid": duration_ms >= 0,
+		})
+		self._raise_if_denied(result)
 		span = SpanRecord(
 			id=span_record_id,
 			tenant_id=tenant_id,
@@ -209,8 +216,8 @@ class LogtService:
 			status=self._runtime.span_status(duration_ms, error),
 			attributes=dict(attributes or {}),
 		)
-		self._spans[span_record_id] = span
-		self._audit(tenant_id, span_record_id, "span_recorded", service_name, "allow", metadata={"trace_id": trace_id, "duration_ms": duration_ms})
+		self._spans[_state_key(tenant_id, span_record_id)] = span
+		self._audit(tenant_id, span_record_id, "span_recorded", service_name, result["decision"], metadata={"trace_id": trace_id, "duration_ms": duration_ms})
 		return span.to_dict()
 
 	def search_logs(
@@ -224,12 +231,12 @@ class LogtService:
 	) -> dict[str, Any]:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": "search_logs",
+			"query_actor_present": bool(requested_by),
 			"query_window_hours": query_window_hours,
 			"query_review_recorded": bool(query_review_recorded),
 		})
 		self._raise_if_review_required(result, query_review_recorded)
-		if not requested_by:
-			raise PermissionError("query_actor_required")
 		matches = [
 			log for log in self.list_logs(tenant_id)
 			if self._runtime.match_log(log, query_text)
@@ -244,7 +251,7 @@ class LogtService:
 			result_count=len(matches),
 			status=self._runtime.query_status(query_window_hours, query_review_recorded),
 		)
-		self._queries[query_id] = query
+		self._queries[_state_key(tenant_id, query_id)] = query
 		self._audit(tenant_id, query_id, "diagnostic_query_executed", requested_by, result["decision"], reasons=self._reasons(result), metadata={"result_count": len(matches)})
 		return {"query": query.to_dict(), "results": matches}
 
@@ -262,12 +269,11 @@ class LogtService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "export_logs",
 			"approval_recorded": bool(approval_recorded),
+			"approval_ref_present": bool(approval_ref),
 		})
 		self._raise_if_denied(result)
 		if not requested_by:
 			raise PermissionError("export_actor_required")
-		if not approval_ref:
-			raise PermissionError("export_approval_reference_required")
 		for item_id in item_ids:
 			if not self._diagnostic_item_belongs_to_tenant(item_id, tenant_id):
 				raise KeyError("diagnostic_export_item_not_found")
@@ -280,7 +286,7 @@ class LogtService:
 			item_ids=tuple(item_ids),
 			status="approved",
 		)
-		self._exports[export_id] = export
+		self._exports[_state_key(tenant_id, export_id)] = export
 		self._audit(tenant_id, export_id, "diagnostic_export_created", requested_by, result["decision"], metadata={"item_count": len(item_ids), "export_type": export_type})
 		return export.to_dict()
 
@@ -293,7 +299,7 @@ class LogtService:
 	) -> dict[str, Any]:
 		metadata = dict(metadata or {})
 		policy_id = str(metadata.get("retention_policy_id") or f"retention-{record_id}")
-		if policy_id not in self._retention_policies:
+		if _state_key(tenant_id, policy_id) not in self._retention_policies:
 			self.create_retention_policy(
 				policy_id=policy_id,
 				tenant_id=tenant_id,
@@ -301,14 +307,14 @@ class LogtService:
 				log_retention_days=int(metadata.get("log_retention_days", 30)),
 			)
 		pipeline_id = str(metadata.get("pipeline_id") or f"pipeline-{record_id}")
-		if pipeline_id not in self._pipelines:
+		if _state_key(tenant_id, pipeline_id) not in self._pipelines:
 			self.create_pipeline(
 				pipeline_id=pipeline_id,
 				tenant_id=tenant_id,
 				name=str(metadata.get("pipeline_name") or "Default diagnostics pipeline"),
 				owner=str(metadata.get("owner") or "system"),
 				schema_ref=str(metadata.get("schema_ref") or "schema://diagnostics"),
-				event_bus_ref=str(metadata.get("event_bus_ref") or "mqeb://diagnostics"),
+				event_bus_ref=str(metadata.get("event_bus_ref") or "bytewax://diagnostics"),
 				sampling_policy=str(metadata.get("sampling_policy") or "head-based"),
 				retention_policy_id=policy_id,
 			)
@@ -353,6 +359,51 @@ class LogtService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def register_logt_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"logt_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_LOGT_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_LOGT_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		agent = LogtAgent(
+			id=agent_id or f"logt-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._audit(tenant_id, agent.id, "logt_agent_registered", name, result["decision"], metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def validate_batch_diagnostic_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_diagnostic_mutation",
+			"event_stream": event_stream,
+		})
+
+	def list_logt_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def service_map(self, tenant_id: str = "default") -> dict[str, Any]:
 		return self._runtime.service_map(self.list_spans(tenant_id))
 
@@ -368,9 +419,11 @@ class LogtService:
 			"query_count": len(self.list_queries(tenant_id)),
 			"export_count": len(self.list_exports(tenant_id)),
 			"retention_policy_count": len(self.list_retention_policies(tenant_id)),
+			"logt_agent_count": len(self.list_logt_agents(tenant_id)),
 			"error_log_count": len([log for log in logs if log["severity"] in {"error", "critical"}]),
 			"slow_span_count": len([span for span in spans if span["status"] == "slow"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -378,13 +431,13 @@ class LogtService:
 		self._raise_if_denied(result)
 
 	def _require_retention_policy(self, policy_id: str, tenant_id: str) -> RetentionPolicy:
-		policy = self._retention_policies.get(policy_id)
+		policy = self._retention_policies.get(_state_key(tenant_id, policy_id))
 		if policy is None or policy.tenant_id != tenant_id:
 			raise KeyError("retention_policy_not_found")
 		return policy
 
 	def _require_pipeline(self, pipeline_id: str, tenant_id: str) -> IngestionPipeline:
-		pipeline = self._pipelines.get(pipeline_id)
+		pipeline = self._pipelines.get(_state_key(tenant_id, pipeline_id))
 		if pipeline is None or pipeline.tenant_id != tenant_id:
 			raise KeyError("ingestion_pipeline_not_found")
 		return pipeline
@@ -397,7 +450,7 @@ class LogtService:
 
 	def _diagnostic_item_belongs_to_tenant(self, item_id: str, tenant_id: str) -> bool:
 		for records in (self._logs, self._traces, self._spans):
-			item = records.get(item_id)
+			item = records.get(_state_key(tenant_id, item_id))
 			if item is not None:
 				return item.tenant_id == tenant_id
 		return False
@@ -447,3 +500,11 @@ class LogtService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "diagnostic_policy_blocked") for action in result.get("actions", ()))
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"
