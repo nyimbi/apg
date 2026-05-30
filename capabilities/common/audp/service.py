@@ -1,7 +1,7 @@
 """
 Audio Processing & Intelligence Services
 
-Core async services for world-class audio processing with comprehensive
+Core async services for governed audio processing with comprehensive
 APG platform integration and industry-leading performance.
 
 Copyright © 2025 Datacraft
@@ -32,7 +32,7 @@ class AudioTranscriptionService:
 	"""
 	Advanced Speech Recognition & Transcription Service
 	
-	Provides world-class speech-to-text capabilities with speaker diarization,
+	Provides speech-to-text capabilities with speaker diarization,
 	real-time streaming, custom vocabularies, and comprehensive APG integration.
 	"""
 	
@@ -825,7 +825,7 @@ class VoiceSynthesisService:
 	"""
 	Advanced Voice Synthesis & Generation Service
 	
-	Provides world-class text-to-speech capabilities with emotion control,
+	Provides text-to-speech capabilities with emotion control,
 	voice cloning, and multi-speaker conversation generation using open source models.
 	
 	Open Source Models Used:

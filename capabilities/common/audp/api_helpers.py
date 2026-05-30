@@ -116,6 +116,30 @@ def request_analysis(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_audio_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_audio_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=_payload_bool(payload, "registered", True),
+	)
+
+
+def change_job_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_job_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		job_id=str(payload["id"]),
+		status=str(payload["status"]),
+		reason=str(payload["reason"]),
+		audit_recorded=_payload_bool(payload, "audit_recorded", True),
+	)
+
+
 def list_consents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_consents(tenant_id)
 
@@ -134,6 +158,10 @@ def list_transcript_reviews(tenant_id: str | None = None) -> list[dict[str, Any]
 
 def list_synthesis_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_synthesis_reviews(tenant_id)
+
+
+def list_audio_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audio_agents(tenant_id)
 
 
 def list_governance_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

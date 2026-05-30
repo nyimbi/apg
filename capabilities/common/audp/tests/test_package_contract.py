@@ -30,6 +30,8 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "audp"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["audio_agents"]["supported_runtimes"]
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -44,3 +46,4 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "audp" in model["capabilities"]
+	assert model["capabilities"]["audp"]["streaming"]["processor"] == "bytewax"

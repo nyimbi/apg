@@ -12,17 +12,60 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "collaboration": "colb",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "audio_runtime.AudpService",
+          "model_lifecycle": "mlcm",
+          "nlp": "nlpc",
+          "notification": "ntfy",
+          "view_models": "view_models.py"
+        },
         "analysis": {
           "content_classification_enabled": true,
           "quality_assessment_enabled": true,
           "sentiment_analysis_enabled": true,
           "topic_detection_enabled": true
         },
+        "audio_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "transcript_reviewer",
+            "synthesis_reviewer",
+            "quality_analyst",
+            "consent_auditor",
+            "workflow_operator"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "governance": {
           "audit_audio_processing": true,
+          "batch_event_stream": "bytewax",
           "recording_consent_required": true,
           "require_tenant_context": true,
-          "retention_policy_required": true
+          "retention_policy_required": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "quality_metrics_required": true
         },
         "synthesis": {
           "max_text_length": 10000,
@@ -37,13 +80,17 @@
         },
         "transcription": {
           "default_language": "auto",
+          "human_review_required_below_confidence": true,
           "minimum_confidence": 0.78,
           "real_time_streaming_enabled": true,
           "speaker_diarization_enabled": true
         },
         "ui": {
+          "enable_agent_panel": true,
           "enable_analysis_workbench": true,
+          "enable_analytics": true,
           "enable_audio_dashboard": true,
+          "enable_audit": true,
           "enable_synthesis_studio": true,
           "enable_transcription_console": true
         }
@@ -55,9 +102,20 @@
       "master_data": {},
       "name": "Audio Processing",
       "provides": [
-        "audp_operations"
+        "audio_transcription",
+        "voice_synthesis",
+        "audio_analysis",
+        "speaker_diarization",
+        "audio_enhancement",
+        "audio_consent_governance",
+        "audio_review_governance",
+        "audio_agents"
       ],
-      "requires": [],
+      "requires": [
+        "aicr",
+        "nlpc",
+        "mlcm"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -149,6 +207,122 @@
               "required_action": "review_transcript"
             },
             "name": "low_transcription_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "audio_job_requested": true,
+              "retention_policy_present": false
+            },
+            "description": "Audio jobs require retention policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_retention_policy_required",
+              "required_action": "attach_audio_retention_policy"
+            },
+            "name": "audio_retention_policy_required"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "audio_agent_present": true
+            },
+            "description": "AI audio agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_agent_registration_required",
+              "required_action": "register_audio_agent"
+            },
+            "name": "audio_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "audio_agent_present": true
+            },
+            "description": "AI audio agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_agent_runtime_not_supported",
+              "required_action": "choose_supported_audio_agent_runtime"
+            },
+            "name": "audio_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "audio_agent_present": true
+            },
+            "description": "AI audio agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_agent_scope_required",
+              "required_action": "set_audio_agent_scope"
+            },
+            "name": "audio_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "audio_agent_present": true
+            },
+            "description": "AI audio-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_agent_disclosure_required",
+              "required_action": "disclose_audio_agent"
+            },
+            "name": "audio_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Audio job state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_state_change_reason_required",
+              "required_action": "record_audio_state_change_reason"
+            },
+            "name": "audio_state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Audio job state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audio_audit_event_required",
+              "required_action": "record_audio_audit_event"
+            },
+            "name": "audio_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Audio records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_audio_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_audio_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_audio_mutation"
+            },
+            "description": "Batch audio mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_audio_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -243,22 +417,150 @@
             "required_action": "review_transcript"
           },
           "name": "low_transcription_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "audio_job_requested": true,
+            "retention_policy_present": false
+          },
+          "description": "Audio jobs require retention policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_retention_policy_required",
+            "required_action": "attach_audio_retention_policy"
+          },
+          "name": "audio_retention_policy_required"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "audio_agent_present": true
+          },
+          "description": "AI audio agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_agent_registration_required",
+            "required_action": "register_audio_agent"
+          },
+          "name": "audio_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "audio_agent_present": true
+          },
+          "description": "AI audio agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_agent_runtime_not_supported",
+            "required_action": "choose_supported_audio_agent_runtime"
+          },
+          "name": "audio_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "audio_agent_present": true
+          },
+          "description": "AI audio agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_agent_scope_required",
+            "required_action": "set_audio_agent_scope"
+          },
+          "name": "audio_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "audio_agent_present": true
+          },
+          "description": "AI audio-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_agent_disclosure_required",
+            "required_action": "disclose_audio_agent"
+          },
+          "name": "audio_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Audio job state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_state_change_reason_required",
+            "required_action": "record_audio_state_change_reason"
+          },
+          "name": "audio_state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Audio job state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audio_audit_event_required",
+            "required_action": "record_audio_audit_event"
+          },
+          "name": "audio_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Audio records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_audio_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_audio_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_audio_mutation"
+          },
+          "description": "Batch audio mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_audio_mutation_requires_bytewax"
         }
       ],
       "runtime": {
         "api": "api.py",
-        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
-        "package_runtime": "audio_runtime.py",
         "service": "service.py",
-        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "AudioAgentPanel",
+          "permission": "audp:govern",
+          "route": "/audp/agents"
+        },
         "analysis": {
           "component": "AudioAnalysis",
           "permission": "audp:analyze",
           "route": "/audp/analysis"
+        },
+        "analytics": {
+          "component": "AudioAnalytics",
+          "permission": "audp:view",
+          "route": "/audp/analytics"
+        },
+        "audit": {
+          "component": "AudioAuditTrail",
+          "permission": "audp:audit",
+          "route": "/audp/audit"
         },
         "consents": {
           "component": "AudioConsentCenter",
@@ -306,12 +608,47 @@
           "route": "/audp/transcription"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_audio_mutation_requires_bytewax",
+        "events": [
+          "audio_consent_recorded",
+          "audio_model_policy_attached",
+          "transcription_requested",
+          "transcript_review_requested",
+          "transcript_review_decided",
+          "synthesis_requested",
+          "synthesis_review_requested",
+          "synthesis_review_decided",
+          "voice_clone_requested",
+          "analysis_requested",
+          "audio_agent_registered",
+          "audio_job_state_changed"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "consents",
+          "model_policies",
+          "jobs",
+          "transcript_reviews",
+          "synthesis_reviews",
+          "audio_agents",
+          "governance_events"
+        ],
+        "topic": "apg.audp.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
           "analysis_grid": {
             "status_style": "topic-chip",
             "visual": "audio-metrics"
+          },
+          "audit_timeline": {
+            "icon": "list-todo",
+            "status_style": "governance-chip"
           },
           "consent_banner": {
             "icon": "badge-check",
@@ -422,6 +759,27 @@
             "permission": "audp:view"
           },
           {
+            "component": "AudioAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/audp/agents",
+            "permission": "audp:govern"
+          },
+          {
+            "component": "AudioAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/audp/audit",
+            "permission": "audp:audit"
+          },
+          {
+            "component": "AudioAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/audp/analytics",
+            "permission": "audp:view"
+          },
+          {
             "component": "AUDPSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -434,7 +792,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -442,23 +800,70 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "audp": []
+      "audp": [
+        "aicr",
+        "nlpc",
+        "mlcm"
+      ]
     }
   },
   "contracts": {
     "audp": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "collaboration": "colb",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "audio_runtime.AudpService",
+          "model_lifecycle": "mlcm",
+          "nlp": "nlpc",
+          "notification": "ntfy",
+          "view_models": "view_models.py"
+        },
         "analysis": {
           "content_classification_enabled": true,
           "quality_assessment_enabled": true,
           "sentiment_analysis_enabled": true,
           "topic_detection_enabled": true
         },
+        "audio_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "transcript_reviewer",
+            "synthesis_reviewer",
+            "quality_analyst",
+            "consent_auditor",
+            "workflow_operator"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "governance": {
           "audit_audio_processing": true,
+          "batch_event_stream": "bytewax",
           "recording_consent_required": true,
           "require_tenant_context": true,
-          "retention_policy_required": true
+          "retention_policy_required": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "quality_metrics_required": true
         },
         "synthesis": {
           "max_text_length": 10000,
@@ -473,22 +878,37 @@
         },
         "transcription": {
           "default_language": "auto",
+          "human_review_required_below_confidence": true,
           "minimum_confidence": 0.78,
           "real_time_streaming_enabled": true,
           "speaker_diarization_enabled": true
         },
         "ui": {
+          "enable_agent_panel": true,
           "enable_analysis_workbench": true,
+          "enable_analytics": true,
           "enable_audio_dashboard": true,
+          "enable_audit": true,
           "enable_synthesis_studio": true,
           "enable_transcription_console": true
         }
       },
       "id": "audp",
       "provides": [
-        "audp_operations"
+        "audio_transcription",
+        "voice_synthesis",
+        "audio_analysis",
+        "speaker_diarization",
+        "audio_enhancement",
+        "audio_consent_governance",
+        "audio_review_governance",
+        "audio_agents"
       ],
-      "requires": []
+      "requires": [
+        "aicr",
+        "nlpc",
+        "mlcm"
+      ]
     }
   },
   "deployment": {
@@ -500,7 +920,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -521,6 +941,58 @@
   },
   "roles": {},
   "rules": {
+    "audio_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "audio_agent_present": true
+      },
+      "description": "AI audio-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_agent_disclosure_required",
+        "required_action": "disclose_audio_agent"
+      },
+      "name": "audio_agent_requires_disclosure"
+    },
+    "audio_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "audio_agent_present": true
+      },
+      "description": "AI audio agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_agent_registration_required",
+        "required_action": "register_audio_agent"
+      },
+      "name": "audio_agent_requires_registration"
+    },
+    "audio_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "audio_agent_present": true
+      },
+      "description": "AI audio agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_agent_scope_required",
+        "required_action": "set_audio_agent_scope"
+      },
+      "name": "audio_agent_requires_scope"
+    },
+    "audio_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "audio_agent_present": true
+      },
+      "description": "AI audio agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_agent_runtime_not_supported",
+        "required_action": "choose_supported_audio_agent_runtime"
+      },
+      "name": "audio_agent_runtime_supported"
+    },
     "audio_model_requires_policy": {
       "condition": {
         "model_invocation": true,
@@ -533,6 +1005,70 @@
         "required_action": "attach_model_policy"
       },
       "name": "audio_model_requires_policy"
+    },
+    "audio_retention_policy_required": {
+      "condition": {
+        "audio_job_requested": true,
+        "retention_policy_present": false
+      },
+      "description": "Audio jobs require retention policy evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_retention_policy_required",
+        "required_action": "attach_audio_retention_policy"
+      },
+      "name": "audio_retention_policy_required"
+    },
+    "audio_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Audio job state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_audit_event_required",
+        "required_action": "record_audio_audit_event"
+      },
+      "name": "audio_state_change_requires_audit"
+    },
+    "audio_state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Audio job state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audio_state_change_reason_required",
+        "required_action": "record_audio_state_change_reason"
+      },
+      "name": "audio_state_change_requires_reason"
+    },
+    "batch_audio_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_audio_mutation"
+      },
+      "description": "Batch audio mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_audio_mutation_requires_bytewax"
+    },
+    "cross_tenant_audio_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Audio records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_audio_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_audio_access_denied"
     },
     "low_transcription_confidence_requires_review": {
       "condition": {

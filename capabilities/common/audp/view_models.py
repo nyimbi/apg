@@ -37,9 +37,11 @@ def dashboard_model(
 		"jobs": service.list_jobs(tenant_id),
 		"transcript_reviews": service.list_transcript_reviews(tenant_id),
 		"synthesis_reviews": service.list_synthesis_reviews(tenant_id),
+		"audio_agents": service.list_audio_agents(tenant_id),
 		"governance_events": service.list_governance_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -140,4 +142,56 @@ def quality_governance_model(
 		"rules": contract["rule_engine"]["rules"],
 		"governance_events": service.list_governance_events(tenant_id),
 		"theme": contract["theme"],
+	}
+
+
+def audio_agents_model(
+	service: AudpService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AudpService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"agents": service.list_audio_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["audio_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["audio_agents"]["allowed_roles"],
+		"theme": contract["theme"]["components"]["agent_panel"],
+	}
+
+
+def audit_trail_model(
+	service: AudpService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AudpService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"governance_events": service.list_governance_events(tenant_id),
+		"streaming": contract["streaming"],
+		"theme": contract["theme"]["components"]["audit_timeline"],
+	}
+
+
+def analytics_model(
+	service: AudpService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AudpService()
+	return {
+		"summary": service.audio_summary(tenant_id),
+		"jobs": service.list_jobs(tenant_id),
+	}
+
+
+def settings_model(
+	service: AudpService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AudpService()
+	contract = service.describe(tenant_id)
+	return {
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"permissions": sorted({route["permission"] for route in contract["ui"]["routes"]}),
 	}

@@ -835,6 +835,22 @@ class AudioModelPolicyRecord(BaseModel):
 	created_at: datetime = Field(default_factory=datetime.utcnow, description="Policy timestamp")
 
 
+class AudioAgentRecord(BaseModel):
+	"""Tenant-scoped AI audio-agent registration and disclosure record."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Audio agent identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	name: str = Field(..., description="Audio agent display name")
+	runtime: str = Field(..., description="Agent runtime such as codex or claude_code")
+	role: str = Field(..., description="Scoped audio-agent role")
+	scope: str = Field(..., description="Allowed contribution scope")
+	registered: bool = Field(True, description="Whether agent registration is active")
+	contribution_disclosed: bool = Field(..., description="Whether AI contribution disclosure is present")
+	policy_ref: str | None = Field(None, description="Optional governing policy reference")
+	created_at: datetime = Field(default_factory=datetime.utcnow, description="Registration timestamp")
+
+
 class AudioProcessingJobRecord(BaseModel):
 	"""Governed package-level audio processing job."""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)

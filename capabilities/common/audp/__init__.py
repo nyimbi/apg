@@ -16,7 +16,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "audp",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware audio transcription, synthesis, analysis, enhancement, speaker diarization, and voice-model governance",
+	"description": "Tenant-aware audio transcription, synthesis, analysis, enhancement, speaker diarization, voice-model governance, AI audio-agent coordination, and review evidence",
 	"category": "specialized_ai_analytics",
 	"subcategory": "audio_processing",
 	"vendor": "Datacraft",
@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["audio_transcription", "voice_synthesis", "audio_analysis", "speaker_diarization", "audio_enhancement", "audio_consent_governance", "audio_review_governance"],
-	"permissions": ["audp:view", "audp:transcribe", "audp:synthesize", "audp:analyze", "audp:manage_models", "audp:govern", "audp:review", "audp:admin"]
+	"provides": ["audio_transcription", "voice_synthesis", "audio_analysis", "speaker_diarization", "audio_enhancement", "audio_consent_governance", "audio_review_governance", "audio_agents"],
+	"permissions": ["audp:view", "audp:transcribe", "audp:synthesize", "audp:analyze", "audp:manage_models", "audp:govern", "audp:review", "audp:audit", "audp:admin"]
 }
 
 __capability_code__ = "AUDIO_PROCESSING"
@@ -42,7 +42,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["colb", "ntfy", "cach", "audl"],
+		"optional_dependencies": ["colb", "ntfy", "cach", "audl", "bytewax", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -53,6 +53,7 @@ def register_capability() -> dict[str, Any]:
 			"speaker_diarization": "Identify and segment speakers with consent and retention controls",
 			"audio_consent_governance": "Record and enforce recording and voice-owner consent evidence",
 			"audio_review_governance": "Require human review for low-confidence transcripts and governed synthetic audio",
+			"audio_agents": "Register Codex, Claude Code, OpenCode, Pi, and future runtimes as scoped audio-processing collaborators",
 			"capability_rules": "Evaluate deterministic audio-processing governance rules",
 			"visual_theming": "Apply audio-intelligence theme tokens and components"
 		},
@@ -64,11 +65,13 @@ def register_capability() -> dict[str, Any]:
 			"models": "/audp/api/v1/models",
 			"consents": "/audp/api/v1/consents",
 			"reviews": "/audp/api/v1/reviews",
+			"agents": "/audp/api/v1/agents",
 			"governance_events": "/audp/api/v1/governance-events"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

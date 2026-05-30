@@ -16,6 +16,70 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 16:00 EAT
+
+AUDP audio-processing lifecycle/guardrail packet:
+
+- Added `README.md` and updated `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`,
+  and `todo.md` so the documented packet matches the executable
+  dependency-light AUDP lifecycle.
+- Expanded `capability_contract.py` with audio-agent, governance,
+  observability, adapter, UI, theme, and Bytewax lifecycle-stream
+  configuration.
+- Expanded deterministic rules to cover tenant context, recording consent,
+  voice-owner consent, synthetic-audio watermarking, synthetic release review,
+  model policy, low-confidence transcript review, retention policy, AI
+  audio-agent registration/runtime/scope/disclosure, state-change reason/audit,
+  cross-tenant access, and Bytewax batch mutation enforcement.
+- Added `AudioAgentRecord` and extended `AudpService` with scoped audio-agent
+  registration, audio job state changes, agent listing, and agent dashboard
+  summary state.
+- Extended API helpers and view models with audio-agent, audit, analytics,
+  settings, and Bytewax stream surfaces.
+- Updated registration metadata, permissions, optional dependencies, package
+  contract tests, generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`), and old CI fixture wording.
+- Focused review cleanup: regenerated stale package evidence after contract
+  changes and verified the generated semantic model now exposes Bytewax,
+  supported audio-agent runtimes, and `/audp/agents`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/audp/__init__.py
+  capabilities/common/audp/capability_contract.py capabilities/common/audp/models.py
+  capabilities/common/audp/audio_runtime.py capabilities/common/audp/api_helpers.py
+  capabilities/common/audp/view_models.py capabilities/common/audp/app.py
+  capabilities/common/audp/service.py capabilities/common/audp/api.py
+  capabilities/common/audp/test_capability_contract.py
+  capabilities/common/audp/test_api_job_status.py
+  capabilities/common/audp/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/audp/test_capability_contract.py
+  capabilities/common/audp/tests/test_package_contract.py` passed with 10 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/pytest -q capabilities/common/audp/test_api_job_status.py`
+  passed with 3 tests and the same adjacent deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.audp import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.audp.streaming.processor,
+  .capabilities.audp.configuration.audio_agents.supported_runtimes,
+  .capabilities.audp.screens.agents.route'
+  capabilities/common/audp/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/audp/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/audp --json` passed with `audp` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/audp --json`
+  passed with `side_effect_free: true` and no warnings.
+- AUDP stale-marker and banned stream search returned no matches for old package
+  markers, unsupported overclaims, unfinished scaffolding, TODOs, or Kafka
+  references.
+- `git diff --check -- capabilities/common/audp docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live microphone/camera capture, live
+  speech-to-text providers, live text-to-speech or voice-cloning engines,
+  production AICR/NLPC/MLCM/AUDL/NTFY/COLB/CACH/MONI adapters, live Bytewax
+  topology, rendered browser UI, and performance/resilience/clinical checks.
+
 ### 2026-05-30 15:49 EAT
 
 POSE pose-estimation lifecycle/guardrail packet:

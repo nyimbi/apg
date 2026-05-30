@@ -14,8 +14,8 @@
 AUDP is the tenant-scoped audio intelligence capability for APG applications.
 It governs audio recording consent, transcription, transcript review, voice
 synthesis, synthetic-audio release review, voice cloning consent, audio
-analysis, model policy enforcement, retention posture, and synthetic-audio
-watermark evidence.
+analysis, model policy enforcement, retention posture, synthetic-audio
+watermark evidence, and scoped AI audio-agent participation.
 
 The package must remain usable without live speech-to-text providers, text-to-
 speech providers, GPU workers, object storage, streaming infrastructure, or
@@ -49,6 +49,8 @@ AUDP owns these package-level records:
 - `AudioSynthesisReviewRecord`: release-review evidence for synthetic audio
   output.
 - `AudioModelPolicyRecord`: policy attachment for model-backed audio work.
+- `AudioAgentRecord`: AI audio-agent registration, runtime, role, scope,
+  disclosure, and policy reference.
 - `AudioGovernanceEvent`: tenant-scoped evidence event for AUDP decisions.
 
 All mutable package-level state must be tenant-qualified so duplicate IDs in
@@ -70,8 +72,12 @@ The focused lifecycle is:
    approval or rejection before completion.
 9. Request voice cloning only when voice-owner consent is present.
 10. Request audio analysis with consent, model policy, and retention metadata.
-11. Emit tenant-scoped governance events for consent, model policy, job,
-    review, synthesis, cloning, and analysis lifecycle changes.
+11. Register AI audio agents with supported runtime, role, scope, disclosure,
+    and policy evidence.
+12. Change job state only with reason and audit evidence.
+13. Emit tenant-scoped governance events for consent, model policy, job,
+    review, synthesis, cloning, analysis, agent, and state-change lifecycle
+    changes.
 
 ## Rules And Guardrails
 
@@ -86,6 +92,14 @@ The contract rules are executable guardrails:
 - `audio_model_requires_policy`: model-backed processing requires policy.
 - `low_transcription_confidence_requires_review`: low-confidence transcripts
   require human review.
+- `audio_retention_policy_required`: audio jobs require retention policy
+  evidence.
+- `audio_agent_*`: AI audio agents require registration, supported runtime,
+  explicit scope, and contribution disclosure.
+- `audio_state_change_*`: state changes require reason and audit evidence.
+- `cross_tenant_audio_access_denied`: tenant boundaries must not be crossed.
+- `batch_audio_mutation_requires_bytewax`: batch mutations require Bytewax
+  event streams.
 
 Service methods must enforce these rules and expose the same decisions through
 API helpers and view models.
@@ -103,12 +117,15 @@ AUDP exposes route and view-model surfaces for:
 - consent center;
 - review queue;
 - quality/governance center;
+- AI audio-agent panel;
+- audit timeline;
+- analytics summary;
 - settings.
 
 The `audp_audio_intelligence` theme must provide semantic tokens and component
 metadata for waveform viewers, transcript panels, synthesis studios, analysis
 grids, consent banners, transcript-review queues, and synthetic-watermark
-status chips.
+status chips, audio-agent panels, and audit timelines.
 
 ## Adapter Boundaries
 
@@ -118,7 +135,7 @@ These integrations remain replaceable:
   models;
 - text-to-speech providers and voice-cloning engines;
 - GPU/audio worker pools, media stores, and transcoding pipelines;
-- ByteWax stream processors and low-latency audio streaming adapters;
+- Bytewax stream processors and low-latency audio streaming adapters;
 - speaker diarization, sentiment, topic, and acoustic-analysis providers;
 - audit, notification, collaboration, workflow, and model-lifecycle services.
 

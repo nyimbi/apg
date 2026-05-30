@@ -6,11 +6,8 @@
     "cap_spec.md",
     "models.py",
     "service.py",
-    "audio_runtime.py",
     "api.py",
-    "api_helpers.py",
     "views.py",
-    "view_models.py",
     "app.py",
     "semantic_model.json",
     "release_report.json"

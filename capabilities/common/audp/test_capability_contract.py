@@ -14,13 +14,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "audp"
 	assert contract["configuration"]["tenant_id"] == "tenant-audio"
 	assert contract["configuration"]["transcription"]["minimum_confidence"] == 0.85
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "transcription", "synthesis", "analysis", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "transcription", "synthesis", "analysis", "sessions", "models", "consents", "reviews", "quality", "settings"}
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "transcription", "synthesis", "analysis", "audio_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert len(contract["rule_engine"]["rules"]) >= 15
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "transcription", "synthesis", "analysis", "sessions", "models", "consents", "reviews", "quality", "agents", "audit", "analytics", "settings"}
 	assert contract["ui"]["api_prefix"] == "/audp/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "waveform_viewer" in contract["theme"]["components"]
 	assert "consent_banner" in contract["theme"]["components"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["audio_agents"]["supported_runtimes"]
 
 
 def test_rule_engine_enforces_audio_guardrails():
@@ -38,10 +40,20 @@ def test_rule_engine_enforces_audio_guardrails():
 		"synthetic_release_reviewed": False,
 	})
 	clone_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "clone_voice", "voice_owner_consent_recorded": False})
+	agent_result = evaluate_capability_rules({
+		"audio_agent_present": True,
+		"agent_registered": False,
+		"agent_runtime_supported": False,
+		"agent_scope_present": False,
+		"agent_contribution_disclosed": False,
+	})
+	stream_result = evaluate_capability_rules({"operation": "batch_audio_mutation", "event_stream": "memory"})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "recording_consent_required", "synthetic_audio_requires_watermark", "synthetic_audio_requires_release_review", "audio_model_requires_policy", "low_transcription_confidence_requires_review"}
 	assert clone_result["matched_rules"] == ["voice_cloning_requires_consent"]
+	assert set(agent_result["matched_rules"]) == {"audio_agent_requires_registration", "audio_agent_runtime_supported", "audio_agent_requires_scope", "audio_agent_requires_disclosure"}
+	assert stream_result["matched_rules"] == ["batch_audio_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -52,10 +64,14 @@ def test_registration_includes_full_capability_contract():
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "audp_audio_intelligence"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert registration["ui_components"]["transcription"] == "/audp/transcription"
+	assert registration["ui_components"]["agents"] == "/audp/agents"
 	assert "aicr" in registration["dependencies"]
 	assert "audp:transcribe" in registration["permissions"]
+	assert "audp:audit" in registration["permissions"]
 	assert "audio_consent_governance" in registration["capabilities"]
+	assert "audio_agents" in registration["capabilities"]
 
 
 def test_service_runs_audio_governance_lifecycle():
@@ -130,6 +146,22 @@ def test_service_runs_audio_governance_lifecycle():
 		model_id=policy["model_id"],
 		analysis_types=["sentiment", "quality"],
 	)
+	agent = service.register_audio_agent(
+		agent_id="codex-audio-agent",
+		tenant_id="tenant-audio",
+		name="Codex Audio Agent",
+		runtime="codex",
+		role="transcript_reviewer",
+		scope="transcription,review",
+		contribution_disclosed=True,
+		policy_ref="audio-agent-policy",
+	)
+	changed = service.change_job_state(
+		tenant_id="tenant-audio",
+		job_id=analysis["id"],
+		status="cancelled",
+		reason="analysis rerouted to human queue",
+	)
 	dashboard = view_models.dashboard_model(service, "tenant-audio")
 
 	assert transcription["job"]["status"] == "pending_review"
@@ -140,7 +172,10 @@ def test_service_runs_audio_governance_lifecycle():
 	assert synthesis_review["decision"] == "approved"
 	assert clone["job_type"] == "voice_cloning"
 	assert analysis["job_type"] == "analysis"
+	assert agent["runtime"] == "codex"
+	assert changed["status"] == "cancelled"
 	assert dashboard["summary"]["job_count"] == 4
+	assert dashboard["summary"]["agent_count"] == 1
 	assert dashboard["summary"]["pending_review_count"] == 0
 	assert {event["event_type"] for event in dashboard["governance_events"]} >= {
 		"audio_consent_recorded",
@@ -153,7 +188,13 @@ def test_service_runs_audio_governance_lifecycle():
 		"synthesis_review_decided",
 		"voice_clone_requested",
 		"analysis_requested",
+		"audio_agent_registered",
+		"audio_job_state_changed",
 	}
+	assert view_models.audio_agents_model(service, "tenant-audio")["agents"][0]["id"] == "codex-audio-agent"
+	assert view_models.audit_trail_model(service, "tenant-audio")["streaming"]["processor"] == "bytewax"
+	assert view_models.analytics_model(service, "tenant-audio")["summary"]["agent_count"] == 1
+	assert "audio_agents" in view_models.settings_model(service, "tenant-audio")["configuration"]
 
 
 def test_service_blocks_audio_guardrail_violations():
@@ -212,6 +253,12 @@ def test_service_blocks_audio_guardrail_violations():
 			model_id="audio-model",
 		)
 
+	with pytest.raises(PermissionError, match="audio_agent_disclosure_required"):
+		service.register_audio_agent("agent-no-disclosure", "tenant-audio", "Agent", "codex", "transcript_reviewer", "review", False)
+
+	with pytest.raises(PermissionError, match="audio_agent_runtime_not_supported"):
+		service.register_audio_agent("agent-bad-runtime", "tenant-audio", "Agent", "unsupported", "transcript_reviewer", "review", True)
+
 	transcription = service.request_transcription(
 		job_id="transcribe-review",
 		tenant_id="tenant-audio",
@@ -245,6 +292,9 @@ def test_service_blocks_audio_guardrail_violations():
 			decision="approved",
 			notes="",
 		)
+
+	with pytest.raises(PermissionError, match="audio_state_change_reason_required"):
+		service.change_job_state("tenant-audio", "transcribe-review", "blocked", "")
 
 
 def test_service_keeps_duplicate_ids_isolated_by_tenant():
@@ -370,6 +420,15 @@ def test_api_helpers_and_view_models_expose_audio_lifecycle():
 		"model_id": policy["model_id"],
 		"watermark_applied": True,
 	})
+	agent = api_helpers.register_audio_agent({
+		"id": "api-agent",
+		"tenant_id": consent["tenant_id"],
+		"name": "API Audio Agent",
+		"runtime": "codex",
+		"role": "transcript_reviewer",
+		"scope": "transcription",
+		"contribution_disclosed": True,
+	})
 	decision = api_helpers.decide_transcript_review({
 		"id": transcription["transcript_review"]["id"],
 		"tenant_id": consent["tenant_id"],
@@ -386,9 +445,13 @@ def test_api_helpers_and_view_models_expose_audio_lifecycle():
 	})
 	model = view_models.transcription_console_model(api_helpers.SERVICE, consent["tenant_id"])
 	synthesis_model = view_models.synthesis_studio_model(api_helpers.SERVICE, consent["tenant_id"])
+	agent_model = view_models.audio_agents_model(api_helpers.SERVICE, consent["tenant_id"])
 
 	assert decision["decision"] == "approved"
 	assert synthesis_decision["decision"] == "approved"
+	assert agent["runtime"] == "codex"
 	assert api_helpers.capability_status(consent["tenant_id"])["job_count"] == 2
+	assert api_helpers.capability_status(consent["tenant_id"])["agent_count"] == 1
 	assert model["jobs"][0]["id"] == "api-transcription"
 	assert synthesis_model["synthesis_reviews"][0]["decision"] == "approved"
+	assert agent_model["agents"][0]["id"] == "api-agent"

@@ -5,8 +5,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_AUDIO_AGENT_ROLES,
+	SUPPORTED_AUDIO_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
+	AudioAgentRecord,
 	AudioConsentRecord,
 	AudioGovernanceEvent,
 	AudioModelPolicyRecord,
@@ -28,6 +34,7 @@ class AudpService:
 		self._jobs: dict[tuple[str, str], AudioProcessingJobRecord] = {}
 		self._transcript_reviews: dict[tuple[str, str], AudioTranscriptReviewRecord] = {}
 		self._synthesis_reviews: dict[tuple[str, str], AudioSynthesisReviewRecord] = {}
+		self._agents: dict[tuple[str, str], AudioAgentRecord] = {}
 		self._governance_events: list[AudioGovernanceEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -137,9 +144,11 @@ class AudpService:
 		rule_result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "process_recording",
+			"audio_job_requested": True,
 			"recording_consent_recorded": True,
 			"model_invocation": True,
 			"model_policy_attached": True,
+			"retention_policy_present": bool(retention_policy),
 			"transcription_confidence": confidence,
 			"human_review_recorded": human_review_recorded,
 		})
@@ -245,11 +254,13 @@ class AudpService:
 			raise ValueError("synthesis text is required")
 		rule_result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"audio_job_requested": True,
 			"synthetic_audio_requested": True,
 			"watermark_applied": watermark_applied,
 			"synthetic_release_reviewed": False,
 			"model_invocation": True,
 			"model_policy_attached": True,
+			"retention_policy_present": bool(retention_policy),
 		})
 		if rule_result["decision"] == "deny":
 			_raise_if_blocked(rule_result)
@@ -348,9 +359,11 @@ class AudpService:
 		rule_result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "clone_voice",
+			"audio_job_requested": True,
 			"voice_owner_consent_recorded": True,
 			"model_invocation": True,
 			"model_policy_attached": True,
+			"retention_policy_present": bool(retention_policy),
 		})
 		_raise_if_blocked(rule_result)
 		job = self._create_job(
@@ -393,9 +406,11 @@ class AudpService:
 		rule_result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "process_recording",
+			"audio_job_requested": True,
 			"recording_consent_recorded": True,
 			"model_invocation": True,
 			"model_policy_attached": True,
+			"retention_policy_present": bool(retention_policy),
 		})
 		_raise_if_blocked(rule_result)
 		job = self._create_job(
@@ -418,6 +433,83 @@ class AudpService:
 		)
 		return job.model_dump(mode="json")
 
+	def register_audio_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		normalized_runtime = _normalize_agent_runtime(runtime)
+		normalized_role = _normalize_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"audio_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		_raise_if_blocked(result)
+		if self._tenant_key(tenant_id, agent_id) in self._agents:
+			raise ValueError(f"audio agent already exists for tenant: {agent_id}")
+		agent = AudioAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref or None,
+		)
+		self._agents[self._tenant_key(tenant_id, agent_id)] = agent
+		self._record_governance(
+			tenant_id=tenant_id,
+			event_type="audio_agent_registered",
+			subject_id=agent_id,
+			message=f"Registered audio agent {agent.name}.",
+			evidence={"runtime": normalized_runtime, "role": normalized_role, "scope": scope},
+		)
+		return agent.model_dump(mode="json")
+
+	def change_job_state(
+		self,
+		tenant_id: str,
+		job_id: str,
+		status: str,
+		reason: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		job = self._get_job(tenant_id, job_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		_raise_if_blocked(result)
+		if status not in {"active", "pending_review", "blocked", "completed", "cancelled"}:
+			raise ValueError("audio job status must be active, pending_review, blocked, completed, or cancelled")
+		updated = self._replace_job_status(job, status)
+		self._jobs[self._tenant_key(tenant_id, job_id)] = updated
+		self._record_governance(
+			tenant_id=tenant_id,
+			event_type="audio_job_state_changed",
+			subject_id=job_id,
+			message=reason,
+			evidence={"status": status},
+		)
+		return updated.model_dump(mode="json")
+
 	def list_consents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._consents, tenant_id)
 
@@ -432,6 +524,9 @@ class AudpService:
 
 	def list_synthesis_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._synthesis_reviews, tenant_id)
+
+	def list_audio_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._agents, tenant_id)
 
 	def list_governance_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = list(self._governance_events)
@@ -451,6 +546,7 @@ class AudpService:
 			"transcription_count": len([job for job in jobs if job["job_type"] == "transcription"]),
 			"synthesis_count": len([job for job in jobs if job["job_type"] == "synthesis"]),
 			"analysis_count": len([job for job in jobs if job["job_type"] == "analysis"]),
+			"agent_count": len(self.list_audio_agents(tenant_id)),
 			"pending_review_count": len([review for review in transcript_reviews + synthesis_reviews if review["decision"] == "pending"]),
 			"blocked_job_count": len([job for job in jobs if job["status"] == "blocked"]),
 			"governance_event_count": len(self.list_governance_events(tenant_id)),
@@ -651,6 +747,20 @@ def _coerce_bool(value: Any) -> bool:
 	if isinstance(value, str):
 		return value.strip().lower() in {"1", "true", "yes", "on"}
 	return bool(value)
+
+
+def _normalize_agent_runtime(runtime: str) -> str:
+	value = (runtime or "").strip().lower()
+	if value not in SUPPORTED_AUDIO_AGENT_RUNTIMES:
+		raise PermissionError("audio_agent_runtime_not_supported")
+	return value
+
+
+def _normalize_agent_role(role: str) -> str:
+	value = (role or "").strip().lower()
+	if value not in SUPPORTED_AUDIO_AGENT_ROLES:
+		raise PermissionError("unsupported_audio_agent_role")
+	return value
 
 
 __all__ = ["AudpService"]

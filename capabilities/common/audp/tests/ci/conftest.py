@@ -43,7 +43,7 @@ def sample_audio_files(temp_audio_dir):
 	formats = ['wav', 'mp3', 'm4a', 'flac']
 	for fmt in formats:
 		file_path = temp_audio_dir / f"sample_audio.{fmt}"
-		# Create minimal audio file content (mock data)
+		# Create minimal deterministic audio file content.
 		with open(file_path, 'wb') as f:
 			f.write(b'RIFF' + b'\x00' * 44)  # Minimal WAV header
 		audio_files[fmt] = file_path
