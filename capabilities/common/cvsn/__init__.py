@@ -18,8 +18,8 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 # APG Capability Metadata
 CAPABILITY_METADATA = {
 	"capability_id": "computer_vision",
-	"capability_name": "Computer Vision & Visual Intelligence",
-	"capability_description": "Enterprise-grade computer vision processing with OCR, object detection, facial recognition, quality control, and video analysis",
+	"capability_name": "Computer Vision",
+	"capability_description": "Governed visual intelligence for OCR, object detection, quality inspection, safety analytics, model lifecycle, and generated applications",
 	"version": "1.0.0",
 	"author": "Datacraft",
 	"author_email": "nyimbi@gmail.com",
@@ -36,7 +36,7 @@ CAPABILITY_METADATA = {
 	
 	# Technical specifications
 	"python_version": "3.11+",
-	"framework": "FastAPI + Flask-AppBuilder",
+	"framework": "APG generated application + optional FastAPI/Flask-AppBuilder production services",
 	"database": "PostgreSQL",
 	"cache": "Redis",
 	"ai_models": ["YOLO", "Vision Transformers", "Tesseract OCR", "OpenCV"],
@@ -111,23 +111,21 @@ COMPOSITION_KEYWORDS = [
 # APG Capability Dependencies
 CAPABILITY_DEPENDENCIES = {
 	"required": [
-		"auth_rbac",           # Authentication and authorization
-		"audit_compliance",    # Audit trails and compliance
-		"document_management"  # File and document management
+		"auth",
+		"audl",
+		"conf"
 	],
 	"enhanced": [
-		"ai_orchestration",          # AI model orchestration
-		"workflow_engine",           # Business process automation
-		"business_intelligence",     # Analytics and reporting
-		"real_time_collaboration",   # Live collaboration features
-		"notification_engine"        # Alert and notification system
+		"aicr",
+		"mlcm",
+		"moni",
+		"bytewax"
 	],
 	"optional": [
-		"asset_management",          # Physical asset tracking
-		"quality_management",        # Quality management systems
-		"inventory_management",      # Inventory and stock management
-		"customer_relationship_mgmt", # CRM integration
-		"enterprise_search"          # Advanced search capabilities
+		"stor",
+		"srch",
+		"cach",
+		"mqeb"
 	]
 }
 
@@ -373,26 +371,34 @@ def register_capability() -> Dict[str, Any]:
 		"display_name": CAPABILITY_METADATA["capability_name"],
 		"description": CAPABILITY_METADATA["capability_description"],
 		"version": CAPABILITY_METADATA["version"],
-		"dependencies": ["aicr", "mlcm", "conf", "auth"],
-		"optional_dependencies": ["audl", "moni", "cach", "mqeb"],
+		"dependencies": ["aicr", "mlcm", "conf", "auth", "audl", "moni"],
+		"optional_dependencies": ["stor", "srch", "cach", "mqeb"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"adapters": contract["configuration"]["adapters"],
 		"capabilities": {
-			"document_ocr": "Extract text, tables, and forms from tenant-scoped documents",
-			"object_detection": "Detect, classify, and track visual objects in images and video",
+			"asset_ingestion": "Register tenant-scoped visual assets with source, MIME, size, and digest evidence",
+			"document_ocr": "Extract deterministic text evidence from tenant-scoped document assets",
+			"object_detection": "Detect, classify, and track visual objects in images",
 			"quality_control": "Run visual inspection workflows for manufacturing and operations",
 			"factory_safety": "Surface high-severity smoke, fire, OSHA, and people-counting signals",
-			"model_management": "Expose vision model deployment and tuning surfaces",
+			"video_analytics": "Process governed video clips with sampling-policy evidence",
+			"model_management": "Register and release vision models through MLCM linkage",
+			"pipeline_management": "Register versioned vision pipelines with owner and model evidence",
 			"capability_rules": "Evaluate deterministic computer-vision governance rules",
 			"visual_theming": "Apply industrial vision-console theme tokens and components"
 		},
 		"endpoints": {
+			"assets": "/cvsn/api/v1/assets",
 			"documents": "/cvsn/api/v1/documents",
 			"images": "/cvsn/api/v1/images",
 			"video": "/cvsn/api/v1/video",
 			"quality": "/cvsn/api/v1/quality",
-			"models": "/cvsn/api/v1/models"
+			"safety": "/cvsn/api/v1/safety",
+			"similarity": "/cvsn/api/v1/similarity",
+			"models": "/cvsn/api/v1/models",
+			"audit": "/cvsn/api/v1/audit"
 		},
 		"ui_components": {
 			route["name"]: route["path"]
@@ -400,7 +406,7 @@ def register_capability() -> Dict[str, Any]:
 		},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
-		"permissions": list(CAPABILITY_PERMISSIONS)
+		"permissions": list(CAPABILITY_PERMISSIONS) + ["cv:review"]
 	}
 
 

@@ -14120,3 +14120,58 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Legacy heavy NLPC service, API, and Flask-AppBuilder tests.
 - Load, latency, drift, accuracy, token-cost, and throughput benchmarks.
+
+### 2026-05-30 09:01 EAT
+
+CVSN lifecycle and guardrail packet:
+
+- Selected `capabilities/common/cvsn` as the next common capability after NLPC
+  in the development order.
+- Replaced the root `README.md`, added `SPECIFICATION.md` and `PLAN.md`, and
+  replaced `cap_spec.md` with a pointer to the packet docs and executable
+  contract.
+- Expanded the CVSN contract to 30 deterministic guardrails, 13 UI routes,
+  processing/task/OCR/detection/video/quality/safety/privacy/model-registry/
+  governance/observability/adapter configuration, Bytewax event-stream adapter
+  evidence, and industrial vision-console theme components.
+- Added `cvsn_runtime.CvsnService` as the dependency-light generated-app
+  runtime for asset ingestion, vision jobs, model registration and release,
+  pipeline registration, audit events, list surfaces, dashboard summaries, and
+  APG record compatibility.
+- Added `view_models.py` with generated-app view models for dashboard, assets,
+  documents, images, video, quality, safety, similarity search, review, models,
+  governance, and audit.
+- Updated capability registration with canonical AICR, MLCM, CONF, AUTH, AUDL,
+  MONI, storage, search, Bytewax adapter evidence, richer endpoints, and review
+  permission.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed stale package tests to package-contract wording and expanded focused
+  tests for Bytewax, rule count, route count, runtime lifecycle, generated UI
+  models, committed package evidence, preflight guardrails, and post-processing
+  quality/safety guardrails.
+- Review-agent pass found and fixed post-processing critical defect/safety
+  guardrail enforcement, tenantless or empty pipeline registration, and empty
+  model version registration.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cvsn/__init__.py capabilities/common/cvsn/capability_contract.py capabilities/common/cvsn/cvsn_runtime.py capabilities/common/cvsn/view_models.py capabilities/common/cvsn/app.py capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and CVSN capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/cvsn --json` passed with `ok: true`; CVSN remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cvsn --json` passed with 13 UI routes, 30 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/cvsn/README.md capabilities/common/cvsn/SPECIFICATION.md capabilities/common/cvsn/PLAN.md capabilities/common/cvsn/cap_spec.md capabilities/common/cvsn/__init__.py capabilities/common/cvsn/capability_contract.py capabilities/common/cvsn/cvsn_runtime.py capabilities/common/cvsn/view_models.py capabilities/common/cvsn/app.py capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py capabilities/common/cvsn/package_manifest.json capabilities/common/cvsn/release_report.json capabilities/common/cvsn/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/cvsn docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live OpenCV, YOLO, OCR, transformer, or model-provider inference.
+- Live Bytewax stream execution.
+- External AICR, MLCM, CONF, AUTH, AUDL, MONI, STOR, and SRCH adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Legacy heavy CVSN service, API, and Flask-AppBuilder tests.
+- Load, latency, drift, accuracy, and throughput benchmarks.

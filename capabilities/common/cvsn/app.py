@@ -1,17 +1,123 @@
-"""Publishable APG capability package entrypoint for Computer Vision & Visual Intelligence."""
+"""Publishable APG capability package entrypoint for Computer Vision."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Computer Vision & Visual Intelligence package-backed APG capability", "entity_count": 0, "name": "cvsn", "version": "1.0.0"}, "capabilities": {"cvsn": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"detection": {"default_confidence_threshold": 0.5, "default_iou_threshold": 0.4, "default_object_model": "yolov8n.pt", "max_detections": 100}, "ocr": {"default_engine": "tesseract", "default_language": "eng", "enhance_image": true, "extract_forms": false, "extract_tables": false}, "privacy": {"biometric_anonymization_required": true, "biometric_consent_required": true, "default_retention_days": 30, "facial_recognition_enabled": false}, "processing": {"allowed_document_types": ["application/pdf", "image/jpeg", "image/png", "image/tiff"], "allowed_image_types": ["image/jpeg", "image/png", "image/tiff", "image/bmp", "image/webp"], "allowed_video_types": ["video/mp4", "video/avi", "video/mov", "video/mkv"], "default_async_threshold_files": 10, "max_batch_size": 100, "max_file_size_mb": 50}, "safety": {"barcode_qr_tracking": true, "osha_zone_monitoring": true, "people_counting": true, "severity_alert_threshold": "high", "smoke_fire_alerting": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "cvsn_industrial"}, "ui": {"enable_dashboard": true, "enable_document_processing": true, "enable_factory_safety": true, "enable_model_management": true, "enable_video_analytics": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Computer Vision & Visual Intelligence", "provides": ["cvsn_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_id_missing": true}, "description": "All vision jobs must carry a tenant identifier.", "effect": {"decision": "deny", "reason": "tenant_id_required", "required_action": "attach_tenant_context"}, "name": "require_tenant_isolation"}, {"condition": {"consent_recorded": false, "processing_type": "facial_recognition"}, "description": "Facial recognition requires consent and anonymization controls.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_biometric_consent"}, "name": "biometric_processing_requires_controls"}, {"condition": {"processing_type": "facial_recognition", "retention_days_gt": 30}, "description": "Biometric workloads must declare bounded retention.", "effect": {"decision": "deny", "reason": "biometric_retention_exceeds_default", "required_action": "lower_retention_or_approve_exception"}, "name": "biometric_retention_requires_limit"}, {"condition": {"alerting_enabled": false, "domain": "factory_safety", "severity_in": ["high", "critical"]}, "description": "High-severity smoke, fire, and OSHA findings require alerting.", "effect": {"decision": "deny", "reason": "factory_safety_alerting_required", "required_action": "enable_alerting"}, "name": "factory_hazard_requires_alerting"}, {"condition": {"async_queue_enabled": false, "batch_size_gt": 10}, "description": "Large batches must use asynchronous queue execution.", "effect": {"decision": "require_review", "reason": "large_batch_requires_async_queue", "required_action": "enable_async_queue"}, "name": "large_batch_requires_async_queue"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_id_missing": true}, "description": "All vision jobs must carry a tenant identifier.", "effect": {"decision": "deny", "reason": "tenant_id_required", "required_action": "attach_tenant_context"}, "name": "require_tenant_isolation"}, {"condition": {"consent_recorded": false, "processing_type": "facial_recognition"}, "description": "Facial recognition requires consent and anonymization controls.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_biometric_consent"}, "name": "biometric_processing_requires_controls"}, {"condition": {"processing_type": "facial_recognition", "retention_days_gt": 30}, "description": "Biometric workloads must declare bounded retention.", "effect": {"decision": "deny", "reason": "biometric_retention_exceeds_default", "required_action": "lower_retention_or_approve_exception"}, "name": "biometric_retention_requires_limit"}, {"condition": {"alerting_enabled": false, "domain": "factory_safety", "severity_in": ["high", "critical"]}, "description": "High-severity smoke, fire, and OSHA findings require alerting.", "effect": {"decision": "deny", "reason": "factory_safety_alerting_required", "required_action": "enable_alerting"}, "name": "factory_hazard_requires_alerting"}, {"condition": {"async_queue_enabled": false, "batch_size_gt": 10}, "description": "Large batches must use asynchronous queue execution.", "effect": {"decision": "require_review", "reason": "large_batch_requires_async_queue", "required_action": "enable_async_queue"}, "name": "large_batch_requires_async_queue"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "ComputerVisionDashboard", "permission": "cv:read", "route": "/cvsn/dashboard"}, "documents": {"component": "DocumentProcessingWorkbench", "permission": "cv:ocr", "route": "/cvsn/documents"}, "images": {"component": "ImageAnalysisWorkbench", "permission": "cv:object_detection", "route": "/cvsn/images"}, "models": {"component": "VisionModelManagement", "permission": "cv:model_management", "route": "/cvsn/models"}, "quality": {"component": "QualityInspectionWorkbench", "permission": "cv:quality_control", "route": "/cvsn/quality"}, "rules": {"component": "VisionRuleWorkbench", "permission": "cv:admin", "route": "/cvsn/rules"}, "safety": {"component": "FactorySafetyConsole", "permission": "cv:analytics", "route": "/cvsn/safety"}, "settings": {"component": "VisionSettings", "permission": "cv:admin", "route": "/cvsn/settings"}, "video": {"component": "VideoAnalyticsWorkbench", "permission": "cv:video_analysis", "route": "/cvsn/video"}}, "streaming": {}, "theme": {"components": {"detection_box": {"confidence_variant": "badge", "label_position": "top-left", "stroke": "color.accent"}, "ocr_region": {"fill": "transparent", "stroke": "color.primary", "text_anchor": "below"}, "safety_alert": {"icon": "shield-alert", "requires_acknowledgement": "true", "variant": "critical"}, "vision_canvas": {"background": "surface.canvas", "tool_overlay": "top-right", "zoom_controls": "bottom-right"}}, "name": "cvsn_industrial", "tokens": {"border.radius": "8px", "color.accent": "#C07A21", "color.danger": "#B42318", "color.primary": "#255E5C", "color.success": "#2E7D32", "color.warning": "#A16207", "density": "compact", "surface.canvas": "#F4F7F7", "surface.panel": "#FFFFFF", "text.primary": "#1F2933", "text.secondary": "#52616B"}}, "ui": {"frontend_bundle": "views.py", "requires_theme": true, "routes": [{"component": "ComputerVisionDashboard", "name": "dashboard", "nav_group": "Operations", "path": "/cvsn/dashboard", "permission": "cv:read"}, {"component": "DocumentProcessingWorkbench", "name": "documents", "nav_group": "Process", "path": "/cvsn/documents", "permission": "cv:ocr"}, {"component": "ImageAnalysisWorkbench", "name": "images", "nav_group": "Process", "path": "/cvsn/images", "permission": "cv:object_detection"}, {"component": "VideoAnalyticsWorkbench", "name": "video", "nav_group": "Process", "path": "/cvsn/video", "permission": "cv:video_analysis"}, {"component": "QualityInspectionWorkbench", "name": "quality", "nav_group": "Factory", "path": "/cvsn/quality", "permission": "cv:quality_control"}, {"component": "FactorySafetyConsole", "name": "safety", "nav_group": "Factory", "path": "/cvsn/safety", "permission": "cv:analytics"}, {"component": "VisionModelManagement", "name": "models", "nav_group": "Administration", "path": "/cvsn/models", "permission": "cv:model_management"}, {"component": "VisionRuleWorkbench", "name": "rules", "nav_group": "Governance", "path": "/cvsn/rules", "permission": "cv:admin"}, {"component": "VisionSettings", "name": "settings", "nav_group": "Administration", "path": "/cvsn/settings", "permission": "cv:admin"}], "shell": "apg_python", "template_roots": ["templates/", "views.py"]}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"cvsn": []}}, "contracts": {"cvsn": {"configuration": {"detection": {"default_confidence_threshold": 0.5, "default_iou_threshold": 0.4, "default_object_model": "yolov8n.pt", "max_detections": 100}, "ocr": {"default_engine": "tesseract", "default_language": "eng", "enhance_image": true, "extract_forms": false, "extract_tables": false}, "privacy": {"biometric_anonymization_required": true, "biometric_consent_required": true, "default_retention_days": 30, "facial_recognition_enabled": false}, "processing": {"allowed_document_types": ["application/pdf", "image/jpeg", "image/png", "image/tiff"], "allowed_image_types": ["image/jpeg", "image/png", "image/tiff", "image/bmp", "image/webp"], "allowed_video_types": ["video/mp4", "video/avi", "video/mov", "video/mkv"], "default_async_threshold_files": 10, "max_batch_size": 100, "max_file_size_mb": 50}, "safety": {"barcode_qr_tracking": true, "osha_zone_monitoring": true, "people_counting": true, "severity_alert_threshold": "high", "smoke_fire_alerting": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "cvsn_industrial"}, "ui": {"enable_dashboard": true, "enable_document_processing": true, "enable_factory_safety": true, "enable_model_management": true, "enable_video_analytics": true}}, "id": "cvsn", "provides": ["cvsn_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"cvsn": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"biometric_processing_requires_controls": {"condition": {"consent_recorded": false, "processing_type": "facial_recognition"}, "description": "Facial recognition requires consent and anonymization controls.", "effect": {"decision": "deny", "reason": "biometric_consent_required", "required_action": "record_biometric_consent"}, "name": "biometric_processing_requires_controls"}, "biometric_retention_requires_limit": {"condition": {"processing_type": "facial_recognition", "retention_days_gt": 30}, "description": "Biometric workloads must declare bounded retention.", "effect": {"decision": "deny", "reason": "biometric_retention_exceeds_default", "required_action": "lower_retention_or_approve_exception"}, "name": "biometric_retention_requires_limit"}, "factory_hazard_requires_alerting": {"condition": {"alerting_enabled": false, "domain": "factory_safety", "severity_in": ["high", "critical"]}, "description": "High-severity smoke, fire, and OSHA findings require alerting.", "effect": {"decision": "deny", "reason": "factory_safety_alerting_required", "required_action": "enable_alerting"}, "name": "factory_hazard_requires_alerting"}, "large_batch_requires_async_queue": {"condition": {"async_queue_enabled": false, "batch_size_gt": 10}, "description": "Large batches must use asynchronous queue execution.", "effect": {"decision": "require_review", "reason": "large_batch_requires_async_queue", "required_action": "enable_async_queue"}, "name": "large_batch_requires_async_queue"}, "require_tenant_isolation": {"condition": {"tenant_id_missing": true}, "description": "All vision jobs must carry a tenant identifier.", "effect": {"decision": "deny", "reason": "tenant_id_required", "required_action": "attach_tenant_context"}, "name": "require_tenant_isolation"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.cvsn": {"file": "capability_contract.py", "id": "capability.cvsn", "kind": "capability", "name": "Computer Vision & Visual Intelligence", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("cvsn_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "cvsn",
+			"version": "1.0.0",
+			"description": "Computer Vision package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"cvsn": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"cvsn": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["cvsn_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"model_release": "VisionModelRegistration",
+					"factory_safety": "VisionJob",
+					"quality_inspection": "VisionJob",
+				},
+				"vision_lifecycle": {
+					"asset": "VisionAsset",
+					"job": "VisionJob",
+					"model": "VisionModelRegistration",
+					"pipeline": "VisionPipeline",
+					"audit": "VisionAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"cvsn": {
+				"id": "cvsn",
+				"configuration": contract["configuration"],
+				"provides": ["cvsn_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"cvsn": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "cvsn_runtime.py", "view_models.py"],
+		"symbols": {
+			"capability.cvsn": {
+				"id": "capability.cvsn",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -20,7 +126,7 @@ def component_manifest() -> dict[str, Any]:
 		"format": "apg.component-manifest.v1",
 		"kind": "apg.generated_application",
 		"name": "cvsn",
-		"display_name": "Computer Vision & Visual Intelligence",
+		"display_name": "Computer Vision",
 		"target": "python",
 		"interfaces": {
 			"health": "/health",
@@ -36,12 +142,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("cvsn", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "cvsn" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("CVSN semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("CVSN semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("CVSN adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "cvsn_runtime.CvsnService":
+		errors.append("CVSN generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

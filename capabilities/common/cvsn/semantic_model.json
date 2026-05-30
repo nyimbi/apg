@@ -1,33 +1,85 @@
 {
   "agents": {},
   "app": {
-    "description": "Computer Vision & Visual Intelligence package-backed APG capability",
+    "description": "Computer Vision package-backed APG capability",
     "entity_count": 0,
     "name": "cvsn",
     "version": "1.0.0"
   },
   "capabilities": {
     "cvsn": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "configuration": "conf",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "cvsn_runtime.CvsnService",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "model_lifecycle": "mlcm",
+        "object_storage": "stor",
+        "production_runtime": "service.CVProcessingService",
+        "search_index": "srch"
+      },
+      "approvals": {
+        "factory_safety": "VisionJob",
+        "model_release": "VisionModelRegistration",
+        "quality_inspection": "VisionJob"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "cvsn_runtime.CvsnService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "object_storage": "stor",
+          "production_runtime": "service.CVProcessingService",
+          "search_index": "srch"
+        },
         "detection": {
           "default_confidence_threshold": 0.5,
           "default_iou_threshold": 0.4,
-          "default_object_model": "yolov8n.pt",
+          "default_object_model": "yolov8n",
           "max_detections": 100
         },
+        "governance": {
+          "audit_processing": true,
+          "auth_required": true,
+          "cross_tenant_processing_allowed": false,
+          "operator_required": true,
+          "require_tenant_context": true
+        },
+        "model_registry": {
+          "evaluation_required": true,
+          "mlcm_link_required": true,
+          "model_card_required": true,
+          "release_approval_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
         "ocr": {
-          "default_engine": "tesseract",
           "default_language": "eng",
-          "enhance_image": true,
-          "extract_forms": false,
-          "extract_tables": false
+          "extract_forms_supported": true,
+          "extract_tables_supported": true,
+          "minimum_text_confidence": 0.72
         },
         "privacy": {
           "biometric_anonymization_required": true,
           "biometric_consent_required": true,
+          "content_moderation_policy_required": true,
           "default_retention_days": 30,
           "facial_recognition_enabled": false
         },
@@ -48,15 +100,22 @@
           "allowed_video_types": [
             "video/mp4",
             "video/avi",
-            "video/mov",
-            "video/mkv"
+            "video/quicktime",
+            "video/x-matroska"
           ],
-          "default_async_threshold_files": 10,
+          "asset_hash_required": true,
+          "async_threshold_files": 10,
           "max_batch_size": 100,
           "max_file_size_mb": 50
         },
+        "quality": {
+          "critical_defect_requires_alert": true,
+          "defect_taxonomy_required": true,
+          "golden_sample_required": true,
+          "inspection_plan_required": true
+        },
         "safety": {
-          "barcode_qr_tracking": true,
+          "incident_acknowledgement_required": true,
           "osha_zone_monitoring": true,
           "people_counting": true,
           "severity_alert_threshold": "high",
@@ -68,11 +127,40 @@
           "default_theme": "cvsn_industrial"
         },
         "ui": {
+          "enable_asset_workbench": true,
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
           "enable_document_processing": true,
-          "enable_factory_safety": true,
-          "enable_model_management": true,
+          "enable_governance": true,
+          "enable_image_analysis": true,
+          "enable_model_registry": true,
+          "enable_quality_inspection": true,
+          "enable_review_console": true,
+          "enable_safety_console": true,
+          "enable_settings": true,
+          "enable_similarity_search": true,
           "enable_video_analytics": true
+        },
+        "video": {
+          "max_clip_seconds": 900,
+          "sampling_policy_required": true,
+          "streaming_supported": true
+        },
+        "vision_tasks": {
+          "enabled": [
+            "ocr",
+            "object_detection",
+            "image_classification",
+            "quality_inspection",
+            "factory_safety",
+            "video_analytics",
+            "visual_similarity",
+            "barcode_qr",
+            "facial_analysis",
+            "content_moderation"
+          ],
+          "human_review_for_low_confidence": true,
+          "minimum_confidence_score": 0.7
         }
       },
       "erp_modules": [
@@ -80,7 +168,7 @@
       ],
       "i18n": {},
       "master_data": {},
-      "name": "Computer Vision & Visual Intelligence",
+      "name": "Computer Vision",
       "provides": [
         "cvsn_operations"
       ],
@@ -89,32 +177,222 @@
         "rules": [
           {
             "condition": {
-              "tenant_id_missing": true
+              "tenant_context_present": false
             },
-            "description": "All vision jobs must carry a tenant identifier.",
+            "description": "All vision operations require tenant context.",
             "effect": {
               "decision": "deny",
-              "reason": "tenant_id_required",
+              "reason": "tenant_context_required",
               "required_action": "attach_tenant_context"
             },
-            "name": "require_tenant_isolation"
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "ingest_asset",
+              "source_ref_present": false
+            },
+            "description": "Vision assets require a source reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_source_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "asset_requires_source"
+          },
+          {
+            "condition": {
+              "mime_type_supported": false,
+              "operation": "ingest_asset"
+            },
+            "description": "Vision assets must use supported MIME types.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_mime_type",
+              "required_action": "choose_supported_media_type"
+            },
+            "name": "asset_requires_supported_mime_type"
+          },
+          {
+            "condition": {
+              "file_size_mb_gt": 50,
+              "operation": "ingest_asset"
+            },
+            "description": "Vision assets must fit the configured file-size limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_too_large",
+              "required_action": "compress_or_split_asset"
+            },
+            "name": "asset_size_within_limit"
+          },
+          {
+            "condition": {
+              "asset_hash_present": false,
+              "operation": "ingest_asset"
+            },
+            "description": "Vision assets require digest evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_hash_required",
+              "required_action": "record_asset_hash"
+            },
+            "name": "asset_hash_required"
+          },
+          {
+            "condition": {
+              "operation": "run_job",
+              "task_enabled": false
+            },
+            "description": "Vision processing tasks must be enabled.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vision_task_not_enabled",
+              "required_action": "enable_task_or_change_pipeline"
+            },
+            "name": "task_must_be_enabled"
+          },
+          {
+            "condition": {
+              "operation": "run_job",
+              "operator_present": false
+            },
+            "description": "Vision jobs require an accountable operator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "operator_required",
+              "required_action": "attach_operator"
+            },
+            "name": "operator_required"
+          },
+          {
+            "condition": {
+              "asset_kind_in": [
+                "video"
+              ],
+              "processing_type": "ocr"
+            },
+            "description": "OCR jobs require document or image assets.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ocr_requires_document_or_image",
+              "required_action": "choose_document_asset"
+            },
+            "name": "document_task_requires_document_asset"
+          },
+          {
+            "condition": {
+              "asset_kind_ne": "video",
+              "processing_type": "video_analytics"
+            },
+            "description": "Video analytics jobs require video assets.",
+            "effect": {
+              "decision": "deny",
+              "reason": "video_asset_required",
+              "required_action": "choose_video_asset"
+            },
+            "name": "video_task_requires_video_asset"
+          },
+          {
+            "condition": {
+              "inspection_plan_attached": false,
+              "processing_type": "quality_inspection"
+            },
+            "description": "Quality inspection requires an inspection plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "inspection_plan_required",
+              "required_action": "attach_inspection_plan"
+            },
+            "name": "quality_requires_inspection_plan"
+          },
+          {
+            "condition": {
+              "defect_taxonomy_attached": false,
+              "processing_type": "quality_inspection"
+            },
+            "description": "Quality inspection requires defect taxonomy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "defect_taxonomy_required",
+              "required_action": "attach_defect_taxonomy"
+            },
+            "name": "quality_requires_defect_taxonomy"
+          },
+          {
+            "condition": {
+              "alerting_enabled": false,
+              "critical_defect_detected": true,
+              "processing_type": "quality_inspection"
+            },
+            "description": "Critical visual defects require alert routing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_defect_alert_required",
+              "required_action": "enable_quality_alerts"
+            },
+            "name": "quality_critical_defect_requires_alert"
+          },
+          {
+            "condition": {
+              "alerting_enabled": false,
+              "processing_type": "factory_safety",
+              "severity_in": [
+                "high",
+                "critical"
+              ]
+            },
+            "description": "High-severity factory hazards require alerting.",
+            "effect": {
+              "decision": "deny",
+              "reason": "factory_safety_alerting_required",
+              "required_action": "enable_safety_alerts"
+            },
+            "name": "factory_hazard_requires_alerting"
+          },
+          {
+            "condition": {
+              "incident_acknowledged": false,
+              "processing_type": "factory_safety",
+              "severity": "critical"
+            },
+            "description": "Critical factory hazards require acknowledgement.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "incident_acknowledgement_required",
+              "required_action": "acknowledge_incident"
+            },
+            "name": "factory_hazard_requires_acknowledgement"
           },
           {
             "condition": {
               "consent_recorded": false,
-              "processing_type": "facial_recognition"
+              "processing_type": "facial_analysis"
             },
-            "description": "Facial recognition requires consent and anonymization controls.",
+            "description": "Facial analysis requires biometric consent.",
             "effect": {
               "decision": "deny",
               "reason": "biometric_consent_required",
               "required_action": "record_biometric_consent"
             },
-            "name": "biometric_processing_requires_controls"
+            "name": "facial_analysis_requires_consent"
           },
           {
             "condition": {
-              "processing_type": "facial_recognition",
+              "anonymization_enabled": false,
+              "processing_type": "facial_analysis"
+            },
+            "description": "Facial analysis requires anonymization controls.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_anonymization_required",
+              "required_action": "enable_biometric_anonymization"
+            },
+            "name": "facial_analysis_requires_anonymization"
+          },
+          {
+            "condition": {
+              "processing_type": "facial_analysis",
               "retention_days_gt": 30
             },
             "description": "Biometric workloads must declare bounded retention.",
@@ -127,20 +405,29 @@
           },
           {
             "condition": {
-              "alerting_enabled": false,
-              "domain": "factory_safety",
-              "severity_in": [
-                "high",
-                "critical"
-              ]
+              "moderation_policy_attached": false,
+              "processing_type": "content_moderation"
             },
-            "description": "High-severity smoke, fire, and OSHA findings require alerting.",
+            "description": "Content moderation requires a policy reference.",
             "effect": {
               "decision": "deny",
-              "reason": "factory_safety_alerting_required",
-              "required_action": "enable_alerting"
+              "reason": "moderation_policy_required",
+              "required_action": "attach_moderation_policy"
             },
-            "name": "factory_hazard_requires_alerting"
+            "name": "content_moderation_requires_policy"
+          },
+          {
+            "condition": {
+              "confidence_score_lt": 0.7,
+              "human_review_recorded": false
+            },
+            "description": "Low-confidence vision results require human review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_confidence_review_required",
+              "required_action": "record_human_review"
+            },
+            "name": "low_confidence_requires_review"
           },
           {
             "condition": {
@@ -154,6 +441,134 @@
               "required_action": "enable_async_queue"
             },
             "name": "large_batch_requires_async_queue"
+          },
+          {
+            "condition": {
+              "batch_size_gt": 100
+            },
+            "description": "Vision batches must fit the configured batch limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "batch_size_exceeds_limit",
+              "required_action": "split_batch"
+            },
+            "name": "batch_size_within_limit"
+          },
+          {
+            "condition": {
+              "clip_seconds_gt": 900,
+              "processing_type": "video_analytics"
+            },
+            "description": "Video clips must fit configured duration limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "video_clip_too_long",
+              "required_action": "split_video_clip"
+            },
+            "name": "video_clip_within_limit"
+          },
+          {
+            "condition": {
+              "processing_type": "video_analytics",
+              "sampling_policy_attached": false
+            },
+            "description": "Video analytics requires sampling policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sampling_policy_required",
+              "required_action": "attach_sampling_policy"
+            },
+            "name": "video_requires_sampling_policy"
+          },
+          {
+            "condition": {
+              "mlcm_model_ref_present": false,
+              "operation": "register_model"
+            },
+            "description": "Vision model registrations require MLCM linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mlcm_model_ref_required",
+              "required_action": "link_mlcm_model"
+            },
+            "name": "model_requires_mlcm_link"
+          },
+          {
+            "condition": {
+              "model_card_present": false,
+              "operation": "register_model"
+            },
+            "description": "Vision model registrations require model-card evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_card_required",
+              "required_action": "attach_model_card"
+            },
+            "name": "model_requires_card"
+          },
+          {
+            "condition": {
+              "evaluation_recorded": false,
+              "operation": "release_model"
+            },
+            "description": "Vision model release requires evaluation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_evaluation_required",
+              "required_action": "record_model_evaluation"
+            },
+            "name": "model_release_requires_evaluation"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "release_model"
+            },
+            "description": "Vision model release requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_release_approval_required",
+              "required_action": "record_release_approval"
+            },
+            "name": "model_release_requires_approval"
+          },
+          {
+            "condition": {
+              "cross_tenant_processing": true
+            },
+            "description": "Cross-tenant vision processing is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_processing_denied",
+              "required_action": "use_tenant_scoped_asset"
+            },
+            "name": "cross_tenant_processing_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Vision processing state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "configure_vision_events"
+            },
+            "description": "Vision event streams must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "vision_events_require_bytewax"
           }
         ],
         "type": "deterministic"
@@ -161,32 +576,222 @@
       "rules": [
         {
           "condition": {
-            "tenant_id_missing": true
+            "tenant_context_present": false
           },
-          "description": "All vision jobs must carry a tenant identifier.",
+          "description": "All vision operations require tenant context.",
           "effect": {
             "decision": "deny",
-            "reason": "tenant_id_required",
+            "reason": "tenant_context_required",
             "required_action": "attach_tenant_context"
           },
-          "name": "require_tenant_isolation"
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "ingest_asset",
+            "source_ref_present": false
+          },
+          "description": "Vision assets require a source reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_source_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "asset_requires_source"
+        },
+        {
+          "condition": {
+            "mime_type_supported": false,
+            "operation": "ingest_asset"
+          },
+          "description": "Vision assets must use supported MIME types.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_mime_type",
+            "required_action": "choose_supported_media_type"
+          },
+          "name": "asset_requires_supported_mime_type"
+        },
+        {
+          "condition": {
+            "file_size_mb_gt": 50,
+            "operation": "ingest_asset"
+          },
+          "description": "Vision assets must fit the configured file-size limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_too_large",
+            "required_action": "compress_or_split_asset"
+          },
+          "name": "asset_size_within_limit"
+        },
+        {
+          "condition": {
+            "asset_hash_present": false,
+            "operation": "ingest_asset"
+          },
+          "description": "Vision assets require digest evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_hash_required",
+            "required_action": "record_asset_hash"
+          },
+          "name": "asset_hash_required"
+        },
+        {
+          "condition": {
+            "operation": "run_job",
+            "task_enabled": false
+          },
+          "description": "Vision processing tasks must be enabled.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vision_task_not_enabled",
+            "required_action": "enable_task_or_change_pipeline"
+          },
+          "name": "task_must_be_enabled"
+        },
+        {
+          "condition": {
+            "operation": "run_job",
+            "operator_present": false
+          },
+          "description": "Vision jobs require an accountable operator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "operator_required",
+            "required_action": "attach_operator"
+          },
+          "name": "operator_required"
+        },
+        {
+          "condition": {
+            "asset_kind_in": [
+              "video"
+            ],
+            "processing_type": "ocr"
+          },
+          "description": "OCR jobs require document or image assets.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ocr_requires_document_or_image",
+            "required_action": "choose_document_asset"
+          },
+          "name": "document_task_requires_document_asset"
+        },
+        {
+          "condition": {
+            "asset_kind_ne": "video",
+            "processing_type": "video_analytics"
+          },
+          "description": "Video analytics jobs require video assets.",
+          "effect": {
+            "decision": "deny",
+            "reason": "video_asset_required",
+            "required_action": "choose_video_asset"
+          },
+          "name": "video_task_requires_video_asset"
+        },
+        {
+          "condition": {
+            "inspection_plan_attached": false,
+            "processing_type": "quality_inspection"
+          },
+          "description": "Quality inspection requires an inspection plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "inspection_plan_required",
+            "required_action": "attach_inspection_plan"
+          },
+          "name": "quality_requires_inspection_plan"
+        },
+        {
+          "condition": {
+            "defect_taxonomy_attached": false,
+            "processing_type": "quality_inspection"
+          },
+          "description": "Quality inspection requires defect taxonomy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "defect_taxonomy_required",
+            "required_action": "attach_defect_taxonomy"
+          },
+          "name": "quality_requires_defect_taxonomy"
+        },
+        {
+          "condition": {
+            "alerting_enabled": false,
+            "critical_defect_detected": true,
+            "processing_type": "quality_inspection"
+          },
+          "description": "Critical visual defects require alert routing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_defect_alert_required",
+            "required_action": "enable_quality_alerts"
+          },
+          "name": "quality_critical_defect_requires_alert"
+        },
+        {
+          "condition": {
+            "alerting_enabled": false,
+            "processing_type": "factory_safety",
+            "severity_in": [
+              "high",
+              "critical"
+            ]
+          },
+          "description": "High-severity factory hazards require alerting.",
+          "effect": {
+            "decision": "deny",
+            "reason": "factory_safety_alerting_required",
+            "required_action": "enable_safety_alerts"
+          },
+          "name": "factory_hazard_requires_alerting"
+        },
+        {
+          "condition": {
+            "incident_acknowledged": false,
+            "processing_type": "factory_safety",
+            "severity": "critical"
+          },
+          "description": "Critical factory hazards require acknowledgement.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "incident_acknowledgement_required",
+            "required_action": "acknowledge_incident"
+          },
+          "name": "factory_hazard_requires_acknowledgement"
         },
         {
           "condition": {
             "consent_recorded": false,
-            "processing_type": "facial_recognition"
+            "processing_type": "facial_analysis"
           },
-          "description": "Facial recognition requires consent and anonymization controls.",
+          "description": "Facial analysis requires biometric consent.",
           "effect": {
             "decision": "deny",
             "reason": "biometric_consent_required",
             "required_action": "record_biometric_consent"
           },
-          "name": "biometric_processing_requires_controls"
+          "name": "facial_analysis_requires_consent"
         },
         {
           "condition": {
-            "processing_type": "facial_recognition",
+            "anonymization_enabled": false,
+            "processing_type": "facial_analysis"
+          },
+          "description": "Facial analysis requires anonymization controls.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_anonymization_required",
+            "required_action": "enable_biometric_anonymization"
+          },
+          "name": "facial_analysis_requires_anonymization"
+        },
+        {
+          "condition": {
+            "processing_type": "facial_analysis",
             "retention_days_gt": 30
           },
           "description": "Biometric workloads must declare bounded retention.",
@@ -199,20 +804,29 @@
         },
         {
           "condition": {
-            "alerting_enabled": false,
-            "domain": "factory_safety",
-            "severity_in": [
-              "high",
-              "critical"
-            ]
+            "moderation_policy_attached": false,
+            "processing_type": "content_moderation"
           },
-          "description": "High-severity smoke, fire, and OSHA findings require alerting.",
+          "description": "Content moderation requires a policy reference.",
           "effect": {
             "decision": "deny",
-            "reason": "factory_safety_alerting_required",
-            "required_action": "enable_alerting"
+            "reason": "moderation_policy_required",
+            "required_action": "attach_moderation_policy"
           },
-          "name": "factory_hazard_requires_alerting"
+          "name": "content_moderation_requires_policy"
+        },
+        {
+          "condition": {
+            "confidence_score_lt": 0.7,
+            "human_review_recorded": false
+          },
+          "description": "Low-confidence vision results require human review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_confidence_review_required",
+            "required_action": "record_human_review"
+          },
+          "name": "low_confidence_requires_review"
         },
         {
           "condition": {
@@ -226,15 +840,154 @@
             "required_action": "enable_async_queue"
           },
           "name": "large_batch_requires_async_queue"
+        },
+        {
+          "condition": {
+            "batch_size_gt": 100
+          },
+          "description": "Vision batches must fit the configured batch limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "batch_size_exceeds_limit",
+            "required_action": "split_batch"
+          },
+          "name": "batch_size_within_limit"
+        },
+        {
+          "condition": {
+            "clip_seconds_gt": 900,
+            "processing_type": "video_analytics"
+          },
+          "description": "Video clips must fit configured duration limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "video_clip_too_long",
+            "required_action": "split_video_clip"
+          },
+          "name": "video_clip_within_limit"
+        },
+        {
+          "condition": {
+            "processing_type": "video_analytics",
+            "sampling_policy_attached": false
+          },
+          "description": "Video analytics requires sampling policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sampling_policy_required",
+            "required_action": "attach_sampling_policy"
+          },
+          "name": "video_requires_sampling_policy"
+        },
+        {
+          "condition": {
+            "mlcm_model_ref_present": false,
+            "operation": "register_model"
+          },
+          "description": "Vision model registrations require MLCM linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mlcm_model_ref_required",
+            "required_action": "link_mlcm_model"
+          },
+          "name": "model_requires_mlcm_link"
+        },
+        {
+          "condition": {
+            "model_card_present": false,
+            "operation": "register_model"
+          },
+          "description": "Vision model registrations require model-card evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_card_required",
+            "required_action": "attach_model_card"
+          },
+          "name": "model_requires_card"
+        },
+        {
+          "condition": {
+            "evaluation_recorded": false,
+            "operation": "release_model"
+          },
+          "description": "Vision model release requires evaluation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_evaluation_required",
+            "required_action": "record_model_evaluation"
+          },
+          "name": "model_release_requires_evaluation"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "release_model"
+          },
+          "description": "Vision model release requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_release_approval_required",
+            "required_action": "record_release_approval"
+          },
+          "name": "model_release_requires_approval"
+        },
+        {
+          "condition": {
+            "cross_tenant_processing": true
+          },
+          "description": "Cross-tenant vision processing is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_processing_denied",
+            "required_action": "use_tenant_scoped_asset"
+          },
+          "name": "cross_tenant_processing_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Vision processing state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "configure_vision_events"
+          },
+          "description": "Vision event streams must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "vision_events_require_bytewax"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "production_service": "service.CVProcessingService",
+        "service": "cvsn_runtime.CvsnService",
+        "views": "view_models.py"
       },
       "screens": {
+        "assets": {
+          "component": "VisionAssetWorkbench",
+          "permission": "cv:write",
+          "route": "/cvsn/assets"
+        },
+        "audit": {
+          "component": "VisionAuditTimeline",
+          "permission": "cv:reports",
+          "route": "/cvsn/audit"
+        },
         "dashboard": {
           "component": "ComputerVisionDashboard",
           "permission": "cv:read",
@@ -245,13 +998,18 @@
           "permission": "cv:ocr",
           "route": "/cvsn/documents"
         },
+        "governance": {
+          "component": "VisionGovernance",
+          "permission": "cv:admin",
+          "route": "/cvsn/governance"
+        },
         "images": {
           "component": "ImageAnalysisWorkbench",
           "permission": "cv:object_detection",
           "route": "/cvsn/images"
         },
         "models": {
-          "component": "VisionModelManagement",
+          "component": "VisionModelRegistry",
           "permission": "cv:model_management",
           "route": "/cvsn/models"
         },
@@ -260,10 +1018,10 @@
           "permission": "cv:quality_control",
           "route": "/cvsn/quality"
         },
-        "rules": {
-          "component": "VisionRuleWorkbench",
-          "permission": "cv:admin",
-          "route": "/cvsn/rules"
+        "review": {
+          "component": "VisionReviewConsole",
+          "permission": "cv:review",
+          "route": "/cvsn/review"
         },
         "safety": {
           "component": "FactorySafetyConsole",
@@ -275,29 +1033,52 @@
           "permission": "cv:admin",
           "route": "/cvsn/settings"
         },
+        "similarity": {
+          "component": "VisualSimilaritySearch",
+          "permission": "cv:object_detection",
+          "route": "/cvsn/similarity"
+        },
         "video": {
           "component": "VideoAnalyticsWorkbench",
           "permission": "cv:video_analysis",
           "route": "/cvsn/video"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
           "detection_box": {
             "confidence_variant": "badge",
             "label_position": "top-left",
             "stroke": "color.accent"
+          },
+          "model_card": {
+            "status_style": "release-chip",
+            "visual": "evaluation-summary"
           },
           "ocr_region": {
             "fill": "transparent",
             "stroke": "color.primary",
             "text_anchor": "below"
           },
+          "quality_defect_marker": {
+            "severity_style": "defect-chip",
+            "stroke": "color.danger"
+          },
           "safety_alert": {
             "icon": "shield-alert",
             "requires_acknowledgement": "true",
             "variant": "critical"
+          },
+          "video_timeline": {
+            "alert_style": "event-marker",
+            "visual": "frame-strip"
           },
           "vision_canvas": {
             "background": "surface.canvas",
@@ -321,7 +1102,7 @@
         }
       },
       "ui": {
-        "frontend_bundle": "views.py",
+        "api_prefix": "/cvsn/api/v1",
         "requires_theme": true,
         "routes": [
           {
@@ -330,6 +1111,13 @@
             "nav_group": "Operations",
             "path": "/cvsn/dashboard",
             "permission": "cv:read"
+          },
+          {
+            "component": "VisionAssetWorkbench",
+            "name": "assets",
+            "nav_group": "Process",
+            "path": "/cvsn/assets",
+            "permission": "cv:write"
           },
           {
             "component": "DocumentProcessingWorkbench",
@@ -367,18 +1155,39 @@
             "permission": "cv:analytics"
           },
           {
-            "component": "VisionModelManagement",
+            "component": "VisualSimilaritySearch",
+            "name": "similarity",
+            "nav_group": "Search",
+            "path": "/cvsn/similarity",
+            "permission": "cv:object_detection"
+          },
+          {
+            "component": "VisionReviewConsole",
+            "name": "review",
+            "nav_group": "Governance",
+            "path": "/cvsn/review",
+            "permission": "cv:review"
+          },
+          {
+            "component": "VisionModelRegistry",
             "name": "models",
             "nav_group": "Administration",
             "path": "/cvsn/models",
             "permission": "cv:model_management"
           },
           {
-            "component": "VisionRuleWorkbench",
-            "name": "rules",
+            "component": "VisionGovernance",
+            "name": "governance",
             "nav_group": "Governance",
-            "path": "/cvsn/rules",
+            "path": "/cvsn/governance",
             "permission": "cv:admin"
+          },
+          {
+            "component": "VisionAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/cvsn/audit",
+            "permission": "cv:reports"
           },
           {
             "component": "VisionSettings",
@@ -391,8 +1200,16 @@
         "shell": "apg_python",
         "template_roots": [
           "templates/",
-          "views.py"
-        ]
+          "static/"
+        ],
+        "view_module": "view_models.py"
+      },
+      "vision_lifecycle": {
+        "asset": "VisionAsset",
+        "audit": "VisionAuditEvent",
+        "job": "VisionJob",
+        "model": "VisionModelRegistration",
+        "pipeline": "VisionPipeline"
       }
     }
   },
@@ -406,22 +1223,56 @@
   "contracts": {
     "cvsn": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "cvsn_runtime.CvsnService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "object_storage": "stor",
+          "production_runtime": "service.CVProcessingService",
+          "search_index": "srch"
+        },
         "detection": {
           "default_confidence_threshold": 0.5,
           "default_iou_threshold": 0.4,
-          "default_object_model": "yolov8n.pt",
+          "default_object_model": "yolov8n",
           "max_detections": 100
         },
+        "governance": {
+          "audit_processing": true,
+          "auth_required": true,
+          "cross_tenant_processing_allowed": false,
+          "operator_required": true,
+          "require_tenant_context": true
+        },
+        "model_registry": {
+          "evaluation_required": true,
+          "mlcm_link_required": true,
+          "model_card_required": true,
+          "release_approval_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
         "ocr": {
-          "default_engine": "tesseract",
           "default_language": "eng",
-          "enhance_image": true,
-          "extract_forms": false,
-          "extract_tables": false
+          "extract_forms_supported": true,
+          "extract_tables_supported": true,
+          "minimum_text_confidence": 0.72
         },
         "privacy": {
           "biometric_anonymization_required": true,
           "biometric_consent_required": true,
+          "content_moderation_policy_required": true,
           "default_retention_days": 30,
           "facial_recognition_enabled": false
         },
@@ -442,15 +1293,22 @@
           "allowed_video_types": [
             "video/mp4",
             "video/avi",
-            "video/mov",
-            "video/mkv"
+            "video/quicktime",
+            "video/x-matroska"
           ],
-          "default_async_threshold_files": 10,
+          "asset_hash_required": true,
+          "async_threshold_files": 10,
           "max_batch_size": 100,
           "max_file_size_mb": 50
         },
+        "quality": {
+          "critical_defect_requires_alert": true,
+          "defect_taxonomy_required": true,
+          "golden_sample_required": true,
+          "inspection_plan_required": true
+        },
         "safety": {
-          "barcode_qr_tracking": true,
+          "incident_acknowledgement_required": true,
           "osha_zone_monitoring": true,
           "people_counting": true,
           "severity_alert_threshold": "high",
@@ -462,11 +1320,40 @@
           "default_theme": "cvsn_industrial"
         },
         "ui": {
+          "enable_asset_workbench": true,
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
           "enable_document_processing": true,
-          "enable_factory_safety": true,
-          "enable_model_management": true,
+          "enable_governance": true,
+          "enable_image_analysis": true,
+          "enable_model_registry": true,
+          "enable_quality_inspection": true,
+          "enable_review_console": true,
+          "enable_safety_console": true,
+          "enable_settings": true,
+          "enable_similarity_search": true,
           "enable_video_analytics": true
+        },
+        "video": {
+          "max_clip_seconds": 900,
+          "sampling_policy_required": true,
+          "streaming_supported": true
+        },
+        "vision_tasks": {
+          "enabled": [
+            "ocr",
+            "object_detection",
+            "image_classification",
+            "quality_inspection",
+            "factory_safety",
+            "video_analytics",
+            "visual_similarity",
+            "barcode_qr",
+            "facial_analysis",
+            "content_moderation"
+          ],
+          "human_review_for_low_confidence": true,
+          "minimum_confidence_score": 0.7
         }
       },
       "id": "cvsn",
@@ -506,22 +1393,73 @@
   },
   "roles": {},
   "rules": {
-    "biometric_processing_requires_controls": {
+    "asset_hash_required": {
       "condition": {
-        "consent_recorded": false,
-        "processing_type": "facial_recognition"
+        "asset_hash_present": false,
+        "operation": "ingest_asset"
       },
-      "description": "Facial recognition requires consent and anonymization controls.",
+      "description": "Vision assets require digest evidence.",
       "effect": {
         "decision": "deny",
-        "reason": "biometric_consent_required",
-        "required_action": "record_biometric_consent"
+        "reason": "asset_hash_required",
+        "required_action": "record_asset_hash"
       },
-      "name": "biometric_processing_requires_controls"
+      "name": "asset_hash_required"
+    },
+    "asset_requires_source": {
+      "condition": {
+        "operation": "ingest_asset",
+        "source_ref_present": false
+      },
+      "description": "Vision assets require a source reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "asset_source_required",
+        "required_action": "attach_source_reference"
+      },
+      "name": "asset_requires_source"
+    },
+    "asset_requires_supported_mime_type": {
+      "condition": {
+        "mime_type_supported": false,
+        "operation": "ingest_asset"
+      },
+      "description": "Vision assets must use supported MIME types.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_mime_type",
+        "required_action": "choose_supported_media_type"
+      },
+      "name": "asset_requires_supported_mime_type"
+    },
+    "asset_size_within_limit": {
+      "condition": {
+        "file_size_mb_gt": 50,
+        "operation": "ingest_asset"
+      },
+      "description": "Vision assets must fit the configured file-size limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "asset_too_large",
+        "required_action": "compress_or_split_asset"
+      },
+      "name": "asset_size_within_limit"
+    },
+    "batch_size_within_limit": {
+      "condition": {
+        "batch_size_gt": 100
+      },
+      "description": "Vision batches must fit the configured batch limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "batch_size_exceeds_limit",
+        "required_action": "split_batch"
+      },
+      "name": "batch_size_within_limit"
     },
     "biometric_retention_requires_limit": {
       "condition": {
-        "processing_type": "facial_recognition",
+        "processing_type": "facial_analysis",
         "retention_days_gt": 30
       },
       "description": "Biometric workloads must declare bounded retention.",
@@ -532,20 +1470,100 @@
       },
       "name": "biometric_retention_requires_limit"
     },
+    "content_moderation_requires_policy": {
+      "condition": {
+        "moderation_policy_attached": false,
+        "processing_type": "content_moderation"
+      },
+      "description": "Content moderation requires a policy reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "moderation_policy_required",
+        "required_action": "attach_moderation_policy"
+      },
+      "name": "content_moderation_requires_policy"
+    },
+    "cross_tenant_processing_denied": {
+      "condition": {
+        "cross_tenant_processing": true
+      },
+      "description": "Cross-tenant vision processing is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_processing_denied",
+        "required_action": "use_tenant_scoped_asset"
+      },
+      "name": "cross_tenant_processing_denied"
+    },
+    "document_task_requires_document_asset": {
+      "condition": {
+        "asset_kind_in": [
+          "video"
+        ],
+        "processing_type": "ocr"
+      },
+      "description": "OCR jobs require document or image assets.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ocr_requires_document_or_image",
+        "required_action": "choose_document_asset"
+      },
+      "name": "document_task_requires_document_asset"
+    },
+    "facial_analysis_requires_anonymization": {
+      "condition": {
+        "anonymization_enabled": false,
+        "processing_type": "facial_analysis"
+      },
+      "description": "Facial analysis requires anonymization controls.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_anonymization_required",
+        "required_action": "enable_biometric_anonymization"
+      },
+      "name": "facial_analysis_requires_anonymization"
+    },
+    "facial_analysis_requires_consent": {
+      "condition": {
+        "consent_recorded": false,
+        "processing_type": "facial_analysis"
+      },
+      "description": "Facial analysis requires biometric consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_required",
+        "required_action": "record_biometric_consent"
+      },
+      "name": "facial_analysis_requires_consent"
+    },
+    "factory_hazard_requires_acknowledgement": {
+      "condition": {
+        "incident_acknowledged": false,
+        "processing_type": "factory_safety",
+        "severity": "critical"
+      },
+      "description": "Critical factory hazards require acknowledgement.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "incident_acknowledgement_required",
+        "required_action": "acknowledge_incident"
+      },
+      "name": "factory_hazard_requires_acknowledgement"
+    },
     "factory_hazard_requires_alerting": {
       "condition": {
         "alerting_enabled": false,
-        "domain": "factory_safety",
+        "processing_type": "factory_safety",
         "severity_in": [
           "high",
           "critical"
         ]
       },
-      "description": "High-severity smoke, fire, and OSHA findings require alerting.",
+      "description": "High-severity factory hazards require alerting.",
       "effect": {
         "decision": "deny",
         "reason": "factory_safety_alerting_required",
-        "required_action": "enable_alerting"
+        "required_action": "enable_safety_alerts"
       },
       "name": "factory_hazard_requires_alerting"
     },
@@ -562,29 +1580,227 @@
       },
       "name": "large_batch_requires_async_queue"
     },
-    "require_tenant_isolation": {
+    "low_confidence_requires_review": {
       "condition": {
-        "tenant_id_missing": true
+        "confidence_score_lt": 0.7,
+        "human_review_recorded": false
       },
-      "description": "All vision jobs must carry a tenant identifier.",
+      "description": "Low-confidence vision results require human review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_confidence_review_required",
+        "required_action": "record_human_review"
+      },
+      "name": "low_confidence_requires_review"
+    },
+    "model_release_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "release_model"
+      },
+      "description": "Vision model release requires approval.",
       "effect": {
         "decision": "deny",
-        "reason": "tenant_id_required",
+        "reason": "model_release_approval_required",
+        "required_action": "record_release_approval"
+      },
+      "name": "model_release_requires_approval"
+    },
+    "model_release_requires_evaluation": {
+      "condition": {
+        "evaluation_recorded": false,
+        "operation": "release_model"
+      },
+      "description": "Vision model release requires evaluation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_evaluation_required",
+        "required_action": "record_model_evaluation"
+      },
+      "name": "model_release_requires_evaluation"
+    },
+    "model_requires_card": {
+      "condition": {
+        "model_card_present": false,
+        "operation": "register_model"
+      },
+      "description": "Vision model registrations require model-card evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_card_required",
+        "required_action": "attach_model_card"
+      },
+      "name": "model_requires_card"
+    },
+    "model_requires_mlcm_link": {
+      "condition": {
+        "mlcm_model_ref_present": false,
+        "operation": "register_model"
+      },
+      "description": "Vision model registrations require MLCM linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mlcm_model_ref_required",
+        "required_action": "link_mlcm_model"
+      },
+      "name": "model_requires_mlcm_link"
+    },
+    "operator_required": {
+      "condition": {
+        "operation": "run_job",
+        "operator_present": false
+      },
+      "description": "Vision jobs require an accountable operator.",
+      "effect": {
+        "decision": "deny",
+        "reason": "operator_required",
+        "required_action": "attach_operator"
+      },
+      "name": "operator_required"
+    },
+    "quality_critical_defect_requires_alert": {
+      "condition": {
+        "alerting_enabled": false,
+        "critical_defect_detected": true,
+        "processing_type": "quality_inspection"
+      },
+      "description": "Critical visual defects require alert routing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_defect_alert_required",
+        "required_action": "enable_quality_alerts"
+      },
+      "name": "quality_critical_defect_requires_alert"
+    },
+    "quality_requires_defect_taxonomy": {
+      "condition": {
+        "defect_taxonomy_attached": false,
+        "processing_type": "quality_inspection"
+      },
+      "description": "Quality inspection requires defect taxonomy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "defect_taxonomy_required",
+        "required_action": "attach_defect_taxonomy"
+      },
+      "name": "quality_requires_defect_taxonomy"
+    },
+    "quality_requires_inspection_plan": {
+      "condition": {
+        "inspection_plan_attached": false,
+        "processing_type": "quality_inspection"
+      },
+      "description": "Quality inspection requires an inspection plan.",
+      "effect": {
+        "decision": "deny",
+        "reason": "inspection_plan_required",
+        "required_action": "attach_inspection_plan"
+      },
+      "name": "quality_requires_inspection_plan"
+    },
+    "state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Vision processing state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "state_change_requires_audit"
+    },
+    "task_must_be_enabled": {
+      "condition": {
+        "operation": "run_job",
+        "task_enabled": false
+      },
+      "description": "Vision processing tasks must be enabled.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vision_task_not_enabled",
+        "required_action": "enable_task_or_change_pipeline"
+      },
+      "name": "task_must_be_enabled"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All vision operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
-      "name": "require_tenant_isolation"
+      "name": "tenant_context_required"
+    },
+    "video_clip_within_limit": {
+      "condition": {
+        "clip_seconds_gt": 900,
+        "processing_type": "video_analytics"
+      },
+      "description": "Video clips must fit configured duration limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "video_clip_too_long",
+        "required_action": "split_video_clip"
+      },
+      "name": "video_clip_within_limit"
+    },
+    "video_requires_sampling_policy": {
+      "condition": {
+        "processing_type": "video_analytics",
+        "sampling_policy_attached": false
+      },
+      "description": "Video analytics requires sampling policy evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sampling_policy_required",
+        "required_action": "attach_sampling_policy"
+      },
+      "name": "video_requires_sampling_policy"
+    },
+    "video_task_requires_video_asset": {
+      "condition": {
+        "asset_kind_ne": "video",
+        "processing_type": "video_analytics"
+      },
+      "description": "Video analytics jobs require video assets.",
+      "effect": {
+        "decision": "deny",
+        "reason": "video_asset_required",
+        "required_action": "choose_video_asset"
+      },
+      "name": "video_task_requires_video_asset"
+    },
+    "vision_events_require_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "configure_vision_events"
+      },
+      "description": "Vision event streams must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "vision_events_require_bytewax"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "cvsn_runtime.py",
+    "view_models.py"
   ],
   "symbols": {
     "capability.cvsn": {
       "file": "capability_contract.py",
       "id": "capability.cvsn",
       "kind": "capability",
-      "name": "Computer Vision & Visual Intelligence",
+      "name": "Computer Vision",
       "range": {
         "end": {
           "character": 1,
