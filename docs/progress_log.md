@@ -13166,3 +13166,25 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/keym --json` passed with export-approval/rotation-exception/compromise routes, 11 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized_contract_keym|materialized_app_keym|test_materialized" capabilities/common/keym` returned no stale KEYM package markers.
 - `git diff --check -- capabilities/common/keym docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 03:46 EAT
+
+MQEB specification and plan packet started:
+
+- Selected `capabilities/common/mqeb` as the next common capability after KEYM
+  in the development order.
+- Added `capabilities/common/mqeb/SPECIFICATION.md` to define MQEB as APG's
+  Bytewax-first event-fabric capability, explicitly keeping Kafka as an
+  optional future bridge rather than the core dependency.
+- Defined first-class MQEB concepts: topics, messages, subscriptions, delivery
+  attempts, routing rules, priority quota exceptions, replay requests, and
+  operational audit events.
+- Captured the target lifecycle packet: topic lifecycle, governed publish
+  decisions, subscription pause/resume, delivery/dead-letter evidence, priority
+  quota review, replay review, dependency-light API/view models, and refreshed
+  package evidence.
+- Added `capabilities/common/mqeb/PLAN.md` with the implementation sequence,
+  review risks, focused proof commands, and explicit guardrail boundaries for
+  Bytewax workers, live brokers, cloud queues, schema registries, SIEM/SOAR,
+  and APG AUTH/MTEN/AUDL/CONF/KEYM/ENCR/SECU/MONI/HLTH integrations.
+- Added the new specification and plan artifacts to MQEB `package_manifest.json`.
