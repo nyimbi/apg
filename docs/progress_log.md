@@ -16100,3 +16100,58 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External WFLO, SECU, AUTH, AUDL, SCHD, NCOD, AICR, MONI, or THEM adapters.
+
+### 2026-05-30 17:00 EAT
+
+DEPL lifecycle and guardrail packet:
+
+- Selected `capabilities/common/depl` as the next common capability after CONS.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable DEPL contract to cover environments, releases,
+  rollback plans, health gates, deployment plans, deployment runs, rollback
+  events, deployment agents, governance, observability, APG adapters, UI
+  routes, visual theme tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, release owner,
+  release manifest, artifact signature, change-ticket evidence, health-check
+  evidence, health gates, production approval, rollback plans, canary review,
+  trace capture, deployment-agent registration/runtime/scope/disclosure, audit
+  evidence, tenant isolation, and Bytewax batch mutation.
+- Added runtime fields and services for deployment-agent records,
+  tenant-qualified object keys, guarded deployment-plan state changes,
+  Bytewax batch-mutation validation, and stricter health-gate evidence.
+- Hardened `DeplService` so duplicate IDs are tenant-local across
+  environments, releases, rollback plans, health gates, plans, runs, rollback
+  events, and agents.
+- Added API helper coverage for deployment agents, deployment-plan state
+  changes, batch mutation validation, listing state, and status summaries.
+- Added agent-panel, audit, analytics, and settings view models, plus richer
+  dashboard metadata with stream and theme information.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, guardrails, health-check
+  evidence, deployment agents, tenant-safe duplicate IDs, Bytewax policy, view
+  models, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/depl/__init__.py capabilities/common/depl/models.py capabilities/common/depl/deployment_engine.py capabilities/common/depl/service.py capabilities/common/depl/api.py capabilities/common/depl/views.py capabilities/common/depl/capability_contract.py capabilities/common/depl/app.py capabilities/common/depl/test_capability_contract.py capabilities/common/depl/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/depl/test_capability_contract.py capabilities/common/depl/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and DEPL capability evidence.
+- `jq '.capabilities.depl.streaming.processor, .capabilities.depl.configuration.deployment_agents.supported_runtimes, .capabilities.depl.screens.agents.route' capabilities/common/depl/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, and `/depl/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/depl --json` passed with `ok: true`; DEPL remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/depl --json` passed with 11 UI routes, 20 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/depl docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live cloud-provider deployment calls, Kubernetes or container orchestration,
+  registry writes, ticketing mutation, notification dispatch, external
+  AI-agent CLIs, durable deployment databases, browser-rendered deployment UI,
+  and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External CICD, ENVM, LOGT, MONI, HLTH, NTFY, AUDL, COMP, or THEM
+  adapters.

@@ -23,6 +23,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"release_count": summary["release_count"],
 		"deployed_run_count": summary["deployed_run_count"],
 		"pending_review_count": summary["pending_review_count"],
+		"deployment_agent_count": summary["deployment_agent_count"],
+		"audit_event_count": summary["audit_event_count"],
 		"governance_posture": summary["governance_posture"],
 	}
 
@@ -122,6 +124,39 @@ def execute_rollback(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_deployment_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_deployment_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+	)
+
+
+def change_deployment_plan_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_deployment_plan_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		plan_id=str(payload["plan_id"]),
+		status=str(payload["status"]),
+		reason=str(payload.get("reason") or ""),
+		actor=str(payload.get("actor") or "deployment-operator"),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
+	)
+
+
+def validate_batch_deployment_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_deployment_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or ""),
+		actor=str(payload.get("actor") or "deployment-operator"),
+	)
+
+
 def deployment_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": SERVICE.dashboard_summary(tenant_id),
@@ -132,5 +167,6 @@ def deployment_state(tenant_id: str = "default") -> dict[str, Any]:
 		"deployment_plans": SERVICE.list_deployment_plans(tenant_id),
 		"deployment_runs": SERVICE.list_deployment_runs(tenant_id),
 		"rollback_events": SERVICE.list_rollback_events(tenant_id),
+		"deployment_agents": SERVICE.list_deployment_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}

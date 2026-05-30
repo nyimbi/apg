@@ -12,6 +12,39 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "ci_cd": "cicd",
+          "composition": "comp",
+          "environment": "envm",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DeplService",
+          "logs": "logt",
+          "monitoring": "moni",
+          "notifications": "ntfy",
+          "view_models": "views.py"
+        },
+        "deployment_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "release_planner",
+            "rollout_operator",
+            "health_reviewer",
+            "rollback_coordinator",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "evidence": {
           "change_ticket_required": true,
           "deployment_audit_required": true,
@@ -19,10 +52,20 @@
           "log_trace_link_required": true
         },
         "governance": {
+          "batch_event_stream": "bytewax",
           "environment_policy_required": true,
           "production_approval_required": true,
           "require_tenant_context": true,
-          "separation_of_duties_required": true
+          "separation_of_duties_required": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "health_metrics_required": true,
+          "trace_required": true
         },
         "releases": {
           "approval_required": true,
@@ -46,6 +89,9 @@
           "default_theme": "depl_release_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_health_gate_view": true,
           "enable_release_console": true,
           "enable_rollback_center": true,
@@ -59,9 +105,18 @@
       "master_data": {},
       "name": "Deployment Management",
       "provides": [
-        "depl_operations"
+        "release_management",
+        "deployment_rollouts",
+        "health_gates",
+        "rollback_control",
+        "deployment_audit",
+        "deployment_agents"
       ],
-      "requires": [],
+      "requires": [
+        "logt",
+        "moni",
+        "hlth"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -88,6 +143,58 @@
               "required_action": "assign_release_owner"
             },
             "name": "release_requires_owner"
+          },
+          {
+            "condition": {
+              "manifest_attached": false,
+              "operation": "create_release"
+            },
+            "description": "Releases require manifest evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "manifest_required",
+              "required_action": "attach_release_manifest"
+            },
+            "name": "release_requires_manifest"
+          },
+          {
+            "condition": {
+              "artifact_signature_attached": false,
+              "operation": "create_release"
+            },
+            "description": "Release artifacts require signature evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "artifact_signature_required",
+              "required_action": "attach_artifact_signature"
+            },
+            "name": "release_requires_signature"
+          },
+          {
+            "condition": {
+              "change_ticket_attached": false,
+              "operation": "create_release"
+            },
+            "description": "Releases require change-ticket evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_ticket_required",
+              "required_action": "attach_change_ticket"
+            },
+            "name": "release_requires_change_ticket"
+          },
+          {
+            "condition": {
+              "check_count_lte": 0,
+              "operation": "record_health_gate"
+            },
+            "description": "Health gates require at least one check.",
+            "effect": {
+              "decision": "deny",
+              "reason": "health_checks_required",
+              "required_action": "record_health_checks"
+            },
+            "name": "health_gate_requires_checks"
           },
           {
             "condition": {
@@ -140,6 +247,135 @@
               "required_action": "review_canary_scope"
             },
             "name": "large_canary_requires_review"
+          },
+          {
+            "condition": {
+              "log_trace_captured": false,
+              "operation": "deploy"
+            },
+            "description": "Deployment runs require log and trace evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "log_trace_link_required",
+              "required_action": "attach_log_trace_link"
+            },
+            "name": "deployment_requires_trace"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "deployment_agent_present": true
+            },
+            "description": "AI deployment agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_agent_registration_required",
+              "required_action": "register_deployment_agent"
+            },
+            "name": "deployment_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "deployment_agent_present": true
+            },
+            "description": "AI deployment agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_agent_runtime_not_supported",
+              "required_action": "choose_supported_deployment_agent_runtime"
+            },
+            "name": "deployment_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "deployment_agent_present": true
+            },
+            "description": "AI deployment agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_agent_role_not_supported",
+              "required_action": "choose_supported_deployment_agent_role"
+            },
+            "name": "deployment_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "deployment_agent_present": true
+            },
+            "description": "AI deployment agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_agent_scope_required",
+              "required_action": "set_deployment_agent_scope"
+            },
+            "name": "deployment_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "deployment_agent_present": true
+            },
+            "description": "AI deployment-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_agent_disclosure_required",
+              "required_action": "disclose_deployment_agent"
+            },
+            "name": "deployment_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Deployment lifecycle state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "depl_state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "depl_state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Deployment lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "depl_audit_event_required",
+              "required_action": "record_deployment_audit_event"
+            },
+            "name": "depl_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Deployment records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_deployment_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_deployment_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_deployment_mutation"
+            },
+            "description": "Batch deployment mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_deployment_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -169,6 +405,58 @@
             "required_action": "assign_release_owner"
           },
           "name": "release_requires_owner"
+        },
+        {
+          "condition": {
+            "manifest_attached": false,
+            "operation": "create_release"
+          },
+          "description": "Releases require manifest evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "manifest_required",
+            "required_action": "attach_release_manifest"
+          },
+          "name": "release_requires_manifest"
+        },
+        {
+          "condition": {
+            "artifact_signature_attached": false,
+            "operation": "create_release"
+          },
+          "description": "Release artifacts require signature evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "artifact_signature_required",
+            "required_action": "attach_artifact_signature"
+          },
+          "name": "release_requires_signature"
+        },
+        {
+          "condition": {
+            "change_ticket_attached": false,
+            "operation": "create_release"
+          },
+          "description": "Releases require change-ticket evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_ticket_required",
+            "required_action": "attach_change_ticket"
+          },
+          "name": "release_requires_change_ticket"
+        },
+        {
+          "condition": {
+            "check_count_lte": 0,
+            "operation": "record_health_gate"
+          },
+          "description": "Health gates require at least one check.",
+          "effect": {
+            "decision": "deny",
+            "reason": "health_checks_required",
+            "required_action": "record_health_checks"
+          },
+          "name": "health_gate_requires_checks"
         },
         {
           "condition": {
@@ -221,6 +509,135 @@
             "required_action": "review_canary_scope"
           },
           "name": "large_canary_requires_review"
+        },
+        {
+          "condition": {
+            "log_trace_captured": false,
+            "operation": "deploy"
+          },
+          "description": "Deployment runs require log and trace evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "log_trace_link_required",
+            "required_action": "attach_log_trace_link"
+          },
+          "name": "deployment_requires_trace"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "deployment_agent_present": true
+          },
+          "description": "AI deployment agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_agent_registration_required",
+            "required_action": "register_deployment_agent"
+          },
+          "name": "deployment_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "deployment_agent_present": true
+          },
+          "description": "AI deployment agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_agent_runtime_not_supported",
+            "required_action": "choose_supported_deployment_agent_runtime"
+          },
+          "name": "deployment_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "deployment_agent_present": true
+          },
+          "description": "AI deployment agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_agent_role_not_supported",
+            "required_action": "choose_supported_deployment_agent_role"
+          },
+          "name": "deployment_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "deployment_agent_present": true
+          },
+          "description": "AI deployment agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_agent_scope_required",
+            "required_action": "set_deployment_agent_scope"
+          },
+          "name": "deployment_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "deployment_agent_present": true
+          },
+          "description": "AI deployment-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_agent_disclosure_required",
+            "required_action": "disclose_deployment_agent"
+          },
+          "name": "deployment_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Deployment lifecycle state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "depl_state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "depl_state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Deployment lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "depl_audit_event_required",
+            "required_action": "record_deployment_audit_event"
+          },
+          "name": "depl_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Deployment records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_deployment_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_deployment_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_deployment_mutation"
+          },
+          "description": "Batch deployment mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_deployment_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -230,6 +647,21 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "DeploymentAgentPanel",
+          "permission": "depl:deploy",
+          "route": "/depl/agents"
+        },
+        "analytics": {
+          "component": "DeploymentAnalytics",
+          "permission": "depl:view",
+          "route": "/depl/analytics"
+        },
+        "audit": {
+          "component": "DeploymentAuditTrail",
+          "permission": "depl:audit",
+          "route": "/depl/audit"
+        },
         "dashboard": {
           "component": "DEPLDashboard",
           "permission": "depl:view",
@@ -271,9 +703,44 @@
           "route": "/depl/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_deployment_mutation_requires_bytewax",
+        "events": [
+          "environment_registered",
+          "release_created",
+          "rollback_plan_attached",
+          "health_gate_recorded",
+          "deployment_plan_created",
+          "deployment_review_approved",
+          "deployment_plan_state_changed",
+          "deployment_executed",
+          "rollback_executed",
+          "deployment_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "environments",
+          "releases",
+          "rollback_plans",
+          "health_gates",
+          "deployment_plans",
+          "deployment_runs",
+          "rollback_events",
+          "deployment_agents",
+          "audit_events"
+        ],
+        "topic": "apg.depl.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
+          "audit_timeline": {
+            "icon": "list-checks",
+            "status_style": "governance-chip"
+          },
           "health_gate": {
             "status_style": "health-chip",
             "visual": "gate-checklist"
@@ -354,10 +821,31 @@
             "permission": "depl:rollback"
           },
           {
+            "component": "DeploymentAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/depl/agents",
+            "permission": "depl:deploy"
+          },
+          {
             "component": "DeploymentEvidence",
             "name": "evidence",
             "nav_group": "Governance",
             "path": "/depl/evidence",
+            "permission": "depl:view"
+          },
+          {
+            "component": "DeploymentAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/depl/audit",
+            "permission": "depl:audit"
+          },
+          {
+            "component": "DeploymentAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/depl/analytics",
             "permission": "depl:view"
           },
           {
@@ -381,12 +869,49 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "depl": []
+      "depl": [
+        "logt",
+        "moni",
+        "hlth"
+      ]
     }
   },
   "contracts": {
     "depl": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "ci_cd": "cicd",
+          "composition": "comp",
+          "environment": "envm",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DeplService",
+          "logs": "logt",
+          "monitoring": "moni",
+          "notifications": "ntfy",
+          "view_models": "views.py"
+        },
+        "deployment_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "release_planner",
+            "rollout_operator",
+            "health_reviewer",
+            "rollback_coordinator",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "evidence": {
           "change_ticket_required": true,
           "deployment_audit_required": true,
@@ -394,10 +919,20 @@
           "log_trace_link_required": true
         },
         "governance": {
+          "batch_event_stream": "bytewax",
           "environment_policy_required": true,
           "production_approval_required": true,
           "require_tenant_context": true,
-          "separation_of_duties_required": true
+          "separation_of_duties_required": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "health_metrics_required": true,
+          "trace_required": true
         },
         "releases": {
           "approval_required": true,
@@ -421,6 +956,9 @@
           "default_theme": "depl_release_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_health_gate_view": true,
           "enable_release_console": true,
           "enable_rollback_center": true,
@@ -429,9 +967,18 @@
       },
       "id": "depl",
       "provides": [
-        "depl_operations"
+        "release_management",
+        "deployment_rollouts",
+        "health_gates",
+        "rollback_control",
+        "deployment_audit",
+        "deployment_agents"
       ],
-      "requires": []
+      "requires": [
+        "logt",
+        "moni",
+        "hlth"
+      ]
     }
   },
   "deployment": {
@@ -443,7 +990,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -464,6 +1011,122 @@
   },
   "roles": {},
   "rules": {
+    "batch_deployment_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_deployment_mutation"
+      },
+      "description": "Batch deployment mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_deployment_mutation_requires_bytewax"
+    },
+    "cross_tenant_deployment_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Deployment records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_deployment_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_deployment_access_denied"
+    },
+    "depl_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Deployment lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "depl_audit_event_required",
+        "required_action": "record_deployment_audit_event"
+      },
+      "name": "depl_state_change_requires_audit"
+    },
+    "depl_state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Deployment lifecycle state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "depl_state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "depl_state_change_requires_reason"
+    },
+    "deployment_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "deployment_agent_present": true
+      },
+      "description": "AI deployment-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_agent_disclosure_required",
+        "required_action": "disclose_deployment_agent"
+      },
+      "name": "deployment_agent_requires_disclosure"
+    },
+    "deployment_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "deployment_agent_present": true
+      },
+      "description": "AI deployment agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_agent_registration_required",
+        "required_action": "register_deployment_agent"
+      },
+      "name": "deployment_agent_requires_registration"
+    },
+    "deployment_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "deployment_agent_present": true
+      },
+      "description": "AI deployment agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_agent_scope_required",
+        "required_action": "set_deployment_agent_scope"
+      },
+      "name": "deployment_agent_requires_scope"
+    },
+    "deployment_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "deployment_agent_present": true
+      },
+      "description": "AI deployment agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_agent_role_not_supported",
+        "required_action": "choose_supported_deployment_agent_role"
+      },
+      "name": "deployment_agent_role_supported"
+    },
+    "deployment_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "deployment_agent_present": true
+      },
+      "description": "AI deployment agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_agent_runtime_not_supported",
+        "required_action": "choose_supported_deployment_agent_runtime"
+      },
+      "name": "deployment_agent_runtime_supported"
+    },
     "deployment_requires_health_gate": {
       "condition": {
         "health_gate_passed": false,
@@ -476,6 +1139,32 @@
         "required_action": "pass_health_gate"
       },
       "name": "deployment_requires_health_gate"
+    },
+    "deployment_requires_trace": {
+      "condition": {
+        "log_trace_captured": false,
+        "operation": "deploy"
+      },
+      "description": "Deployment runs require log and trace evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "log_trace_link_required",
+        "required_action": "attach_log_trace_link"
+      },
+      "name": "deployment_requires_trace"
+    },
+    "health_gate_requires_checks": {
+      "condition": {
+        "check_count_lte": 0,
+        "operation": "record_health_gate"
+      },
+      "description": "Health gates require at least one check.",
+      "effect": {
+        "decision": "deny",
+        "reason": "health_checks_required",
+        "required_action": "record_health_checks"
+      },
+      "name": "health_gate_requires_checks"
     },
     "large_canary_requires_review": {
       "condition": {
@@ -503,6 +1192,32 @@
       },
       "name": "production_requires_approval"
     },
+    "release_requires_change_ticket": {
+      "condition": {
+        "change_ticket_attached": false,
+        "operation": "create_release"
+      },
+      "description": "Releases require change-ticket evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "change_ticket_required",
+        "required_action": "attach_change_ticket"
+      },
+      "name": "release_requires_change_ticket"
+    },
+    "release_requires_manifest": {
+      "condition": {
+        "manifest_attached": false,
+        "operation": "create_release"
+      },
+      "description": "Releases require manifest evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "manifest_required",
+        "required_action": "attach_release_manifest"
+      },
+      "name": "release_requires_manifest"
+    },
     "release_requires_owner": {
       "condition": {
         "operation": "create_release",
@@ -515,6 +1230,19 @@
         "required_action": "assign_release_owner"
       },
       "name": "release_requires_owner"
+    },
+    "release_requires_signature": {
+      "condition": {
+        "artifact_signature_attached": false,
+        "operation": "create_release"
+      },
+      "description": "Release artifacts require signature evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "artifact_signature_required",
+        "required_action": "attach_artifact_signature"
+      },
+      "name": "release_requires_signature"
     },
     "rollback_requires_plan": {
       "condition": {

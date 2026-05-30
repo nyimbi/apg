@@ -5,6 +5,7 @@ import pytest
 from capabilities.common.depl import register_capability
 from capabilities.common.depl.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.depl.service import DeplService
+from capabilities.common.depl.views import analytics_model, audit_trail_model, dashboard_model, deployment_agents_model, settings_model
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
@@ -13,7 +14,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "depl"
 	assert contract["configuration"]["tenant_id"] == "tenant-deploy"
 	assert contract["configuration"]["rollouts"]["max_canary_percent"] == 10
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "releases", "rollouts", "evidence", "governance", "ui", "theme"]
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "releases", "rollouts", "evidence", "deployment_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["configuration"]["deployment_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["streaming"]["topic"] == "apg.depl.lifecycle"
 	assert contract["theme"]["name"] == "depl_release_ops"
 
 
@@ -32,6 +36,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "depl"
 	assert "logt" in registration["dependencies"]
 	assert registration["ui_components"]["rollback"] == "/depl/rollback"
+	assert registration["ui_components"]["agents"] == "/depl/agents"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert "depl:deploy" in registration["permissions"]
 
 
@@ -75,6 +81,16 @@ def test_service_runs_release_deployment_and_rollback_lifecycle():
 		"trace:deploy-1001",
 		"sre",
 	)
+	agent = service.register_deployment_agent(
+		"tenant-depl",
+		"codex-rollout",
+		"Codex Rollout Reviewer",
+		"codex",
+		"health_reviewer",
+		"Review release health evidence and rollout readiness.",
+		True,
+		"policy:depl:agents:v1",
+	)
 	plan = service.create_deployment_plan(
 		"plan-2026-05",
 		"tenant-depl",
@@ -104,11 +120,18 @@ def test_service_runs_release_deployment_and_rollback_lifecycle():
 		"synthetic rollback drill",
 	)
 	summary = service.dashboard_summary("tenant-depl")
+	views = dashboard_model(service, "tenant-depl")
+	agents = deployment_agents_model(service, "tenant-depl")
+	analytics = analytics_model(service, "tenant-depl")
+	audit = audit_trail_model(service, "tenant-depl")
+	settings = settings_model("tenant-depl")
 
 	assert environment["tier"] == "production"
 	assert release["artifact_signature"] == "sigstore:signature"
 	assert rollback["tested"] is True
 	assert health["status"] == "passed"
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "health_reviewer"
 	assert plan["status"] == "approved"
 	assert run["status"] == "deployed"
 	assert run["fingerprint"].startswith("depl-")
@@ -116,8 +139,14 @@ def test_service_runs_release_deployment_and_rollback_lifecycle():
 	assert summary["environment_count"] == 1
 	assert summary["release_count"] == 1
 	assert summary["rollback_count"] == 1
+	assert summary["deployment_agent_count"] == 1
 	assert summary["governance_posture"] == "ready"
 	assert len(service.list_audit_events("tenant-depl")) >= 7
+	assert views["deployment_agents"][0]["id"] == "codex-rollout"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert analytics["signals"]["rollback_rate"] == 1.0
+	assert audit["guardrails"]
+	assert settings["streaming"]["processor"] == "bytewax"
 
 
 def test_service_enforces_deployment_guardrails():
@@ -173,6 +202,16 @@ def test_service_enforces_deployment_guardrails():
 		service.attach_rollback_plan("rbp-untested", "tenant-depl", "rel-2026-05", "owner", ["restore"], tested=False)
 
 	service.attach_rollback_plan("rbp-2026-05", "tenant-depl", "rel-2026-05", "owner", ["restore"], tested=True)
+	with pytest.raises(PermissionError, match="health_checks_required"):
+		service.record_health_gate(
+			"hlg-empty",
+			"tenant-depl",
+			"rel-2026-05",
+			{},
+			"health-report:empty",
+			"trace:empty",
+			"sre",
+		)
 	failed_gate = service.record_health_gate(
 		"hlg-failed",
 		"tenant-depl",
@@ -286,3 +325,62 @@ def test_large_canary_requires_review_before_execution():
 
 	assert approved["status"] == "approved"
 	assert run["status"] == "deployed"
+
+
+def test_deployment_agents_state_changes_bytewax_and_tenant_scope():
+	service = DeplService()
+	for tenant_id in ("tenant-a", "tenant-b"):
+		service.register_environment("shared-env", tenant_id, "Stage", "staging", "owner", "policy", [])
+		service.create_release(
+			"shared-release",
+			tenant_id,
+			"2026.05",
+			"owner",
+			{"service": "erp-core"},
+			"sha256:artifact",
+			"sigstore:signature",
+			"CHG-1001",
+			"creator",
+		)
+		service.attach_rollback_plan("shared-rollback", tenant_id, "shared-release", "owner", ["restore"], tested=True)
+		service.record_health_gate("shared-health", tenant_id, "shared-release", {"smoke": True}, "health-report", "trace", "sre")
+		service.create_deployment_plan(
+			"shared-plan",
+			tenant_id,
+			"shared-release",
+			"shared-env",
+			"rolling",
+			"owner",
+			approval_recorded=True,
+			rollback_plan_id="shared-rollback",
+			health_gate_id="shared-health",
+			change_ticket="CHG-1001",
+		)
+		service.register_deployment_agent(
+			tenant_id,
+			"shared-agent",
+			"Shared Agent",
+			"codex",
+			"rollout_operator",
+			f"Operate deployment for {tenant_id}.",
+			True,
+		)
+
+	assert len(service.list_deployment_agents("tenant-a")) == 1
+	assert len(service.list_deployment_agents("tenant-b")) == 1
+	assert service.list_deployment_plans("tenant-a")[0]["tenant_id"] == "tenant-a"
+
+	paused = service.change_deployment_plan_state("tenant-a", "shared-plan", "paused", "Pause for release window.", "owner")
+	assert paused["status"] == "paused"
+	assert service.validate_batch_deployment_mutation("tenant-a", "bytewax", "owner")["processor"] == "bytewax"
+
+	with pytest.raises(PermissionError, match="depl_state_change_reason_required"):
+		service.change_deployment_plan_state("tenant-a", "shared-plan", "paused", "", "owner")
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_deployment_mutation("tenant-a", "custom-stream", "owner")
+	with pytest.raises(PermissionError, match="deployment_agent_runtime_not_supported"):
+		service.register_deployment_agent("tenant-a", "bad-runtime", "Bad Runtime", "custom", "rollout_operator", "Operate.", True)
+	with pytest.raises(PermissionError, match="deployment_agent_role_not_supported"):
+		service.register_deployment_agent("tenant-a", "bad-role", "Bad Role", "codex", "owner", "Operate.", True)
+	with pytest.raises(PermissionError, match="deployment_agent_disclosure_required"):
+		service.register_deployment_agent("tenant-a", "undisclosed", "Undisclosed", "codex", "rollout_operator", "Operate.", False)

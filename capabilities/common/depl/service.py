@@ -5,10 +5,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_DEPLOYMENT_AGENT_ROLES,
+	SUPPORTED_DEPLOYMENT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .deployment_engine import DeploymentEngine
 from .models import (
 	DeploymentAuditEvent,
+	DeploymentAgent,
 	DeploymentEnvironment,
 	DeploymentPlan,
 	DeploymentRun,
@@ -30,6 +36,7 @@ class DeplService:
 		self._deployment_plans: dict[str, DeploymentPlan] = {}
 		self._deployment_runs: dict[str, DeploymentRun] = {}
 		self._rollback_events: dict[str, RollbackEvent] = {}
+		self._agents: dict[str, DeploymentAgent] = {}
 		self._audit_events: dict[str, DeploymentAuditEvent] = {}
 		self._engine = DeploymentEngine()
 
@@ -56,6 +63,9 @@ class DeplService:
 			raise PermissionError("environment_policy_required")
 		if tier == "production" and not approvers:
 			raise PermissionError("production_approvers_required")
+		key = self._key(tenant_id, environment_id)
+		if key in self._environments:
+			raise ValueError("environment_already_exists")
 		environment = DeploymentEnvironment(
 			id=environment_id,
 			tenant_id=tenant_id,
@@ -65,7 +75,7 @@ class DeplService:
 			policy=policy,
 			approvers=tuple(str(item) for item in approvers),
 		)
-		self._environments[environment_id] = environment
+		self._environments[key] = environment
 		self._record_audit(tenant_id, environment_id, "environment_registered", owner, "allow", metadata={"tier": tier})
 		return environment.to_dict()
 
@@ -85,16 +95,16 @@ class DeplService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_release",
 			"release_owner_assigned": bool(owner),
+			"manifest_attached": bool(manifest),
+			"artifact_signature_attached": bool(artifact_signature),
+			"change_ticket_attached": bool(change_ticket),
 		})
 		self._raise_if_denied(result)
-		if not manifest:
-			raise PermissionError("manifest_required")
 		if not artifact_digest:
 			raise PermissionError("artifact_digest_required")
-		if not artifact_signature:
-			raise PermissionError("artifact_signature_required")
-		if not change_ticket:
-			raise PermissionError("change_ticket_required")
+		key = self._key(tenant_id, release_id)
+		if key in self._releases:
+			raise ValueError("release_already_exists")
 		release = ReleaseManifest(
 			id=release_id,
 			tenant_id=tenant_id,
@@ -106,7 +116,7 @@ class DeplService:
 			change_ticket=change_ticket,
 			created_by=created_by,
 		)
-		self._releases[release_id] = release
+		self._releases[key] = release
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=release_id,
@@ -134,6 +144,9 @@ class DeplService:
 			raise PermissionError("rollback_steps_required")
 		if not tested:
 			raise PermissionError("rollback_plan_test_required")
+		key = self._key(tenant_id, rollback_plan_id)
+		if key in self._rollback_plans:
+			raise ValueError("rollback_plan_already_exists")
 		plan = RollbackPlan(
 			id=rollback_plan_id,
 			tenant_id=tenant_id,
@@ -142,7 +155,7 @@ class DeplService:
 			steps=tuple(str(step) for step in steps),
 			tested=bool(tested),
 		)
-		self._rollback_plans[rollback_plan_id] = plan
+		self._rollback_plans[key] = plan
 		self._record_audit(tenant_id, rollback_plan_id, "rollback_plan_attached", owner, "allow", metadata={"release_id": release_id})
 		return plan.to_dict()
 
@@ -157,11 +170,20 @@ class DeplService:
 		recorded_by: str,
 	) -> dict[str, Any]:
 		self._require_release(release_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_health_gate",
+			"check_count": len(checks),
+		})
+		self._raise_if_denied(result)
 		status = self._engine.health_status(checks, report_reference, log_trace_link)
 		if not report_reference:
 			raise PermissionError("health_report_required")
 		if not log_trace_link:
 			raise PermissionError("log_trace_link_required")
+		key = self._key(tenant_id, health_gate_id)
+		if key in self._health_gates:
+			raise ValueError("health_gate_already_exists")
 		gate = HealthGate(
 			id=health_gate_id,
 			tenant_id=tenant_id,
@@ -172,7 +194,7 @@ class DeplService:
 			status=status,
 			recorded_by=recorded_by,
 		)
-		self._health_gates[health_gate_id] = gate
+		self._health_gates[key] = gate
 		self._record_audit(tenant_id, health_gate_id, "health_gate_recorded", recorded_by, status, metadata={"release_id": release_id})
 		return gate.to_dict()
 
@@ -219,6 +241,9 @@ class DeplService:
 		self._raise_if_denied(result)
 		review_status = "required" if result["decision"] == "require_review" else "approved"
 		status = "pending_review" if review_status == "required" else "approved"
+		key = self._key(tenant_id, plan_id)
+		if key in self._deployment_plans:
+			raise ValueError("deployment_plan_already_exists")
 		plan = DeploymentPlan(
 			id=plan_id,
 			tenant_id=tenant_id,
@@ -234,7 +259,7 @@ class DeplService:
 			status=status,
 			review_status=review_status,
 		)
-		self._deployment_plans[plan_id] = plan
+		self._deployment_plans[key] = plan
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=plan_id,
@@ -252,6 +277,7 @@ class DeplService:
 			return plan.to_dict()
 		plan.status = "approved"
 		plan.review_status = "approved"
+		self._deployment_plans[self._key(tenant_id, plan_id)] = plan
 		self._record_audit(tenant_id, plan_id, "deployment_review_approved", reviewer, "allow")
 		return plan.to_dict()
 
@@ -277,12 +303,14 @@ class DeplService:
 			"health_gate_passed": health_gate.status == "passed",
 			"canary_percent": plan.canary_percent,
 			"canary_review_recorded": plan.review_status == "approved",
+			"log_trace_captured": bool(log_trace_link),
 		})
 		self._raise_if_denied(result)
-		if not log_trace_link:
-			raise PermissionError("log_trace_link_required")
 		if not health_report_reference:
 			raise PermissionError("health_report_required")
+		key = self._key(tenant_id, run_id)
+		if key in self._deployment_runs:
+			raise ValueError("deployment_run_already_exists")
 		fingerprint = self._engine.deployment_fingerprint({
 			"run_id": run_id,
 			"tenant_id": tenant_id,
@@ -304,8 +332,9 @@ class DeplService:
 			health_report_reference=health_report_reference,
 			completed_at=datetime.now(timezone.utc),
 		)
-		self._deployment_runs[run_id] = run
+		self._deployment_runs[key] = run
 		plan.status = "deployed"
+		self._deployment_plans[self._key(tenant_id, plan_id)] = plan
 		self._record_audit(tenant_id, run_id, "deployment_executed", actor, result["decision"], metadata={"plan_id": plan_id})
 		return run.to_dict()
 
@@ -322,6 +351,9 @@ class DeplService:
 		rollback_plan = self._require_rollback_plan(plan.rollback_plan_id, tenant_id)
 		if not reason:
 			raise PermissionError("rollback_reason_required")
+		key = self._key(tenant_id, rollback_event_id)
+		if key in self._rollback_events:
+			raise ValueError("rollback_event_already_exists")
 		event = RollbackEvent(
 			id=rollback_event_id,
 			tenant_id=tenant_id,
@@ -333,9 +365,88 @@ class DeplService:
 		)
 		run.status = "rolled_back"
 		plan.status = "rolled_back"
-		self._rollback_events[rollback_event_id] = event
+		self._deployment_runs[self._key(tenant_id, run_id)] = run
+		self._deployment_plans[self._key(tenant_id, plan.id)] = plan
+		self._rollback_events[key] = event
 		self._record_audit(tenant_id, rollback_event_id, "rollback_executed", actor, "allow", metadata={"run_id": run_id})
 		return event.to_dict()
+
+	def register_deployment_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_deployment_agent_runtime(runtime)
+		normalized_role = _normalize_deployment_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"deployment_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_role_supported": bool(normalized_role),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_denied(result)
+		key = self._key(tenant_id, agent_id)
+		if key in self._agents:
+			raise ValueError("deployment_agent_already_registered")
+		agent = DeploymentAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref or None,
+		)
+		self._agents[key] = agent
+		self._record_audit(tenant_id, agent_id, "deployment_agent_registered", agent.name, result["decision"], metadata={"runtime": normalized_runtime, "role": normalized_role})
+		return agent.to_dict()
+
+	def change_deployment_plan_state(
+		self,
+		tenant_id: str,
+		plan_id: str,
+		status: str,
+		reason: str,
+		actor: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		plan = self._require_deployment_plan(plan_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		self._raise_if_denied(result)
+		plan.status = status
+		self._deployment_plans[self._key(tenant_id, plan_id)] = plan
+		self._record_audit(tenant_id, plan_id, "deployment_plan_state_changed", actor, result["decision"], metadata={"status": status, "reason": reason})
+		return plan.to_dict()
+
+	def validate_batch_deployment_mutation(self, tenant_id: str, event_stream: str, actor: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "batch_deployment_mutation",
+			"event_stream": event_stream,
+		})
+		self._raise_if_denied(result)
+		self._record_audit(tenant_id, "batch-deployment-mutation", "batch_deployment_mutation_validated", actor, result["decision"], metadata={"event_stream": event_stream})
+		return {"tenant_id": tenant_id, "event_stream": event_stream, "decision": result["decision"], "processor": "bytewax"}
 
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		releases = self.list_releases(tenant_id)
@@ -349,6 +460,8 @@ class DeplService:
 			"pending_review_count": len([item for item in plans if item["status"] == "pending_review"]),
 			"deployed_run_count": len([item for item in runs if item["status"] == "deployed"]),
 			"rollback_count": len(self.list_rollback_events(tenant_id)),
+			"deployment_agent_count": len(self.list_deployment_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"passing_health_gate_count": len([item for item in health_gates if item["status"] == "passed"]),
 			"governance_posture": "ready" if releases and all(item["change_ticket"] for item in releases) else "needs_release_evidence",
 		}
@@ -374,6 +487,9 @@ class DeplService:
 	def list_rollback_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._rollback_events, tenant_id)
 
+	def list_deployment_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -382,38 +498,38 @@ class DeplService:
 		self._raise_if_denied(result)
 
 	def _require_environment(self, environment_id: str, tenant_id: str) -> DeploymentEnvironment:
-		environment = self._environments.get(environment_id)
-		if environment is None or environment.tenant_id != tenant_id:
+		environment = self._environments.get(self._key(tenant_id, environment_id))
+		if environment is None:
 			raise KeyError("environment_not_found")
 		return environment
 
 	def _require_release(self, release_id: str, tenant_id: str) -> ReleaseManifest:
-		release = self._releases.get(release_id)
-		if release is None or release.tenant_id != tenant_id:
+		release = self._releases.get(self._key(tenant_id, release_id))
+		if release is None:
 			raise KeyError("release_not_found")
 		return release
 
 	def _require_rollback_plan(self, rollback_plan_id: str, tenant_id: str) -> RollbackPlan:
-		plan = self._rollback_plans.get(rollback_plan_id)
-		if plan is None or plan.tenant_id != tenant_id:
+		plan = self._rollback_plans.get(self._key(tenant_id, rollback_plan_id))
+		if plan is None:
 			raise KeyError("rollback_plan_not_found")
 		return plan
 
 	def _require_health_gate(self, health_gate_id: str, tenant_id: str) -> HealthGate:
-		gate = self._health_gates.get(health_gate_id)
-		if gate is None or gate.tenant_id != tenant_id:
+		gate = self._health_gates.get(self._key(tenant_id, health_gate_id))
+		if gate is None:
 			raise KeyError("health_gate_not_found")
 		return gate
 
 	def _require_deployment_plan(self, plan_id: str, tenant_id: str) -> DeploymentPlan:
-		plan = self._deployment_plans.get(plan_id)
-		if plan is None or plan.tenant_id != tenant_id:
+		plan = self._deployment_plans.get(self._key(tenant_id, plan_id))
+		if plan is None:
 			raise KeyError("deployment_plan_not_found")
 		return plan
 
 	def _require_deployment_run(self, run_id: str, tenant_id: str) -> DeploymentRun:
-		run = self._deployment_runs.get(run_id)
-		if run is None or run.tenant_id != tenant_id:
+		run = self._deployment_runs.get(self._key(tenant_id, run_id))
+		if run is None:
 			raise KeyError("deployment_run_not_found")
 		return run
 
@@ -458,3 +574,18 @@ class DeplService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+	def _key(self, tenant_id: str, object_id: str) -> str:
+		if not tenant_id:
+			raise PermissionError("tenant_context_required")
+		return f"{tenant_id}:{object_id}"
+
+
+def _normalize_deployment_agent_runtime(value: str) -> str:
+	value = value.strip().lower()
+	return value if value in SUPPORTED_DEPLOYMENT_AGENT_RUNTIMES else ""
+
+
+def _normalize_deployment_agent_role(value: str) -> str:
+	value = value.strip().lower()
+	return value if value in SUPPORTED_DEPLOYMENT_AGENT_ROLES else ""
