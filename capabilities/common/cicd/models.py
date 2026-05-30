@@ -155,6 +155,36 @@ class PromotionRun:
 
 
 @dataclass(frozen=True)
+class DeliveryAgent:
+	"""AI delivery-agent registration with runtime, role, scope, and disclosure."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = True
+	policy_ref: str | None = None
+	status: str = "active"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"policy_ref": self.policy_ref,
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
 class CicdAuditEvent:
 	"""Governance event emitted by CI/CD operations."""
 

@@ -18,6 +18,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"streaming": contract["streaming"],
 		**SERVICE.pipeline_summary(tenant_id),
 	}
 
@@ -43,6 +44,7 @@ def approve_pipeline(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.approve_pipeline(
 		pipeline_id=str(payload["id"]),
 		reviewer=str(payload.get("reviewer") or "reviewer"),
+		tenant_id=str(payload["tenant_id"]) if payload.get("tenant_id") else None,
 	)
 
 
@@ -90,6 +92,32 @@ def promote_artifact(payload: dict[str, Any]) -> dict[str, Any]:
 		target_environment=str(payload.get("target_environment") or "staging"),
 		requested_by=str(payload.get("requested_by") or "release-manager"),
 		approval_recorded=bool(payload.get("approval_recorded", False)),
+		approver=str(payload.get("approver") or "") or None,
+		environment_policy_attached=bool(payload.get("environment_policy_attached", True)),
+	)
+
+
+def register_delivery_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_delivery_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+	)
+
+
+def change_pipeline_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_pipeline_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		pipeline_id=str(payload["id"]),
+		status=str(payload.get("status") or "paused"),
+		reason=str(payload.get("reason") or ""),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
 	)
 
 
@@ -124,6 +152,10 @@ def list_gates(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_promotions(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_promotions(tenant_id)
+
+
+def list_delivery_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_delivery_agents(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

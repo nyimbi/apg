@@ -17,7 +17,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "cicd",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware pipelines, builds, quality gates, artifacts, promotions, release automation, and delivery governance",
+	"description": "Tenant-aware pipelines, builds, quality gates, artifacts, promotions, scoped AI delivery agents, release automation, and delivery governance",
 	"category": "infrastructure_operations",
 	"subcategory": "continuous_delivery",
 	"vendor": "Datacraft",
@@ -25,8 +25,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["pipeline_management", "build_orchestration", "quality_gates", "artifact_promotion", "release_automation"],
-	"permissions": ["cicd:view", "cicd:manage_pipelines", "cicd:run_builds", "cicd:promote", "cicd:admin"]
+	"provides": ["pipeline_management", "build_orchestration", "quality_gates", "artifact_promotion", "release_automation", "delivery_agents", "delivery_audit"],
+	"permissions": ["cicd:view", "cicd:manage_pipelines", "cicd:run_builds", "cicd:promote", "cicd:audit", "cicd:admin"]
 }
 
 
@@ -40,7 +40,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["scpt", "ntfy", "comp", "edge"],
+		"optional_dependencies": ["scpt", "ntfy", "comp", "edge", "bytewax", "audl", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -49,13 +49,17 @@ def register_capability() -> dict[str, Any]:
 			"build_orchestration": "Run builds with workers, caches, secrets, logs, and trace evidence",
 			"quality_gates": "Enforce tests, scans, approvals, and artifact policies before promotion",
 			"release_automation": "Promote artifacts through environments and deployment capabilities",
+			"delivery_agents": "Register scoped AI delivery agents across Codex, Claude Code, OpenCode, Pi, and compatible runtimes",
+			"delivery_audit": "Record pipeline, build, artifact, gate, promotion, agent, and state-change evidence",
+			"bytewax_streaming": "Declare Bytewax lifecycle streams for CI/CD batch and state events",
 			"capability_rules": "Evaluate deterministic CI/CD governance rules",
 			"visual_theming": "Apply pipeline-automation theme tokens and components"
 		},
-		"endpoints": {"pipelines": "/cicd/api/v1/pipelines", "builds": "/cicd/api/v1/builds", "artifacts": "/cicd/api/v1/artifacts", "gates": "/cicd/api/v1/gates", "promotions": "/cicd/api/v1/promotions"},
+		"endpoints": {"pipelines": "/cicd/api/v1/pipelines", "builds": "/cicd/api/v1/builds", "artifacts": "/cicd/api/v1/artifacts", "gates": "/cicd/api/v1/gates", "promotions": "/cicd/api/v1/promotions", "agents": "/cicd/api/v1/agents", "audit": "/cicd/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

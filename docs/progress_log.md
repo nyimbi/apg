@@ -16,6 +16,70 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 16:37 EAT
+
+CICD continuous-integration/delivery lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Expanded `capability_contract.py` with delivery-agent, governance,
+  observability, adapter, UI, theme, and Bytewax lifecycle-stream
+  configuration.
+- Expanded deterministic rules to cover tenant context, pipeline owner, source
+  policy, worker pool, stage count, secret scope, cache policy, quality gate,
+  build trace capture, security scan evidence, artifact signature, promotion
+  approval, environment policy, separation of duties, high-parallelism review,
+  AI delivery-agent registration/runtime/role/scope/disclosure, state-change
+  reason/audit, cross-tenant access, and Bytewax batch mutation enforcement.
+- Added first-class `DeliveryAgent` model support and extended `CicdService`
+  with tenant-safe pipeline/build/artifact/gate/promotion keys, delivery-agent
+  registration, guarded pipeline state changes, and delivery-agent dashboard
+  counts.
+- Extended API helpers and view models with delivery-agent, audit, analytics,
+  artifact registry, quality gate, state-change, promotion approval, settings,
+  and Bytewax stream surfaces.
+- Updated registration metadata with delivery-agent and audit capabilities,
+  CICD audit permission, agent/audit endpoints, optional Bytewax/AUDL/MONI
+  adapters, and streaming metadata.
+- Renamed the package test to `tests/test_package_contract.py` and expanded
+  coverage for Bytewax, delivery agents, duplicate pipeline/agent IDs across
+  tenants, state-change guardrails, UI models, and package evidence.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cicd/__init__.py
+  capabilities/common/cicd/capability_contract.py capabilities/common/cicd/models.py
+  capabilities/common/cicd/cicd_engine.py capabilities/common/cicd/service.py
+  capabilities/common/cicd/api.py capabilities/common/cicd/views.py
+  capabilities/common/cicd/app.py capabilities/common/cicd/test_capability_contract.py
+  capabilities/common/cicd/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/cicd/test_capability_contract.py
+  capabilities/common/cicd/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.cicd import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.cicd.streaming.processor,
+  .capabilities.cicd.configuration.delivery_agents.supported_runtimes,
+  .capabilities.cicd.screens.agents.route'
+  capabilities/common/cicd/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/cicd/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/cicd --json` passed with `cicd` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cicd --json`
+  passed with `side_effect_free: true` and no warnings.
+- CICD stale-marker and banned stream search returned no matches for old
+  package markers, unsupported overclaims, unfinished scaffolding, TODOs, or
+  unsupported stream-provider references.
+- `git diff --check -- capabilities/common/cicd docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live Git/build-runner/container
+  registry/security-scanner/deployment providers, production SCPT/NTFY/COMP/
+  EDGE/AUDL/MONI adapters, live Bytewax topology, rendered browser UI, and
+  performance/resilience checks.
+
 ### 2026-05-30 16:22 EAT
 
 SCRP scraper/data-harvesting lifecycle/guardrail packet:
