@@ -93,6 +93,16 @@ def test_room_meeting_participant_recording_caption_and_end_lifecycle_executes()
 		caption_count=42,
 		generated_by="caption-service",
 	)
+	agent = service.register_meeting_agent(
+		tenant_id="tenant-a",
+		meeting_id=meeting["id"],
+		agent_ref="codex://meeting-summarizer",
+		runtime="codex",
+		role="summarizer",
+		scope_ref="scope://meeting/1",
+		disclosure_ref="disclosure://meeting/1",
+		registered_by="host-1",
+	)
 	ended = service.end_meeting("tenant-a", meeting["id"], "host-1")
 	summary = service.dashboard_summary("tenant-a")
 
@@ -101,11 +111,13 @@ def test_room_meeting_participant_recording_caption_and_end_lifecycle_executes()
 	assert participant["role"] == "host"
 	assert recording["encrypted"] is True
 	assert captions["caption_count"] == 42
+	assert agent["role"] == "summarizer"
 	assert ended["status"] == "ended"
 	assert summary["room_count"] == 1
 	assert summary["meeting_count"] == 1
 	assert summary["recording_count"] == 1
 	assert summary["caption_count"] == 1
+	assert summary["meeting_agent_count"] == 1
 
 
 def test_video_guardrails_require_tenant_host_guest_policy_consent_encryption_and_capacity_review():
@@ -148,6 +160,37 @@ def test_video_guardrails_require_tenant_host_guest_policy_consent_encryption_an
 	else:
 		raise AssertionError("recording without encryption was accepted")
 
+	try:
+		service.start_meeting("tenant-a", room["id"], "No Secure Transport", "host-1", 2, secure_transport=False)
+	except PermissionError as exc:
+		assert str(exc) == "secure_transport_required"
+	else:
+		raise AssertionError("meeting without secure transport was accepted")
+
+	try:
+		service.start_meeting("tenant-a", room["id"], "No Screen Share Policy", "host-1", 2, screen_share_requested=True, screen_share_policy_attached=False)
+	except PermissionError as exc:
+		assert str(exc) == "screen_share_policy_required"
+	else:
+		raise AssertionError("screen share without policy was accepted")
+
+	try:
+		service.start_meeting(
+			"tenant-a",
+			room["id"],
+			"No Retention",
+			"host-1",
+			2,
+			recording_requested=True,
+			recording_consent_ref="consent://x",
+			recording_encrypted=True,
+			recording_retention_policy_attached=False,
+		)
+	except PermissionError as exc:
+		assert str(exc) == "recording_retention_required"
+	else:
+		raise AssertionError("recording without retention policy was accepted")
+
 	large = service.start_meeting(
 		tenant_id="tenant-a",
 		room_id=room["id"],
@@ -160,6 +203,29 @@ def test_video_guardrails_require_tenant_host_guest_policy_consent_encryption_an
 	)
 	assert large["status"] == "review_required"
 	assert large["required_actions"] == ["review_meeting_capacity"]
+
+	allowed = service.start_meeting("tenant-a", room["id"], "Agent Guard", "host-1", 2)
+	try:
+		service.register_meeting_agent("tenant-a", allowed["id"], "codex://agent", "codex", "summarizer", "", "disclosure://x", "host-1")
+	except PermissionError as exc:
+		assert str(exc) == "meeting_agent_scope_required"
+	else:
+		raise AssertionError("unscoped meeting agent was accepted")
+
+	try:
+		service.register_meeting_agent("tenant-a", allowed["id"], "unknown://agent", "unknown", "summarizer", "scope://x", "disclosure://x", "host-1")
+	except PermissionError as exc:
+		assert str(exc) == "meeting_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported meeting agent runtime was accepted")
+
+	rule_result = service.evaluate({
+		"tenant_context_present": True,
+		"operation": "batch_video_mutation",
+		"event_stream": "legacy_bus",
+	})
+	assert rule_result["decision"] == "deny"
+	assert rule_result["matched_rules"] == ["batch_video_mutation_requires_bytewax"]
 
 
 def test_api_and_view_models_expose_video_conferencing_surfaces():
@@ -206,6 +272,16 @@ def test_api_and_view_models_expose_video_conferencing_surfaces():
 		"caption_count": 10,
 		"generated_by": "caption-service",
 	})
+	api.register_meeting_agent({
+		"tenant_id": "tenant-b",
+		"meeting_id": meeting["id"],
+		"agent_ref": "codex://meeting-agent",
+		"runtime": "codex",
+		"role": "action_tracker",
+		"scope_ref": "scope://customer",
+		"disclosure_ref": "disclosure://customer",
+		"registered_by": "host-1",
+	})
 
 	status = api.capability_status("tenant-b")
 	system = api.list_video_conferencing("tenant-b")
@@ -215,16 +291,22 @@ def test_api_and_view_models_expose_video_conferencing_surfaces():
 	participants = views.participant_panel_model(local_service, "tenant-b")
 	recordings = views.recording_library_model(local_service, "tenant-b")
 	captions = views.caption_workbench_model(local_service, "tenant-b")
+	agents = views.meeting_agent_model(local_service, "tenant-b")
 	analytics = views.analytics_model(local_service, "tenant-b")
+	audit = views.audit_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["meeting_count"] == 1
+	assert status["meeting_agent_count"] == 1
 	assert system["summary"]["participant_count"] == 1
+	assert system["meeting_agents"][0]["role"] == "action_tracker"
 	assert dashboard["summary"]["recording_count"] == 1
 	assert meetings["route"] == "/vidc/meetings"
 	assert rooms["waiting_room_supported"] is True
 	assert participants["roles"] == ["host", "cohost", "participant", "guest", "observer"]
 	assert recordings["encryption_required"] is True
 	assert captions["languages_supported"] == ["en", "fr", "sw", "ar"]
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert analytics["review_required_meetings"] == []
+	assert audit["event_stream"] == "bytewax"
 	assert settings["theme"]["name"] == "vidc_meeting_room"

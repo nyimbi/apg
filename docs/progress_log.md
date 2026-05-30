@@ -16,6 +16,53 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 11:10 EAT
+
+VIDC video-conferencing lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Expanded `capability_contract.py` with meeting-agent, observability, adapter,
+  Bytewax event-stream, UI, audit, and theme configuration.
+- Expanded deterministic rules from the earlier small guardrail set to cover
+  tenant context, room setup, host accountability, secure media transport,
+  screen-share policy, guest policy and waiting-room review, recording consent,
+  encryption, retention, access audit, large-meeting review, participant and
+  caption requirements, computer-vision assist policy, AI meeting-agent
+  registration/runtime/scope/disclosure, state-change audit, cross-tenant
+  access denial, and Bytewax batch mutation enforcement.
+- Added `MeetingAgentRecord` plus `VidcService.register_meeting_agent()` and
+  list/dashboard support so AI meeting assistants are executable first-class
+  meeting participants.
+- Updated API helpers, view models, registration metadata, permissions, and
+  generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) to match the expanded
+  contract.
+- Focused review cleanup: added a missing supported-runtime guardrail for AI
+  meeting agents before committing the packet.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/vidc/__init__.py
+  capabilities/common/vidc/capability_contract.py
+  capabilities/common/vidc/video_runtime.py capabilities/common/vidc/service.py
+  capabilities/common/vidc/api.py capabilities/common/vidc/views.py
+  capabilities/common/vidc/app.py
+  capabilities/common/vidc/test_capability_contract.py
+  capabilities/common/vidc/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/vidc/test_capability_contract.py
+  capabilities/common/vidc/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/vidc --json` passed with `vidc` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/vidc --json`
+  passed with `side_effect_free: true` and no warnings.
+- Not run: full repository pytest suite, live WebRTC/SFU stack, TURN/STUN
+  allocation, live transcription, live computer-vision inference, external
+  AI-agent CLI invocation, live Bytewax topology, rendered browser UI, and
+  performance/resilience benchmarks.
+
 ### 2026-05-30 10:48 EAT
 
 RAGN retrieval-augmented-generation lifecycle/guardrail packet:

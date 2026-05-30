@@ -85,11 +85,28 @@ def caption_workbench_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or VidcService()
+	contract = service.describe(tenant_id)
 	return {
 		"route": "/vidc/captions",
 		"tenant_id": tenant_id,
 		"captions": service.list_captions(tenant_id),
-		"languages_supported": ["en", "fr", "sw", "ar"],
+		"languages_supported": contract["configuration"]["media"]["supported_caption_languages"],
+	}
+
+
+def meeting_agent_model(
+	service: VidcService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or VidcService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/vidc/agents",
+		"tenant_id": tenant_id,
+		"meeting_agents": service.list_meeting_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["meeting_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["meeting_agents"]["allowed_roles"],
+		"theme": contract["theme"]["components"]["agent_panel"],
 	}
 
 
@@ -110,11 +127,27 @@ def analytics_model(
 	}
 
 
+def audit_model(
+	service: VidcService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or VidcService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/vidc/audit",
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"event_stream": contract["configuration"]["observability"]["event_stream"],
+		"theme": contract["theme"]["components"]["audit_timeline"],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, object]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"route": "/vidc/settings",
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}

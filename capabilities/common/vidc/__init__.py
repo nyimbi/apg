@@ -16,7 +16,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "vidc",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware video meetings, rooms, recordings, captions, moderation, and collaboration integrations",
+	"description": "Tenant-aware video meetings, rooms, recordings, captions, moderation, meeting agents, and collaboration integrations",
 	"category": "collaboration_communication",
 	"subcategory": "video_conferencing",
 	"vendor": "Datacraft",
@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["video_meetings", "meeting_rooms", "recordings", "live_captions", "meeting_moderation"],
-	"permissions": ["vidc:view", "vidc:schedule", "vidc:join", "vidc:moderate", "vidc:manage_recordings", "vidc:admin"]
+	"provides": ["video_meetings", "meeting_rooms", "recordings", "live_captions", "meeting_moderation", "meeting_agents"],
+	"permissions": ["vidc:view", "vidc:schedule", "vidc:join", "vidc:moderate", "vidc:manage_recordings", "vidc:audit", "vidc:admin"]
 }
 
 
@@ -39,7 +39,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["ntfy", "nlpc", "audl", "auth"],
+		"optional_dependencies": ["ntfy", "nlpc", "audl", "auth", "them"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,6 +48,7 @@ def register_capability() -> dict[str, Any]:
 			"meeting_rooms": "Manage rooms, lobbies, participants, and access policies",
 			"recordings": "Capture, encrypt, retain, and audit meeting recordings",
 			"live_captions": "Generate captions and transcript artifacts with policy controls",
+			"meeting_agents": "Register scoped AI assistants for captions, summaries, moderation, and actions",
 			"capability_rules": "Evaluate deterministic video-conferencing rules",
 			"visual_theming": "Apply meeting-room theme tokens and components"
 		},
@@ -56,7 +57,8 @@ def register_capability() -> dict[str, Any]:
 			"rooms": "/vidc/api/v1/rooms",
 			"participants": "/vidc/api/v1/participants",
 			"recordings": "/vidc/api/v1/recordings",
-			"captions": "/vidc/api/v1/captions"
+			"captions": "/vidc/api/v1/captions",
+			"agents": "/vidc/api/v1/agents"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],

@@ -12,6 +12,7 @@ ROOM_STATUSES = {"ready", "disabled"}
 MEETING_STATUSES = {"scheduled", "active", "review_required", "ended", "blocked"}
 PARTICIPANT_ROLES = {"host", "cohost", "participant", "guest", "observer"}
 RECORDING_STATUSES = {"available", "blocked", "retained", "expired"}
+MEETING_AGENT_ROLES = {"captioner", "summarizer", "moderator", "action_tracker"}
 
 
 def utc_now() -> str:
@@ -28,6 +29,13 @@ def normalize_participant_role(role: str) -> str:
 	value = str(role or "participant").strip().lower()
 	if value not in PARTICIPANT_ROLES:
 		raise ValueError(f"unsupported_participant_role:{role}")
+	return value
+
+
+def normalize_meeting_agent_role(role: str) -> str:
+	value = str(role or "summarizer").strip().lower()
+	if value not in MEETING_AGENT_ROLES:
+		raise ValueError(f"unsupported_meeting_agent_role:{role}")
 	return value
 
 
@@ -130,6 +138,24 @@ class CaptionRecord:
 
 
 @dataclass(slots=True)
+class MeetingAgentRecord:
+	id: str
+	tenant_id: str
+	meeting_id: str
+	agent_ref: str
+	runtime: str
+	role: str
+	scope_ref: str
+	disclosure_ref: str
+	registered_by: str
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize(self)
+
+
+@dataclass(slots=True)
 class MeetingAuditEventRecord:
 	id: str
 	tenant_id: str
@@ -146,16 +172,19 @@ class MeetingAuditEventRecord:
 
 __all__ = [
 	"MEETING_STATUSES",
+	"MEETING_AGENT_ROLES",
 	"PARTICIPANT_ROLES",
 	"RECORDING_STATUSES",
 	"ROOM_STATUSES",
 	"CaptionRecord",
 	"MeetingAuditEventRecord",
 	"MeetingRecord",
+	"MeetingAgentRecord",
 	"MeetingRoomRecord",
 	"ParticipantRecord",
 	"RecordingRecord",
 	"meeting_required_actions",
+	"normalize_meeting_agent_role",
 	"normalize_participant_role",
 	"stable_id",
 	"utc_now",
