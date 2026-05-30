@@ -8,19 +8,83 @@
   },
   "capabilities": {
     "nlpc": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "configuration": "conf",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "nlpc_runtime.NlpcService",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "model_lifecycle": "mlcm",
+        "production_runtime": "service.NLPCService",
+        "search_index": "srch"
+      },
+      "approvals": {
+        "annotation_review": "NlpcAnnotation",
+        "model_release": "NlpcModelRegistration",
+        "pipeline_registration": "NlpcPipeline"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "nlpc_runtime.NlpcService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.NLPCService",
+          "search_index": "srch"
+        },
+        "annotation": {
+          "annotation_guidelines_required": true,
+          "golden_dataset_required": true,
+          "minimum_consensus_score": 0.8,
+          "review_required_for_disagreement": true
+        },
         "governance": {
           "audit_processing": true,
+          "auth_required": true,
+          "cross_tenant_processing_allowed": false,
           "model_policy_required": true,
           "pii_redaction_policy_required": true,
           "require_tenant_context": true
         },
+        "languages": {
+          "african_language_coverage_required": 40,
+          "auto_detection_enabled": true,
+          "language_policy_required": true,
+          "minimum_detection_confidence": 0.7
+        },
+        "model_registry": {
+          "evaluation_required": true,
+          "mlcm_link_required": true,
+          "model_policy_required": true,
+          "release_approval_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "pipelines": {
+          "batch_async_required": true,
+          "pipeline_owner_required": true,
+          "registered_model_required": true,
+          "versioned_pipeline_required": true
+        },
         "processing": {
           "async_threshold_documents": 25,
           "default_language": "auto",
+          "document_hash_required": true,
           "language_detection_required": true,
           "max_document_chars": 250000,
           "supported_languages": [
@@ -91,9 +155,13 @@
             "semantic_search",
             "summarization",
             "text_generation",
-            "pii_detection"
+            "pii_detection",
+            "translation",
+            "topic_modeling",
+            "keyword_extraction"
           ],
           "generation_safety_required": true,
+          "human_review_for_low_confidence": true,
           "minimum_confidence_score": 0.75
         },
         "tenant_id": "default",
@@ -103,9 +171,19 @@
         },
         "ui": {
           "enable_annotation_workbench": true,
+          "enable_audit_timeline": true,
+          "enable_batch_queue": true,
+          "enable_dashboard": true,
+          "enable_document_workbench": true,
+          "enable_governance": true,
           "enable_language_coverage": true,
+          "enable_lexicon_manager": true,
           "enable_model_registry": true,
-          "enable_processing_console": true
+          "enable_pipeline_designer": true,
+          "enable_processing_console": true,
+          "enable_review_console": true,
+          "enable_semantic_search": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -114,6 +192,16 @@
       "i18n": {},
       "master_data": {},
       "name": "NLP Core",
+      "nlp_lifecycle": {
+        "annotation": "NlpcAnnotation",
+        "annotation_project": "NlpcAnnotationProject",
+        "audit": "NlpcAuditEvent",
+        "document": "NlpcDocument",
+        "lexicon": "NlpcLexicon",
+        "model": "NlpcModelRegistration",
+        "pipeline": "NlpcPipeline",
+        "processing_run": "NlpcProcessingRun"
+      },
       "provides": [
         "nlpc_operations"
       ],
@@ -134,6 +222,46 @@
           },
           {
             "condition": {
+              "content_present": false,
+              "operation": "ingest_document"
+            },
+            "description": "Document ingestion requires non-empty content.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_content_required",
+              "required_action": "provide_document_text"
+            },
+            "name": "document_requires_content"
+          },
+          {
+            "condition": {
+              "document_chars_gt": 250000,
+              "operation": "ingest_document"
+            },
+            "description": "Documents must fit the configured processing size limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_too_large",
+              "required_action": "split_document"
+            },
+            "name": "document_size_within_limit"
+          },
+          {
+            "condition": {
+              "language_detection_enabled": false,
+              "language_known": false,
+              "operation": "ingest_document"
+            },
+            "description": "Document ingestion requires a language or detection permission.",
+            "effect": {
+              "decision": "deny",
+              "reason": "language_required",
+              "required_action": "run_language_detection"
+            },
+            "name": "document_requires_language_or_detection"
+          },
+          {
+            "condition": {
               "language_known": false,
               "operation": "process_document"
             },
@@ -144,6 +272,46 @@
               "required_action": "run_language_detection"
             },
             "name": "language_required_or_detected"
+          },
+          {
+            "condition": {
+              "language_supported": false,
+              "operation": "process_document"
+            },
+            "description": "Processing language must be supported by NLPC.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_language",
+              "required_action": "choose_supported_language"
+            },
+            "name": "language_must_be_supported"
+          },
+          {
+            "condition": {
+              "confidence_score_lt": 0.7,
+              "human_review_recorded": false,
+              "operation": "detect_language"
+            },
+            "description": "Low-confidence language detection requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "language_detection_review_required",
+              "required_action": "record_language_review"
+            },
+            "name": "language_detection_low_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "process_document",
+              "task_enabled": false
+            },
+            "description": "NLP tasks must be enabled for the tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "nlp_task_not_enabled",
+              "required_action": "enable_task_or_change_pipeline"
+            },
+            "name": "task_must_be_enabled"
           },
           {
             "condition": {
@@ -173,6 +341,58 @@
           },
           {
             "condition": {
+              "model_policy_attached": false,
+              "task": "text_generation"
+            },
+            "description": "Text generation requires model policy metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_policy_required",
+              "required_action": "attach_model_policy"
+            },
+            "name": "generation_requires_model_policy"
+          },
+          {
+            "condition": {
+              "task": "translation",
+              "translation_pair_present": false
+            },
+            "description": "Translation requires source and target language evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "translation_pair_required",
+              "required_action": "attach_source_and_target_languages"
+            },
+            "name": "translation_requires_source_and_target"
+          },
+          {
+            "condition": {
+              "search_index_attached": false,
+              "task": "semantic_search"
+            },
+            "description": "Semantic search requires a search index binding.",
+            "effect": {
+              "decision": "deny",
+              "reason": "search_index_required",
+              "required_action": "attach_search_index"
+            },
+            "name": "semantic_search_requires_index"
+          },
+          {
+            "condition": {
+              "length_budget_present": false,
+              "task": "summarization"
+            },
+            "description": "Summarization requires an output length budget.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "summary_length_budget_required",
+              "required_action": "record_summary_budget"
+            },
+            "name": "summarization_requires_length_budget"
+          },
+          {
+            "condition": {
               "confidence_score_lt": 0.75,
               "human_review_recorded": false
             },
@@ -196,6 +416,188 @@
               "required_action": "enable_async_queue"
             },
             "name": "large_batch_requires_async_queue"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "configure_batch_events"
+            },
+            "description": "Batch processing event streams must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "register_pipeline",
+              "owner_assigned": false
+            },
+            "description": "NLP pipelines require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pipeline_owner_required",
+              "required_action": "assign_pipeline_owner"
+            },
+            "name": "pipeline_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_pipeline",
+              "registered_model_attached": false
+            },
+            "description": "NLP pipelines require registered model linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_model_required",
+              "required_action": "attach_registered_model"
+            },
+            "name": "pipeline_requires_registered_model"
+          },
+          {
+            "condition": {
+              "operation": "register_pipeline",
+              "pipeline_version_present": false
+            },
+            "description": "NLP pipelines require version metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pipeline_version_required",
+              "required_action": "version_pipeline"
+            },
+            "name": "pipeline_requires_version"
+          },
+          {
+            "condition": {
+              "mlcm_model_ref_present": false,
+              "operation": "register_model"
+            },
+            "description": "NLP model registrations require MLCM linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mlcm_model_ref_required",
+              "required_action": "link_mlcm_model"
+            },
+            "name": "model_requires_mlcm_link"
+          },
+          {
+            "condition": {
+              "evaluation_recorded": false,
+              "operation": "release_model"
+            },
+            "description": "NLP model release requires evaluation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_evaluation_required",
+              "required_action": "record_model_evaluation"
+            },
+            "name": "model_release_requires_evaluation"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "release_model"
+            },
+            "description": "NLP model release requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_release_approval_required",
+              "required_action": "record_release_approval"
+            },
+            "name": "model_release_requires_approval"
+          },
+          {
+            "condition": {
+              "guidelines_present": false,
+              "operation": "create_annotation_project"
+            },
+            "description": "Annotation projects require guidelines.",
+            "effect": {
+              "decision": "deny",
+              "reason": "annotation_guidelines_required",
+              "required_action": "attach_annotation_guidelines"
+            },
+            "name": "annotation_requires_guidelines"
+          },
+          {
+            "condition": {
+              "adjudication_recorded": false,
+              "consensus_score_lt": 0.8,
+              "operation": "submit_annotation"
+            },
+            "description": "Low annotation consensus requires adjudication.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "annotation_adjudication_required",
+              "required_action": "record_annotation_adjudication"
+            },
+            "name": "annotation_low_consensus_requires_review"
+          },
+          {
+            "condition": {
+              "language_known": false,
+              "operation": "register_lexicon"
+            },
+            "description": "Tenant lexicons require language metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lexicon_language_required",
+              "required_action": "attach_lexicon_language"
+            },
+            "name": "lexicon_requires_language"
+          },
+          {
+            "condition": {
+              "operation": "record_quality_metric",
+              "owner_assigned": false
+            },
+            "description": "NLP quality metrics require accountable ownership.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "quality_metric_owner_required",
+              "required_action": "assign_metric_owner"
+            },
+            "name": "quality_metric_requires_owner"
+          },
+          {
+            "condition": {
+              "cross_tenant_processing": true
+            },
+            "description": "Cross-tenant text processing is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_processing_denied",
+              "required_action": "use_tenant_scoped_document"
+            },
+            "name": "cross_tenant_processing_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "NLP processing state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "audit_event_required_for_processing"
+          },
+          {
+            "condition": {
+              "african_language_count_lt": 40,
+              "operation": "validate_language_registry"
+            },
+            "description": "The language registry must keep at least 40 African language codes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "african_language_coverage_required",
+              "required_action": "restore_african_language_codes"
+            },
+            "name": "african_language_coverage_required"
           }
         ],
         "type": "deterministic"
@@ -215,6 +617,46 @@
         },
         {
           "condition": {
+            "content_present": false,
+            "operation": "ingest_document"
+          },
+          "description": "Document ingestion requires non-empty content.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_content_required",
+            "required_action": "provide_document_text"
+          },
+          "name": "document_requires_content"
+        },
+        {
+          "condition": {
+            "document_chars_gt": 250000,
+            "operation": "ingest_document"
+          },
+          "description": "Documents must fit the configured processing size limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_too_large",
+            "required_action": "split_document"
+          },
+          "name": "document_size_within_limit"
+        },
+        {
+          "condition": {
+            "language_detection_enabled": false,
+            "language_known": false,
+            "operation": "ingest_document"
+          },
+          "description": "Document ingestion requires a language or detection permission.",
+          "effect": {
+            "decision": "deny",
+            "reason": "language_required",
+            "required_action": "run_language_detection"
+          },
+          "name": "document_requires_language_or_detection"
+        },
+        {
+          "condition": {
             "language_known": false,
             "operation": "process_document"
           },
@@ -225,6 +667,46 @@
             "required_action": "run_language_detection"
           },
           "name": "language_required_or_detected"
+        },
+        {
+          "condition": {
+            "language_supported": false,
+            "operation": "process_document"
+          },
+          "description": "Processing language must be supported by NLPC.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_language",
+            "required_action": "choose_supported_language"
+          },
+          "name": "language_must_be_supported"
+        },
+        {
+          "condition": {
+            "confidence_score_lt": 0.7,
+            "human_review_recorded": false,
+            "operation": "detect_language"
+          },
+          "description": "Low-confidence language detection requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "language_detection_review_required",
+            "required_action": "record_language_review"
+          },
+          "name": "language_detection_low_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "process_document",
+            "task_enabled": false
+          },
+          "description": "NLP tasks must be enabled for the tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "nlp_task_not_enabled",
+            "required_action": "enable_task_or_change_pipeline"
+          },
+          "name": "task_must_be_enabled"
         },
         {
           "condition": {
@@ -254,6 +736,58 @@
         },
         {
           "condition": {
+            "model_policy_attached": false,
+            "task": "text_generation"
+          },
+          "description": "Text generation requires model policy metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_policy_required",
+            "required_action": "attach_model_policy"
+          },
+          "name": "generation_requires_model_policy"
+        },
+        {
+          "condition": {
+            "task": "translation",
+            "translation_pair_present": false
+          },
+          "description": "Translation requires source and target language evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "translation_pair_required",
+            "required_action": "attach_source_and_target_languages"
+          },
+          "name": "translation_requires_source_and_target"
+        },
+        {
+          "condition": {
+            "search_index_attached": false,
+            "task": "semantic_search"
+          },
+          "description": "Semantic search requires a search index binding.",
+          "effect": {
+            "decision": "deny",
+            "reason": "search_index_required",
+            "required_action": "attach_search_index"
+          },
+          "name": "semantic_search_requires_index"
+        },
+        {
+          "condition": {
+            "length_budget_present": false,
+            "task": "summarization"
+          },
+          "description": "Summarization requires an output length budget.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "summary_length_budget_required",
+            "required_action": "record_summary_budget"
+          },
+          "name": "summarization_requires_length_budget"
+        },
+        {
+          "condition": {
             "confidence_score_lt": 0.75,
             "human_review_recorded": false
           },
@@ -277,19 +811,212 @@
             "required_action": "enable_async_queue"
           },
           "name": "large_batch_requires_async_queue"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "configure_batch_events"
+          },
+          "description": "Batch processing event streams must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "register_pipeline",
+            "owner_assigned": false
+          },
+          "description": "NLP pipelines require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pipeline_owner_required",
+            "required_action": "assign_pipeline_owner"
+          },
+          "name": "pipeline_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_pipeline",
+            "registered_model_attached": false
+          },
+          "description": "NLP pipelines require registered model linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_model_required",
+            "required_action": "attach_registered_model"
+          },
+          "name": "pipeline_requires_registered_model"
+        },
+        {
+          "condition": {
+            "operation": "register_pipeline",
+            "pipeline_version_present": false
+          },
+          "description": "NLP pipelines require version metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pipeline_version_required",
+            "required_action": "version_pipeline"
+          },
+          "name": "pipeline_requires_version"
+        },
+        {
+          "condition": {
+            "mlcm_model_ref_present": false,
+            "operation": "register_model"
+          },
+          "description": "NLP model registrations require MLCM linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mlcm_model_ref_required",
+            "required_action": "link_mlcm_model"
+          },
+          "name": "model_requires_mlcm_link"
+        },
+        {
+          "condition": {
+            "evaluation_recorded": false,
+            "operation": "release_model"
+          },
+          "description": "NLP model release requires evaluation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_evaluation_required",
+            "required_action": "record_model_evaluation"
+          },
+          "name": "model_release_requires_evaluation"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "release_model"
+          },
+          "description": "NLP model release requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_release_approval_required",
+            "required_action": "record_release_approval"
+          },
+          "name": "model_release_requires_approval"
+        },
+        {
+          "condition": {
+            "guidelines_present": false,
+            "operation": "create_annotation_project"
+          },
+          "description": "Annotation projects require guidelines.",
+          "effect": {
+            "decision": "deny",
+            "reason": "annotation_guidelines_required",
+            "required_action": "attach_annotation_guidelines"
+          },
+          "name": "annotation_requires_guidelines"
+        },
+        {
+          "condition": {
+            "adjudication_recorded": false,
+            "consensus_score_lt": 0.8,
+            "operation": "submit_annotation"
+          },
+          "description": "Low annotation consensus requires adjudication.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "annotation_adjudication_required",
+            "required_action": "record_annotation_adjudication"
+          },
+          "name": "annotation_low_consensus_requires_review"
+        },
+        {
+          "condition": {
+            "language_known": false,
+            "operation": "register_lexicon"
+          },
+          "description": "Tenant lexicons require language metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lexicon_language_required",
+            "required_action": "attach_lexicon_language"
+          },
+          "name": "lexicon_requires_language"
+        },
+        {
+          "condition": {
+            "operation": "record_quality_metric",
+            "owner_assigned": false
+          },
+          "description": "NLP quality metrics require accountable ownership.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "quality_metric_owner_required",
+            "required_action": "assign_metric_owner"
+          },
+          "name": "quality_metric_requires_owner"
+        },
+        {
+          "condition": {
+            "cross_tenant_processing": true
+          },
+          "description": "Cross-tenant text processing is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_processing_denied",
+            "required_action": "use_tenant_scoped_document"
+          },
+          "name": "cross_tenant_processing_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "NLP processing state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "audit_event_required_for_processing"
+        },
+        {
+          "condition": {
+            "african_language_count_lt": 40,
+            "operation": "validate_language_registry"
+          },
+          "description": "The language registry must keep at least 40 African language codes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "african_language_coverage_required",
+            "required_action": "restore_african_language_codes"
+          },
+          "name": "african_language_coverage_required"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "production_service": "service.NLPCService",
+        "service": "nlpc_runtime.NlpcService",
+        "views": "view_models.py"
       },
       "screens": {
         "annotations": {
           "component": "AnnotationWorkbench",
           "permission": "nlpc:annotate",
           "route": "/nlpc/annotations"
+        },
+        "audit": {
+          "component": "NLPCAuditTimeline",
+          "permission": "nlpc:view",
+          "route": "/nlpc/audit"
+        },
+        "batches": {
+          "component": "BatchQueue",
+          "permission": "nlpc:process",
+          "route": "/nlpc/batches"
         },
         "dashboard": {
           "component": "NLPCDashboard",
@@ -311,15 +1038,35 @@
           "permission": "nlpc:view",
           "route": "/nlpc/languages"
         },
+        "lexicons": {
+          "component": "LexiconManager",
+          "permission": "nlpc:manage_models",
+          "route": "/nlpc/lexicons"
+        },
         "models": {
           "component": "NLPModelRegistry",
           "permission": "nlpc:manage_models",
           "route": "/nlpc/models"
         },
+        "pipelines": {
+          "component": "PipelineDesigner",
+          "permission": "nlpc:manage_models",
+          "route": "/nlpc/pipelines"
+        },
         "process": {
           "component": "ProcessingConsole",
           "permission": "nlpc:process",
           "route": "/nlpc/process"
+        },
+        "review": {
+          "component": "HumanReviewConsole",
+          "permission": "nlpc:annotate",
+          "route": "/nlpc/review"
+        },
+        "search": {
+          "component": "SemanticSearchConsole",
+          "permission": "nlpc:process",
+          "route": "/nlpc/search"
         },
         "settings": {
           "component": "NLPCSettings",
@@ -327,12 +1074,22 @@
           "route": "/nlpc/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
           "annotation_panel": {
             "status_style": "review-chip",
             "visual": "span-highlighter"
+          },
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
+          "batch_queue": {
+            "status_style": "async-chip",
+            "visual": "document-stack"
           },
           "document_queue": {
             "icon": "file-text",
@@ -343,9 +1100,21 @@
             "highlight": "african-language-chip",
             "visual": "coverage-grid"
           },
+          "lexicon_manager": {
+            "status_style": "language-chip",
+            "visual": "term-table"
+          },
           "model_result_card": {
             "threshold_style": "quality-band",
             "visual": "confidence-meter"
+          },
+          "pipeline_designer": {
+            "status_style": "model-policy-chip",
+            "visual": "task-chain"
+          },
+          "semantic_search": {
+            "highlight": "similarity-chip",
+            "visual": "ranked-results"
           }
         },
         "name": "nlpc_text_intelligence",
@@ -389,10 +1158,31 @@
             "permission": "nlpc:process"
           },
           {
+            "component": "PipelineDesigner",
+            "name": "pipelines",
+            "nav_group": "Process",
+            "path": "/nlpc/pipelines",
+            "permission": "nlpc:manage_models"
+          },
+          {
+            "component": "BatchQueue",
+            "name": "batches",
+            "nav_group": "Process",
+            "path": "/nlpc/batches",
+            "permission": "nlpc:process"
+          },
+          {
             "component": "AnnotationWorkbench",
             "name": "annotations",
             "nav_group": "Quality",
             "path": "/nlpc/annotations",
+            "permission": "nlpc:annotate"
+          },
+          {
+            "component": "HumanReviewConsole",
+            "name": "review",
+            "nav_group": "Quality",
+            "path": "/nlpc/review",
             "permission": "nlpc:annotate"
           },
           {
@@ -410,11 +1200,32 @@
             "permission": "nlpc:view"
           },
           {
+            "component": "LexiconManager",
+            "name": "lexicons",
+            "nav_group": "Coverage",
+            "path": "/nlpc/lexicons",
+            "permission": "nlpc:manage_models"
+          },
+          {
+            "component": "SemanticSearchConsole",
+            "name": "search",
+            "nav_group": "Search",
+            "path": "/nlpc/search",
+            "permission": "nlpc:process"
+          },
+          {
             "component": "NLPGovernance",
             "name": "governance",
             "nav_group": "Governance",
             "path": "/nlpc/governance",
             "permission": "nlpc:govern"
+          },
+          {
+            "component": "NLPCAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/nlpc/audit",
+            "permission": "nlpc:view"
           },
           {
             "component": "NLPCSettings",
@@ -429,7 +1240,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -443,15 +1254,62 @@
   "contracts": {
     "nlpc": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "nlpc_runtime.NlpcService",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.NLPCService",
+          "search_index": "srch"
+        },
+        "annotation": {
+          "annotation_guidelines_required": true,
+          "golden_dataset_required": true,
+          "minimum_consensus_score": 0.8,
+          "review_required_for_disagreement": true
+        },
         "governance": {
           "audit_processing": true,
+          "auth_required": true,
+          "cross_tenant_processing_allowed": false,
           "model_policy_required": true,
           "pii_redaction_policy_required": true,
           "require_tenant_context": true
         },
+        "languages": {
+          "african_language_coverage_required": 40,
+          "auto_detection_enabled": true,
+          "language_policy_required": true,
+          "minimum_detection_confidence": 0.7
+        },
+        "model_registry": {
+          "evaluation_required": true,
+          "mlcm_link_required": true,
+          "model_policy_required": true,
+          "release_approval_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "pipelines": {
+          "batch_async_required": true,
+          "pipeline_owner_required": true,
+          "registered_model_required": true,
+          "versioned_pipeline_required": true
+        },
         "processing": {
           "async_threshold_documents": 25,
           "default_language": "auto",
+          "document_hash_required": true,
           "language_detection_required": true,
           "max_document_chars": 250000,
           "supported_languages": [
@@ -522,9 +1380,13 @@
             "semantic_search",
             "summarization",
             "text_generation",
-            "pii_detection"
+            "pii_detection",
+            "translation",
+            "topic_modeling",
+            "keyword_extraction"
           ],
           "generation_safety_required": true,
+          "human_review_for_low_confidence": true,
           "minimum_confidence_score": 0.75
         },
         "tenant_id": "default",
@@ -534,9 +1396,19 @@
         },
         "ui": {
           "enable_annotation_workbench": true,
+          "enable_audit_timeline": true,
+          "enable_batch_queue": true,
+          "enable_dashboard": true,
+          "enable_document_workbench": true,
+          "enable_governance": true,
           "enable_language_coverage": true,
+          "enable_lexicon_manager": true,
           "enable_model_registry": true,
-          "enable_processing_console": true
+          "enable_pipeline_designer": true,
+          "enable_processing_console": true,
+          "enable_review_console": true,
+          "enable_semantic_search": true,
+          "enable_settings": true
         }
       },
       "id": "nlpc",
@@ -576,6 +1448,137 @@
   },
   "roles": {},
   "rules": {
+    "african_language_coverage_required": {
+      "condition": {
+        "african_language_count_lt": 40,
+        "operation": "validate_language_registry"
+      },
+      "description": "The language registry must keep at least 40 African language codes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "african_language_coverage_required",
+        "required_action": "restore_african_language_codes"
+      },
+      "name": "african_language_coverage_required"
+    },
+    "annotation_low_consensus_requires_review": {
+      "condition": {
+        "adjudication_recorded": false,
+        "consensus_score_lt": 0.8,
+        "operation": "submit_annotation"
+      },
+      "description": "Low annotation consensus requires adjudication.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "annotation_adjudication_required",
+        "required_action": "record_annotation_adjudication"
+      },
+      "name": "annotation_low_consensus_requires_review"
+    },
+    "annotation_requires_guidelines": {
+      "condition": {
+        "guidelines_present": false,
+        "operation": "create_annotation_project"
+      },
+      "description": "Annotation projects require guidelines.",
+      "effect": {
+        "decision": "deny",
+        "reason": "annotation_guidelines_required",
+        "required_action": "attach_annotation_guidelines"
+      },
+      "name": "annotation_requires_guidelines"
+    },
+    "audit_event_required_for_processing": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "NLP processing state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "audit_event_required_for_processing"
+    },
+    "batch_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "configure_batch_events"
+      },
+      "description": "Batch processing event streams must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_requires_bytewax_stream"
+    },
+    "cross_tenant_processing_denied": {
+      "condition": {
+        "cross_tenant_processing": true
+      },
+      "description": "Cross-tenant text processing is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_processing_denied",
+        "required_action": "use_tenant_scoped_document"
+      },
+      "name": "cross_tenant_processing_denied"
+    },
+    "document_requires_content": {
+      "condition": {
+        "content_present": false,
+        "operation": "ingest_document"
+      },
+      "description": "Document ingestion requires non-empty content.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_content_required",
+        "required_action": "provide_document_text"
+      },
+      "name": "document_requires_content"
+    },
+    "document_requires_language_or_detection": {
+      "condition": {
+        "language_detection_enabled": false,
+        "language_known": false,
+        "operation": "ingest_document"
+      },
+      "description": "Document ingestion requires a language or detection permission.",
+      "effect": {
+        "decision": "deny",
+        "reason": "language_required",
+        "required_action": "run_language_detection"
+      },
+      "name": "document_requires_language_or_detection"
+    },
+    "document_size_within_limit": {
+      "condition": {
+        "document_chars_gt": 250000,
+        "operation": "ingest_document"
+      },
+      "description": "Documents must fit the configured processing size limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_too_large",
+        "required_action": "split_document"
+      },
+      "name": "document_size_within_limit"
+    },
+    "generation_requires_model_policy": {
+      "condition": {
+        "model_policy_attached": false,
+        "task": "text_generation"
+      },
+      "description": "Text generation requires model policy metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_policy_required",
+        "required_action": "attach_model_policy"
+      },
+      "name": "generation_requires_model_policy"
+    },
     "generation_requires_safety_policy": {
       "condition": {
         "safety_policy_attached": false,
@@ -588,6 +1591,33 @@
         "required_action": "attach_safety_policy"
       },
       "name": "generation_requires_safety_policy"
+    },
+    "language_detection_low_confidence_requires_review": {
+      "condition": {
+        "confidence_score_lt": 0.7,
+        "human_review_recorded": false,
+        "operation": "detect_language"
+      },
+      "description": "Low-confidence language detection requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "language_detection_review_required",
+        "required_action": "record_language_review"
+      },
+      "name": "language_detection_low_confidence_requires_review"
+    },
+    "language_must_be_supported": {
+      "condition": {
+        "language_supported": false,
+        "operation": "process_document"
+      },
+      "description": "Processing language must be supported by NLPC.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_language",
+        "required_action": "choose_supported_language"
+      },
+      "name": "language_must_be_supported"
     },
     "language_required_or_detected": {
       "condition": {
@@ -615,6 +1645,19 @@
       },
       "name": "large_batch_requires_async_queue"
     },
+    "lexicon_requires_language": {
+      "condition": {
+        "language_known": false,
+        "operation": "register_lexicon"
+      },
+      "description": "Tenant lexicons require language metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "lexicon_language_required",
+        "required_action": "attach_lexicon_language"
+      },
+      "name": "lexicon_requires_language"
+    },
     "low_confidence_requires_review": {
       "condition": {
         "confidence_score_lt": 0.75,
@@ -627,6 +1670,45 @@
         "required_action": "record_human_review"
       },
       "name": "low_confidence_requires_review"
+    },
+    "model_release_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "release_model"
+      },
+      "description": "NLP model release requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_release_approval_required",
+        "required_action": "record_release_approval"
+      },
+      "name": "model_release_requires_approval"
+    },
+    "model_release_requires_evaluation": {
+      "condition": {
+        "evaluation_recorded": false,
+        "operation": "release_model"
+      },
+      "description": "NLP model release requires evaluation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_evaluation_required",
+        "required_action": "record_model_evaluation"
+      },
+      "name": "model_release_requires_evaluation"
+    },
+    "model_requires_mlcm_link": {
+      "condition": {
+        "mlcm_model_ref_present": false,
+        "operation": "register_model"
+      },
+      "description": "NLP model registrations require MLCM linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mlcm_model_ref_required",
+        "required_action": "link_mlcm_model"
+      },
+      "name": "model_requires_mlcm_link"
     },
     "pii_requires_redaction_policy": {
       "condition": {
@@ -641,6 +1723,97 @@
       },
       "name": "pii_requires_redaction_policy"
     },
+    "pipeline_requires_owner": {
+      "condition": {
+        "operation": "register_pipeline",
+        "owner_assigned": false
+      },
+      "description": "NLP pipelines require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pipeline_owner_required",
+        "required_action": "assign_pipeline_owner"
+      },
+      "name": "pipeline_requires_owner"
+    },
+    "pipeline_requires_registered_model": {
+      "condition": {
+        "operation": "register_pipeline",
+        "registered_model_attached": false
+      },
+      "description": "NLP pipelines require registered model linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_model_required",
+        "required_action": "attach_registered_model"
+      },
+      "name": "pipeline_requires_registered_model"
+    },
+    "pipeline_requires_version": {
+      "condition": {
+        "operation": "register_pipeline",
+        "pipeline_version_present": false
+      },
+      "description": "NLP pipelines require version metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pipeline_version_required",
+        "required_action": "version_pipeline"
+      },
+      "name": "pipeline_requires_version"
+    },
+    "quality_metric_requires_owner": {
+      "condition": {
+        "operation": "record_quality_metric",
+        "owner_assigned": false
+      },
+      "description": "NLP quality metrics require accountable ownership.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "quality_metric_owner_required",
+        "required_action": "assign_metric_owner"
+      },
+      "name": "quality_metric_requires_owner"
+    },
+    "semantic_search_requires_index": {
+      "condition": {
+        "search_index_attached": false,
+        "task": "semantic_search"
+      },
+      "description": "Semantic search requires a search index binding.",
+      "effect": {
+        "decision": "deny",
+        "reason": "search_index_required",
+        "required_action": "attach_search_index"
+      },
+      "name": "semantic_search_requires_index"
+    },
+    "summarization_requires_length_budget": {
+      "condition": {
+        "length_budget_present": false,
+        "task": "summarization"
+      },
+      "description": "Summarization requires an output length budget.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "summary_length_budget_required",
+        "required_action": "record_summary_budget"
+      },
+      "name": "summarization_requires_length_budget"
+    },
+    "task_must_be_enabled": {
+      "condition": {
+        "operation": "process_document",
+        "task_enabled": false
+      },
+      "description": "NLP tasks must be enabled for the tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "nlp_task_not_enabled",
+        "required_action": "enable_task_or_change_pipeline"
+      },
+      "name": "task_must_be_enabled"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -652,11 +1825,26 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "translation_requires_source_and_target": {
+      "condition": {
+        "task": "translation",
+        "translation_pair_present": false
+      },
+      "description": "Translation requires source and target language evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "translation_pair_required",
+        "required_action": "attach_source_and_target_languages"
+      },
+      "name": "translation_requires_source_and_target"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "nlpc_runtime.py",
+    "view_models.py"
   ],
   "symbols": {
     "capability.nlpc": {

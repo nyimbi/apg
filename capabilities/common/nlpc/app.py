@@ -5,13 +5,122 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "NLP Core package-backed APG capability", "entity_count": 0, "name": "nlpc", "version": "1.0.0"}, "capabilities": {"nlpc": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_processing": true, "model_policy_required": true, "pii_redaction_policy_required": true, "require_tenant_context": true}, "processing": {"async_threshold_documents": 25, "default_language": "auto", "language_detection_required": true, "max_document_chars": 250000, "supported_languages": ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko", "ar", "hi", "af", "aa", "ak", "am", "bm", "ee", "ff", "ha", "ig", "kr", "ki", "rw", "rn", "kg", "ln", "lg", "mg", "ny", "om", "sg", "sn", "so", "st", "sw", "ss", "ti", "ts", "tn", "tw", "ve", "wo", "xh", "yo", "zu", "kab", "kam", "luo", "mas", "mer", "mos", "nus", "suk", "tzm", "tig", "umb"]}, "tasks": {"enabled": ["text_classification", "sentiment_analysis", "entity_recognition", "semantic_search", "summarization", "text_generation", "pii_detection"], "generation_safety_required": true, "minimum_confidence_score": 0.75}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "nlpc_text_intelligence"}, "ui": {"enable_annotation_workbench": true, "enable_language_coverage": true, "enable_model_registry": true, "enable_processing_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "NLP Core", "provides": ["nlpc_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All NLP operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"language_known": false, "operation": "process_document"}, "description": "Processing requires a declared or detected language.", "effect": {"decision": "deny", "reason": "language_required", "required_action": "run_language_detection"}, "name": "language_required_or_detected"}, {"condition": {"redaction_policy_attached": false, "task": "pii_detection"}, "description": "PII extraction requires a redaction policy.", "effect": {"decision": "deny", "reason": "pii_redaction_policy_required", "required_action": "attach_redaction_policy"}, "name": "pii_requires_redaction_policy"}, {"condition": {"safety_policy_attached": false, "task": "text_generation"}, "description": "Text generation requires a model safety policy.", "effect": {"decision": "deny", "reason": "generation_safety_policy_required", "required_action": "attach_safety_policy"}, "name": "generation_requires_safety_policy"}, {"condition": {"confidence_score_lt": 0.75, "human_review_recorded": false}, "description": "Low-confidence NLP results require review.", "effect": {"decision": "require_review", "reason": "low_confidence_review_required", "required_action": "record_human_review"}, "name": "low_confidence_requires_review"}, {"condition": {"async_queue_enabled": false, "document_count_gt": 25}, "description": "Large NLP batches must run through the async queue.", "effect": {"decision": "require_review", "reason": "large_batch_requires_async_queue", "required_action": "enable_async_queue"}, "name": "large_batch_requires_async_queue"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All NLP operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"language_known": false, "operation": "process_document"}, "description": "Processing requires a declared or detected language.", "effect": {"decision": "deny", "reason": "language_required", "required_action": "run_language_detection"}, "name": "language_required_or_detected"}, {"condition": {"redaction_policy_attached": false, "task": "pii_detection"}, "description": "PII extraction requires a redaction policy.", "effect": {"decision": "deny", "reason": "pii_redaction_policy_required", "required_action": "attach_redaction_policy"}, "name": "pii_requires_redaction_policy"}, {"condition": {"safety_policy_attached": false, "task": "text_generation"}, "description": "Text generation requires a model safety policy.", "effect": {"decision": "deny", "reason": "generation_safety_policy_required", "required_action": "attach_safety_policy"}, "name": "generation_requires_safety_policy"}, {"condition": {"confidence_score_lt": 0.75, "human_review_recorded": false}, "description": "Low-confidence NLP results require review.", "effect": {"decision": "require_review", "reason": "low_confidence_review_required", "required_action": "record_human_review"}, "name": "low_confidence_requires_review"}, {"condition": {"async_queue_enabled": false, "document_count_gt": 25}, "description": "Large NLP batches must run through the async queue.", "effect": {"decision": "require_review", "reason": "large_batch_requires_async_queue", "required_action": "enable_async_queue"}, "name": "large_batch_requires_async_queue"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"annotations": {"component": "AnnotationWorkbench", "permission": "nlpc:annotate", "route": "/nlpc/annotations"}, "dashboard": {"component": "NLPCDashboard", "permission": "nlpc:view", "route": "/nlpc/dashboard"}, "documents": {"component": "DocumentWorkbench", "permission": "nlpc:process", "route": "/nlpc/documents"}, "governance": {"component": "NLPGovernance", "permission": "nlpc:govern", "route": "/nlpc/governance"}, "languages": {"component": "LanguageCoverage", "permission": "nlpc:view", "route": "/nlpc/languages"}, "models": {"component": "NLPModelRegistry", "permission": "nlpc:manage_models", "route": "/nlpc/models"}, "process": {"component": "ProcessingConsole", "permission": "nlpc:process", "route": "/nlpc/process"}, "settings": {"component": "NLPCSettings", "permission": "nlpc:admin", "route": "/nlpc/settings"}}, "streaming": {}, "theme": {"components": {"annotation_panel": {"status_style": "review-chip", "visual": "span-highlighter"}, "document_queue": {"icon": "file-text", "risk_style": "policy-band", "status_indicator": "processing-pill"}, "language_coverage_map": {"highlight": "african-language-chip", "visual": "coverage-grid"}, "model_result_card": {"threshold_style": "quality-band", "visual": "confidence-meter"}}, "name": "nlpc_text_intelligence", "tokens": {"border.radius": "8px", "color.accent": "#C44536", "color.danger": "#C53030", "color.primary": "#28536B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/nlpc/api/v1", "requires_theme": true, "routes": [{"component": "NLPCDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/nlpc/dashboard", "permission": "nlpc:view"}, {"component": "ProcessingConsole", "name": "process", "nav_group": "Process", "path": "/nlpc/process", "permission": "nlpc:process"}, {"component": "DocumentWorkbench", "name": "documents", "nav_group": "Process", "path": "/nlpc/documents", "permission": "nlpc:process"}, {"component": "AnnotationWorkbench", "name": "annotations", "nav_group": "Quality", "path": "/nlpc/annotations", "permission": "nlpc:annotate"}, {"component": "NLPModelRegistry", "name": "models", "nav_group": "Models", "path": "/nlpc/models", "permission": "nlpc:manage_models"}, {"component": "LanguageCoverage", "name": "languages", "nav_group": "Coverage", "path": "/nlpc/languages", "permission": "nlpc:view"}, {"component": "NLPGovernance", "name": "governance", "nav_group": "Governance", "path": "/nlpc/governance", "permission": "nlpc:govern"}, {"component": "NLPCSettings", "name": "settings", "nav_group": "Administration", "path": "/nlpc/settings", "permission": "nlpc:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"nlpc": []}}, "contracts": {"nlpc": {"configuration": {"governance": {"audit_processing": true, "model_policy_required": true, "pii_redaction_policy_required": true, "require_tenant_context": true}, "processing": {"async_threshold_documents": 25, "default_language": "auto", "language_detection_required": true, "max_document_chars": 250000, "supported_languages": ["en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko", "ar", "hi", "af", "aa", "ak", "am", "bm", "ee", "ff", "ha", "ig", "kr", "ki", "rw", "rn", "kg", "ln", "lg", "mg", "ny", "om", "sg", "sn", "so", "st", "sw", "ss", "ti", "ts", "tn", "tw", "ve", "wo", "xh", "yo", "zu", "kab", "kam", "luo", "mas", "mer", "mos", "nus", "suk", "tzm", "tig", "umb"]}, "tasks": {"enabled": ["text_classification", "sentiment_analysis", "entity_recognition", "semantic_search", "summarization", "text_generation", "pii_detection"], "generation_safety_required": true, "minimum_confidence_score": 0.75}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "nlpc_text_intelligence"}, "ui": {"enable_annotation_workbench": true, "enable_language_coverage": true, "enable_model_registry": true, "enable_processing_console": true}}, "id": "nlpc", "provides": ["nlpc_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"nlpc": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"generation_requires_safety_policy": {"condition": {"safety_policy_attached": false, "task": "text_generation"}, "description": "Text generation requires a model safety policy.", "effect": {"decision": "deny", "reason": "generation_safety_policy_required", "required_action": "attach_safety_policy"}, "name": "generation_requires_safety_policy"}, "language_required_or_detected": {"condition": {"language_known": false, "operation": "process_document"}, "description": "Processing requires a declared or detected language.", "effect": {"decision": "deny", "reason": "language_required", "required_action": "run_language_detection"}, "name": "language_required_or_detected"}, "large_batch_requires_async_queue": {"condition": {"async_queue_enabled": false, "document_count_gt": 25}, "description": "Large NLP batches must run through the async queue.", "effect": {"decision": "require_review", "reason": "large_batch_requires_async_queue", "required_action": "enable_async_queue"}, "name": "large_batch_requires_async_queue"}, "low_confidence_requires_review": {"condition": {"confidence_score_lt": 0.75, "human_review_recorded": false}, "description": "Low-confidence NLP results require review.", "effect": {"decision": "require_review", "reason": "low_confidence_review_required", "required_action": "record_human_review"}, "name": "low_confidence_requires_review"}, "pii_requires_redaction_policy": {"condition": {"redaction_policy_attached": false, "task": "pii_detection"}, "description": "PII extraction requires a redaction policy.", "effect": {"decision": "deny", "reason": "pii_redaction_policy_required", "required_action": "attach_redaction_policy"}, "name": "pii_requires_redaction_policy"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All NLP operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.nlpc": {"file": "capability_contract.py", "id": "capability.nlpc", "kind": "capability", "name": "NLP Core", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("nlpc_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "nlpc",
+			"version": "1.0.0",
+			"description": "NLP Core package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"nlpc": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"nlpc": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["nlpc_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"model_release": "NlpcModelRegistration",
+					"annotation_review": "NlpcAnnotation",
+					"pipeline_registration": "NlpcPipeline",
+				},
+				"nlp_lifecycle": {
+					"document": "NlpcDocument",
+					"processing_run": "NlpcProcessingRun",
+					"pipeline": "NlpcPipeline",
+					"model": "NlpcModelRegistration",
+					"annotation_project": "NlpcAnnotationProject",
+					"annotation": "NlpcAnnotation",
+					"lexicon": "NlpcLexicon",
+					"audit": "NlpcAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"nlpc": {
+				"id": "nlpc",
+				"configuration": contract["configuration"],
+				"provides": ["nlpc_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"nlpc": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "nlpc_runtime.py", "view_models.py"],
+		"symbols": {
+			"capability.nlpc": {
+				"id": "capability.nlpc",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +145,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("nlpc", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "nlpc" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("NLPC semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("NLPC semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("NLPC adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "nlpc_runtime.NlpcService":
+		errors.append("NLPC generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

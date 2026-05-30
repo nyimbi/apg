@@ -14066,3 +14066,57 @@ Not run to preserve battery:
 - Rendered browser UI behavior.
 - Persistent database migrations.
 - Load, latency, convergence, poisoning, privacy, and throughput benchmarks.
+
+### 2026-05-30 08:39 EAT
+
+NLPC lifecycle and guardrail packet:
+
+- Selected `capabilities/common/nlpc` as the next common capability after FEDL
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the packet docs and executable contract.
+- Expanded the NLPC contract to 30 deterministic guardrails, 14 UI routes,
+  document/language/task/pipeline/annotation/model/observability/adapter
+  configuration, Bytewax event-stream adapter evidence, and text-intelligence
+  console theme components.
+- Added `nlpc_runtime.NlpcService` as the dependency-light generated-app
+  runtime for document ingestion, processing runs, pipelines, model registration
+  and release, annotation projects, annotations, lexicons, audit events, list
+  surfaces, dashboard summaries, and APG record compatibility.
+- Added `view_models.py` with generated-app view models for dashboard,
+  processing, documents, pipelines, batches, annotations, review, models,
+  languages, lexicons, search, governance, and audit.
+- Updated capability registration with canonical AICR, MLCM, CONF, AUTH, AUDL,
+  MONI, SRCH, RAGN, CACH, Bytewax adapter evidence, richer endpoints, and
+  search/review permissions.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed stale package tests to package-contract wording and expanded focused
+  tests for Bytewax, rule count, route count, African language coverage,
+  runtime lifecycle, generated UI models, package evidence, and guardrails.
+- Manual review found and fixed accidental missing-key rule matches in the
+  NLPC rule engine so rules only trigger from explicit context evidence.
+- Review-agent pass found and fixed preflight guardrail ordering, non-Bytewax
+  event-stream enforcement, and committed package-evidence assertions.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules; the tests include a preflight assertion that denied tasks do not execute before policy checks.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and NLPC capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/nlpc --json` passed with `ok: true`; NLPC remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/nlpc --json` passed with 14 UI routes, 30 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/nlpc/README.md capabilities/common/nlpc/SPECIFICATION.md capabilities/common/nlpc/PLAN.md capabilities/common/nlpc/cap_spec.md capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/tests/test_package_contract.py capabilities/common/nlpc/package_manifest.json capabilities/common/nlpc/release_report.json capabilities/common/nlpc/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/nlpc docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live model provider calls.
+- Live Bytewax stream execution.
+- External AICR, MLCM, CONF, AUTH, AUDL, MONI, and SRCH adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Legacy heavy NLPC service, API, and Flask-AppBuilder tests.
+- Load, latency, drift, accuracy, token-cost, and throughput benchmarks.

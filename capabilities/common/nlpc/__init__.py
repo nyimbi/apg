@@ -34,12 +34,12 @@ CAPABILITY_INFO = {
 	"subcategory": "nlp",
 	"priority": "high",
 	"dependencies": [
-		"aicr",      # AI Core Framework for model orchestration
-		"mlcm",      # Machine Learning Core Management
-		"conf",      # Configuration management
-		"auth_rbac", # Authentication and authorization
-		"audit_compliance",  # Audit trails and compliance
-		"real_time_collaboration"  # Real-time processing
+		"aicr",  # AI Core Framework for model orchestration
+		"mlcm",  # Machine Learning Core Management
+		"conf",  # Configuration management
+		"auth",  # Authentication and authorization
+		"audl",  # Audit ledger
+		"moni"  # Metrics and monitoring
 	],
 	"provides": [
 		"text_processing",
@@ -243,25 +243,34 @@ def register_capability() -> dict[str, Any]:
 		"display_name": "NLP Core",
 		"description": CAPABILITY_INFO["description"],
 		"version": CAPABILITY_INFO["version"],
-		"dependencies": ["aicr", "mlcm", "conf"],
-		"optional_dependencies": ["auth", "audl", "mqeb", "cach", "ragn"],
+		"dependencies": ["aicr", "mlcm", "conf", "auth", "audl", "moni"],
+		"optional_dependencies": ["srch", "ragn", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"adapters": contract["configuration"]["adapters"],
 		"capabilities": {
 			"text_processing": "Process tenant-scoped documents through NLP pipelines",
 			"language_analysis": "Detect and normalize languages, including broad African language coverage",
 			"sentiment_analysis": "Score sentiment, emotion, and intent for governed text workloads",
 			"entity_recognition": "Extract named entities, keywords, and PII signals",
 			"text_generation": "Route generation and summarization with safety controls",
+			"pipeline_management": "Configure versioned NLP task pipelines with owner and model linkage",
+			"annotation_governance": "Manage annotation projects, consensus, adjudication, and review work",
+			"model_release": "Link NLP model registrations to MLCM evaluation and release approval",
+			"semantic_search": "Expose search-index binding metadata for text retrieval workflows",
 			"capability_rules": "Evaluate deterministic NLP governance rules",
 			"visual_theming": "Apply text-intelligence console theme tokens and components"
 		},
 		"endpoints": {
 			"documents": "/nlpc/api/v1/documents",
 			"process": "/nlpc/api/v1/process",
+			"pipelines": "/nlpc/api/v1/pipelines",
+			"annotations": "/nlpc/api/v1/annotations",
 			"models": "/nlpc/api/v1/models",
 			"languages": "/nlpc/api/v1/languages",
+			"lexicons": "/nlpc/api/v1/lexicons",
+			"audit": "/nlpc/api/v1/audit",
 			"analytics": "/nlpc/api/v1/analytics"
 		},
 		"ui_components": {
@@ -274,6 +283,8 @@ def register_capability() -> dict[str, Any]:
 			"nlpc:view",
 			"nlpc:process",
 			"nlpc:annotate",
+			"nlpc:review",
+			"nlpc:search",
 			"nlpc:manage_models",
 			"nlpc:govern",
 			"nlpc:admin"
