@@ -16,6 +16,73 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 18:49 EAT
+
+CKM WFA workflow automation lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the workflow
+  automation capability, and replaced `cap_spec.md` with a pointer to the
+  active packet specification.
+- Expanded `capability_contract.py` with WFA-agent, definition, instance, task,
+  approval, exception, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, definition owner, version,
+  activation approval, active definition, instance initiator, human-task
+  assignee or queue, SLA due time, completion evidence, independent approval
+  review, approval decision reasons, rejection reasons, SLA breach review,
+  exception ownership, WFA-agent
+  registration/runtime/role/scope/disclosure, audit-backed state changes, and
+  Bytewax batch workflow mutation.
+- Added dependency-light `lifecycle.py` with workflow definitions, process
+  instances, tasks, approvals, exceptions, WFA agents, audit events, dashboard
+  summary, and batch mutation validation.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract and lifecycle surfaces.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Added `test_capability_contract.py` for focused contract, rule, lifecycle,
+  app, semantic evidence, and documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/ckm/wfa/__init__.py
+  capabilities/ckm/wfa/capability_contract.py capabilities/ckm/wfa/lifecycle.py
+  capabilities/ckm/wfa/app.py capabilities/ckm/wfa/test_capability_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/ckm/wfa/test_capability_contract.py`
+  passed with 4 tests.
+- `./.venv/bin/python -c "import importlib; pkg =
+  importlib.import_module('capabilities.ckm.wfa'); service =
+  pkg.WfaLifecycleService('tenant-proof'); service.create_process('proc-1',
+  'Proof process', 'user-owner', '1.0', {'amount': {'type':'number'}});
+  print(service.dashboard_summary())"` passed and confirmed process creation
+  plus Bytewax stream metadata in the lifecycle summary.
+- `jq '.capabilities.ckm_wfa.streaming.processor,
+  .capabilities.ckm_wfa.configuration.wfa_agents.supported_runtimes,
+  .capabilities.ckm_wfa.screens.agents.route,
+  (.capabilities.ckm_wfa.rules[] |
+  select(.name=="approval_requires_independent_reviewer") | .effect.reason),
+  (.capabilities.ckm_wfa.rules[] |
+  select(.name=="approval_requires_decision_reason") | .effect.reason),
+  (.capabilities.ckm_wfa.rules[] |
+  select(.name=="batch_workflow_mutation_requires_bytewax") | .effect.reason)'
+  capabilities/ckm/wfa/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/ckm-wfa/agents`,
+  `independent_reviewer_required`, `approval_decision_reason_required`, and
+  `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/ckm/wfa --json` passed with `ckm_wfa` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/ckm/wfa --json`
+  passed with `side_effect_free: true` and no warnings.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/ckm/wfa docs/progress_log.md` passed.
+- Not run: legacy visual designer, database, connector, scheduler, analytics,
+  and workflow-engine integration suites; live external connector execution;
+  durable database migrations; live Bytewax topology; rendered browser UI;
+  performance checks; and full repository tests.
+
 ### 2026-05-30 18:38 EAT
 
 CKM RTC real-time collaboration lifecycle/guardrail packet:
