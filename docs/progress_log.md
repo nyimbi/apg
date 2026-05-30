@@ -14905,3 +14905,62 @@ Not run to preserve battery:
   adapters.
 - Security certification, federation interoperability, load, latency,
   authorization, replay, and throughput benchmarks.
+
+### 2026-05-30 12:33 EAT
+
+DLPD lifecycle and guardrail packet:
+
+- Selected `capabilities/common/dlpd` as the next common capability after IDFD
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the active specification.
+- Expanded the DLPD contract to cover data patterns, policies, channels,
+  classification, response, quarantine, incidents, reviews, security,
+  governance, observability, adapters, UI routes, and visual theme tokens.
+- Expanded deterministic guardrails to 36 rules covering tenant context,
+  policy ownership, policy channels, classifier attachment, egress binding,
+  active policies, covered channels, destinations, classifier labels, pattern
+  keys, custom classifier review, classifier confidence, sensitive labels,
+  source-code review, secret/high-severity blocking, medium-severity response,
+  large-export review, external and restricted destinations, quarantine
+  encryption, quarantine content hashes, quarantine release, legal hold,
+  incidents, incident resolution, duplicate incidents, notifications, review
+  independence, review notes, raw-content retention denial, Bytewax batch
+  mutation, tenant isolation, and audit requirements.
+- Hardened `DlpdService` to key policies, classifiers, inspections, quarantine
+  items, and incidents by tenant and record ID.
+- Added tenant-local classifier validation for policy registration and
+  cross-tenant access denial for tenant-local lookups.
+- Expanded view helpers for classifiers, channels, inspections, quarantine,
+  reviews, legal hold, analytics, audit, and settings payloads.
+- Replaced static `app.py` evidence with a contract-derived semantic model and
+  self-test that checks rule count, route count, Bytewax event streaming, and
+  generated runtime metadata.
+- Updated capability registration with richer provides, permissions, endpoints,
+  optional dependencies, and adapter evidence.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale materialized terminology.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dlpd/__init__.py capabilities/common/dlpd/capability_contract.py capabilities/common/dlpd/dlp_engine.py capabilities/common/dlpd/models.py capabilities/common/dlpd/service.py capabilities/common/dlpd/api.py capabilities/common/dlpd/views.py capabilities/common/dlpd/app.py capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and DLPD capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/dlpd --json` passed with `ok: true`; DLPD remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dlpd --json` passed with 12 UI routes, 36 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/dlpd/README.md capabilities/common/dlpd/SPECIFICATION.md capabilities/common/dlpd/PLAN.md capabilities/common/dlpd/cap_spec.md capabilities/common/dlpd/__init__.py capabilities/common/dlpd/capability_contract.py capabilities/common/dlpd/dlp_engine.py capabilities/common/dlpd/models.py capabilities/common/dlpd/service.py capabilities/common/dlpd/api.py capabilities/common/dlpd/views.py capabilities/common/dlpd/app.py capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_package_contract.py capabilities/common/dlpd/package_manifest.json capabilities/common/dlpd/release_report.json capabilities/common/dlpd/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/dlpd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live network, email, chat, clipboard, object-store, or file-share
+  interception.
+- Browser-rendered UI behavior.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External SECU, ENCR, NLPC, ANOM, AUDL, MQEB, SRCH, COMP, MONI, or CACH
+  adapters.
+- Security certification, DLP appliance interoperability, load, latency,
+  evasion, authorization, and throughput benchmarks.

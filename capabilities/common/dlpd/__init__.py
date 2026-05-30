@@ -25,8 +25,19 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["sensitive_data_discovery", "channel_inspection", "exfiltration_detection", "incident_response", "policy_enforcement"],
-	"permissions": ["dlpd:view", "dlpd:inspect", "dlpd:manage_policies", "dlpd:respond", "dlpd:admin"]
+	"provides": [
+		"sensitive_data_discovery",
+		"policy_enforcement",
+		"classifier_governance",
+		"channel_inspection",
+		"exfiltration_detection",
+		"quarantine_vault",
+		"incident_response",
+		"legal_hold",
+		"dlp_reviews",
+		"dlp_audit",
+	],
+	"permissions": ["dlpd:view", "dlpd:inspect", "dlpd:manage_policies", "dlpd:respond", "dlpd:review", "dlpd:audit", "dlpd:admin"]
 }
 
 
@@ -40,25 +51,35 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "mqeb", "srch", "comp"],
+		"optional_dependencies": ["audl", "mqeb", "srch", "comp", "moni", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"sensitive_data_discovery": "Classify governed data across documents, streams, messages, and exports",
+			"classifier_governance": "Register built-in and reviewed custom classifiers",
 			"channel_inspection": "Inspect egress channels with tenant policy and anomaly context",
 			"exfiltration_detection": "Detect unusual movement and block or quarantine risky transfers",
+			"quarantine_vault": "Seal sensitive payload evidence using encrypted quarantine metadata",
 			"incident_response": "Create, assign, escalate, and audit DLP incidents",
+			"legal_hold": "Preserve quarantined evidence under legal hold",
+			"dlp_reviews": "Route large exports, source-code egress, and restricted destinations to review",
+			"dlp_audit": "Record digest-backed audit events for DLP state changes",
 			"capability_rules": "Evaluate deterministic data-loss-prevention rules",
 			"visual_theming": "Apply DLP operations theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/dlpd/api/v1/status",
 			"policies": "/dlpd/api/v1/policies",
 			"inspection": "/dlpd/api/v1/inspection",
 			"incidents": "/dlpd/api/v1/incidents",
 			"channels": "/dlpd/api/v1/channels",
-			"classifiers": "/dlpd/api/v1/classifiers"
+			"classifiers": "/dlpd/api/v1/classifiers",
+			"quarantine": "/dlpd/api/v1/quarantine",
+			"reviews": "/dlpd/api/v1/reviews",
+			"audit": "/dlpd/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

@@ -33,9 +33,40 @@ def dashboard_model(
 def policy_console_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
 	return {
 		"tenant_id": tenant_id,
+		"route": "/dlpd/policies",
 		"policies": service.list_policies(tenant_id),
 		"classifiers": service.list_classifiers(tenant_id),
 		"routes": capability_routes(tenant_id),
+		"theme_component": "policy_matrix",
+	}
+
+
+def classifier_workbench_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/classifiers",
+		"classifiers": service.list_classifiers(tenant_id),
+		"theme_component": "classifier_grid",
+	}
+
+
+def channel_monitor_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/channels",
+		"policies": service.list_policies(tenant_id),
+		"inspections": service.list_inspections(tenant_id),
+		"theme_component": "channel_flow",
+	}
+
+
+def inspection_workbench_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/inspections",
+		"inspections": service.list_inspections(tenant_id),
+		"review_required": [item for item in service.list_inspections(tenant_id) if item["review_required"]],
+		"theme_component": "inspection_table",
 	}
 
 
@@ -43,7 +74,65 @@ def incident_queue_model(service: DlpdService, tenant_id: str) -> dict[str, obje
 	incidents = service.list_incidents(tenant_id)
 	return {
 		"tenant_id": tenant_id,
+		"route": "/dlpd/incidents",
 		"open": [incident for incident in incidents if incident["status"] == "open"],
 		"resolved": [incident for incident in incidents if incident["status"] == "resolved"],
 		"quarantine": service.list_quarantine(tenant_id),
+		"theme_component": "incident_queue",
+	}
+
+
+def quarantine_vault_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/quarantine",
+		"quarantine": service.list_quarantine(tenant_id),
+		"theme_component": "quarantine_vault",
+	}
+
+
+def review_queue_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/reviews",
+		"review_rules": [rule for rule in contract["rule_engine"]["rules"] if rule["effect"]["decision"] == "require_review"],
+		"review_required": [item for item in service.list_inspections(tenant_id) if item["review_required"]],
+		"theme_component": "review_queue",
+	}
+
+
+def legal_hold_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/legal-hold",
+		"legal_hold_items": [item for item in service.list_quarantine(tenant_id) if item["legal_hold"]],
+		"theme_component": "legal_hold",
+	}
+
+
+def analytics_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/analytics",
+		"summary": service.dashboard_summary(tenant_id),
+		"theme_component": "inspection_table",
+	}
+
+
+def audit_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/audit",
+		"audit_events": service.list_audit_events(tenant_id),
+		"theme_component": "audit_timeline",
+	}
+
+
+def settings_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/settings",
+		"configuration": service.describe(tenant_id)["configuration"],
+		"theme": service.describe(tenant_id)["theme"],
 	}

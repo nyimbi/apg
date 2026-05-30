@@ -5,13 +5,121 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Data Loss Prevention package-backed APG capability", "entity_count": 0, "name": "dlpd", "version": "1.0.0"}, "capabilities": {"dlpd": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"channels": {"anomaly_context_required": true, "bulk_export_threshold_records": 10000, "egress_policy_required": true, "inspected": ["email", "api_export", "file_share", "chat", "clipboard", "object_storage"]}, "data_patterns": {"custom_pattern_review_required": true, "enabled_classifiers": ["pii", "phi", "pci", "secrets", "financial_records", "source_code"], "minimum_classifier_confidence": 0.82, "nlp_classification_enabled": true}, "governance": {"audit_inspection": true, "encrypted_quarantine_required": true, "legal_hold_supported": true, "require_tenant_context": true}, "response": {"block_high_severity": true, "incident_owner_required": true, "notification_required": true, "quarantine_supported": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "dlpd_data_protection_ops"}, "ui": {"enable_channel_monitor": true, "enable_classifier_workbench": true, "enable_incident_queue": true, "enable_policy_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Data Loss Prevention", "provides": ["dlpd_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All DLP operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"egress_policy_attached": false, "operation": "inspect_egress"}, "description": "Inspected egress sources require a policy.", "effect": {"decision": "deny", "reason": "egress_policy_required", "required_action": "attach_egress_policy"}, "name": "inspection_source_requires_policy"}, {"condition": {"classification_label_present": false, "sensitive_content_detected": true}, "description": "Sensitive content cannot move without classification metadata.", "effect": {"decision": "deny", "reason": "classification_label_required", "required_action": "apply_classification_label"}, "name": "sensitive_content_requires_classification"}, {"condition": {"blocked_or_quarantined": false, "severity": "high"}, "description": "High-severity exfiltration signals must be blocked or quarantined.", "effect": {"decision": "deny", "reason": "high_severity_block_required", "required_action": "block_or_quarantine_transfer"}, "name": "high_severity_exfiltration_requires_block"}, {"condition": {"quarantine_encrypted": false, "quarantine_requested": true}, "description": "Quarantined sensitive data must be encrypted.", "effect": {"decision": "deny", "reason": "encrypted_quarantine_required", "required_action": "encrypt_quarantine"}, "name": "quarantine_requires_encryption"}, {"condition": {"export_record_count_gt": 10000, "review_recorded": false}, "description": "Large exports require review before release.", "effect": {"decision": "require_review", "reason": "large_export_review_required", "required_action": "review_export"}, "name": "large_export_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All DLP operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"egress_policy_attached": false, "operation": "inspect_egress"}, "description": "Inspected egress sources require a policy.", "effect": {"decision": "deny", "reason": "egress_policy_required", "required_action": "attach_egress_policy"}, "name": "inspection_source_requires_policy"}, {"condition": {"classification_label_present": false, "sensitive_content_detected": true}, "description": "Sensitive content cannot move without classification metadata.", "effect": {"decision": "deny", "reason": "classification_label_required", "required_action": "apply_classification_label"}, "name": "sensitive_content_requires_classification"}, {"condition": {"blocked_or_quarantined": false, "severity": "high"}, "description": "High-severity exfiltration signals must be blocked or quarantined.", "effect": {"decision": "deny", "reason": "high_severity_block_required", "required_action": "block_or_quarantine_transfer"}, "name": "high_severity_exfiltration_requires_block"}, {"condition": {"quarantine_encrypted": false, "quarantine_requested": true}, "description": "Quarantined sensitive data must be encrypted.", "effect": {"decision": "deny", "reason": "encrypted_quarantine_required", "required_action": "encrypt_quarantine"}, "name": "quarantine_requires_encryption"}, {"condition": {"export_record_count_gt": 10000, "review_recorded": false}, "description": "Large exports require review before release.", "effect": {"decision": "require_review", "reason": "large_export_review_required", "required_action": "review_export"}, "name": "large_export_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "DLPAnalytics", "permission": "dlpd:view", "route": "/dlpd/analytics"}, "channels": {"component": "ChannelMonitor", "permission": "dlpd:inspect", "route": "/dlpd/channels"}, "classifiers": {"component": "ClassifierWorkbench", "permission": "dlpd:manage_policies", "route": "/dlpd/classifiers"}, "dashboard": {"component": "DLPDDashboard", "permission": "dlpd:view", "route": "/dlpd/dashboard"}, "incidents": {"component": "IncidentQueue", "permission": "dlpd:respond", "route": "/dlpd/incidents"}, "policies": {"component": "DLPPolicyConsole", "permission": "dlpd:manage_policies", "route": "/dlpd/policies"}, "quarantine": {"component": "QuarantineVault", "permission": "dlpd:respond", "route": "/dlpd/quarantine"}, "settings": {"component": "DLPDSettings", "permission": "dlpd:admin", "route": "/dlpd/settings"}}, "streaming": {}, "theme": {"components": {"channel_flow": {"highlight": "blocked-chip", "visual": "egress-sankey"}, "classifier_grid": {"icon": "scan-text", "risk_style": "sensitivity-band", "status_indicator": "classifier-pill"}, "incident_queue": {"status_style": "response-chip", "visual": "severity-lanes"}, "quarantine_vault": {"status_style": "hold-chip", "visual": "encrypted-item-list"}}, "name": "dlpd_data_protection_ops", "tokens": {"border.radius": "8px", "color.accent": "#B83280", "color.danger": "#C53030", "color.primary": "#254E58", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F9FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/dlpd/api/v1", "requires_theme": true, "routes": [{"component": "DLPDDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/dlpd/dashboard", "permission": "dlpd:view"}, {"component": "DLPPolicyConsole", "name": "policies", "nav_group": "Policies", "path": "/dlpd/policies", "permission": "dlpd:manage_policies"}, {"component": "ClassifierWorkbench", "name": "classifiers", "nav_group": "Policies", "path": "/dlpd/classifiers", "permission": "dlpd:manage_policies"}, {"component": "ChannelMonitor", "name": "channels", "nav_group": "Monitoring", "path": "/dlpd/channels", "permission": "dlpd:inspect"}, {"component": "IncidentQueue", "name": "incidents", "nav_group": "Response", "path": "/dlpd/incidents", "permission": "dlpd:respond"}, {"component": "QuarantineVault", "name": "quarantine", "nav_group": "Response", "path": "/dlpd/quarantine", "permission": "dlpd:respond"}, {"component": "DLPAnalytics", "name": "analytics", "nav_group": "Operations", "path": "/dlpd/analytics", "permission": "dlpd:view"}, {"component": "DLPDSettings", "name": "settings", "nav_group": "Administration", "path": "/dlpd/settings", "permission": "dlpd:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"dlpd": []}}, "contracts": {"dlpd": {"configuration": {"channels": {"anomaly_context_required": true, "bulk_export_threshold_records": 10000, "egress_policy_required": true, "inspected": ["email", "api_export", "file_share", "chat", "clipboard", "object_storage"]}, "data_patterns": {"custom_pattern_review_required": true, "enabled_classifiers": ["pii", "phi", "pci", "secrets", "financial_records", "source_code"], "minimum_classifier_confidence": 0.82, "nlp_classification_enabled": true}, "governance": {"audit_inspection": true, "encrypted_quarantine_required": true, "legal_hold_supported": true, "require_tenant_context": true}, "response": {"block_high_severity": true, "incident_owner_required": true, "notification_required": true, "quarantine_supported": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "dlpd_data_protection_ops"}, "ui": {"enable_channel_monitor": true, "enable_classifier_workbench": true, "enable_incident_queue": true, "enable_policy_console": true}}, "id": "dlpd", "provides": ["dlpd_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"dlpd": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"high_severity_exfiltration_requires_block": {"condition": {"blocked_or_quarantined": false, "severity": "high"}, "description": "High-severity exfiltration signals must be blocked or quarantined.", "effect": {"decision": "deny", "reason": "high_severity_block_required", "required_action": "block_or_quarantine_transfer"}, "name": "high_severity_exfiltration_requires_block"}, "inspection_source_requires_policy": {"condition": {"egress_policy_attached": false, "operation": "inspect_egress"}, "description": "Inspected egress sources require a policy.", "effect": {"decision": "deny", "reason": "egress_policy_required", "required_action": "attach_egress_policy"}, "name": "inspection_source_requires_policy"}, "large_export_requires_review": {"condition": {"export_record_count_gt": 10000, "review_recorded": false}, "description": "Large exports require review before release.", "effect": {"decision": "require_review", "reason": "large_export_review_required", "required_action": "review_export"}, "name": "large_export_requires_review"}, "quarantine_requires_encryption": {"condition": {"quarantine_encrypted": false, "quarantine_requested": true}, "description": "Quarantined sensitive data must be encrypted.", "effect": {"decision": "deny", "reason": "encrypted_quarantine_required", "required_action": "encrypt_quarantine"}, "name": "quarantine_requires_encryption"}, "sensitive_content_requires_classification": {"condition": {"classification_label_present": false, "sensitive_content_detected": true}, "description": "Sensitive content cannot move without classification metadata.", "effect": {"decision": "deny", "reason": "classification_label_required", "required_action": "apply_classification_label"}, "name": "sensitive_content_requires_classification"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All DLP operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.dlpd": {"file": "capability_contract.py", "id": "capability.dlpd", "kind": "capability", "name": "Data Loss Prevention", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("dlpd_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "dlpd",
+			"version": "1.0.0",
+			"description": "Data Loss Prevention package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"dlpd": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"dlpd": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["dlpd_operations"],
+				"requires": ["secu", "encr", "nlpc", "anom"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"api_helpers": contract["configuration"]["adapters"]["api_helpers"],
+					"views": contract["configuration"]["adapters"]["view_models"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"large_export": "DLPReview",
+					"source_code_egress": "DLPReview",
+					"restricted_destination": "DLPReview",
+					"quarantine_release": "DLPReview",
+				},
+				"dlp_lifecycle": {
+					"policy": "DlpPolicy",
+					"classifier": "DataClassifier",
+					"inspection": "EgressInspection",
+					"quarantine": "QuarantineItem",
+					"incident": "DlpIncident",
+					"audit": "DlpAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"dlpd": {
+				"id": "dlpd",
+				"configuration": contract["configuration"],
+				"provides": ["dlpd_operations"],
+				"requires": ["secu", "encr", "nlpc", "anom"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"dlpd": ["secu", "encr", "nlpc", "anom"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 4},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "dlp_engine.py", "service.py", "api.py", "views.py", "app.py"],
+		"symbols": {
+			"capability.dlpd": {
+				"id": "capability.dlpd",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +144,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("dlpd", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "dlpd" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("DLPD semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("DLPD semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("DLPD adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.DlpdService":
+		errors.append("DLPD generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

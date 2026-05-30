@@ -23,15 +23,18 @@ from .models import (
 )
 
 
+StoreKey = tuple[str, str]
+
+
 class DlpdService:
 	"""Tenant-scoped DLP policy, classifier, inspection, incident, and quarantine service."""
 
 	def __init__(self) -> None:
-		self._policies: dict[str, DlpPolicy] = {}
-		self._classifiers: dict[str, DataClassifier] = {}
-		self._inspections: dict[str, EgressInspection] = {}
-		self._quarantine: dict[str, QuarantineItem] = {}
-		self._incidents: dict[str, DlpIncident] = {}
+		self._policies: dict[StoreKey, DlpPolicy] = {}
+		self._classifiers: dict[StoreKey, DataClassifier] = {}
+		self._inspections: dict[StoreKey, EgressInspection] = {}
+		self._quarantine: dict[StoreKey, QuarantineItem] = {}
+		self._incidents: dict[StoreKey, DlpIncident] = {}
 		self._audit_events: list[DlpAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -52,11 +55,18 @@ class DlpdService:
 		egress_policy_attached: bool = True,
 		large_export_review_required: bool = True,
 	) -> dict[str, Any]:
+		self._ensure_new(self._policies, tenant_id, policy_id)
 		self._require_tenant(tenant_id)
-		if DEFAULT_CONFIGURATION["response"]["incident_owner_required"] and not owner:
-			raise PermissionError("incident_owner_required")
-		if DEFAULT_CONFIGURATION["channels"]["egress_policy_required"] and not egress_policy_attached:
-			raise PermissionError("egress_policy_required")
+		self._raise_if_denied(self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_policy",
+			"owner_present": bool(owner),
+			"channels_present": bool(channels),
+			"classifiers_present": bool(classifiers),
+			"egress_policy_attached": egress_policy_attached,
+		}))
+		for classifier_id in classifiers:
+			self._require_classifier(classifier_id, tenant_id)
 		if default_action not in {"allow", "alert", "block", "quarantine"}:
 			raise ValueError("default_action must be one of allow, alert, block, quarantine")
 		policy = DlpPolicy(
@@ -70,7 +80,7 @@ class DlpdService:
 			egress_policy_attached=egress_policy_attached,
 			large_export_review_required=large_export_review_required,
 		)
-		self._policies[policy_id] = policy
+		self._policies[self._key(tenant_id, policy_id)] = policy
 		self._record_audit(tenant_id, "policy_registered", policy_id, owner, policy.to_dict())
 		return policy.to_dict()
 
@@ -85,9 +95,16 @@ class DlpdService:
 		reviewed_by: str | None = None,
 		confidence_threshold: float | None = None,
 	) -> dict[str, Any]:
+		self._ensure_new(self._classifiers, tenant_id, classifier_id)
 		self._require_tenant(tenant_id)
-		if classifier_type == "custom" and DEFAULT_CONFIGURATION["data_patterns"]["custom_pattern_review_required"] and not reviewed_by:
-			raise PermissionError("custom_pattern_review_required")
+		self._raise_if_denied(self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_classifier",
+			"classifier_type": classifier_type,
+			"sensitivity_label_present": bool(sensitivity_label),
+			"pattern_keys_present": bool(pattern_keys),
+			"classifier_review_recorded": bool(reviewed_by) or classifier_type != "custom",
+		}))
 		classifier = DataClassifier(
 			id=classifier_id,
 			tenant_id=tenant_id,
@@ -98,7 +115,7 @@ class DlpdService:
 			reviewed_by=reviewed_by,
 			confidence_threshold=confidence_threshold or DEFAULT_CONFIGURATION["data_patterns"]["minimum_classifier_confidence"],
 		)
-		self._classifiers[classifier_id] = classifier
+		self._classifiers[self._key(tenant_id, classifier_id)] = classifier
 		self._record_audit(tenant_id, "classifier_registered", classifier_id, reviewed_by or "system", classifier.to_dict())
 		return classifier.to_dict()
 
@@ -111,6 +128,12 @@ class DlpdService:
 		self._require_tenant(tenant_id)
 		pattern_keys = self._pattern_keys_for(tenant_id, classifier_ids)
 		hits = detect_classifier_hits(content, pattern_keys)
+		confidence = max([hit["confidence"] for hit in hits], default=1.0)
+		self._raise_if_denied(self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "classify_content",
+			"classifier_confidence": confidence,
+		}))
 		return {
 			"tenant_id": tenant_id,
 			"content_hash": stable_digest(content),
@@ -135,12 +158,14 @@ class DlpdService:
 		review_recorded: bool = False,
 		quarantine_encrypted: bool = True,
 	) -> dict[str, Any]:
+		self._ensure_new(self._inspections, tenant_id, inspection_id)
 		self._require_tenant(tenant_id)
 		policy = self._require_policy(policy_id, tenant_id)
 		if channel not in policy.channels:
 			raise PermissionError("channel_not_covered_by_policy")
 		classification = self.classify_content(tenant_id, content, policy.classifiers)
 		hits = classification["classifier_hits"]
+		hit_names = {hit["classifier"] for hit in hits}
 		effective_label = classification_label or (classification["classification_label"] if auto_classify else None)
 		severity = classification["severity"]
 		review_required = (
@@ -155,10 +180,16 @@ class DlpdService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "inspect_egress",
 			"egress_policy_attached": policy.egress_policy_attached,
+			"policy_active": policy.status == "active",
+			"channel_covered": channel in policy.channels,
+			"destination_present": bool(destination),
 			"sensitive_content_detected": bool(hits),
 			"classification_label_present": bool(effective_label),
 			"severity": severity,
 			"blocked_or_quarantined": blocked or quarantined,
+			"alerted_or_quarantined": action in {"alert", "block", "quarantine"},
+			"secret_detected": "secrets" in hit_names,
+			"source_code_detected": "source_code" in hit_names,
 			"quarantine_requested": quarantined,
 			"quarantine_encrypted": quarantine_encrypted,
 			"export_record_count": record_count,
@@ -183,7 +214,7 @@ class DlpdService:
 			review_required=result["decision"] == "require_review",
 			reviewed_by="reviewed" if review_recorded else None,
 		)
-		self._inspections[inspection_id] = inspection
+		self._inspections[self._key(tenant_id, inspection_id)] = inspection
 		if quarantined:
 			quarantine = self._create_quarantine_item(inspection, quarantine_encrypted)
 			inspection.quarantine_id = quarantine.id
@@ -197,6 +228,12 @@ class DlpdService:
 		inspection = self._require_inspection(inspection_id, tenant_id)
 		if not inspection.review_required:
 			raise ValueError("inspection_does_not_require_review")
+		self._raise_if_denied(self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "review_export",
+			"reviewer_same_as_subject": reviewer == inspection.subject_id,
+			"notes_present": True,
+		}))
 		inspection.review_required = False
 		inspection.reviewed_by = reviewer
 		inspection.decision = "reviewed"
@@ -205,6 +242,11 @@ class DlpdService:
 
 	def resolve_incident(self, incident_id: str, tenant_id: str, actor: str, resolution: str) -> dict[str, Any]:
 		incident = self._require_incident(incident_id, tenant_id)
+		self._raise_if_denied(self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "resolve_incident",
+			"resolution_present": bool(resolution),
+		}))
 		incident.status = "resolved"
 		incident.resolution = resolution
 		incident.resolved_at = utc_now()
@@ -258,8 +300,10 @@ class DlpdService:
 	def _create_quarantine_item(self, inspection: EgressInspection, encrypted: bool) -> QuarantineItem:
 		result = self.evaluate({
 			"tenant_context_present": bool(inspection.tenant_id),
+			"operation": "create_quarantine_item",
 			"quarantine_requested": True,
 			"quarantine_encrypted": encrypted,
+			"content_hash_present": bool(inspection.content_hash),
 		})
 		self._raise_if_denied(result)
 		item = QuarantineItem(
@@ -271,11 +315,19 @@ class DlpdService:
 			encrypted=encrypted,
 			legal_hold=DEFAULT_CONFIGURATION["governance"]["legal_hold_supported"],
 		)
-		self._quarantine[item.id] = item
+		self._quarantine[self._key(inspection.tenant_id, item.id)] = item
 		self._record_audit(inspection.tenant_id, "content_quarantined", item.id, inspection.subject_id, item.to_dict())
 		return item
 
 	def _open_incident(self, inspection: EgressInspection, policy: DlpPolicy, result: dict[str, Any]) -> DlpIncident:
+		self._raise_if_denied(self.evaluate({
+			"tenant_context_present": bool(inspection.tenant_id),
+			"operation": "open_incident",
+			"owner_present": bool(policy.owner),
+			"severity_present": bool(inspection.severity),
+			"duplicate_open_incident": False,
+			"notification_sent": DEFAULT_CONFIGURATION["response"]["notification_required"],
+		}))
 		required_action = ",".join(action.get("required_action", "respond") for action in result["actions"]) or inspection.decision
 		incident = DlpIncident(
 			id=f"inc-{inspection.id}",
@@ -286,7 +338,7 @@ class DlpdService:
 			required_action=required_action,
 			notifications_sent=DEFAULT_CONFIGURATION["response"]["notification_required"],
 		)
-		self._incidents[incident.id] = incident
+		self._incidents[self._key(inspection.tenant_id, incident.id)] = incident
 		self._record_audit(inspection.tenant_id, "incident_opened", incident.id, policy.owner, incident.to_dict())
 		return incident
 
@@ -295,26 +347,30 @@ class DlpdService:
 		self._raise_if_denied(result)
 
 	def _require_policy(self, policy_id: str, tenant_id: str) -> DlpPolicy:
-		policy = self._policies.get(policy_id)
-		if policy is None or policy.tenant_id != tenant_id:
+		policy = self._policies.get(self._key(tenant_id, policy_id))
+		if policy is None:
+			self._raise_cross_tenant_if_present(self._policies, policy_id, tenant_id)
 			raise KeyError(f"unknown_policy:{policy_id}")
 		return policy
 
 	def _require_classifier(self, classifier_id: str, tenant_id: str) -> DataClassifier:
-		classifier = self._classifiers.get(classifier_id)
-		if classifier is None or classifier.tenant_id != tenant_id:
+		classifier = self._classifiers.get(self._key(tenant_id, classifier_id))
+		if classifier is None:
+			self._raise_cross_tenant_if_present(self._classifiers, classifier_id, tenant_id)
 			raise KeyError(f"unknown_classifier:{classifier_id}")
 		return classifier
 
 	def _require_inspection(self, inspection_id: str, tenant_id: str) -> EgressInspection:
-		inspection = self._inspections.get(inspection_id)
-		if inspection is None or inspection.tenant_id != tenant_id:
+		inspection = self._inspections.get(self._key(tenant_id, inspection_id))
+		if inspection is None:
+			self._raise_cross_tenant_if_present(self._inspections, inspection_id, tenant_id)
 			raise KeyError(f"unknown_inspection:{inspection_id}")
 		return inspection
 
 	def _require_incident(self, incident_id: str, tenant_id: str) -> DlpIncident:
-		incident = self._incidents.get(incident_id)
-		if incident is None or incident.tenant_id != tenant_id:
+		incident = self._incidents.get(self._key(tenant_id, incident_id))
+		if incident is None:
+			self._raise_cross_tenant_if_present(self._incidents, incident_id, tenant_id)
 			raise KeyError(f"unknown_incident:{incident_id}")
 		return incident
 
@@ -340,8 +396,22 @@ class DlpdService:
 		if result["decision"] == "deny":
 			raise PermissionError(", ".join(action.get("reason", "dlp_policy_blocked") for action in result["actions"]))
 
-	def _list_for_tenant(self, records: dict[str, Any], tenant_id: str | None) -> list[dict[str, Any]]:
+	def _list_for_tenant(self, records: dict[StoreKey, Any], tenant_id: str | None) -> list[dict[str, Any]]:
 		items = list(records.values())
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+	def _ensure_new(self, records: dict[StoreKey, Any], tenant_id: str, record_id: str) -> None:
+		if not record_id:
+			raise ValueError("dlp_record_id_required")
+		if self._key(tenant_id, record_id) in records:
+			raise ValueError(f"dlp_record_already_exists:{record_id}")
+
+	def _raise_cross_tenant_if_present(self, records: dict[StoreKey, Any], record_id: str, tenant_id: str) -> None:
+		if any(record.id == record_id and record.tenant_id != tenant_id for record in records.values()):
+			result = self.evaluate({"tenant_context_present": bool(tenant_id), "cross_tenant_access": True})
+			raise PermissionError(", ".join(action.get("reason", "cross_tenant_dlp_access_denied") for action in result["actions"]))
+
+	def _key(self, tenant_id: str, record_id: str) -> StoreKey:
+		return (tenant_id, record_id)

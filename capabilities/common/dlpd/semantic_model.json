@@ -8,13 +8,59 @@
   },
   "capabilities": {
     "dlpd": {
-      "approvals": {},
+      "adapters": {
+        "anomaly_detection": "anom",
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "cache": "cach",
+        "compliance": "comp",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.DlpdService",
+        "helper_runtime": "dlp_engine.py",
+        "message_bus": "mqeb",
+        "monitoring": "moni",
+        "nlp_core": "nlpc",
+        "production_api": "api.py",
+        "production_runtime": "service.py",
+        "production_views": "views.py",
+        "search": "srch",
+        "security_framework": "secu",
+        "view_models": "views.py"
+      },
+      "approvals": {
+        "large_export": "DLPReview",
+        "quarantine_release": "DLPReview",
+        "restricted_destination": "DLPReview",
+        "source_code_egress": "DLPReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "anomaly_detection": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "compliance": "comp",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DlpdService",
+          "helper_runtime": "dlp_engine.py",
+          "message_bus": "mqeb",
+          "monitoring": "moni",
+          "nlp_core": "nlpc",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "search": "srch",
+          "security_framework": "secu",
+          "view_models": "views.py"
+        },
         "channels": {
           "anomaly_context_required": true,
           "bulk_export_threshold_records": 10000,
+          "destination_required": true,
           "egress_policy_required": true,
           "inspected": [
             "email",
@@ -24,6 +70,12 @@
             "clipboard",
             "object_storage"
           ]
+        },
+        "classification": {
+          "high_confidence_threshold": 0.9,
+          "secret_patterns_high_severity": true,
+          "sensitive_content_requires_label": true,
+          "source_code_review_required": true
         },
         "data_patterns": {
           "custom_pattern_review_required": true,
@@ -36,7 +88,8 @@
             "source_code"
           ],
           "minimum_classifier_confidence": 0.82,
-          "nlp_classification_enabled": true
+          "nlp_classification_enabled": true,
+          "sensitive_label_required": true
         },
         "governance": {
           "audit_inspection": true,
@@ -44,11 +97,54 @@
           "legal_hold_supported": true,
           "require_tenant_context": true
         },
+        "incidents": {
+          "duplicate_open_incident_blocked": true,
+          "owner_required": true,
+          "resolution_required": true,
+          "severity_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "policies": {
+          "active_policy_required": true,
+          "channels_required": true,
+          "classifiers_required": true,
+          "default_actions": [
+            "allow",
+            "alert",
+            "block",
+            "quarantine"
+          ],
+          "owner_required": true
+        },
+        "quarantine": {
+          "content_hash_required": true,
+          "encrypted_required": true,
+          "legal_hold_default": true,
+          "release_review_required": true
+        },
         "response": {
           "block_high_severity": true,
           "incident_owner_required": true,
+          "legal_hold_supported": true,
           "notification_required": true,
           "quarantine_supported": true
+        },
+        "reviews": {
+          "independent_reviewer_required": true,
+          "large_export_review_required": true,
+          "review_notes_required": true,
+          "sensitive_destination_review_required": true
+        },
+        "security": {
+          "encrypted_quarantine_required": true,
+          "policy_mutation_audit_required": true,
+          "raw_content_retention_allowed": false,
+          "tenant_isolation_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -56,11 +152,27 @@
           "default_theme": "dlpd_data_protection_ops"
         },
         "ui": {
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_channel_monitor": true,
           "enable_classifier_workbench": true,
+          "enable_dashboard": true,
           "enable_incident_queue": true,
-          "enable_policy_console": true
+          "enable_inspection_workbench": true,
+          "enable_legal_hold": true,
+          "enable_policy_console": true,
+          "enable_quarantine_vault": true,
+          "enable_review_queue": true,
+          "enable_settings": true
         }
+      },
+      "dlp_lifecycle": {
+        "audit": "DlpAuditEvent",
+        "classifier": "DataClassifier",
+        "incident": "DlpIncident",
+        "inspection": "EgressInspection",
+        "policy": "DlpPolicy",
+        "quarantine": "QuarantineItem"
       },
       "erp_modules": [
         "common"
@@ -71,7 +183,12 @@
       "provides": [
         "dlpd_operations"
       ],
-      "requires": [],
+      "requires": [
+        "secu",
+        "encr",
+        "nlpc",
+        "anom"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -88,6 +205,58 @@
           },
           {
             "condition": {
+              "operation": "register_policy",
+              "owner_present": false
+            },
+            "description": "DLP policies require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_owner_required",
+              "required_action": "assign_policy_owner"
+            },
+            "name": "policy_requires_owner"
+          },
+          {
+            "condition": {
+              "channels_present": false,
+              "operation": "register_policy"
+            },
+            "description": "DLP policies require at least one inspected channel.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_channels_required",
+              "required_action": "select_channels"
+            },
+            "name": "policy_requires_channels"
+          },
+          {
+            "condition": {
+              "classifiers_present": false,
+              "operation": "register_policy"
+            },
+            "description": "DLP policies require at least one classifier.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "policy_classifiers_required",
+              "required_action": "attach_classifiers"
+            },
+            "name": "policy_requires_classifiers"
+          },
+          {
+            "condition": {
+              "egress_policy_attached": false,
+              "operation": "register_policy"
+            },
+            "description": "DLP policies require egress policy binding.",
+            "effect": {
+              "decision": "deny",
+              "reason": "egress_policy_required",
+              "required_action": "attach_egress_policy"
+            },
+            "name": "policy_requires_egress_binding"
+          },
+          {
+            "condition": {
               "egress_policy_attached": false,
               "operation": "inspect_egress"
             },
@@ -98,6 +267,98 @@
               "required_action": "attach_egress_policy"
             },
             "name": "inspection_source_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "inspect_egress",
+              "policy_active": false
+            },
+            "description": "Inspections require an active policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_dlp_policy_required",
+              "required_action": "activate_policy"
+            },
+            "name": "inspection_requires_active_policy"
+          },
+          {
+            "condition": {
+              "channel_covered": false,
+              "operation": "inspect_egress"
+            },
+            "description": "Inspections must use channels covered by the selected policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_not_covered_by_policy",
+              "required_action": "select_covered_channel"
+            },
+            "name": "inspection_requires_covered_channel"
+          },
+          {
+            "condition": {
+              "destination_present": false,
+              "operation": "inspect_egress"
+            },
+            "description": "Inspections require a destination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "destination_required",
+              "required_action": "record_destination"
+            },
+            "name": "inspection_requires_destination"
+          },
+          {
+            "condition": {
+              "operation": "register_classifier",
+              "sensitivity_label_present": false
+            },
+            "description": "Classifiers require a sensitivity label.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sensitivity_label_required",
+              "required_action": "set_sensitivity_label"
+            },
+            "name": "classifier_requires_label"
+          },
+          {
+            "condition": {
+              "operation": "register_classifier",
+              "pattern_keys_present": false
+            },
+            "description": "Classifiers require one or more pattern keys.",
+            "effect": {
+              "decision": "deny",
+              "reason": "classifier_patterns_required",
+              "required_action": "attach_classifier_patterns"
+            },
+            "name": "classifier_requires_patterns"
+          },
+          {
+            "condition": {
+              "classifier_review_recorded": false,
+              "classifier_type": "custom",
+              "operation": "register_classifier"
+            },
+            "description": "Custom DLP classifiers require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "custom_pattern_review_required",
+              "required_action": "review_custom_classifier"
+            },
+            "name": "custom_classifier_requires_review"
+          },
+          {
+            "condition": {
+              "classifier_confidence_lt": 0.82,
+              "operation": "classify_content"
+            },
+            "description": "Classifier confidence must meet the tenant threshold.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "classifier_confidence_review_required",
+              "required_action": "review_classifier_hit"
+            },
+            "name": "classifier_confidence_requires_threshold"
           },
           {
             "condition": {
@@ -114,6 +375,32 @@
           },
           {
             "condition": {
+              "review_recorded": false,
+              "source_code_detected": true
+            },
+            "description": "Source-code egress requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "source_code_review_required",
+              "required_action": "review_source_code_egress"
+            },
+            "name": "source_code_requires_review"
+          },
+          {
+            "condition": {
+              "blocked_or_quarantined": false,
+              "secret_detected": true
+            },
+            "description": "Secret exfiltration must be blocked or quarantined.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secret_exfiltration_block_required",
+              "required_action": "block_or_quarantine_transfer"
+            },
+            "name": "secret_exfiltration_requires_block"
+          },
+          {
+            "condition": {
               "blocked_or_quarantined": false,
               "severity": "high"
             },
@@ -124,6 +411,58 @@
               "required_action": "block_or_quarantine_transfer"
             },
             "name": "high_severity_exfiltration_requires_block"
+          },
+          {
+            "condition": {
+              "alerted_or_quarantined": false,
+              "severity": "medium"
+            },
+            "description": "Medium-severity egress requires alert, block, or quarantine.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "medium_severity_response_required",
+              "required_action": "alert_or_quarantine_transfer"
+            },
+            "name": "medium_severity_requires_alert_or_quarantine"
+          },
+          {
+            "condition": {
+              "export_record_count_gt": 10000,
+              "review_recorded": false
+            },
+            "description": "Large exports require review before release.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_export_review_required",
+              "required_action": "review_export"
+            },
+            "name": "large_export_requires_review"
+          },
+          {
+            "condition": {
+              "egress_policy_attached": false,
+              "external_destination": true
+            },
+            "description": "External destinations require an egress policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "external_destination_policy_required",
+              "required_action": "attach_external_destination_policy"
+            },
+            "name": "external_destination_requires_policy"
+          },
+          {
+            "condition": {
+              "restricted_destination": true,
+              "review_recorded": false
+            },
+            "description": "Restricted destinations require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "restricted_destination_review_required",
+              "required_action": "review_destination"
+            },
+            "name": "restricted_destination_requires_review"
           },
           {
             "condition": {
@@ -140,16 +479,183 @@
           },
           {
             "condition": {
-              "export_record_count_gt": 10000,
-              "review_recorded": false
+              "content_hash_present": false,
+              "operation": "create_quarantine_item"
             },
-            "description": "Large exports require review before release.",
+            "description": "Quarantine entries require content hashes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quarantine_content_hash_required",
+              "required_action": "record_content_hash"
+            },
+            "name": "quarantine_requires_content_hash"
+          },
+          {
+            "condition": {
+              "operation": "release_quarantine",
+              "release_review_recorded": false
+            },
+            "description": "Quarantine release requires review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quarantine_release_review_required",
+              "required_action": "review_quarantine_release"
+            },
+            "name": "quarantine_release_requires_review"
+          },
+          {
+            "condition": {
+              "legal_hold_active": true,
+              "operation": "release_quarantine"
+            },
+            "description": "Items on legal hold cannot be released.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legal_hold_release_blocked",
+              "required_action": "clear_legal_hold"
+            },
+            "name": "legal_hold_release_blocked"
+          },
+          {
+            "condition": {
+              "operation": "open_incident",
+              "owner_present": false
+            },
+            "description": "DLP incidents require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_owner_required",
+              "required_action": "assign_incident_owner"
+            },
+            "name": "incident_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "open_incident",
+              "severity_present": false
+            },
+            "description": "DLP incidents require severity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_severity_required",
+              "required_action": "record_incident_severity"
+            },
+            "name": "incident_requires_severity"
+          },
+          {
+            "condition": {
+              "operation": "resolve_incident",
+              "resolution_present": false
+            },
+            "description": "DLP incident resolution requires notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_resolution_required",
+              "required_action": "record_resolution"
+            },
+            "name": "incident_resolution_requires_notes"
+          },
+          {
+            "condition": {
+              "duplicate_open_incident": true,
+              "operation": "open_incident"
+            },
+            "description": "Duplicate open incidents are blocked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "duplicate_open_incident",
+              "required_action": "resolve_existing_incident"
+            },
+            "name": "duplicate_open_incident_blocked"
+          },
+          {
+            "condition": {
+              "notification_sent": false,
+              "operation": "open_incident"
+            },
+            "description": "Incidents require notification evidence.",
             "effect": {
               "decision": "require_review",
-              "reason": "large_export_review_required",
-              "required_action": "review_export"
+              "reason": "incident_notification_required",
+              "required_action": "send_incident_notification"
             },
-            "name": "large_export_requires_review"
+            "name": "notification_required_for_incident"
+          },
+          {
+            "condition": {
+              "operation": "review_export",
+              "reviewer_same_as_subject": true
+            },
+            "description": "DLP reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_dlp_review_required",
+              "required_action": "route_to_independent_reviewer"
+            },
+            "name": "review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "notes_present": false,
+              "operation": "review_export"
+            },
+            "description": "DLP review decisions require notes.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "dlp_review_notes_required",
+              "required_action": "record_review_notes"
+            },
+            "name": "review_decision_requires_notes"
+          },
+          {
+            "condition": {
+              "raw_content_retention_requested": true
+            },
+            "description": "The generated runtime may not retain raw sensitive content.",
+            "effect": {
+              "decision": "deny",
+              "reason": "raw_content_retention_denied",
+              "required_action": "store_hash_and_metadata_only"
+            },
+            "name": "raw_content_retention_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_dlp_mutation"
+            },
+            "description": "Batch DLP mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_dlp_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "DLP records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_dlp_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_dlp_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "DLP state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_audit_event_required",
+              "required_action": "record_dlp_audit_event"
+            },
+            "name": "dlp_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -169,6 +675,58 @@
         },
         {
           "condition": {
+            "operation": "register_policy",
+            "owner_present": false
+          },
+          "description": "DLP policies require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_owner_required",
+            "required_action": "assign_policy_owner"
+          },
+          "name": "policy_requires_owner"
+        },
+        {
+          "condition": {
+            "channels_present": false,
+            "operation": "register_policy"
+          },
+          "description": "DLP policies require at least one inspected channel.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_channels_required",
+            "required_action": "select_channels"
+          },
+          "name": "policy_requires_channels"
+        },
+        {
+          "condition": {
+            "classifiers_present": false,
+            "operation": "register_policy"
+          },
+          "description": "DLP policies require at least one classifier.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "policy_classifiers_required",
+            "required_action": "attach_classifiers"
+          },
+          "name": "policy_requires_classifiers"
+        },
+        {
+          "condition": {
+            "egress_policy_attached": false,
+            "operation": "register_policy"
+          },
+          "description": "DLP policies require egress policy binding.",
+          "effect": {
+            "decision": "deny",
+            "reason": "egress_policy_required",
+            "required_action": "attach_egress_policy"
+          },
+          "name": "policy_requires_egress_binding"
+        },
+        {
+          "condition": {
             "egress_policy_attached": false,
             "operation": "inspect_egress"
           },
@@ -179,6 +737,98 @@
             "required_action": "attach_egress_policy"
           },
           "name": "inspection_source_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "inspect_egress",
+            "policy_active": false
+          },
+          "description": "Inspections require an active policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_dlp_policy_required",
+            "required_action": "activate_policy"
+          },
+          "name": "inspection_requires_active_policy"
+        },
+        {
+          "condition": {
+            "channel_covered": false,
+            "operation": "inspect_egress"
+          },
+          "description": "Inspections must use channels covered by the selected policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_not_covered_by_policy",
+            "required_action": "select_covered_channel"
+          },
+          "name": "inspection_requires_covered_channel"
+        },
+        {
+          "condition": {
+            "destination_present": false,
+            "operation": "inspect_egress"
+          },
+          "description": "Inspections require a destination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "destination_required",
+            "required_action": "record_destination"
+          },
+          "name": "inspection_requires_destination"
+        },
+        {
+          "condition": {
+            "operation": "register_classifier",
+            "sensitivity_label_present": false
+          },
+          "description": "Classifiers require a sensitivity label.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sensitivity_label_required",
+            "required_action": "set_sensitivity_label"
+          },
+          "name": "classifier_requires_label"
+        },
+        {
+          "condition": {
+            "operation": "register_classifier",
+            "pattern_keys_present": false
+          },
+          "description": "Classifiers require one or more pattern keys.",
+          "effect": {
+            "decision": "deny",
+            "reason": "classifier_patterns_required",
+            "required_action": "attach_classifier_patterns"
+          },
+          "name": "classifier_requires_patterns"
+        },
+        {
+          "condition": {
+            "classifier_review_recorded": false,
+            "classifier_type": "custom",
+            "operation": "register_classifier"
+          },
+          "description": "Custom DLP classifiers require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "custom_pattern_review_required",
+            "required_action": "review_custom_classifier"
+          },
+          "name": "custom_classifier_requires_review"
+        },
+        {
+          "condition": {
+            "classifier_confidence_lt": 0.82,
+            "operation": "classify_content"
+          },
+          "description": "Classifier confidence must meet the tenant threshold.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "classifier_confidence_review_required",
+            "required_action": "review_classifier_hit"
+          },
+          "name": "classifier_confidence_requires_threshold"
         },
         {
           "condition": {
@@ -195,6 +845,32 @@
         },
         {
           "condition": {
+            "review_recorded": false,
+            "source_code_detected": true
+          },
+          "description": "Source-code egress requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "source_code_review_required",
+            "required_action": "review_source_code_egress"
+          },
+          "name": "source_code_requires_review"
+        },
+        {
+          "condition": {
+            "blocked_or_quarantined": false,
+            "secret_detected": true
+          },
+          "description": "Secret exfiltration must be blocked or quarantined.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secret_exfiltration_block_required",
+            "required_action": "block_or_quarantine_transfer"
+          },
+          "name": "secret_exfiltration_requires_block"
+        },
+        {
+          "condition": {
             "blocked_or_quarantined": false,
             "severity": "high"
           },
@@ -205,6 +881,58 @@
             "required_action": "block_or_quarantine_transfer"
           },
           "name": "high_severity_exfiltration_requires_block"
+        },
+        {
+          "condition": {
+            "alerted_or_quarantined": false,
+            "severity": "medium"
+          },
+          "description": "Medium-severity egress requires alert, block, or quarantine.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "medium_severity_response_required",
+            "required_action": "alert_or_quarantine_transfer"
+          },
+          "name": "medium_severity_requires_alert_or_quarantine"
+        },
+        {
+          "condition": {
+            "export_record_count_gt": 10000,
+            "review_recorded": false
+          },
+          "description": "Large exports require review before release.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_export_review_required",
+            "required_action": "review_export"
+          },
+          "name": "large_export_requires_review"
+        },
+        {
+          "condition": {
+            "egress_policy_attached": false,
+            "external_destination": true
+          },
+          "description": "External destinations require an egress policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "external_destination_policy_required",
+            "required_action": "attach_external_destination_policy"
+          },
+          "name": "external_destination_requires_policy"
+        },
+        {
+          "condition": {
+            "restricted_destination": true,
+            "review_recorded": false
+          },
+          "description": "Restricted destinations require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "restricted_destination_review_required",
+            "required_action": "review_destination"
+          },
+          "name": "restricted_destination_requires_review"
         },
         {
           "condition": {
@@ -221,22 +949,190 @@
         },
         {
           "condition": {
-            "export_record_count_gt": 10000,
-            "review_recorded": false
+            "content_hash_present": false,
+            "operation": "create_quarantine_item"
           },
-          "description": "Large exports require review before release.",
+          "description": "Quarantine entries require content hashes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quarantine_content_hash_required",
+            "required_action": "record_content_hash"
+          },
+          "name": "quarantine_requires_content_hash"
+        },
+        {
+          "condition": {
+            "operation": "release_quarantine",
+            "release_review_recorded": false
+          },
+          "description": "Quarantine release requires review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quarantine_release_review_required",
+            "required_action": "review_quarantine_release"
+          },
+          "name": "quarantine_release_requires_review"
+        },
+        {
+          "condition": {
+            "legal_hold_active": true,
+            "operation": "release_quarantine"
+          },
+          "description": "Items on legal hold cannot be released.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legal_hold_release_blocked",
+            "required_action": "clear_legal_hold"
+          },
+          "name": "legal_hold_release_blocked"
+        },
+        {
+          "condition": {
+            "operation": "open_incident",
+            "owner_present": false
+          },
+          "description": "DLP incidents require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_owner_required",
+            "required_action": "assign_incident_owner"
+          },
+          "name": "incident_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "open_incident",
+            "severity_present": false
+          },
+          "description": "DLP incidents require severity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_severity_required",
+            "required_action": "record_incident_severity"
+          },
+          "name": "incident_requires_severity"
+        },
+        {
+          "condition": {
+            "operation": "resolve_incident",
+            "resolution_present": false
+          },
+          "description": "DLP incident resolution requires notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_resolution_required",
+            "required_action": "record_resolution"
+          },
+          "name": "incident_resolution_requires_notes"
+        },
+        {
+          "condition": {
+            "duplicate_open_incident": true,
+            "operation": "open_incident"
+          },
+          "description": "Duplicate open incidents are blocked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "duplicate_open_incident",
+            "required_action": "resolve_existing_incident"
+          },
+          "name": "duplicate_open_incident_blocked"
+        },
+        {
+          "condition": {
+            "notification_sent": false,
+            "operation": "open_incident"
+          },
+          "description": "Incidents require notification evidence.",
           "effect": {
             "decision": "require_review",
-            "reason": "large_export_review_required",
-            "required_action": "review_export"
+            "reason": "incident_notification_required",
+            "required_action": "send_incident_notification"
           },
-          "name": "large_export_requires_review"
+          "name": "notification_required_for_incident"
+        },
+        {
+          "condition": {
+            "operation": "review_export",
+            "reviewer_same_as_subject": true
+          },
+          "description": "DLP reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_dlp_review_required",
+            "required_action": "route_to_independent_reviewer"
+          },
+          "name": "review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "notes_present": false,
+            "operation": "review_export"
+          },
+          "description": "DLP review decisions require notes.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "dlp_review_notes_required",
+            "required_action": "record_review_notes"
+          },
+          "name": "review_decision_requires_notes"
+        },
+        {
+          "condition": {
+            "raw_content_retention_requested": true
+          },
+          "description": "The generated runtime may not retain raw sensitive content.",
+          "effect": {
+            "decision": "deny",
+            "reason": "raw_content_retention_denied",
+            "required_action": "store_hash_and_metadata_only"
+          },
+          "name": "raw_content_retention_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_dlp_mutation"
+          },
+          "description": "Batch DLP mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_dlp_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "DLP records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_dlp_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_dlp_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "DLP state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_audit_event_required",
+            "required_action": "record_dlp_audit_event"
+          },
+          "name": "dlp_state_change_requires_audit"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "dlp_engine.py",
+        "service": "service.DlpdService",
         "views": "views.py"
       },
       "screens": {
@@ -244,6 +1140,11 @@
           "component": "DLPAnalytics",
           "permission": "dlpd:view",
           "route": "/dlpd/analytics"
+        },
+        "audit": {
+          "component": "DLPAuditTrail",
+          "permission": "dlpd:audit",
+          "route": "/dlpd/audit"
         },
         "channels": {
           "component": "ChannelMonitor",
@@ -265,6 +1166,16 @@
           "permission": "dlpd:respond",
           "route": "/dlpd/incidents"
         },
+        "inspections": {
+          "component": "InspectionWorkbench",
+          "permission": "dlpd:inspect",
+          "route": "/dlpd/inspections"
+        },
+        "legal_hold": {
+          "component": "LegalHoldConsole",
+          "permission": "dlpd:respond",
+          "route": "/dlpd/legal-hold"
+        },
         "policies": {
           "component": "DLPPolicyConsole",
           "permission": "dlpd:manage_policies",
@@ -275,15 +1186,26 @@
           "permission": "dlpd:respond",
           "route": "/dlpd/quarantine"
         },
+        "reviews": {
+          "component": "DLPReviewQueue",
+          "permission": "dlpd:review",
+          "route": "/dlpd/reviews"
+        },
         "settings": {
           "component": "DLPDSettings",
           "permission": "dlpd:admin",
           "route": "/dlpd/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "digest-chip",
+            "visual": "event-timeline"
+          },
           "channel_flow": {
             "highlight": "blocked-chip",
             "visual": "egress-sankey"
@@ -297,9 +1219,25 @@
             "status_style": "response-chip",
             "visual": "severity-lanes"
           },
+          "inspection_table": {
+            "status_style": "decision-chip",
+            "visual": "egress-table"
+          },
+          "legal_hold": {
+            "status_style": "hold-chip",
+            "visual": "hold-ledger"
+          },
+          "policy_matrix": {
+            "status_style": "policy-chip",
+            "visual": "policy-channel-grid"
+          },
           "quarantine_vault": {
             "status_style": "hold-chip",
             "visual": "encrypted-item-list"
+          },
+          "review_queue": {
+            "status_style": "review-chip",
+            "visual": "decision-lane"
           }
         },
         "name": "dlpd_data_protection_ops",
@@ -350,6 +1288,13 @@
             "permission": "dlpd:inspect"
           },
           {
+            "component": "InspectionWorkbench",
+            "name": "inspections",
+            "nav_group": "Monitoring",
+            "path": "/dlpd/inspections",
+            "permission": "dlpd:inspect"
+          },
+          {
             "component": "IncidentQueue",
             "name": "incidents",
             "nav_group": "Response",
@@ -364,11 +1309,32 @@
             "permission": "dlpd:respond"
           },
           {
+            "component": "DLPReviewQueue",
+            "name": "reviews",
+            "nav_group": "Response",
+            "path": "/dlpd/reviews",
+            "permission": "dlpd:review"
+          },
+          {
+            "component": "LegalHoldConsole",
+            "name": "legal_hold",
+            "nav_group": "Governance",
+            "path": "/dlpd/legal-hold",
+            "permission": "dlpd:respond"
+          },
+          {
             "component": "DLPAnalytics",
             "name": "analytics",
             "nav_group": "Operations",
             "path": "/dlpd/analytics",
             "permission": "dlpd:view"
+          },
+          {
+            "component": "DLPAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/dlpd/audit",
+            "permission": "dlpd:audit"
           },
           {
             "component": "DLPDSettings",
@@ -391,15 +1357,41 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "dlpd": []
+      "dlpd": [
+        "secu",
+        "encr",
+        "nlpc",
+        "anom"
+      ]
     }
   },
   "contracts": {
     "dlpd": {
       "configuration": {
+        "adapters": {
+          "anomaly_detection": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "compliance": "comp",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DlpdService",
+          "helper_runtime": "dlp_engine.py",
+          "message_bus": "mqeb",
+          "monitoring": "moni",
+          "nlp_core": "nlpc",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "search": "srch",
+          "security_framework": "secu",
+          "view_models": "views.py"
+        },
         "channels": {
           "anomaly_context_required": true,
           "bulk_export_threshold_records": 10000,
+          "destination_required": true,
           "egress_policy_required": true,
           "inspected": [
             "email",
@@ -409,6 +1401,12 @@
             "clipboard",
             "object_storage"
           ]
+        },
+        "classification": {
+          "high_confidence_threshold": 0.9,
+          "secret_patterns_high_severity": true,
+          "sensitive_content_requires_label": true,
+          "source_code_review_required": true
         },
         "data_patterns": {
           "custom_pattern_review_required": true,
@@ -421,7 +1419,8 @@
             "source_code"
           ],
           "minimum_classifier_confidence": 0.82,
-          "nlp_classification_enabled": true
+          "nlp_classification_enabled": true,
+          "sensitive_label_required": true
         },
         "governance": {
           "audit_inspection": true,
@@ -429,11 +1428,54 @@
           "legal_hold_supported": true,
           "require_tenant_context": true
         },
+        "incidents": {
+          "duplicate_open_incident_blocked": true,
+          "owner_required": true,
+          "resolution_required": true,
+          "severity_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "policies": {
+          "active_policy_required": true,
+          "channels_required": true,
+          "classifiers_required": true,
+          "default_actions": [
+            "allow",
+            "alert",
+            "block",
+            "quarantine"
+          ],
+          "owner_required": true
+        },
+        "quarantine": {
+          "content_hash_required": true,
+          "encrypted_required": true,
+          "legal_hold_default": true,
+          "release_review_required": true
+        },
         "response": {
           "block_high_severity": true,
           "incident_owner_required": true,
+          "legal_hold_supported": true,
           "notification_required": true,
           "quarantine_supported": true
+        },
+        "reviews": {
+          "independent_reviewer_required": true,
+          "large_export_review_required": true,
+          "review_notes_required": true,
+          "sensitive_destination_review_required": true
+        },
+        "security": {
+          "encrypted_quarantine_required": true,
+          "policy_mutation_audit_required": true,
+          "raw_content_retention_allowed": false,
+          "tenant_isolation_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -441,17 +1483,30 @@
           "default_theme": "dlpd_data_protection_ops"
         },
         "ui": {
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_channel_monitor": true,
           "enable_classifier_workbench": true,
+          "enable_dashboard": true,
           "enable_incident_queue": true,
-          "enable_policy_console": true
+          "enable_inspection_workbench": true,
+          "enable_legal_hold": true,
+          "enable_policy_console": true,
+          "enable_quarantine_vault": true,
+          "enable_review_queue": true,
+          "enable_settings": true
         }
       },
       "id": "dlpd",
       "provides": [
         "dlpd_operations"
       ],
-      "requires": []
+      "requires": [
+        "secu",
+        "encr",
+        "nlpc",
+        "anom"
+      ]
     }
   },
   "deployment": {
@@ -463,7 +1518,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -484,6 +1539,123 @@
   },
   "roles": {},
   "rules": {
+    "batch_dlp_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_dlp_mutation"
+      },
+      "description": "Batch DLP mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_dlp_mutation_requires_bytewax"
+    },
+    "classifier_confidence_requires_threshold": {
+      "condition": {
+        "classifier_confidence_lt": 0.82,
+        "operation": "classify_content"
+      },
+      "description": "Classifier confidence must meet the tenant threshold.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "classifier_confidence_review_required",
+        "required_action": "review_classifier_hit"
+      },
+      "name": "classifier_confidence_requires_threshold"
+    },
+    "classifier_requires_label": {
+      "condition": {
+        "operation": "register_classifier",
+        "sensitivity_label_present": false
+      },
+      "description": "Classifiers require a sensitivity label.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sensitivity_label_required",
+        "required_action": "set_sensitivity_label"
+      },
+      "name": "classifier_requires_label"
+    },
+    "classifier_requires_patterns": {
+      "condition": {
+        "operation": "register_classifier",
+        "pattern_keys_present": false
+      },
+      "description": "Classifiers require one or more pattern keys.",
+      "effect": {
+        "decision": "deny",
+        "reason": "classifier_patterns_required",
+        "required_action": "attach_classifier_patterns"
+      },
+      "name": "classifier_requires_patterns"
+    },
+    "cross_tenant_dlp_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "DLP records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_dlp_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_dlp_access_denied"
+    },
+    "custom_classifier_requires_review": {
+      "condition": {
+        "classifier_review_recorded": false,
+        "classifier_type": "custom",
+        "operation": "register_classifier"
+      },
+      "description": "Custom DLP classifiers require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "custom_pattern_review_required",
+        "required_action": "review_custom_classifier"
+      },
+      "name": "custom_classifier_requires_review"
+    },
+    "dlp_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "DLP state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_audit_event_required",
+        "required_action": "record_dlp_audit_event"
+      },
+      "name": "dlp_state_change_requires_audit"
+    },
+    "duplicate_open_incident_blocked": {
+      "condition": {
+        "duplicate_open_incident": true,
+        "operation": "open_incident"
+      },
+      "description": "Duplicate open incidents are blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "duplicate_open_incident",
+        "required_action": "resolve_existing_incident"
+      },
+      "name": "duplicate_open_incident_blocked"
+    },
+    "external_destination_requires_policy": {
+      "condition": {
+        "egress_policy_attached": false,
+        "external_destination": true
+      },
+      "description": "External destinations require an egress policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "external_destination_policy_required",
+        "required_action": "attach_external_destination_policy"
+      },
+      "name": "external_destination_requires_policy"
+    },
     "high_severity_exfiltration_requires_block": {
       "condition": {
         "blocked_or_quarantined": false,
@@ -496,6 +1668,84 @@
         "required_action": "block_or_quarantine_transfer"
       },
       "name": "high_severity_exfiltration_requires_block"
+    },
+    "incident_requires_owner": {
+      "condition": {
+        "operation": "open_incident",
+        "owner_present": false
+      },
+      "description": "DLP incidents require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_owner_required",
+        "required_action": "assign_incident_owner"
+      },
+      "name": "incident_requires_owner"
+    },
+    "incident_requires_severity": {
+      "condition": {
+        "operation": "open_incident",
+        "severity_present": false
+      },
+      "description": "DLP incidents require severity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_severity_required",
+        "required_action": "record_incident_severity"
+      },
+      "name": "incident_requires_severity"
+    },
+    "incident_resolution_requires_notes": {
+      "condition": {
+        "operation": "resolve_incident",
+        "resolution_present": false
+      },
+      "description": "DLP incident resolution requires notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_resolution_required",
+        "required_action": "record_resolution"
+      },
+      "name": "incident_resolution_requires_notes"
+    },
+    "inspection_requires_active_policy": {
+      "condition": {
+        "operation": "inspect_egress",
+        "policy_active": false
+      },
+      "description": "Inspections require an active policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_dlp_policy_required",
+        "required_action": "activate_policy"
+      },
+      "name": "inspection_requires_active_policy"
+    },
+    "inspection_requires_covered_channel": {
+      "condition": {
+        "channel_covered": false,
+        "operation": "inspect_egress"
+      },
+      "description": "Inspections must use channels covered by the selected policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "channel_not_covered_by_policy",
+        "required_action": "select_covered_channel"
+      },
+      "name": "inspection_requires_covered_channel"
+    },
+    "inspection_requires_destination": {
+      "condition": {
+        "destination_present": false,
+        "operation": "inspect_egress"
+      },
+      "description": "Inspections require a destination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "destination_required",
+        "required_action": "record_destination"
+      },
+      "name": "inspection_requires_destination"
     },
     "inspection_source_requires_policy": {
       "condition": {
@@ -523,6 +1773,123 @@
       },
       "name": "large_export_requires_review"
     },
+    "legal_hold_release_blocked": {
+      "condition": {
+        "legal_hold_active": true,
+        "operation": "release_quarantine"
+      },
+      "description": "Items on legal hold cannot be released.",
+      "effect": {
+        "decision": "deny",
+        "reason": "legal_hold_release_blocked",
+        "required_action": "clear_legal_hold"
+      },
+      "name": "legal_hold_release_blocked"
+    },
+    "medium_severity_requires_alert_or_quarantine": {
+      "condition": {
+        "alerted_or_quarantined": false,
+        "severity": "medium"
+      },
+      "description": "Medium-severity egress requires alert, block, or quarantine.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "medium_severity_response_required",
+        "required_action": "alert_or_quarantine_transfer"
+      },
+      "name": "medium_severity_requires_alert_or_quarantine"
+    },
+    "notification_required_for_incident": {
+      "condition": {
+        "notification_sent": false,
+        "operation": "open_incident"
+      },
+      "description": "Incidents require notification evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "incident_notification_required",
+        "required_action": "send_incident_notification"
+      },
+      "name": "notification_required_for_incident"
+    },
+    "policy_requires_channels": {
+      "condition": {
+        "channels_present": false,
+        "operation": "register_policy"
+      },
+      "description": "DLP policies require at least one inspected channel.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_channels_required",
+        "required_action": "select_channels"
+      },
+      "name": "policy_requires_channels"
+    },
+    "policy_requires_classifiers": {
+      "condition": {
+        "classifiers_present": false,
+        "operation": "register_policy"
+      },
+      "description": "DLP policies require at least one classifier.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "policy_classifiers_required",
+        "required_action": "attach_classifiers"
+      },
+      "name": "policy_requires_classifiers"
+    },
+    "policy_requires_egress_binding": {
+      "condition": {
+        "egress_policy_attached": false,
+        "operation": "register_policy"
+      },
+      "description": "DLP policies require egress policy binding.",
+      "effect": {
+        "decision": "deny",
+        "reason": "egress_policy_required",
+        "required_action": "attach_egress_policy"
+      },
+      "name": "policy_requires_egress_binding"
+    },
+    "policy_requires_owner": {
+      "condition": {
+        "operation": "register_policy",
+        "owner_present": false
+      },
+      "description": "DLP policies require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_owner_required",
+        "required_action": "assign_policy_owner"
+      },
+      "name": "policy_requires_owner"
+    },
+    "quarantine_release_requires_review": {
+      "condition": {
+        "operation": "release_quarantine",
+        "release_review_recorded": false
+      },
+      "description": "Quarantine release requires review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quarantine_release_review_required",
+        "required_action": "review_quarantine_release"
+      },
+      "name": "quarantine_release_requires_review"
+    },
+    "quarantine_requires_content_hash": {
+      "condition": {
+        "content_hash_present": false,
+        "operation": "create_quarantine_item"
+      },
+      "description": "Quarantine entries require content hashes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quarantine_content_hash_required",
+        "required_action": "record_content_hash"
+      },
+      "name": "quarantine_requires_content_hash"
+    },
     "quarantine_requires_encryption": {
       "condition": {
         "quarantine_encrypted": false,
@@ -536,6 +1903,70 @@
       },
       "name": "quarantine_requires_encryption"
     },
+    "raw_content_retention_denied": {
+      "condition": {
+        "raw_content_retention_requested": true
+      },
+      "description": "The generated runtime may not retain raw sensitive content.",
+      "effect": {
+        "decision": "deny",
+        "reason": "raw_content_retention_denied",
+        "required_action": "store_hash_and_metadata_only"
+      },
+      "name": "raw_content_retention_denied"
+    },
+    "restricted_destination_requires_review": {
+      "condition": {
+        "restricted_destination": true,
+        "review_recorded": false
+      },
+      "description": "Restricted destinations require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "restricted_destination_review_required",
+        "required_action": "review_destination"
+      },
+      "name": "restricted_destination_requires_review"
+    },
+    "review_decision_requires_notes": {
+      "condition": {
+        "notes_present": false,
+        "operation": "review_export"
+      },
+      "description": "DLP review decisions require notes.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "dlp_review_notes_required",
+        "required_action": "record_review_notes"
+      },
+      "name": "review_decision_requires_notes"
+    },
+    "review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "review_export",
+        "reviewer_same_as_subject": true
+      },
+      "description": "DLP reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_dlp_review_required",
+        "required_action": "route_to_independent_reviewer"
+      },
+      "name": "review_requires_independent_reviewer"
+    },
+    "secret_exfiltration_requires_block": {
+      "condition": {
+        "blocked_or_quarantined": false,
+        "secret_detected": true
+      },
+      "description": "Secret exfiltration must be blocked or quarantined.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secret_exfiltration_block_required",
+        "required_action": "block_or_quarantine_transfer"
+      },
+      "name": "secret_exfiltration_requires_block"
+    },
     "sensitive_content_requires_classification": {
       "condition": {
         "classification_label_present": false,
@@ -548,6 +1979,19 @@
         "required_action": "apply_classification_label"
       },
       "name": "sensitive_content_requires_classification"
+    },
+    "source_code_requires_review": {
+      "condition": {
+        "review_recorded": false,
+        "source_code_detected": true
+      },
+      "description": "Source-code egress requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "source_code_review_required",
+        "required_action": "review_source_code_egress"
+      },
+      "name": "source_code_requires_review"
     },
     "tenant_context_required": {
       "condition": {
@@ -564,7 +2008,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "dlp_engine.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.dlpd": {
