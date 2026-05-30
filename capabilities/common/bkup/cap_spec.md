@@ -1,124 +1,20 @@
-# Backup and Restore Capability Specification
+# BKUP Capability Specification Pointer
 
-- **Capability Name**: Backup and Restore
-- **Capability ID**: `bkup`
-- **Category**: common
-- **Version**: 1.0.0
+The active BKUP specification is maintained in `SPECIFICATION.md`.
 
-## Current Executable Package Scope
+Use:
 
-BKUP now provides a dependency-light backup and restore governance control
-plane for generated APG applications. The package runtime covers tenant-scoped
-backup plans, encrypted snapshots, restore approvals, stale restore-test review,
-retention disposition, legal-hold blocking, continuity reports, and audit
-evidence without requiring storage providers, schedulers, or production restore
-infrastructure.
+- `README.md` for package usage and generated-application composition notes.
+- `SPECIFICATION.md` for the normative capability contract, lifecycle, rules,
+  UI, configuration, adapter boundaries, and acceptance gates.
+- `PLAN.md` for the current implementation and review plan.
 
-The current executable lifecycle includes:
-
-- tenant-qualified backup plans with owner, schedule, source inventory, RPO,
-  retention, and legal-hold state;
-- encrypted snapshot creation with integrity evidence, lineage, region, source
-  mapping, and tenant-local duplicate protection;
-- explicit restore approval request/decision records for production restore
-  execution;
-- restore requests that ignore raw `approval_recorded` booleans and require
-  matching approved restore evidence for production;
-- stale restore-test review with independent reviewer and notes;
-- retention disposition request/decision records for snapshot archive/delete
-  transitions;
-- legal-hold blocking for snapshot disposition;
-- dashboard, restore approval, retention disposition, restore console, plan
-  manager, and audit view models;
-- contract-derived semantic model, release evidence, UI routes, rule metadata,
-  and visual theme components.
-
-Cloud storage, object-lock APIs, filesystem snapshots, database/VM/Kubernetes
-restore orchestration, schedulers, and production persistence remain adapter
-responsibilities. Adapters must honor the package runtime guardrails.
-
-### Focused Proof Commands
+Focused proof commands:
 
 ```bash
-./.venv/bin/python -m py_compile capabilities/common/bkup/__init__.py capabilities/common/bkup/models.py capabilities/common/bkup/backup_engine.py capabilities/common/bkup/service.py capabilities/common/bkup/api.py capabilities/common/bkup/views.py capabilities/common/bkup/capability_contract.py capabilities/common/bkup/app.py capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py
+./.venv/bin/python -m py_compile capabilities/common/bkup/__init__.py capabilities/common/bkup/capability_contract.py capabilities/common/bkup/models.py capabilities/common/bkup/backup_engine.py capabilities/common/bkup/service.py capabilities/common/bkup/api.py capabilities/common/bkup/views.py capabilities/common/bkup/app.py capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py
+./.venv/bin/python -c "from capabilities.common.bkup import app; r=app.self_test(); print(r); assert r['passed']"
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/bkup --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json
 ```
-
-## Purpose
-
-This package implements the executable APG contract for `bkup` as a
-dependency-light backup and restore runtime. It provides tenant backup plans,
-encrypted snapshot metadata, restore execution records, continuity reports,
-retention/legal-hold metadata, audit events, UI route metadata, semantic-model
-publication, and publish-plan evidence without requiring an external storage
-provider.
-
-## Provided Services
-
-- `backup_plans`
-- `snapshots`
-- `restore_testing`
-- `retention_policy`
-- `continuity_reporting`
-- `capability_rules`
-
-## Required Services
-
-- `tenant_context`
-- `encryption_policy`
-- `configuration_management`
-- `audit_logging`
-
-## Configuration
-
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations. Backup plans require owners, schedules, source inventories, and
-retention policy. Snapshots require encryption and integrity evidence. Restore
-operations require integrity checks, and production restores require approval.
-
-## Rules
-
-- `tenant_context_required`
-- `backup_plan_requires_owner`
-- `snapshot_requires_encryption`
-- `snapshot_requires_integrity`
-- `restore_requires_integrity_check`
-- `production_restore_requires_approval`
-- `stale_restore_test_requires_review`
-- `restore_review_requires_independent_reviewer`
-- `retention_disposition_blocks_legal_hold`
-- `retention_review_requires_independent_reviewer`
-
-## UI
-
-The package exposes 11 APG Python UI route contract(s) through
-`views.py` and the package semantic model. The dashboard view model surfaces
-backup plans, snapshots, restore runs, restore approvals, retention
-dispositions, continuity reports, review queues, and audit events from
-`BkupService`.
-
-## Theme
-
-The package uses the `bkup_continuity_ops` APG theme contract.
-
-## Runtime Behavior
-
-`BkupService` maintains deterministic tenant-qualified in-memory registries for
-backup plans, snapshots, restore runs, restore approvals, retention
-dispositions, continuity reports, and audit events. Snapshot hashes are
-generated by `backup_engine.py` from canonical plan/source metadata. Restore
-runs enforce APG rules for integrity checks, explicit production approval, and
-stale restore-test review. Retention disposition enforces legal hold and
-independent reviewer rules. Continuity reports compare observed RPO/RTO and
-restore-test age against configured targets.
-
-## Known Integration Boundary
-
-This package intentionally avoids live object-store, database snapshot, tape,
-or cloud-provider calls. Provider-specific snapshot execution, encryption key
-rotation, immutable storage, deployment orchestration, and compliance reporting
-should be composed through APG capabilities such as `encr`, `conf`, `audl`,
-`schd`, `moni`, `comp`, and `depl`.

@@ -42,8 +42,12 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "bkup"
 	assert contract["configuration"]["tenant_id"] == "tenant-backup"
 	assert contract["configuration"]["plans"]["rpo_minutes"] == 15
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "plans", "snapshots", "restore", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 10
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "plans", "snapshots", "restore", "backup_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["configuration"]["backup_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert set(contract["provides"]) >= {"backup_plan_governance", "restore_governance", "backup_agents"}
+	assert contract["requires"] == ["encr", "conf", "audl"]
+	assert len(contract["rule_engine"]["rules"]) >= 17
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"plans",
@@ -53,8 +57,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"restore_approvals",
 		"retention",
 		"retention_dispositions",
+		"backup_agents",
 		"reports",
 		"audit",
+		"analytics",
 		"settings",
 	}
 	assert contract["theme"]["name"] == "bkup_continuity_ops"
@@ -82,6 +88,7 @@ def test_rule_engine_enforces_backup_guardrails():
 	restore_review_result = evaluate_capability_rules({"operation": "approve_restore", "restore_reviewer_same_as_requester": True})
 	retention_result = evaluate_capability_rules({"operation": "retention_disposition", "legal_hold_active": True})
 	retention_review_result = evaluate_capability_rules({"operation": "approve_retention_disposition", "retention_reviewer_same_as_requester": True})
+	batch_result = evaluate_capability_rules({"requested_operation": "batch_backup_mutation", "event_stream": "memory"})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -95,6 +102,7 @@ def test_rule_engine_enforces_backup_guardrails():
 	assert restore_review_result["matched_rules"] == ["restore_review_requires_independent_reviewer"]
 	assert retention_result["matched_rules"] == ["retention_disposition_blocks_legal_hold"]
 	assert retention_review_result["matched_rules"] == ["retention_review_requires_independent_reviewer"]
+	assert batch_result["matched_rules"] == ["batch_backup_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -103,8 +111,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "bkup"
 	assert "encr" in registration["dependencies"]
 	assert registration["ui_components"]["restore"] == "/bkup/restore"
+	assert registration["ui_components"]["backup_agents"] == "/bkup/agents"
 	assert registration["ui_components"]["restore_approvals"] == "/bkup/restore/approvals"
 	assert registration["ui_components"]["retention_dispositions"] == "/bkup/retention/dispositions"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert "bkup:restore" in registration["permissions"]
 	assert "bkup:approve_restore" in registration["permissions"]
 	assert "bkup:approve_retention" in registration["permissions"]
@@ -174,6 +184,7 @@ def test_service_creates_plans_snapshots_restores_reports_retention_and_audit():
 	assert summary["completed_restore_count"] == 1
 	assert summary["restore_approval_count"] == 1
 	assert summary["retention_disposition_count"] == 1
+	assert summary["backup_agent_count"] == 0
 	assert model["summary"]["audit_event_count"] >= 8
 
 
@@ -369,6 +380,54 @@ def test_service_keeps_duplicate_ids_isolated_by_tenant():
 		)
 
 
+def test_service_registers_backup_agents_and_enforces_bytewax_guardrail():
+	service = BkupService()
+	agent = service.register_backup_agent(
+		agent_id="backup-agent-1",
+		tenant_id="tenant-backup-agent",
+		name="Restore Review Assistant",
+		runtime="claude-code",
+		role="restore-reviewer",
+		scope="summarize production restore approval evidence",
+		contribution_disclosed=True,
+		policy_ref="bkup-agent-policy",
+	)
+	batch = service.validate_batch_backup_mutation(
+		tenant_id="tenant-backup-agent",
+		event_stream="bytewax",
+		mutation_count=2,
+	)
+	dashboard = views.dashboard_model(service, "tenant-backup-agent")
+	agents = views.backup_agent_model(service, "tenant-backup-agent")
+	analytics = views.analytics_model(service, "tenant-backup-agent")
+	settings = views.settings_model("tenant-backup-agent")
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "restore_reviewer"
+	assert batch["accepted"] is True
+	assert dashboard["backup_agents"][0]["id"] == "backup-agent-1"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert analytics["summary"]["backup_agent_count"] == 1
+	assert settings["streaming"]["processor"] == "bytewax"
+
+	with pytest.raises(PermissionError, match="backup_agent_runtime_not_supported"):
+		service.register_backup_agent(
+			agent_id="bad-runtime",
+			tenant_id="tenant-backup-agent",
+			name="Bad Runtime",
+			runtime="unsupported",
+			role="restore_reviewer",
+			scope="restore review",
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_backup_mutation(
+			tenant_id="tenant-backup-agent",
+			event_stream="memory",
+			mutation_count=1,
+		)
+
+
 def test_api_helpers_and_view_models_expose_bkup_lifecycle():
 	tenant_id = "tenant-api-bkup"
 	api.create_backup_plan({
@@ -431,9 +490,28 @@ def test_api_helpers_and_view_models_expose_bkup_lifecycle():
 	dashboard = views.dashboard_model(tenant_id=tenant_id)
 	restore_approvals = views.restore_approval_model(tenant_id=tenant_id)
 	retention = views.retention_disposition_model(tenant_id=tenant_id)
+	agent = api.register_backup_agent({
+		"id": "api-backup-agent",
+		"tenant_id": tenant_id,
+		"name": "API Backup Agent",
+		"runtime": "opencode",
+		"role": "continuity_reviewer",
+		"scope": "continuity report review",
+		"contribution_disclosed": True,
+	})
+	batch = api.validate_batch_backup_mutation({
+		"tenant_id": tenant_id,
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+	})
 
 	assert restore["status"] == "completed"
 	assert api.capability_status(tenant_id)["restore_approval_count"] == 1
+	assert api.capability_status(tenant_id)["backup_agent_count"] == 1
+	assert api.capability_status(tenant_id)["streaming"]["processor"] == "bytewax"
 	assert dashboard["summary"]["retention_disposition_count"] == 1
 	assert restore_approvals["decided_approvals"][0]["id"] == "api-restore-approval"
 	assert retention["decided_dispositions"][0]["id"] == "api-disposition"
+	assert agent["runtime"] == "opencode"
+	assert api.list_backup_agents(tenant_id)[0]["id"] == "api-backup-agent"
+	assert batch["accepted"] is True

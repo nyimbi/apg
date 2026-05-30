@@ -30,6 +30,10 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "bkup"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["backup_agents"]["supported_runtimes"]
+	for required_doc in ("README.md", "SPECIFICATION.md", "PLAN.md", "cap_spec.md"):
+		assert (PACKAGE_DIR / required_doc).exists()
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -44,3 +48,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "bkup" in model["capabilities"]
+	assert model["capabilities"]["bkup"]["streaming"]["processor"] == "bytewax"
+	assert model["capabilities"]["bkup"]["screens"]["backup_agents"]["route"] == "/bkup/agents"

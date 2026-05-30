@@ -25,7 +25,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["backup_plans", "snapshots", "restore_testing", "retention_policy", "continuity_reporting"],
+	"provides": ["backup_plans", "snapshots", "restore_testing", "retention_policy", "continuity_reporting", "backup_agents"],
 	"permissions": ["bkup:view", "bkup:manage_plans", "bkup:run_backup", "bkup:restore", "bkup:approve_restore", "bkup:approve_retention", "bkup:admin"]
 }
 
@@ -51,13 +51,16 @@ def register_capability() -> dict[str, Any]:
 			"restore_approvals": "Route production and high-risk restores through independent approval",
 			"retention_policy": "Enforce retention, legal hold, deletion, and compliance policies",
 			"retention_dispositions": "Approve legal-hold-aware snapshot deletion and archival disposition",
+			"backup_agents": "Register governed AI backup agents for continuity and restore review support",
+			"bytewax_streaming": "Expose Bytewax lifecycle-stream metadata for batch backup mutation",
 			"capability_rules": "Evaluate deterministic backup and restore rules",
 			"visual_theming": "Apply continuity-operations theme tokens and components"
 		},
-		"endpoints": {"plans": "/bkup/api/v1/plans", "snapshots": "/bkup/api/v1/snapshots", "restores": "/bkup/api/v1/restores", "restore_approvals": "/bkup/api/v1/restore-approvals", "retention": "/bkup/api/v1/retention", "retention_dispositions": "/bkup/api/v1/retention-dispositions", "reports": "/bkup/api/v1/reports"},
+		"endpoints": {"plans": "/bkup/api/v1/plans", "snapshots": "/bkup/api/v1/snapshots", "restores": "/bkup/api/v1/restores", "restore_approvals": "/bkup/api/v1/restore-approvals", "retention": "/bkup/api/v1/retention", "retention_dispositions": "/bkup/api/v1/retention-dispositions", "reports": "/bkup/api/v1/reports", "backup_agents": "/bkup/api/v1/agents"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

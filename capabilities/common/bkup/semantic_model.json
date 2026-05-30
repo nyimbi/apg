@@ -8,18 +8,55 @@
   },
   "capabilities": {
     "bkup": {
-      "approvals": {
-        "restore": "RestoreApproval",
-        "retention_disposition": "RetentionDisposition"
-      },
+      "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "configuration": "conf",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.BkupService",
+          "monitoring": "moni",
+          "scheduler": "schd",
+          "view_models": "views.py"
+        },
+        "backup_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "plan_reviewer",
+            "snapshot_reviewer",
+            "restore_reviewer",
+            "retention_reviewer",
+            "continuity_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "governance": {
           "audit_backup_events": true,
+          "batch_event_stream": "bytewax",
           "legal_hold_supported": true,
           "require_tenant_context": true,
           "retention_policy_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "continuity_metrics_required": true,
+          "event_stream": "bytewax",
+          "trace_required": true
         },
         "plans": {
           "plan_owner_required": true,
@@ -45,6 +82,9 @@
           "default_theme": "bkup_continuity_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_backup_dashboard": true,
           "enable_continuity_reports": true,
           "enable_plan_manager": true,
@@ -60,9 +100,18 @@
       "master_data": {},
       "name": "Backup and Restore",
       "provides": [
-        "bkup_operations"
+        "backup_plan_governance",
+        "snapshot_vault",
+        "restore_governance",
+        "retention_governance",
+        "continuity_reporting",
+        "backup_agents"
       ],
-      "requires": [],
+      "requires": [
+        "encr",
+        "conf",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -193,6 +242,97 @@
               "required_action": "route_to_independent_retention_reviewer"
             },
             "name": "retention_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "backup_agent_present": true
+            },
+            "description": "AI backup agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_agent_registration_required",
+              "required_action": "register_backup_agent"
+            },
+            "name": "backup_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "backup_agent_present": true
+            },
+            "description": "AI backup agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_agent_runtime_not_supported",
+              "required_action": "choose_supported_backup_agent_runtime"
+            },
+            "name": "backup_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "backup_agent_present": true
+            },
+            "description": "AI backup agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_agent_role_not_supported",
+              "required_action": "choose_supported_backup_agent_role"
+            },
+            "name": "backup_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "backup_agent_present": true
+            },
+            "description": "AI backup agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_agent_scope_required",
+              "required_action": "set_backup_agent_scope"
+            },
+            "name": "backup_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "backup_agent_present": true
+            },
+            "description": "AI backup-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_agent_disclosure_required",
+              "required_action": "disclose_backup_agent"
+            },
+            "name": "backup_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "BKUP lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "backup_audit_event_required",
+              "required_action": "record_backup_audit_event"
+            },
+            "name": "backup_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_backup_mutation"
+            },
+            "description": "Batch BKUP mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_backup_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -326,6 +466,97 @@
             "required_action": "route_to_independent_retention_reviewer"
           },
           "name": "retention_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "backup_agent_present": true
+          },
+          "description": "AI backup agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_agent_registration_required",
+            "required_action": "register_backup_agent"
+          },
+          "name": "backup_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "backup_agent_present": true
+          },
+          "description": "AI backup agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_agent_runtime_not_supported",
+            "required_action": "choose_supported_backup_agent_runtime"
+          },
+          "name": "backup_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "backup_agent_present": true
+          },
+          "description": "AI backup agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_agent_role_not_supported",
+            "required_action": "choose_supported_backup_agent_role"
+          },
+          "name": "backup_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "backup_agent_present": true
+          },
+          "description": "AI backup agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_agent_scope_required",
+            "required_action": "set_backup_agent_scope"
+          },
+          "name": "backup_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "backup_agent_present": true
+          },
+          "description": "AI backup-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_agent_disclosure_required",
+            "required_action": "disclose_backup_agent"
+          },
+          "name": "backup_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "BKUP lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "backup_audit_event_required",
+            "required_action": "record_backup_audit_event"
+          },
+          "name": "backup_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_backup_mutation"
+          },
+          "description": "Batch BKUP mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_backup_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -335,6 +566,11 @@
         "views": "views.py"
       },
       "screens": {
+        "analytics": {
+          "component": "BackupAnalytics",
+          "permission": "bkup:view",
+          "route": "/bkup/analytics"
+        },
         "audit": {
           "component": "BackupAudit",
           "permission": "bkup:view",
@@ -344,6 +580,11 @@
           "component": "BackupRuns",
           "permission": "bkup:run_backup",
           "route": "/bkup/backup"
+        },
+        "backup_agents": {
+          "component": "BackupAgentPanel",
+          "permission": "bkup:approve_restore",
+          "route": "/bkup/agents"
         },
         "dashboard": {
           "component": "BKUPDashboard",
@@ -391,9 +632,39 @@
           "route": "/bkup/snapshots"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_backup_mutation_requires_bytewax",
+        "events": [
+          "backup_plan_created",
+          "snapshot_created",
+          "restore_approval_requested",
+          "restore_approval_decided",
+          "restore_requested",
+          "restore_review_approved",
+          "restore_test_recorded",
+          "retention_disposition_requested",
+          "retention_disposition_decided",
+          "backup_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "plans",
+          "snapshots",
+          "restores",
+          "restore_approvals",
+          "retention_dispositions",
+          "continuity_reports",
+          "backup_agents",
+          "audit_events"
+        ],
+        "topic": "apg.bkup.lifecycle"
+      },
       "theme": {
         "components": {
+          "backup_agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
           "backup_audit": {
             "status_style": "decision-chip",
             "visual": "event-ledger"
@@ -422,6 +693,10 @@
           "snapshot_vault": {
             "highlight": "encryption-chip",
             "visual": "snapshot-list"
+          },
+          "stream_health": {
+            "status_style": "stream-chip",
+            "visual": "event-lane"
           }
         },
         "name": "bkup_continuity_ops",
@@ -500,6 +775,13 @@
             "permission": "bkup:approve_retention"
           },
           {
+            "component": "BackupAgentPanel",
+            "name": "backup_agents",
+            "nav_group": "Governance",
+            "path": "/bkup/agents",
+            "permission": "bkup:approve_restore"
+          },
+          {
             "component": "ContinuityReports",
             "name": "reports",
             "nav_group": "Governance",
@@ -511,6 +793,13 @@
             "name": "audit",
             "nav_group": "Governance",
             "path": "/bkup/audit",
+            "permission": "bkup:view"
+          },
+          {
+            "component": "BackupAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/bkup/analytics",
             "permission": "bkup:view"
           },
           {
@@ -534,17 +823,61 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "bkup": []
+      "bkup": [
+        "encr",
+        "conf",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "bkup": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "configuration": "conf",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.BkupService",
+          "monitoring": "moni",
+          "scheduler": "schd",
+          "view_models": "views.py"
+        },
+        "backup_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "plan_reviewer",
+            "snapshot_reviewer",
+            "restore_reviewer",
+            "retention_reviewer",
+            "continuity_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "governance": {
           "audit_backup_events": true,
+          "batch_event_stream": "bytewax",
           "legal_hold_supported": true,
           "require_tenant_context": true,
           "retention_policy_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "continuity_metrics_required": true,
+          "event_stream": "bytewax",
+          "trace_required": true
         },
         "plans": {
           "plan_owner_required": true,
@@ -570,6 +903,9 @@
           "default_theme": "bkup_continuity_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_backup_dashboard": true,
           "enable_continuity_reports": true,
           "enable_plan_manager": true,
@@ -580,9 +916,18 @@
       },
       "id": "bkup",
       "provides": [
-        "bkup_operations"
+        "backup_plan_governance",
+        "snapshot_vault",
+        "restore_governance",
+        "retention_governance",
+        "continuity_reporting",
+        "backup_agents"
       ],
-      "requires": []
+      "requires": [
+        "encr",
+        "conf",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -594,7 +939,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -615,6 +960,71 @@
   },
   "roles": {},
   "rules": {
+    "backup_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "backup_agent_present": true
+      },
+      "description": "AI backup-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_agent_disclosure_required",
+        "required_action": "disclose_backup_agent"
+      },
+      "name": "backup_agent_requires_disclosure"
+    },
+    "backup_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "backup_agent_present": true
+      },
+      "description": "AI backup agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_agent_registration_required",
+        "required_action": "register_backup_agent"
+      },
+      "name": "backup_agent_requires_registration"
+    },
+    "backup_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "backup_agent_present": true
+      },
+      "description": "AI backup agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_agent_scope_required",
+        "required_action": "set_backup_agent_scope"
+      },
+      "name": "backup_agent_requires_scope"
+    },
+    "backup_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "backup_agent_present": true
+      },
+      "description": "AI backup agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_agent_role_not_supported",
+        "required_action": "choose_supported_backup_agent_role"
+      },
+      "name": "backup_agent_role_supported"
+    },
+    "backup_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "backup_agent_present": true
+      },
+      "description": "AI backup agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_agent_runtime_not_supported",
+        "required_action": "choose_supported_backup_agent_runtime"
+      },
+      "name": "backup_agent_runtime_supported"
+    },
     "backup_plan_requires_owner": {
       "condition": {
         "operation": "create_backup_plan",
@@ -627,6 +1037,32 @@
         "required_action": "assign_plan_owner"
       },
       "name": "backup_plan_requires_owner"
+    },
+    "backup_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "BKUP lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "backup_audit_event_required",
+        "required_action": "record_backup_audit_event"
+      },
+      "name": "backup_state_change_requires_audit"
+    },
+    "batch_backup_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_backup_mutation"
+      },
+      "description": "Batch BKUP mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_backup_mutation_requires_bytewax"
     },
     "production_restore_requires_approval": {
       "condition": {

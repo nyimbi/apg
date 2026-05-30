@@ -16,6 +16,8 @@ BKUP exposes these application components:
 - Restore approval queue for independent approval of production or high-risk restore operations.
 - Retention disposition queue for legal-hold-aware snapshot deletion or archival approvals.
 - Continuity reporting for restore tests, RPO/RTO findings, stale test detection, and audit evidence.
+- Backup-agent governance for Codex, Claude Code, OpenCode, and Pi style runtimes with explicit role, scope, disclosure, and audit evidence.
+- Bytewax lifecycle stream metadata for batch backup mutation and generated application composition.
 - Dashboard and view models that generated APG applications can render directly.
 
 ## Lifecycle
@@ -105,6 +107,37 @@ Every plan, snapshot, restore, approval, disposition, and continuity transition 
 
 Production deployments may forward these events to AUDL.
 
+### 8. Backup-Agent Registration
+
+AI backup agents are governed lifecycle records, not hidden automation. A valid
+agent registration requires:
+
+- tenant context;
+- supported runtime: `codex`, `claude_code`, `opencode`, or `pi`;
+- supported role: `plan_reviewer`, `snapshot_reviewer`, `restore_reviewer`,
+  `retention_reviewer`, or `continuity_reviewer`;
+- explicit operating scope;
+- contribution disclosure;
+- optional policy reference.
+
+Generated applications must display agent scope and disclosure on review
+surfaces so human approvers can distinguish agent-assisted summaries from
+direct reviewer decisions.
+
+### 9. Streaming
+
+BKUP publishes Bytewax lifecycle stream metadata through the capability
+contract and generated semantic model:
+
+- processor: `bytewax`;
+- topic: `apg.bkup.lifecycle`;
+- state collections: plans, snapshots, restores, restore approvals, retention
+  dispositions, continuity reports, backup agents, and audit events;
+- events: plan creation, snapshot creation, restore approval decisions,
+  restore requests, restore review approvals, restore-test records, retention
+  disposition decisions, and backup-agent registration;
+- batch mutation guardrail: `batch_backup_mutation_requires_bytewax`.
+
 ## Rule Engine
 
 The capability contract must expose deterministic rules for:
@@ -118,6 +151,10 @@ The capability contract must expose deterministic rules for:
 - independent restore reviewer;
 - legal-hold retention block;
 - independent retention reviewer.
+- backup-agent registration, supported runtime, supported role, scope, and
+  disclosure;
+- lifecycle state-change audit evidence;
+- Bytewax batch backup mutation.
 
 The runtime must enforce equivalent behavior and fail closed.
 
@@ -133,8 +170,10 @@ BKUP must expose UI routes and theme components for:
 - restore approval queue;
 - retention policy;
 - retention disposition queue;
+- backup-agent panel;
 - continuity reports;
 - audit;
+- analytics;
 - settings.
 
 Theme components must support compact operational surfaces for RPO/RTO state, encryption state, lineage, restore approvals, legal hold, retention disposition, and continuity findings.
@@ -150,15 +189,35 @@ The package runtime must not implement or require:
 - production persistence;
 - legal/regulatory advice;
 - live disaster-recovery execution.
+- live Bytewax topology execution.
 
 Those concerns belong behind adapters.
 
 ## Acceptance Criteria
 
 - The package has `SPECIFICATION.md` and `PLAN.md`.
+- The package has a practical root `README.md`.
 - The service stores records by tenant-qualified keys.
 - Restore approval and retention disposition are explicit lifecycle records, not raw booleans.
+- Backup agents can be registered with supported runtime, supported role,
+  scope, disclosure, and policy evidence.
+- Unsupported backup-agent runtime, missing scope, or undisclosed contribution
+  fails closed.
+- Batch backup mutation validation accepts Bytewax and denies other stream
+  providers.
 - API helpers and view models expose approval/disposition queues.
+- Generated semantic model exposes backup-agent route, provides/requires
+  metadata, and Bytewax stream metadata.
 - Contract, semantic model, release report, and manifest include the new surfaces.
 - Focused tests prove positive and negative governance paths.
 - Implementation audit and publish-plan pass for `capabilities/common/bkup`.
+
+## Focused Proof Commands
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/bkup/__init__.py capabilities/common/bkup/capability_contract.py capabilities/common/bkup/models.py capabilities/common/bkup/backup_engine.py capabilities/common/bkup/service.py capabilities/common/bkup/api.py capabilities/common/bkup/views.py capabilities/common/bkup/app.py capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/bkup/test_capability_contract.py capabilities/common/bkup/tests/test_package_contract.py
+./.venv/bin/python -c "from capabilities.common.bkup import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/bkup --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json
+```

@@ -6,8 +6,14 @@ from dataclasses import replace
 from typing import Any
 
 from .backup_engine import BackupEngine
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_BACKUP_AGENT_ROLES,
+	SUPPORTED_BACKUP_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
+	BackupAgent,
 	BackupAuditEvent,
 	BackupPlan,
 	BackupSnapshot,
@@ -28,6 +34,7 @@ class BkupService:
 		self._restore_approvals: dict[tuple[str, str], RestoreApproval] = {}
 		self._retention_dispositions: dict[tuple[str, str], RetentionDisposition] = {}
 		self._reports: dict[tuple[str, str], ContinuityReport] = {}
+		self._backup_agents: dict[tuple[str, str], BackupAgent] = {}
 		self._audit_events: dict[tuple[str, str], BackupAuditEvent] = {}
 		self._engine = BackupEngine()
 
@@ -469,6 +476,84 @@ class BkupService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events.values(), tenant_id)
 
+	def register_backup_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		registered: bool = True,
+		contribution_disclosed: bool = True,
+		policy_ref: str | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"backup_agent_present": True,
+			"agent_registered": registered,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_BACKUP_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_BACKUP_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		self._ensure_new(self._backup_agents, tenant_id, agent_id, "backup agent")
+		if not name:
+			raise ValueError("backup_agent_name_required")
+		agent = BackupAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+			status=status,
+		)
+		self._backup_agents[self._tenant_key(tenant_id, agent_id)] = agent
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="backup_agent_registered",
+			actor="system",
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"runtime": agent.runtime, "role": agent.role, "scope": scope},
+		)
+		return agent.to_dict()
+
+	def list_backup_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._backup_agents.values(), tenant_id)
+
+	def validate_batch_backup_mutation(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "batch_backup_mutation",
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+		})
+		self._raise_if_denied(result)
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+			"accepted": True,
+			"rule_result": result,
+		}
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		"""Compatibility surface exposing snapshots as BKUP records."""
 		return self.list_snapshots(tenant_id)
@@ -509,6 +594,7 @@ class BkupService:
 			"pending_retention_disposition_count": len([item for item in self.list_retention_dispositions(tenant_id) if item["status"] == "pending"]),
 			"continuity_report_count": len(reports),
 			"review_required_report_count": len([item for item in reports if item["review_status"] == "required"]),
+			"backup_agent_count": len(self.list_backup_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -628,3 +714,7 @@ class BkupService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")

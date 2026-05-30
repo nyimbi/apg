@@ -4,20 +4,13 @@
       "capability_contract": {
         "display_name": "Backup and Restore",
         "errors": [],
-        "route_count": 11,
-        "rule_count": 10
+        "route_count": 13,
+        "rule_count": 17
       }
     },
     "self_test": {
       "capability": "bkup",
-      "errors": [],
       "passed": true,
-      "routes": [
-        "/health",
-        "/self-test",
-        "/component.json",
-        "/semantic-model.json"
-      ],
       "status": "ok"
     },
     "semantic_model": {

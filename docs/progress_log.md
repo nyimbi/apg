@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 18:12 EAT
+
+BKUP backup/restore lifecycle/guardrail packet:
+
+- Added a practical `README.md`, refreshed `SPECIFICATION.md` and `PLAN.md`,
+  and replaced `cap_spec.md` with a compatibility pointer to the active
+  specification.
+- Expanded `capability_contract.py` with first-class backup-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for backup-agent registration, supported
+  runtime, supported role, explicit scope, contribution disclosure, BKUP
+  state-change audit evidence, and Bytewax batch backup mutation enforcement.
+- Added backup-agent and analytics route metadata plus backup-agent and stream
+  theme components.
+- Added `BackupAgent` model support and extended `BkupService` with
+  tenant-qualified backup-agent registration, listing, dashboard counts,
+  normalized runtime/role tokens, and batch mutation validation.
+- Extended API helpers and view models with backup-agent, audit, analytics,
+  settings, and Bytewax stream surfaces.
+- Updated BKUP registration metadata with backup-agent capability, agent
+  endpoint, streaming metadata, and backup-agent provides metadata.
+- Expanded focused tests for backup-agent registration, unsupported runtime,
+  Bytewax batch mutation, API helper exposure, view model exposure, generated
+  semantic stream metadata, and package documentation presence.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/bkup/__init__.py
+  capabilities/common/bkup/capability_contract.py capabilities/common/bkup/models.py
+  capabilities/common/bkup/backup_engine.py capabilities/common/bkup/service.py
+  capabilities/common/bkup/api.py capabilities/common/bkup/views.py
+  capabilities/common/bkup/app.py capabilities/common/bkup/test_capability_contract.py
+  capabilities/common/bkup/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/bkup/test_capability_contract.py
+  capabilities/common/bkup/tests/test_package_contract.py` passed with 10 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.bkup import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.bkup.streaming.processor,
+  .capabilities.bkup.configuration.backup_agents.supported_runtimes,
+  .capabilities.bkup.screens.backup_agents.route'
+  capabilities/common/bkup/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/bkup/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/bkup --json` passed with `bkup` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/bkup --json`
+  passed with `side_effect_free: true` and no warnings.
+- BKUP stale-marker and unsupported stream search returned no matches for the
+  touched packet files.
+- `git diff --check -- capabilities/common/bkup docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live storage providers, schedulers,
+  database/VM/Kubernetes restore orchestrators, production ENCR/CONF/AUDL/
+  SCHD/MONI/COMP adapters, live Bytewax topology, rendered browser UI, and
+  performance/resilience checks.
+
 ### 2026-05-30 18:05 EAT
 
 BCLG blockchain-ledger lifecycle/guardrail packet:

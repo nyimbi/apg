@@ -28,12 +28,14 @@ def dashboard_model(
 		"restore_approvals": service.list_restore_approvals(tenant_id),
 		"retention_dispositions": service.list_retention_dispositions(tenant_id),
 		"reports": service.list_reports(tenant_id),
+		"backup_agents": service.list_backup_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"restore_review_queue": [
 			item for item in service.list_restores(tenant_id)
 			if item["status"] == "pending_review"
 		],
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -110,6 +112,50 @@ def audit_model(
 		"summary": service.continuity_summary(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"theme": contract["theme"],
+	}
+
+
+def backup_agent_model(
+	service: BkupService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_backup_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["backup_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["backup_agents"]["allowed_roles"],
+		"required_fields": ["name", "runtime", "role", "scope", "contribution_disclosed"],
+		"actions": ["register", "scope", "review_contribution", "deactivate"],
+	}
+
+
+def analytics_model(
+	service: BkupService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	summary = service.continuity_summary(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"summary": summary,
+		"restore_completion_rate": _safe_ratio(summary["completed_restore_count"], summary["restore_count"]),
+		"available_snapshot_rate": _safe_ratio(summary["available_snapshot_count"], summary["snapshot_count"]),
+		"continuity_review_rate": _safe_ratio(summary["review_required_report_count"], summary["continuity_report_count"]),
+		"agent_coverage": _safe_ratio(summary["backup_agent_count"], max(summary["plan_count"], 1)),
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -123,3 +169,7 @@ def _service_or_default(service: BkupService | None) -> BkupService:
 		return SERVICE
 	except ImportError:  # pragma: no cover - standalone package loading path
 		return BkupService()
+
+
+def _safe_ratio(numerator: int, denominator: int) -> float:
+	return round(numerator / denominator, 4) if denominator else 0.0
