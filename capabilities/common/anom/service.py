@@ -41,11 +41,20 @@ class AnomService:
 		source_id: str,
 		tenant_id: str,
 		name: str,
-		kind: str = "metric",
-		owner: str = "operations",
+		kind: str = "",
+		owner: str = "",
 		labels: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._enforce_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_source",
+			"source_name_present": bool(name),
+			"source_owner_present": bool(owner),
+			"source_kind_present": bool(kind),
+			"source_kind_known": kind in self.describe(tenant_id)["configuration"]["sources"]["allowed_kinds"],
+		})
+		_raise_if_blocked(result)
 		source = MonitoringSource(
 			id=source_id,
 			tenant_id=tenant_id,
@@ -77,9 +86,16 @@ class AnomService:
 		source_id: str,
 		metric: str,
 		values: list[float] | tuple[float, ...],
-		sensitivity: str = "medium",
+		sensitivity: str = "",
 	) -> dict[str, Any]:
-		self._enforce_baseline_policy(tenant_id, len(values))
+		source_present = self._tenant_key(tenant_id, source_id) in self._sources
+		self._enforce_baseline_policy(
+			tenant_id=tenant_id,
+			source_present=source_present,
+			metric_present=bool(metric),
+			history_points=len(values),
+			sensitivity=sensitivity,
+		)
 		source = self._get_source(tenant_id, source_id)
 		baseline = self._engine.build_baseline(
 			baseline_id=baseline_id,
@@ -144,8 +160,16 @@ class AnomService:
 		timestamp: str | None = None,
 		context: dict[str, Any] | None = None,
 		owner: str | None = None,
+		triage_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._enforce_detection_policy(tenant_id, self._tenant_key(tenant_id, source_id) in self._sources)
+		value_present = value is not None
+		self._enforce_detection_policy(
+			tenant_id=tenant_id,
+			source_present=self._tenant_key(tenant_id, source_id) in self._sources,
+			baseline_present=self._tenant_key(tenant_id, baseline_id) in self._baselines,
+			metric_present=bool(metric),
+			value_present=value_present,
+		)
 		source = self._get_source(tenant_id, source_id)
 		baseline = self._get_baseline(tenant_id, baseline_id)
 		observation = Observation(
@@ -157,10 +181,10 @@ class AnomService:
 			timestamp=timestamp,
 			context=dict(context or {}),
 		)
-		self._observations[self._tenant_key(tenant_id, observation.id)] = observation
 		scored = self._engine.score_observation(baseline, observation)
 		severity = str(scored["severity"])
-		self._enforce_signal_policy(tenant_id, severity, bool(owner))
+		self._enforce_signal_policy(tenant_id, severity, bool(owner), triage_recorded=bool(triage_recorded))
+		self._observations[self._tenant_key(tenant_id, observation.id)] = observation
 		signal = AnomalySignal(
 			id=detection_id,
 			tenant_id=tenant_id,
@@ -181,11 +205,12 @@ class AnomService:
 			evidence={
 				"source_id": source.id,
 				"baseline_id": baseline.id,
-				"metric": metric,
-				"score": scored["score"],
-				"owner_assigned": bool(owner),
-			},
-		)
+					"metric": metric,
+					"score": scored["score"],
+					"owner_assigned": bool(owner),
+					"triage_recorded": bool(triage_recorded),
+				},
+			)
 		if owner and scored["anomalous"]:
 			self.open_investigation(
 				investigation_id=f"investigate:{detection_id}",
@@ -217,7 +242,12 @@ class AnomService:
 	) -> dict[str, Any]:
 		"""Compatibility helper that records a manual anomaly signal."""
 		metadata = dict(metadata or {})
-		self._enforce_signal_policy(tenant_id, str(metadata.get("severity") or "medium"), bool(metadata.get("owner")))
+		self._enforce_signal_policy(
+			tenant_id,
+			str(metadata.get("severity") or "medium"),
+			bool(metadata.get("owner")),
+			triage_recorded=bool(metadata.get("triage_recorded", False)),
+		)
 		signal = AnomalySignal(
 			id=record_id,
 			tenant_id=tenant_id,
@@ -247,8 +277,14 @@ class AnomService:
 		owner: str,
 	) -> dict[str, Any]:
 		self._enforce_tenant(tenant_id)
-		if not owner:
-			raise ValueError("investigation owner is required")
+		signal_present = self._tenant_key(tenant_id, signal_id) in self._signals
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "open_investigation",
+			"signal_present": signal_present,
+			"owner_assigned": bool(owner),
+		})
+		_raise_if_blocked(result)
 		signal = self._get_signal(tenant_id, signal_id)
 		investigation = Investigation(
 			id=investigation_id,
@@ -278,13 +314,15 @@ class AnomService:
 			self._enforce_tenant("")
 		investigation = self._resolve_investigation(investigation_id, tenant_id)
 		self._enforce_tenant(tenant_id)
-		if not resolution:
-			raise ValueError("investigation resolution is required")
-		if not closed_by:
-			raise ValueError("investigation closer is required")
 		evidence = tuple(resolution_evidence or ())
-		if not evidence:
-			raise ValueError("investigation resolution evidence is required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "close_investigation",
+			"resolution_present": bool(resolution),
+			"closed_by_present": bool(closed_by),
+			"resolution_evidence_present": bool(evidence),
+		})
+		_raise_if_blocked(result)
 		updated = Investigation(
 			id=investigation.id,
 			tenant_id=investigation.tenant_id,
@@ -321,13 +359,19 @@ class AnomService:
 		notes: str = "",
 		tuning_review_recorded: bool = False,
 	) -> dict[str, Any]:
-		signal = self._get_signal(tenant_id, signal_id)
-		if not reviewer:
-			raise ValueError("feedback reviewer is required")
+		signal_present = self._tenant_key(tenant_id, signal_id) in self._signals
 		projected_feedback = [item.to_dict() for item in self._feedback.values() if item.tenant_id == tenant_id]
 		projected_feedback.append({"label": label})
 		false_positive_rate = self._engine.false_positive_rate(projected_feedback)
-		self._enforce_feedback_policy(tenant_id, false_positive_rate, tuning_review_recorded)
+		self._enforce_feedback_policy(
+			tenant_id=tenant_id,
+			signal_present=signal_present,
+			label=label,
+			reviewer=reviewer,
+			false_positive_rate=false_positive_rate,
+			tuning_review_recorded=tuning_review_recorded,
+		)
+		signal = self._get_signal(tenant_id, signal_id)
 		feedback = DetectionFeedback(
 			id=feedback_id,
 			tenant_id=tenant_id,
@@ -441,27 +485,57 @@ class AnomService:
 		})
 		_raise_if_blocked(result)
 
-	def _enforce_detection_policy(self, tenant_id: str, source_present: bool) -> None:
+	def _enforce_detection_policy(
+		self,
+		tenant_id: str,
+		source_present: bool,
+		baseline_present: bool,
+		metric_present: bool,
+		value_present: bool,
+	) -> None:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "detect",
 			"monitoring_source_present": source_present,
+			"baseline_present": baseline_present,
+			"metric_present": metric_present,
+			"value_present": value_present,
 		})
 		_raise_if_blocked(result)
 
-	def _enforce_baseline_policy(self, tenant_id: str, history_points: int) -> None:
+	def _enforce_baseline_policy(
+		self,
+		tenant_id: str,
+		source_present: bool,
+		metric_present: bool,
+		history_points: int,
+		sensitivity: str,
+	) -> None:
+		allowed = self.describe(tenant_id)["configuration"]["detection"]["allowed_sensitivities"]
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_baseline",
+			"monitoring_source_present": source_present,
+			"metric_present": metric_present,
 			"history_points": history_points,
+			"sensitivity_present": bool(sensitivity),
+			"sensitivity_known": sensitivity in allowed,
 		})
 		_raise_if_blocked(result)
 
-	def _enforce_signal_policy(self, tenant_id: str, severity: str, owner_assigned: bool) -> None:
+	def _enforce_signal_policy(
+		self,
+		tenant_id: str,
+		severity: str,
+		owner_assigned: bool,
+		triage_recorded: bool,
+	) -> None:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": "detect",
 			"severity": severity,
 			"owner_assigned": owner_assigned,
+			"triage_recorded": triage_recorded,
 		})
 		_raise_if_blocked(result)
 
@@ -476,11 +550,20 @@ class AnomService:
 	def _enforce_feedback_policy(
 		self,
 		tenant_id: str,
+		signal_present: bool,
+		label: str,
+		reviewer: str,
 		false_positive_rate: float,
 		tuning_review_recorded: bool,
 	) -> None:
+		allowed = self.describe(tenant_id)["configuration"]["feedback"]["allowed_labels"]
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": "record_feedback",
+			"signal_present": signal_present,
+			"reviewer_present": bool(reviewer),
+			"label_present": bool(label),
+			"label_known": label in allowed,
 			"false_positive_rate": false_positive_rate,
 			"tuning_review_recorded": tuning_review_recorded,
 		})

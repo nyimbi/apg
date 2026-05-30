@@ -1,52 +1,42 @@
-# ANOM Capability Development Plan
+# ANOM Implementation Plan
 
-## Current State
+## Phase 1 - Contract
 
-ANOM already has a deterministic anomaly engine, package contract, service,
-API helper facade, view models, and focused tests. The next packet should make
-the lifecycle more operational by strengthening tenant isolation and requiring
-closure evidence for investigations.
+- Expand configuration into sources, detection, baselines, signals,
+  investigations, feedback, governance, observability, adapters, UI, and theme.
+- Add deterministic guardrails for source, baseline, detection, signal,
+  investigation, feedback, audit, cross-tenant, alert, reset, and Bytewax stream
+  behavior.
+- Expand UI routes and theme component metadata for generated apps.
 
-## Packet 1: Governed Investigation Closure
+## Phase 2 - Runtime
 
-Deliver a focused lifecycle packet:
+- Keep `AnomService` as the generated-app runtime.
+- Harden source, baseline, detection, investigation, feedback, reset, and audit
+  guardrails where the expanded contract needs executable evidence.
+- Keep deterministic helpers in `anomaly_engine.py` so generated applications
+  execute before live monitoring, prediction, or incident tools are connected.
 
-- add tenant-scoped anomaly audit events;
-- make in-memory source, baseline, observation, signal, investigation, and
-  feedback stores tenant-qualified;
-- detect signals and open investigations without allowing duplicate IDs across
-  tenants to collide;
-- require tenant, actor, resolution, and evidence when closing investigations;
-- expose audit events and closure fields through API helpers and view models;
-- replace stale generated-package test naming with package contract tests;
-- update package documentation and progress evidence.
+## Phase 3 - UI Models
 
-## Implementation Steps
+- Extend route-specific view models for dashboard, sources, baselines, detector,
+  signals, investigations, alerts, rules, feedback, quality, audit, and
+  settings.
+- Ensure view models import only the contract and dependency-light runtime.
 
-1. Extend `models.py` with `AnomalyAuditEvent` and closure evidence fields on
-   `Investigation`.
-2. Update `service.py` to use tenant-qualified keys, emit audit events, and
-   enforce investigation closure evidence.
-3. Update `api.py` with closure and audit helper functions.
-4. Update `views.py` so dashboard and investigation views expose audit evidence.
-5. Extend package contract tests with positive detect-investigate-close
-   coverage and negative tenant, missing owner, missing resolution evidence,
-   feedback review, baseline reset, and duplicate-ID isolation coverage.
-6. Rename generated-package tests to package contract naming.
-7. Update `cap_spec.md` with the current executable lifecycle and proof
-   commands.
-8. Run focused package proof, implementation audit, publish-plan, and diff
-   checks.
+## Phase 4 - Package Evidence
 
-## Review Checklist
+- Replace static package evidence with contract-derived `app.semantic_model()`.
+- Make `self_test()` validate route count, rule count, Bytewax streaming, and
+  runtime service evidence.
+- Refresh `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` from the current app entrypoint.
 
-- Monitoring source and baseline lookup is tenant-qualified.
-- Signal, investigation, and feedback state is tenant-qualified.
-- Critical anomalies cannot be accepted without an owner.
-- Investigations cannot close without resolution evidence.
-- Tenant mismatches are blocked.
-- API helpers expose the same behavior as service methods.
-- View models expose source, baseline, signal, investigation, feedback, rule,
-  theme, and audit-event state.
-- Monitoring, incident, workflow, and storage integrations remain adapter
-  boundaries.
+## Phase 5 - Review and Verification
+
+- Expand focused tests for contract shape, guardrails, runtime lifecycle, UI
+  models, committed package evidence, and APG record compatibility.
+- Run only ANOM py-compile, focused pytest, package self-test, implementation
+  audit, publish plan, stale-marker scan, and whitespace check.
+- Record verification in `docs/progress_log.md`.
+- Commit and push the verified slice using the Lore commit protocol.

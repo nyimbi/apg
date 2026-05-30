@@ -34,7 +34,9 @@ capability_metadata: dict[str, Any] = {
 		"behavioral_baselines",
 		"alert_scoring",
 		"root_cause_hints",
-		"investigation_workflows"
+		"investigation_workflows",
+		"feedback_tuning",
+		"alert_dispatch"
 	],
 	"composition_patterns": [
 		"monitoring_anomaly_signal",
@@ -48,6 +50,7 @@ capability_metadata: dict[str, Any] = {
 		"anom:investigate",
 		"anom:tune",
 		"anom:manage_rules",
+		"anom:audit",
 		"anom:admin"
 	]
 }
@@ -63,25 +66,32 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "mqeb", "hlth", "secu"],
+		"optional_dependencies": ["conf", "auth", "audl", "wflo", "ntfy", "hlth", "secu", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"adapters": contract["configuration"]["adapters"],
 		"capabilities": {
 			"metric_anomaly_detection": "Detect anomalies across monitored metrics and forecasts",
 			"event_anomaly_detection": "Score unusual events and behavioral sequences",
+			"source_registry": "Register tenant-scoped metric, event, trace, forecast, and security sources",
 			"baseline_management": "Maintain tenant-scoped statistical and model baselines",
 			"investigation_workflows": "Route high-severity anomalies into governed investigations",
 			"investigation_closure_governance": "Require tenant-safe closure evidence for anomaly investigations",
+			"feedback_tuning": "Track false positives and require tuning review when quality degrades",
+			"alert_dispatch": "Expose notification-adapter metadata for severe anomaly dispatch",
 			"capability_rules": "Evaluate deterministic anomaly-governance rules",
 			"visual_theming": "Apply anomaly-console theme tokens and components"
 		},
 		"endpoints": {
+			"sources": "/anom/api/v1/sources",
 			"signals": "/anom/api/v1/signals",
 			"baselines": "/anom/api/v1/baselines",
 			"detections": "/anom/api/v1/detections",
 			"investigations": "/anom/api/v1/investigations",
+			"alerts": "/anom/api/v1/alerts",
 			"feedback": "/anom/api/v1/feedback",
+			"quality": "/anom/api/v1/quality",
 			"audit_events": "/anom/api/v1/audit-events"
 		},
 		"ui_components": {

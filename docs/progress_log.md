@@ -14230,3 +14230,62 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Legacy heavy PRED service, API, and Flask-AppBuilder tests.
 - Load, latency, drift, accuracy, and throughput benchmarks.
+
+### 2026-05-30 09:37 EAT
+
+ANOM lifecycle and guardrail packet:
+
+- Selected `capabilities/common/anom` as the next common capability after PRED
+  in the development order.
+- Added root `README.md`, replaced `SPECIFICATION.md` and `PLAN.md`, and
+  replaced `cap_spec.md` with a pointer to the packet docs and executable
+  contract.
+- Expanded the ANOM contract to 31 deterministic guardrails, 12 UI routes,
+  source/detection/baseline/signal/investigation/feedback/governance/
+  observability/adapter configuration, Bytewax event-stream adapter evidence,
+  and signal-console theme components.
+- Kept `service.AnomService` as the dependency-light generated-app runtime and
+  hardened source registration, baseline creation/reset, observation scoring,
+  signal creation, investigation opening/closure, feedback tuning, audit
+  events, list surfaces, dashboard summaries, and APG record compatibility.
+- Separated high-severity triage evidence from owner assignment, removed
+  synthesized required-field defaults from service/API guardrails, and kept
+  CONF/AUTH/AUDL as optional adapter integrations rather than hard runtime
+  dependencies.
+- Extended `views.py` with generated-app view models for dashboard, sources,
+  baselines, detector, signals, investigations, alerts, rules, feedback,
+  quality, audit, and settings.
+- Updated capability registration with canonical PRED, AICR, MONI dependencies,
+  optional CONF/AUTH/AUDL/WFLO/NTFY/HLTH/SECU/CACH adapters, richer endpoints,
+  and audit permission.
+- Replaced static package evidence with contract-derived `app.py` semantics and
+  refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded focused tests for Bytewax, rule count, route count, audit
+  permission, runtime lifecycle, generated UI models, package evidence, APG
+  record compatibility, tenant isolation, required-field guardrails, triage
+  evidence, false-positive tuning, and API helper guardrails.
+- Review-agent pass found and fixed required-field default bypasses,
+  high-severity triage bypass, and hard dependency overstatement.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/anom/__init__.py capabilities/common/anom/capability_contract.py capabilities/common/anom/models.py capabilities/common/anom/anomaly_engine.py capabilities/common/anom/service.py capabilities/common/anom/api.py capabilities/common/anom/views.py capabilities/common/anom/app.py capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and ANOM capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json` passed with `ok: true`; ANOM remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json` passed with 12 UI routes, 31 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/anom/README.md capabilities/common/anom/SPECIFICATION.md capabilities/common/anom/PLAN.md capabilities/common/anom/cap_spec.md capabilities/common/anom/__init__.py capabilities/common/anom/capability_contract.py capabilities/common/anom/models.py capabilities/common/anom/anomaly_engine.py capabilities/common/anom/service.py capabilities/common/anom/api.py capabilities/common/anom/views.py capabilities/common/anom/app.py capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py capabilities/common/anom/package_manifest.json capabilities/common/anom/release_report.json capabilities/common/anom/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/anom docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live monitoring backend ingestion.
+- Live Bytewax stream execution.
+- External PRED, AICR, MONI, WFLO, NTFY, HLTH, CONF, AUTH, AUDL, and CACH
+  adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Legacy heavy ANOM service, API, and Flask-AppBuilder tests.
+- Load, latency, precision/recall, drift, and throughput benchmarks.

@@ -1,16 +1,18 @@
 """Regression coverage for the ANOM executable capability contract."""
 
+from __future__ import annotations
+
 import pytest
 
 from capabilities.common.anom import api, register_capability, views
 from capabilities.common.anom.capability_contract import (
 	evaluate_capability_rules,
-	get_capability_contract
+	get_capability_contract,
 )
 from capabilities.common.anom.service import AnomService
 
 
-def test_contract_exposes_configuration_rules_ui_and_theme():
+def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
 	contract = get_capability_contract("tenant-signals", {"detection": {"default_sensitivity": "high"}})
 
 	assert contract["capability"] == "anom"
@@ -18,47 +20,87 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["configuration"]["detection"]["default_sensitivity"] == "high"
 	assert contract["configuration_schema"]["required"] == [
 		"tenant_id",
+		"sources",
 		"detection",
 		"baselines",
+		"signals",
 		"investigation",
+		"feedback",
 		"governance",
+		"observability",
+		"adapters",
 		"ui",
-		"theme"
+		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "signals", "baselines", "investigations", "rules", "feedback", "settings"}
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {
+		"dashboard",
+		"sources",
+		"baselines",
+		"detector",
+		"signals",
+		"investigations",
+		"alerts",
+		"rules",
+		"feedback",
+		"quality",
+		"audit",
+		"settings",
+	}
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.AnomService"
+	assert next(route for route in contract["ui"]["routes"] if route["name"] == "audit")["permission"] == "anom:audit"
 	assert contract["ui"]["api_prefix"] == "/anom/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert "signal_card" in contract["theme"]["components"]
+	assert {"signal_card", "baseline_chart", "alert_queue", "quality_dashboard", "audit_timeline"} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_anomaly_guardrails():
-	result = evaluate_capability_rules({
+	detection_result = evaluate_capability_rules({
 		"tenant_context_present": False,
 		"operation": "detect",
 		"monitoring_source_present": False,
-		"history_points": 20,
+		"baseline_present": False,
+		"metric_present": False,
+		"value_present": False,
 		"severity": "critical",
 		"owner_assigned": False,
-		"approval_recorded": False,
-		"false_positive_rate": 0.4,
-		"tuning_review_recorded": False
 	})
-	baseline_result = evaluate_capability_rules({
+	feedback_result = evaluate_capability_rules({
 		"tenant_context_present": True,
-		"operation": "create_baseline",
-		"history_points": 20
+		"operation": "record_feedback",
+		"signal_present": True,
+		"reviewer_present": True,
+		"label_present": True,
+		"label_known": True,
+		"false_positive_rate": 0.4,
+		"tuning_review_recorded": False,
+	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "configure_batch_detection",
+		"event_stream": "kafka",
+	})
+	state_change_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"state_change_requested": True,
+		"audit_event_recorded": False,
 	})
 
-	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert detection_result["decision"] == "deny"
+	assert set(detection_result["matched_rules"]) == {
 		"tenant_context_required",
 		"detection_requires_monitoring_source",
+		"detection_requires_baseline",
+		"detection_requires_metric",
+		"detection_requires_value",
 		"critical_anomaly_requires_owner",
-		"high_false_positive_rate_requires_tuning"
 	}
-	assert baseline_result["decision"] == "deny"
-	assert baseline_result["matched_rules"] == ["baseline_requires_history"]
+	assert feedback_result["decision"] == "require_review"
+	assert feedback_result["matched_rules"] == ["high_false_positive_rate_requires_tuning"]
+	assert batch_result["matched_rules"] == ["batch_detection_requires_bytewax"]
+	assert batch_result["actions"][0]["reason"] == "bytewax_event_stream_required"
+	assert state_change_result["matched_rules"] == ["anomaly_state_change_requires_audit"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -67,12 +109,15 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "anom"
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
+	assert registration["adapters"]["event_stream"] == "bytewax"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "anom_signal_console"
 	assert registration["ui_components"]["investigations"] == "/anom/investigations"
+	assert registration["ui_components"]["audit"] == "/anom/audit"
 	assert "investigation_closure_governance" in registration["capabilities"]
+	assert "feedback_tuning" in registration["capabilities"]
 	assert "pred" in registration["dependencies"]
-	assert "anom:investigate" in registration["permissions"]
+	assert "anom:audit" in registration["permissions"]
 
 
 def test_service_builds_baselines_detects_signals_and_tracks_investigations():
@@ -117,7 +162,13 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 		reviewer="sre-lead",
 	)
 	summary = service.signal_summary("tenant-signals")
-	investigation_view = views.investigation_queue_model(service, "tenant-signals")
+	dashboard = views.dashboard_model(service, "tenant-signals")
+	source_registry = views.source_registry_model(service, "tenant-signals")
+	detector = views.detection_workbench_model(service, "tenant-signals")
+	alerts = views.alert_queue_model(service, "tenant-signals")
+	rules = views.rule_manager_model(service, "tenant-signals")
+	quality = views.quality_model(service, "tenant-signals")
+	audit = views.audit_timeline_model(service, "tenant-signals")
 
 	assert baseline["history_points"] == 60
 	assert signal["severity"] == "critical"
@@ -128,7 +179,13 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 	assert feedback["label"] == "true_positive"
 	assert summary["critical_or_high_count"] == 1
 	assert summary["investigation_count"] == 1
-	assert "closure_required_fields" in investigation_view
+	assert dashboard["summary"]["signal_count"] == 1
+	assert source_registry["sources"][0]["id"] == "api_latency"
+	assert detector["required_fields"] == ["source_id", "baseline_id", "metric", "value"]
+	assert alerts["notification_adapter"] == "ntfy"
+	assert len(rules["rules"]) >= 30
+	assert quality["tuning_required"] is False
+	assert audit["audit_events"]
 	assert {event["event_type"] for event in service.list_audit_events("tenant-signals")} >= {
 		"monitoring_source_registered",
 		"baseline_created",
@@ -141,6 +198,15 @@ def test_service_builds_baselines_detects_signals_and_tracks_investigations():
 
 def test_service_blocks_invalid_detection_and_tuning_flows():
 	service = AnomService()
+
+	with pytest.raises(PermissionError, match="source_name_required"):
+		service.register_source(
+			source_id="missing-name",
+			tenant_id="tenant-signals",
+			name="",
+			kind="metric",
+			owner="platform",
+		)
 
 	with pytest.raises(PermissionError, match="monitoring_source_required"):
 		service.detect(
@@ -157,7 +223,56 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 		tenant_id="tenant-signals",
 		name="Error Rate",
 		kind="metric",
+		owner="platform",
 	)
+
+	with pytest.raises(PermissionError, match="source_owner_required"):
+		service.register_source(
+			source_id="missing-owner",
+			tenant_id="tenant-signals",
+			name="Missing Owner",
+			kind="metric",
+			owner="",
+		)
+
+	with pytest.raises(PermissionError, match="source_kind_required"):
+		service.register_source(
+			source_id="missing-kind",
+			tenant_id="tenant-signals",
+			name="Missing Kind",
+			kind="",
+			owner="platform",
+	)
+
+	with pytest.raises(PermissionError, match="baseline_source_required"):
+		service.create_baseline(
+			baseline_id="missing-source-baseline",
+			tenant_id="tenant-signals",
+			source_id="missing",
+			metric="error_rate",
+			values=[1.0 + (index % 3) for index in range(60)],
+			sensitivity="medium",
+		)
+
+	with pytest.raises(PermissionError, match="baseline_metric_required"):
+		service.create_baseline(
+			baseline_id="missing-metric",
+			tenant_id="tenant-signals",
+			source_id="errors",
+			metric="",
+			values=[1.0 + (index % 3) for index in range(60)],
+			sensitivity="medium",
+		)
+
+	with pytest.raises(PermissionError, match="baseline_sensitivity_required"):
+		service.create_baseline(
+			baseline_id="missing-sensitivity",
+			tenant_id="tenant-signals",
+			source_id="errors",
+			metric="error_rate",
+			values=[1.0 + (index % 3) for index in range(60)],
+			sensitivity="",
+		)
 
 	with pytest.raises(PermissionError, match="insufficient_baseline_history"):
 		service.create_baseline(
@@ -166,6 +281,7 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 			source_id="errors",
 			metric="error_rate",
 			values=[1.0, 2.0, 3.0],
+			sensitivity="medium",
 		)
 
 	service.create_baseline(
@@ -197,6 +313,20 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 		owner="sre-lead",
 	)
 
+	with pytest.raises(PermissionError, match="high_anomaly_triage_required"):
+		service.create_record(
+			record_id="high-without-triage",
+			tenant_id="tenant-signals",
+			metadata={"severity": "high", "owner": "sre-lead"},
+		)
+
+	triaged = service.create_record(
+		record_id="high-with-triage",
+		tenant_id="tenant-signals",
+		metadata={"severity": "high", "owner": "sre-lead", "triage_recorded": True},
+	)
+	assert triaged["severity"] == "high"
+
 	with pytest.raises(PermissionError, match="tuning_review_required"):
 		service.record_feedback(
 			feedback_id="fp-1",
@@ -221,7 +351,7 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 			approval_recorded=True,
 		)
 
-	with pytest.raises(ValueError, match="investigation resolution evidence is required"):
+	with pytest.raises(PermissionError, match="investigation_resolution_evidence_required"):
 		service.close_investigation(
 			investigation_id="investigate:critical-with-owner",
 			tenant_id="tenant-signals",
@@ -230,7 +360,7 @@ def test_service_blocks_invalid_detection_and_tuning_flows():
 			resolution_evidence=[],
 		)
 
-	with pytest.raises(ValueError, match="feedback reviewer is required"):
+	with pytest.raises(PermissionError, match="feedback_reviewer_required"):
 		service.record_feedback(
 			feedback_id="reviewer-required",
 			tenant_id="tenant-signals",
@@ -248,6 +378,7 @@ def test_service_keeps_duplicate_ids_isolated_by_tenant():
 			source_id="shared-source",
 			tenant_id=tenant_id,
 			name=f"Shared Source {tenant_id}",
+			kind="metric",
 			owner=owner,
 		)
 		service.create_baseline(
@@ -256,6 +387,7 @@ def test_service_keeps_duplicate_ids_isolated_by_tenant():
 			source_id="shared-source",
 			metric="latency",
 			values=[100.0 + (index % 4) for index in range(60)],
+			sensitivity="medium",
 		)
 		service.detect(
 			detection_id="shared-signal",
@@ -283,18 +415,32 @@ def test_service_keeps_duplicate_ids_isolated_by_tenant():
 
 
 def test_api_helpers_expose_closure_and_audit_lifecycle():
+	with pytest.raises(PermissionError, match="source_name_required"):
+		api.register_source({"id": "api-missing-source-fields", "tenant_id": "tenant-api-anom"})
+
 	source = api.register_source({
 		"id": "api-source",
 		"tenant_id": "tenant-api-anom",
 		"name": "API Source",
+		"kind": "metric",
 		"owner": "api-owner",
 	})
+	with pytest.raises(PermissionError, match="baseline_metric_required"):
+		api.create_baseline({
+			"id": "api-missing-metric",
+			"tenant_id": source["tenant_id"],
+			"source_id": source["id"],
+			"values": [100.0 + (index % 5) for index in range(60)],
+			"sensitivity": "medium",
+		})
+
 	baseline = api.create_baseline({
 		"id": "api-baseline",
 		"tenant_id": source["tenant_id"],
 		"source_id": source["id"],
 		"metric": "latency",
 		"values": [100.0 + (index % 5) for index in range(60)],
+		"sensitivity": "medium",
 	})
 	signal = api.detect({
 		"id": "api-signal",
@@ -305,6 +451,15 @@ def test_api_helpers_expose_closure_and_audit_lifecycle():
 		"value": 180.0,
 		"owner": "api-owner",
 	})
+	with pytest.raises(PermissionError, match="feedback_reviewer_required"):
+		api.record_feedback({
+			"id": "api-feedback-missing-reviewer",
+			"tenant_id": source["tenant_id"],
+			"signal_id": signal["id"],
+			"label": "true_positive",
+			"tuning_review_recorded": True,
+		})
+
 	closed = api.close_investigation({
 		"id": f"investigate:{signal['id']}",
 		"tenant_id": source["tenant_id"],

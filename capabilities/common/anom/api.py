@@ -26,9 +26,9 @@ def register_source(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.register_source(
 		source_id=str(payload["id"]),
 		tenant_id=str(payload.get("tenant_id") or "default"),
-		name=str(payload.get("name") or payload["id"]),
-		kind=str(payload.get("kind") or "metric"),
-		owner=str(payload.get("owner") or "operations"),
+		name=str(payload.get("name") or ""),
+		kind=str(payload.get("kind") or ""),
+		owner=str(payload.get("owner") or ""),
 		labels=dict(payload.get("labels") or {}),
 	)
 
@@ -38,9 +38,9 @@ def create_baseline(payload: dict[str, Any]) -> dict[str, Any]:
 		baseline_id=str(payload["id"]),
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		source_id=str(payload["source_id"]),
-		metric=str(payload.get("metric") or "value"),
+		metric=str(payload.get("metric") or ""),
 		values=[float(item) for item in payload.get("values", [])],
-		sensitivity=str(payload.get("sensitivity") or "medium"),
+		sensitivity=str(payload.get("sensitivity") or ""),
 	)
 
 
@@ -64,6 +64,7 @@ def detect(payload: dict[str, Any]) -> dict[str, Any]:
 		timestamp=payload.get("timestamp"),
 		context=dict(payload.get("context") or {}),
 		owner=payload.get("owner"),
+		triage_recorded=bool(payload.get("triage_recorded", False)),
 	)
 
 
@@ -92,7 +93,7 @@ def record_feedback(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		signal_id=str(payload["signal_id"]),
 		label=str(payload["label"]),
-		reviewer=str(payload.get("reviewer") or "reviewer"),
+		reviewer=str(payload.get("reviewer") or ""),
 		notes=str(payload.get("notes") or ""),
 		tuning_review_recorded=bool(payload.get("tuning_review_recorded", False)),
 	)

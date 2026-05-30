@@ -8,30 +8,122 @@
   },
   "capabilities": {
     "anom": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "configuration": "conf",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.AnomService",
+        "health": "hlth",
+        "helper_runtime": "anomaly_engine.py",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "monitoring": "moni",
+        "notification": "ntfy",
+        "predictive_analytics": "pred",
+        "production_runtime": "service.AnomService",
+        "workflow": "wflo"
+      },
+      "anomaly_lifecycle": {
+        "audit": "AnomalyAuditEvent",
+        "baseline": "BaselineProfile",
+        "feedback": "DetectionFeedback",
+        "investigation": "Investigation",
+        "observation": "Observation",
+        "signal": "AnomalySignal",
+        "source": "MonitoringSource"
+      },
+      "approvals": {
+        "baseline_reset": "BaselineProfile",
+        "feedback_tuning": "DetectionFeedback",
+        "investigation": "Investigation"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AnomService",
+          "health": "hlth",
+          "helper_runtime": "anomaly_engine.py",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "monitoring": "moni",
+          "notification": "ntfy",
+          "predictive_analytics": "pred",
+          "production_runtime": "service.AnomService",
+          "workflow": "wflo"
+        },
         "baselines": {
           "auto_baseline_enabled": true,
           "baseline_review_required": true,
-          "drift_reset_requires_approval": true
+          "drift_reset_requires_approval": true,
+          "minimum_refresh_points": 50
         },
         "detection": {
+          "allowed_sensitivities": [
+            "low",
+            "medium",
+            "high"
+          ],
           "default_sensitivity": "medium",
           "event_detection_enabled": true,
+          "forecast_residual_detection_enabled": true,
           "metric_detection_enabled": true,
           "minimum_baseline_points": 50
         },
+        "feedback": {
+          "allowed_labels": [
+            "true_positive",
+            "false_positive",
+            "expected_change"
+          ],
+          "false_positive_review_threshold": 0.2,
+          "reviewer_required": true
+        },
         "governance": {
           "audit_detections": true,
+          "auth_required": true,
           "monitoring_source_required": true,
           "require_tenant_context": true
         },
         "investigation": {
+          "closure_evidence_required": true,
           "critical_anomalies_require_owner": true,
           "feedback_loop_enabled": true,
           "root_cause_hints_enabled": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "signals": {
+          "critical_requires_owner": true,
+          "cross_tenant_detection_allowed": false,
+          "high_requires_owner": false,
+          "root_cause_hints_enabled": true
+        },
+        "sources": {
+          "allowed_kinds": [
+            "metric",
+            "event",
+            "trace",
+            "forecast",
+            "security"
+          ],
+          "kind_required": true,
+          "name_required": true,
+          "owner_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -39,10 +131,18 @@
           "default_theme": "anom_signal_console"
         },
         "ui": {
+          "enable_alerts": true,
+          "enable_audit": true,
           "enable_baseline_console": true,
+          "enable_dashboard": true,
+          "enable_detector": true,
           "enable_feedback_review": true,
           "enable_investigation_queue": true,
-          "enable_signal_board": true
+          "enable_quality": true,
+          "enable_rules": true,
+          "enable_settings": true,
+          "enable_signals": true,
+          "enable_sources": true
         }
       },
       "erp_modules": [
@@ -71,16 +171,81 @@
           },
           {
             "condition": {
-              "monitoring_source_present": false,
-              "operation": "detect"
+              "operation": "register_source",
+              "source_name_present": false
             },
-            "description": "Anomaly detection requires a monitoring source.",
+            "description": "Monitoring sources require a display name.",
             "effect": {
               "decision": "deny",
-              "reason": "monitoring_source_required",
-              "required_action": "attach_monitoring_source"
+              "reason": "source_name_required",
+              "required_action": "attach_source_name"
             },
-            "name": "detection_requires_monitoring_source"
+            "name": "source_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_owner_present": false
+            },
+            "description": "Monitoring sources require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_kind_present": false
+            },
+            "description": "Monitoring sources require a kind.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_kind_required",
+              "required_action": "attach_source_kind"
+            },
+            "name": "source_requires_kind"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_kind_known": false
+            },
+            "description": "Unknown monitoring source kinds require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "source_kind_review_required",
+              "required_action": "review_source_kind"
+            },
+            "name": "source_kind_requires_review"
+          },
+          {
+            "condition": {
+              "monitoring_source_present": false,
+              "operation": "create_baseline"
+            },
+            "description": "Baseline creation requires a registered monitoring source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_source_required",
+              "required_action": "select_monitoring_source"
+            },
+            "name": "baseline_requires_source"
+          },
+          {
+            "condition": {
+              "metric_present": false,
+              "operation": "create_baseline"
+            },
+            "description": "Baselines require a metric name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_metric_required",
+              "required_action": "attach_metric"
+            },
+            "name": "baseline_requires_metric"
           },
           {
             "condition": {
@@ -97,6 +262,85 @@
           },
           {
             "condition": {
+              "operation": "create_baseline",
+              "sensitivity_present": false
+            },
+            "description": "Baselines require sensitivity metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_sensitivity_required",
+              "required_action": "choose_sensitivity"
+            },
+            "name": "baseline_requires_sensitivity"
+          },
+          {
+            "condition": {
+              "operation": "create_baseline",
+              "sensitivity_known": false
+            },
+            "description": "Unknown sensitivity values require tuning review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "baseline_sensitivity_review_required",
+              "required_action": "review_sensitivity"
+            },
+            "name": "baseline_sensitivity_requires_review"
+          },
+          {
+            "condition": {
+              "monitoring_source_present": false,
+              "operation": "detect"
+            },
+            "description": "Anomaly detection requires a monitoring source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "monitoring_source_required",
+              "required_action": "attach_monitoring_source"
+            },
+            "name": "detection_requires_monitoring_source"
+          },
+          {
+            "condition": {
+              "baseline_present": false,
+              "operation": "detect"
+            },
+            "description": "Anomaly detection requires a baseline.",
+            "effect": {
+              "decision": "deny",
+              "reason": "baseline_required",
+              "required_action": "select_baseline"
+            },
+            "name": "detection_requires_baseline"
+          },
+          {
+            "condition": {
+              "metric_present": false,
+              "operation": "detect"
+            },
+            "description": "Anomaly detection requires a metric.",
+            "effect": {
+              "decision": "deny",
+              "reason": "detection_metric_required",
+              "required_action": "attach_metric"
+            },
+            "name": "detection_requires_metric"
+          },
+          {
+            "condition": {
+              "operation": "detect",
+              "value_present": false
+            },
+            "description": "Anomaly detection requires an observed value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "observation_value_required",
+              "required_action": "attach_observation_value"
+            },
+            "name": "detection_requires_value"
+          },
+          {
+            "condition": {
+              "operation": "detect",
               "owner_assigned": false,
               "severity": "critical"
             },
@@ -107,6 +351,163 @@
               "required_action": "assign_owner"
             },
             "name": "critical_anomaly_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "detect",
+              "severity": "high",
+              "triage_recorded": false
+            },
+            "description": "High-severity anomalies require triage evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_anomaly_triage_required",
+              "required_action": "record_triage"
+            },
+            "name": "high_anomaly_requires_triage"
+          },
+          {
+            "condition": {
+              "cross_tenant_detection": true
+            },
+            "description": "Cross-tenant source or baseline use is denied.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_detection_denied",
+              "required_action": "use_tenant_scoped_detection"
+            },
+            "name": "cross_tenant_detection_denied"
+          },
+          {
+            "condition": {
+              "operation": "open_investigation",
+              "signal_present": false
+            },
+            "description": "Investigations require an anomaly signal.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investigation_signal_required",
+              "required_action": "select_signal"
+            },
+            "name": "investigation_requires_signal"
+          },
+          {
+            "condition": {
+              "operation": "open_investigation",
+              "owner_assigned": false
+            },
+            "description": "Investigations require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investigation_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "investigation_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "close_investigation",
+              "resolution_present": false
+            },
+            "description": "Investigation closure requires a resolution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investigation_resolution_required",
+              "required_action": "attach_resolution"
+            },
+            "name": "investigation_close_requires_resolution"
+          },
+          {
+            "condition": {
+              "closed_by_present": false,
+              "operation": "close_investigation"
+            },
+            "description": "Investigation closure requires the closing actor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investigation_closer_required",
+              "required_action": "attach_closer"
+            },
+            "name": "investigation_close_requires_actor"
+          },
+          {
+            "condition": {
+              "operation": "close_investigation",
+              "resolution_evidence_present": false
+            },
+            "description": "Investigation closure requires resolution evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investigation_resolution_evidence_required",
+              "required_action": "attach_resolution_evidence"
+            },
+            "name": "investigation_close_requires_evidence"
+          },
+          {
+            "condition": {
+              "operation": "record_feedback",
+              "signal_present": false
+            },
+            "description": "Feedback requires an anomaly signal.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feedback_signal_required",
+              "required_action": "select_signal"
+            },
+            "name": "feedback_requires_signal"
+          },
+          {
+            "condition": {
+              "operation": "record_feedback",
+              "reviewer_present": false
+            },
+            "description": "Feedback requires a reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feedback_reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "feedback_requires_reviewer"
+          },
+          {
+            "condition": {
+              "label_present": false,
+              "operation": "record_feedback"
+            },
+            "description": "Feedback requires a label.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feedback_label_required",
+              "required_action": "choose_feedback_label"
+            },
+            "name": "feedback_requires_label"
+          },
+          {
+            "condition": {
+              "label_known": false,
+              "operation": "record_feedback"
+            },
+            "description": "Unknown feedback labels require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "feedback_label_review_required",
+              "required_action": "review_feedback_label"
+            },
+            "name": "feedback_label_requires_review"
+          },
+          {
+            "condition": {
+              "false_positive_rate_gt": 0.2,
+              "operation": "record_feedback",
+              "tuning_review_recorded": false
+            },
+            "description": "High false-positive rates require tuning review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "tuning_review_required",
+              "required_action": "record_tuning_review"
+            },
+            "name": "high_false_positive_rate_requires_tuning"
           },
           {
             "condition": {
@@ -123,16 +524,42 @@
           },
           {
             "condition": {
-              "false_positive_rate_gt": 0.2,
-              "tuning_review_recorded": false
+              "event_stream_ne": "bytewax",
+              "operation": "configure_batch_detection"
             },
-            "description": "High false-positive rates require tuning review.",
+            "description": "Batch anomaly detection streams must use Bytewax.",
             "effect": {
-              "decision": "require_review",
-              "reason": "tuning_review_required",
-              "required_action": "record_tuning_review"
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
             },
-            "name": "high_false_positive_rate_requires_tuning"
+            "name": "batch_detection_requires_bytewax"
+          },
+          {
+            "condition": {
+              "notification_adapter_present": false,
+              "operation": "dispatch_alert"
+            },
+            "description": "Alert dispatch requires a notification adapter.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_adapter_required",
+              "required_action": "configure_notification_adapter"
+            },
+            "name": "alert_dispatch_requires_notification_adapter"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Anomaly state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "anomaly_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -152,16 +579,81 @@
         },
         {
           "condition": {
-            "monitoring_source_present": false,
-            "operation": "detect"
+            "operation": "register_source",
+            "source_name_present": false
           },
-          "description": "Anomaly detection requires a monitoring source.",
+          "description": "Monitoring sources require a display name.",
           "effect": {
             "decision": "deny",
-            "reason": "monitoring_source_required",
-            "required_action": "attach_monitoring_source"
+            "reason": "source_name_required",
+            "required_action": "attach_source_name"
           },
-          "name": "detection_requires_monitoring_source"
+          "name": "source_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_owner_present": false
+          },
+          "description": "Monitoring sources require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_kind_present": false
+          },
+          "description": "Monitoring sources require a kind.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_kind_required",
+            "required_action": "attach_source_kind"
+          },
+          "name": "source_requires_kind"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_kind_known": false
+          },
+          "description": "Unknown monitoring source kinds require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "source_kind_review_required",
+            "required_action": "review_source_kind"
+          },
+          "name": "source_kind_requires_review"
+        },
+        {
+          "condition": {
+            "monitoring_source_present": false,
+            "operation": "create_baseline"
+          },
+          "description": "Baseline creation requires a registered monitoring source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_source_required",
+            "required_action": "select_monitoring_source"
+          },
+          "name": "baseline_requires_source"
+        },
+        {
+          "condition": {
+            "metric_present": false,
+            "operation": "create_baseline"
+          },
+          "description": "Baselines require a metric name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_metric_required",
+            "required_action": "attach_metric"
+          },
+          "name": "baseline_requires_metric"
         },
         {
           "condition": {
@@ -178,6 +670,85 @@
         },
         {
           "condition": {
+            "operation": "create_baseline",
+            "sensitivity_present": false
+          },
+          "description": "Baselines require sensitivity metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_sensitivity_required",
+            "required_action": "choose_sensitivity"
+          },
+          "name": "baseline_requires_sensitivity"
+        },
+        {
+          "condition": {
+            "operation": "create_baseline",
+            "sensitivity_known": false
+          },
+          "description": "Unknown sensitivity values require tuning review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "baseline_sensitivity_review_required",
+            "required_action": "review_sensitivity"
+          },
+          "name": "baseline_sensitivity_requires_review"
+        },
+        {
+          "condition": {
+            "monitoring_source_present": false,
+            "operation": "detect"
+          },
+          "description": "Anomaly detection requires a monitoring source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "monitoring_source_required",
+            "required_action": "attach_monitoring_source"
+          },
+          "name": "detection_requires_monitoring_source"
+        },
+        {
+          "condition": {
+            "baseline_present": false,
+            "operation": "detect"
+          },
+          "description": "Anomaly detection requires a baseline.",
+          "effect": {
+            "decision": "deny",
+            "reason": "baseline_required",
+            "required_action": "select_baseline"
+          },
+          "name": "detection_requires_baseline"
+        },
+        {
+          "condition": {
+            "metric_present": false,
+            "operation": "detect"
+          },
+          "description": "Anomaly detection requires a metric.",
+          "effect": {
+            "decision": "deny",
+            "reason": "detection_metric_required",
+            "required_action": "attach_metric"
+          },
+          "name": "detection_requires_metric"
+        },
+        {
+          "condition": {
+            "operation": "detect",
+            "value_present": false
+          },
+          "description": "Anomaly detection requires an observed value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "observation_value_required",
+            "required_action": "attach_observation_value"
+          },
+          "name": "detection_requires_value"
+        },
+        {
+          "condition": {
+            "operation": "detect",
             "owner_assigned": false,
             "severity": "critical"
           },
@@ -188,6 +759,163 @@
             "required_action": "assign_owner"
           },
           "name": "critical_anomaly_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "detect",
+            "severity": "high",
+            "triage_recorded": false
+          },
+          "description": "High-severity anomalies require triage evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_anomaly_triage_required",
+            "required_action": "record_triage"
+          },
+          "name": "high_anomaly_requires_triage"
+        },
+        {
+          "condition": {
+            "cross_tenant_detection": true
+          },
+          "description": "Cross-tenant source or baseline use is denied.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_detection_denied",
+            "required_action": "use_tenant_scoped_detection"
+          },
+          "name": "cross_tenant_detection_denied"
+        },
+        {
+          "condition": {
+            "operation": "open_investigation",
+            "signal_present": false
+          },
+          "description": "Investigations require an anomaly signal.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investigation_signal_required",
+            "required_action": "select_signal"
+          },
+          "name": "investigation_requires_signal"
+        },
+        {
+          "condition": {
+            "operation": "open_investigation",
+            "owner_assigned": false
+          },
+          "description": "Investigations require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investigation_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "investigation_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "close_investigation",
+            "resolution_present": false
+          },
+          "description": "Investigation closure requires a resolution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investigation_resolution_required",
+            "required_action": "attach_resolution"
+          },
+          "name": "investigation_close_requires_resolution"
+        },
+        {
+          "condition": {
+            "closed_by_present": false,
+            "operation": "close_investigation"
+          },
+          "description": "Investigation closure requires the closing actor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investigation_closer_required",
+            "required_action": "attach_closer"
+          },
+          "name": "investigation_close_requires_actor"
+        },
+        {
+          "condition": {
+            "operation": "close_investigation",
+            "resolution_evidence_present": false
+          },
+          "description": "Investigation closure requires resolution evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investigation_resolution_evidence_required",
+            "required_action": "attach_resolution_evidence"
+          },
+          "name": "investigation_close_requires_evidence"
+        },
+        {
+          "condition": {
+            "operation": "record_feedback",
+            "signal_present": false
+          },
+          "description": "Feedback requires an anomaly signal.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feedback_signal_required",
+            "required_action": "select_signal"
+          },
+          "name": "feedback_requires_signal"
+        },
+        {
+          "condition": {
+            "operation": "record_feedback",
+            "reviewer_present": false
+          },
+          "description": "Feedback requires a reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feedback_reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "feedback_requires_reviewer"
+        },
+        {
+          "condition": {
+            "label_present": false,
+            "operation": "record_feedback"
+          },
+          "description": "Feedback requires a label.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feedback_label_required",
+            "required_action": "choose_feedback_label"
+          },
+          "name": "feedback_requires_label"
+        },
+        {
+          "condition": {
+            "label_known": false,
+            "operation": "record_feedback"
+          },
+          "description": "Unknown feedback labels require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "feedback_label_review_required",
+            "required_action": "review_feedback_label"
+          },
+          "name": "feedback_label_requires_review"
+        },
+        {
+          "condition": {
+            "false_positive_rate_gt": 0.2,
+            "operation": "record_feedback",
+            "tuning_review_recorded": false
+          },
+          "description": "High false-positive rates require tuning review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "tuning_review_required",
+            "required_action": "record_tuning_review"
+          },
+          "name": "high_false_positive_rate_requires_tuning"
         },
         {
           "condition": {
@@ -204,25 +932,62 @@
         },
         {
           "condition": {
-            "false_positive_rate_gt": 0.2,
-            "tuning_review_recorded": false
+            "event_stream_ne": "bytewax",
+            "operation": "configure_batch_detection"
           },
-          "description": "High false-positive rates require tuning review.",
+          "description": "Batch anomaly detection streams must use Bytewax.",
           "effect": {
-            "decision": "require_review",
-            "reason": "tuning_review_required",
-            "required_action": "record_tuning_review"
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
           },
-          "name": "high_false_positive_rate_requires_tuning"
+          "name": "batch_detection_requires_bytewax"
+        },
+        {
+          "condition": {
+            "notification_adapter_present": false,
+            "operation": "dispatch_alert"
+          },
+          "description": "Alert dispatch requires a notification adapter.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_adapter_required",
+            "required_action": "configure_notification_adapter"
+          },
+          "name": "alert_dispatch_requires_notification_adapter"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Anomaly state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "anomaly_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "anomaly_engine.py",
+        "service": "service.AnomService",
         "views": "views.py"
       },
       "screens": {
+        "alerts": {
+          "component": "AlertDispatchQueue",
+          "permission": "anom:investigate",
+          "route": "/anom/alerts"
+        },
+        "audit": {
+          "component": "AnomalyAuditTimeline",
+          "permission": "anom:audit",
+          "route": "/anom/audit"
+        },
         "baselines": {
           "component": "BaselineConsole",
           "permission": "anom:tune",
@@ -233,6 +998,11 @@
           "permission": "anom:view",
           "route": "/anom/dashboard"
         },
+        "detector": {
+          "component": "DetectionWorkbench",
+          "permission": "anom:detect",
+          "route": "/anom/detector"
+        },
         "feedback": {
           "component": "FeedbackReview",
           "permission": "anom:tune",
@@ -242,6 +1012,11 @@
           "component": "InvestigationQueue",
           "permission": "anom:investigate",
           "route": "/anom/investigations"
+        },
+        "quality": {
+          "component": "DetectionQuality",
+          "permission": "anom:tune",
+          "route": "/anom/quality"
         },
         "rules": {
           "component": "AnomalyRuleManager",
@@ -257,14 +1032,33 @@
           "component": "SignalBoard",
           "permission": "anom:detect",
           "route": "/anom/signals"
+        },
+        "sources": {
+          "component": "MonitoringSourceRegistry",
+          "permission": "anom:tune",
+          "route": "/anom/sources"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "alert_queue": {
+            "status_style": "notification-chip",
+            "visual": "queue-table"
+          },
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
           "baseline_chart": {
             "highlight": "drift-marker",
             "visual": "threshold-band"
+          },
+          "detection_workbench": {
+            "status_style": "threshold-chip",
+            "visual": "score-panel"
           },
           "feedback_panel": {
             "threshold_style": "false-positive-meter",
@@ -274,10 +1068,18 @@
             "status_style": "owner-chip",
             "visual": "event-timeline"
           },
+          "quality_dashboard": {
+            "status_style": "tuning-chip",
+            "visual": "quality-grid"
+          },
           "signal_card": {
             "icon": "activity",
             "risk_style": "anomaly-band",
             "status_indicator": "severity-pill"
+          },
+          "source_registry": {
+            "status_style": "kind-chip",
+            "visual": "source-table"
           }
         },
         "name": "anom_signal_console",
@@ -285,7 +1087,7 @@
           "border.radius": "8px",
           "color.accent": "#D1495B",
           "color.danger": "#C53030",
-          "color.primary": "#334E68",
+          "color.primary": "#2D5A87",
           "color.success": "#2F855A",
           "color.warning": "#B7791F",
           "density": "compact",
@@ -307,11 +1109,11 @@
             "permission": "anom:view"
           },
           {
-            "component": "SignalBoard",
-            "name": "signals",
-            "nav_group": "Signals",
-            "path": "/anom/signals",
-            "permission": "anom:detect"
+            "component": "MonitoringSourceRegistry",
+            "name": "sources",
+            "nav_group": "Sources",
+            "path": "/anom/sources",
+            "permission": "anom:tune"
           },
           {
             "component": "BaselineConsole",
@@ -321,10 +1123,31 @@
             "permission": "anom:tune"
           },
           {
+            "component": "DetectionWorkbench",
+            "name": "detector",
+            "nav_group": "Detection",
+            "path": "/anom/detector",
+            "permission": "anom:detect"
+          },
+          {
+            "component": "SignalBoard",
+            "name": "signals",
+            "nav_group": "Signals",
+            "path": "/anom/signals",
+            "permission": "anom:detect"
+          },
+          {
             "component": "InvestigationQueue",
             "name": "investigations",
             "nav_group": "Investigations",
             "path": "/anom/investigations",
+            "permission": "anom:investigate"
+          },
+          {
+            "component": "AlertDispatchQueue",
+            "name": "alerts",
+            "nav_group": "Investigations",
+            "path": "/anom/alerts",
             "permission": "anom:investigate"
           },
           {
@@ -342,6 +1165,20 @@
             "permission": "anom:tune"
           },
           {
+            "component": "DetectionQuality",
+            "name": "quality",
+            "nav_group": "Quality",
+            "path": "/anom/quality",
+            "permission": "anom:tune"
+          },
+          {
+            "component": "AnomalyAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/anom/audit",
+            "permission": "anom:audit"
+          },
+          {
             "component": "ANOMSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -354,7 +1191,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "__init__.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -368,26 +1205,87 @@
   "contracts": {
     "anom": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AnomService",
+          "health": "hlth",
+          "helper_runtime": "anomaly_engine.py",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "monitoring": "moni",
+          "notification": "ntfy",
+          "predictive_analytics": "pred",
+          "production_runtime": "service.AnomService",
+          "workflow": "wflo"
+        },
         "baselines": {
           "auto_baseline_enabled": true,
           "baseline_review_required": true,
-          "drift_reset_requires_approval": true
+          "drift_reset_requires_approval": true,
+          "minimum_refresh_points": 50
         },
         "detection": {
+          "allowed_sensitivities": [
+            "low",
+            "medium",
+            "high"
+          ],
           "default_sensitivity": "medium",
           "event_detection_enabled": true,
+          "forecast_residual_detection_enabled": true,
           "metric_detection_enabled": true,
           "minimum_baseline_points": 50
         },
+        "feedback": {
+          "allowed_labels": [
+            "true_positive",
+            "false_positive",
+            "expected_change"
+          ],
+          "false_positive_review_threshold": 0.2,
+          "reviewer_required": true
+        },
         "governance": {
           "audit_detections": true,
+          "auth_required": true,
           "monitoring_source_required": true,
           "require_tenant_context": true
         },
         "investigation": {
+          "closure_evidence_required": true,
           "critical_anomalies_require_owner": true,
           "feedback_loop_enabled": true,
           "root_cause_hints_enabled": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "signals": {
+          "critical_requires_owner": true,
+          "cross_tenant_detection_allowed": false,
+          "high_requires_owner": false,
+          "root_cause_hints_enabled": true
+        },
+        "sources": {
+          "allowed_kinds": [
+            "metric",
+            "event",
+            "trace",
+            "forecast",
+            "security"
+          ],
+          "kind_required": true,
+          "name_required": true,
+          "owner_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -395,10 +1293,18 @@
           "default_theme": "anom_signal_console"
         },
         "ui": {
+          "enable_alerts": true,
+          "enable_audit": true,
           "enable_baseline_console": true,
+          "enable_dashboard": true,
+          "enable_detector": true,
           "enable_feedback_review": true,
           "enable_investigation_queue": true,
-          "enable_signal_board": true
+          "enable_quality": true,
+          "enable_rules": true,
+          "enable_settings": true,
+          "enable_signals": true,
+          "enable_sources": true
         }
       },
       "id": "anom",
@@ -438,6 +1344,32 @@
   },
   "roles": {},
   "rules": {
+    "alert_dispatch_requires_notification_adapter": {
+      "condition": {
+        "notification_adapter_present": false,
+        "operation": "dispatch_alert"
+      },
+      "description": "Alert dispatch requires a notification adapter.",
+      "effect": {
+        "decision": "deny",
+        "reason": "notification_adapter_required",
+        "required_action": "configure_notification_adapter"
+      },
+      "name": "alert_dispatch_requires_notification_adapter"
+    },
+    "anomaly_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Anomaly state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "anomaly_state_change_requires_audit"
+    },
     "baseline_requires_history": {
       "condition": {
         "history_points_lt": 50,
@@ -450,6 +1382,45 @@
         "required_action": "collect_more_history"
       },
       "name": "baseline_requires_history"
+    },
+    "baseline_requires_metric": {
+      "condition": {
+        "metric_present": false,
+        "operation": "create_baseline"
+      },
+      "description": "Baselines require a metric name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_metric_required",
+        "required_action": "attach_metric"
+      },
+      "name": "baseline_requires_metric"
+    },
+    "baseline_requires_sensitivity": {
+      "condition": {
+        "operation": "create_baseline",
+        "sensitivity_present": false
+      },
+      "description": "Baselines require sensitivity metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_sensitivity_required",
+        "required_action": "choose_sensitivity"
+      },
+      "name": "baseline_requires_sensitivity"
+    },
+    "baseline_requires_source": {
+      "condition": {
+        "monitoring_source_present": false,
+        "operation": "create_baseline"
+      },
+      "description": "Baseline creation requires a registered monitoring source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_source_required",
+        "required_action": "select_monitoring_source"
+      },
+      "name": "baseline_requires_source"
     },
     "baseline_reset_requires_approval": {
       "condition": {
@@ -464,8 +1435,35 @@
       },
       "name": "baseline_reset_requires_approval"
     },
+    "baseline_sensitivity_requires_review": {
+      "condition": {
+        "operation": "create_baseline",
+        "sensitivity_known": false
+      },
+      "description": "Unknown sensitivity values require tuning review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "baseline_sensitivity_review_required",
+        "required_action": "review_sensitivity"
+      },
+      "name": "baseline_sensitivity_requires_review"
+    },
+    "batch_detection_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "configure_batch_detection"
+      },
+      "description": "Batch anomaly detection streams must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_detection_requires_bytewax"
+    },
     "critical_anomaly_requires_owner": {
       "condition": {
+        "operation": "detect",
         "owner_assigned": false,
         "severity": "critical"
       },
@@ -476,6 +1474,44 @@
         "required_action": "assign_owner"
       },
       "name": "critical_anomaly_requires_owner"
+    },
+    "cross_tenant_detection_denied": {
+      "condition": {
+        "cross_tenant_detection": true
+      },
+      "description": "Cross-tenant source or baseline use is denied.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_detection_denied",
+        "required_action": "use_tenant_scoped_detection"
+      },
+      "name": "cross_tenant_detection_denied"
+    },
+    "detection_requires_baseline": {
+      "condition": {
+        "baseline_present": false,
+        "operation": "detect"
+      },
+      "description": "Anomaly detection requires a baseline.",
+      "effect": {
+        "decision": "deny",
+        "reason": "baseline_required",
+        "required_action": "select_baseline"
+      },
+      "name": "detection_requires_baseline"
+    },
+    "detection_requires_metric": {
+      "condition": {
+        "metric_present": false,
+        "operation": "detect"
+      },
+      "description": "Anomaly detection requires a metric.",
+      "effect": {
+        "decision": "deny",
+        "reason": "detection_metric_required",
+        "required_action": "attach_metric"
+      },
+      "name": "detection_requires_metric"
     },
     "detection_requires_monitoring_source": {
       "condition": {
@@ -490,9 +1526,89 @@
       },
       "name": "detection_requires_monitoring_source"
     },
+    "detection_requires_value": {
+      "condition": {
+        "operation": "detect",
+        "value_present": false
+      },
+      "description": "Anomaly detection requires an observed value.",
+      "effect": {
+        "decision": "deny",
+        "reason": "observation_value_required",
+        "required_action": "attach_observation_value"
+      },
+      "name": "detection_requires_value"
+    },
+    "feedback_label_requires_review": {
+      "condition": {
+        "label_known": false,
+        "operation": "record_feedback"
+      },
+      "description": "Unknown feedback labels require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "feedback_label_review_required",
+        "required_action": "review_feedback_label"
+      },
+      "name": "feedback_label_requires_review"
+    },
+    "feedback_requires_label": {
+      "condition": {
+        "label_present": false,
+        "operation": "record_feedback"
+      },
+      "description": "Feedback requires a label.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feedback_label_required",
+        "required_action": "choose_feedback_label"
+      },
+      "name": "feedback_requires_label"
+    },
+    "feedback_requires_reviewer": {
+      "condition": {
+        "operation": "record_feedback",
+        "reviewer_present": false
+      },
+      "description": "Feedback requires a reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feedback_reviewer_required",
+        "required_action": "assign_reviewer"
+      },
+      "name": "feedback_requires_reviewer"
+    },
+    "feedback_requires_signal": {
+      "condition": {
+        "operation": "record_feedback",
+        "signal_present": false
+      },
+      "description": "Feedback requires an anomaly signal.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feedback_signal_required",
+        "required_action": "select_signal"
+      },
+      "name": "feedback_requires_signal"
+    },
+    "high_anomaly_requires_triage": {
+      "condition": {
+        "operation": "detect",
+        "severity": "high",
+        "triage_recorded": false
+      },
+      "description": "High-severity anomalies require triage evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "high_anomaly_triage_required",
+        "required_action": "record_triage"
+      },
+      "name": "high_anomaly_requires_triage"
+    },
     "high_false_positive_rate_requires_tuning": {
       "condition": {
         "false_positive_rate_gt": 0.2,
+        "operation": "record_feedback",
         "tuning_review_recorded": false
       },
       "description": "High false-positive rates require tuning review.",
@@ -502,6 +1618,123 @@
         "required_action": "record_tuning_review"
       },
       "name": "high_false_positive_rate_requires_tuning"
+    },
+    "investigation_close_requires_actor": {
+      "condition": {
+        "closed_by_present": false,
+        "operation": "close_investigation"
+      },
+      "description": "Investigation closure requires the closing actor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "investigation_closer_required",
+        "required_action": "attach_closer"
+      },
+      "name": "investigation_close_requires_actor"
+    },
+    "investigation_close_requires_evidence": {
+      "condition": {
+        "operation": "close_investigation",
+        "resolution_evidence_present": false
+      },
+      "description": "Investigation closure requires resolution evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "investigation_resolution_evidence_required",
+        "required_action": "attach_resolution_evidence"
+      },
+      "name": "investigation_close_requires_evidence"
+    },
+    "investigation_close_requires_resolution": {
+      "condition": {
+        "operation": "close_investigation",
+        "resolution_present": false
+      },
+      "description": "Investigation closure requires a resolution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "investigation_resolution_required",
+        "required_action": "attach_resolution"
+      },
+      "name": "investigation_close_requires_resolution"
+    },
+    "investigation_requires_owner": {
+      "condition": {
+        "operation": "open_investigation",
+        "owner_assigned": false
+      },
+      "description": "Investigations require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "investigation_owner_required",
+        "required_action": "assign_owner"
+      },
+      "name": "investigation_requires_owner"
+    },
+    "investigation_requires_signal": {
+      "condition": {
+        "operation": "open_investigation",
+        "signal_present": false
+      },
+      "description": "Investigations require an anomaly signal.",
+      "effect": {
+        "decision": "deny",
+        "reason": "investigation_signal_required",
+        "required_action": "select_signal"
+      },
+      "name": "investigation_requires_signal"
+    },
+    "source_kind_requires_review": {
+      "condition": {
+        "operation": "register_source",
+        "source_kind_known": false
+      },
+      "description": "Unknown monitoring source kinds require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "source_kind_review_required",
+        "required_action": "review_source_kind"
+      },
+      "name": "source_kind_requires_review"
+    },
+    "source_requires_kind": {
+      "condition": {
+        "operation": "register_source",
+        "source_kind_present": false
+      },
+      "description": "Monitoring sources require a kind.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_kind_required",
+        "required_action": "attach_source_kind"
+      },
+      "name": "source_requires_kind"
+    },
+    "source_requires_name": {
+      "condition": {
+        "operation": "register_source",
+        "source_name_present": false
+      },
+      "description": "Monitoring sources require a display name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_name_required",
+        "required_action": "attach_source_name"
+      },
+      "name": "source_requires_name"
+    },
+    "source_requires_owner": {
+      "condition": {
+        "operation": "register_source",
+        "source_owner_present": false
+      },
+      "description": "Monitoring sources require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_owner_required",
+        "required_action": "assign_source_owner"
+      },
+      "name": "source_requires_owner"
     },
     "tenant_context_required": {
       "condition": {
@@ -518,7 +1751,10 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "service.py",
+    "anomaly_engine.py",
+    "views.py"
   ],
   "symbols": {
     "capability.anom": {

@@ -1,120 +1,109 @@
-# ANOM Capability Specification
-
-## Identity
-
-- Capability ID: `anom`
-- Display name: Anomaly Detection
-- Category: `common`
-- Owner: APG Platform Team
-- Runtime shell: `apg_python`
-- Theme: `anom_signal_console`
+# ANOM Specification
 
 ## Purpose
 
-ANOM provides tenant-scoped anomaly detection for metrics, events, and monitored
-signals. It registers monitoring sources, builds baselines, scores observations,
-routes severe anomalies into investigations, records feedback, and emits
-governance evidence for detection and investigation decisions.
+ANOM provides APG with first-class anomaly detection for generated
+applications. It supports monitored source registration, baseline management,
+observation scoring, signal triage, investigation workflows, feedback tuning,
+UI composition, and auditable policy enforcement.
 
-The package must remain dependency-light. Statistical scoring, state
-transitions, rules, API helpers, and view models must be executable without
-external monitoring systems, vector stores, alerting systems, or incident tools.
-Those systems remain adapter boundaries.
+## Scope
 
-## Users And Outcomes
+This packet establishes the executable baseline for ANOM:
 
-- Operators can register monitored sources and build baselines from historical
-  observations.
-- SRE and risk teams can detect anomalous values and receive root-cause hints.
-- Investigation owners can triage and close severe anomaly investigations with
-  resolution evidence.
-- Platform teams can review false-positive feedback and tune detection policy.
-- Generated APG applications can compose ANOM with MONI, PRED, AICR, AUDL,
-  WFLO, NTFY, and HLTH without coupling to one monitoring vendor.
+- Contract-driven configuration, schema, adapters, deterministic rules, UI
+  routes, and visual theme tokens.
+- A dependency-light runtime service for generated applications.
+- UI view models that can be composed into APG screens.
+- Package evidence that can be published and self-tested from the current
+  executable contract.
+- Focused tests for the contract, lifecycle, guardrails, view models, and
+  package evidence.
 
-## Domain Model
+## Actors
 
-ANOM owns these package-level records:
+- Operator: registers sources, creates baselines, and monitors signal boards.
+- SRE or risk owner: investigates critical and high anomaly signals.
+- Detection steward: records feedback and tunes false-positive behavior.
+- Platform operator: configures Bytewax streams, monitoring, notifications,
+  audit, auth, metrics, cache, and generated app deployment.
 
-- `MonitoringSource`: tenant-owned metric, stream, or event source.
-- `BaselineProfile`: statistical baseline with sensitivity and history count.
-- `Observation`: single measured value or event score.
-- `AnomalySignal`: scored signal with severity, status, and root-cause hints.
-- `Investigation`: governed investigation assigned to an anomaly signal.
-- `DetectionFeedback`: reviewer label used to tune detection quality.
-- `AnomalyAuditEvent`: tenant-scoped evidence event for source, baseline,
-  detection, investigation, and feedback lifecycle changes.
+## Functional Requirements
 
-All mutable runtime state must be tenant-qualified so duplicate IDs in different
-tenants cannot overwrite or expose each other.
+### Source Lifecycle
 
-## Lifecycle
+- Register monitoring sources with tenant, name, kind, owner, and labels.
+- Deny missing tenant, name, owner, or kind.
+- Require review for unknown source kinds.
 
-The focused lifecycle is:
+### Baseline Lifecycle
 
-1. Register a tenant-owned monitoring source.
-2. Build a baseline from sufficient historical values.
-3. Detect a new observation against the baseline.
-4. Require an owner for critical anomaly signals.
-5. Open an investigation for owned critical or high signals.
-6. Close the investigation only with tenant match, actor, resolution, and
-   evidence.
-7. Record feedback and require tuning review when the false-positive rate is
-   too high.
-8. Emit audit events for each important lifecycle decision.
+- Create baselines from tenant-scoped sources, metric names, historical values,
+  and sensitivity.
+- Deny missing source, metric, sufficient history, or sensitivity.
+- Require review for unknown sensitivity values.
+- Reset baselines only with approval evidence.
 
-## Rules And Guardrails
+### Detection Lifecycle
 
-The contract rules are executable guardrails:
+- Score observations against registered baselines using deterministic z-score
+  thresholds and sensitivity.
+- Deny missing source, baseline, metric, or observed value.
+- Deny critical anomaly acceptance without an investigation owner.
+- Require triage review for high-severity anomalies without evidence.
+- Deny cross-tenant source or baseline use.
 
-- `tenant_context_required`: operations require tenant context.
-- `detection_requires_monitoring_source`: detection requires a monitoring
-  source.
-- `baseline_requires_history`: baseline creation requires enough observations.
-- `critical_anomaly_requires_owner`: critical signals require an owner.
-- `baseline_reset_requires_approval`: baseline reset requires approval.
-- `high_false_positive_rate_requires_tuning`: high false-positive rates require
-  tuning review.
+### Investigation Lifecycle
 
-Service methods must enforce these rules and expose the same decisions through
-API helpers and view models.
+- Open investigations from tenant-scoped anomaly signals and owners.
+- Close investigations only with resolution, closing actor, and resolution
+  evidence.
+- Emit audit events for source, baseline, signal, investigation, and feedback
+  lifecycle changes.
 
-## UI And Theme
+### Feedback Lifecycle
 
-ANOM exposes route and view-model surfaces for:
+- Record feedback against anomaly signals with reviewer, label, and notes.
+- Deny missing signal, reviewer, or label.
+- Require review for unknown labels.
+- Require tuning review when false-positive rate exceeds the configured
+  threshold.
 
-- dashboard summary;
-- signal board;
-- baseline console;
-- investigation queue;
-- rule management;
-- feedback review;
-- settings.
+### UI and Theming
 
-The `anom_signal_console` theme must provide semantic tokens and component
-metadata for severity, baseline drift, investigation ownership, and
-false-positive review.
+- Expose routes for dashboard, sources, baselines, detector, signals,
+  investigations, alerts, rules, feedback, quality, audit, and settings.
+- Provide route-specific view models.
+- Publish signal-console theme tokens and component hints.
 
-## Adapter Boundaries
+### Adapters
 
-These integrations remain replaceable:
+- Use Bytewax for batch anomaly/event streams.
+- Expose adapter keys for generated runtime, helper runtime, HTTP API, PRED,
+  AICR, MONI, WFLO, NTFY, HLTH, CONF, AUTH, AUDL, MONI metrics, and CACH.
 
-- monitoring backends and metric stores;
-- alerting and incident-management systems;
-- workflow engines for escalation;
-- predictive-model and AI scoring engines;
-- audit and SIEM exporters;
-- persistent storage providers.
+## Non-Goals
 
-Local package tests must not require those systems.
+- Live monitoring backend ingestion.
+- Live Bytewax stream execution.
+- Live notification or incident-management dispatch.
+- Persistent database migrations.
+- Browser-rendered UI validation.
+- Load, latency, precision/recall, drift, and throughput benchmarking.
 
-## Acceptance Gates
+These are later integration and hardening tasks once the executable baseline is
+stable.
 
-Focused ANOM proof:
+## Acceptance Criteria
 
-```bash
-./.venv/bin/pytest -q capabilities/common/anom/test_capability_contract.py capabilities/common/anom/tests/test_package_contract.py
-./.venv/bin/apg capabilities implementation-audit --root capabilities/common/anom --json
-./.venv/bin/apg capabilities publish-plan capabilities/common/anom --json
-git diff --check -- capabilities/common/anom
-```
+- `get_capability_contract()` exposes at least 30 deterministic rules, at least
+  12 UI routes, Bytewax adapter evidence, runtime adapter evidence, and theme
+  component metadata.
+- `AnomService` executes source, baseline, detection, investigation, feedback,
+  reset, list, summary, audit, and APG record compatibility flows.
+- Guardrail tests prove denied or review-required cases fail before invalid
+  state is accepted.
+- `app.self_test()` passes and fails if route, rule, Bytewax, or runtime
+  evidence becomes stale.
+- Package JSON evidence can be regenerated from `app.semantic_model()` and
+  `app.component_manifest()`.
