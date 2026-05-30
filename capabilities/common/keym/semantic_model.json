@@ -8,7 +8,11 @@
   },
   "capabilities": {
     "keym": {
-      "approvals": {},
+      "approvals": {
+        "export": "ExportApprovalRecord",
+        "rotation": "KeyRotationRecord",
+        "rotation_exception": "RotationExceptionRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -51,6 +55,12 @@
           "compromise_response": "disable_and_rotate",
           "default_rotation_days": 90
         },
+        "operation_governance": {
+          "record_key_lifecycle_audit": true,
+          "require_independent_export_review": true,
+          "require_independent_rotation_exception_review": true,
+          "require_rotation_evidence": true
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -58,9 +68,12 @@
         },
         "ui": {
           "enable_audit_viewer": true,
+          "enable_compromise_console": true,
+          "enable_export_approvals": true,
           "enable_hsm_console": true,
           "enable_inventory": true,
-          "enable_policy_manager": true
+          "enable_policy_manager": true,
+          "enable_rotation_exceptions": true
         }
       },
       "erp_modules": [
@@ -151,6 +164,69 @@
               "required_action": "disable_and_rotate_key"
             },
             "name": "compromised_key_blocks_use"
+          },
+          {
+            "condition": {
+              "key_status": "disabled",
+              "operation_is_cryptographic": true
+            },
+            "description": "Disabled keys cannot be used for cryptographic operations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_disabled",
+              "required_action": "reactivate_or_rotate_key"
+            },
+            "name": "disabled_key_blocks_use"
+          },
+          {
+            "condition": {
+              "key_status": "destroyed",
+              "operation_is_cryptographic": true
+            },
+            "description": "Destroyed keys cannot be used for cryptographic operations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_destroyed",
+              "required_action": "provision_replacement_key"
+            },
+            "name": "destroyed_key_blocks_use"
+          },
+          {
+            "condition": {
+              "reviewer_same_as_requester": true
+            },
+            "description": "KEYM approvals and exceptions require independent review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "review_notes_attached": false
+            },
+            "description": "KEYM approvals and exceptions require reviewer notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "review_requires_notes"
+          },
+          {
+            "condition": {
+              "key_rotation_evidence_attached": false,
+              "operation": "complete_rotation"
+            },
+            "description": "Key rotation completion requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_rotation_evidence_required",
+              "required_action": "attach_key_rotation_evidence"
+            },
+            "name": "rotation_completion_requires_evidence"
           }
         ],
         "type": "deterministic"
@@ -232,13 +308,76 @@
             "required_action": "disable_and_rotate_key"
           },
           "name": "compromised_key_blocks_use"
+        },
+        {
+          "condition": {
+            "key_status": "disabled",
+            "operation_is_cryptographic": true
+          },
+          "description": "Disabled keys cannot be used for cryptographic operations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_disabled",
+            "required_action": "reactivate_or_rotate_key"
+          },
+          "name": "disabled_key_blocks_use"
+        },
+        {
+          "condition": {
+            "key_status": "destroyed",
+            "operation_is_cryptographic": true
+          },
+          "description": "Destroyed keys cannot be used for cryptographic operations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_destroyed",
+            "required_action": "provision_replacement_key"
+          },
+          "name": "destroyed_key_blocks_use"
+        },
+        {
+          "condition": {
+            "reviewer_same_as_requester": true
+          },
+          "description": "KEYM approvals and exceptions require independent review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "review_notes_attached": false
+          },
+          "description": "KEYM approvals and exceptions require reviewer notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "review_requires_notes"
+        },
+        {
+          "condition": {
+            "key_rotation_evidence_attached": false,
+            "operation": "complete_rotation"
+          },
+          "description": "Key rotation completion requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_rotation_evidence_required",
+            "required_action": "attach_key_rotation_evidence"
+          },
+          "name": "rotation_completion_requires_evidence"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
         "analytics": {
@@ -251,10 +390,20 @@
           "permission": "keym.view_audit_logs",
           "route": "/keym/audit"
         },
+        "compromise": {
+          "component": "CompromiseResponseConsole",
+          "permission": "keym.admin",
+          "route": "/keym/compromise"
+        },
         "dashboard": {
           "component": "KeyManagementDashboard",
           "permission": "keym.read_key",
           "route": "/keym/dashboard"
+        },
+        "export_approvals": {
+          "component": "ExportApprovalQueue",
+          "permission": "keym.export_key",
+          "route": "/keym/export-approvals"
         },
         "hsm": {
           "component": "HSMConsole",
@@ -276,6 +425,11 @@
           "permission": "keym.manage_policies",
           "route": "/keym/policies"
         },
+        "rotation_exceptions": {
+          "component": "RotationExceptionQueue",
+          "permission": "keym.rotate_key",
+          "route": "/keym/rotation-exceptions"
+        },
         "settings": {
           "component": "KeyManagementSettings",
           "permission": "keym.admin",
@@ -285,9 +439,24 @@
       "streaming": {},
       "theme": {
         "components": {
+          "compromise_response_panel": {
+            "icon": "shield-x",
+            "status_indicator": "danger-rail",
+            "variant": "incident"
+          },
+          "export_approval_queue": {
+            "icon": "shield-check",
+            "status_indicator": "dual-control",
+            "variant": "approval"
+          },
           "hsm_attestation_panel": {
             "status_style": "seal-chip",
             "visual": "signed-attestation-stack"
+          },
+          "key_audit_timeline": {
+            "icon": "scroll-text",
+            "line_style": "segmented",
+            "variant": "evidence"
           },
           "key_inventory_row": {
             "icon": "key-round",
@@ -297,6 +466,11 @@
           "policy_violation_trace": {
             "highlight": "deny-marker",
             "visual": "rule-ladder"
+          },
+          "rotation_exception_queue": {
+            "icon": "clock-alert",
+            "status_indicator": "review-bar",
+            "variant": "review"
           },
           "rotation_timeline": {
             "threshold_style": "expiry-bands",
@@ -342,6 +516,27 @@
             "nav_group": "Operations",
             "path": "/keym/lifecycle",
             "permission": "keym.rotate_key"
+          },
+          {
+            "component": "ExportApprovalQueue",
+            "name": "export_approvals",
+            "nav_group": "Governance",
+            "path": "/keym/export-approvals",
+            "permission": "keym.export_key"
+          },
+          {
+            "component": "RotationExceptionQueue",
+            "name": "rotation_exceptions",
+            "nav_group": "Governance",
+            "path": "/keym/rotation-exceptions",
+            "permission": "keym.rotate_key"
+          },
+          {
+            "component": "CompromiseResponseConsole",
+            "name": "compromise",
+            "nav_group": "Security",
+            "path": "/keym/compromise",
+            "permission": "keym.admin"
           },
           {
             "component": "PolicyManagerView",
@@ -437,6 +632,12 @@
           "compromise_response": "disable_and_rotate",
           "default_rotation_days": 90
         },
+        "operation_governance": {
+          "record_key_lifecycle_audit": true,
+          "require_independent_export_review": true,
+          "require_independent_rotation_exception_review": true,
+          "require_rotation_evidence": true
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -444,9 +645,12 @@
         },
         "ui": {
           "enable_audit_viewer": true,
+          "enable_compromise_console": true,
+          "enable_export_approvals": true,
           "enable_hsm_console": true,
           "enable_inventory": true,
-          "enable_policy_manager": true
+          "enable_policy_manager": true,
+          "enable_rotation_exceptions": true
         }
       },
       "id": "keym",
@@ -499,6 +703,32 @@
       },
       "name": "compromised_key_blocks_use"
     },
+    "destroyed_key_blocks_use": {
+      "condition": {
+        "key_status": "destroyed",
+        "operation_is_cryptographic": true
+      },
+      "description": "Destroyed keys cannot be used for cryptographic operations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_destroyed",
+        "required_action": "provision_replacement_key"
+      },
+      "name": "destroyed_key_blocks_use"
+    },
+    "disabled_key_blocks_use": {
+      "condition": {
+        "key_status": "disabled",
+        "operation_is_cryptographic": true
+      },
+      "description": "Disabled keys cannot be used for cryptographic operations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_disabled",
+        "required_action": "reactivate_or_rotate_key"
+      },
+      "name": "disabled_key_blocks_use"
+    },
     "export_requires_dual_control": {
       "condition": {
         "dual_control_approved": false,
@@ -538,6 +768,30 @@
       },
       "name": "overdue_rotation_requires_review"
     },
+    "review_requires_independent_reviewer": {
+      "condition": {
+        "reviewer_same_as_requester": true
+      },
+      "description": "KEYM approvals and exceptions require independent review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "review_requires_independent_reviewer"
+    },
+    "review_requires_notes": {
+      "condition": {
+        "review_notes_attached": false
+      },
+      "description": "KEYM approvals and exceptions require reviewer notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "review_requires_notes"
+    },
     "root_key_requires_hsm_attestation": {
       "condition": {
         "hsm_attested": false,
@@ -550,6 +804,19 @@
         "required_action": "complete_hsm_attestation"
       },
       "name": "root_key_requires_hsm_attestation"
+    },
+    "rotation_completion_requires_evidence": {
+      "condition": {
+        "key_rotation_evidence_attached": false,
+        "operation": "complete_rotation"
+      },
+      "description": "Key rotation completion requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_rotation_evidence_required",
+        "required_action": "attach_key_rotation_evidence"
+      },
+      "name": "rotation_completion_requires_evidence"
     },
     "tenant_context_required": {
       "condition": {

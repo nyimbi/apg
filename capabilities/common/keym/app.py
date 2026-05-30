@@ -5,13 +5,128 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Key Management package-backed APG capability", "entity_count": 0, "name": "keym", "version": "1.0.0"}, "capabilities": {"keym": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"access": {"max_failed_attempts": 3, "require_dual_control_for_export": true, "require_policy_for_key_creation": true, "require_tenant_context": true}, "automation": {"ai_lifecycle_recommendations": true, "anomaly_detection_enabled": true, "notify_on_policy_violation": true}, "compliance": {"audit_retention_days": 2555, "frameworks": ["FIPS_140_2", "GDPR", "HIPAA", "PCI_DSS", "ISO_27001"], "immutable_audit_required": true}, "hsm": {"attestation_required_for_root_keys": true, "hardware_hsm_preferred": true, "software_hsm_enabled": true}, "key_domains": {"allow_cross_region_replication": true, "default_domain": "tenant-root", "root_keys_require_hsm": true, "tenant_isolation_required": true}, "lifecycle": {"auto_rotation_enabled": true, "backup_required": true, "compromise_response": "disable_and_rotate", "default_rotation_days": 90}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "keym_vault_console"}, "ui": {"enable_audit_viewer": true, "enable_hsm_console": true, "enable_inventory": true, "enable_policy_manager": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Key Management", "provides": ["keym_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All key operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_key", "policy_attached": false}, "description": "Key creation requires an attached key policy.", "effect": {"decision": "deny", "reason": "key_policy_required", "required_action": "attach_key_policy"}, "name": "key_creation_requires_policy"}, {"condition": {"hsm_attested": false, "key_class": "root"}, "description": "Root keys require HSM attestation before activation.", "effect": {"decision": "deny", "reason": "hsm_attestation_required", "required_action": "complete_hsm_attestation"}, "name": "root_key_requires_hsm_attestation"}, {"condition": {"dual_control_approved": false, "operation": "export_key"}, "description": "Key export requires dual-control approval and wrapping.", "effect": {"decision": "deny", "reason": "dual_control_required", "required_action": "record_dual_control_approval"}, "name": "export_requires_dual_control"}, {"condition": {"rotation_age_days_gt": 90, "rotation_exception_recorded": false}, "description": "Overdue key rotation requires review before continued use.", "effect": {"decision": "require_review", "reason": "rotation_overdue", "required_action": "rotate_key_or_record_exception"}, "name": "overdue_rotation_requires_review"}, {"condition": {"key_status": "compromised", "operation_is_cryptographic": true}, "description": "Compromised keys cannot be used for cryptographic operations.", "effect": {"decision": "deny", "reason": "key_compromised", "required_action": "disable_and_rotate_key"}, "name": "compromised_key_blocks_use"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All key operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_key", "policy_attached": false}, "description": "Key creation requires an attached key policy.", "effect": {"decision": "deny", "reason": "key_policy_required", "required_action": "attach_key_policy"}, "name": "key_creation_requires_policy"}, {"condition": {"hsm_attested": false, "key_class": "root"}, "description": "Root keys require HSM attestation before activation.", "effect": {"decision": "deny", "reason": "hsm_attestation_required", "required_action": "complete_hsm_attestation"}, "name": "root_key_requires_hsm_attestation"}, {"condition": {"dual_control_approved": false, "operation": "export_key"}, "description": "Key export requires dual-control approval and wrapping.", "effect": {"decision": "deny", "reason": "dual_control_required", "required_action": "record_dual_control_approval"}, "name": "export_requires_dual_control"}, {"condition": {"rotation_age_days_gt": 90, "rotation_exception_recorded": false}, "description": "Overdue key rotation requires review before continued use.", "effect": {"decision": "require_review", "reason": "rotation_overdue", "required_action": "rotate_key_or_record_exception"}, "name": "overdue_rotation_requires_review"}, {"condition": {"key_status": "compromised", "operation_is_cryptographic": true}, "description": "Compromised keys cannot be used for cryptographic operations.", "effect": {"decision": "deny", "reason": "key_compromised", "required_action": "disable_and_rotate_key"}, "name": "compromised_key_blocks_use"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "SecurityAnalyticsView", "permission": "keym.admin", "route": "/keym/analytics"}, "audit": {"component": "AuditLogsView", "permission": "keym.view_audit_logs", "route": "/keym/audit"}, "dashboard": {"component": "KeyManagementDashboard", "permission": "keym.read_key", "route": "/keym/dashboard"}, "hsm": {"component": "HSMConsole", "permission": "keym.manage_hsm", "route": "/keym/hsm"}, "inventory": {"component": "KeyInventoryView", "permission": "keym.read_key", "route": "/keym/keys"}, "lifecycle": {"component": "KeyLifecycleWorkbench", "permission": "keym.rotate_key", "route": "/keym/lifecycle"}, "policies": {"component": "PolicyManagerView", "permission": "keym.manage_policies", "route": "/keym/policies"}, "settings": {"component": "KeyManagementSettings", "permission": "keym.admin", "route": "/keym/settings"}}, "streaming": {}, "theme": {"components": {"hsm_attestation_panel": {"status_style": "seal-chip", "visual": "signed-attestation-stack"}, "key_inventory_row": {"icon": "key-round", "risk_style": "right-aligned-score", "status_indicator": "lifecycle-pill"}, "policy_violation_trace": {"highlight": "deny-marker", "visual": "rule-ladder"}, "rotation_timeline": {"threshold_style": "expiry-bands", "visual": "deadline-track"}}, "name": "keym_vault_console", "tokens": {"border.radius": "8px", "color.accent": "#B7791F", "color.danger": "#B83232", "color.primary": "#24415F", "color.success": "#2F855A", "color.warning": "#C05621", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#16202A", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/keym/api/v1", "requires_theme": true, "routes": [{"component": "KeyManagementDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/keym/dashboard", "permission": "keym.read_key"}, {"component": "KeyInventoryView", "name": "inventory", "nav_group": "Operations", "path": "/keym/keys", "permission": "keym.read_key"}, {"component": "KeyLifecycleWorkbench", "name": "lifecycle", "nav_group": "Operations", "path": "/keym/lifecycle", "permission": "keym.rotate_key"}, {"component": "PolicyManagerView", "name": "policies", "nav_group": "Governance", "path": "/keym/policies", "permission": "keym.manage_policies"}, {"component": "HSMConsole", "name": "hsm", "nav_group": "Security", "path": "/keym/hsm", "permission": "keym.manage_hsm"}, {"component": "AuditLogsView", "name": "audit", "nav_group": "Governance", "path": "/keym/audit", "permission": "keym.view_audit_logs"}, {"component": "SecurityAnalyticsView", "name": "analytics", "nav_group": "Intelligence", "path": "/keym/analytics", "permission": "keym.admin"}, {"component": "KeyManagementSettings", "name": "settings", "nav_group": "Administration", "path": "/keym/settings", "permission": "keym.admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"keym": []}}, "contracts": {"keym": {"configuration": {"access": {"max_failed_attempts": 3, "require_dual_control_for_export": true, "require_policy_for_key_creation": true, "require_tenant_context": true}, "automation": {"ai_lifecycle_recommendations": true, "anomaly_detection_enabled": true, "notify_on_policy_violation": true}, "compliance": {"audit_retention_days": 2555, "frameworks": ["FIPS_140_2", "GDPR", "HIPAA", "PCI_DSS", "ISO_27001"], "immutable_audit_required": true}, "hsm": {"attestation_required_for_root_keys": true, "hardware_hsm_preferred": true, "software_hsm_enabled": true}, "key_domains": {"allow_cross_region_replication": true, "default_domain": "tenant-root", "root_keys_require_hsm": true, "tenant_isolation_required": true}, "lifecycle": {"auto_rotation_enabled": true, "backup_required": true, "compromise_response": "disable_and_rotate", "default_rotation_days": 90}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "keym_vault_console"}, "ui": {"enable_audit_viewer": true, "enable_hsm_console": true, "enable_inventory": true, "enable_policy_manager": true}}, "id": "keym", "provides": ["keym_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"keym": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"compromised_key_blocks_use": {"condition": {"key_status": "compromised", "operation_is_cryptographic": true}, "description": "Compromised keys cannot be used for cryptographic operations.", "effect": {"decision": "deny", "reason": "key_compromised", "required_action": "disable_and_rotate_key"}, "name": "compromised_key_blocks_use"}, "export_requires_dual_control": {"condition": {"dual_control_approved": false, "operation": "export_key"}, "description": "Key export requires dual-control approval and wrapping.", "effect": {"decision": "deny", "reason": "dual_control_required", "required_action": "record_dual_control_approval"}, "name": "export_requires_dual_control"}, "key_creation_requires_policy": {"condition": {"operation": "create_key", "policy_attached": false}, "description": "Key creation requires an attached key policy.", "effect": {"decision": "deny", "reason": "key_policy_required", "required_action": "attach_key_policy"}, "name": "key_creation_requires_policy"}, "overdue_rotation_requires_review": {"condition": {"rotation_age_days_gt": 90, "rotation_exception_recorded": false}, "description": "Overdue key rotation requires review before continued use.", "effect": {"decision": "require_review", "reason": "rotation_overdue", "required_action": "rotate_key_or_record_exception"}, "name": "overdue_rotation_requires_review"}, "root_key_requires_hsm_attestation": {"condition": {"hsm_attested": false, "key_class": "root"}, "description": "Root keys require HSM attestation before activation.", "effect": {"decision": "deny", "reason": "hsm_attestation_required", "required_action": "complete_hsm_attestation"}, "name": "root_key_requires_hsm_attestation"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All key operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.keym": {"file": "capability_contract.py", "id": "capability.keym", "kind": "capability", "name": "Key Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("keym_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "keym",
+			"version": "1.0.0",
+			"description": "Key Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"keym": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"keym": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["keym_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"export": "ExportApprovalRecord",
+					"rotation_exception": "RotationExceptionRecord",
+					"rotation": "KeyRotationRecord",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"keym": {
+				"id": "keym",
+				"configuration": contract["configuration"],
+				"provides": ["keym_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"keym": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.keym": {
+				"id": "capability.keym",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +151,18 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("keym", {}).get("ui", {}).get("routes", [])
+	approvals = model.get("capabilities", {}).get("keym", {}).get("approvals", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "keym" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 11:
+		errors.append("KEYM semantic model route manifest is stale")
+	if "export" not in approvals or "rotation_exception" not in approvals:
+		errors.append("KEYM semantic model approval manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

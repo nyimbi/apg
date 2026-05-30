@@ -13134,3 +13134,35 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/encr --json` passed with exception/rotation/audit routes, 9 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized_contract_encr|materialized_app_encr|test_materialized" capabilities/common/encr` returned no stale ENCR package markers. A broader raw `materialized` search still finds legitimate SQL materialized-view comments in `schema.sql`.
 - `git diff --check -- capabilities/common/encr docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 03:14 EAT
+
+KEYM governed key lifecycle, export approval, rotation exception, and compromise response slice:
+
+- Added `capabilities/common/keym/SPECIFICATION.md`, `capabilities/common/keym/PLAN.md`, and `capabilities/common/keym/README.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light managed key, key operation, export approval, rotation exception, key rotation, and KEYM audit event records to the package runtime.
+- Added tenant-qualified KEYM service state for managed keys, operations, export approvals, rotation exceptions, rotations, and audit events without disturbing the existing async key-management service.
+- Added key creation guardrails for tenant context, key ID, owner, algorithm, key class, policy reference, HSM attestation, and duplicate tenant-local key IDs.
+- Added key operation evaluation with KEYM-owned export approval state, KEYM-owned rotation exception state, overdue rotation review, compromised/disabled/destroyed-key denial, matched rules, required actions, and audit evidence.
+- Added export approval request/decision workflows with independent reviewer, reviewer notes, approval, rejection, and audit evidence.
+- Added rotation exception request/decision workflows with independent reviewer, reviewer notes, approval, rejection, and audit evidence.
+- Added rotation scheduling and completion workflows with requester, reason, actor, evidence, duplicate-completion protection, key rotation-age reset, compromised-key reactivation on rotation, and audit evidence.
+- Added compromised-key marking with actor, evidence, high-severity audit, and fail-closed cryptographic use denial.
+- Added domain API helpers and dependency-light `view_models.py` for dashboards, inventory, lifecycle, export approvals, rotation exceptions, HSM attestation, compromise response, audit timelines, analytics, and settings.
+- Extended the KEYM capability contract with operation governance configuration, export approval, rotation exception, compromise routes, 11 deterministic rules, and theme components for generated APG applications.
+- Extended KEYM registration with export dual control, rotation exception review, compromise response, extra endpoints, and permissions.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale package test file to `tests/test_package_contract.py`.
+- Added positive key-export-approval-rotation-exception-rotation-compromise-audit coverage and API-helper/view-model coverage.
+- Added negative missing tenant, missing policy, missing HSM attestation, unsupported key class, export without approval, overdue rotation, missing export reason, normalized self export approval, missing approval notes, missing rotation exception reason, normalized self rotation exception review, missing exception notes, missing rotation reason, missing rotation evidence, duplicate rotation completion, missing compromise evidence, compromised/disabled/destroyed-key denial, and destroyed-key rotation denial coverage.
+- Updated `cap_spec.md` with the current executable package scope, adapter boundaries, and focused proof commands.
+- Code review found and fixed whitespace/case self-review bypasses, missing disabled/destroyed-key cryptographic-use denial, ignored compatibility status input, and destroyed-key rotation reactivation risk.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/keym/__init__.py capabilities/common/keym/models.py capabilities/common/keym/service.py capabilities/common/keym/api.py capabilities/common/keym/capability_contract.py capabilities/common/keym/app.py capabilities/common/keym/view_models.py capabilities/common/keym/tests/test_capability_contract.py capabilities/common/keym/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/keym/tests/test_capability_contract.py capabilities/common/keym/tests/test_package_contract.py` passed with 11 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/keym --json` passed with `ok: true`; KEYM remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/keym --json` passed with export-approval/rotation-exception/compromise routes, 11 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized_contract_keym|materialized_app_keym|test_materialized" capabilities/common/keym` returned no stale KEYM package markers.
+- `git diff --check -- capabilities/common/keym docs/progress_log.md` passed with no whitespace errors.

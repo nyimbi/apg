@@ -8,6 +8,65 @@ The APG Key Management capability (`common/keym`) delivers an **AI-powered, quan
 
 **APG Advantage**: Our solution delivers **autonomous intelligence**, **predictive security**, and **seamless APG integration** that eliminates 90% of manual key management tasks while providing enterprise-grade security and compliance automation.
 
+## Current Executable Runtime
+
+The package now exposes a deterministic, dependency-light `KeymService` for
+generated APG applications, capability composition, publish-plan checks, and
+focused package tests. The runtime keeps live HSM, KMS, vault, blockchain
+audit, AI lifecycle, security-intelligence, SIEM, SOAR, DLP, GRC, monitoring,
+and notification providers behind adapter boundaries while making KEYM
+guardrails executable in the local repository.
+
+Current package behavior:
+
+- creates tenant-scoped managed keys with owner, algorithm, key class, policy
+  reference, HSM attestation posture, lifecycle state, rotation age, and
+  compromise state;
+- evaluates key operations through deterministic KEYM rules, producing `allow`,
+  `require_review`, or `deny` decisions with matched rules and required
+  actions;
+- denies key creation without a policy reference;
+- denies root-key creation without HSM attestation;
+- denies export operations unless KEYM-owned dual-control approval state is
+  approved;
+- marks overdue rotations as review-required unless a rotation exception is
+  approved;
+- blocks cryptographic operations on compromised keys;
+- records export approval, rotation exception, rotation completion, compromise,
+  and audit state;
+- exposes API helpers and UI view models for inventory, lifecycle, export
+  approvals, rotation exceptions, HSM attestation, compromise response, audit,
+  analytics, and settings.
+
+The compatibility `create_record` and `list_records` helpers remain available
+for older package tooling, while new code should use the domain-specific
+service methods.
+
+## Adapter Boundaries
+
+KEYM intentionally keeps the following live integrations outside the
+dependency-light runtime until future slices verify them directly:
+
+- APG ENCR, SECU, AUDL, AUTH, and MTEN service adapters;
+- HSM, KMS, cloud key-store, vault, and software-HSM providers;
+- blockchain audit ledgers and immutable audit exporters;
+- AI lifecycle, anomaly detection, and security intelligence engines;
+- compliance/GRC, SIEM, SOAR, DLP, monitoring, and notification systems.
+
+Package behavior should remain deterministic without those integrations. Live
+systems should be introduced as adapters around the current service contract.
+
+## Focused Verification
+
+Use these commands for a battery-conscious KEYM package proof:
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/keym/__init__.py capabilities/common/keym/models.py capabilities/common/keym/service.py capabilities/common/keym/api.py capabilities/common/keym/capability_contract.py capabilities/common/keym/app.py capabilities/common/keym/view_models.py capabilities/common/keym/tests/test_capability_contract.py capabilities/common/keym/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/keym/tests/test_capability_contract.py capabilities/common/keym/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/keym --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/keym --json
+```
+
 ## Business Value Proposition Within APG Ecosystem
 
 ### 10x Performance Advantages

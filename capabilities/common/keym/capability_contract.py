@@ -52,11 +52,20 @@ class CapabilityConfiguration:
 			"anomaly_detection_enabled": True,
 			"notify_on_policy_violation": True
 		},
+		"operation_governance": {
+			"require_independent_export_review": True,
+			"require_independent_rotation_exception_review": True,
+			"require_rotation_evidence": True,
+			"record_key_lifecycle_audit": True
+		},
 		"ui": {
 			"enable_inventory": True,
 			"enable_policy_manager": True,
 			"enable_hsm_console": True,
-			"enable_audit_viewer": True
+			"enable_audit_viewer": True,
+			"enable_export_approvals": True,
+			"enable_rotation_exceptions": True,
+			"enable_compromise_console": True
 		},
 		"theme": {
 			"default_theme": "keym_vault_console",
@@ -73,6 +82,7 @@ class CapabilityConfiguration:
 			"hsm",
 			"compliance",
 			"automation",
+			"operation_governance",
 			"ui",
 			"theme"
 		],
@@ -84,6 +94,7 @@ class CapabilityConfiguration:
 			"hsm": {"type": "object"},
 			"compliance": {"type": "object"},
 			"automation": {"type": "object"},
+			"operation_governance": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -185,6 +196,26 @@ class CapabilityTheme:
 		"policy_violation_trace": {
 			"visual": "rule-ladder",
 			"highlight": "deny-marker"
+		},
+		"export_approval_queue": {
+			"icon": "shield-check",
+			"status_indicator": "dual-control",
+			"variant": "approval"
+		},
+		"rotation_exception_queue": {
+			"icon": "clock-alert",
+			"status_indicator": "review-bar",
+			"variant": "review"
+		},
+		"compromise_response_panel": {
+			"icon": "shield-x",
+			"status_indicator": "danger-rail",
+			"variant": "incident"
+		},
+		"key_audit_timeline": {
+			"icon": "scroll-text",
+			"line_style": "segmented",
+			"variant": "evidence"
 		}
 	})
 
@@ -251,6 +282,56 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "key_compromised",
 				"required_action": "disable_and_rotate_key"
 			}
+		),
+		CapabilityRule(
+			name="disabled_key_blocks_use",
+			description="Disabled keys cannot be used for cryptographic operations.",
+			condition={"key_status": "disabled", "operation_is_cryptographic": True},
+			effect={
+				"decision": "deny",
+				"reason": "key_disabled",
+				"required_action": "reactivate_or_rotate_key"
+			}
+		),
+		CapabilityRule(
+			name="destroyed_key_blocks_use",
+			description="Destroyed keys cannot be used for cryptographic operations.",
+			condition={"key_status": "destroyed", "operation_is_cryptographic": True},
+			effect={
+				"decision": "deny",
+				"reason": "key_destroyed",
+				"required_action": "provision_replacement_key"
+			}
+		),
+		CapabilityRule(
+			name="review_requires_independent_reviewer",
+			description="KEYM approvals and exceptions require independent review.",
+			condition={"reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="review_requires_notes",
+			description="KEYM approvals and exceptions require reviewer notes.",
+			condition={"review_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "review_notes_required",
+				"required_action": "attach_review_notes"
+			}
+		),
+		CapabilityRule(
+			name="rotation_completion_requires_evidence",
+			description="Key rotation completion requires evidence.",
+			condition={"operation": "complete_rotation", "key_rotation_evidence_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_rotation_evidence_required",
+				"required_action": "attach_key_rotation_evidence"
+			}
 		)
 	]
 
@@ -261,6 +342,9 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("dashboard", "/keym/dashboard", "KeyManagementDashboard", "keym.read_key", "Overview"),
 		CapabilityUIRoute("inventory", "/keym/keys", "KeyInventoryView", "keym.read_key", "Operations"),
 		CapabilityUIRoute("lifecycle", "/keym/lifecycle", "KeyLifecycleWorkbench", "keym.rotate_key", "Operations"),
+		CapabilityUIRoute("export_approvals", "/keym/export-approvals", "ExportApprovalQueue", "keym.export_key", "Governance"),
+		CapabilityUIRoute("rotation_exceptions", "/keym/rotation-exceptions", "RotationExceptionQueue", "keym.rotate_key", "Governance"),
+		CapabilityUIRoute("compromise", "/keym/compromise", "CompromiseResponseConsole", "keym.admin", "Security"),
 		CapabilityUIRoute("policies", "/keym/policies", "PolicyManagerView", "keym.manage_policies", "Governance"),
 		CapabilityUIRoute("hsm", "/keym/hsm", "HSMConsole", "keym.manage_hsm", "Security"),
 		CapabilityUIRoute("audit", "/keym/audit", "AuditLogsView", "keym.view_audit_logs", "Governance"),

@@ -19,7 +19,7 @@ from .models import (
 	KeySpec, Key, KeyOperation, AuditEvent, KeyUsageStats,
 	KeyAlgorithm, KeyUsage, KeyState, SecurityLevel, create_key_spec_async
 )
-from .service import KeyManagementService, create_key_management_service
+from .service import KeyManagementService, KeymService, create_key_management_service
 
 
 # APG API Response Models
@@ -47,6 +47,151 @@ app = FastAPI(title="APG Key Management API", version="1.0.0")
 
 # Global service instance
 keym_service: KeyManagementService | None = None
+SERVICE = KeymService()
+
+
+def _required_tenant_id(payload: Dict[str, Any]) -> str:
+	tenant_id = str(payload.get("tenant_id") or "").strip()
+	if not tenant_id:
+		raise PermissionError("tenant_context_required")
+	return tenant_id
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	contract = SERVICE.describe(tenant_id)
+	summary = SERVICE.dashboard_summary(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		"key_count": summary["key_count"],
+		"operation_count": summary["operation_count"],
+		"denied_operation_count": summary["denied_operation_count"],
+		"review_required_count": summary["review_required_count"],
+		"pending_export_approval_count": summary["pending_export_approval_count"],
+		"pending_rotation_exception_count": summary["pending_rotation_exception_count"],
+		"scheduled_rotation_count": summary["scheduled_rotation_count"],
+		"compromised_key_count": summary["compromised_key_count"],
+	}
+
+
+def create_managed_key(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.create_managed_key(
+		tenant_id=_required_tenant_id(payload),
+		key_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload.get("owner") or ""),
+		algorithm=str(payload.get("algorithm") or "AES-256"),
+		key_class=str(payload.get("key_class") or "data"),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		hsm_attested=bool(payload.get("hsm_attested", False)),
+		rotation_age_days=int(payload.get("rotation_age_days", 0) or 0),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def evaluate_key_operation(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.evaluate_key_operation(
+		tenant_id=_required_tenant_id(payload),
+		operation_id=str(payload["id"]),
+		key_id=str(payload["key_id"]),
+		operation=str(payload.get("operation") or "use_key"),
+	)
+
+
+def request_export_approval(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.request_export_approval(
+		tenant_id=_required_tenant_id(payload),
+		approval_id=str(payload["id"]),
+		key_id=str(payload["key_id"]),
+		requested_by=str(payload.get("requested_by") or ""),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def decide_export_approval(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.decide_export_approval(
+		tenant_id=_required_tenant_id(payload),
+		approval_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def request_rotation_exception(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.request_rotation_exception(
+		tenant_id=_required_tenant_id(payload),
+		exception_id=str(payload["id"]),
+		key_id=str(payload["key_id"]),
+		requested_by=str(payload.get("requested_by") or ""),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def decide_rotation_exception(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.decide_rotation_exception(
+		tenant_id=_required_tenant_id(payload),
+		exception_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def schedule_rotation(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.schedule_rotation(
+		tenant_id=_required_tenant_id(payload),
+		rotation_id=str(payload["id"]),
+		key_id=str(payload["key_id"]),
+		requested_by=str(payload.get("requested_by") or ""),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def complete_rotation(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.complete_rotation(
+		tenant_id=_required_tenant_id(payload),
+		rotation_id=str(payload["id"]),
+		actor=str(payload.get("actor") or ""),
+		evidence=str(payload.get("evidence") or ""),
+	)
+
+
+def mark_key_compromised(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.mark_key_compromised(
+		tenant_id=_required_tenant_id(payload),
+		key_id=str(payload["key_id"]),
+		actor=str(payload.get("actor") or ""),
+		evidence=str(payload.get("evidence") or ""),
+	)
+
+
+def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.create_record(
+		record_id=str(payload["id"]),
+		tenant_id=_required_tenant_id(payload),
+		metadata=dict(payload.get("metadata") or {}),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def list_records(tenant_id: str | None = None) -> list[Dict[str, Any]]:
+	return SERVICE.list_records(tenant_id)
+
+
+def list_key_posture(tenant_id: str = "default") -> Dict[str, Any]:
+	return {
+		"keys": SERVICE.list_keys(tenant_id),
+		"operations": SERVICE.list_operations(tenant_id),
+		"export_approvals": SERVICE.list_export_approvals(tenant_id),
+		"rotation_exceptions": SERVICE.list_rotation_exceptions(tenant_id),
+		"rotations": SERVICE.list_rotations(tenant_id),
+		"audit_events": SERVICE.list_audit_events(tenant_id),
+		"summary": SERVICE.dashboard_summary(tenant_id),
+	}
 
 
 async def get_service() -> KeyManagementService:

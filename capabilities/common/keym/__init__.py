@@ -103,6 +103,10 @@ CAPABILITY_METADATA = {
 			"keym.manage_policies",
 			"keym.view_audit_logs",
 			"keym.manage_hsm",
+			"keym.export_key",
+			"keym.approve_export",
+			"keym.approve_rotation_exception",
+			"keym.respond_compromise",
 			"keym.admin"
 		],
 		
@@ -209,6 +213,9 @@ def register_capability() -> Dict[str, Any]:
 			"key_policy_governance": "Attach policy and approval controls to key operations",
 			"hsm_attestation": "Enforce software or hardware HSM attestation where required",
 			"cryptographic_operations": "Coordinate encrypt, decrypt, sign, and verify workflows",
+			"export_dual_control": "Govern key export through package-backed dual-control approvals",
+			"rotation_exception_review": "Govern overdue rotation exceptions with independent review",
+			"compromise_response": "Block compromised keys until rotation evidence is recorded",
 			"audit_and_compliance": "Expose immutable key access audit and compliance surfaces",
 			"capability_rules": "Evaluate deterministic key-governance rules",
 			"visual_theming": "Apply vault-console theme tokens and components"
@@ -216,6 +223,9 @@ def register_capability() -> Dict[str, Any]:
 		"endpoints": {
 			"keys": "/keym/api/v1/keys",
 			"lifecycle": "/keym/api/v1/lifecycle",
+			"export_approvals": "/keym/api/v1/export-approvals",
+			"rotation_exceptions": "/keym/api/v1/rotation-exceptions",
+			"compromise": "/keym/api/v1/compromise",
 			"policies": "/keym/api/v1/policies",
 			"hsm": "/keym/api/v1/hsm",
 			"audit": "/keym/api/v1/audit",

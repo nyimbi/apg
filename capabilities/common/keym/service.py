@@ -10,6 +10,7 @@ Copyright: © 2025 Datacraft
 import asyncio
 import hashlib
 import secrets
+from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from uuid_extensions import uuid7str
@@ -25,6 +26,572 @@ from .models import (
 	KeyAlgorithm, KeyUsage, KeyState, SecurityLevel, ComplianceFramework,
 	HSMConfiguration, CloudKeyStore, create_key_spec_async
 )
+
+
+KEY_CLASSES = {"data", "root", "tenant", "signing", "wrapping"}
+KEY_STATUSES = {"active", "disabled", "compromised", "destroyed"}
+DECISIONS = {"allow", "deny", "require_review"}
+
+
+def _utc_now() -> str:
+	return datetime.utcnow().isoformat() + "Z"
+
+
+def _stable_id(prefix: str, *parts: object) -> str:
+	payload = "|".join(str(part) for part in parts)
+	return f"{prefix}_{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _normalize_key_class(value: str) -> str:
+	normalized = str(value or "data").strip().lower()
+	if normalized not in KEY_CLASSES:
+		raise ValueError(f"unsupported_key_class:{value}")
+	return normalized
+
+
+def _normalize_status(value: str) -> str:
+	normalized = str(value or "active").strip().lower()
+	if normalized not in KEY_STATUSES:
+		raise ValueError(f"unsupported_key_status:{value}")
+	return normalized
+
+
+def _required_actions(result: dict[str, Any]) -> list[str]:
+	return [
+		str(action["required_action"])
+		for action in result.get("actions", [])
+		if action.get("required_action")
+	]
+
+
+@dataclass(slots=True)
+class ManagedKeyRecord:
+	id: str
+	tenant_id: str
+	name: str
+	owner: str
+	algorithm: str
+	key_class: str
+	policy_ref: str
+	hsm_attested: bool
+	status: str = "active"
+	rotation_age_days: int = 0
+	created_at: str = field(default_factory=_utc_now)
+	last_rotated_at: str = ""
+	compromised_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class KeyOperationRecord:
+	id: str
+	tenant_id: str
+	key_id: str
+	operation: str
+	decision: str
+	status: str
+	matched_rules: list[str]
+	required_actions: list[str]
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class ExportApprovalRecord:
+	id: str
+	tenant_id: str
+	key_id: str
+	requested_by: str
+	reason: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class RotationExceptionRecord:
+	id: str
+	tenant_id: str
+	key_id: str
+	requested_by: str
+	reason: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class KeyRotationRecord:
+	id: str
+	tenant_id: str
+	key_id: str
+	requested_by: str
+	reason: str
+	status: str = "scheduled"
+	actor: str = ""
+	evidence: str = ""
+	created_at: str = field(default_factory=_utc_now)
+	completed_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class KeymAuditEventRecord:
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	actor: str
+	severity: str = "info"
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+class KeymService:
+	"""Dependency-light KEYM service for generated APG applications."""
+
+	def __init__(self) -> None:
+		from .capability_contract import evaluate_capability_rules, get_capability_contract
+
+		self._evaluate_rules = evaluate_capability_rules
+		self._get_contract = get_capability_contract
+		self.keys: dict[str, ManagedKeyRecord] = {}
+		self.operations: dict[str, KeyOperationRecord] = {}
+		self.export_approvals: dict[str, ExportApprovalRecord] = {}
+		self.rotation_exceptions: dict[str, RotationExceptionRecord] = {}
+		self.rotations: dict[str, KeyRotationRecord] = {}
+		self.audit_events: dict[str, KeymAuditEventRecord] = {}
+
+	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+		return self._get_contract(tenant_id, overrides)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return self._evaluate_rules(dict(context))
+
+	def create_managed_key(
+		self,
+		tenant_id: str,
+		key_id: str,
+		name: str,
+		owner: str,
+		algorithm: str = "AES-256",
+		key_class: str = "data",
+		policy_ref: str = "",
+		hsm_attested: bool = False,
+		rotation_age_days: int = 0,
+		status: str = "active",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(key_id or "").strip():
+			raise ValueError("managed_key_id_required")
+		if not str(name or "").strip():
+			raise ValueError("managed_key_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("managed_key_owner_required")
+		if not str(algorithm or "").strip():
+			raise ValueError("managed_key_algorithm_required")
+		key_class_value = _normalize_key_class(key_class)
+		status_value = _normalize_status(status)
+		context = {
+			"tenant_context_present": True,
+			"operation": "create_key",
+			"policy_attached": bool(str(policy_ref or "").strip()),
+			"key_class": key_class_value,
+			"hsm_attested": bool(hsm_attested),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_id = _stable_id("keym_key", tenant_id, key_id)
+		if record_id in self.keys:
+			raise ValueError(f"managed_key_already_exists:{key_id}")
+		record = ManagedKeyRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			owner=str(owner).strip(),
+			algorithm=str(algorithm).strip(),
+			key_class=key_class_value,
+			policy_ref=str(policy_ref).strip(),
+			hsm_attested=bool(hsm_attested),
+			status=status_value,
+			rotation_age_days=max(0, int(rotation_age_days)),
+		)
+		self.keys[record.id] = record
+		self._record_event(tenant_id, "managed_key_created", record.id, f"Managed key created: {record.name}", owner)
+		return record.to_dict()
+
+	def evaluate_key_operation(
+		self,
+		tenant_id: str,
+		operation_id: str,
+		key_id: str,
+		operation: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(operation_id or "").strip():
+			raise ValueError("key_operation_id_required")
+		if not str(operation or "").strip():
+			raise ValueError("key_operation_required")
+		key = self._get_key(tenant_id, key_id)
+		operation_name = str(operation).strip().lower()
+		context = {
+			"tenant_context_present": True,
+			"operation": operation_name,
+			"policy_attached": bool(key.policy_ref),
+			"key_class": key.key_class,
+			"hsm_attested": key.hsm_attested,
+			"dual_control_approved": self._export_approved(tenant_id, key.id),
+			"rotation_age_days": key.rotation_age_days,
+			"rotation_exception_recorded": self._rotation_exception_approved(tenant_id, key.id),
+			"key_status": key.status,
+			"operation_is_cryptographic": operation_name in {"use_key", "encrypt", "decrypt", "sign", "verify", "export_key"},
+		}
+		result = self.evaluate(context)
+		status = {
+			"allow": "allowed",
+			"deny": "denied",
+			"require_review": "review_required",
+		}[result["decision"]]
+		record = KeyOperationRecord(
+			id=_stable_id("keym_operation", tenant_id, operation_id),
+			tenant_id=tenant_id,
+			key_id=key.id,
+			operation=operation_name,
+			decision=result["decision"],
+			status=status,
+			matched_rules=list(result["matched_rules"]),
+			required_actions=_required_actions(result),
+		)
+		self.operations[record.id] = record
+		severity = "high" if status == "denied" else "medium" if status == "review_required" else "info"
+		self._record_event(tenant_id, f"key_operation_{status}", record.id, f"Key operation {status}: {operation_name}", key.owner, severity)
+		return record.to_dict()
+
+	def request_export_approval(
+		self,
+		tenant_id: str,
+		approval_id: str,
+		key_id: str,
+		requested_by: str,
+		reason: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		key = self._get_key(tenant_id, key_id)
+		if not str(approval_id or "").strip():
+			raise ValueError("export_approval_id_required")
+		if not str(requested_by or "").strip():
+			raise ValueError("export_approval_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("export_approval_reason_required")
+		record_id = _stable_id("keym_export_approval", tenant_id, approval_id)
+		if record_id in self.export_approvals:
+			raise ValueError(f"export_approval_already_exists:{approval_id}")
+		record = ExportApprovalRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			key_id=key.id,
+			requested_by=str(requested_by).strip(),
+			reason=str(reason).strip(),
+		)
+		self.export_approvals[record.id] = record
+		self._record_event(tenant_id, "export_approval_requested", record.id, f"Export approval requested: {key.name}", requested_by, "medium")
+		return record.to_dict()
+
+	def decide_export_approval(
+		self,
+		tenant_id: str,
+		approval_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		record = self._get_export_approval(tenant_id, approval_id)
+		self._decide_review_record(
+			record,
+			operation="decide_export_approval",
+			reviewer=reviewer,
+			decision=decision,
+			notes=notes,
+			self_review_reason="independent_export_reviewer_required",
+		)
+		self._record_event(tenant_id, "export_approval_decided", record.id, f"Export approval {decision}: {record.key_id}", reviewer, "medium")
+		return record.to_dict()
+
+	def request_rotation_exception(
+		self,
+		tenant_id: str,
+		exception_id: str,
+		key_id: str,
+		requested_by: str,
+		reason: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		key = self._get_key(tenant_id, key_id)
+		if key.rotation_age_days <= 90:
+			raise ValueError("rotation_exception_not_required")
+		if not str(exception_id or "").strip():
+			raise ValueError("rotation_exception_id_required")
+		if not str(requested_by or "").strip():
+			raise ValueError("rotation_exception_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("rotation_exception_reason_required")
+		record_id = _stable_id("keym_rotation_exception", tenant_id, exception_id)
+		if record_id in self.rotation_exceptions:
+			raise ValueError(f"rotation_exception_already_exists:{exception_id}")
+		record = RotationExceptionRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			key_id=key.id,
+			requested_by=str(requested_by).strip(),
+			reason=str(reason).strip(),
+		)
+		self.rotation_exceptions[record.id] = record
+		self._record_event(tenant_id, "rotation_exception_requested", record.id, f"Rotation exception requested: {key.name}", requested_by, "medium")
+		return record.to_dict()
+
+	def decide_rotation_exception(
+		self,
+		tenant_id: str,
+		exception_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		record = self._get_rotation_exception(tenant_id, exception_id)
+		self._decide_review_record(
+			record,
+			operation="decide_rotation_exception",
+			reviewer=reviewer,
+			decision=decision,
+			notes=notes,
+			self_review_reason="independent_rotation_exception_reviewer_required",
+		)
+		self._record_event(tenant_id, "rotation_exception_decided", record.id, f"Rotation exception {decision}: {record.key_id}", reviewer, "medium")
+		return record.to_dict()
+
+	def schedule_rotation(
+		self,
+		tenant_id: str,
+		rotation_id: str,
+		key_id: str,
+		requested_by: str,
+		reason: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		key = self._get_key(tenant_id, key_id)
+		if key.status == "destroyed":
+			raise PermissionError("key_destroyed")
+		if not str(rotation_id or "").strip():
+			raise ValueError("key_rotation_id_required")
+		if not str(requested_by or "").strip():
+			raise ValueError("key_rotation_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("key_rotation_reason_required")
+		record_id = _stable_id("keym_rotation", tenant_id, rotation_id)
+		if record_id in self.rotations:
+			raise ValueError(f"key_rotation_already_exists:{rotation_id}")
+		record = KeyRotationRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			key_id=key.id,
+			requested_by=str(requested_by).strip(),
+			reason=str(reason).strip(),
+		)
+		self.rotations[record.id] = record
+		self._record_event(tenant_id, "key_rotation_scheduled", record.id, f"Key rotation scheduled: {key.name}", requested_by, "medium")
+		return record.to_dict()
+
+	def complete_rotation(self, tenant_id: str, rotation_id: str, actor: str, evidence: str) -> dict[str, Any]:
+		record = self._get_rotation(tenant_id, rotation_id)
+		key = self._get_key(tenant_id, record.key_id)
+		if key.status == "destroyed":
+			raise PermissionError("key_destroyed")
+		if record.status == "completed":
+			raise ValueError("key_rotation_already_completed")
+		if not str(actor or "").strip():
+			raise ValueError("key_rotation_actor_required")
+		result = self.evaluate({
+			"operation": "complete_rotation",
+			"key_rotation_evidence_attached": bool(str(evidence or "").strip()),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record.status = "completed"
+		record.actor = str(actor).strip()
+		record.evidence = str(evidence).strip()
+		record.completed_at = _utc_now()
+		key.status = "active"
+		key.rotation_age_days = 0
+		key.last_rotated_at = record.completed_at
+		self._record_event(tenant_id, "key_rotation_completed", record.id, f"Key rotation completed: {key.name}", actor, "medium")
+		return record.to_dict()
+
+	def mark_key_compromised(self, tenant_id: str, key_id: str, actor: str, evidence: str) -> dict[str, Any]:
+		key = self._get_key(tenant_id, key_id)
+		if not str(actor or "").strip():
+			raise ValueError("compromise_actor_required")
+		if not str(evidence or "").strip():
+			raise ValueError("compromise_evidence_required")
+		key.status = "compromised"
+		key.compromised_at = _utc_now()
+		self._record_event(tenant_id, "managed_key_compromised", key.id, evidence, actor, "high")
+		return key.to_dict()
+
+	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
+		metadata = dict(metadata or {})
+		return self.create_managed_key(
+			tenant_id=tenant_id,
+			key_id=record_id,
+			name=str(metadata.get("name") or record_id),
+			owner=str(metadata.get("owner") or metadata.get("created_by") or "system"),
+			algorithm=str(metadata.get("algorithm") or "AES-256"),
+			key_class=str(metadata.get("key_class") or "data"),
+			policy_ref=str(metadata.get("policy_ref") or "policy://default"),
+			hsm_attested=bool(metadata.get("hsm_attested", False)),
+			rotation_age_days=int(metadata.get("rotation_age_days", 0) or 0),
+			status=status,
+		)
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.list_keys(tenant_id)
+
+	def list_keys(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.keys, tenant_id)
+
+	def list_operations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.operations, tenant_id)
+
+	def list_export_approvals(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.export_approvals, tenant_id)
+
+	def list_rotation_exceptions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.rotation_exceptions, tenant_id)
+
+	def list_rotations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.rotations, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.audit_events, tenant_id)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		operations = self.list_operations(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"key_count": len(self.list_keys(tenant_id)),
+			"operation_count": len(operations),
+			"denied_operation_count": sum(1 for item in operations if item["status"] == "denied"),
+			"review_required_count": sum(1 for item in operations if item["status"] == "review_required"),
+			"pending_export_approval_count": sum(1 for item in self.list_export_approvals(tenant_id) if item["status"] == "pending"),
+			"pending_rotation_exception_count": sum(1 for item in self.list_rotation_exceptions(tenant_id) if item["status"] == "pending"),
+			"scheduled_rotation_count": sum(1 for item in self.list_rotations(tenant_id) if item["status"] == "scheduled"),
+			"compromised_key_count": sum(1 for item in self.list_keys(tenant_id) if item["status"] == "compromised"),
+			"recent_events": self.list_audit_events(tenant_id)[-5:],
+		}
+
+	def _require_tenant(self, tenant_id: str) -> None:
+		if not str(tenant_id or "").strip():
+			raise PermissionError("tenant_context_required")
+
+	def _get_key(self, tenant_id: str, key_id: str) -> ManagedKeyRecord:
+		record = self.keys.get(_stable_id("keym_key", tenant_id, key_id)) or self.keys.get(key_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"managed_key_not_found:{key_id}")
+		return record
+
+	def _get_export_approval(self, tenant_id: str, approval_id: str) -> ExportApprovalRecord:
+		record = self.export_approvals.get(_stable_id("keym_export_approval", tenant_id, approval_id)) or self.export_approvals.get(approval_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"export_approval_not_found:{approval_id}")
+		return record
+
+	def _get_rotation_exception(self, tenant_id: str, exception_id: str) -> RotationExceptionRecord:
+		record = self.rotation_exceptions.get(_stable_id("keym_rotation_exception", tenant_id, exception_id)) or self.rotation_exceptions.get(exception_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"rotation_exception_not_found:{exception_id}")
+		return record
+
+	def _get_rotation(self, tenant_id: str, rotation_id: str) -> KeyRotationRecord:
+		record = self.rotations.get(_stable_id("keym_rotation", tenant_id, rotation_id)) or self.rotations.get(rotation_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"key_rotation_not_found:{rotation_id}")
+		return record
+
+	def _export_approved(self, tenant_id: str, key_id: str) -> bool:
+		return any(item.tenant_id == tenant_id and item.key_id == key_id and item.status == "approved" for item in self.export_approvals.values())
+
+	def _rotation_exception_approved(self, tenant_id: str, key_id: str) -> bool:
+		return any(item.tenant_id == tenant_id and item.key_id == key_id and item.status == "approved" for item in self.rotation_exceptions.values())
+
+	def _decide_review_record(self, record: Any, operation: str, reviewer: str, decision: str, notes: str, self_review_reason: str) -> None:
+		if record.status != "pending":
+			raise ValueError("review_already_decided")
+		decision_value = str(decision or "").strip().lower()
+		if decision_value not in {"approved", "rejected"}:
+			raise ValueError("review_decision_invalid")
+		reviewer_value = str(reviewer or "").strip()
+		notes_value = str(notes or "").strip()
+		if not reviewer_value:
+			raise ValueError("reviewer_required")
+		if not notes_value:
+			raise ValueError("review_notes_required")
+		requester_value = str(record.requested_by or "").strip()
+		result = self.evaluate({
+			"operation": operation,
+			"reviewer_same_as_requester": reviewer_value.casefold() == requester_value.casefold(),
+			"review_notes_attached": bool(notes_value),
+		})
+		if result["decision"] == "deny":
+			reason = self._first_reason(result)
+			raise PermissionError(self_review_reason if reason == "independent_reviewer_required" else reason)
+		record.status = decision_value
+		record.decision = decision_value
+		record.reviewer = reviewer_value
+		record.notes = notes_value
+
+	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info") -> dict[str, Any]:
+		record = KeymAuditEventRecord(
+			id=_stable_id("keym_event", tenant_id, event_type, subject_id, len(self.audit_events)),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			actor=actor,
+			severity=severity,
+		)
+		self.audit_events[record.id] = record
+		return record.to_dict()
+
+	def _first_reason(self, result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "key_operation_denied"
+
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = [record.to_dict() for record in records.values()]
+		if tenant_id is not None:
+			items = [item for item in items if item["tenant_id"] == tenant_id]
+		return sorted(items, key=lambda item: item["id"])
 
 
 class KeyManagementService:
@@ -1302,5 +1869,15 @@ async def create_key_management_service(config: Dict[str, Any] | None = None) ->
 	return service
 
 
-# Export service class and factory
-__all__ = ["KeyManagementService", "create_key_management_service"]
+# Export service classes and factory
+__all__ = [
+	"ExportApprovalRecord",
+	"KeyManagementService",
+	"KeyOperationRecord",
+	"KeyRotationRecord",
+	"KeymAuditEventRecord",
+	"KeymService",
+	"ManagedKeyRecord",
+	"RotationExceptionRecord",
+	"create_key_management_service",
+]
