@@ -19,6 +19,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"streaming": contract["streaming"],
 		"purpose_count": summary["purpose_count"],
 		"active_consent_count": summary["active_consent_count"],
 		"open_request_count": summary["open_request_count"],
@@ -112,6 +113,30 @@ def complete_privacy_request(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_privacy_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_privacy_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+	)
+
+
+def change_purpose_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_purpose_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		purpose_id=str(payload["id"]),
+		active=bool(payload.get("active", True)),
+		reason=str(payload.get("reason") or ""),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
+	)
+
+
 def privacy_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": SERVICE.dashboard_summary(tenant_id),
@@ -121,5 +146,6 @@ def privacy_state(tenant_id: str = "default") -> dict[str, Any]:
 		"preferences": SERVICE.list_preferences(tenant_id),
 		"requests": SERVICE.list_requests(tenant_id),
 		"processing_decisions": SERVICE.list_processing_decisions(tenant_id),
+		"privacy_agents": SERVICE.list_privacy_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}

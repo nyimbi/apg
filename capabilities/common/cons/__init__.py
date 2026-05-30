@@ -17,7 +17,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "cons",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant privacy purposes, consent capture, preference centers, privacy requests, and auditable processing controls",
+	"description": "Tenant privacy purposes, consent capture, preference centers, privacy requests, scoped AI privacy agents, and auditable processing controls",
 	"category": "governance",
 	"subcategory": "privacy",
 	"vendor": "Datacraft",
@@ -25,8 +25,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["purpose_registry", "consent_capture", "privacy_requests", "preference_center", "privacy_audit"],
-	"permissions": ["cons:view", "cons:manage_purposes", "cons:capture", "cons:process_requests", "cons:admin"]
+	"provides": ["purpose_registry", "consent_capture", "privacy_requests", "preference_center", "privacy_audit", "privacy_agents"],
+	"permissions": ["cons:view", "cons:manage_purposes", "cons:capture", "cons:process_requests", "cons:audit", "cons:admin"]
 }
 
 
@@ -40,7 +40,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["i18n", "audl", "mchn", "wsbl"],
+		"optional_dependencies": ["i18n", "audl", "mchn", "wsbl", "bytewax", "ntfy", "wflo"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -49,13 +49,17 @@ def register_capability() -> dict[str, Any]:
 			"consent_capture": "Capture consent events with notice, provenance, source, and audit metadata",
 			"privacy_requests": "Process data access, correction, deletion, export, and objection requests",
 			"preference_center": "Expose tenant-branded privacy preferences and consent withdrawal",
+			"privacy_agents": "Register scoped AI privacy agents across Codex, Claude Code, OpenCode, Pi, and compatible runtimes",
+			"privacy_audit": "Record notice, purpose, consent, request, agent, and processing evidence",
+			"bytewax_streaming": "Declare Bytewax lifecycle streams for privacy batch and state events",
 			"capability_rules": "Evaluate deterministic privacy-governance rules",
 			"visual_theming": "Apply privacy-center theme tokens and components"
 		},
-		"endpoints": {"purposes": "/cons/api/v1/purposes", "notices": "/cons/api/v1/notices", "consents": "/cons/api/v1/consents", "requests": "/cons/api/v1/requests", "preferences": "/cons/api/v1/preferences"},
+		"endpoints": {"purposes": "/cons/api/v1/purposes", "notices": "/cons/api/v1/notices", "consents": "/cons/api/v1/consents", "requests": "/cons/api/v1/requests", "preferences": "/cons/api/v1/preferences", "agents": "/cons/api/v1/agents", "audit": "/cons/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

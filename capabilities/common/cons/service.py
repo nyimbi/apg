@@ -5,11 +5,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_PRIVACY_AGENT_ROLES,
+	SUPPORTED_PRIVACY_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	ConsentEvent,
 	PreferenceProfile,
 	PrivacyAuditEvent,
+	PrivacyAgent,
 	PrivacyNotice,
 	PrivacyPurpose,
 	PrivacyRequest,
@@ -29,6 +35,7 @@ class ConsService:
 		self._preferences: dict[str, PreferenceProfile] = {}
 		self._requests: dict[str, PrivacyRequest] = {}
 		self._processing_decisions: dict[str, ProcessingDecision] = {}
+		self._agents: dict[str, PrivacyAgent] = {}
 		self._audit_events: list[PrivacyAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -48,6 +55,9 @@ class ConsService:
 		published_by: str,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, notice_id)
+		if key in self._notices:
+			raise ValueError("notice_already_exists")
 		notice = PrivacyNotice(
 			id=notice_id,
 			tenant_id=tenant_id,
@@ -57,7 +67,7 @@ class ConsService:
 			purposes=list(purposes),
 			published_by=published_by,
 		)
-		self._notices[notice_id] = notice
+		self._notices[key] = notice
 		self._record_audit(tenant_id, "notice_published", notice_id, published_by, notice.to_dict())
 		return notice.to_dict()
 
@@ -77,14 +87,15 @@ class ConsService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_purpose",
 			"legal_basis_present": bool(legal_basis),
+			"purpose_owner_assigned": bool(owner),
+			"retention_policy_present": bool(retention_policy),
+			"notice_link_present": bool(notice_id),
 		})
 		self._raise_if_denied(result)
-		if DEFAULT_CONFIGURATION["purposes"]["purpose_owner_required"] and not owner:
-			raise PermissionError("purpose_owner_required")
-		if DEFAULT_CONFIGURATION["purposes"]["retention_policy_required"] and not retention_policy:
-			raise PermissionError("retention_policy_required")
-		if DEFAULT_CONFIGURATION["purposes"]["notice_link_required"]:
-			self._require_notice(notice_id, tenant_id)
+		self._require_notice(notice_id, tenant_id)
+		key = self._key(tenant_id, purpose_id)
+		if key in self._purposes:
+			raise ValueError("purpose_already_exists")
 		purpose = PrivacyPurpose(
 			id=purpose_id,
 			tenant_id=tenant_id,
@@ -95,7 +106,7 @@ class ConsService:
 			notice_id=notice_id,
 			data_categories=list(data_categories),
 		)
-		self._purposes[purpose_id] = purpose
+		self._purposes[key] = purpose
 		self._record_audit(tenant_id, "purpose_created", purpose_id, owner, purpose.to_dict())
 		return purpose.to_dict()
 
@@ -113,6 +124,9 @@ class ConsService:
 		self._require_tenant(tenant_id)
 		self._require_purpose(purpose_id, tenant_id)
 		self._require_notice(notice_id, tenant_id)
+		key = self._key(tenant_id, consent_id)
+		if key in self._consents:
+			raise ValueError("consent_already_exists")
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "capture_consent",
@@ -138,7 +152,7 @@ class ConsService:
 			captured_at=captured_at or utc_now(),
 			provenance_hash=stable_digest(payload),
 		)
-		self._consents[consent_id] = consent
+		self._consents[key] = consent
 		self._record_audit(tenant_id, "consent_captured", consent_id, captured_by, consent.to_dict())
 		return consent.to_dict()
 
@@ -159,6 +173,7 @@ class ConsService:
 		updated_by: str,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		key = self._key(tenant_id, profile_id)
 		profile = PreferenceProfile(
 			id=profile_id,
 			tenant_id=tenant_id,
@@ -167,7 +182,7 @@ class ConsService:
 			purposes=dict(purposes),
 			updated_by=updated_by,
 		)
-		self._preferences[profile_id] = profile
+		self._preferences[key] = profile
 		self._record_audit(tenant_id, "preferences_updated", profile_id, updated_by, profile.to_dict())
 		return profile.to_dict()
 
@@ -196,7 +211,7 @@ class ConsService:
 				reason=", ".join(action.get("reason", "consent_required") for action in result["actions"]),
 				consent_id=None,
 			)
-			self._processing_decisions[decision_id] = decision
+			self._processing_decisions[self._key(tenant_id, decision_id)] = decision
 			self._record_audit(tenant_id, "processing_denied", decision_id, subject_id, decision.to_dict())
 			raise PermissionError(decision.reason)
 		decision = ProcessingDecision(
@@ -208,7 +223,7 @@ class ConsService:
 			reason="active_consent_present",
 			consent_id=active.id if active else None,
 		)
-		self._processing_decisions[decision_id] = decision
+		self._processing_decisions[self._key(tenant_id, decision_id)] = decision
 		self._record_audit(tenant_id, "processing_allowed", decision_id, subject_id, decision.to_dict())
 		return decision.to_dict()
 
@@ -228,10 +243,12 @@ class ConsService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "process_privacy_request",
 			"identity_verified": identity_verified,
+			"request_evidence_present": bool(evidence_reference),
 		})
 		self._raise_if_denied(result)
-		if DEFAULT_CONFIGURATION["privacy_requests"]["request_evidence_required"] and not evidence_reference:
-			raise PermissionError("request_evidence_required")
+		key = self._key(tenant_id, request_id)
+		if key in self._requests:
+			raise ValueError("privacy_request_already_exists")
 		submitted = submitted_at or utc_now()
 		request = PrivacyRequest(
 			id=request_id,
@@ -244,7 +261,7 @@ class ConsService:
 			submitted_at=submitted,
 			due_at=request_due_at(submitted),
 		)
-		self._requests[request_id] = request
+		self._requests[key] = request
 		self._record_audit(tenant_id, "privacy_request_submitted", request_id, submitted_by, request.to_dict())
 		return request.to_dict()
 
@@ -255,6 +272,70 @@ class ConsService:
 		request.resolution = resolution
 		self._record_audit(tenant_id, "privacy_request_completed", request_id, actor, request.to_dict())
 		return request.to_dict()
+
+	def register_privacy_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_privacy_agent_runtime(runtime)
+		normalized_role = _normalize_privacy_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"privacy_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_role_supported": bool(normalized_role),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_denied(result)
+		key = self._key(tenant_id, agent_id)
+		if key in self._agents:
+			raise ValueError("privacy_agent_already_registered")
+		agent = PrivacyAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref or None,
+		)
+		self._agents[key] = agent
+		self._record_audit(tenant_id, "privacy_agent_registered", agent_id, agent.name, agent.to_dict())
+		return agent.to_dict()
+
+	def change_purpose_state(
+		self,
+		tenant_id: str,
+		purpose_id: str,
+		active: bool,
+		reason: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		purpose = self._require_purpose(purpose_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		self._raise_if_denied(result)
+		purpose.active = bool(active)
+		self._record_audit(tenant_id, "purpose_state_changed", purpose_id, purpose.owner, purpose.to_dict() | {"reason": reason})
+		return purpose.to_dict()
 
 	def review_stale_consents(self, tenant_id: str, now: datetime | None = None) -> list[dict[str, Any]]:
 		self._require_tenant(tenant_id)
@@ -289,6 +370,8 @@ class ConsService:
 			"open_request_count": len([request for request in requests if request.status == "open"]),
 			"overdue_request_count": len([request for request in requests if request.status == "open" and request_sla_state(request.due_at) == "overdue"]),
 			"processing_decision_count": len([decision for decision in self._processing_decisions.values() if decision.tenant_id == tenant_id]),
+			"privacy_agent_count": len([agent for agent in self._agents.values() if agent.tenant_id == tenant_id]),
+			"audit_event_count": len([event for event in self._audit_events if event.tenant_id == tenant_id]),
 			"coverage": consent_coverage(len(active_consents), len(withdrawn), len(purposes)),
 		}
 
@@ -309,6 +392,9 @@ class ConsService:
 
 	def list_processing_decisions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._tenant_sorted(self._processing_decisions.values(), tenant_id)
+
+	def list_privacy_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._agents.values(), tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
@@ -336,26 +422,26 @@ class ConsService:
 		self._raise_if_denied(self.evaluate({"tenant_context_present": bool(tenant_id)}))
 
 	def _require_notice(self, notice_id: str, tenant_id: str) -> PrivacyNotice:
-		notice = self._notices.get(notice_id)
-		if notice is None or notice.tenant_id != tenant_id:
+		notice = self._notices.get(self._key(tenant_id, notice_id))
+		if notice is None:
 			raise KeyError("notice_not_found")
 		return notice
 
 	def _require_purpose(self, purpose_id: str, tenant_id: str) -> PrivacyPurpose:
-		purpose = self._purposes.get(purpose_id)
-		if purpose is None or purpose.tenant_id != tenant_id:
+		purpose = self._purposes.get(self._key(tenant_id, purpose_id))
+		if purpose is None:
 			raise KeyError("purpose_not_found")
 		return purpose
 
 	def _require_consent(self, consent_id: str, tenant_id: str) -> ConsentEvent:
-		consent = self._consents.get(consent_id)
-		if consent is None or consent.tenant_id != tenant_id:
+		consent = self._consents.get(self._key(tenant_id, consent_id))
+		if consent is None:
 			raise KeyError("consent_not_found")
 		return consent
 
 	def _require_request(self, request_id: str, tenant_id: str) -> PrivacyRequest:
-		request = self._requests.get(request_id)
-		if request is None or request.tenant_id != tenant_id:
+		request = self._requests.get(self._key(tenant_id, request_id))
+		if request is None:
 			raise KeyError("privacy_request_not_found")
 		return request
 
@@ -369,3 +455,16 @@ class ConsService:
 		if result["decision"] == "deny":
 			reasons = ", ".join(action.get("reason", "privacy_policy_blocked") for action in result["actions"])
 			raise PermissionError(reasons or "privacy_policy_blocked")
+
+	def _key(self, tenant_id: str, object_id: str) -> str:
+		return f"{tenant_id}:{object_id}"
+
+
+def _normalize_privacy_agent_runtime(runtime: str) -> str:
+	value = (runtime or "").strip().lower()
+	return value if value in SUPPORTED_PRIVACY_AGENT_RUNTIMES else ""
+
+
+def _normalize_privacy_agent_role(role: str) -> str:
+	value = (role or "").strip().lower()
+	return value if value in SUPPORTED_PRIVACY_AGENT_ROLES else ""

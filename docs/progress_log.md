@@ -16,6 +16,69 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 16:46 EAT
+
+CONS consent/privacy lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Expanded `capability_contract.py` with privacy-agent, governance,
+  observability, adapter, UI, theme, and Bytewax lifecycle-stream
+  configuration.
+- Expanded deterministic rules to cover tenant context, purpose legal basis,
+  purpose owner, retention policy, notice linkage, consent capture notice,
+  active consent, privacy-request identity verification, request evidence,
+  stale-consent review, AI privacy-agent registration/runtime/role/scope/
+  disclosure, state-change reason/audit, cross-tenant access, and Bytewax batch
+  mutation enforcement.
+- Added first-class `PrivacyAgent` model support and extended `ConsService`
+  with tenant-safe notice/purpose/consent/preference/request/decision keys,
+  privacy-agent registration, guarded purpose state changes, and privacy-agent
+  dashboard counts.
+- Extended API helpers and view models with privacy-agent, audit, analytics,
+  settings, state-change, privacy-state, and Bytewax stream surfaces.
+- Updated registration metadata with privacy-agent and audit capabilities,
+  CONS audit permission, agent/audit endpoints, optional Bytewax/NTFY/WFLO
+  adapters, and streaming metadata.
+- Renamed the package test to `tests/test_package_contract.py` and expanded
+  coverage for Bytewax, privacy agents, duplicate purpose/agent IDs across
+  tenants, state-change guardrails, UI models, and package evidence.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cons/__init__.py
+  capabilities/common/cons/capability_contract.py capabilities/common/cons/models.py
+  capabilities/common/cons/privacy_engine.py capabilities/common/cons/service.py
+  capabilities/common/cons/api.py capabilities/common/cons/views.py
+  capabilities/common/cons/app.py capabilities/common/cons/test_capability_contract.py
+  capabilities/common/cons/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/cons/test_capability_contract.py
+  capabilities/common/cons/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.cons import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.cons.streaming.processor,
+  .capabilities.cons.configuration.privacy_agents.supported_runtimes,
+  .capabilities.cons.screens.agents.route'
+  capabilities/common/cons/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/cons/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/cons --json` passed with `cons` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cons --json`
+  passed with `side_effect_free: true` and no warnings.
+- CONS stale-marker and banned stream search returned no matches for old
+  package markers, unsupported overclaims, unfinished scaffolding, TODOs, or
+  unsupported stream-provider references.
+- `git diff --check -- capabilities/common/cons docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live identity/DLP/audit-log/
+  notification/workflow/marketing/regulator providers, production COMP/AUTH/
+  DLPD/AUDL/NTFY/WFLO/I18N adapters, live Bytewax topology, rendered browser
+  UI, and performance/resilience checks.
+
 ### 2026-05-30 16:37 EAT
 
 CICD continuous-integration/delivery lifecycle/guardrail packet:
