@@ -14964,3 +14964,61 @@ Not run to preserve battery:
   adapters.
 - Security certification, DLP appliance interoperability, load, latency,
   evasion, authorization, and throughput benchmarks.
+
+### 2026-05-30 12:50 EAT
+
+ZTNA lifecycle and guardrail packet:
+
+- Selected `capabilities/common/ztna` as the next common capability after DLPD.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the ZTNA contract to cover identities, devices, resources, access,
+  sessions, segmentation, reviews, security, governance, observability,
+  adapters, UI routes, and visual theme components.
+- Expanded deterministic guardrails to 33 rules covering tenant context,
+  identity subject/display name, verification, suspension, federated provider
+  evidence, device identity, posture, trust, compliance, attestation, resource
+  name, policy, segment, microsegmentation, privileged MFA, privileged
+  approval, least-privilege scope, high-risk review, explicit decision
+  evidence, session approval, continuous verification, reauthentication, close
+  actor evidence, policy attachment, independent review, review notes,
+  duplicate reviews, audit evidence, Bytewax batch mutation, tenant isolation,
+  and zero-trust state-change audit.
+- Hardened `ZtnaService` to route registration, access, approval, session, and
+  policy mutation decisions through the deterministic rule engine.
+- Added tenant-local ID and cross-tenant access tests so repeated business keys
+  can exist safely across tenants.
+- Preserved inventory evidence by allowing low-trust or non-compliant devices
+  to register as quarantined while still denying access until remediated.
+- Added API helper fields for JIT approval, least-privilege scope, and explicit
+  access-decision evidence.
+- Added identity console, review queue, and audit view models.
+- Replaced embedded semantic evidence with a contract-derived semantic model
+  and self-test that checks route count, rule count, Bytewax event streaming,
+  and generated runtime metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Completed a focused local review and fixed the device-registration versus
+  quarantine lifecycle mismatch before final verification.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ztna/__init__.py capabilities/common/ztna/capability_contract.py capabilities/common/ztna/zero_trust_runtime.py capabilities/common/ztna/models.py capabilities/common/ztna/service.py capabilities/common/ztna/api.py capabilities/common/ztna/views.py capabilities/common/ztna/app.py capabilities/common/ztna/test_capability_contract.py capabilities/common/ztna/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/ztna/test_capability_contract.py capabilities/common/ztna/tests/test_package_contract.py` passed with 19 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and ZTNA capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ztna --json` passed with `ok: true`; ZTNA remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ztna --json` passed with 11 UI routes, 33 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/ztna/README.md capabilities/common/ztna/SPECIFICATION.md capabilities/common/ztna/PLAN.md capabilities/common/ztna/cap_spec.md capabilities/common/ztna/__init__.py capabilities/common/ztna/capability_contract.py capabilities/common/ztna/zero_trust_runtime.py capabilities/common/ztna/models.py capabilities/common/ztna/service.py capabilities/common/ztna/api.py capabilities/common/ztna/views.py capabilities/common/ztna/app.py capabilities/common/ztna/test_capability_contract.py capabilities/common/ztna/tests/test_package_contract.py capabilities/common/ztna/package_manifest.json capabilities/common/ztna/release_report.json capabilities/common/ztna/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/ztna docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live tunnel, service mesh, endpoint posture, identity provider, MFA provider,
+  packet inspection, SIEM, audit sink, or session-recording integrations.
+- Browser-rendered UI behavior.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, SECU, MFAU, MONI, AUDL, IDFD, ANOM, MQEB, or CACH adapters.
+- Security certification, zero-trust interoperability, load, latency,
+  authorization, policy, evasion, and throughput benchmarks.

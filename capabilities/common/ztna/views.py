@@ -37,6 +37,20 @@ def policy_console_model(service: ZtnaService | None = None, tenant_id: str = "d
 		"resources": resources,
 		"policy_required": [resource for resource in resources if not resource["policy_attached"]],
 		"actions": ["attach_resource_policy", "review_high_risk_access"],
+		"theme_component": "resource_map",
+	}
+
+
+def identity_console_model(service: ZtnaService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or ZtnaService()
+	identities = service.list_identities(tenant_id)
+	return {
+		"route": "/ztna/identities",
+		"tenant_id": tenant_id,
+		"identities": identities,
+		"pending": [identity for identity in identities if not identity["verified"]],
+		"privileged": [identity for identity in identities if identity["privileged"]],
+		"theme_component": "identity_console",
 	}
 
 
@@ -49,6 +63,7 @@ def device_posture_model(service: ZtnaService | None = None, tenant_id: str = "d
 		"devices": devices,
 		"quarantined": [device for device in devices if device["status"] == "quarantined"],
 		"actions": ["register_device", "update_device_posture", "quarantine_device"],
+		"theme_component": "device_posture",
 	}
 
 
@@ -62,6 +77,7 @@ def resource_map_model(service: ZtnaService | None = None, tenant_id: str = "def
 		"resources": resources,
 		"segments": segments,
 		"actions": ["register_resource", "attach_resource_policy"],
+		"theme_component": "resource_map",
 	}
 
 
@@ -74,6 +90,7 @@ def access_requests_model(service: ZtnaService | None = None, tenant_id: str = "
 		"access_requests": requests,
 		"review_required": [request for request in requests if request["status"] == "review_required"],
 		"actions": ["request_access", "approve_access_request", "start_session"],
+		"theme_component": "access_decision",
 	}
 
 
@@ -86,6 +103,7 @@ def session_monitor_model(service: ZtnaService | None = None, tenant_id: str = "
 		"sessions": sessions,
 		"reauth_required": [session for session in sessions if session["reauth_required"]],
 		"actions": ["reevaluate_session", "close_session"],
+		"theme_component": "session_monitor",
 	}
 
 
@@ -102,6 +120,30 @@ def risk_console_model(service: ZtnaService | None = None, tenant_id: str = "def
 			"review_rate": _ratio(sum(1 for request in requests if request["status"] == "review_required"), len(requests)),
 			"revocation_rate": _ratio(sum(1 for session in sessions if session["status"] == "revoked"), len(sessions)),
 		},
+		"theme_component": "risk_console",
+	}
+
+
+def review_queue_model(service: ZtnaService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or ZtnaService()
+	contract = service.describe(tenant_id)
+	requests = service.list_access_requests(tenant_id)
+	return {
+		"route": "/ztna/reviews",
+		"tenant_id": tenant_id,
+		"review_required": [request for request in requests if request["status"] == "review_required"],
+		"review_rules": [rule for rule in contract["rule_engine"]["rules"] if rule["effect"]["decision"] == "require_review"],
+		"theme_component": "review_queue",
+	}
+
+
+def audit_model(service: ZtnaService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or ZtnaService()
+	return {
+		"route": "/ztna/audit",
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"theme_component": "audit_timeline",
 	}
 
 

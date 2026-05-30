@@ -8,15 +8,66 @@
   },
   "capabilities": {
     "ztna": {
-      "approvals": {},
+      "adapters": {
+        "anomaly_detection": "anom",
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "authentication": "auth",
+        "cache": "cach",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.ZtnaService",
+        "helper_runtime": "zero_trust_runtime.py",
+        "identity_federation": "idfd",
+        "message_bus": "mqeb",
+        "mfa_provider": "mfau",
+        "monitoring": "moni",
+        "production_api": "api.py",
+        "production_runtime": "service.py",
+        "production_views": "views.py",
+        "security_framework": "secu",
+        "view_models": "views.py"
+      },
+      "approvals": {
+        "high_risk_access": "AccessReview",
+        "privileged_access": "AccessReview",
+        "session_reauth": "AccessReview",
+        "unmanaged_privileged_device": "AccessReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "access": {
+          "deny_by_default": true,
+          "high_risk_review_required": true,
+          "just_in_time_approval_supported": true,
+          "privileged_approval_required": true,
+          "risk_threshold": 0.8
+        },
+        "adapters": {
+          "anomaly_detection": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.ZtnaService",
+          "helper_runtime": "zero_trust_runtime.py",
+          "identity_federation": "idfd",
+          "message_bus": "mqeb",
+          "mfa_provider": "mfau",
+          "monitoring": "moni",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "security_framework": "secu",
+          "view_models": "views.py"
+        },
         "devices": {
           "attestation_required_for_sensitive_resources": true,
           "managed_device_preferred": true,
           "minimum_device_trust": 0.7,
-          "posture_required": true
+          "posture_required": true,
+          "quarantine_untrusted_devices": true
         },
         "governance": {
           "audit_access_decisions": true,
@@ -28,13 +79,44 @@
           "continuous_identity_checks": true,
           "federated_identity_allowed": true,
           "mfa_required_for_privileged": true,
+          "suspended_identity_denied": true,
           "verified_identity_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
         },
         "resources": {
           "least_privilege_default": true,
           "microsegmentation_enabled": true,
           "resource_policy_required": true,
+          "sensitive_resource_attestation_required": true,
           "session_recording_for_privileged": true
+        },
+        "reviews": {
+          "duplicate_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true
+        },
+        "security": {
+          "audit_access_decisions": true,
+          "deny_by_default": true,
+          "policy_mutation_audit_required": true,
+          "tenant_isolation_required": true
+        },
+        "segmentation": {
+          "default_segment": "default",
+          "microsegmentation_required": true,
+          "network_segment_required": true
+        },
+        "sessions": {
+          "close_reason_required": true,
+          "continuous_verification_required": true,
+          "max_session_hours": 12,
+          "reauth_on_risk_change": true,
+          "revocation_supported": true
         },
         "tenant_id": "default",
         "theme": {
@@ -43,9 +125,16 @@
         },
         "ui": {
           "enable_access_console": true,
+          "enable_audit": true,
+          "enable_dashboard": true,
           "enable_device_posture": true,
+          "enable_identity_console": true,
+          "enable_policy_console": true,
           "enable_resource_map": true,
-          "enable_session_monitor": true
+          "enable_review_queue": true,
+          "enable_risk_console": true,
+          "enable_session_monitor": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -57,7 +146,12 @@
       "provides": [
         "ztna_operations"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "secu",
+        "mfau",
+        "moni"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -74,6 +168,32 @@
           },
           {
             "condition": {
+              "operation": "register_identity",
+              "subject_present": false
+            },
+            "description": "Identity registration requires a subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "identity_subject_required",
+              "required_action": "attach_subject"
+            },
+            "name": "identity_subject_required"
+          },
+          {
+            "condition": {
+              "display_name_present": false,
+              "operation": "register_identity"
+            },
+            "description": "Identity registration requires a display name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "identity_display_name_required",
+              "required_action": "record_display_name"
+            },
+            "name": "identity_display_name_required"
+          },
+          {
+            "condition": {
               "identity_verified": false
             },
             "description": "Access requires verified identity.",
@@ -83,6 +203,45 @@
               "required_action": "verify_identity"
             },
             "name": "identity_must_be_verified"
+          },
+          {
+            "condition": {
+              "identity_status": "suspended"
+            },
+            "description": "Suspended identities cannot access resources.",
+            "effect": {
+              "decision": "deny",
+              "reason": "identity_suspended",
+              "required_action": "restore_identity"
+            },
+            "name": "suspended_identity_denied"
+          },
+          {
+            "condition": {
+              "federated_identity": true,
+              "federated_provider_present": false,
+              "operation": "register_identity"
+            },
+            "description": "Federated identities require provider evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "federated_provider_required",
+              "required_action": "attach_federated_provider"
+            },
+            "name": "federated_identity_requires_provider"
+          },
+          {
+            "condition": {
+              "identity_present": false,
+              "operation": "register_device"
+            },
+            "description": "Device registration requires a tenant-local identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_identity_required",
+              "required_action": "select_identity"
+            },
+            "name": "device_requires_identity"
           },
           {
             "condition": {
@@ -98,6 +257,70 @@
           },
           {
             "condition": {
+              "device_trust_score_lt": 0.7
+            },
+            "description": "Device trust score must meet tenant threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_trust_too_low",
+              "required_action": "quarantine_or_repair_device"
+            },
+            "name": "device_trust_score_requires_threshold"
+          },
+          {
+            "condition": {
+              "device_compliant": false
+            },
+            "description": "Non-compliant devices cannot access resources.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_compliance_required",
+              "required_action": "remediate_device"
+            },
+            "name": "device_compliance_required"
+          },
+          {
+            "condition": {
+              "device_attested": false,
+              "sensitive_resource": true
+            },
+            "description": "Sensitive resources require attested devices.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_attestation_required",
+              "required_action": "attest_device"
+            },
+            "name": "sensitive_resource_requires_attested_device"
+          },
+          {
+            "condition": {
+              "access_level": "privileged",
+              "access_review_recorded": false,
+              "managed_device": false
+            },
+            "description": "Privileged access from unmanaged devices requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "managed_device_review_required",
+              "required_action": "review_unmanaged_privileged_access"
+            },
+            "name": "managed_device_preferred_for_privileged"
+          },
+          {
+            "condition": {
+              "operation": "register_resource",
+              "resource_name_present": false
+            },
+            "description": "Resource registration requires a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "resource_name_required",
+              "required_action": "name_resource"
+            },
+            "name": "resource_name_required"
+          },
+          {
+            "condition": {
               "resource_policy_attached": false
             },
             "description": "Resource access requires a matching policy.",
@@ -107,6 +330,32 @@
               "required_action": "attach_resource_policy"
             },
             "name": "resource_policy_required"
+          },
+          {
+            "condition": {
+              "network_segment_present": false,
+              "operation": "register_resource"
+            },
+            "description": "Resources require a network segment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "network_segment_required",
+              "required_action": "assign_network_segment"
+            },
+            "name": "resource_segment_required"
+          },
+          {
+            "condition": {
+              "microsegmentation_present": false,
+              "sensitive_resource": true
+            },
+            "description": "Sensitive resources require microsegmentation evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "microsegmentation_required",
+              "required_action": "attach_microsegmentation_policy"
+            },
+            "name": "microsegmentation_required"
           },
           {
             "condition": {
@@ -123,6 +372,33 @@
           },
           {
             "condition": {
+              "access_level": "privileged",
+              "access_review_recorded": false,
+              "just_in_time_approval_present": false
+            },
+            "description": "Privileged access requires review or approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "privileged_access_review_required",
+              "required_action": "approve_privileged_access"
+            },
+            "name": "privileged_access_requires_approval"
+          },
+          {
+            "condition": {
+              "least_privilege_scope_present": false,
+              "operation": "request_access"
+            },
+            "description": "Access requests require least-privilege scope.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "least_privilege_scope_required",
+              "required_action": "narrow_access_scope"
+            },
+            "name": "least_privilege_scope_required"
+          },
+          {
+            "condition": {
               "access_review_recorded": false,
               "access_risk_score_gt": 0.8
             },
@@ -133,6 +409,175 @@
               "required_action": "review_access_request"
             },
             "name": "high_risk_access_requires_review"
+          },
+          {
+            "condition": {
+              "explicit_access_decision_present": false,
+              "operation": "request_access"
+            },
+            "description": "Deny-by-default posture requires explicit access decision evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "explicit_access_decision_required",
+              "required_action": "record_access_decision"
+            },
+            "name": "deny_by_default_requires_explicit_approval"
+          },
+          {
+            "condition": {
+              "access_request_approved": false,
+              "operation": "start_session"
+            },
+            "description": "Sessions require approved access requests.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_request_not_approved",
+              "required_action": "approve_access_request"
+            },
+            "name": "session_requires_approved_request"
+          },
+          {
+            "condition": {
+              "continuous_verification_present": false,
+              "operation": "reevaluate_session"
+            },
+            "description": "Active sessions require continuous verification evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "continuous_verification_required",
+              "required_action": "collect_session_context"
+            },
+            "name": "session_requires_continuous_verification"
+          },
+          {
+            "condition": {
+              "access_review_recorded": false,
+              "access_risk_score_gt": 0.8,
+              "operation": "reevaluate_session"
+            },
+            "description": "High-risk sessions require reauthentication.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "session_reauth_required",
+              "required_action": "reauthenticate_session"
+            },
+            "name": "session_reauth_required_on_high_risk"
+          },
+          {
+            "condition": {
+              "actor_present": false,
+              "operation": "close_session"
+            },
+            "description": "Session closure requires an actor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "session_close_actor_required",
+              "required_action": "record_session_actor"
+            },
+            "name": "session_close_requires_actor"
+          },
+          {
+            "condition": {
+              "operation": "attach_resource_policy",
+              "policy_present": false
+            },
+            "description": "Policy attachment requires a policy ID.",
+            "effect": {
+              "decision": "deny",
+              "reason": "resource_policy_id_required",
+              "required_action": "select_policy"
+            },
+            "name": "resource_policy_attachment_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "approve_access_request",
+              "reviewer_same_as_requester": true
+            },
+            "description": "Access reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_access_review_required",
+              "required_action": "route_to_independent_reviewer"
+            },
+            "name": "review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "notes_present": false,
+              "operation": "approve_access_request"
+            },
+            "description": "Access reviews require notes.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "access_review_notes_required",
+              "required_action": "record_review_notes"
+            },
+            "name": "review_decision_requires_notes"
+          },
+          {
+            "condition": {
+              "duplicate_pending_review": true,
+              "operation": "request_access"
+            },
+            "description": "Duplicate pending access reviews are blocked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "duplicate_access_review",
+              "required_action": "complete_existing_review"
+            },
+            "name": "duplicate_access_review_blocked"
+          },
+          {
+            "condition": {
+              "access_decision_recorded": true,
+              "audit_event_recorded": false
+            },
+            "description": "Zero-trust access decisions require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_audit_event_required",
+              "required_action": "record_access_audit"
+            },
+            "name": "audit_required_for_access_decision"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_ztna_mutation"
+            },
+            "description": "Batch zero-trust mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_ztna_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Zero-trust records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_zero_trust_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_zero_trust_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Zero-trust state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "zero_trust_audit_event_required",
+              "required_action": "record_zero_trust_audit_event"
+            },
+            "name": "zero_trust_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -152,6 +597,32 @@
         },
         {
           "condition": {
+            "operation": "register_identity",
+            "subject_present": false
+          },
+          "description": "Identity registration requires a subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "identity_subject_required",
+            "required_action": "attach_subject"
+          },
+          "name": "identity_subject_required"
+        },
+        {
+          "condition": {
+            "display_name_present": false,
+            "operation": "register_identity"
+          },
+          "description": "Identity registration requires a display name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "identity_display_name_required",
+            "required_action": "record_display_name"
+          },
+          "name": "identity_display_name_required"
+        },
+        {
+          "condition": {
             "identity_verified": false
           },
           "description": "Access requires verified identity.",
@@ -161,6 +632,45 @@
             "required_action": "verify_identity"
           },
           "name": "identity_must_be_verified"
+        },
+        {
+          "condition": {
+            "identity_status": "suspended"
+          },
+          "description": "Suspended identities cannot access resources.",
+          "effect": {
+            "decision": "deny",
+            "reason": "identity_suspended",
+            "required_action": "restore_identity"
+          },
+          "name": "suspended_identity_denied"
+        },
+        {
+          "condition": {
+            "federated_identity": true,
+            "federated_provider_present": false,
+            "operation": "register_identity"
+          },
+          "description": "Federated identities require provider evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "federated_provider_required",
+            "required_action": "attach_federated_provider"
+          },
+          "name": "federated_identity_requires_provider"
+        },
+        {
+          "condition": {
+            "identity_present": false,
+            "operation": "register_device"
+          },
+          "description": "Device registration requires a tenant-local identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_identity_required",
+            "required_action": "select_identity"
+          },
+          "name": "device_requires_identity"
         },
         {
           "condition": {
@@ -176,6 +686,70 @@
         },
         {
           "condition": {
+            "device_trust_score_lt": 0.7
+          },
+          "description": "Device trust score must meet tenant threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_trust_too_low",
+            "required_action": "quarantine_or_repair_device"
+          },
+          "name": "device_trust_score_requires_threshold"
+        },
+        {
+          "condition": {
+            "device_compliant": false
+          },
+          "description": "Non-compliant devices cannot access resources.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_compliance_required",
+            "required_action": "remediate_device"
+          },
+          "name": "device_compliance_required"
+        },
+        {
+          "condition": {
+            "device_attested": false,
+            "sensitive_resource": true
+          },
+          "description": "Sensitive resources require attested devices.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_attestation_required",
+            "required_action": "attest_device"
+          },
+          "name": "sensitive_resource_requires_attested_device"
+        },
+        {
+          "condition": {
+            "access_level": "privileged",
+            "access_review_recorded": false,
+            "managed_device": false
+          },
+          "description": "Privileged access from unmanaged devices requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "managed_device_review_required",
+            "required_action": "review_unmanaged_privileged_access"
+          },
+          "name": "managed_device_preferred_for_privileged"
+        },
+        {
+          "condition": {
+            "operation": "register_resource",
+            "resource_name_present": false
+          },
+          "description": "Resource registration requires a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "resource_name_required",
+            "required_action": "name_resource"
+          },
+          "name": "resource_name_required"
+        },
+        {
+          "condition": {
             "resource_policy_attached": false
           },
           "description": "Resource access requires a matching policy.",
@@ -185,6 +759,32 @@
             "required_action": "attach_resource_policy"
           },
           "name": "resource_policy_required"
+        },
+        {
+          "condition": {
+            "network_segment_present": false,
+            "operation": "register_resource"
+          },
+          "description": "Resources require a network segment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "network_segment_required",
+            "required_action": "assign_network_segment"
+          },
+          "name": "resource_segment_required"
+        },
+        {
+          "condition": {
+            "microsegmentation_present": false,
+            "sensitive_resource": true
+          },
+          "description": "Sensitive resources require microsegmentation evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "microsegmentation_required",
+            "required_action": "attach_microsegmentation_policy"
+          },
+          "name": "microsegmentation_required"
         },
         {
           "condition": {
@@ -201,6 +801,33 @@
         },
         {
           "condition": {
+            "access_level": "privileged",
+            "access_review_recorded": false,
+            "just_in_time_approval_present": false
+          },
+          "description": "Privileged access requires review or approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "privileged_access_review_required",
+            "required_action": "approve_privileged_access"
+          },
+          "name": "privileged_access_requires_approval"
+        },
+        {
+          "condition": {
+            "least_privilege_scope_present": false,
+            "operation": "request_access"
+          },
+          "description": "Access requests require least-privilege scope.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "least_privilege_scope_required",
+            "required_action": "narrow_access_scope"
+          },
+          "name": "least_privilege_scope_required"
+        },
+        {
+          "condition": {
             "access_review_recorded": false,
             "access_risk_score_gt": 0.8
           },
@@ -211,12 +838,182 @@
             "required_action": "review_access_request"
           },
           "name": "high_risk_access_requires_review"
+        },
+        {
+          "condition": {
+            "explicit_access_decision_present": false,
+            "operation": "request_access"
+          },
+          "description": "Deny-by-default posture requires explicit access decision evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "explicit_access_decision_required",
+            "required_action": "record_access_decision"
+          },
+          "name": "deny_by_default_requires_explicit_approval"
+        },
+        {
+          "condition": {
+            "access_request_approved": false,
+            "operation": "start_session"
+          },
+          "description": "Sessions require approved access requests.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_request_not_approved",
+            "required_action": "approve_access_request"
+          },
+          "name": "session_requires_approved_request"
+        },
+        {
+          "condition": {
+            "continuous_verification_present": false,
+            "operation": "reevaluate_session"
+          },
+          "description": "Active sessions require continuous verification evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "continuous_verification_required",
+            "required_action": "collect_session_context"
+          },
+          "name": "session_requires_continuous_verification"
+        },
+        {
+          "condition": {
+            "access_review_recorded": false,
+            "access_risk_score_gt": 0.8,
+            "operation": "reevaluate_session"
+          },
+          "description": "High-risk sessions require reauthentication.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "session_reauth_required",
+            "required_action": "reauthenticate_session"
+          },
+          "name": "session_reauth_required_on_high_risk"
+        },
+        {
+          "condition": {
+            "actor_present": false,
+            "operation": "close_session"
+          },
+          "description": "Session closure requires an actor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "session_close_actor_required",
+            "required_action": "record_session_actor"
+          },
+          "name": "session_close_requires_actor"
+        },
+        {
+          "condition": {
+            "operation": "attach_resource_policy",
+            "policy_present": false
+          },
+          "description": "Policy attachment requires a policy ID.",
+          "effect": {
+            "decision": "deny",
+            "reason": "resource_policy_id_required",
+            "required_action": "select_policy"
+          },
+          "name": "resource_policy_attachment_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "approve_access_request",
+            "reviewer_same_as_requester": true
+          },
+          "description": "Access reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_access_review_required",
+            "required_action": "route_to_independent_reviewer"
+          },
+          "name": "review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "notes_present": false,
+            "operation": "approve_access_request"
+          },
+          "description": "Access reviews require notes.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "access_review_notes_required",
+            "required_action": "record_review_notes"
+          },
+          "name": "review_decision_requires_notes"
+        },
+        {
+          "condition": {
+            "duplicate_pending_review": true,
+            "operation": "request_access"
+          },
+          "description": "Duplicate pending access reviews are blocked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "duplicate_access_review",
+            "required_action": "complete_existing_review"
+          },
+          "name": "duplicate_access_review_blocked"
+        },
+        {
+          "condition": {
+            "access_decision_recorded": true,
+            "audit_event_recorded": false
+          },
+          "description": "Zero-trust access decisions require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_audit_event_required",
+            "required_action": "record_access_audit"
+          },
+          "name": "audit_required_for_access_decision"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_ztna_mutation"
+          },
+          "description": "Batch zero-trust mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_ztna_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Zero-trust records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_zero_trust_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_zero_trust_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Zero-trust state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "zero_trust_audit_event_required",
+            "required_action": "record_zero_trust_audit_event"
+          },
+          "name": "zero_trust_state_change_requires_audit"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "zero_trust_runtime.py",
+        "service": "service.ZtnaService",
         "views": "views.py"
       },
       "screens": {
@@ -224,6 +1021,11 @@
           "component": "AccessRequests",
           "permission": "ztna:approve_access",
           "route": "/ztna/access"
+        },
+        "audit": {
+          "component": "ZTNAAuditTrail",
+          "permission": "ztna:audit",
+          "route": "/ztna/audit"
         },
         "dashboard": {
           "component": "ZTNADashboard",
@@ -235,6 +1037,11 @@
           "permission": "ztna:manage_devices",
           "route": "/ztna/devices"
         },
+        "identities": {
+          "component": "IdentityConsole",
+          "permission": "ztna:manage_policies",
+          "route": "/ztna/identities"
+        },
         "policies": {
           "component": "ZeroTrustPolicies",
           "permission": "ztna:manage_policies",
@@ -244,6 +1051,11 @@
           "component": "ResourceMap",
           "permission": "ztna:manage_policies",
           "route": "/ztna/resources"
+        },
+        "reviews": {
+          "component": "AccessReviewQueue",
+          "permission": "ztna:review",
+          "route": "/ztna/reviews"
         },
         "risk": {
           "component": "AccessRiskConsole",
@@ -261,7 +1073,9 @@
           "route": "/ztna/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
           "access_decision": {
@@ -269,13 +1083,29 @@
             "risk_style": "trust-band",
             "status_indicator": "decision-pill"
           },
+          "audit_timeline": {
+            "status_style": "decision-chip",
+            "visual": "event-timeline"
+          },
           "device_posture": {
             "highlight": "trust-score-chip",
             "visual": "posture-checklist"
           },
+          "identity_console": {
+            "status_style": "verification-chip",
+            "visual": "identity-list"
+          },
           "resource_map": {
             "status_style": "policy-chip",
             "visual": "segmented-network-map"
+          },
+          "review_queue": {
+            "status_style": "review-chip",
+            "visual": "decision-lane"
+          },
+          "risk_console": {
+            "status_style": "risk-chip",
+            "visual": "risk-lanes"
           },
           "session_monitor": {
             "status_style": "reauth-chip",
@@ -316,6 +1146,13 @@
             "permission": "ztna:manage_policies"
           },
           {
+            "component": "IdentityConsole",
+            "name": "identities",
+            "nav_group": "Identity",
+            "path": "/ztna/identities",
+            "permission": "ztna:manage_policies"
+          },
+          {
             "component": "DevicePosture",
             "name": "devices",
             "nav_group": "Devices",
@@ -351,6 +1188,20 @@
             "permission": "ztna:view"
           },
           {
+            "component": "AccessReviewQueue",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/ztna/reviews",
+            "permission": "ztna:review"
+          },
+          {
+            "component": "ZTNAAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/ztna/audit",
+            "permission": "ztna:audit"
+          },
+          {
             "component": "ZTNASettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -364,6 +1215,14 @@
           "static/"
         ],
         "view_module": "views.py"
+      },
+      "zero_trust_lifecycle": {
+        "access_request": "ZeroTrustAccessRequestRecord",
+        "audit": "ZeroTrustAuditEventRecord",
+        "device": "ZeroTrustDeviceRecord",
+        "identity": "ZeroTrustIdentityRecord",
+        "resource": "ZeroTrustResourceRecord",
+        "session": "ZeroTrustSessionRecord"
       }
     }
   },
@@ -371,17 +1230,49 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "ztna": []
+      "ztna": [
+        "auth",
+        "secu",
+        "mfau",
+        "moni"
+      ]
     }
   },
   "contracts": {
     "ztna": {
       "configuration": {
+        "access": {
+          "deny_by_default": true,
+          "high_risk_review_required": true,
+          "just_in_time_approval_supported": true,
+          "privileged_approval_required": true,
+          "risk_threshold": 0.8
+        },
+        "adapters": {
+          "anomaly_detection": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.ZtnaService",
+          "helper_runtime": "zero_trust_runtime.py",
+          "identity_federation": "idfd",
+          "message_bus": "mqeb",
+          "mfa_provider": "mfau",
+          "monitoring": "moni",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "security_framework": "secu",
+          "view_models": "views.py"
+        },
         "devices": {
           "attestation_required_for_sensitive_resources": true,
           "managed_device_preferred": true,
           "minimum_device_trust": 0.7,
-          "posture_required": true
+          "posture_required": true,
+          "quarantine_untrusted_devices": true
         },
         "governance": {
           "audit_access_decisions": true,
@@ -393,13 +1284,44 @@
           "continuous_identity_checks": true,
           "federated_identity_allowed": true,
           "mfa_required_for_privileged": true,
+          "suspended_identity_denied": true,
           "verified_identity_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
         },
         "resources": {
           "least_privilege_default": true,
           "microsegmentation_enabled": true,
           "resource_policy_required": true,
+          "sensitive_resource_attestation_required": true,
           "session_recording_for_privileged": true
+        },
+        "reviews": {
+          "duplicate_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true
+        },
+        "security": {
+          "audit_access_decisions": true,
+          "deny_by_default": true,
+          "policy_mutation_audit_required": true,
+          "tenant_isolation_required": true
+        },
+        "segmentation": {
+          "default_segment": "default",
+          "microsegmentation_required": true,
+          "network_segment_required": true
+        },
+        "sessions": {
+          "close_reason_required": true,
+          "continuous_verification_required": true,
+          "max_session_hours": 12,
+          "reauth_on_risk_change": true,
+          "revocation_supported": true
         },
         "tenant_id": "default",
         "theme": {
@@ -408,16 +1330,28 @@
         },
         "ui": {
           "enable_access_console": true,
+          "enable_audit": true,
+          "enable_dashboard": true,
           "enable_device_posture": true,
+          "enable_identity_console": true,
+          "enable_policy_console": true,
           "enable_resource_map": true,
-          "enable_session_monitor": true
+          "enable_review_queue": true,
+          "enable_risk_console": true,
+          "enable_session_monitor": true,
+          "enable_settings": true
         }
       },
       "id": "ztna",
       "provides": [
         "ztna_operations"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "secu",
+        "mfau",
+        "moni"
+      ]
     }
   },
   "deployment": {
@@ -429,7 +1363,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -450,6 +1384,69 @@
   },
   "roles": {},
   "rules": {
+    "audit_required_for_access_decision": {
+      "condition": {
+        "access_decision_recorded": true,
+        "audit_event_recorded": false
+      },
+      "description": "Zero-trust access decisions require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_audit_event_required",
+        "required_action": "record_access_audit"
+      },
+      "name": "audit_required_for_access_decision"
+    },
+    "batch_ztna_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_ztna_mutation"
+      },
+      "description": "Batch zero-trust mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_ztna_mutation_requires_bytewax"
+    },
+    "cross_tenant_zero_trust_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Zero-trust records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_zero_trust_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_zero_trust_access_denied"
+    },
+    "deny_by_default_requires_explicit_approval": {
+      "condition": {
+        "explicit_access_decision_present": false,
+        "operation": "request_access"
+      },
+      "description": "Deny-by-default posture requires explicit access decision evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "explicit_access_decision_required",
+        "required_action": "record_access_decision"
+      },
+      "name": "deny_by_default_requires_explicit_approval"
+    },
+    "device_compliance_required": {
+      "condition": {
+        "device_compliant": false
+      },
+      "description": "Non-compliant devices cannot access resources.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_compliance_required",
+        "required_action": "remediate_device"
+      },
+      "name": "device_compliance_required"
+    },
     "device_posture_required": {
       "condition": {
         "device_posture_present": false
@@ -461,6 +1458,58 @@
         "required_action": "collect_device_posture"
       },
       "name": "device_posture_required"
+    },
+    "device_requires_identity": {
+      "condition": {
+        "identity_present": false,
+        "operation": "register_device"
+      },
+      "description": "Device registration requires a tenant-local identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_identity_required",
+        "required_action": "select_identity"
+      },
+      "name": "device_requires_identity"
+    },
+    "device_trust_score_requires_threshold": {
+      "condition": {
+        "device_trust_score_lt": 0.7
+      },
+      "description": "Device trust score must meet tenant threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_trust_too_low",
+        "required_action": "quarantine_or_repair_device"
+      },
+      "name": "device_trust_score_requires_threshold"
+    },
+    "duplicate_access_review_blocked": {
+      "condition": {
+        "duplicate_pending_review": true,
+        "operation": "request_access"
+      },
+      "description": "Duplicate pending access reviews are blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "duplicate_access_review",
+        "required_action": "complete_existing_review"
+      },
+      "name": "duplicate_access_review_blocked"
+    },
+    "federated_identity_requires_provider": {
+      "condition": {
+        "federated_identity": true,
+        "federated_provider_present": false,
+        "operation": "register_identity"
+      },
+      "description": "Federated identities require provider evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "federated_provider_required",
+        "required_action": "attach_federated_provider"
+      },
+      "name": "federated_identity_requires_provider"
     },
     "high_risk_access_requires_review": {
       "condition": {
@@ -475,6 +1524,19 @@
       },
       "name": "high_risk_access_requires_review"
     },
+    "identity_display_name_required": {
+      "condition": {
+        "display_name_present": false,
+        "operation": "register_identity"
+      },
+      "description": "Identity registration requires a display name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "identity_display_name_required",
+        "required_action": "record_display_name"
+      },
+      "name": "identity_display_name_required"
+    },
     "identity_must_be_verified": {
       "condition": {
         "identity_verified": false
@@ -486,6 +1548,73 @@
         "required_action": "verify_identity"
       },
       "name": "identity_must_be_verified"
+    },
+    "identity_subject_required": {
+      "condition": {
+        "operation": "register_identity",
+        "subject_present": false
+      },
+      "description": "Identity registration requires a subject.",
+      "effect": {
+        "decision": "deny",
+        "reason": "identity_subject_required",
+        "required_action": "attach_subject"
+      },
+      "name": "identity_subject_required"
+    },
+    "least_privilege_scope_required": {
+      "condition": {
+        "least_privilege_scope_present": false,
+        "operation": "request_access"
+      },
+      "description": "Access requests require least-privilege scope.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "least_privilege_scope_required",
+        "required_action": "narrow_access_scope"
+      },
+      "name": "least_privilege_scope_required"
+    },
+    "managed_device_preferred_for_privileged": {
+      "condition": {
+        "access_level": "privileged",
+        "access_review_recorded": false,
+        "managed_device": false
+      },
+      "description": "Privileged access from unmanaged devices requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "managed_device_review_required",
+        "required_action": "review_unmanaged_privileged_access"
+      },
+      "name": "managed_device_preferred_for_privileged"
+    },
+    "microsegmentation_required": {
+      "condition": {
+        "microsegmentation_present": false,
+        "sensitive_resource": true
+      },
+      "description": "Sensitive resources require microsegmentation evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "microsegmentation_required",
+        "required_action": "attach_microsegmentation_policy"
+      },
+      "name": "microsegmentation_required"
+    },
+    "privileged_access_requires_approval": {
+      "condition": {
+        "access_level": "privileged",
+        "access_review_recorded": false,
+        "just_in_time_approval_present": false
+      },
+      "description": "Privileged access requires review or approval.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "privileged_access_review_required",
+        "required_action": "approve_privileged_access"
+      },
+      "name": "privileged_access_requires_approval"
     },
     "privileged_access_requires_mfa": {
       "condition": {
@@ -500,6 +1629,32 @@
       },
       "name": "privileged_access_requires_mfa"
     },
+    "resource_name_required": {
+      "condition": {
+        "operation": "register_resource",
+        "resource_name_present": false
+      },
+      "description": "Resource registration requires a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "resource_name_required",
+        "required_action": "name_resource"
+      },
+      "name": "resource_name_required"
+    },
+    "resource_policy_attachment_requires_policy": {
+      "condition": {
+        "operation": "attach_resource_policy",
+        "policy_present": false
+      },
+      "description": "Policy attachment requires a policy ID.",
+      "effect": {
+        "decision": "deny",
+        "reason": "resource_policy_id_required",
+        "required_action": "select_policy"
+      },
+      "name": "resource_policy_attachment_requires_policy"
+    },
     "resource_policy_required": {
       "condition": {
         "resource_policy_attached": false
@@ -512,6 +1667,123 @@
       },
       "name": "resource_policy_required"
     },
+    "resource_segment_required": {
+      "condition": {
+        "network_segment_present": false,
+        "operation": "register_resource"
+      },
+      "description": "Resources require a network segment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "network_segment_required",
+        "required_action": "assign_network_segment"
+      },
+      "name": "resource_segment_required"
+    },
+    "review_decision_requires_notes": {
+      "condition": {
+        "notes_present": false,
+        "operation": "approve_access_request"
+      },
+      "description": "Access reviews require notes.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "access_review_notes_required",
+        "required_action": "record_review_notes"
+      },
+      "name": "review_decision_requires_notes"
+    },
+    "review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "approve_access_request",
+        "reviewer_same_as_requester": true
+      },
+      "description": "Access reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_access_review_required",
+        "required_action": "route_to_independent_reviewer"
+      },
+      "name": "review_requires_independent_reviewer"
+    },
+    "sensitive_resource_requires_attested_device": {
+      "condition": {
+        "device_attested": false,
+        "sensitive_resource": true
+      },
+      "description": "Sensitive resources require attested devices.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_attestation_required",
+        "required_action": "attest_device"
+      },
+      "name": "sensitive_resource_requires_attested_device"
+    },
+    "session_close_requires_actor": {
+      "condition": {
+        "actor_present": false,
+        "operation": "close_session"
+      },
+      "description": "Session closure requires an actor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_close_actor_required",
+        "required_action": "record_session_actor"
+      },
+      "name": "session_close_requires_actor"
+    },
+    "session_reauth_required_on_high_risk": {
+      "condition": {
+        "access_review_recorded": false,
+        "access_risk_score_gt": 0.8,
+        "operation": "reevaluate_session"
+      },
+      "description": "High-risk sessions require reauthentication.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "session_reauth_required",
+        "required_action": "reauthenticate_session"
+      },
+      "name": "session_reauth_required_on_high_risk"
+    },
+    "session_requires_approved_request": {
+      "condition": {
+        "access_request_approved": false,
+        "operation": "start_session"
+      },
+      "description": "Sessions require approved access requests.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_request_not_approved",
+        "required_action": "approve_access_request"
+      },
+      "name": "session_requires_approved_request"
+    },
+    "session_requires_continuous_verification": {
+      "condition": {
+        "continuous_verification_present": false,
+        "operation": "reevaluate_session"
+      },
+      "description": "Active sessions require continuous verification evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "continuous_verification_required",
+        "required_action": "collect_session_context"
+      },
+      "name": "session_requires_continuous_verification"
+    },
+    "suspended_identity_denied": {
+      "condition": {
+        "identity_status": "suspended"
+      },
+      "description": "Suspended identities cannot access resources.",
+      "effect": {
+        "decision": "deny",
+        "reason": "identity_suspended",
+        "required_action": "restore_identity"
+      },
+      "name": "suspended_identity_denied"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -523,11 +1795,30 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "zero_trust_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Zero-trust state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "zero_trust_audit_event_required",
+        "required_action": "record_zero_trust_audit_event"
+      },
+      "name": "zero_trust_state_change_requires_audit"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "zero_trust_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.ztna": {

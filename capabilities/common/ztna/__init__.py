@@ -24,8 +24,18 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["zero_trust_policies", "device_posture", "resource_access_broker", "continuous_verification", "risk_based_access"],
-	"permissions": ["ztna:view", "ztna:manage_policies", "ztna:approve_access", "ztna:manage_devices", "ztna:admin"]
+	"provides": [
+		"zero_trust_policies",
+		"identity_context",
+		"device_posture",
+		"resource_access_broker",
+		"continuous_verification",
+		"risk_based_access",
+		"session_governance",
+		"access_reviews",
+		"zero_trust_audit",
+	],
+	"permissions": ["ztna:view", "ztna:manage_policies", "ztna:approve_access", "ztna:manage_devices", "ztna:review", "ztna:audit", "ztna:admin"]
 }
 
 
@@ -39,25 +49,35 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "idfd", "anom", "mqeb"],
+		"optional_dependencies": ["audl", "idfd", "anom", "mqeb", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"zero_trust_policies": "Bind access decisions to user, device, resource, risk, and tenant policy",
+			"identity_context": "Track verified, federated, privileged, and suspended identity context",
 			"device_posture": "Evaluate managed device health, attestation, patch, and compliance signals",
 			"resource_access_broker": "Broker least-privilege application and service access",
 			"continuous_verification": "Continuously re-check risk and revoke sessions when context changes",
+			"session_governance": "Start, reevaluate, close, and audit governed resource sessions",
+			"access_reviews": "Route high-risk and privileged access through explicit review",
+			"zero_trust_audit": "Record access, session, policy, identity, device, and resource audit events",
 			"capability_rules": "Evaluate deterministic zero-trust access rules",
 			"visual_theming": "Apply zero-trust operations theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/ztna/api/v1/status",
 			"policies": "/ztna/api/v1/policies",
+			"identities": "/ztna/api/v1/identities",
 			"devices": "/ztna/api/v1/devices",
 			"resources": "/ztna/api/v1/resources",
 			"access": "/ztna/api/v1/access",
-			"sessions": "/ztna/api/v1/sessions"
+			"sessions": "/ztna/api/v1/sessions",
+			"risk": "/ztna/api/v1/risk",
+			"reviews": "/ztna/api/v1/reviews",
+			"audit": "/ztna/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

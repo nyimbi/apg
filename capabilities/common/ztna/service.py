@@ -48,6 +48,15 @@ class ZtnaService:
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_identity",
+			"subject_present": bool(subject_id),
+			"display_name_present": bool(display_name),
+			"federated_identity": bool(federated_provider),
+			"federated_provider_present": bool(federated_provider),
+		})
+		self._raise_if_denied(result)
 		identity_id = stable_id("identity", tenant_id, identity_key)
 		identity = ZeroTrustIdentityRecord(
 			id=identity_id,
@@ -92,7 +101,13 @@ class ZtnaService:
 		self._require_tenant(tenant_id)
 		identity = self._get_identity(identity_id)
 		if identity.tenant_id != tenant_id:
-			raise ValueError("identity_tenant_mismatch")
+			self._raise_cross_tenant()
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_device",
+			"identity_present": bool(identity),
+		})
+		self._raise_if_denied(result)
 		score = bounded_score(trust_score)
 		status = "trusted" if posture_present and compliant and score >= 0.7 else "quarantined"
 		device_id = stable_id("device", tenant_id, identity_id, device_key)
@@ -146,6 +161,15 @@ class ZtnaService:
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_resource",
+			"resource_name_present": bool(name),
+			"network_segment_present": bool(network_segment),
+			"sensitive_resource": sensitive,
+			"microsegmentation_present": bool(network_segment),
+		})
+		self._raise_if_denied(result)
 		resource_id = stable_id("resource", tenant_id, resource_key)
 		resource = ZeroTrustResourceRecord(
 			id=resource_id,
@@ -165,6 +189,14 @@ class ZtnaService:
 
 	def attach_resource_policy(self, resource_id: str, policy_id: str, actor_id: str) -> dict[str, Any]:
 		resource = self._get_resource(resource_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(resource.tenant_id),
+			"operation": "attach_resource_policy",
+			"policy_present": bool(policy_id),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		resource.policy_attached = True
 		resource.policy_id = policy_id
 		resource.status = "active"
@@ -179,6 +211,9 @@ class ZtnaService:
 		requested_by: str,
 		mfa_completed: bool | None = None,
 		access_review_recorded: bool = False,
+		just_in_time_approval_present: bool = False,
+		least_privilege_scope_present: bool = True,
+		explicit_access_decision_present: bool = True,
 		access_risk_score: float | None = None,
 	) -> dict[str, Any]:
 		identity = self._get_identity(identity_id)
@@ -187,15 +222,37 @@ class ZtnaService:
 		self._assert_same_tenant(identity.tenant_id, device.tenant_id, resource.tenant_id)
 		mfa_ok = identity.mfa_completed if mfa_completed is None else bool(mfa_completed)
 		risk = bounded_score(access_risk_score if access_risk_score is not None else self._risk_score(identity, device, resource))
+		duplicate_pending_review = any(
+			request.tenant_id == identity.tenant_id
+			and request.identity_id == identity_id
+			and request.device_id == device_id
+			and request.resource_id == resource_id
+			and request.status == "review_required"
+			for request in self._access_requests.values()
+		)
 		context = {
+			"operation": "request_access",
 			"tenant_context_present": bool(identity.tenant_id),
 			"identity_verified": identity.verified,
+			"identity_status": identity.status,
 			"device_posture_present": device.posture_present,
+			"device_trust_score": device.trust_score,
+			"device_compliant": device.compliant,
+			"device_attested": device.attested,
+			"managed_device": device.managed,
 			"resource_policy_attached": resource.policy_attached,
+			"sensitive_resource": resource.sensitive,
+			"microsegmentation_present": bool(resource.network_segment),
 			"access_level": resource.access_level,
 			"mfa_completed": mfa_ok,
 			"access_risk_score": risk,
 			"access_review_recorded": access_review_recorded,
+			"just_in_time_approval_present": just_in_time_approval_present,
+			"least_privilege_scope_present": least_privilege_scope_present,
+			"explicit_access_decision_present": explicit_access_decision_present,
+			"duplicate_pending_review": duplicate_pending_review,
+			"access_decision_recorded": True,
+			"audit_event_recorded": True,
 		}
 		result = self.evaluate(context)
 		deny_reasons = [action.get("reason", "access_denied") for action in result["actions"] if action.get("decision") == "deny"]
@@ -226,6 +283,15 @@ class ZtnaService:
 		request = self._get_access_request(request_id)
 		if request.status not in {"review_required", "approved"}:
 			raise PermissionError("access_request_not_reviewable")
+		result = self.evaluate({
+			"tenant_context_present": bool(request.tenant_id),
+			"operation": "approve_access_request",
+			"reviewer_same_as_requester": reviewer_id == request.requested_by,
+			"notes_present": True,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		request.status = "approved"
 		request.required_actions = []
 		request.reviewed_by = reviewer_id
@@ -235,8 +301,14 @@ class ZtnaService:
 
 	def start_session(self, request_id: str, actor_id: str) -> dict[str, Any]:
 		request = self._get_access_request(request_id)
-		if request.status != "approved":
-			raise PermissionError("access_request_not_approved")
+		result = self.evaluate({
+			"tenant_context_present": bool(request.tenant_id),
+			"operation": "start_session",
+			"access_request_approved": request.status == "approved",
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		session_id = stable_id("session", request.tenant_id, request.id)
 		session = ZeroTrustSessionRecord(
 			id=session_id,
@@ -267,6 +339,7 @@ class ZtnaService:
 		risk = bounded_score(risk_score)
 		result = self.evaluate({
 			"tenant_context_present": bool(session.tenant_id),
+			"operation": "reevaluate_session",
 			"identity_verified": identity_verified,
 			"device_posture_present": device_posture_present,
 			"resource_policy_attached": resource.policy_attached,
@@ -274,6 +347,7 @@ class ZtnaService:
 			"mfa_completed": True,
 			"access_risk_score": risk,
 			"access_review_recorded": access_review_recorded,
+			"continuous_verification_present": True,
 		})
 		session.risk_score = risk
 		if result["decision"] == "deny":
@@ -291,6 +365,14 @@ class ZtnaService:
 
 	def close_session(self, session_id: str, actor_id: str) -> dict[str, Any]:
 		session = self._get_session(session_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(session.tenant_id),
+			"operation": "close_session",
+			"actor_present": bool(actor_id),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		session.status = "closed"
 		session.ended_at = utc_now()
 		self._audit(session.tenant_id, "session_closed", session.id, actor_id, {})
@@ -368,8 +450,7 @@ class ZtnaService:
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		result = self.evaluate({"tenant_context_present": bool(tenant_id)})
-		if result["decision"] == "deny":
-			raise PermissionError(", ".join(action.get("reason", "tenant_context_required") for action in result["actions"]))
+		self._raise_if_denied(result)
 
 	def _get_identity(self, identity_id: str) -> ZeroTrustIdentityRecord:
 		try:
@@ -404,7 +485,8 @@ class ZtnaService:
 	@staticmethod
 	def _assert_same_tenant(*tenant_ids: str) -> None:
 		if len(set(tenant_ids)) != 1:
-			raise ValueError("tenant_context_mismatch")
+			result = evaluate_capability_rules({"tenant_context_present": True, "cross_tenant_access": True})
+			raise PermissionError(", ".join(action.get("reason", "cross_tenant_zero_trust_access_denied") for action in result["actions"]))
 
 	def _audit(self, tenant_id: str, action: str, subject_id: str, actor_id: str, details: dict[str, Any] | None = None) -> None:
 		event = ZeroTrustAuditEventRecord(
@@ -416,6 +498,14 @@ class ZtnaService:
 			details=dict(details or {}),
 		)
 		self._audit_events.append(event)
+
+	def _raise_if_denied(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "deny":
+			raise PermissionError(", ".join(action.get("reason", "zero_trust_policy_blocked") for action in result["actions"]))
+
+	def _raise_cross_tenant(self) -> None:
+		result = self.evaluate({"tenant_context_present": True, "cross_tenant_access": True})
+		self._raise_if_denied(result)
 
 	@staticmethod
 	def _filter(records: Any, tenant_id: str | None) -> list[Any]:

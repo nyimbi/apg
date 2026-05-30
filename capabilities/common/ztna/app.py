@@ -5,13 +5,121 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Zero Trust Network Access package-backed APG capability", "entity_count": 0, "name": "ztna", "version": "1.0.0"}, "capabilities": {"ztna": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"devices": {"attestation_required_for_sensitive_resources": true, "managed_device_preferred": true, "minimum_device_trust": 0.7, "posture_required": true}, "governance": {"audit_access_decisions": true, "deny_by_default": true, "require_tenant_context": true, "risk_threshold": 0.8}, "identities": {"continuous_identity_checks": true, "federated_identity_allowed": true, "mfa_required_for_privileged": true, "verified_identity_required": true}, "resources": {"least_privilege_default": true, "microsegmentation_enabled": true, "resource_policy_required": true, "session_recording_for_privileged": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ztna_zero_trust_ops"}, "ui": {"enable_access_console": true, "enable_device_posture": true, "enable_resource_map": true, "enable_session_monitor": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Zero Trust Network Access", "provides": ["ztna_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All zero-trust decisions require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"identity_verified": false}, "description": "Access requires verified identity.", "effect": {"decision": "deny", "reason": "identity_verification_required", "required_action": "verify_identity"}, "name": "identity_must_be_verified"}, {"condition": {"device_posture_present": false}, "description": "Access requires current device posture.", "effect": {"decision": "deny", "reason": "device_posture_required", "required_action": "collect_device_posture"}, "name": "device_posture_required"}, {"condition": {"resource_policy_attached": false}, "description": "Resource access requires a matching policy.", "effect": {"decision": "deny", "reason": "resource_policy_required", "required_action": "attach_resource_policy"}, "name": "resource_policy_required"}, {"condition": {"access_level": "privileged", "mfa_completed": false}, "description": "Privileged access requires MFA.", "effect": {"decision": "deny", "reason": "privileged_mfa_required", "required_action": "complete_mfa"}, "name": "privileged_access_requires_mfa"}, {"condition": {"access_review_recorded": false, "access_risk_score_gt": 0.8}, "description": "High-risk access decisions require review.", "effect": {"decision": "require_review", "reason": "high_risk_access_review_required", "required_action": "review_access_request"}, "name": "high_risk_access_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All zero-trust decisions require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"identity_verified": false}, "description": "Access requires verified identity.", "effect": {"decision": "deny", "reason": "identity_verification_required", "required_action": "verify_identity"}, "name": "identity_must_be_verified"}, {"condition": {"device_posture_present": false}, "description": "Access requires current device posture.", "effect": {"decision": "deny", "reason": "device_posture_required", "required_action": "collect_device_posture"}, "name": "device_posture_required"}, {"condition": {"resource_policy_attached": false}, "description": "Resource access requires a matching policy.", "effect": {"decision": "deny", "reason": "resource_policy_required", "required_action": "attach_resource_policy"}, "name": "resource_policy_required"}, {"condition": {"access_level": "privileged", "mfa_completed": false}, "description": "Privileged access requires MFA.", "effect": {"decision": "deny", "reason": "privileged_mfa_required", "required_action": "complete_mfa"}, "name": "privileged_access_requires_mfa"}, {"condition": {"access_review_recorded": false, "access_risk_score_gt": 0.8}, "description": "High-risk access decisions require review.", "effect": {"decision": "require_review", "reason": "high_risk_access_review_required", "required_action": "review_access_request"}, "name": "high_risk_access_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"access": {"component": "AccessRequests", "permission": "ztna:approve_access", "route": "/ztna/access"}, "dashboard": {"component": "ZTNADashboard", "permission": "ztna:view", "route": "/ztna/dashboard"}, "devices": {"component": "DevicePosture", "permission": "ztna:manage_devices", "route": "/ztna/devices"}, "policies": {"component": "ZeroTrustPolicies", "permission": "ztna:manage_policies", "route": "/ztna/policies"}, "resources": {"component": "ResourceMap", "permission": "ztna:manage_policies", "route": "/ztna/resources"}, "risk": {"component": "AccessRiskConsole", "permission": "ztna:view", "route": "/ztna/risk"}, "sessions": {"component": "SessionMonitor", "permission": "ztna:view", "route": "/ztna/sessions"}, "settings": {"component": "ZTNASettings", "permission": "ztna:admin", "route": "/ztna/settings"}}, "streaming": {}, "theme": {"components": {"access_decision": {"icon": "shield", "risk_style": "trust-band", "status_indicator": "decision-pill"}, "device_posture": {"highlight": "trust-score-chip", "visual": "posture-checklist"}, "resource_map": {"status_style": "policy-chip", "visual": "segmented-network-map"}, "session_monitor": {"status_style": "reauth-chip", "visual": "active-session-table"}}, "name": "ztna_zero_trust_ops", "tokens": {"border.radius": "8px", "color.accent": "#38A169", "color.danger": "#C53030", "color.primary": "#1A365D", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/ztna/api/v1", "requires_theme": true, "routes": [{"component": "ZTNADashboard", "name": "dashboard", "nav_group": "Overview", "path": "/ztna/dashboard", "permission": "ztna:view"}, {"component": "ZeroTrustPolicies", "name": "policies", "nav_group": "Policies", "path": "/ztna/policies", "permission": "ztna:manage_policies"}, {"component": "DevicePosture", "name": "devices", "nav_group": "Devices", "path": "/ztna/devices", "permission": "ztna:manage_devices"}, {"component": "ResourceMap", "name": "resources", "nav_group": "Resources", "path": "/ztna/resources", "permission": "ztna:manage_policies"}, {"component": "AccessRequests", "name": "access", "nav_group": "Access", "path": "/ztna/access", "permission": "ztna:approve_access"}, {"component": "SessionMonitor", "name": "sessions", "nav_group": "Operations", "path": "/ztna/sessions", "permission": "ztna:view"}, {"component": "AccessRiskConsole", "name": "risk", "nav_group": "Operations", "path": "/ztna/risk", "permission": "ztna:view"}, {"component": "ZTNASettings", "name": "settings", "nav_group": "Administration", "path": "/ztna/settings", "permission": "ztna:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"ztna": []}}, "contracts": {"ztna": {"configuration": {"devices": {"attestation_required_for_sensitive_resources": true, "managed_device_preferred": true, "minimum_device_trust": 0.7, "posture_required": true}, "governance": {"audit_access_decisions": true, "deny_by_default": true, "require_tenant_context": true, "risk_threshold": 0.8}, "identities": {"continuous_identity_checks": true, "federated_identity_allowed": true, "mfa_required_for_privileged": true, "verified_identity_required": true}, "resources": {"least_privilege_default": true, "microsegmentation_enabled": true, "resource_policy_required": true, "session_recording_for_privileged": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ztna_zero_trust_ops"}, "ui": {"enable_access_console": true, "enable_device_posture": true, "enable_resource_map": true, "enable_session_monitor": true}}, "id": "ztna", "provides": ["ztna_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"ztna": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"device_posture_required": {"condition": {"device_posture_present": false}, "description": "Access requires current device posture.", "effect": {"decision": "deny", "reason": "device_posture_required", "required_action": "collect_device_posture"}, "name": "device_posture_required"}, "high_risk_access_requires_review": {"condition": {"access_review_recorded": false, "access_risk_score_gt": 0.8}, "description": "High-risk access decisions require review.", "effect": {"decision": "require_review", "reason": "high_risk_access_review_required", "required_action": "review_access_request"}, "name": "high_risk_access_requires_review"}, "identity_must_be_verified": {"condition": {"identity_verified": false}, "description": "Access requires verified identity.", "effect": {"decision": "deny", "reason": "identity_verification_required", "required_action": "verify_identity"}, "name": "identity_must_be_verified"}, "privileged_access_requires_mfa": {"condition": {"access_level": "privileged", "mfa_completed": false}, "description": "Privileged access requires MFA.", "effect": {"decision": "deny", "reason": "privileged_mfa_required", "required_action": "complete_mfa"}, "name": "privileged_access_requires_mfa"}, "resource_policy_required": {"condition": {"resource_policy_attached": false}, "description": "Resource access requires a matching policy.", "effect": {"decision": "deny", "reason": "resource_policy_required", "required_action": "attach_resource_policy"}, "name": "resource_policy_required"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All zero-trust decisions require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.ztna": {"file": "capability_contract.py", "id": "capability.ztna", "kind": "capability", "name": "Zero Trust Network Access", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("ztna_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "ztna",
+			"version": "1.0.0",
+			"description": "Zero Trust Network Access package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"ztna": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"ztna": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["ztna_operations"],
+				"requires": ["auth", "secu", "mfau", "moni"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"api_helpers": contract["configuration"]["adapters"]["api_helpers"],
+					"views": contract["configuration"]["adapters"]["view_models"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"high_risk_access": "AccessReview",
+					"privileged_access": "AccessReview",
+					"unmanaged_privileged_device": "AccessReview",
+					"session_reauth": "AccessReview",
+				},
+				"zero_trust_lifecycle": {
+					"identity": "ZeroTrustIdentityRecord",
+					"device": "ZeroTrustDeviceRecord",
+					"resource": "ZeroTrustResourceRecord",
+					"access_request": "ZeroTrustAccessRequestRecord",
+					"session": "ZeroTrustSessionRecord",
+					"audit": "ZeroTrustAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"ztna": {
+				"id": "ztna",
+				"configuration": contract["configuration"],
+				"provides": ["ztna_operations"],
+				"requires": ["auth", "secu", "mfau", "moni"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"ztna": ["auth", "secu", "mfau", "moni"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 4},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "zero_trust_runtime.py", "service.py", "api.py", "views.py", "app.py"],
+		"symbols": {
+			"capability.ztna": {
+				"id": "capability.ztna",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +144,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("ztna", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "ztna" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 10:
+		errors.append("ZTNA semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("ZTNA semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("ZTNA adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.ZtnaService":
+		errors.append("ZTNA generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

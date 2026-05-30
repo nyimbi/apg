@@ -97,6 +97,9 @@ def request_access(payload: dict[str, Any]) -> dict[str, Any]:
 		requested_by=str(payload["requested_by"]),
 		mfa_completed=payload.get("mfa_completed"),
 		access_review_recorded=bool(payload.get("access_review_recorded", False)),
+		just_in_time_approval_present=bool(payload.get("just_in_time_approval_present", False)),
+		least_privilege_scope_present=bool(payload.get("least_privilege_scope_present", True)),
+		explicit_access_decision_present=bool(payload.get("explicit_access_decision_present", True)),
 		access_risk_score=payload.get("access_risk_score"),
 	)
 

@@ -70,10 +70,14 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	assert contract["capability"] == "ztna"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "ztna" in model["capabilities"]
+	assert model["capabilities"]["ztna"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["ztna"]["runtime"]["service"] == "service.ZtnaService"
 
 
 def test_identity_device_resource_access_session_lifecycle_executes():
@@ -143,6 +147,17 @@ def test_device_posture_and_resource_policy_are_required():
 	assert request["status"] == "approved"
 
 
+def test_untrusted_devices_are_registered_for_remediation_but_denied_access():
+	service = ZtnaService()
+	identity = service.register_identity("analyst", "tenant-ztna", "user-1", "Analyst", verified=True)
+	device = service.register_device("risky", "tenant-ztna", identity["id"], "Risky Device", trust_score=0.2, compliant=False)
+	resource = service.register_resource("crm", "tenant-ztna", "CRM", policy_attached=True)
+
+	assert device["status"] == "quarantined"
+	with pytest.raises(PermissionError, match="device_trust_too_low"):
+		service.request_access(identity["id"], device["id"], resource["id"], requested_by="user-1")
+
+
 def test_privileged_access_requires_mfa():
 	service = ZtnaService()
 	identity = service.register_identity("admin", "tenant-ztna", "admin-1", "Admin", verified=True, privileged=True, mfa_completed=False)
@@ -154,9 +169,11 @@ def test_privileged_access_requires_mfa():
 
 	identity = service.verify_identity(identity["id"], actor_id="mfau", mfa_completed=True)
 	request = service.request_access(identity["id"], device["id"], resource["id"], requested_by="admin-1", mfa_completed=True)
+	approved = service.approve_access_request(request["id"], reviewer_id="reviewer-1")
 
 	assert identity["mfa_completed"] is True
-	assert request["status"] == "approved"
+	assert request["status"] == "review_required"
+	assert approved["status"] == "approved"
 
 
 def test_high_risk_access_requires_review_before_session():
@@ -181,6 +198,29 @@ def test_high_risk_access_requires_review_before_session():
 
 	assert approved["status"] == "approved"
 	assert session["status"] == "active"
+
+
+def test_request_specific_guardrails_require_review_or_block_duplicates():
+	service = ZtnaService()
+	identity, device, resource = _build_accessible_resource(service)
+	scoped = service.request_access(
+		identity["id"],
+		device["id"],
+		resource["id"],
+		requested_by="user-1",
+		least_privilege_scope_present=False,
+	)
+
+	assert scoped["status"] == "review_required"
+	assert "narrow_access_scope" in scoped["required_actions"]
+	with pytest.raises(PermissionError, match="duplicate_access_review"):
+		service.request_access(
+			identity["id"],
+			device["id"],
+			resource["id"],
+			requested_by="user-1",
+			least_privilege_scope_present=False,
+		)
 
 
 def test_continuous_verification_can_require_reauth_or_revoke_session():
@@ -242,18 +282,24 @@ def test_view_models_match_routes_theme_and_runtime_state():
 
 	dashboard = views.dashboard_model(service, "tenant-ztna")
 	policies = views.policy_console_model(service, "tenant-ztna")
+	identities = views.identity_console_model(service, "tenant-ztna")
 	devices = views.device_posture_model(service, "tenant-ztna")
 	resources = views.resource_map_model(service, "tenant-ztna")
 	access = views.access_requests_model(service, "tenant-ztna")
 	sessions = views.session_monitor_model(service, "tenant-ztna")
 	risk = views.risk_console_model(service, "tenant-ztna")
+	reviews = views.review_queue_model(service, "tenant-ztna")
+	audit = views.audit_model(service, "tenant-ztna")
 	settings = views.settings_model("tenant-ztna")
 
 	assert dashboard["summary"]["identity_count"] == 1
 	assert policies["policy_required"] == []
+	assert identities["identities"][0]["id"] == identity["id"]
 	assert devices["devices"][0]["id"] == device["id"]
 	assert resources["segments"] == ["default"]
 	assert access["access_requests"][0]["id"] == request["id"]
 	assert sessions["sessions"][0]["id"] == session["id"]
 	assert risk["signals"]["revocation_rate"] == 0.0
+	assert reviews["review_required"] == []
+	assert audit["audit_events"]
 	assert settings["theme"]["name"] == "ztna_zero_trust_ops"
