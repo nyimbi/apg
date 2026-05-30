@@ -1,54 +1,56 @@
-"""Publishable APG capability package entrypoint for Payroll Management - Revolutionary."""
+"""Publishable APG capability entrypoint for HCM Payroll."""
 
 from __future__ import annotations
 
+import importlib.util
 import json
+from pathlib import Path
 from typing import Any
 
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Payroll Management - Revolutionary package-backed APG capability", "entity_count": 0, "name": "pay_payroll", "version": "1.0.0"}, "capabilities": {"pay_payroll": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"capability": {"category": "Pay", "enabled": true, "id": "pay_payroll", "name": "Payroll Management - Revolutionary", "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/hcm/pay/payroll/cap_spec.md", "version": "1.0.0"}, "execution": {"async_supported": true, "audit_operations": true, "policy_enforced": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "pay_payroll_operations"}, "ui": {"enable_dashboard": true, "enable_operations": true, "enable_rules": true, "enable_settings": true}}, "erp_modules": ["hcm"], "i18n": {}, "master_data": {}, "name": "Payroll Management - Revolutionary", "provides": ["pay_payroll_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "Payroll Management - Revolutionary operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation_type": "write", "policy_attached": false}, "description": "Payroll Management - Revolutionary write operations require policy enforcement.", "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"}, "name": "operation_policy_required"}, {"condition": {"review_recorded": false, "risk_level": "high"}, "description": "High-risk Payroll Management - Revolutionary operations require review.", "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"}, "name": "high_risk_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "Payroll Management - Revolutionary operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation_type": "write", "policy_attached": false}, "description": "Payroll Management - Revolutionary write operations require policy enforcement.", "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"}, "name": "operation_policy_required"}, {"condition": {"review_recorded": false, "risk_level": "high"}, "description": "High-risk Payroll Management - Revolutionary operations require review.", "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"}, "name": "high_risk_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "CapabilityDashboard", "permission": "pay_payroll:view", "route": "/pay-payroll/dashboard"}, "operations": {"component": "CapabilityOperations", "permission": "pay_payroll:operate", "route": "/pay-payroll/operations"}, "rules": {"component": "CapabilityRules", "permission": "pay_payroll:govern", "route": "/pay-payroll/rules"}, "settings": {"component": "CapabilitySettings", "permission": "pay_payroll:admin", "route": "/pay-payroll/settings"}}, "streaming": {}, "theme": {"components": {"dashboard": {"icon": "layout-dashboard", "risk_style": "policy-band", "status_indicator": "health-pill"}, "operations": {"status_style": "sla-chip", "visual": "work-queue"}, "rules": {"status_style": "decision-chip", "visual": "rule-list"}, "settings": {"density": "compact", "visual": "settings-panel"}}, "name": "pay_payroll_operations", "tokens": {"border.radius": "8px", "color.accent": "#C44536", "color.danger": "#C53030", "color.primary": "#28536B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/pay-payroll/api/v1", "requires_theme": true, "routes": [{"component": "CapabilityDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/pay-payroll/dashboard", "permission": "pay_payroll:view"}, {"component": "CapabilityOperations", "name": "operations", "nav_group": "Operations", "path": "/pay-payroll/operations", "permission": "pay_payroll:operate"}, {"component": "CapabilityRules", "name": "rules", "nav_group": "Governance", "path": "/pay-payroll/rules", "permission": "pay_payroll:govern"}, {"component": "CapabilitySettings", "name": "settings", "nav_group": "Administration", "path": "/pay-payroll/settings", "permission": "pay_payroll:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"pay_payroll": []}}, "contracts": {"pay_payroll": {"configuration": {"capability": {"category": "Pay", "enabled": true, "id": "pay_payroll", "name": "Payroll Management - Revolutionary", "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/hcm/pay/payroll/cap_spec.md", "version": "1.0.0"}, "execution": {"async_supported": true, "audit_operations": true, "policy_enforced": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "pay_payroll_operations"}, "ui": {"enable_dashboard": true, "enable_operations": true, "enable_rules": true, "enable_settings": true}}, "id": "pay_payroll", "provides": ["pay_payroll_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"pay_payroll": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"high_risk_requires_review": {"condition": {"review_recorded": false, "risk_level": "high"}, "description": "High-risk Payroll Management - Revolutionary operations require review.", "effect": {"decision": "require_review", "reason": "high_risk_review_required", "required_action": "record_review"}, "name": "high_risk_requires_review"}, "operation_policy_required": {"condition": {"operation_type": "write", "policy_attached": false}, "description": "Payroll Management - Revolutionary write operations require policy enforcement.", "effect": {"decision": "deny", "reason": "operation_policy_required", "required_action": "attach_operation_policy"}, "name": "operation_policy_required"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "Payroll Management - Revolutionary operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.pay_payroll": {"file": "capability_contract.py", "id": "capability.pay_payroll", "kind": "capability", "name": "Payroll Management - Revolutionary", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - direct script execution
+	spec = importlib.util.spec_from_file_location("payroll_capability_contract", PACKAGE_DIR / "capability_contract.py")
+	assert spec is not None and spec.loader is not None
+	module = importlib.util.module_from_spec(spec)
+	spec.loader.exec_module(module)
+	get_capability_contract = module.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
 	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	contract = get_capability_contract()
+	return {"format": "apg.semantic-model.v1", "ok": True, "app": {"name": "pay_payroll", "version": "2.1.0", "description": "Payroll package-backed APG capability", "entity_count": 13}, "capabilities": {"pay_payroll": {"name": contract["name"], "version": contract["version"], "provides": contract["provides"], "requires": contract["requires"], "configuration": contract["configuration"], "rules": contract["rule_engine"]["rules"], "rule_engine": contract["rule_engine"], "ui": contract["ui"], "screens": {route["name"]: {"route": route["path"], "component": route["component"], "permission": route["permission"]} for route in contract["ui"]["routes"]}, "theme": contract["theme"], "streaming": contract["streaming"], "runtime": {"entrypoint": "app.py", "service": "service.py", "api": "api.py", "views": "views.py"}}}, "contracts": {"pay_payroll": {"id": "pay_payroll", "provides": contract["provides"], "requires": contract["requires"], "configuration": contract["configuration"]}}, "composition": {"capability_dependencies": {"pay_payroll": contract["requires"]}, "agent_teams": {"payroll_review": {"runtimes": contract["configuration"]["payroll_agents"]["supported_runtimes"], "roles": contract["configuration"]["payroll_agents"]["supported_roles"]}}, "applications": {}}, "packages": {"pay_payroll": {"entrypoint": "app.py", "profile": "capability"}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "graphs": {"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])}}, "diagnostics": []}
 
 
 def component_manifest() -> dict[str, Any]:
 	"""Return the APG component manifest for this capability package."""
-	return {
-		"format": "apg.component-manifest.v1",
-		"kind": "apg.generated_application",
-		"name": "pay_payroll",
-		"display_name": "Payroll Management - Revolutionary",
-		"target": "python",
-		"interfaces": {
-			"health": "/health",
-			"self_test": "/self-test",
-			"semantic_model": "/semantic-model.json",
-		},
-		"capabilities": ["pay_payroll"],
-	}
+	return {"format": "apg.component-manifest.v1", "kind": "apg.generated_application", "name": "pay_payroll", "display_name": "Payroll", "target": "python", "interfaces": {"health": "/health", "self_test": "/self-test", "semantic_model": "/semantic-model.json"}, "capabilities": ["pay_payroll"]}
 
 
 def self_test() -> dict[str, Any]:
 	"""Run a dependency-light package self-test."""
 	model = semantic_model()
 	manifest = component_manifest()
+	capability = model.get("capabilities", {}).get("pay_payroll", {})
 	errors: list[str] = []
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
-	if "pay_payroll" not in model.get("capabilities", {}):
+	if not capability:
 		errors.append("capability missing from semantic model")
+	if capability.get("streaming", {}).get("processor") != "bytewax":
+		errors.append("streaming processor must be bytewax")
+	if "payroll_agents" not in capability.get("provides", []):
+		errors.append("payroll_agents provide missing")
+	if "agents" not in capability.get("screens", {}):
+		errors.append("agent workbench screen missing")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	return {
-		"passed": not errors,
-		"status": "ok" if not errors else "failed",
-		"errors": errors,
-		"routes": ["/health", "/self-test", "/component.json", "/semantic-model.json"],
-		"capability": "pay_payroll",
-	}
+	return {"passed": not errors, "status": "ok" if not errors else "failed", "errors": errors, "routes": ["/health", "/self-test", "/component.json", "/semantic-model.json"], "capability": "pay_payroll"}
 
 
 if __name__ == "__main__":

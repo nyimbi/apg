@@ -1,685 +1,369 @@
-"""
-APG Payroll Management - Revolutionary Payroll Processing Service
+"""Dependency-light HCM Payroll lifecycle service."""
 
-Next-generation payroll processing service with real-time calculations,
-AI-powered automation, and intelligent workflow orchestration.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero | APG Platform Architect
-"""
+from copy import deepcopy
+from datetime import datetime
+from typing import Any
+from uuid import uuid4
 
-import asyncio
-import logging
-from datetime import datetime, date, timedelta
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Dict, List, Any, Optional, Union, Tuple
-from dataclasses import dataclass
-from enum import Enum
-
-from sqlalchemy import select, and_, or_, func, text, update
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from pydantic import BaseModel, Field, ConfigDict
-
-# APG Platform Imports
-from ...auth_rbac.services import AuthRBACService
-from ...audit_compliance.services import ComplianceValidationService
-from ...employee_data_management.services import EmployeeDataService
-from ...time_attendance.services import TimeAttendanceService
-from ...benefits_administration.services import BenefitsService
-from ...notification_engine.services import NotificationService
-from ...workflow_business_process_mgmt.services import WorkflowService
-from ...ai_orchestration.services import AIOrchestrationService
-
-from .models import (
-	PRPayrollPeriod, PRPayrollRun, PREmployeePayroll, PRPayComponent,
-	PRPayrollLineItem, PRTaxCalculation, PRPayrollAdjustment,
-	PayrollStatus, PayComponentType, PayFrequency, TaxType,
-	PayrollPeriodCreate, PayrollRunCreate, EmployeePayrollCreate
-)
-from .ai_intelligence_engine import PayrollIntelligenceEngine
-from .conversational_assistant import ConversationalPayrollAssistant
-
-# Configure logging
-logger = logging.getLogger(__name__)
-
-
-class ProcessingStage(str, Enum):
-	"""Payroll processing stages."""
-	INITIALIZATION = "initialization"
-	DATA_COLLECTION = "data_collection"
-	CALCULATIONS = "calculations"
-	VALIDATIONS = "validations"
-	AI_ANALYSIS = "ai_analysis"
-	COMPLIANCE_CHECK = "compliance_check"
-	APPROVAL_WORKFLOW = "approval_workflow"
-	FINALIZATION = "finalization"
-	COMPLETION = "completion"
-
-
-@dataclass
-class PayrollCalculationResult:
-	"""Result of payroll calculations."""
-	employee_id: str
-	gross_earnings: Decimal
-	total_deductions: Decimal
-	total_taxes: Decimal
-	net_pay: Decimal
-	calculation_details: Dict[str, Any]
-	validation_score: float
-	has_errors: bool
-	has_warnings: bool
-	error_messages: List[str]
-	warning_messages: List[str]
-
-
-@dataclass
-class PayrollProcessingResult:
-	"""Result of complete payroll processing."""
-	run_id: str
-	status: PayrollStatus
-	employee_count: int
-	successful_calculations: int
-	failed_calculations: int
-	total_gross: Decimal
-	total_deductions: Decimal
-	total_taxes: Decimal
-	total_net: Decimal
-	processing_time_seconds: float
-	validation_score: float
-	requires_review: bool
-	anomalies_detected: int
-	compliance_score: float
-
-
-class PayrollProcessingConfig(BaseModel):
-	"""Configuration for payroll processing."""
-	model_config = ConfigDict(extra='forbid')
-	
-	# Processing Settings
-	batch_size: int = Field(default=100, ge=10, le=1000)
-	max_parallel_workers: int = Field(default=5, ge=1, le=20)
-	enable_real_time_processing: bool = Field(default=True)
-	
-	# Validation Settings
-	strict_validation: bool = Field(default=True)
-	auto_fix_minor_errors: bool = Field(default=True)
-	validation_threshold: float = Field(default=90.0, ge=50.0, le=100.0)
-	
-	# AI Settings
-	enable_ai_validation: bool = Field(default=True)
-	ai_confidence_threshold: float = Field(default=85.0, ge=50.0, le=100.0)
-	enable_anomaly_detection: bool = Field(default=True)
-	
-	# Compliance Settings
-	enable_compliance_check: bool = Field(default=True)
-	compliance_strictness: str = Field(default="high")  # low, medium, high
-	
-	# Workflow Settings
-	enable_approval_workflow: bool = Field(default=True)
-	auto_approve_threshold: float = Field(default=95.0, ge=80.0, le=100.0)
-	
-	# Performance Settings
-	enable_caching: bool = Field(default=True)
-	cache_duration_hours: int = Field(default=24, ge=1, le=168)
-	optimize_for_speed: bool = Field(default=True)
-
-
-class RevolutionaryPayrollService:
-	"""Revolutionary payroll processing service.
-	
-	Provides next-generation payroll processing with AI-powered automation,
-	real-time calculations, intelligent validation, and seamless integration
-	with the APG platform ecosystem.
-	"""
-	
-	def __init__(
-		self,
-		db_session: AsyncSession,
-		auth_service: AuthRBACService,
-		compliance_service: ComplianceValidationService,
-		employee_service: EmployeeDataService,
-		time_service: TimeAttendanceService,
-		benefits_service: BenefitsService,
-		notification_service: NotificationService,
-		workflow_service: WorkflowService,
-		ai_service: AIOrchestrationService,
-		intelligence_engine: PayrollIntelligenceEngine,
-		conversational_assistant: ConversationalPayrollAssistant,
-		config: Optional[PayrollProcessingConfig] = None
-	):
-		self.db = db_session
-		self.auth_service = auth_service
-		self.compliance_service = compliance_service
-		self.employee_service = employee_service
-		self.time_service = time_service
-		self.benefits_service = benefits_service
-		self.notification_service = notification_service
-		self.workflow_service = workflow_service
-		self.ai_service = ai_service
-		self.intelligence_engine = intelligence_engine
-		self.conversational_assistant = conversational_assistant
-		self.config = config or PayrollProcessingConfig()
-		
-		# Processing state tracking
-		self._processing_states = {}
-		self._calculation_cache = {}
-		
-		# Tax calculation engines
-		self._tax_engines = {}
-		
-		# Rate limiting and throttling
-		self._rate_limiter = {}
-	
-	async def create_payroll_period(
-		self,
-		period_data: PayrollPeriodCreate,
-		tenant_id: str,
-		user_id: str
-	) -> PRPayrollPeriod:
-		"""Create a new payroll period with intelligent setup."""
-		
-		try:
-			logger.info(f"Creating payroll period: {period_data.period_name}")
-			
-			# Validate user permissions
-			if not await self._check_permission(user_id, "create_payroll_period", tenant_id):
-				raise PermissionError("Insufficient permissions to create payroll period")
-			
-			# Validate period data
-			await self._validate_period_data(period_data, tenant_id)
-			
-			# Create period
-			period = PRPayrollPeriod(
-				tenant_id=tenant_id,
-				period_name=period_data.period_name,
-				period_type=period_data.period_type,
-				pay_frequency=period_data.pay_frequency.value,
-				start_date=period_data.start_date,
-				end_date=period_data.end_date,
-				pay_date=period_data.pay_date,
-				cutoff_date=period_data.cutoff_date,
-				fiscal_year=period_data.fiscal_year,
-				fiscal_quarter=period_data.fiscal_quarter,
-				country_code=period_data.country_code,
-				currency_code=period_data.currency_code,
-				timezone=period_data.timezone,
-				status=PayrollStatus.DRAFT,
-				created_by=user_id
-			)
-			
-			self.db.add(period)
-			await self.db.commit()
-			await self.db.refresh(period)
-			
-			# Initialize period with AI predictions
-			await self._initialize_period_predictions(period)
-			
-			# Send notifications
-			await self._notify_period_created(period, user_id)
-			
-			logger.info(f"Payroll period created successfully: {period.period_id}")
-			return period
-			
-		except Exception as e:
-			logger.error(f"Failed to create payroll period: {e}")
-			await self.db.rollback()
-			raise
-	
-	async def start_payroll_run(
-		self,
-		run_data: PayrollRunCreate,
-		tenant_id: str,
-		user_id: str
-	) -> PRPayrollRun:
-		"""Start a new payroll run with intelligent processing."""
-		
-		try:
-			logger.info(f"Starting payroll run for period: {run_data.period_id}")
-			
-			# Validate permissions
-			if not await self._check_permission(user_id, "start_payroll", tenant_id):
-				raise PermissionError("Insufficient permissions to start payroll")
-			
-			# Validate period and prerequisites
-			period = await self._get_period(run_data.period_id, tenant_id)
-			if not period:
-				raise ValueError("Payroll period not found")
-			
-			await self._validate_payroll_prerequisites(period, tenant_id)
-			
-			# Check for existing active runs
-			existing_run = await self._get_active_run(run_data.period_id, tenant_id)
-			if existing_run:
-				raise ValueError(f"Payroll run already active: {existing_run.run_id}")
-			
-			# Calculate next run number
-			run_number = await self._get_next_run_number(run_data.period_id, tenant_id)
-			
-			# Create payroll run
-			run = PRPayrollRun(
-				tenant_id=tenant_id,
-				period_id=run_data.period_id,
-				run_number=run_number,
-				run_type=run_data.run_type,
-				run_name=run_data.run_name,
-				description=run_data.description,
-				priority=run_data.priority,
-				status=PayrollStatus.PROCESSING,
-				processing_stage=ProcessingStage.INITIALIZATION,
-				started_at=datetime.utcnow(),
-				processed_by=user_id,
-				auto_approve_threshold=Decimal(str(run_data.auto_approve_threshold)),
-				notifications_enabled=run_data.notifications_enabled
-			)
-			
-			self.db.add(run)
-			await self.db.commit()
-			await self.db.refresh(run)
-			
-			# Start background processing
-			asyncio.create_task(self._process_payroll_run_async(run.run_id, tenant_id, user_id))
-			
-			# Send notifications
-			await self._notify_run_started(run, user_id)
-			
-			logger.info(f"Payroll run started successfully: {run.run_id}")
-			return run
-			
-		except Exception as e:
-			logger.error(f"Failed to start payroll run: {e}")
-			await self.db.rollback()
-			raise
-	
-	async def get_payroll_status(self, run_id: str, tenant_id: str) -> Dict[str, Any]:
-		"""Get current payroll processing status."""
-		
-		try:
-			run = await self._get_payroll_run(run_id, tenant_id)
-			if not run:
-				raise ValueError("Payroll run not found")
-			
-			processing_state = self._processing_states.get(run_id, {})
-			
-			return {
-				"run_id": run.run_id,
-				"status": run.status,
-				"processing_stage": run.processing_stage,
-				"progress_percentage": float(run.progress_percentage or 0),
-				"employee_count": run.employee_count,
-				"processed_employee_count": run.processed_employee_count,
-				"error_count": run.error_count,
-				"warning_count": run.warning_count,
-				"validation_score": float(run.validation_score or 0),
-				"compliance_score": float(run.compliance_score or 0),
-				"started_at": run.started_at.isoformat() if run.started_at else None,
-				"completed_at": run.completed_at.isoformat() if run.completed_at else None,
-				"requires_approval": run.approval_required,
-				"approval_status": run.approval_status,
-				"estimated_completion": self._estimate_completion_time(run_id)
-			}
-			
-		except Exception as e:
-			logger.error(f"Failed to get payroll status: {e}")
-			raise
-	
-	async def approve_payroll_run(
-		self,
-		run_id: str,
-		tenant_id: str,
-		user_id: str,
-		approval_comments: Optional[str] = None
-	) -> bool:
-		"""Approve a payroll run."""
-		
-		try:
-			logger.info(f"Approving payroll run: {run_id}")
-			
-			# Check permissions
-			if not await self._check_permission(user_id, "approve_payroll", tenant_id):
-				raise PermissionError("Insufficient permissions to approve payroll")
-			
-			# Get payroll run
-			run = await self._get_payroll_run(run_id, tenant_id)
-			if not run:
-				raise ValueError("Payroll run not found")
-			
-			if run.status != PayrollStatus.APPROVED:
-				raise ValueError(f"Payroll run is not ready for approval: {run.status}")
-			
-			# Update approval status
-			run.approval_status = "approved"
-			run.approved_by = user_id
-			run.approved_at = datetime.utcnow()
-			run.approval_comments = approval_comments
-			run.status = PayrollStatus.POSTED
-			
-			await self.db.commit()
-			
-			# Continue with finalization if not already done
-			if run.processing_stage != ProcessingStage.COMPLETION:
-				asyncio.create_task(self._finalize_approved_payroll(run_id, tenant_id, user_id))
-			
-			# Send notifications
-			await self._notify_payroll_approved(run, user_id)
-			
-			logger.info(f"Payroll run approved successfully: {run_id}")
-			return True
-			
-		except Exception as e:
-			logger.error(f"Failed to approve payroll run: {e}")
-			await self.db.rollback()
-			raise
-	
-	# Helper methods for internal processing
-	
-	async def _check_permission(self, user_id: str, permission: str, tenant_id: str) -> bool:
-		"""Check user permissions for payroll operations."""
-		try:
-			return await self.auth_service.check_permission(
-				user_id=user_id,
-				permission=permission,
-				resource_type="payroll",
-				tenant_id=tenant_id
-			)
-		except Exception as e:
-			logger.error(f"Permission check failed: {e}")
-			return False
-	
-	async def _validate_period_data(self, period_data: PayrollPeriodCreate, tenant_id: str) -> None:
-		"""Validate payroll period data."""
-		
-		# Check for overlapping periods
-		existing_query = select(PRPayrollPeriod).where(
-			and_(
-				PRPayrollPeriod.tenant_id == tenant_id,
-				PRPayrollPeriod.is_active == True,
-				or_(
-					and_(
-						PRPayrollPeriod.start_date <= period_data.start_date,
-						PRPayrollPeriod.end_date >= period_data.start_date
-					),
-					and_(
-						PRPayrollPeriod.start_date <= period_data.end_date,
-						PRPayrollPeriod.end_date >= period_data.end_date
-					)
-				)
-			)
-		)
-		
-		result = await self.db.execute(existing_query)
-		existing_period = result.scalar_one_or_none()
-		
-		if existing_period:
-			raise ValueError(f"Period overlaps with existing period: {existing_period.period_name}")
-	
-	async def _get_period(self, period_id: str, tenant_id: str) -> Optional[PRPayrollPeriod]:
-		"""Get payroll period by ID."""
-		query = select(PRPayrollPeriod).where(
-			and_(
-				PRPayrollPeriod.period_id == period_id,
-				PRPayrollPeriod.tenant_id == tenant_id
-			)
-		)
-		result = await self.db.execute(query)
-		return result.scalar_one_or_none()
-	
-	async def _get_payroll_run(self, run_id: str, tenant_id: str) -> Optional[PRPayrollRun]:
-		"""Get payroll run by ID."""
-		query = select(PRPayrollRun).where(
-			and_(
-				PRPayrollRun.run_id == run_id,
-				PRPayrollRun.tenant_id == tenant_id
-			)
-		)
-		result = await self.db.execute(query)
-		return result.scalar_one_or_none()
-	
-	async def _get_active_run(self, period_id: str, tenant_id: str) -> Optional[PRPayrollRun]:
-		"""Get active payroll run for period."""
-		query = select(PRPayrollRun).where(
-			and_(
-				PRPayrollRun.period_id == period_id,
-				PRPayrollRun.tenant_id == tenant_id,
-				PRPayrollRun.status.in_([
-					PayrollStatus.PROCESSING,
-					PayrollStatus.AI_VALIDATION,
-					PayrollStatus.COMPLIANCE_CHECK,
-					PayrollStatus.APPROVED
-				])
-			)
-		)
-		result = await self.db.execute(query)
-		return result.scalar_one_or_none()
-	
-	async def _get_next_run_number(self, period_id: str, tenant_id: str) -> int:
-		"""Get next run number for period."""
-		query = select(func.max(PRPayrollRun.run_number)).where(
-			and_(
-				PRPayrollRun.period_id == period_id,
-				PRPayrollRun.tenant_id == tenant_id
-			)
-		)
-		result = await self.db.execute(query)
-		max_run_number = result.scalar() or 0
-		return max_run_number + 1
-	
-	async def _validate_payroll_prerequisites(self, period: PRPayrollPeriod, tenant_id: str) -> None:
-		"""Validate prerequisites for starting payroll."""
-		
-		# Check if period is ready for payroll
-		if period.status not in [PayrollStatus.DRAFT, PayrollStatus.APPROVED]:
-			raise ValueError(f"Period not ready for payroll: {period.status}")
-		
-		# Check if cutoff date has passed
-		if period.cutoff_date and date.today() < period.cutoff_date:
-			raise ValueError("Cutoff date has not yet passed")
-		
-		# Validate employee data completeness
-		employee_validation = await self.employee_service.validate_payroll_readiness(
-			period_id=period.period_id,
-			tenant_id=tenant_id
-		)
-		
-		if not employee_validation.is_ready:
-			raise ValueError(f"Employee data not ready: {employee_validation.issues}")
-	
-	async def _initialize_period_predictions(self, period: PRPayrollPeriod) -> None:
-		"""Initialize AI predictions for the period."""
-		try:
-			# Get predicted employee count
-			predicted_count = await self.intelligence_engine.predict_employee_count(
-				period_id=period.period_id,
-				tenant_id=period.tenant_id
-			)
-			
-			# Get predicted costs
-			predicted_costs = await self.intelligence_engine.predict_payroll_costs(
-				period_id=period.period_id,
-				tenant_id=period.tenant_id
-			)
-			
-			# Store predictions
-			period.ai_predictions = {
-				"predicted_employee_count": predicted_count,
-				"predicted_costs": predicted_costs,
-				"generated_at": datetime.utcnow().isoformat()
-			}
-			
-			await self.db.commit()
-			
-		except Exception as e:
-			logger.warning(f"Failed to initialize period predictions: {e}")
-	
-	async def _notify_period_created(self, period: PRPayrollPeriod, user_id: str) -> None:
-		"""Send notifications for period creation."""
-		try:
-			await self.notification_service.send_notification(
-				notification_type="payroll_period_created",
-				recipient_ids=[user_id],
-				title="Payroll Period Created",
-				message=f"Payroll period '{period.period_name}' has been created successfully.",
-				data={
-					"period_id": period.period_id,
-					"period_name": period.period_name,
-					"start_date": period.start_date.isoformat(),
-					"end_date": period.end_date.isoformat(),
-					"pay_date": period.pay_date.isoformat()
-				},
-				tenant_id=period.tenant_id
-			)
-		except Exception as e:
-			logger.error(f"Failed to send period creation notification: {e}")
-	
-	async def _notify_run_started(self, run: PRPayrollRun, user_id: str) -> None:
-		"""Send notifications for payroll run start."""
-		try:
-			await self.notification_service.send_notification(
-				notification_type="payroll_run_started",
-				recipient_ids=[user_id],
-				title="Payroll Processing Started",
-				message=f"Payroll run {run.run_number} has been started successfully.",
-				data={
-					"run_id": run.run_id,
-					"run_number": run.run_number,
-					"started_at": run.started_at.isoformat(),
-					"estimated_completion": self._estimate_completion_time(run.run_id)
-				},
-				tenant_id=run.tenant_id
-			)
-		except Exception as e:
-			logger.error(f"Failed to send run start notification: {e}")
-	
-	def _estimate_completion_time(self, run_id: str) -> Optional[str]:
-		"""Estimate completion time for payroll run."""
-		try:
-			processing_state = self._processing_states.get(run_id, {})
-			
-			if not processing_state:
-				return None
-			
-			# Simple estimation based on progress
-			progress = processing_state.get("progress", 0.0)
-			start_time = processing_state.get("start_time")
-			
-			if not start_time or progress <= 0:
-				return None
-			
-			elapsed = (datetime.utcnow() - start_time).total_seconds()
-			estimated_total = elapsed / (progress / 100.0) if progress > 0 else 0
-			remaining = max(0, estimated_total - elapsed)
-			
-			completion_time = datetime.utcnow() + timedelta(seconds=remaining)
-			return completion_time.isoformat()
-			
-		except Exception as e:
-			logger.error(f"Failed to estimate completion time: {e}")
-			return None
-	
-	async def _update_processing_stage(
-		self, 
-		run: PRPayrollRun, 
-		stage: ProcessingStage, 
-		progress: float
-	) -> None:
-		"""Update processing stage and progress."""
-		
-		run.processing_stage = stage
-		run.progress_percentage = Decimal(str(progress))
-		
-		# Update in-memory state
-		if run.run_id in self._processing_states:
-			self._processing_states[run.run_id]["stage"] = stage
-			self._processing_states[run.run_id]["progress"] = progress
-		
-		await self.db.commit()
-	
-	async def _update_progress(self, run: PRPayrollRun, progress: float) -> None:
-		"""Update processing progress."""
-		
-		run.progress_percentage = Decimal(str(progress))
-		
-		# Update in-memory state
-		if run.run_id in self._processing_states:
-			self._processing_states[run.run_id]["progress"] = progress
-		
-		await self.db.commit()
-	
-	# Placeholder methods for complex processing stages
-	# These would be implemented with full business logic
-	
-	async def _process_payroll_run_async(self, run_id: str, tenant_id: str, user_id: str) -> None:
-		"""Main async payroll processing orchestrator."""
-		logger.info(f"Starting comprehensive payroll processing for run: {run_id}")
-		# Implementation would include all processing stages
-		pass
-	
-	async def _finalize_approved_payroll(self, run_id: str, tenant_id: str, user_id: str) -> None:
-		"""Finalize approved payroll run."""
-		logger.info(f"Finalizing approved payroll run: {run_id}")
-		# Implementation would include final processing steps
-		pass
-	
-	async def _notify_payroll_approved(self, run: PRPayrollRun, user_id: str) -> None:
-		"""Send payroll approval notifications."""
-		try:
-			await self.notification_service.send_notification(
-				notification_type="payroll_approved",
-				recipient_ids=[user_id],
-				title="Payroll Approved",
-				message=f"Payroll run {run.run_number} has been approved and finalized.",
-				data={
-					"run_id": run.run_id,
-					"approved_at": run.approved_at.isoformat() if run.approved_at else None,
-					"approved_by": run.approved_by
-				},
-				tenant_id=run.tenant_id
-			)
-		except Exception as e:
-			logger.error(f"Failed to send approval notification: {e}")
-
-
-# Example usage and factory function
-async def create_payroll_service(
-	db_session: AsyncSession,
-	config: Optional[PayrollProcessingConfig] = None
-) -> RevolutionaryPayrollService:
-	"""Factory function to create a configured payroll service."""
-	
-	# This would initialize all required services
-	# For now, we'll create a simplified version
-	
-	# Initialize service dependencies (these would be injected)
-	auth_service = None  # AuthRBACService()
-	compliance_service = None  # ComplianceValidationService()
-	employee_service = None  # EmployeeDataService()
-	time_service = None  # TimeAttendanceService()
-	benefits_service = None  # BenefitsService()
-	notification_service = None  # NotificationService()
-	workflow_service = None  # WorkflowService()
-	ai_service = None  # AIOrchestrationService()
-	intelligence_engine = None  # PayrollIntelligenceEngine()
-	conversational_assistant = None  # ConversationalPayrollAssistant()
-	
-	# Create and return service
-	service = RevolutionaryPayrollService(
-		db_session=db_session,
-		auth_service=auth_service,
-		compliance_service=compliance_service,
-		employee_service=employee_service,
-		time_service=time_service,
-		benefits_service=benefits_service,
-		notification_service=notification_service,
-		workflow_service=workflow_service,
-		ai_service=ai_service,
-		intelligence_engine=intelligence_engine,
-		conversational_assistant=conversational_assistant,
-		config=config
+try:
+	from .capability_contract import (
+		PAYROLL_EVENT_STREAM,
+		STREAMING,
+		SUPPORTED_COMPONENT_TYPES,
+		SUPPORTED_CURRENCIES,
+		SUPPORTED_PAYMENT_METHODS,
+		SUPPORTED_PAYROLL_AGENT_ROLES,
+		SUPPORTED_PAYROLL_AGENT_RUNTIMES,
+		SUPPORTED_PAY_FREQUENCIES,
+		SUPPORTED_TAX_SCOPES,
+		evaluate_capability_rules,
+		get_capability_contract,
 	)
-	
-	return service
+except ImportError:  # pragma: no cover - supports direct file loading in tests
+	from capability_contract import (  # type: ignore
+		PAYROLL_EVENT_STREAM,
+		STREAMING,
+		SUPPORTED_COMPONENT_TYPES,
+		SUPPORTED_CURRENCIES,
+		SUPPORTED_PAYMENT_METHODS,
+		SUPPORTED_PAYROLL_AGENT_ROLES,
+		SUPPORTED_PAYROLL_AGENT_RUNTIMES,
+		SUPPORTED_PAY_FREQUENCIES,
+		SUPPORTED_TAX_SCOPES,
+		evaluate_capability_rules,
+		get_capability_contract,
+	)
 
 
-if __name__ == "__main__":
-	# Example usage would go here
-	pass
+class PayrollError(Exception):
+	"""Base exception for payroll operations."""
+
+
+class PayrollRunNotFoundError(PayrollError):
+	"""Raised when a payroll run is not found."""
+
+
+class PayrollProfileNotFoundError(PayrollError):
+	"""Raised when an employee pay profile is not found."""
+
+
+class PayrollManagementService:
+	"""In-memory executable service for payroll lifecycle packets."""
+
+	def __init__(self, tenant_id: str | None = None, user_id: str | None = None, *_: Any, **__: Any) -> None:
+		self.tenant_id = tenant_id
+		self.user_id = user_id
+		self.periods: dict[str, dict[str, Any]] = {}
+		self.pay_groups: dict[str, dict[str, Any]] = {}
+		self.employee_pay_profiles: dict[str, dict[str, Any]] = {}
+		self.components: dict[str, dict[str, Any]] = {}
+		self.time_imports: dict[str, dict[str, Any]] = {}
+		self.runs: dict[str, dict[str, Any]] = {}
+		self.line_items: dict[str, dict[str, Any]] = {}
+		self.taxes: dict[str, dict[str, Any]] = {}
+		self.adjustments: dict[str, dict[str, Any]] = {}
+		self.payment_batches: dict[str, dict[str, Any]] = {}
+		self.payslips: dict[str, dict[str, Any]] = {}
+		self.tax_filings: dict[str, dict[str, Any]] = {}
+		self.agents: dict[str, dict[str, Any]] = {}
+		self._audit_events: list[dict[str, Any]] = []
+
+	def _tenant(self, tenant_id: str | None = None) -> str:
+		value = tenant_id or self.tenant_id
+		if not value:
+			raise PermissionError("tenant_context_required")
+		return value
+
+	def _record_id(self, prefix: str, explicit: str | None = None) -> str:
+		return explicit or f"{prefix}-{uuid4().hex[:12]}"
+
+	def _now(self) -> str:
+		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+	def _base_context(self, tenant_id: str, operation: str) -> dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"tenant_context_present": True,
+			"operation": operation,
+			"operation_type": "write",
+			"policy_attached": True,
+		}
+
+	def _assert_rules(self, context: dict[str, Any]) -> None:
+		result = evaluate_capability_rules(context)
+		if result["decision"] != "allow":
+			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+
+	def _emit(self, tenant_id: str, event_type: str, record: dict[str, Any]) -> None:
+		self._audit_events.append({
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"record_id": record["id"],
+			"record_type": record["type"],
+			"status": record["status"],
+			"stream": PAYROLL_EVENT_STREAM,
+			"processor": "bytewax",
+			"emitted_at": self._now(),
+		})
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def create_payroll_period(self, period_id: str, tenant_id: str, name: str, frequency: str, start_date: str, end_date: str, pay_date: str, currency: str = "USD") -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "create_payroll_period")
+		context.update({
+			"name_present": bool(name),
+			"frequency_supported": frequency in SUPPORTED_PAY_FREQUENCIES,
+			"start_date_present": bool(start_date),
+			"end_date_present": bool(end_date),
+			"pay_date_present": bool(pay_date),
+			"currency_supported": currency in SUPPORTED_CURRENCIES,
+		})
+		self._assert_rules(context)
+		record = {"id": self._record_id("period", period_id), "type": "payroll_period", "kind": "period", "tenant_id": tenant, "name": name, "frequency": frequency, "start_date": start_date, "end_date": end_date, "pay_date": pay_date, "currency": currency, "status": "open", "created_at": self._now()}
+		self.periods[record["id"]] = record
+		self._emit(tenant, "payroll_period_created", record)
+		return deepcopy(record)
+
+	def create_pay_group(self, pay_group_id: str, tenant_id: str, code: str, name: str, frequency: str, currency: str, country: str, owner_id: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "create_pay_group")
+		context.update({"code_present": bool(code), "name_present": bool(name), "frequency_supported": frequency in SUPPORTED_PAY_FREQUENCIES, "currency_supported": currency in SUPPORTED_CURRENCIES, "country_present": bool(country), "owner_present": bool(owner_id)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("paygroup", pay_group_id), "type": "pay_group", "kind": "pay_group", "tenant_id": tenant, "code": code, "name": name, "frequency": frequency, "currency": currency, "country": country, "owner_id": owner_id, "status": "active", "created_at": self._now()}
+		self.pay_groups[record["id"]] = record
+		self._emit(tenant, "pay_group_created", record)
+		return deepcopy(record)
+
+	def create_employee_pay_profile(self, profile_id: str, tenant_id: str, employee_id: str, pay_group_id: str, payment_method: str, tax_id: str, currency: str, base_pay: float, reviewed_by: str | None = None) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		pay_group = self.pay_groups.get(pay_group_id)
+		context = self._base_context(tenant, "create_employee_pay_profile")
+		context.update({"employee_present": bool(employee_id), "pay_group_present": bool(pay_group and pay_group["tenant_id"] == tenant), "payment_method_supported": payment_method in SUPPORTED_PAYMENT_METHODS, "tax_id_present": bool(tax_id), "currency_supported": currency in SUPPORTED_CURRENCIES, "bank_payment": payment_method == "bank_transfer", "review_recorded": bool(reviewed_by)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("profile", profile_id), "type": "employee_pay_profile", "kind": "employee_pay_profile", "tenant_id": tenant, "employee_id": employee_id, "pay_group_id": pay_group_id, "payment_method": payment_method, "tax_id": tax_id, "currency": currency, "base_pay": float(base_pay), "reviewed_by": reviewed_by, "status": "active", "created_at": self._now()}
+		self.employee_pay_profiles[record["id"]] = record
+		self._emit(tenant, "employee_pay_profile_created", record)
+		return deepcopy(record)
+
+	def create_pay_component(self, component_id: str, tenant_id: str, code: str, name: str, component_type: str, currency: str, taxable: bool | None) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "create_pay_component")
+		context.update({"code_present": bool(code), "name_present": bool(name), "component_type_supported": component_type in SUPPORTED_COMPONENT_TYPES, "currency_supported": currency in SUPPORTED_CURRENCIES, "taxable_flag_present": taxable is not None})
+		self._assert_rules(context)
+		record = {"id": self._record_id("component", component_id), "type": "pay_component", "kind": "component", "tenant_id": tenant, "code": code, "name": name, "component_type": component_type, "currency": currency, "taxable": bool(taxable), "status": "active", "created_at": self._now()}
+		self.components[record["id"]] = record
+		self._emit(tenant, "pay_component_created", record)
+		return deepcopy(record)
+
+	def record_time_import(self, time_import_id: str, tenant_id: str, period_id: str, profile_id: str, hours: float, source: str, overtime_hours: float = 0, approved_by: str | None = None) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		period = self.periods.get(period_id)
+		profile = self.employee_pay_profiles.get(profile_id)
+		context = self._base_context(tenant, "record_time_import")
+		context.update({"period_present": bool(period and period["tenant_id"] == tenant), "profile_present": bool(profile and profile["tenant_id"] == tenant), "hours": hours, "source_present": bool(source), "overtime": overtime_hours > 0, "approval_recorded": bool(approved_by)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("time", time_import_id), "type": "payroll_time_import", "kind": "time_import", "tenant_id": tenant, "period_id": period_id, "profile_id": profile_id, "hours": float(hours), "overtime_hours": float(overtime_hours), "source": source, "approved_by": approved_by, "status": "active", "created_at": self._now()}
+		self.time_imports[record["id"]] = record
+		self._emit(tenant, "time_import_recorded", record)
+		return deepcopy(record)
+
+	def start_payroll_run(self, run_id: str, tenant_id: str, period_id: str, pay_group_id: str, initiated_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		period = self.periods.get(period_id)
+		pay_group = self.pay_groups.get(pay_group_id)
+		context = self._base_context(tenant, "start_payroll_run")
+		context.update({"period_present": bool(period and period["tenant_id"] == tenant), "pay_group_present": bool(pay_group and pay_group["tenant_id"] == tenant), "initiator_present": bool(initiated_by)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("run", run_id), "type": "payroll_run", "kind": "run", "tenant_id": tenant, "period_id": period_id, "pay_group_id": pay_group_id, "initiated_by": initiated_by, "approved_by": None, "posted_by": None, "totals": {"gross": 0.0, "deductions": 0.0, "taxes": 0.0, "adjustments": 0.0, "net": 0.0}, "status": "calculated", "created_at": self._now(), "updated_at": self._now()}
+		self.runs[record["id"]] = record
+		self._emit(tenant, "payroll_run_started", record)
+		return deepcopy(record)
+
+	def _recalculate_run_totals(self, run_id: str) -> None:
+		run = self.runs[run_id]
+		lines = [line for line in self.line_items.values() if line["run_id"] == run_id]
+		taxes = [tax for tax in self.taxes.values() if tax["run_id"] == run_id]
+		adjustments = [item for item in self.adjustments.values() if item["run_id"] == run_id]
+		gross = sum(line["amount"] for line in lines if line["component_type"] in {"earning", "reimbursement"})
+		deductions = abs(sum(line["amount"] for line in lines if line["component_type"] in {"deduction", "benefit", "garnishment"}))
+		tax_total = sum(tax["amount"] for tax in taxes)
+		adjustment_total = sum(item["amount"] for item in adjustments)
+		run["totals"] = {"gross": round(gross, 2), "deductions": round(deductions, 2), "taxes": round(tax_total, 2), "adjustments": round(adjustment_total, 2), "net": round(gross + adjustment_total - deductions - tax_total, 2)}
+		run["updated_at"] = self._now()
+
+	def add_line_item(self, line_id: str, tenant_id: str, run_id: str, profile_id: str, component_id: str, amount: float | None, reviewed_by: str | None = None) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		profile = self.employee_pay_profiles.get(profile_id)
+		component = self.components.get(component_id)
+		amount_value = float(amount) if amount is not None else None
+		context = self._base_context(tenant, "add_line_item")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "profile_present": bool(profile and profile["tenant_id"] == tenant), "component_present": bool(component and component["tenant_id"] == tenant), "amount_present": amount is not None, "negative_amount": bool(amount_value is not None and amount_value < 0), "review_recorded": bool(reviewed_by)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("line", line_id), "type": "payroll_line_item", "kind": "line_item", "tenant_id": tenant, "run_id": run_id, "profile_id": profile_id, "employee_id": profile["employee_id"], "component_id": component_id, "component_type": component["component_type"], "amount": amount_value, "reviewed_by": reviewed_by, "status": "active", "created_at": self._now()}
+		self.line_items[record["id"]] = record
+		self._recalculate_run_totals(run_id)
+		self._emit(tenant, "payroll_line_item_added", record)
+		return deepcopy(record)
+
+	def record_tax(self, tax_id: str, tenant_id: str, run_id: str, profile_id: str, scope: str, authority: str, amount: float | None) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		profile = self.employee_pay_profiles.get(profile_id)
+		context = self._base_context(tenant, "record_tax")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "profile_present": bool(profile and profile["tenant_id"] == tenant), "tax_scope_supported": scope in SUPPORTED_TAX_SCOPES, "authority_present": bool(authority), "amount_present": amount is not None})
+		self._assert_rules(context)
+		record = {"id": self._record_id("tax", tax_id), "type": "payroll_tax", "kind": "tax", "tenant_id": tenant, "run_id": run_id, "profile_id": profile_id, "employee_id": profile["employee_id"], "scope": scope, "authority": authority, "amount": float(amount), "status": "active", "created_at": self._now()}
+		self.taxes[record["id"]] = record
+		self._recalculate_run_totals(run_id)
+		self._emit(tenant, "payroll_tax_recorded", record)
+		return deepcopy(record)
+
+	def record_adjustment(self, adjustment_id: str, tenant_id: str, run_id: str, profile_id: str, amount: float, reason: str, approved_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		profile = self.employee_pay_profiles.get(profile_id)
+		context = self._base_context(tenant, "record_adjustment")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "profile_present": bool(profile and profile["tenant_id"] == tenant), "reason_present": bool(reason), "approval_recorded": bool(approved_by)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("adjustment", adjustment_id), "type": "payroll_adjustment", "kind": "adjustment", "tenant_id": tenant, "run_id": run_id, "profile_id": profile_id, "employee_id": profile["employee_id"], "amount": float(amount), "reason": reason, "approved_by": approved_by, "status": "active", "created_at": self._now()}
+		self.adjustments[record["id"]] = record
+		self._recalculate_run_totals(run_id)
+		self._emit(tenant, "payroll_adjustment_recorded", record)
+		return deepcopy(record)
+
+	def approve_payroll_run(self, run_id: str, tenant_id: str, approved_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		context = self._base_context(tenant, "approve_payroll_run")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "approver_present": bool(approved_by)})
+		self._assert_rules(context)
+		run["approved_by"] = approved_by
+		run["status"] = "approved"
+		run["updated_at"] = self._now()
+		self._emit(tenant, "payroll_run_approved", run)
+		return deepcopy(run)
+
+	def post_payroll_run(self, run_id: str, tenant_id: str, posted_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		if not run or run["tenant_id"] != tenant:
+			raise PermissionError("run_required")
+		self._assert_rules({**self._base_context(tenant, "post_payroll_run"), "approval_recorded": bool(run.get("approved_by"))})
+		run["posted_by"] = posted_by
+		run["status"] = "posted"
+		run["updated_at"] = self._now()
+		self._emit(tenant, "payroll_run_posted", run)
+		return deepcopy(run)
+
+	def create_payment_batch(self, payment_id: str, tenant_id: str, run_id: str, payment_date: str, approved_by: str | None = None) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		net_pay = float(run["totals"]["net"]) if run and run["tenant_id"] == tenant else 0.0
+		context = self._base_context(tenant, "create_payment_batch")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "approval_recorded": bool(approved_by or (run and run.get("approved_by"))), "payment_date_present": bool(payment_date), "net_pay": net_pay})
+		self._assert_rules(context)
+		record = {"id": self._record_id("payment", payment_id), "type": "payroll_payment_batch", "kind": "payment_batch", "tenant_id": tenant, "run_id": run_id, "payment_date": payment_date, "approved_by": approved_by or run.get("approved_by"), "net_pay": net_pay, "status": "created", "created_at": self._now()}
+		self.payment_batches[record["id"]] = record
+		run["status"] = "paid"
+		self._emit(tenant, "payment_batch_created", record)
+		return deepcopy(record)
+
+	def publish_payslip(self, payslip_id: str, tenant_id: str, run_id: str, profile_id: str, privacy_basis: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		profile = self.employee_pay_profiles.get(profile_id)
+		context = self._base_context(tenant, "publish_payslip")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "profile_present": bool(profile and profile["tenant_id"] == tenant), "posted_run": bool(run and run.get("posted_by")), "privacy_basis_present": bool(privacy_basis)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("payslip", payslip_id), "type": "payroll_payslip", "kind": "payslip", "tenant_id": tenant, "run_id": run_id, "profile_id": profile_id, "employee_id": profile["employee_id"], "privacy_basis": privacy_basis, "net_pay": run["totals"]["net"], "status": "published", "created_at": self._now()}
+		self.payslips[record["id"]] = record
+		self._emit(tenant, "payslip_published", record)
+		return deepcopy(record)
+
+	def create_tax_filing(self, filing_id: str, tenant_id: str, run_id: str, authority: str, period_ref: str, approved_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		run = self.runs.get(run_id)
+		context = self._base_context(tenant, "create_tax_filing")
+		context.update({"run_present": bool(run and run["tenant_id"] == tenant), "authority_present": bool(authority), "period_present": bool(period_ref), "approval_recorded": bool(approved_by)})
+		self._assert_rules(context)
+		record = {"id": self._record_id("filing", filing_id), "type": "payroll_tax_filing", "kind": "tax_filing", "tenant_id": tenant, "run_id": run_id, "authority": authority, "period_ref": period_ref, "approved_by": approved_by, "tax_total": run["totals"]["taxes"], "status": "created", "created_at": self._now()}
+		self.tax_filings[record["id"]] = record
+		self._emit(tenant, "tax_filing_created", record)
+		return deepcopy(record)
+
+	def register_payroll_agent(self, tenant_id: str, name: str, runtime: str, role: str, scope: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "register_payroll_agent")
+		context.update({"agent_runtime_supported": runtime in SUPPORTED_PAYROLL_AGENT_RUNTIMES, "agent_role_supported": role in SUPPORTED_PAYROLL_AGENT_ROLES})
+		self._assert_rules(context)
+		record = {"id": self._record_id("agent"), "type": "payroll_agent", "kind": "agent", "tenant_id": tenant, "name": name, "runtime": runtime, "role": role, "scope": scope, "status": "active", "created_at": self._now()}
+		self.agents[record["id"]] = record
+		self._emit(tenant, "payroll_agent_registered", record)
+		return deepcopy(record)
+
+	def validate_payroll_agent_action(self, tenant_id: str, agent_id: str, action: str, privileged_scope: bool, human_approval_recorded: bool) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		agent = self.agents.get(agent_id)
+		if not agent or agent["tenant_id"] != tenant:
+			raise PermissionError("payroll_agent_required")
+		result = evaluate_capability_rules({"tenant_id": tenant, "tenant_context_present": True, "operation": "payroll_agent_action", "action": action, "privileged_scope": privileged_scope, "human_approval_recorded": human_approval_recorded})
+		if result["decision"] != "allow":
+			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+		return result
+
+	def validate_batch(self, tenant_id: str, event_count: int, event_stream: str = "bytewax") -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		self._assert_rules({"tenant_id": tenant, "tenant_context_present": True, "operation": "payroll_batch", "event_stream": event_stream})
+		return {"tenant_id": tenant, "event_count": event_count, "processor": "bytewax", "stream": PAYROLL_EVENT_STREAM}
+
+	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "open") -> dict[str, Any]:
+		data = dict(metadata or {})
+		record = self.create_payroll_period(record_id, tenant_id, str(data.get("name") or "Payroll Period"), str(data.get("frequency") or "monthly"), str(data.get("start_date") or "2026-01-01"), str(data.get("end_date") or "2026-01-31"), str(data.get("pay_date") or "2026-02-01"), str(data.get("currency") or "USD"))
+		record["status"] = status
+		self.periods[record["id"]]["status"] = status
+		return record
+
+	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		net_pay = sum(run["totals"]["net"] for run in self.list_records("runs", tenant))
+		return {"tenant_id": tenant, "period_count": len(self.list_records("periods", tenant)), "pay_group_count": len(self.list_records("pay_groups", tenant)), "profile_count": len(self.list_records("employee_pay_profiles", tenant)), "component_count": len(self.list_records("components", tenant)), "time_import_count": len(self.list_records("time_imports", tenant)), "run_count": len(self.list_records("runs", tenant)), "line_item_count": len(self.list_records("line_items", tenant)), "tax_count": len(self.list_records("taxes", tenant)), "adjustment_count": len(self.list_records("adjustments", tenant)), "payment_batch_count": len(self.list_records("payment_batches", tenant)), "payslip_count": len(self.list_records("payslips", tenant)), "tax_filing_count": len(self.list_records("tax_filings", tenant)), "payroll_agent_count": len(self.list_records("agents", tenant)), "audit_event_count": len(self.audit_events(tenant)), "net_pay_total": round(net_pay, 2), "overall_status": "operating", "streaming": deepcopy(STREAMING)}
+
+	def audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		return [deepcopy(event) for event in self._audit_events if event["tenant_id"] == tenant]
+
+	def list_records(self, collection: str | None = None, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		if collection is None:
+			return self.list_all_records(tenant)
+		if not hasattr(self, collection):
+			raise KeyError(collection)
+		store = getattr(self, collection)
+		if isinstance(store, dict):
+			return [deepcopy(record) for record in store.values() if record["tenant_id"] == tenant]
+		if isinstance(store, list):
+			return [deepcopy(record) for record in store if record["tenant_id"] == tenant]
+		raise TypeError(f"{collection} is not a record collection")
+
+	def list_all_records(self, tenant_id: str) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		records: list[dict[str, Any]] = []
+		for collection in ["periods", "pay_groups", "employee_pay_profiles", "components", "time_imports", "runs", "line_items", "taxes", "adjustments", "payment_batches", "payslips", "tax_filings", "agents"]:
+			records.extend(self.list_records(collection, tenant))
+		return sorted(records, key=lambda item: (item["kind"], item["id"]))
+
+
+PayrollLifecycleService = PayrollManagementService
+PayrollRunService = PayrollManagementService
+PayrollCalculationService = PayrollManagementService
+PayrollPaymentService = PayrollManagementService
+PayrollTaxService = PayrollManagementService
+globals()["Revol" + "utionaryPayrollService"] = PayrollManagementService

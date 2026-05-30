@@ -4,7 +4,7 @@ APG Payroll Management - Production Validation & Testing Suite
 Comprehensive validation and testing suite for production deployment
 verification, performance testing, and system health monitoring.
 
-© 2025 Datacraft. All rights reserved.
+(c) 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
 """
 

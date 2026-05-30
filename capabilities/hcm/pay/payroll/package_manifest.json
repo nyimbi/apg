@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Payroll Management - Revolutionary",
+  "display_name": "Payroll",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,45 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 15,
+  "rule_count": 67,
+  "streaming": {
+    "events": [
+      "payroll_period_created",
+      "pay_group_created",
+      "employee_pay_profile_created",
+      "pay_component_created",
+      "time_import_recorded",
+      "payroll_run_started",
+      "payroll_line_item_added",
+      "payroll_tax_recorded",
+      "payroll_adjustment_recorded",
+      "payroll_run_approved",
+      "payroll_run_posted",
+      "payment_batch_created",
+      "payslip_published",
+      "tax_filing_created",
+      "payroll_agent_registered"
+    ],
+    "guardrails": [
+      "payroll_batch_requires_bytewax",
+      "payroll_event_requires_bytewax",
+      "privileged_payroll_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "open",
+      "calculated",
+      "review",
+      "approved",
+      "posted",
+      "paid",
+      "voided",
+      "blocked"
+    ],
+    "stream": "apg.hcm.pay.payroll.lifecycle"
+  },
+  "version": "2.1.0"
 }

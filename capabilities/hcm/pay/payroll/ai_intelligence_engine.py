@@ -1,10 +1,10 @@
 """
 APG Payroll Management - AI-Powered Intelligence Engine
 
-Revolutionary AI intelligence engine with predictive capabilities,
+Governed AI intelligence engine with predictive capabilities,
 automated error detection, and intelligent payroll optimization.
 
-© 2025 Datacraft. All rights reserved.
+(c) 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
 """
 
@@ -122,7 +122,7 @@ class PayrollIntelligenceConfig(BaseModel):
 
 
 class PayrollIntelligenceEngine:
-	"""Revolutionary AI-powered payroll intelligence engine.
+	"""Governed AI-powered payroll intelligence engine.
 	
 	Provides predictive analytics, anomaly detection, intelligent validation,
 	and automated optimization for payroll processing.

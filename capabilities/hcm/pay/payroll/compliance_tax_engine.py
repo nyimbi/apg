@@ -1,10 +1,10 @@
 """
 APG Payroll Management - Intelligent Compliance & Tax Engine
 
-Revolutionary compliance and tax calculation engine with AI-powered
+Governed compliance and tax calculation engine with AI-powered
 regulatory monitoring, automated filing, and intelligent optimization.
 
-© 2025 Datacraft. All rights reserved.
+(c) 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
 """
 
@@ -136,7 +136,7 @@ class ComplianceTaxConfig(BaseModel):
 
 
 class IntelligentComplianceTaxEngine:
-	"""Revolutionary compliance and tax calculation engine.
+	"""Governed compliance and tax calculation engine.
 	
 	Provides AI-powered regulatory monitoring, automated compliance validation,
 	intelligent tax calculations, and predictive compliance risk assessment.

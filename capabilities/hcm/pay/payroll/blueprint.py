@@ -1,10 +1,10 @@
 """
 APG Payroll Management - Flask-AppBuilder Blueprint Integration
 
-Revolutionary Flask-AppBuilder blueprint providing seamless integration
+Governed Flask-AppBuilder blueprint providing seamless integration
 with the APG platform ecosystem and advanced payroll management capabilities.
 
-© 2025 Datacraft. All rights reserved.
+(c) 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
 """
 
@@ -34,7 +34,7 @@ from .models import (
 	PRPayrollPeriod, PRPayrollRun, PREmployeePayroll, PRPayComponent,
 	PRPayrollLineItem, PRTaxCalculation, PRPayrollAdjustment
 )
-from .service import RevolutionaryPayrollService
+from .service import PayrollManagementService
 from .ai_intelligence_engine import PayrollIntelligenceEngine
 from .conversational_assistant import ConversationalPayrollAssistant
 from .compliance_tax_engine import IntelligentComplianceTaxEngine
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 
 class PayrollCapabilityBlueprint:
-	"""Revolutionary APG Payroll Management Blueprint.
+	"""Governed APG Payroll Management Blueprint.
 	
 	Provides comprehensive payroll management capabilities with seamless
 	APG platform integration, AI-powered automation, and enterprise-grade
@@ -72,8 +72,8 @@ class PayrollCapabilityBlueprint:
 		self.config = {
 			'name': 'payroll_management',
 			'display_name': 'Payroll Management',
-			'version': '2.0.0-revolutionary',
-			'description': 'Revolutionary AI-powered payroll management system',
+			'version': '2.0.0-governed',
+			'description': 'Governed AI-powered payroll management system',
 			'category': 'Human Capital Management',
 			'priority': 1,
 			'requires_auth': True,
@@ -167,7 +167,7 @@ class PayrollCapabilityBlueprint:
 		"""Initialize core payroll services."""
 		try:
 			# Initialize payroll service
-			self.payroll_service = RevolutionaryPayrollService(
+			self.payroll_service = PayrollManagementService(
 				db_session=self.db,
 				auth_service=getattr(self.appbuilder, 'auth_service', None),
 				compliance_service=getattr(self.appbuilder, 'compliance_service', None),

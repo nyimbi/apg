@@ -1,60 +1,246 @@
 {
-  "agents": {},
   "app": {
-    "description": "Payroll Management - Revolutionary package-backed APG capability",
-    "entity_count": 0,
+    "description": "Payroll package-backed APG capability",
+    "entity_count": 13,
     "name": "pay_payroll",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "pay_payroll": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Pay",
-          "enabled": true,
-          "id": "pay_payroll",
-          "name": "Payroll Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/hcm/pay/payroll/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "banking": "adapter",
+          "benefits": "adapter",
+          "employee_data": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "tax_authority": "adapter",
+          "theme": "adapter",
+          "time_attendance": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "adjustments": {
+          "approval_required": true,
+          "employee_required": true,
+          "reason_required": true,
+          "run_required": true
+        },
+        "components": {
+          "code_required": true,
+          "currency_required": true,
+          "name_required": true,
+          "supported_types": [
+            "earning",
+            "deduction",
+            "tax",
+            "benefit",
+            "reimbursement",
+            "garnishment"
+          ],
+          "taxable_flag_required": true
+        },
+        "employee_pay_profiles": {
+          "bank_review_required": true,
+          "currency_required": true,
+          "employee_required": true,
+          "pay_group_required": true,
+          "payment_method_required": true,
+          "supported_payment_methods": [
+            "bank_transfer",
+            "check",
+            "cash",
+            "mobile_money",
+            "pay_card"
+          ],
+          "tax_id_required": true
+        },
+        "governance": {
+          "approval_before_payment": true,
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "line_items": {
+          "amount_required": true,
+          "component_required": true,
+          "employee_required": true,
+          "negative_amount_review_required": true,
+          "run_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_component_events": true,
+          "emit_pay_group_events": true,
+          "emit_payment_events": true,
+          "emit_period_events": true,
+          "emit_profile_events": true,
+          "emit_run_events": true,
+          "emit_tax_events": true,
+          "event_stream": "apg.hcm.pay.payroll.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "pay_groups": {
+          "code_required": true,
+          "country_required": true,
+          "currency_required": true,
+          "frequency_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "payments": {
+          "approval_required": true,
+          "payment_date_required": true,
+          "positive_net_pay_required": true,
+          "run_required": true
+        },
+        "payroll_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "payroll_reviewer",
+            "tax_reviewer",
+            "compliance_reviewer",
+            "payment_reviewer",
+            "variance_reviewer",
+            "employee_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "payslips": {
+          "employee_required": true,
+          "posting_required": true,
+          "privacy_basis_required": true,
+          "run_required": true
+        },
+        "periods": {
+          "currency_required": true,
+          "end_date_required": true,
+          "frequency_required": true,
+          "name_required": true,
+          "pay_date_required": true,
+          "start_date_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "ZAR",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_frequencies": [
+            "weekly",
+            "biweekly",
+            "semimonthly",
+            "monthly"
+          ]
+        },
+        "runs": {
+          "approval_required_before_posting": true,
+          "initiator_required": true,
+          "pay_group_required": true,
+          "period_required": true,
+          "variance_review_threshold_percent": 10
+        },
+        "tax_filings": {
+          "approval_required": true,
+          "authority_required": true,
+          "period_required": true,
+          "run_required": true
+        },
+        "taxes": {
+          "amount_required": true,
+          "employee_required": true,
+          "run_required": true,
+          "supported_scopes": [
+            "employee",
+            "employer",
+            "statutory",
+            "local",
+            "social_security"
+          ],
+          "tax_authority_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "pay_payroll_operations"
+          "default_theme": "payroll_control"
+        },
+        "time_imports": {
+          "approval_required_for_overtime": true,
+          "employee_required": true,
+          "hours_nonnegative": true,
+          "period_required": true,
+          "source_required": true
         },
         "ui": {
+          "enable_adjustments": true,
+          "enable_agents": true,
+          "enable_components": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_filings": true,
+          "enable_line_items": true,
+          "enable_pay_groups": true,
+          "enable_payments": true,
+          "enable_payslips": true,
+          "enable_periods": true,
+          "enable_profiles": true,
+          "enable_runs": true,
+          "enable_settings": true,
+          "enable_taxes": true,
+          "enable_time_imports": true
         }
       },
-      "erp_modules": [
-        "hcm"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Payroll Management - Revolutionary",
+      "name": "Payroll",
       "provides": [
-        "pay_payroll_operations"
+        "payroll_period_lifecycle",
+        "pay_group_lifecycle",
+        "employee_pay_profile_lifecycle",
+        "pay_component_lifecycle",
+        "time_import_lifecycle",
+        "payroll_run_lifecycle",
+        "payroll_line_item_lifecycle",
+        "payroll_tax_lifecycle",
+        "payroll_adjustment_lifecycle",
+        "payroll_payment_workflow",
+        "payslip_lifecycle",
+        "payroll_tax_filing_lifecycle",
+        "payroll_dashboard_service",
+        "payroll_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "employee_profile_lifecycle",
+        "time_attendance",
+        "benefits",
+        "general_ledger",
+        "banking",
+        "tax_authority"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Payroll Management - Revolutionary operations require tenant context.",
+            "description": "Payroll operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +253,862 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Payroll Management - Revolutionary write operations require policy enforcement.",
+            "description": "Payroll writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "payroll_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "name_present": false,
+              "operation": "create_payroll_period"
             },
-            "description": "High-risk Payroll Management - Revolutionary operations require review.",
+            "description": "Payroll periods require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_name_required",
+              "required_action": "set_period_name"
+            },
+            "name": "period_requires_name"
+          },
+          {
+            "condition": {
+              "frequency_supported": false,
+              "operation": "create_payroll_period"
+            },
+            "description": "Payroll period frequency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_frequency_not_supported",
+              "required_action": "select_supported_frequency"
+            },
+            "name": "period_frequency_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_payroll_period",
+              "start_date_present": false
+            },
+            "description": "Payroll periods require start date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_start_date_required",
+              "required_action": "set_start_date"
+            },
+            "name": "period_requires_start_date"
+          },
+          {
+            "condition": {
+              "end_date_present": false,
+              "operation": "create_payroll_period"
+            },
+            "description": "Payroll periods require end date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_end_date_required",
+              "required_action": "set_end_date"
+            },
+            "name": "period_requires_end_date"
+          },
+          {
+            "condition": {
+              "operation": "create_payroll_period",
+              "pay_date_present": false
+            },
+            "description": "Payroll periods require pay date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_date_required",
+              "required_action": "set_pay_date"
+            },
+            "name": "period_requires_pay_date"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_payroll_period"
+            },
+            "description": "Payroll period currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "period_currency_supported"
+          },
+          {
+            "condition": {
+              "code_present": false,
+              "operation": "create_pay_group"
+            },
+            "description": "Pay groups require code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_group_code_required",
+              "required_action": "set_pay_group_code"
+            },
+            "name": "pay_group_requires_code"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_pay_group"
+            },
+            "description": "Pay groups require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_group_name_required",
+              "required_action": "set_pay_group_name"
+            },
+            "name": "pay_group_requires_name"
+          },
+          {
+            "condition": {
+              "frequency_supported": false,
+              "operation": "create_pay_group"
+            },
+            "description": "Pay group frequency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_frequency_not_supported",
+              "required_action": "select_supported_frequency"
+            },
+            "name": "pay_group_frequency_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_pay_group"
+            },
+            "description": "Pay group currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "pay_group_currency_supported"
+          },
+          {
+            "condition": {
+              "country_present": false,
+              "operation": "create_pay_group"
+            },
+            "description": "Pay groups require country.",
+            "effect": {
+              "decision": "deny",
+              "reason": "country_required",
+              "required_action": "set_country"
+            },
+            "name": "pay_group_requires_country"
+          },
+          {
+            "condition": {
+              "operation": "create_pay_group",
+              "owner_present": false
+            },
+            "description": "Pay groups require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_group_owner_required",
+              "required_action": "assign_pay_group_owner"
+            },
+            "name": "pay_group_requires_owner"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "create_employee_pay_profile"
+            },
+            "description": "Employee pay profiles require employee.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_required",
+              "required_action": "select_employee"
+            },
+            "name": "profile_requires_employee"
+          },
+          {
+            "condition": {
+              "operation": "create_employee_pay_profile",
+              "pay_group_present": false
+            },
+            "description": "Employee pay profiles require pay group.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_group_required",
+              "required_action": "select_pay_group"
+            },
+            "name": "profile_requires_pay_group"
+          },
+          {
+            "condition": {
+              "operation": "create_employee_pay_profile",
+              "payment_method_supported": false
+            },
+            "description": "Employee pay profile payment method must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_method_not_supported",
+              "required_action": "select_supported_payment_method"
+            },
+            "name": "profile_payment_method_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_employee_pay_profile",
+              "tax_id_present": false
+            },
+            "description": "Employee pay profiles require tax id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_id_required",
+              "required_action": "set_tax_id"
+            },
+            "name": "profile_requires_tax_id"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_employee_pay_profile"
+            },
+            "description": "Employee pay profile currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "profile_currency_supported"
+          },
+          {
+            "condition": {
+              "bank_payment": true,
+              "operation": "create_employee_pay_profile",
+              "review_recorded": false
+            },
+            "description": "Bank payment profiles require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "bank_profile_review_required",
+              "required_action": "record_bank_profile_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "bank_profile_requires_review"
+          },
+          {
+            "condition": {
+              "code_present": false,
+              "operation": "create_pay_component"
+            },
+            "description": "Pay components require code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_code_required",
+              "required_action": "set_component_code"
+            },
+            "name": "component_requires_code"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_pay_component"
+            },
+            "description": "Pay components require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_name_required",
+              "required_action": "set_component_name"
+            },
+            "name": "component_requires_name"
+          },
+          {
+            "condition": {
+              "component_type_supported": false,
+              "operation": "create_pay_component"
+            },
+            "description": "Pay component type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_type_not_supported",
+              "required_action": "select_supported_component_type"
+            },
+            "name": "component_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_pay_component"
+            },
+            "description": "Pay component currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "component_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_pay_component",
+              "taxable_flag_present": false
+            },
+            "description": "Pay components require taxable flag.",
+            "effect": {
+              "decision": "deny",
+              "reason": "taxable_flag_required",
+              "required_action": "set_taxable_flag"
+            },
+            "name": "component_requires_taxable_flag"
+          },
+          {
+            "condition": {
+              "operation": "record_time_import",
+              "period_present": false
+            },
+            "description": "Time imports require payroll period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_required",
+              "required_action": "select_period"
+            },
+            "name": "time_import_requires_period"
+          },
+          {
+            "condition": {
+              "operation": "record_time_import",
+              "profile_present": false
+            },
+            "description": "Time imports require employee pay profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_profile_required",
+              "required_action": "select_employee_profile"
+            },
+            "name": "time_import_requires_employee"
+          },
+          {
+            "condition": {
+              "hours_lt": 0,
+              "operation": "record_time_import"
+            },
+            "description": "Time import hours cannot be negative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hours_invalid",
+              "required_action": "set_valid_hours"
+            },
+            "name": "time_import_hours_nonnegative"
+          },
+          {
+            "condition": {
+              "operation": "record_time_import",
+              "source_present": false
+            },
+            "description": "Time imports require source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "time_source_required",
+              "required_action": "set_time_source"
+            },
+            "name": "time_import_requires_source"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "record_time_import",
+              "overtime": true
+            },
+            "description": "Overtime imports require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "overtime_approval_required",
+              "required_action": "record_overtime_approval"
+            },
+            "name": "overtime_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "start_payroll_run",
+              "period_present": false
+            },
+            "description": "Payroll runs require period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_required",
+              "required_action": "select_period"
+            },
+            "name": "run_requires_period"
+          },
+          {
+            "condition": {
+              "operation": "start_payroll_run",
+              "pay_group_present": false
+            },
+            "description": "Payroll runs require pay group.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pay_group_required",
+              "required_action": "select_pay_group"
+            },
+            "name": "run_requires_pay_group"
+          },
+          {
+            "condition": {
+              "initiator_present": false,
+              "operation": "start_payroll_run"
+            },
+            "description": "Payroll runs require initiator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_initiator_required",
+              "required_action": "set_run_initiator"
+            },
+            "name": "run_requires_initiator"
+          },
+          {
+            "condition": {
+              "operation": "add_line_item",
+              "run_present": false
+            },
+            "description": "Payroll line items require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "line_requires_run"
+          },
+          {
+            "condition": {
+              "operation": "add_line_item",
+              "profile_present": false
+            },
+            "description": "Payroll line items require employee profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_profile_required",
+              "required_action": "select_employee_profile"
+            },
+            "name": "line_requires_profile"
+          },
+          {
+            "condition": {
+              "component_present": false,
+              "operation": "add_line_item"
+            },
+            "description": "Payroll line items require component.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_required",
+              "required_action": "select_component"
+            },
+            "name": "line_requires_component"
+          },
+          {
+            "condition": {
+              "amount_present": false,
+              "operation": "add_line_item"
+            },
+            "description": "Payroll line items require amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "amount_required",
+              "required_action": "set_amount"
+            },
+            "name": "line_requires_amount"
+          },
+          {
+            "condition": {
+              "negative_amount": true,
+              "operation": "add_line_item",
+              "review_recorded": false
+            },
+            "description": "Negative payroll lines require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "negative_amount_review_required",
+              "required_action": "record_negative_amount_review"
+            },
+            "name": "negative_line_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "record_tax",
+              "run_present": false
+            },
+            "description": "Payroll tax records require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "tax_requires_run"
+          },
+          {
+            "condition": {
+              "operation": "record_tax",
+              "profile_present": false
+            },
+            "description": "Payroll tax records require employee profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_profile_required",
+              "required_action": "select_employee_profile"
+            },
+            "name": "tax_requires_profile"
+          },
+          {
+            "condition": {
+              "operation": "record_tax",
+              "tax_scope_supported": false
+            },
+            "description": "Payroll tax scope must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_scope_not_supported",
+              "required_action": "select_supported_tax_scope"
+            },
+            "name": "tax_scope_supported"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "record_tax"
+            },
+            "description": "Payroll tax records require tax authority.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_authority_required",
+              "required_action": "set_tax_authority"
+            },
+            "name": "tax_requires_authority"
+          },
+          {
+            "condition": {
+              "amount_present": false,
+              "operation": "record_tax"
+            },
+            "description": "Payroll tax records require amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "amount_required",
+              "required_action": "set_amount"
+            },
+            "name": "tax_requires_amount"
+          },
+          {
+            "condition": {
+              "operation": "record_adjustment",
+              "run_present": false
+            },
+            "description": "Payroll adjustments require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "adjustment_requires_run"
+          },
+          {
+            "condition": {
+              "operation": "record_adjustment",
+              "profile_present": false
+            },
+            "description": "Payroll adjustments require employee profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_profile_required",
+              "required_action": "select_employee_profile"
+            },
+            "name": "adjustment_requires_profile"
+          },
+          {
+            "condition": {
+              "operation": "record_adjustment",
+              "reason_present": false
+            },
+            "description": "Payroll adjustments require reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "adjustment_reason_required",
+              "required_action": "set_adjustment_reason"
+            },
+            "name": "adjustment_requires_reason"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "record_adjustment"
+            },
+            "description": "Payroll adjustments require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "adjustment_approval_required",
+              "required_action": "record_adjustment_approval"
+            },
+            "name": "adjustment_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "approve_payroll_run",
+              "run_present": false
+            },
+            "description": "Payroll approvals require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "approval_requires_run"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "approve_payroll_run"
+            },
+            "description": "Payroll approvals require approver.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payroll_approver_required",
+              "required_action": "assign_payroll_approver"
+            },
+            "name": "approval_requires_approver"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "post_payroll_run"
+            },
+            "description": "Payroll posting requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payroll_approval_required",
+              "required_action": "approve_payroll_run"
+            },
+            "name": "posting_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "create_payment_batch",
+              "run_present": false
+            },
+            "description": "Payment batches require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "payment_requires_run"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_payment_batch"
+            },
+            "description": "Payment batches require approved run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_approval_required",
+              "required_action": "approve_payroll_run"
+            },
+            "name": "payment_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "create_payment_batch",
+              "payment_date_present": false
+            },
+            "description": "Payment batches require payment date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_date_required",
+              "required_action": "set_payment_date"
+            },
+            "name": "payment_requires_date"
+          },
+          {
+            "condition": {
+              "net_pay_lte": 0,
+              "operation": "create_payment_batch"
+            },
+            "description": "Payment batches require positive net pay.",
+            "effect": {
+              "decision": "deny",
+              "reason": "net_pay_invalid",
+              "required_action": "calculate_positive_net_pay"
+            },
+            "name": "payment_net_positive"
+          },
+          {
+            "condition": {
+              "operation": "publish_payslip",
+              "run_present": false
+            },
+            "description": "Payslips require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "payslip_requires_run"
+          },
+          {
+            "condition": {
+              "operation": "publish_payslip",
+              "profile_present": false
+            },
+            "description": "Payslips require employee profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_profile_required",
+              "required_action": "select_employee_profile"
+            },
+            "name": "payslip_requires_profile"
+          },
+          {
+            "condition": {
+              "operation": "publish_payslip",
+              "posted_run": false
+            },
+            "description": "Payslips require posted run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "posted_run_required",
+              "required_action": "post_payroll_run"
+            },
+            "name": "payslip_requires_posted_run"
+          },
+          {
+            "condition": {
+              "operation": "publish_payslip",
+              "privacy_basis_present": false
+            },
+            "description": "Payslips require privacy basis.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_basis_required",
+              "required_action": "set_privacy_basis"
+            },
+            "name": "payslip_requires_privacy_basis"
+          },
+          {
+            "condition": {
+              "operation": "create_tax_filing",
+              "run_present": false
+            },
+            "description": "Tax filings require run.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_required",
+              "required_action": "select_run"
+            },
+            "name": "filing_requires_run"
+          },
+          {
+            "condition": {
+              "authority_present": false,
+              "operation": "create_tax_filing"
+            },
+            "description": "Tax filings require authority.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_authority_required",
+              "required_action": "set_tax_authority"
+            },
+            "name": "filing_requires_authority"
+          },
+          {
+            "condition": {
+              "operation": "create_tax_filing",
+              "period_present": false
+            },
+            "description": "Tax filings require period reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_required",
+              "required_action": "select_period"
+            },
+            "name": "filing_requires_period"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_tax_filing"
+            },
+            "description": "Tax filings require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tax_filing_approval_required",
+              "required_action": "record_tax_filing_approval"
+            },
+            "name": "filing_requires_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "payroll_batch"
+            },
+            "description": "Payroll batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_payroll_batch_to_bytewax"
+            },
+            "name": "payroll_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "payroll_event"
+            },
+            "description": "Payroll events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_payroll_event_to_bytewax"
+            },
+            "name": "payroll_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_payroll_agent"
+            },
+            "description": "Payroll agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payroll_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "payroll_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_payroll_agent"
+            },
+            "description": "Payroll agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payroll_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "payroll_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "payroll_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged payroll actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_payroll_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +1118,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Payroll Management - Revolutionary operations require tenant context.",
+          "description": "Payroll operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +1131,862 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Payroll Management - Revolutionary write operations require policy enforcement.",
+          "description": "Payroll writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "payroll_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "name_present": false,
+            "operation": "create_payroll_period"
           },
-          "description": "High-risk Payroll Management - Revolutionary operations require review.",
+          "description": "Payroll periods require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_name_required",
+            "required_action": "set_period_name"
+          },
+          "name": "period_requires_name"
+        },
+        {
+          "condition": {
+            "frequency_supported": false,
+            "operation": "create_payroll_period"
+          },
+          "description": "Payroll period frequency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_frequency_not_supported",
+            "required_action": "select_supported_frequency"
+          },
+          "name": "period_frequency_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_payroll_period",
+            "start_date_present": false
+          },
+          "description": "Payroll periods require start date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_start_date_required",
+            "required_action": "set_start_date"
+          },
+          "name": "period_requires_start_date"
+        },
+        {
+          "condition": {
+            "end_date_present": false,
+            "operation": "create_payroll_period"
+          },
+          "description": "Payroll periods require end date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_end_date_required",
+            "required_action": "set_end_date"
+          },
+          "name": "period_requires_end_date"
+        },
+        {
+          "condition": {
+            "operation": "create_payroll_period",
+            "pay_date_present": false
+          },
+          "description": "Payroll periods require pay date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_date_required",
+            "required_action": "set_pay_date"
+          },
+          "name": "period_requires_pay_date"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_payroll_period"
+          },
+          "description": "Payroll period currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "period_currency_supported"
+        },
+        {
+          "condition": {
+            "code_present": false,
+            "operation": "create_pay_group"
+          },
+          "description": "Pay groups require code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_group_code_required",
+            "required_action": "set_pay_group_code"
+          },
+          "name": "pay_group_requires_code"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_pay_group"
+          },
+          "description": "Pay groups require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_group_name_required",
+            "required_action": "set_pay_group_name"
+          },
+          "name": "pay_group_requires_name"
+        },
+        {
+          "condition": {
+            "frequency_supported": false,
+            "operation": "create_pay_group"
+          },
+          "description": "Pay group frequency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_frequency_not_supported",
+            "required_action": "select_supported_frequency"
+          },
+          "name": "pay_group_frequency_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_pay_group"
+          },
+          "description": "Pay group currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "pay_group_currency_supported"
+        },
+        {
+          "condition": {
+            "country_present": false,
+            "operation": "create_pay_group"
+          },
+          "description": "Pay groups require country.",
+          "effect": {
+            "decision": "deny",
+            "reason": "country_required",
+            "required_action": "set_country"
+          },
+          "name": "pay_group_requires_country"
+        },
+        {
+          "condition": {
+            "operation": "create_pay_group",
+            "owner_present": false
+          },
+          "description": "Pay groups require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_group_owner_required",
+            "required_action": "assign_pay_group_owner"
+          },
+          "name": "pay_group_requires_owner"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "create_employee_pay_profile"
+          },
+          "description": "Employee pay profiles require employee.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_required",
+            "required_action": "select_employee"
+          },
+          "name": "profile_requires_employee"
+        },
+        {
+          "condition": {
+            "operation": "create_employee_pay_profile",
+            "pay_group_present": false
+          },
+          "description": "Employee pay profiles require pay group.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_group_required",
+            "required_action": "select_pay_group"
+          },
+          "name": "profile_requires_pay_group"
+        },
+        {
+          "condition": {
+            "operation": "create_employee_pay_profile",
+            "payment_method_supported": false
+          },
+          "description": "Employee pay profile payment method must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_method_not_supported",
+            "required_action": "select_supported_payment_method"
+          },
+          "name": "profile_payment_method_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_employee_pay_profile",
+            "tax_id_present": false
+          },
+          "description": "Employee pay profiles require tax id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_id_required",
+            "required_action": "set_tax_id"
+          },
+          "name": "profile_requires_tax_id"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_employee_pay_profile"
+          },
+          "description": "Employee pay profile currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "profile_currency_supported"
+        },
+        {
+          "condition": {
+            "bank_payment": true,
+            "operation": "create_employee_pay_profile",
+            "review_recorded": false
+          },
+          "description": "Bank payment profiles require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "bank_profile_review_required",
+            "required_action": "record_bank_profile_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "bank_profile_requires_review"
+        },
+        {
+          "condition": {
+            "code_present": false,
+            "operation": "create_pay_component"
+          },
+          "description": "Pay components require code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_code_required",
+            "required_action": "set_component_code"
+          },
+          "name": "component_requires_code"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_pay_component"
+          },
+          "description": "Pay components require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_name_required",
+            "required_action": "set_component_name"
+          },
+          "name": "component_requires_name"
+        },
+        {
+          "condition": {
+            "component_type_supported": false,
+            "operation": "create_pay_component"
+          },
+          "description": "Pay component type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_type_not_supported",
+            "required_action": "select_supported_component_type"
+          },
+          "name": "component_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_pay_component"
+          },
+          "description": "Pay component currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "component_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_pay_component",
+            "taxable_flag_present": false
+          },
+          "description": "Pay components require taxable flag.",
+          "effect": {
+            "decision": "deny",
+            "reason": "taxable_flag_required",
+            "required_action": "set_taxable_flag"
+          },
+          "name": "component_requires_taxable_flag"
+        },
+        {
+          "condition": {
+            "operation": "record_time_import",
+            "period_present": false
+          },
+          "description": "Time imports require payroll period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_required",
+            "required_action": "select_period"
+          },
+          "name": "time_import_requires_period"
+        },
+        {
+          "condition": {
+            "operation": "record_time_import",
+            "profile_present": false
+          },
+          "description": "Time imports require employee pay profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_profile_required",
+            "required_action": "select_employee_profile"
+          },
+          "name": "time_import_requires_employee"
+        },
+        {
+          "condition": {
+            "hours_lt": 0,
+            "operation": "record_time_import"
+          },
+          "description": "Time import hours cannot be negative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hours_invalid",
+            "required_action": "set_valid_hours"
+          },
+          "name": "time_import_hours_nonnegative"
+        },
+        {
+          "condition": {
+            "operation": "record_time_import",
+            "source_present": false
+          },
+          "description": "Time imports require source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "time_source_required",
+            "required_action": "set_time_source"
+          },
+          "name": "time_import_requires_source"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "record_time_import",
+            "overtime": true
+          },
+          "description": "Overtime imports require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "overtime_approval_required",
+            "required_action": "record_overtime_approval"
+          },
+          "name": "overtime_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "start_payroll_run",
+            "period_present": false
+          },
+          "description": "Payroll runs require period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_required",
+            "required_action": "select_period"
+          },
+          "name": "run_requires_period"
+        },
+        {
+          "condition": {
+            "operation": "start_payroll_run",
+            "pay_group_present": false
+          },
+          "description": "Payroll runs require pay group.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pay_group_required",
+            "required_action": "select_pay_group"
+          },
+          "name": "run_requires_pay_group"
+        },
+        {
+          "condition": {
+            "initiator_present": false,
+            "operation": "start_payroll_run"
+          },
+          "description": "Payroll runs require initiator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_initiator_required",
+            "required_action": "set_run_initiator"
+          },
+          "name": "run_requires_initiator"
+        },
+        {
+          "condition": {
+            "operation": "add_line_item",
+            "run_present": false
+          },
+          "description": "Payroll line items require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "line_requires_run"
+        },
+        {
+          "condition": {
+            "operation": "add_line_item",
+            "profile_present": false
+          },
+          "description": "Payroll line items require employee profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_profile_required",
+            "required_action": "select_employee_profile"
+          },
+          "name": "line_requires_profile"
+        },
+        {
+          "condition": {
+            "component_present": false,
+            "operation": "add_line_item"
+          },
+          "description": "Payroll line items require component.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_required",
+            "required_action": "select_component"
+          },
+          "name": "line_requires_component"
+        },
+        {
+          "condition": {
+            "amount_present": false,
+            "operation": "add_line_item"
+          },
+          "description": "Payroll line items require amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "amount_required",
+            "required_action": "set_amount"
+          },
+          "name": "line_requires_amount"
+        },
+        {
+          "condition": {
+            "negative_amount": true,
+            "operation": "add_line_item",
+            "review_recorded": false
+          },
+          "description": "Negative payroll lines require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "negative_amount_review_required",
+            "required_action": "record_negative_amount_review"
+          },
+          "name": "negative_line_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "record_tax",
+            "run_present": false
+          },
+          "description": "Payroll tax records require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "tax_requires_run"
+        },
+        {
+          "condition": {
+            "operation": "record_tax",
+            "profile_present": false
+          },
+          "description": "Payroll tax records require employee profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_profile_required",
+            "required_action": "select_employee_profile"
+          },
+          "name": "tax_requires_profile"
+        },
+        {
+          "condition": {
+            "operation": "record_tax",
+            "tax_scope_supported": false
+          },
+          "description": "Payroll tax scope must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_scope_not_supported",
+            "required_action": "select_supported_tax_scope"
+          },
+          "name": "tax_scope_supported"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "record_tax"
+          },
+          "description": "Payroll tax records require tax authority.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_authority_required",
+            "required_action": "set_tax_authority"
+          },
+          "name": "tax_requires_authority"
+        },
+        {
+          "condition": {
+            "amount_present": false,
+            "operation": "record_tax"
+          },
+          "description": "Payroll tax records require amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "amount_required",
+            "required_action": "set_amount"
+          },
+          "name": "tax_requires_amount"
+        },
+        {
+          "condition": {
+            "operation": "record_adjustment",
+            "run_present": false
+          },
+          "description": "Payroll adjustments require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "adjustment_requires_run"
+        },
+        {
+          "condition": {
+            "operation": "record_adjustment",
+            "profile_present": false
+          },
+          "description": "Payroll adjustments require employee profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_profile_required",
+            "required_action": "select_employee_profile"
+          },
+          "name": "adjustment_requires_profile"
+        },
+        {
+          "condition": {
+            "operation": "record_adjustment",
+            "reason_present": false
+          },
+          "description": "Payroll adjustments require reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "adjustment_reason_required",
+            "required_action": "set_adjustment_reason"
+          },
+          "name": "adjustment_requires_reason"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "record_adjustment"
+          },
+          "description": "Payroll adjustments require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "adjustment_approval_required",
+            "required_action": "record_adjustment_approval"
+          },
+          "name": "adjustment_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "approve_payroll_run",
+            "run_present": false
+          },
+          "description": "Payroll approvals require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "approval_requires_run"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "approve_payroll_run"
+          },
+          "description": "Payroll approvals require approver.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payroll_approver_required",
+            "required_action": "assign_payroll_approver"
+          },
+          "name": "approval_requires_approver"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "post_payroll_run"
+          },
+          "description": "Payroll posting requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payroll_approval_required",
+            "required_action": "approve_payroll_run"
+          },
+          "name": "posting_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "create_payment_batch",
+            "run_present": false
+          },
+          "description": "Payment batches require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "payment_requires_run"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_payment_batch"
+          },
+          "description": "Payment batches require approved run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_approval_required",
+            "required_action": "approve_payroll_run"
+          },
+          "name": "payment_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "create_payment_batch",
+            "payment_date_present": false
+          },
+          "description": "Payment batches require payment date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_date_required",
+            "required_action": "set_payment_date"
+          },
+          "name": "payment_requires_date"
+        },
+        {
+          "condition": {
+            "net_pay_lte": 0,
+            "operation": "create_payment_batch"
+          },
+          "description": "Payment batches require positive net pay.",
+          "effect": {
+            "decision": "deny",
+            "reason": "net_pay_invalid",
+            "required_action": "calculate_positive_net_pay"
+          },
+          "name": "payment_net_positive"
+        },
+        {
+          "condition": {
+            "operation": "publish_payslip",
+            "run_present": false
+          },
+          "description": "Payslips require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "payslip_requires_run"
+        },
+        {
+          "condition": {
+            "operation": "publish_payslip",
+            "profile_present": false
+          },
+          "description": "Payslips require employee profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_profile_required",
+            "required_action": "select_employee_profile"
+          },
+          "name": "payslip_requires_profile"
+        },
+        {
+          "condition": {
+            "operation": "publish_payslip",
+            "posted_run": false
+          },
+          "description": "Payslips require posted run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "posted_run_required",
+            "required_action": "post_payroll_run"
+          },
+          "name": "payslip_requires_posted_run"
+        },
+        {
+          "condition": {
+            "operation": "publish_payslip",
+            "privacy_basis_present": false
+          },
+          "description": "Payslips require privacy basis.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_basis_required",
+            "required_action": "set_privacy_basis"
+          },
+          "name": "payslip_requires_privacy_basis"
+        },
+        {
+          "condition": {
+            "operation": "create_tax_filing",
+            "run_present": false
+          },
+          "description": "Tax filings require run.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_required",
+            "required_action": "select_run"
+          },
+          "name": "filing_requires_run"
+        },
+        {
+          "condition": {
+            "authority_present": false,
+            "operation": "create_tax_filing"
+          },
+          "description": "Tax filings require authority.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_authority_required",
+            "required_action": "set_tax_authority"
+          },
+          "name": "filing_requires_authority"
+        },
+        {
+          "condition": {
+            "operation": "create_tax_filing",
+            "period_present": false
+          },
+          "description": "Tax filings require period reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_required",
+            "required_action": "select_period"
+          },
+          "name": "filing_requires_period"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_tax_filing"
+          },
+          "description": "Tax filings require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tax_filing_approval_required",
+            "required_action": "record_tax_filing_approval"
+          },
+          "name": "filing_requires_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "payroll_batch"
+          },
+          "description": "Payroll batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_payroll_batch_to_bytewax"
+          },
+          "name": "payroll_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "payroll_event"
+          },
+          "description": "Payroll events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_payroll_event_to_bytewax"
+          },
+          "name": "payroll_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_payroll_agent"
+          },
+          "description": "Payroll agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payroll_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "payroll_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_payroll_agent"
+          },
+          "description": "Payroll agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payroll_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "payroll_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "payroll_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged payroll actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_payroll_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,55 +1996,183 @@
         "views": "views.py"
       },
       "screens": {
+        "adjustments": {
+          "component": "PayrollAdjustmentWorkbench",
+          "permission": "pay_payroll:adjust",
+          "route": "/hcm/payroll/adjustments"
+        },
+        "agents": {
+          "component": "PayrollAgentWorkbench",
+          "permission": "pay_payroll:admin",
+          "route": "/hcm/payroll/agents"
+        },
+        "components": {
+          "component": "PayComponentWorkbench",
+          "permission": "pay_payroll:manage_setup",
+          "route": "/hcm/payroll/components"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "PayrollDashboard",
           "permission": "pay_payroll:view",
-          "route": "/pay-payroll/dashboard"
+          "route": "/hcm/payroll/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "pay_payroll:operate",
-          "route": "/pay-payroll/operations"
+        "filings": {
+          "component": "PayrollTaxFilingWorkbench",
+          "permission": "pay_payroll:file_tax",
+          "route": "/hcm/payroll/tax-filings"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "pay_payroll:govern",
-          "route": "/pay-payroll/rules"
+        "line_items": {
+          "component": "PayrollLineItemWorkbench",
+          "permission": "pay_payroll:review",
+          "route": "/hcm/payroll/line-items"
+        },
+        "pay_groups": {
+          "component": "PayGroupWorkbench",
+          "permission": "pay_payroll:manage_setup",
+          "route": "/hcm/payroll/pay-groups"
+        },
+        "payments": {
+          "component": "PayrollPaymentWorkbench",
+          "permission": "pay_payroll:pay",
+          "route": "/hcm/payroll/payments"
+        },
+        "payslips": {
+          "component": "PayslipWorkbench",
+          "permission": "pay_payroll:view_payslips",
+          "route": "/hcm/payroll/payslips"
+        },
+        "periods": {
+          "component": "PayrollPeriodWorkbench",
+          "permission": "pay_payroll:manage_periods",
+          "route": "/hcm/payroll/periods"
+        },
+        "profiles": {
+          "component": "EmployeePayProfileWorkbench",
+          "permission": "pay_payroll:manage_profiles",
+          "route": "/hcm/payroll/profiles"
+        },
+        "runs": {
+          "component": "PayrollRunWorkbench",
+          "permission": "pay_payroll:manage_runs",
+          "route": "/hcm/payroll/runs"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "PayrollSettings",
           "permission": "pay_payroll:admin",
-          "route": "/pay-payroll/settings"
+          "route": "/hcm/payroll/settings"
+        },
+        "taxes": {
+          "component": "PayrollTaxWorkbench",
+          "permission": "pay_payroll:review_tax",
+          "route": "/hcm/payroll/taxes"
+        },
+        "time_imports": {
+          "component": "PayrollTimeImportWorkbench",
+          "permission": "pay_payroll:manage_runs",
+          "route": "/hcm/payroll/time-imports"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "payroll_period_created",
+          "pay_group_created",
+          "employee_pay_profile_created",
+          "pay_component_created",
+          "time_import_recorded",
+          "payroll_run_started",
+          "payroll_line_item_added",
+          "payroll_tax_recorded",
+          "payroll_adjustment_recorded",
+          "payroll_run_approved",
+          "payroll_run_posted",
+          "payment_batch_created",
+          "payslip_published",
+          "tax_filing_created",
+          "payroll_agent_registered"
+        ],
+        "guardrails": [
+          "payroll_batch_requires_bytewax",
+          "payroll_event_requires_bytewax",
+          "privileged_payroll_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "open",
+          "calculated",
+          "review",
+          "approved",
+          "posted",
+          "paid",
+          "voided",
+          "blocked"
+        ],
+        "stream": "apg.hcm.pay.payroll.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "adjustments": {
+            "status_style": "adjustment-chip",
+            "visual": "adjustment-list"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "components": {
+            "status_style": "component-chip",
+            "visual": "component-list"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "filings": {
+            "status_style": "filing-chip",
+            "visual": "filing-calendar"
+          },
+          "line_items": {
+            "status_style": "line-chip",
+            "visual": "line-ledger"
+          },
+          "pay_groups": {
+            "status_style": "group-chip",
+            "visual": "pay-group-table"
+          },
+          "payments": {
+            "status_style": "payment-chip",
+            "visual": "payment-lane"
+          },
+          "payslips": {
+            "status_style": "privacy-chip",
+            "visual": "payslip-list"
+          },
+          "periods": {
+            "icon": "calendar-days",
+            "status_indicator": "period-pill",
+            "visual": "calendar-list"
+          },
+          "profiles": {
+            "status_style": "profile-chip",
+            "visual": "profile-ledger"
+          },
+          "runs": {
+            "status_style": "run-chip",
+            "visual": "run-board"
+          },
+          "taxes": {
+            "status_style": "tax-chip",
+            "visual": "tax-ledger"
+          },
+          "time_imports": {
+            "status_style": "source-chip",
+            "visual": "time-import-board"
           }
         },
-        "name": "pay_payroll_operations",
+        "name": "payroll_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
-          "color.danger": "#C53030",
+          "color.accent": "#5B6C8C",
+          "color.danger": "#B42318",
           "color.primary": "#28536B",
-          "color.success": "#2F855A",
+          "color.success": "#237A57",
           "color.warning": "#B7791F",
           "density": "compact",
           "surface.canvas": "#F7F8FA",
@@ -196,35 +2182,112 @@
         }
       },
       "ui": {
-        "api_prefix": "/pay-payroll/api/v1",
+        "api_prefix": "/hcm/payroll/api/v1",
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "PayrollDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
-            "path": "/pay-payroll/dashboard",
+            "path": "/hcm/payroll/dashboard",
             "permission": "pay_payroll:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/pay-payroll/operations",
-            "permission": "pay_payroll:operate"
+            "component": "PayrollPeriodWorkbench",
+            "name": "periods",
+            "nav_group": "Setup",
+            "path": "/hcm/payroll/periods",
+            "permission": "pay_payroll:manage_periods"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/pay-payroll/rules",
-            "permission": "pay_payroll:govern"
+            "component": "PayGroupWorkbench",
+            "name": "pay_groups",
+            "nav_group": "Setup",
+            "path": "/hcm/payroll/pay-groups",
+            "permission": "pay_payroll:manage_setup"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "EmployeePayProfileWorkbench",
+            "name": "profiles",
+            "nav_group": "Employees",
+            "path": "/hcm/payroll/profiles",
+            "permission": "pay_payroll:manage_profiles"
+          },
+          {
+            "component": "PayComponentWorkbench",
+            "name": "components",
+            "nav_group": "Setup",
+            "path": "/hcm/payroll/components",
+            "permission": "pay_payroll:manage_setup"
+          },
+          {
+            "component": "PayrollTimeImportWorkbench",
+            "name": "time_imports",
+            "nav_group": "Processing",
+            "path": "/hcm/payroll/time-imports",
+            "permission": "pay_payroll:manage_runs"
+          },
+          {
+            "component": "PayrollRunWorkbench",
+            "name": "runs",
+            "nav_group": "Processing",
+            "path": "/hcm/payroll/runs",
+            "permission": "pay_payroll:manage_runs"
+          },
+          {
+            "component": "PayrollLineItemWorkbench",
+            "name": "line_items",
+            "nav_group": "Processing",
+            "path": "/hcm/payroll/line-items",
+            "permission": "pay_payroll:review"
+          },
+          {
+            "component": "PayrollTaxWorkbench",
+            "name": "taxes",
+            "nav_group": "Compliance",
+            "path": "/hcm/payroll/taxes",
+            "permission": "pay_payroll:review_tax"
+          },
+          {
+            "component": "PayrollAdjustmentWorkbench",
+            "name": "adjustments",
+            "nav_group": "Processing",
+            "path": "/hcm/payroll/adjustments",
+            "permission": "pay_payroll:adjust"
+          },
+          {
+            "component": "PayrollPaymentWorkbench",
+            "name": "payments",
+            "nav_group": "Payments",
+            "path": "/hcm/payroll/payments",
+            "permission": "pay_payroll:pay"
+          },
+          {
+            "component": "PayslipWorkbench",
+            "name": "payslips",
+            "nav_group": "Employees",
+            "path": "/hcm/payroll/payslips",
+            "permission": "pay_payroll:view_payslips"
+          },
+          {
+            "component": "PayrollTaxFilingWorkbench",
+            "name": "filings",
+            "nav_group": "Compliance",
+            "path": "/hcm/payroll/tax-filings",
+            "permission": "pay_payroll:file_tax"
+          },
+          {
+            "component": "PayrollAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/hcm/payroll/agents",
+            "permission": "pay_payroll:admin"
+          },
+          {
+            "component": "PayrollSettings",
             "name": "settings",
             "nav_group": "Administration",
-            "path": "/pay-payroll/settings",
+            "path": "/hcm/payroll/settings",
             "permission": "pay_payroll:admin"
           }
         ],
@@ -234,50 +2297,276 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "payroll_review": {
+        "roles": [
+          "payroll_reviewer",
+          "tax_reviewer",
+          "compliance_reviewer",
+          "payment_reviewer",
+          "variance_reviewer",
+          "employee_query_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "pay_payroll": []
+      "pay_payroll": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "employee_profile_lifecycle",
+        "time_attendance",
+        "benefits",
+        "general_ledger",
+        "banking",
+        "tax_authority"
+      ]
     }
   },
   "contracts": {
     "pay_payroll": {
       "configuration": {
-        "capability": {
-          "category": "Pay",
-          "enabled": true,
-          "id": "pay_payroll",
-          "name": "Payroll Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/hcm/pay/payroll/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "banking": "adapter",
+          "benefits": "adapter",
+          "employee_data": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "tax_authority": "adapter",
+          "theme": "adapter",
+          "time_attendance": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "adjustments": {
+          "approval_required": true,
+          "employee_required": true,
+          "reason_required": true,
+          "run_required": true
+        },
+        "components": {
+          "code_required": true,
+          "currency_required": true,
+          "name_required": true,
+          "supported_types": [
+            "earning",
+            "deduction",
+            "tax",
+            "benefit",
+            "reimbursement",
+            "garnishment"
+          ],
+          "taxable_flag_required": true
+        },
+        "employee_pay_profiles": {
+          "bank_review_required": true,
+          "currency_required": true,
+          "employee_required": true,
+          "pay_group_required": true,
+          "payment_method_required": true,
+          "supported_payment_methods": [
+            "bank_transfer",
+            "check",
+            "cash",
+            "mobile_money",
+            "pay_card"
+          ],
+          "tax_id_required": true
+        },
+        "governance": {
+          "approval_before_payment": true,
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "line_items": {
+          "amount_required": true,
+          "component_required": true,
+          "employee_required": true,
+          "negative_amount_review_required": true,
+          "run_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_component_events": true,
+          "emit_pay_group_events": true,
+          "emit_payment_events": true,
+          "emit_period_events": true,
+          "emit_profile_events": true,
+          "emit_run_events": true,
+          "emit_tax_events": true,
+          "event_stream": "apg.hcm.pay.payroll.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "pay_groups": {
+          "code_required": true,
+          "country_required": true,
+          "currency_required": true,
+          "frequency_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "payments": {
+          "approval_required": true,
+          "payment_date_required": true,
+          "positive_net_pay_required": true,
+          "run_required": true
+        },
+        "payroll_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "payroll_reviewer",
+            "tax_reviewer",
+            "compliance_reviewer",
+            "payment_reviewer",
+            "variance_reviewer",
+            "employee_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "payslips": {
+          "employee_required": true,
+          "posting_required": true,
+          "privacy_basis_required": true,
+          "run_required": true
+        },
+        "periods": {
+          "currency_required": true,
+          "end_date_required": true,
+          "frequency_required": true,
+          "name_required": true,
+          "pay_date_required": true,
+          "start_date_required": true,
+          "supported_currencies": [
+            "USD",
+            "KES",
+            "EUR",
+            "GBP",
+            "NGN",
+            "ZAR",
+            "GHS",
+            "UGX",
+            "TZS"
+          ],
+          "supported_frequencies": [
+            "weekly",
+            "biweekly",
+            "semimonthly",
+            "monthly"
+          ]
+        },
+        "runs": {
+          "approval_required_before_posting": true,
+          "initiator_required": true,
+          "pay_group_required": true,
+          "period_required": true,
+          "variance_review_threshold_percent": 10
+        },
+        "tax_filings": {
+          "approval_required": true,
+          "authority_required": true,
+          "period_required": true,
+          "run_required": true
+        },
+        "taxes": {
+          "amount_required": true,
+          "employee_required": true,
+          "run_required": true,
+          "supported_scopes": [
+            "employee",
+            "employer",
+            "statutory",
+            "local",
+            "social_security"
+          ],
+          "tax_authority_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "pay_payroll_operations"
+          "default_theme": "payroll_control"
+        },
+        "time_imports": {
+          "approval_required_for_overtime": true,
+          "employee_required": true,
+          "hours_nonnegative": true,
+          "period_required": true,
+          "source_required": true
         },
         "ui": {
+          "enable_adjustments": true,
+          "enable_agents": true,
+          "enable_components": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_filings": true,
+          "enable_line_items": true,
+          "enable_pay_groups": true,
+          "enable_payments": true,
+          "enable_payslips": true,
+          "enable_periods": true,
+          "enable_profiles": true,
+          "enable_runs": true,
+          "enable_settings": true,
+          "enable_taxes": true,
+          "enable_time_imports": true
         }
       },
       "id": "pay_payroll",
       "provides": [
-        "pay_payroll_operations"
+        "payroll_period_lifecycle",
+        "pay_group_lifecycle",
+        "employee_pay_profile_lifecycle",
+        "pay_component_lifecycle",
+        "time_import_lifecycle",
+        "payroll_run_lifecycle",
+        "payroll_line_item_lifecycle",
+        "payroll_tax_lifecycle",
+        "payroll_adjustment_lifecycle",
+        "payroll_payment_workflow",
+        "payslip_lifecycle",
+        "payroll_tax_filing_lifecycle",
+        "payroll_dashboard_service",
+        "payroll_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "employee_profile_lifecycle",
+        "time_attendance",
+        "benefits",
+        "general_ledger",
+        "banking",
+        "tax_authority"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +2574,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 12,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "pay_payroll": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Payroll Management - Revolutionary operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Payroll Management - Revolutionary write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Payroll Management - Revolutionary operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.pay_payroll": {
-      "file": "capability_contract.py",
-      "id": "capability.pay_payroll",
-      "kind": "capability",
-      "name": "Payroll Management - Revolutionary",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

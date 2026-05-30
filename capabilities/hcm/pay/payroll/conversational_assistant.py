@@ -1,10 +1,10 @@
 """
 APG Payroll Management - Conversational Payroll Assistant
 
-Revolutionary AI-powered conversational interface for payroll operations.
+Governed AI-powered conversational interface for payroll operations.
 Natural language processing, voice commands, and intelligent automation.
 
-© 2025 Datacraft. All rights reserved.
+(c) 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
 """
 
@@ -154,7 +154,7 @@ class ConversationConfig(BaseModel):
 
 
 class ConversationalPayrollAssistant:
-	"""Revolutionary conversational interface for payroll operations.
+	"""Governed conversational interface for payroll operations.
 	
 	Provides natural language processing, voice commands, and intelligent
 	automation for all payroll-related tasks and queries.
@@ -1025,7 +1025,7 @@ class ConversationalPayrollAssistant:
 	async def _get_payroll_summary_data(self, period: str, tenant_id: str) -> Optional[Dict[str, Any]]:
 		"""Get payroll summary data for specified period."""
 		try:
-			# Get summary from materialized view or calculate
+			# Get summary from reporting view or calculate
 			query = text("""
 				SELECT 
 					period_name,

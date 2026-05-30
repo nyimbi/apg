@@ -1,4 +1,4 @@
--- APG Payroll Management - Revolutionary Database Schema
+-- APG Payroll Management - Governed Database Schema
 -- © 2025 Datacraft. All rights reserved.
 -- Author: Nyimbi Odero | APG Platform Architect
 
@@ -158,7 +158,7 @@ LEFT JOIN pr_employee_payroll ep ON r.run_id = ep.run_id
 WHERE p.is_active = true
 GROUP BY p.tenant_id, p.period_id, p.period_name, p.start_date, p.end_date, p.pay_date;
 
--- Create unique index on materialized view
+-- Create unique index on reporting view
 CREATE UNIQUE INDEX IF NOT EXISTS ix_mv_payroll_summary_unique 
 ON mv_payroll_summary (tenant_id, period_id);
 
@@ -187,7 +187,7 @@ GROUP BY ep.tenant_id, ep.employee_id, e.employee_number, e.full_name, ep.depart
 -- AUTOMATED REFRESH PROCEDURES
 -- ===============================
 
--- Function to refresh all materialized views
+-- Function to refresh all reporting views
 CREATE OR REPLACE FUNCTION refresh_payroll_analytics()
 RETURNS void AS $$
 BEGIN
@@ -410,7 +410,7 @@ CREATE TABLE IF NOT EXISTS pr_schema_version (
 
 -- Insert current schema version
 INSERT INTO pr_schema_version (version_id, version_name, applied_by, description)
-VALUES (1, 'v2.0.0-revolutionary-ai', 'system', 'Revolutionary APG Payroll with AI-powered features')
+VALUES (1, 'v2.0.0-governed-ai', 'system', 'Governed APG Payroll with AI-powered features')
 ON CONFLICT (version_id) DO NOTHING;
 
 -- ===============================
@@ -449,6 +449,6 @@ ON pr_employee_payroll (employee_id);
 -- COMPLETION COMMENT
 -- ===============================
 
--- Schema optimization complete - Revolutionary APG Payroll Database
--- This schema provides 10x performance improvements over traditional payroll systems
+-- Schema optimization complete - Governed APG Payroll Database
+-- This schema provides measurable performance improvements over traditional payroll systems
 -- with AI-powered analytics, real-time processing, and intelligent automation.

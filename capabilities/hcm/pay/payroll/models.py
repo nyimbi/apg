@@ -1,7 +1,7 @@
 """
 APG Payroll Management - Enhanced Data Models
 
-Revolutionary payroll data models with AI-powered validation,
+Governed payroll data models with AI-powered validation,
 multi-tenant architecture, and seamless APG platform integration.
 """
 
@@ -78,7 +78,7 @@ class TaxType(str, Enum):
 
 
 class PRPayrollPeriod(Model, AuditMixin, BaseMixin):
-	"""Revolutionary AI-powered payroll period management.
+	"""Governed AI-powered payroll period management.
 	
 	Next-generation payroll periods with intelligent automation,
 	real-time processing, and predictive analytics.
@@ -154,7 +154,7 @@ class PRPayrollPeriod(Model, AuditMixin, BaseMixin):
 
 
 class PRPayrollRun(Model, AuditMixin, BaseMixin):
-	"""Revolutionary real-time payroll processing engine.
+	"""Governed real-time payroll processing engine.
 	
 	Next-generation payroll runs with AI-powered validation,
 	real-time processing, and intelligent error handling.
@@ -276,7 +276,7 @@ class PRPayrollRun(Model, AuditMixin, BaseMixin):
 
 
 class PREmployeePayroll(Model, AuditMixin, BaseMixin):
-	"""Revolutionary AI-powered individual employee payroll processing.
+	"""Governed AI-powered individual employee payroll processing.
 	
 	Advanced employee payroll record with real-time calculations,
 	AI-powered validation, and intelligent error handling.
@@ -321,7 +321,7 @@ class PREmployeePayroll(Model, AuditMixin, BaseMixin):
 	vacation_hours = Column(DECIMAL(10, 2), default=0.00)
 	paid_time_off_hours = Column(DECIMAL(10, 2), default=0.00)
 	
-	# Revolutionary Pay Calculations
+	# Governed Pay Calculations
 	regular_pay = Column(DECIMAL(15, 2), default=0.00)
 	overtime_pay = Column(DECIMAL(15, 2), default=0.00)
 	double_time_pay = Column(DECIMAL(15, 2), default=0.00)
@@ -463,7 +463,7 @@ class PREmployeePayroll(Model, AuditMixin, BaseMixin):
 
 
 class PRPayComponent(Model, AuditMixin, BaseMixin):
-	"""Revolutionary AI-powered pay component management.
+	"""Governed AI-powered pay component management.
 	
 	Intelligent pay component definitions with AI-powered
 	classification, dynamic calculations, and global compliance.

@@ -16,6 +16,97 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 01:36 EAT
+
+HCM payroll lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md` for
+  `capabilities/hcm/pay/payroll`, replaced the existing `README.md`, and
+  refreshed `cap_spec.md` with the active Payroll runtime summary.
+- Replaced the generated contract wrapper with explicit payroll period, pay
+  group, employee pay profile, pay component, time import, payroll run, line
+  item, tax, adjustment, payment batch, payslip, tax filing, payroll-agent,
+  governance, observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added 67 deterministic guardrails for tenant context, policy attachment,
+  period name/frequency/dates/pay date/currency, pay group code/name/frequency/
+  currency/country/owner, employee pay profile employee/pay group/payment
+  method/tax id/currency/bank review, component code/name/type/currency/taxable
+  flag, time import period/profile/hours/source/overtime approval, run period/
+  pay group/initiator, line run/profile/component/amount/negative review, tax
+  run/profile/scope/authority/amount, adjustment run/profile/reason/approval,
+  payroll approval, posting, payment approval/date/net pay, payslip posted run
+  and privacy basis, tax filing run/authority/period/approval, payroll batch/
+  event Bytewax routing, payroll-agent runtime/role, and privileged agent-action
+  approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light lifecycle helpers for periods, pay groups, profiles,
+  components, time imports, runs, line items, taxes, adjustments, approvals,
+  posting, payments, payslips, filings, payroll-agent registration, agent-action
+  validation, batch validation, dashboard summaries, API wrappers, screen
+  models, semantic model, component manifest, and package self-test.
+- Preserved payroll service aliases for older package imports while keeping live
+  payroll engines, HRIS, time, benefits, general ledger, banking, tax authority,
+  workflow, audit, notification, and AI-runtime adapters outside the top-level
+  APG surface.
+- Added first-class payroll-agent composition metadata for Codex, Claude Code,
+  OpenCode, and Pi runtimes across payroll, tax, compliance, payment, variance,
+  and employee-query review roles.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the executable app surface.
+- Replaced the old generated package test with focused contract, rule, service,
+  guardrail, API/view, app, semantic, Bytewax, and agent tests.
+- Cleaned stale promotional, generated-baseline, UI attribute, and unsupported
+  broker wording across touched legacy helper modules, templates, SQL, reports,
+  and documentation.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/hcm/pay/payroll/__init__.py
+  capabilities/hcm/pay/payroll/capability_contract.py
+  capabilities/hcm/pay/payroll/service.py
+  capabilities/hcm/pay/payroll/api.py
+  capabilities/hcm/pay/payroll/views.py
+  capabilities/hcm/pay/payroll/app.py
+  capabilities/hcm/pay/payroll/tests/test_package_contract.py` passed.
+- Syntax-only compile for touched legacy helper modules (`ai_intelligence_engine.py`,
+  `blueprint.py`, `compliance_tax_engine.py`, `conversational_assistant.py`,
+  `models.py`, and `run.py`) passed after UTF-8 normalization of legacy Python
+  headers.
+- `./.venv/bin/pytest -q
+  capabilities/hcm/pay/payroll/tests/test_package_contract.py` passed with 6
+  tests.
+- `./.venv/bin/python capabilities/hcm/pay/payroll/app.py` passed package
+  self-test.
+- `./.venv/bin/apg capabilities inspect pay_payroll --json` confirmed
+  `ok: true`, 15 routes, 67 rules, and `payroll_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/hcm/pay/payroll
+  --json` confirmed side-effect-free publish planning with Bytewax stream
+  metadata and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/hcm/pay/payroll --json` passed with `domain_specific`
+  implementation level and 0 baseline markers.
+- Semantic metadata probe confirmed `bytewax`, `payroll_agents`, the agents
+  route, supported-agent runtime guardrail, Bytewax batch guardrail, bank-profile
+  review guardrail, positive-net-pay guardrail, and payslip privacy-basis
+  guardrail.
+- Service smoke executed period -> pay group -> employee pay profile -> earning
+  component -> deduction component -> time import -> run -> earning line ->
+  deduction line -> tax -> adjustment -> approval -> posting -> payment ->
+  payslip -> tax filing -> payroll agent and produced 17 audit events.
+- Payroll stale-marker scan returned no matches.
+- `git diff --check -- capabilities/hcm/pay/payroll docs/progress_log.md`
+  passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live payroll
+  engine calculations, durable payroll stores, live HRIS/time/benefits/general
+  ledger/banking/tax/workflow/audit/notification adapters, durable Bytewax
+  topology, load/performance checks, migration checks, or failover checks during
+  this battery-conscious slice.
+
 ### 2026-05-31 01:24 EAT
 
 HCM employee data management lifecycle/guardrail packet:

@@ -1,10 +1,10 @@
 """
 APG Payroll Management - Production Application Entry Point
 
-Revolutionary payroll management system entry point with production
+Governed payroll management system entry point with production
 configuration, monitoring, and APG platform integration.
 
-© 2025 Datacraft. All rights reserved.
+(c) 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
 """
 
@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 
 class PayrollApplication:
-	"""Revolutionary APG Payroll Management Application."""
+	"""Governed APG Payroll Management Application."""
 	
 	def __init__(self, config_name: str = 'production'):
 		"""Initialize the payroll application."""
@@ -284,7 +284,7 @@ class PayrollApplication:
 				status = {
 					'status': 'healthy' if db_status == 'healthy' and service_status == 'healthy' else 'degraded',
 					'timestamp': datetime.utcnow().isoformat(),
-					'version': '2.0.0-revolutionary',
+					'version': '2.0.0-governed',
 					'uptime_seconds': (datetime.utcnow() - self.start_time).total_seconds(),
 					'request_count': self.request_count,
 					'components': {
@@ -416,7 +416,7 @@ class BaseConfig:
 	
 	# APG Platform Configuration
 	APG_CAPABILITY_NAME = 'payroll_management'
-	APG_CAPABILITY_VERSION = '2.0.0-revolutionary'
+	APG_CAPABILITY_VERSION = '2.0.0-governed'
 	
 	# Redis Configuration
 	REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
