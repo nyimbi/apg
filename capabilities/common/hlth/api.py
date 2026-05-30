@@ -21,7 +21,97 @@ from .models import (
 	HealthAction, SystemComponent, HealthReport,
 	HealthStatus, HealthSeverity, HealthDimension
 )
-from .service import SystemHealthService
+from .service import (
+	HlthAlertRecord,
+	HlthBaselineRecord,
+	HlthCheckRecord,
+	HlthComponentRecord,
+	HlthDeploymentGateRecord,
+	HlthIncidentRecord,
+	HlthPredictionRecord,
+	HlthRemediationRequestRecord,
+	HlthService,
+	SystemHealthService,
+)
+
+
+SERVICE = HlthService()
+
+
+def capability_status(tenant_id: str = "default") -> dict[str, Any]:
+	contract = SERVICE.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		"record_count": len(SERVICE.list_records(tenant_id)),
+	}
+
+
+def register_component_record(**kwargs: Any) -> HlthComponentRecord:
+	return SERVICE.register_component(**kwargs)
+
+
+def record_health_check(**kwargs: Any) -> HlthCheckRecord:
+	return SERVICE.record_health_check(**kwargs)
+
+
+def create_baseline_record(**kwargs: Any) -> HlthBaselineRecord:
+	return SERVICE.create_baseline(**kwargs)
+
+
+def request_prediction(**kwargs: Any) -> HlthPredictionRecord:
+	return SERVICE.request_prediction(**kwargs)
+
+
+def create_alert_record(**kwargs: Any) -> HlthAlertRecord:
+	return SERVICE.create_alert(**kwargs)
+
+
+def create_incident_record(**kwargs: Any) -> HlthIncidentRecord:
+	return SERVICE.create_incident(**kwargs)
+
+
+def request_remediation(**kwargs: Any) -> HlthRemediationRequestRecord:
+	return SERVICE.request_remediation(**kwargs)
+
+
+def decide_remediation(**kwargs: Any) -> HlthRemediationRequestRecord:
+	return SERVICE.decide_remediation(**kwargs)
+
+
+def evaluate_deployment_gate(**kwargs: Any) -> HlthDeploymentGateRecord:
+	return SERVICE.evaluate_deployment_gate(**kwargs)
+
+
+def create_record(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.create_record(
+		record_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		metadata=dict(payload.get("metadata") or {}),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def list_records(tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_records(tenant_id, record_type)
+
+
+def list_health(tenant_id: str | None = None) -> dict[str, Any]:
+	return {
+		"summary": SERVICE.dashboard_summary(tenant_id),
+		"components": SERVICE.list_records(tenant_id, "components"),
+		"checks": SERVICE.list_records(tenant_id, "checks"),
+		"baselines": SERVICE.list_records(tenant_id, "baselines"),
+		"predictions": SERVICE.list_records(tenant_id, "predictions"),
+		"alerts": SERVICE.list_records(tenant_id, "alerts"),
+		"incidents": SERVICE.list_records(tenant_id, "incidents"),
+		"remediation_requests": SERVICE.list_records(tenant_id, "remediation_requests"),
+		"deployment_gates": SERVICE.list_records(tenant_id, "deployment_gates"),
+		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
+	}
 
 
 # Create Flask Blueprint
@@ -710,5 +800,21 @@ def health_status():
 		}), 500
 
 
-# Export blueprint for Flask app registration
-__all__ = ['health_api_bp']
+# Export blueprint and dependency-light helpers.
+__all__ = [
+	"SERVICE",
+	"health_api_bp",
+	"capability_status",
+	"register_component_record",
+	"record_health_check",
+	"create_baseline_record",
+	"request_prediction",
+	"create_alert_record",
+	"create_incident_record",
+	"request_remediation",
+	"decide_remediation",
+	"evaluate_deployment_gate",
+	"create_record",
+	"list_records",
+	"list_health",
+]

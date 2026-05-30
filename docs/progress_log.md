@@ -16,6 +16,60 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 04:42 EAT
+
+HLTH health checks and diagnostics lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md` and replaced the primary `README.md`
+  and `cap_spec.md` with current executable scope, usage, adapter boundaries,
+  non-goals, and focused proof commands.
+- Expanded `capability_contract.py` with tenant-scoped component, health check,
+  baseline, prediction, alert, incident, remediation, deployment gate, adapter,
+  security, UI, and theme configuration.
+- Expanded deterministic guardrails to cover tenant context, component IDs,
+  registered components, disabled components, score range, critical alert
+  evidence, incident ownership/routes, stale baselines, low-confidence
+  predictions, remediation runbooks, production approvals, independent review,
+  review notes, unresolved critical incidents, and deployment waiver review.
+- Added dependency-light `HlthService` lifecycle records and control-plane
+  methods beside the existing async `SystemHealthService`.
+- Extended `api.py`, `__init__.py`, `app.py`, `semantic_model.json`,
+  `release_report.json`, and `package_manifest.json` so HLTH publishes current
+  contract-derived composition evidence and generated-app helper functions.
+- Added `view_models.py` for generated dashboard, component inventory, check
+  timeline, baseline, prediction, alert, incident, remediation, deployment
+  gate, report, adapter, audit, and settings screens.
+- Replaced the legacy package contract test with `tests/test_package_contract.py`
+  and expanded regression coverage for lifecycle guardrails, view models,
+  registration metadata, app evidence, and fail-closed references.
+- Focused review fix: restored model symbols expected by the existing health
+  runtime and fixed `tests/conftest.py` to import package modules instead of
+  top-level modules.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/hlth/models.py
+  capabilities/common/hlth/capability_contract.py capabilities/common/hlth/service.py
+  capabilities/common/hlth/api.py capabilities/common/hlth/view_models.py
+  capabilities/common/hlth/app.py capabilities/common/hlth/test_capability_contract.py
+  capabilities/common/hlth/tests/conftest.py
+  capabilities/common/hlth/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/hlth/test_capability_contract.py
+  capabilities/common/hlth/tests/test_package_contract.py` passed with 8 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/hlth --json` passed with HLTH classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/hlth --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- Primary HLTH stale-marker search returned no package-claim matches after
+  cleanup.
+- `git diff --check -- capabilities/common/hlth docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live health probes, ML model training,
+  notification/ticketing/remediation/deployment adapters, production
+  persistence, rendered dashboard/browser behavior, and performance benchmarks.
+
 ### 2026-05-30 04:20 EAT
 
 MONI monitoring and observability lifecycle/guardrail packet:

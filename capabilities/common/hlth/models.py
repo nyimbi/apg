@@ -67,6 +67,7 @@ class HealthDimension(str, Enum):
 
 class ComponentType(str, Enum):
 	"""System component types for health monitoring"""
+	UNKNOWN = "unknown"
 	SERVICE = "service"
 	DATABASE = "database"
 	CACHE = "cache"
@@ -77,6 +78,43 @@ class ComponentType(str, Enum):
 	SCHEDULER = "scheduler"
 	PROXY = "proxy"
 	LOAD_BALANCER = "load_balancer"
+
+
+class ComponentStatus(str, Enum):
+	"""Component lifecycle status values used by the health runtime."""
+	ACTIVE = "active"
+	MAINTENANCE = "maintenance"
+	DEGRADED = "degraded"
+	RETIRED = "retired"
+	DISABLED = "disabled"
+
+
+class ThresholdOperator(str, Enum):
+	"""Threshold comparison operators used by health rules."""
+	GT = "gt"
+	LT = "lt"
+	EQ = "eq"
+	GTE = "gte"
+	LTE = "lte"
+
+
+class HealthActionType(str, Enum):
+	"""Health action type values used by remediation workflows."""
+	RESTART = "restart"
+	SCALE = "scale"
+	ROLLBACK = "rollback"
+	NOTIFY = "notify"
+	RUNBOOK = "runbook"
+
+
+class HealthThreshold(BaseModel):
+	"""Lightweight threshold descriptor for health runtime compatibility."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True)
+
+	name: str = Field(..., description="Threshold name")
+	operator: ThresholdOperator = Field(..., description="Comparison operator")
+	value: float = Field(..., description="Threshold value")
+	severity: HealthSeverity = Field(default=HealthSeverity.MEDIUM, description="Threshold severity")
 
 
 class PredictionConfidence(str, Enum):
@@ -893,7 +931,8 @@ class HealthReport(BaseModel):
 # Export all models for easy imports
 __all__ = [
 	'HealthStatus', 'HealthSeverity', 'AlertStatus', 'RemediationStatus', 
-	'HealthDimension', 'ComponentType', 'PredictionConfidence',
+	'HealthDimension', 'ComponentType', 'ComponentStatus', 'ThresholdOperator',
+	'HealthActionType', 'HealthThreshold', 'PredictionConfidence',
 	'HealthMetric', 'HealthAlert', 'HealthBaseline', 'HealthRule', 
 	'HealthAction', 'SystemComponent', 'HealthReport'
 ]

@@ -2,15 +2,28 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
-        "display_name": "System Health Management",
+        "display_name": "Health Checks and Diagnostics",
         "errors": [],
-        "route_count": 8,
-        "rule_count": 6
+        "route_count": 13,
+        "rule_count": 20
       }
+    },
+    "runtime": {
+      "api": "api.py",
+      "entrypoint": "app.py",
+      "service": "service.py",
+      "views": "view_models.py"
     },
     "self_test": {
       "capability": "hlth",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

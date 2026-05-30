@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 APG System Health Management (HLTH) - Capability Registration
-Comprehensive system health monitoring with predictive intelligence and automated remediation
+Health checks, diagnostics, incidents, and remediation governance
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
@@ -11,6 +11,18 @@ import asyncio
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
+from .service import (
+	HlthAlertRecord,
+	HlthAuditEventRecord,
+	HlthBaselineRecord,
+	HlthCheckRecord,
+	HlthComponentRecord,
+	HlthDeploymentGateRecord,
+	HlthIncidentRecord,
+	HlthPredictionRecord,
+	HlthRemediationRequestRecord,
+	HlthService,
+)
 from .models import (
 	HealthMetric, HealthAlert, HealthBaseline, HealthRule, 
 	HealthAction, SystemComponent, HealthReport,
@@ -25,10 +37,10 @@ from .capability_contract import (
 # APG Capability Metadata for Composition Engine Registration
 CAPABILITY_METADATA = {
 	'name': 'hlth',
-	'display_name': 'System Health Management',
+	'display_name': 'Health Checks and Diagnostics',
 	'version': '1.0.0',
 	'category': 'platform_infrastructure',
-	'description': 'Revolutionary system health monitoring with predictive intelligence and automated remediation',
+	'description': 'Tenant-scoped health checks, diagnostics, incidents, deployment gates, and remediation governance',
 	'author': 'Nyimbi Odero',
 	'company': 'Datacraft',
 	'copyright': '© 2025 Datacraft',
@@ -88,21 +100,22 @@ CAPABILITY_METADATA = {
 		'health.alerts.acknowledge', # Acknowledge health alerts
 		'health.alerts.resolve',    # Resolve health alerts
 		'health.reports.generate',  # Generate health reports
-		'health.config.modify'      # Modify health configuration
+		'health.config.modify',     # Modify health configuration
+		'health.deployments.review' # Review deployment gate decisions
 	],
 	
-	# Revolutionary Features
+	# Composition features
 	'features': [
-		'predictive_health_intelligence',   # Prevents failures 24-48h in advance
-		'zero_config_assessment',          # Auto-discovery and baseline learning
-		'contextual_health_scoring',       # Business-impact weighted scoring
-		'autonomous_remediation',          # Self-healing system responses
-		'unified_health_dashboard',        # Single pane for ecosystem health
-		'proactive_alert_intelligence',    # ML-powered false positive reduction
-		'multi_dimensional_analysis',      # Performance, security, compliance
-		'health_trend_prediction',         # Weeks-ahead forecasting
-		'component_dependency_health',     # Dynamic dependency mapping
-		'real_time_health_correlation'     # Cross-system event correlation
+		'component_registration',
+		'governed_health_checks',
+		'baseline_lifecycle',
+		'prediction_review',
+		'critical_alert_and_incident_governance',
+		'remediation_review',
+		'deployment_gate_decisions',
+		'generated_application_view_models',
+		'health_console_theming',
+		'adapter_boundaries'
 	],
 	
 	# Event Types for APG Event Bus
@@ -508,21 +521,30 @@ def register_capability() -> Dict[str, Any]:
 		'configuration_schema': contract['configuration_schema'],
 		'rule_engine': contract['rule_engine'],
 		'capabilities': {
-			'health_assessment': 'Score component and platform health with tenant context',
-			'health_prediction': 'Forecast component health and failure risks',
+			'component_lifecycle': 'Register and govern tenant system components',
+			'health_assessment': 'Record component health checks with tenant context',
+			'baseline_lifecycle': 'Maintain baseline evidence for generated workflows',
+			'health_prediction': 'Record prediction evidence and review gates',
+			'alert_lifecycle': 'Create route-backed health alerts',
 			'incident_governance': 'Coordinate health incidents, reports, and remediation',
-			'autonomous_remediation': 'Run approved health remediation workflows',
+			'deployment_gates': 'Block or allow deployments based on unresolved critical incidents',
+			'autonomous_remediation': 'Coordinate approved health remediation workflows',
 			'capability_rules': 'Evaluate deterministic health governance rules',
 			'visual_theming': 'Apply health-console theme tokens and components'
 		},
 		'endpoints': {
 			'assessment': '/hlth/api/v1/assessment',
 			'components': '/hlth/api/v1/components',
+			'checks': '/hlth/api/v1/checks',
+			'baselines': '/hlth/api/v1/baselines',
 			'alerts': '/hlth/api/v1/alerts',
 			'incidents': '/hlth/api/v1/incidents',
 			'predictions': '/hlth/api/v1/predictions',
 			'remediation': '/hlth/api/v1/remediation',
-			'reports': '/hlth/api/v1/reports'
+			'deployment_gates': '/hlth/api/v1/deployment-gates',
+			'reports': '/hlth/api/v1/reports',
+			'audit': '/hlth/api/v1/audit',
+			'adapters': '/hlth/api/v1/adapters'
 		},
 		'ui_components': {
 			route['name']: route['path']
@@ -539,7 +561,15 @@ def get_capability_info() -> Dict[str, Any]:
 	return {
 		'metadata': CAPABILITY_METADATA,
 		'contract': get_capability_contract(),
-		'features': CAPABILITY_METADATA['features']
+		'features': [
+			'Tenant-aware component registration',
+			'Governed health checks and score decisions',
+			'Baseline and prediction review workflows',
+			'Critical alert and incident ownership',
+			'Runbook-backed remediation review',
+			'Deployment gate decisions',
+			'Backend-neutral health adapter boundaries'
+		]
 	}
 
 
@@ -618,6 +648,16 @@ __all__ = [
 	'get_export_functions',
 	'get_api_routes',
 	'get_health_service',
+	'HlthService',
+	'HlthComponentRecord',
+	'HlthCheckRecord',
+	'HlthBaselineRecord',
+	'HlthPredictionRecord',
+	'HlthAlertRecord',
+	'HlthIncidentRecord',
+	'HlthRemediationRequestRecord',
+	'HlthDeploymentGateRecord',
+	'HlthAuditEventRecord',
 	'get_capability_contract',
 	'evaluate_capability_rules'
 ]

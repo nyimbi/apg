@@ -23,38 +23,75 @@ class CapabilityConfiguration:
 			"health_check_interval_seconds": 60,
 			"component_discovery_enabled": True,
 			"contextual_health_scoring": True,
-			"business_impact_weighting": True
+			"business_impact_weighting": True,
+			"registered_component_required": True,
+			"disabled_components_block_checks": True,
+			"minimum_score": 0,
+			"maximum_score": 100
 		},
 		"baselines": {
 			"learning_period_days": 7,
 			"auto_update_enabled": True,
-			"stale_baseline_days": 30
+			"stale_baseline_days": 30,
+			"minimum_sample_count": 20,
+			"review_required_for_stale": True
 		},
 		"alerts": {
 			"correlation_window_minutes": 5,
 			"critical_health_score_threshold": 40,
-			"auto_acknowledge_recovered_alerts": True
+			"auto_acknowledge_recovered_alerts": True,
+			"critical_alert_owner_required": True,
+			"critical_alert_route_required": True
 		},
 		"prediction": {
 			"prediction_window_hours": 24,
 			"failure_forecast_enabled": True,
-			"minimum_prediction_confidence": 0.75
+			"minimum_prediction_confidence": 0.75,
+			"baseline_required": True,
+			"review_low_confidence_predictions": True
 		},
 		"remediation": {
 			"auto_remediation_enabled": True,
 			"runbook_required": True,
-			"production_approval_required": True
+			"production_approval_required": True,
+			"require_independent_reviewer": True,
+			"review_notes_required": True
 		},
 		"incidents": {
 			"block_deploy_on_unresolved_critical": True,
 			"incident_owner_required": True,
+			"incident_route_required": True,
 			"postmortem_required_for_sev1": True
+		},
+		"deployment_gates": {
+			"block_on_unresolved_critical": True,
+			"waiver_requires_review": True,
+			"record_gate_audit": True
+		},
+		"adapters": {
+			"supported_probe_sources": ["apg_native", "moni", "opentelemetry", "kubernetes"],
+			"notification_adapter_required_for_critical": True,
+			"remediation_executor": "adapter",
+			"deployment_gate_adapter": "adapter",
+			"prediction_engine": "adapter"
+		},
+		"security": {
+			"require_tenant_context": True,
+			"record_lifecycle_audit": True,
+			"audit_rule_changes": True
 		},
 		"ui": {
 			"enable_dashboard": True,
 			"enable_component_map": True,
+			"enable_check_timeline": True,
+			"enable_baseline_console": True,
 			"enable_prediction_console": True,
-			"enable_remediation_console": True
+			"enable_alert_center": True,
+			"enable_incident_console": True,
+			"enable_remediation_console": True,
+			"enable_deployment_gates": True,
+			"enable_adapter_health": True,
+			"enable_audit_timeline": True
 		},
 		"theme": {
 			"default_theme": "hlth_health_console",
@@ -71,6 +108,9 @@ class CapabilityConfiguration:
 			"prediction",
 			"remediation",
 			"incidents",
+			"deployment_gates",
+			"adapters",
+			"security",
 			"ui",
 			"theme"
 		],
@@ -82,6 +122,9 @@ class CapabilityConfiguration:
 			"prediction": {"type": "object"},
 			"remediation": {"type": "object"},
 			"incidents": {"type": "object"},
+			"deployment_gates": {"type": "object"},
+			"adapters": {"type": "object"},
+			"security": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -183,6 +226,34 @@ class CapabilityTheme:
 		"remediation_action_trace": {
 			"visual": "runbook-timeline",
 			"status_style": "approval-gate"
+		},
+		"component_inventory_panel": {
+			"visual": "component-grid",
+			"status_indicator": "component-state"
+		},
+		"health_check_timeline": {
+			"visual": "score-timeline",
+			"threshold_style": "critical-band"
+		},
+		"baseline_freshness_panel": {
+			"visual": "baseline-age-list",
+			"status_indicator": "freshness-chip"
+		},
+		"incident_impact_panel": {
+			"visual": "incident-impact-list",
+			"highlight": "criticality-chip"
+		},
+		"deployment_gate_panel": {
+			"visual": "gate-decision-list",
+			"status_indicator": "gate-state"
+		},
+		"adapter_status_panel": {
+			"visual": "backend-grid",
+			"status_indicator": "adapter-state"
+		},
+		"audit_decision_timeline": {
+			"visual": "decision-timeline",
+			"highlight": "matched-rule-chip"
 		}
 	})
 
@@ -211,6 +282,46 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="component_must_be_registered",
+			description="Health checks require a registered component.",
+			condition={"operation": "track_component_health", "component_registered": False},
+			effect={
+				"decision": "deny",
+				"reason": "component_registration_required",
+				"required_action": "register_component"
+			}
+		),
+		CapabilityRule(
+			name="disabled_component_blocks_health_check",
+			description="Disabled components cannot accept health check updates.",
+			condition={"operation": "track_component_health", "component_status": "disabled"},
+			effect={
+				"decision": "deny",
+				"reason": "component_disabled",
+				"required_action": "reactivate_or_select_component"
+			}
+		),
+		CapabilityRule(
+			name="health_score_below_range_denied",
+			description="Health scores below zero are denied.",
+			condition={"health_score_lt": 0},
+			effect={
+				"decision": "deny",
+				"reason": "health_score_below_range",
+				"required_action": "provide_score_0_to_100"
+			}
+		),
+		CapabilityRule(
+			name="health_score_above_range_denied",
+			description="Health scores above one hundred are denied.",
+			condition={"health_score_gt": 100},
+			effect={
+				"decision": "deny",
+				"reason": "health_score_above_range",
+				"required_action": "provide_score_0_to_100"
+			}
+		),
+		CapabilityRule(
 			name="critical_health_score_creates_alert",
 			description="Critical health scores require a tracked alert.",
 			condition={"health_score_lt": 40, "alert_created": False},
@@ -218,6 +329,46 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "critical_health_alert_required",
 				"required_action": "create_critical_health_alert"
+			}
+		),
+		CapabilityRule(
+			name="critical_alert_requires_owner",
+			description="Critical health alerts require owner evidence.",
+			condition={"alert_severity": "critical", "alert_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "critical_alert_owner_required",
+				"required_action": "assign_alert_owner"
+			}
+		),
+		CapabilityRule(
+			name="critical_alert_requires_route",
+			description="Critical health alerts require notification route evidence.",
+			condition={"alert_severity": "critical", "notification_route_configured": False},
+			effect={
+				"decision": "deny",
+				"reason": "critical_alert_route_required",
+				"required_action": "configure_alert_route"
+			}
+		),
+		CapabilityRule(
+			name="critical_incident_requires_owner",
+			description="Critical health incidents require owner evidence.",
+			condition={"incident_severity": "critical", "incident_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "critical_incident_owner_required",
+				"required_action": "assign_incident_owner"
+			}
+		),
+		CapabilityRule(
+			name="critical_incident_requires_route",
+			description="Critical health incidents require notification route evidence.",
+			condition={"incident_severity": "critical", "notification_route_configured": False},
+			effect={
+				"decision": "deny",
+				"reason": "critical_incident_route_required",
+				"required_action": "configure_incident_route"
 			}
 		),
 		CapabilityRule(
@@ -231,6 +382,36 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="production_remediation_requires_approval",
+			description="Production remediation requires approval evidence.",
+			condition={"environment": "production", "remediation_requested": True, "production_approved": False},
+			effect={
+				"decision": "deny",
+				"reason": "production_approval_required",
+				"required_action": "attach_production_approval"
+			}
+		),
+		CapabilityRule(
+			name="remediation_review_requires_independent_reviewer",
+			description="Remediation reviews require an independent reviewer.",
+			condition={"reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="review_notes_required",
+			description="Health remediation and waiver reviews require notes.",
+			condition={"review_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "review_notes_required",
+				"required_action": "attach_review_notes"
+			}
+		),
+		CapabilityRule(
 			name="stale_baseline_requires_review",
 			description="Stale health baselines require review before prediction use.",
 			condition={"baseline_age_days_gt": 30, "baseline_review_recorded": False},
@@ -238,6 +419,26 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "require_review",
 				"reason": "baseline_review_required",
 				"required_action": "review_or_refresh_baseline"
+			}
+		),
+		CapabilityRule(
+			name="prediction_requires_baseline",
+			description="Health predictions require baseline evidence.",
+			condition={"operation": "predict_health", "baseline_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "prediction_baseline_required",
+				"required_action": "attach_health_baseline"
+			}
+		),
+		CapabilityRule(
+			name="low_confidence_prediction_requires_review",
+			description="Low-confidence predictions require review before action.",
+			condition={"operation": "predict_health", "prediction_confidence_lt": 0.75},
+			effect={
+				"decision": "require_review",
+				"reason": "prediction_confidence_review_required",
+				"required_action": "review_prediction_evidence"
 			}
 		),
 		CapabilityRule(
@@ -249,6 +450,16 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "critical_incident_unresolved",
 				"required_action": "resolve_or_waive_critical_incident"
 			}
+		),
+		CapabilityRule(
+			name="deployment_waiver_requires_review",
+			description="Deployment waivers require review evidence.",
+			condition={"deployment_waiver_requested": True, "waiver_review_recorded": False},
+			effect={
+				"decision": "deny",
+				"reason": "deployment_waiver_review_required",
+				"required_action": "record_deployment_waiver_review"
+			}
 		)
 	]
 
@@ -258,11 +469,16 @@ def ui_manifest() -> dict[str, Any]:
 	routes = [
 		CapabilityUIRoute("dashboard", "/hlth/dashboard", "HealthDashboard", "health.view", "Overview"),
 		CapabilityUIRoute("components", "/hlth/components", "ComponentHealthMap", "health.view", "Assessment"),
+		CapabilityUIRoute("checks", "/hlth/checks", "HealthCheckTimeline", "health.view", "Assessment"),
+		CapabilityUIRoute("baselines", "/hlth/baselines", "HealthBaselineConsole", "health.manage", "Assessment"),
 		CapabilityUIRoute("alerts", "/hlth/alerts", "HealthAlertCenter", "health.alerts.acknowledge", "Assessment"),
 		CapabilityUIRoute("incidents", "/hlth/incidents", "HealthIncidentManager", "health.incidents.manage", "Response"),
 		CapabilityUIRoute("predictions", "/hlth/predictions", "HealthPredictionConsole", "health.view", "Intelligence"),
 		CapabilityUIRoute("remediation", "/hlth/remediation", "RemediationWorkbench", "health.remediate", "Response"),
+		CapabilityUIRoute("deployment_gates", "/hlth/deployment-gates", "DeploymentGateConsole", "health.deployments.review", "Response"),
 		CapabilityUIRoute("reports", "/hlth/reports", "HealthReportStudio", "health.reports.generate", "Reports"),
+		CapabilityUIRoute("audit", "/hlth/audit", "HealthAuditTimeline", "health.admin", "Governance"),
+		CapabilityUIRoute("adapters", "/hlth/adapters", "HealthAdapterHealth", "health.admin", "Runtime"),
 		CapabilityUIRoute("settings", "/hlth/settings", "HealthSettings", "health.admin", "Administration")
 	]
 	return {
@@ -281,7 +497,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	theme = CapabilityTheme()
 	return {
 		"capability": "hlth",
-		"display_name": "System Health Management",
+		"display_name": "Health Checks and Diagnostics",
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {

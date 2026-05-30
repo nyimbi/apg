@@ -1,47 +1,97 @@
 {
   "agents": {},
   "app": {
-    "description": "System Health Management package-backed APG capability",
+    "description": "Health Checks and Diagnostics package-backed APG capability",
     "entity_count": 0,
     "name": "hlth",
     "version": "1.0.0"
   },
   "capabilities": {
     "hlth": {
-      "approvals": {},
+      "adapters": {
+        "deployment_gate_adapter": "adapter",
+        "notification_adapter_required_for_critical": true,
+        "prediction_engine": "adapter",
+        "remediation_executor": "adapter",
+        "supported_probe_sources": [
+          "apg_native",
+          "moni",
+          "opentelemetry",
+          "kubernetes"
+        ]
+      },
+      "approvals": {
+        "deployment_gate": "HlthDeploymentGateRecord",
+        "remediation": "HlthRemediationRequestRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "deployment_gate_adapter": "adapter",
+          "notification_adapter_required_for_critical": true,
+          "prediction_engine": "adapter",
+          "remediation_executor": "adapter",
+          "supported_probe_sources": [
+            "apg_native",
+            "moni",
+            "opentelemetry",
+            "kubernetes"
+          ]
+        },
         "alerts": {
           "auto_acknowledge_recovered_alerts": true,
           "correlation_window_minutes": 5,
+          "critical_alert_owner_required": true,
+          "critical_alert_route_required": true,
           "critical_health_score_threshold": 40
         },
         "assessment": {
           "business_impact_weighting": true,
           "component_discovery_enabled": true,
           "contextual_health_scoring": true,
-          "health_check_interval_seconds": 60
+          "disabled_components_block_checks": true,
+          "health_check_interval_seconds": 60,
+          "maximum_score": 100,
+          "minimum_score": 0,
+          "registered_component_required": true
         },
         "baselines": {
           "auto_update_enabled": true,
           "learning_period_days": 7,
+          "minimum_sample_count": 20,
+          "review_required_for_stale": true,
           "stale_baseline_days": 30
+        },
+        "deployment_gates": {
+          "block_on_unresolved_critical": true,
+          "record_gate_audit": true,
+          "waiver_requires_review": true
         },
         "incidents": {
           "block_deploy_on_unresolved_critical": true,
           "incident_owner_required": true,
+          "incident_route_required": true,
           "postmortem_required_for_sev1": true
         },
         "prediction": {
+          "baseline_required": true,
           "failure_forecast_enabled": true,
           "minimum_prediction_confidence": 0.75,
-          "prediction_window_hours": 24
+          "prediction_window_hours": 24,
+          "review_low_confidence_predictions": true
         },
         "remediation": {
           "auto_remediation_enabled": true,
           "production_approval_required": true,
+          "require_independent_reviewer": true,
+          "review_notes_required": true,
           "runbook_required": true
+        },
+        "security": {
+          "audit_rule_changes": true,
+          "record_lifecycle_audit": true,
+          "require_tenant_context": true
         },
         "tenant_id": "default",
         "theme": {
@@ -49,8 +99,15 @@
           "default_theme": "hlth_health_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_alert_center": true,
+          "enable_audit_timeline": true,
+          "enable_baseline_console": true,
+          "enable_check_timeline": true,
           "enable_component_map": true,
           "enable_dashboard": true,
+          "enable_deployment_gates": true,
+          "enable_incident_console": true,
           "enable_prediction_console": true,
           "enable_remediation_console": true
         }
@@ -58,9 +115,18 @@
       "erp_modules": [
         "common"
       ],
+      "health_lifecycle": {
+        "alert": "HlthAlertRecord",
+        "audit": "HlthAuditEventRecord",
+        "baseline": "HlthBaselineRecord",
+        "check": "HlthCheckRecord",
+        "component": "HlthComponentRecord",
+        "incident": "HlthIncidentRecord",
+        "prediction": "HlthPredictionRecord"
+      },
       "i18n": {},
       "master_data": {},
-      "name": "System Health Management",
+      "name": "Health Checks and Diagnostics",
       "provides": [
         "hlth_operations"
       ],
@@ -94,6 +160,56 @@
           },
           {
             "condition": {
+              "component_registered": false,
+              "operation": "track_component_health"
+            },
+            "description": "Health checks require a registered component.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_registration_required",
+              "required_action": "register_component"
+            },
+            "name": "component_must_be_registered"
+          },
+          {
+            "condition": {
+              "component_status": "disabled",
+              "operation": "track_component_health"
+            },
+            "description": "Disabled components cannot accept health check updates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_disabled",
+              "required_action": "reactivate_or_select_component"
+            },
+            "name": "disabled_component_blocks_health_check"
+          },
+          {
+            "condition": {
+              "health_score_lt": 0
+            },
+            "description": "Health scores below zero are denied.",
+            "effect": {
+              "decision": "deny",
+              "reason": "health_score_below_range",
+              "required_action": "provide_score_0_to_100"
+            },
+            "name": "health_score_below_range_denied"
+          },
+          {
+            "condition": {
+              "health_score_gt": 100
+            },
+            "description": "Health scores above one hundred are denied.",
+            "effect": {
+              "decision": "deny",
+              "reason": "health_score_above_range",
+              "required_action": "provide_score_0_to_100"
+            },
+            "name": "health_score_above_range_denied"
+          },
+          {
+            "condition": {
               "alert_created": false,
               "health_score_lt": 40
             },
@@ -104,6 +220,58 @@
               "required_action": "create_critical_health_alert"
             },
             "name": "critical_health_score_creates_alert"
+          },
+          {
+            "condition": {
+              "alert_owner_present": false,
+              "alert_severity": "critical"
+            },
+            "description": "Critical health alerts require owner evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_alert_owner_required",
+              "required_action": "assign_alert_owner"
+            },
+            "name": "critical_alert_requires_owner"
+          },
+          {
+            "condition": {
+              "alert_severity": "critical",
+              "notification_route_configured": false
+            },
+            "description": "Critical health alerts require notification route evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_alert_route_required",
+              "required_action": "configure_alert_route"
+            },
+            "name": "critical_alert_requires_route"
+          },
+          {
+            "condition": {
+              "incident_owner_present": false,
+              "incident_severity": "critical"
+            },
+            "description": "Critical health incidents require owner evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_incident_owner_required",
+              "required_action": "assign_incident_owner"
+            },
+            "name": "critical_incident_requires_owner"
+          },
+          {
+            "condition": {
+              "incident_severity": "critical",
+              "notification_route_configured": false
+            },
+            "description": "Critical health incidents require notification route evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_incident_route_required",
+              "required_action": "configure_incident_route"
+            },
+            "name": "critical_incident_requires_route"
           },
           {
             "condition": {
@@ -120,6 +288,44 @@
           },
           {
             "condition": {
+              "environment": "production",
+              "production_approved": false,
+              "remediation_requested": true
+            },
+            "description": "Production remediation requires approval evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "production_approval_required",
+              "required_action": "attach_production_approval"
+            },
+            "name": "production_remediation_requires_approval"
+          },
+          {
+            "condition": {
+              "reviewer_same_as_requester": true
+            },
+            "description": "Remediation reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "remediation_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "review_notes_attached": false
+            },
+            "description": "Health remediation and waiver reviews require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "review_notes_required"
+          },
+          {
+            "condition": {
               "baseline_age_days_gt": 30,
               "baseline_review_recorded": false
             },
@@ -133,6 +339,32 @@
           },
           {
             "condition": {
+              "baseline_present": false,
+              "operation": "predict_health"
+            },
+            "description": "Health predictions require baseline evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "prediction_baseline_required",
+              "required_action": "attach_health_baseline"
+            },
+            "name": "prediction_requires_baseline"
+          },
+          {
+            "condition": {
+              "operation": "predict_health",
+              "prediction_confidence_lt": 0.75
+            },
+            "description": "Low-confidence predictions require review before action.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "prediction_confidence_review_required",
+              "required_action": "review_prediction_evidence"
+            },
+            "name": "low_confidence_prediction_requires_review"
+          },
+          {
+            "condition": {
               "deployment_requested": true,
               "unresolved_critical_incidents_gt": 0
             },
@@ -143,6 +375,19 @@
               "required_action": "resolve_or_waive_critical_incident"
             },
             "name": "unresolved_critical_incident_blocks_deploy"
+          },
+          {
+            "condition": {
+              "deployment_waiver_requested": true,
+              "waiver_review_recorded": false
+            },
+            "description": "Deployment waivers require review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_waiver_review_required",
+              "required_action": "record_deployment_waiver_review"
+            },
+            "name": "deployment_waiver_requires_review"
           }
         ],
         "type": "deterministic"
@@ -175,6 +420,56 @@
         },
         {
           "condition": {
+            "component_registered": false,
+            "operation": "track_component_health"
+          },
+          "description": "Health checks require a registered component.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_registration_required",
+            "required_action": "register_component"
+          },
+          "name": "component_must_be_registered"
+        },
+        {
+          "condition": {
+            "component_status": "disabled",
+            "operation": "track_component_health"
+          },
+          "description": "Disabled components cannot accept health check updates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_disabled",
+            "required_action": "reactivate_or_select_component"
+          },
+          "name": "disabled_component_blocks_health_check"
+        },
+        {
+          "condition": {
+            "health_score_lt": 0
+          },
+          "description": "Health scores below zero are denied.",
+          "effect": {
+            "decision": "deny",
+            "reason": "health_score_below_range",
+            "required_action": "provide_score_0_to_100"
+          },
+          "name": "health_score_below_range_denied"
+        },
+        {
+          "condition": {
+            "health_score_gt": 100
+          },
+          "description": "Health scores above one hundred are denied.",
+          "effect": {
+            "decision": "deny",
+            "reason": "health_score_above_range",
+            "required_action": "provide_score_0_to_100"
+          },
+          "name": "health_score_above_range_denied"
+        },
+        {
+          "condition": {
             "alert_created": false,
             "health_score_lt": 40
           },
@@ -185,6 +480,58 @@
             "required_action": "create_critical_health_alert"
           },
           "name": "critical_health_score_creates_alert"
+        },
+        {
+          "condition": {
+            "alert_owner_present": false,
+            "alert_severity": "critical"
+          },
+          "description": "Critical health alerts require owner evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_alert_owner_required",
+            "required_action": "assign_alert_owner"
+          },
+          "name": "critical_alert_requires_owner"
+        },
+        {
+          "condition": {
+            "alert_severity": "critical",
+            "notification_route_configured": false
+          },
+          "description": "Critical health alerts require notification route evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_alert_route_required",
+            "required_action": "configure_alert_route"
+          },
+          "name": "critical_alert_requires_route"
+        },
+        {
+          "condition": {
+            "incident_owner_present": false,
+            "incident_severity": "critical"
+          },
+          "description": "Critical health incidents require owner evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_incident_owner_required",
+            "required_action": "assign_incident_owner"
+          },
+          "name": "critical_incident_requires_owner"
+        },
+        {
+          "condition": {
+            "incident_severity": "critical",
+            "notification_route_configured": false
+          },
+          "description": "Critical health incidents require notification route evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_incident_route_required",
+            "required_action": "configure_incident_route"
+          },
+          "name": "critical_incident_requires_route"
         },
         {
           "condition": {
@@ -201,6 +548,44 @@
         },
         {
           "condition": {
+            "environment": "production",
+            "production_approved": false,
+            "remediation_requested": true
+          },
+          "description": "Production remediation requires approval evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "production_approval_required",
+            "required_action": "attach_production_approval"
+          },
+          "name": "production_remediation_requires_approval"
+        },
+        {
+          "condition": {
+            "reviewer_same_as_requester": true
+          },
+          "description": "Remediation reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "remediation_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "review_notes_attached": false
+          },
+          "description": "Health remediation and waiver reviews require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "review_notes_required"
+        },
+        {
+          "condition": {
             "baseline_age_days_gt": 30,
             "baseline_review_recorded": false
           },
@@ -214,6 +599,32 @@
         },
         {
           "condition": {
+            "baseline_present": false,
+            "operation": "predict_health"
+          },
+          "description": "Health predictions require baseline evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "prediction_baseline_required",
+            "required_action": "attach_health_baseline"
+          },
+          "name": "prediction_requires_baseline"
+        },
+        {
+          "condition": {
+            "operation": "predict_health",
+            "prediction_confidence_lt": 0.75
+          },
+          "description": "Low-confidence predictions require review before action.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "prediction_confidence_review_required",
+            "required_action": "review_prediction_evidence"
+          },
+          "name": "low_confidence_prediction_requires_review"
+        },
+        {
+          "condition": {
             "deployment_requested": true,
             "unresolved_critical_incidents_gt": 0
           },
@@ -224,19 +635,52 @@
             "required_action": "resolve_or_waive_critical_incident"
           },
           "name": "unresolved_critical_incident_blocks_deploy"
+        },
+        {
+          "condition": {
+            "deployment_waiver_requested": true,
+            "waiver_review_recorded": false
+          },
+          "description": "Deployment waivers require review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_waiver_review_required",
+            "required_action": "record_deployment_waiver_review"
+          },
+          "name": "deployment_waiver_requires_review"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "HealthAdapterHealth",
+          "permission": "health.admin",
+          "route": "/hlth/adapters"
+        },
         "alerts": {
           "component": "HealthAlertCenter",
           "permission": "health.alerts.acknowledge",
           "route": "/hlth/alerts"
+        },
+        "audit": {
+          "component": "HealthAuditTimeline",
+          "permission": "health.admin",
+          "route": "/hlth/audit"
+        },
+        "baselines": {
+          "component": "HealthBaselineConsole",
+          "permission": "health.manage",
+          "route": "/hlth/baselines"
+        },
+        "checks": {
+          "component": "HealthCheckTimeline",
+          "permission": "health.view",
+          "route": "/hlth/checks"
         },
         "components": {
           "component": "ComponentHealthMap",
@@ -247,6 +691,11 @@
           "component": "HealthDashboard",
           "permission": "health.view",
           "route": "/hlth/dashboard"
+        },
+        "deployment_gates": {
+          "component": "DeploymentGateConsole",
+          "permission": "health.deployments.review",
+          "route": "/hlth/deployment-gates"
         },
         "incidents": {
           "component": "HealthIncidentManager",
@@ -277,14 +726,42 @@
       "streaming": {},
       "theme": {
         "components": {
+          "adapter_status_panel": {
+            "status_indicator": "adapter-state",
+            "visual": "backend-grid"
+          },
+          "audit_decision_timeline": {
+            "highlight": "matched-rule-chip",
+            "visual": "decision-timeline"
+          },
+          "baseline_freshness_panel": {
+            "status_indicator": "freshness-chip",
+            "visual": "baseline-age-list"
+          },
           "component_dependency_map": {
             "edge_style": "health-impact-line",
             "visual": "dependency-topology"
+          },
+          "component_inventory_panel": {
+            "status_indicator": "component-state",
+            "visual": "component-grid"
+          },
+          "deployment_gate_panel": {
+            "status_indicator": "gate-state",
+            "visual": "gate-decision-list"
+          },
+          "health_check_timeline": {
+            "threshold_style": "critical-band",
+            "visual": "score-timeline"
           },
           "health_score_card": {
             "icon": "heart-pulse",
             "risk_style": "score-band",
             "status_indicator": "grade-pill"
+          },
+          "incident_impact_panel": {
+            "highlight": "criticality-chip",
+            "visual": "incident-impact-list"
           },
           "prediction_risk_panel": {
             "threshold_style": "confidence-bands",
@@ -329,6 +806,20 @@
             "permission": "health.view"
           },
           {
+            "component": "HealthCheckTimeline",
+            "name": "checks",
+            "nav_group": "Assessment",
+            "path": "/hlth/checks",
+            "permission": "health.view"
+          },
+          {
+            "component": "HealthBaselineConsole",
+            "name": "baselines",
+            "nav_group": "Assessment",
+            "path": "/hlth/baselines",
+            "permission": "health.manage"
+          },
+          {
             "component": "HealthAlertCenter",
             "name": "alerts",
             "nav_group": "Assessment",
@@ -357,11 +848,32 @@
             "permission": "health.remediate"
           },
           {
+            "component": "DeploymentGateConsole",
+            "name": "deployment_gates",
+            "nav_group": "Response",
+            "path": "/hlth/deployment-gates",
+            "permission": "health.deployments.review"
+          },
+          {
             "component": "HealthReportStudio",
             "name": "reports",
             "nav_group": "Reports",
             "path": "/hlth/reports",
             "permission": "health.reports.generate"
+          },
+          {
+            "component": "HealthAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/hlth/audit",
+            "permission": "health.admin"
+          },
+          {
+            "component": "HealthAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Runtime",
+            "path": "/hlth/adapters",
+            "permission": "health.admin"
           },
           {
             "component": "HealthSettings",
@@ -390,36 +902,71 @@
   "contracts": {
     "hlth": {
       "configuration": {
+        "adapters": {
+          "deployment_gate_adapter": "adapter",
+          "notification_adapter_required_for_critical": true,
+          "prediction_engine": "adapter",
+          "remediation_executor": "adapter",
+          "supported_probe_sources": [
+            "apg_native",
+            "moni",
+            "opentelemetry",
+            "kubernetes"
+          ]
+        },
         "alerts": {
           "auto_acknowledge_recovered_alerts": true,
           "correlation_window_minutes": 5,
+          "critical_alert_owner_required": true,
+          "critical_alert_route_required": true,
           "critical_health_score_threshold": 40
         },
         "assessment": {
           "business_impact_weighting": true,
           "component_discovery_enabled": true,
           "contextual_health_scoring": true,
-          "health_check_interval_seconds": 60
+          "disabled_components_block_checks": true,
+          "health_check_interval_seconds": 60,
+          "maximum_score": 100,
+          "minimum_score": 0,
+          "registered_component_required": true
         },
         "baselines": {
           "auto_update_enabled": true,
           "learning_period_days": 7,
+          "minimum_sample_count": 20,
+          "review_required_for_stale": true,
           "stale_baseline_days": 30
+        },
+        "deployment_gates": {
+          "block_on_unresolved_critical": true,
+          "record_gate_audit": true,
+          "waiver_requires_review": true
         },
         "incidents": {
           "block_deploy_on_unresolved_critical": true,
           "incident_owner_required": true,
+          "incident_route_required": true,
           "postmortem_required_for_sev1": true
         },
         "prediction": {
+          "baseline_required": true,
           "failure_forecast_enabled": true,
           "minimum_prediction_confidence": 0.75,
-          "prediction_window_hours": 24
+          "prediction_window_hours": 24,
+          "review_low_confidence_predictions": true
         },
         "remediation": {
           "auto_remediation_enabled": true,
           "production_approval_required": true,
+          "require_independent_reviewer": true,
+          "review_notes_required": true,
           "runbook_required": true
+        },
+        "security": {
+          "audit_rule_changes": true,
+          "record_lifecycle_audit": true,
+          "require_tenant_context": true
         },
         "tenant_id": "default",
         "theme": {
@@ -427,8 +974,15 @@
           "default_theme": "hlth_health_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_alert_center": true,
+          "enable_audit_timeline": true,
+          "enable_baseline_console": true,
+          "enable_check_timeline": true,
           "enable_component_map": true,
           "enable_dashboard": true,
+          "enable_deployment_gates": true,
+          "enable_incident_console": true,
           "enable_prediction_console": true,
           "enable_remediation_console": true
         }
@@ -483,6 +1037,45 @@
       },
       "name": "component_health_requires_component_id"
     },
+    "component_must_be_registered": {
+      "condition": {
+        "component_registered": false,
+        "operation": "track_component_health"
+      },
+      "description": "Health checks require a registered component.",
+      "effect": {
+        "decision": "deny",
+        "reason": "component_registration_required",
+        "required_action": "register_component"
+      },
+      "name": "component_must_be_registered"
+    },
+    "critical_alert_requires_owner": {
+      "condition": {
+        "alert_owner_present": false,
+        "alert_severity": "critical"
+      },
+      "description": "Critical health alerts require owner evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_alert_owner_required",
+        "required_action": "assign_alert_owner"
+      },
+      "name": "critical_alert_requires_owner"
+    },
+    "critical_alert_requires_route": {
+      "condition": {
+        "alert_severity": "critical",
+        "notification_route_configured": false
+      },
+      "description": "Critical health alerts require notification route evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_alert_route_required",
+        "required_action": "configure_alert_route"
+      },
+      "name": "critical_alert_requires_route"
+    },
     "critical_health_score_creates_alert": {
       "condition": {
         "alert_created": false,
@@ -496,6 +1089,122 @@
       },
       "name": "critical_health_score_creates_alert"
     },
+    "critical_incident_requires_owner": {
+      "condition": {
+        "incident_owner_present": false,
+        "incident_severity": "critical"
+      },
+      "description": "Critical health incidents require owner evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_incident_owner_required",
+        "required_action": "assign_incident_owner"
+      },
+      "name": "critical_incident_requires_owner"
+    },
+    "critical_incident_requires_route": {
+      "condition": {
+        "incident_severity": "critical",
+        "notification_route_configured": false
+      },
+      "description": "Critical health incidents require notification route evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_incident_route_required",
+        "required_action": "configure_incident_route"
+      },
+      "name": "critical_incident_requires_route"
+    },
+    "deployment_waiver_requires_review": {
+      "condition": {
+        "deployment_waiver_requested": true,
+        "waiver_review_recorded": false
+      },
+      "description": "Deployment waivers require review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_waiver_review_required",
+        "required_action": "record_deployment_waiver_review"
+      },
+      "name": "deployment_waiver_requires_review"
+    },
+    "disabled_component_blocks_health_check": {
+      "condition": {
+        "component_status": "disabled",
+        "operation": "track_component_health"
+      },
+      "description": "Disabled components cannot accept health check updates.",
+      "effect": {
+        "decision": "deny",
+        "reason": "component_disabled",
+        "required_action": "reactivate_or_select_component"
+      },
+      "name": "disabled_component_blocks_health_check"
+    },
+    "health_score_above_range_denied": {
+      "condition": {
+        "health_score_gt": 100
+      },
+      "description": "Health scores above one hundred are denied.",
+      "effect": {
+        "decision": "deny",
+        "reason": "health_score_above_range",
+        "required_action": "provide_score_0_to_100"
+      },
+      "name": "health_score_above_range_denied"
+    },
+    "health_score_below_range_denied": {
+      "condition": {
+        "health_score_lt": 0
+      },
+      "description": "Health scores below zero are denied.",
+      "effect": {
+        "decision": "deny",
+        "reason": "health_score_below_range",
+        "required_action": "provide_score_0_to_100"
+      },
+      "name": "health_score_below_range_denied"
+    },
+    "low_confidence_prediction_requires_review": {
+      "condition": {
+        "operation": "predict_health",
+        "prediction_confidence_lt": 0.75
+      },
+      "description": "Low-confidence predictions require review before action.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "prediction_confidence_review_required",
+        "required_action": "review_prediction_evidence"
+      },
+      "name": "low_confidence_prediction_requires_review"
+    },
+    "prediction_requires_baseline": {
+      "condition": {
+        "baseline_present": false,
+        "operation": "predict_health"
+      },
+      "description": "Health predictions require baseline evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "prediction_baseline_required",
+        "required_action": "attach_health_baseline"
+      },
+      "name": "prediction_requires_baseline"
+    },
+    "production_remediation_requires_approval": {
+      "condition": {
+        "environment": "production",
+        "production_approved": false,
+        "remediation_requested": true
+      },
+      "description": "Production remediation requires approval evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "production_approval_required",
+        "required_action": "attach_production_approval"
+      },
+      "name": "production_remediation_requires_approval"
+    },
     "remediation_requires_runbook": {
       "condition": {
         "remediation_requested": true,
@@ -508,6 +1217,30 @@
         "required_action": "attach_remediation_runbook"
       },
       "name": "remediation_requires_runbook"
+    },
+    "remediation_review_requires_independent_reviewer": {
+      "condition": {
+        "reviewer_same_as_requester": true
+      },
+      "description": "Remediation reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "remediation_review_requires_independent_reviewer"
+    },
+    "review_notes_required": {
+      "condition": {
+        "review_notes_attached": false
+      },
+      "description": "Health remediation and waiver reviews require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "review_notes_required"
     },
     "stale_baseline_requires_review": {
       "condition": {
@@ -557,7 +1290,7 @@
       "file": "capability_contract.py",
       "id": "capability.hlth",
       "kind": "capability",
-      "name": "System Health Management",
+      "name": "Health Checks and Diagnostics",
       "range": {
         "end": {
           "character": 1,

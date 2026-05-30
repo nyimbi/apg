@@ -14,19 +14,15 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Generator
 from unittest.mock import MagicMock, AsyncMock
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from service import SystemHealthService, HealthServiceConfig
-from models import (
+from capabilities.common.hlth.service import SystemHealthService, HealthServiceConfig
+from capabilities.common.hlth.models import (
     HealthMetric, HealthAlert, SystemComponent, HealthReport,
     HealthStatus, HealthSeverity, HealthDimension, ComponentType
 )
-from enterprise_features import EnterpriseHealthManager, TenantTier, TenantConfiguration
-from multi_tenant_isolation import TenantIsolationManager, IsolationLevel
-from ml_engines import HealthPredictionEngine, AdvancedAnalyticsEngine
-from optimization_engine import ResourceOptimizationEngine
+from capabilities.common.hlth.enterprise_features import EnterpriseHealthManager, TenantTier, TenantConfiguration
+from capabilities.common.hlth.multi_tenant_isolation import TenantIsolationManager, IsolationLevel
+from capabilities.common.hlth.ml_engines import HealthPredictionEngine, AdvancedAnalyticsEngine
+from capabilities.common.hlth.optimization_engine import ResourceOptimizationEngine
 
 
 @pytest.fixture(scope="session")
@@ -179,7 +175,7 @@ async def optimization_engine(prediction_engine):
 
 @pytest.fixture
 def mock_apg_integrations():
-    """Mock APG capability integrations"""
+    """Test-double APG capability integrations."""
     return {
         'moni': MagicMock(),
         'auth': MagicMock(),
@@ -260,7 +256,7 @@ def integration_test_scenarios():
     }
 
 
-# Mock data generators
+# Test data generators
 def generate_mock_metrics(count: int = 10, tenant_id: str = "test") -> list:
     """Generate mock health metrics for testing"""
     metrics = []

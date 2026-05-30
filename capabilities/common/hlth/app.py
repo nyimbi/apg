@@ -1,17 +1,141 @@
-"""Publishable APG capability package entrypoint for System Health Management."""
+"""Publishable APG capability package entrypoint for Health Checks and Diagnostics."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "System Health Management package-backed APG capability", "entity_count": 0, "name": "hlth", "version": "1.0.0"}, "capabilities": {"hlth": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"alerts": {"auto_acknowledge_recovered_alerts": true, "correlation_window_minutes": 5, "critical_health_score_threshold": 40}, "assessment": {"business_impact_weighting": true, "component_discovery_enabled": true, "contextual_health_scoring": true, "health_check_interval_seconds": 60}, "baselines": {"auto_update_enabled": true, "learning_period_days": 7, "stale_baseline_days": 30}, "incidents": {"block_deploy_on_unresolved_critical": true, "incident_owner_required": true, "postmortem_required_for_sev1": true}, "prediction": {"failure_forecast_enabled": true, "minimum_prediction_confidence": 0.75, "prediction_window_hours": 24}, "remediation": {"auto_remediation_enabled": true, "production_approval_required": true, "runbook_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "hlth_health_console"}, "ui": {"enable_component_map": true, "enable_dashboard": true, "enable_prediction_console": true, "enable_remediation_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "System Health Management", "provides": ["hlth_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All health operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"component_id_present": false, "operation": "track_component_health"}, "description": "Component health updates require a component identifier.", "effect": {"decision": "deny", "reason": "component_id_required", "required_action": "attach_component_id"}, "name": "component_health_requires_component_id"}, {"condition": {"alert_created": false, "health_score_lt": 40}, "description": "Critical health scores require a tracked alert.", "effect": {"decision": "deny", "reason": "critical_health_alert_required", "required_action": "create_critical_health_alert"}, "name": "critical_health_score_creates_alert"}, {"condition": {"remediation_requested": true, "runbook_attached": false}, "description": "Remediation actions require an attached runbook.", "effect": {"decision": "deny", "reason": "remediation_runbook_required", "required_action": "attach_remediation_runbook"}, "name": "remediation_requires_runbook"}, {"condition": {"baseline_age_days_gt": 30, "baseline_review_recorded": false}, "description": "Stale health baselines require review before prediction use.", "effect": {"decision": "require_review", "reason": "baseline_review_required", "required_action": "review_or_refresh_baseline"}, "name": "stale_baseline_requires_review"}, {"condition": {"deployment_requested": true, "unresolved_critical_incidents_gt": 0}, "description": "Deployments are blocked while critical incidents remain unresolved.", "effect": {"decision": "deny", "reason": "critical_incident_unresolved", "required_action": "resolve_or_waive_critical_incident"}, "name": "unresolved_critical_incident_blocks_deploy"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All health operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"component_id_present": false, "operation": "track_component_health"}, "description": "Component health updates require a component identifier.", "effect": {"decision": "deny", "reason": "component_id_required", "required_action": "attach_component_id"}, "name": "component_health_requires_component_id"}, {"condition": {"alert_created": false, "health_score_lt": 40}, "description": "Critical health scores require a tracked alert.", "effect": {"decision": "deny", "reason": "critical_health_alert_required", "required_action": "create_critical_health_alert"}, "name": "critical_health_score_creates_alert"}, {"condition": {"remediation_requested": true, "runbook_attached": false}, "description": "Remediation actions require an attached runbook.", "effect": {"decision": "deny", "reason": "remediation_runbook_required", "required_action": "attach_remediation_runbook"}, "name": "remediation_requires_runbook"}, {"condition": {"baseline_age_days_gt": 30, "baseline_review_recorded": false}, "description": "Stale health baselines require review before prediction use.", "effect": {"decision": "require_review", "reason": "baseline_review_required", "required_action": "review_or_refresh_baseline"}, "name": "stale_baseline_requires_review"}, {"condition": {"deployment_requested": true, "unresolved_critical_incidents_gt": 0}, "description": "Deployments are blocked while critical incidents remain unresolved.", "effect": {"decision": "deny", "reason": "critical_incident_unresolved", "required_action": "resolve_or_waive_critical_incident"}, "name": "unresolved_critical_incident_blocks_deploy"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"alerts": {"component": "HealthAlertCenter", "permission": "health.alerts.acknowledge", "route": "/hlth/alerts"}, "components": {"component": "ComponentHealthMap", "permission": "health.view", "route": "/hlth/components"}, "dashboard": {"component": "HealthDashboard", "permission": "health.view", "route": "/hlth/dashboard"}, "incidents": {"component": "HealthIncidentManager", "permission": "health.incidents.manage", "route": "/hlth/incidents"}, "predictions": {"component": "HealthPredictionConsole", "permission": "health.view", "route": "/hlth/predictions"}, "remediation": {"component": "RemediationWorkbench", "permission": "health.remediate", "route": "/hlth/remediation"}, "reports": {"component": "HealthReportStudio", "permission": "health.reports.generate", "route": "/hlth/reports"}, "settings": {"component": "HealthSettings", "permission": "health.admin", "route": "/hlth/settings"}}, "streaming": {}, "theme": {"components": {"component_dependency_map": {"edge_style": "health-impact-line", "visual": "dependency-topology"}, "health_score_card": {"icon": "heart-pulse", "risk_style": "score-band", "status_indicator": "grade-pill"}, "prediction_risk_panel": {"threshold_style": "confidence-bands", "visual": "forecast-sparkline"}, "remediation_action_trace": {"status_style": "approval-gate", "visual": "runbook-timeline"}}, "name": "hlth_health_console", "tokens": {"border.radius": "8px", "color.accent": "#E0A458", "color.danger": "#C53030", "color.primary": "#245C4E", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7FAF8", "surface.panel": "#FFFFFF", "text.primary": "#14261F", "text.secondary": "#52635B"}}, "ui": {"api_prefix": "/hlth/api/v1", "requires_theme": true, "routes": [{"component": "HealthDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/hlth/dashboard", "permission": "health.view"}, {"component": "ComponentHealthMap", "name": "components", "nav_group": "Assessment", "path": "/hlth/components", "permission": "health.view"}, {"component": "HealthAlertCenter", "name": "alerts", "nav_group": "Assessment", "path": "/hlth/alerts", "permission": "health.alerts.acknowledge"}, {"component": "HealthIncidentManager", "name": "incidents", "nav_group": "Response", "path": "/hlth/incidents", "permission": "health.incidents.manage"}, {"component": "HealthPredictionConsole", "name": "predictions", "nav_group": "Intelligence", "path": "/hlth/predictions", "permission": "health.view"}, {"component": "RemediationWorkbench", "name": "remediation", "nav_group": "Response", "path": "/hlth/remediation", "permission": "health.remediate"}, {"component": "HealthReportStudio", "name": "reports", "nav_group": "Reports", "path": "/hlth/reports", "permission": "health.reports.generate"}, {"component": "HealthSettings", "name": "settings", "nav_group": "Administration", "path": "/hlth/settings", "permission": "health.admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"hlth": []}}, "contracts": {"hlth": {"configuration": {"alerts": {"auto_acknowledge_recovered_alerts": true, "correlation_window_minutes": 5, "critical_health_score_threshold": 40}, "assessment": {"business_impact_weighting": true, "component_discovery_enabled": true, "contextual_health_scoring": true, "health_check_interval_seconds": 60}, "baselines": {"auto_update_enabled": true, "learning_period_days": 7, "stale_baseline_days": 30}, "incidents": {"block_deploy_on_unresolved_critical": true, "incident_owner_required": true, "postmortem_required_for_sev1": true}, "prediction": {"failure_forecast_enabled": true, "minimum_prediction_confidence": 0.75, "prediction_window_hours": 24}, "remediation": {"auto_remediation_enabled": true, "production_approval_required": true, "runbook_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "hlth_health_console"}, "ui": {"enable_component_map": true, "enable_dashboard": true, "enable_prediction_console": true, "enable_remediation_console": true}}, "id": "hlth", "provides": ["hlth_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"hlth": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"component_health_requires_component_id": {"condition": {"component_id_present": false, "operation": "track_component_health"}, "description": "Component health updates require a component identifier.", "effect": {"decision": "deny", "reason": "component_id_required", "required_action": "attach_component_id"}, "name": "component_health_requires_component_id"}, "critical_health_score_creates_alert": {"condition": {"alert_created": false, "health_score_lt": 40}, "description": "Critical health scores require a tracked alert.", "effect": {"decision": "deny", "reason": "critical_health_alert_required", "required_action": "create_critical_health_alert"}, "name": "critical_health_score_creates_alert"}, "remediation_requires_runbook": {"condition": {"remediation_requested": true, "runbook_attached": false}, "description": "Remediation actions require an attached runbook.", "effect": {"decision": "deny", "reason": "remediation_runbook_required", "required_action": "attach_remediation_runbook"}, "name": "remediation_requires_runbook"}, "stale_baseline_requires_review": {"condition": {"baseline_age_days_gt": 30, "baseline_review_recorded": false}, "description": "Stale health baselines require review before prediction use.", "effect": {"decision": "require_review", "reason": "baseline_review_required", "required_action": "review_or_refresh_baseline"}, "name": "stale_baseline_requires_review"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All health operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "unresolved_critical_incident_blocks_deploy": {"condition": {"deployment_requested": true, "unresolved_critical_incidents_gt": 0}, "description": "Deployments are blocked while critical incidents remain unresolved.", "effect": {"decision": "deny", "reason": "critical_incident_unresolved", "required_action": "resolve_or_waive_critical_incident"}, "name": "unresolved_critical_incident_blocks_deploy"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.hlth": {"file": "capability_contract.py", "id": "capability.hlth", "kind": "capability", "name": "System Health Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("hlth_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "hlth",
+			"version": "1.0.0",
+			"description": "Health Checks and Diagnostics package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"hlth": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"hlth": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["hlth_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"remediation": "HlthRemediationRequestRecord",
+					"deployment_gate": "HlthDeploymentGateRecord",
+				},
+				"health_lifecycle": {
+					"component": "HlthComponentRecord",
+					"check": "HlthCheckRecord",
+					"baseline": "HlthBaselineRecord",
+					"prediction": "HlthPredictionRecord",
+					"alert": "HlthAlertRecord",
+					"incident": "HlthIncidentRecord",
+					"audit": "HlthAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"hlth": {
+				"id": "hlth",
+				"configuration": contract["configuration"],
+				"provides": ["hlth_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"hlth": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.hlth": {
+				"id": "capability.hlth",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -20,7 +144,7 @@ def component_manifest() -> dict[str, Any]:
 		"format": "apg.component-manifest.v1",
 		"kind": "apg.generated_application",
 		"name": "hlth",
-		"display_name": "System Health Management",
+		"display_name": "Health Checks and Diagnostics",
 		"target": "python",
 		"interfaces": {
 			"health": "/health",
@@ -36,12 +160,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("hlth", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "hlth" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 13:
+		errors.append("HLTH semantic model route manifest is stale")
+	if len(rules) < 18:
+		errors.append("HLTH semantic model rule manifest is stale")
+	if "moni" not in adapters.get("supported_probe_sources", []):
+		errors.append("HLTH adapter manifest must include MONI probe source boundary")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
