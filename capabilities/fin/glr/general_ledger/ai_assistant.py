@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - AI-Powered Intelligent Assistant
 
-Revolutionary AI assistant that transforms journal entry creation from a manual,
+Advanced AI assistant that transforms journal entry creation from a manual,
 error-prone process into an intelligent, guided experience that delights users.
 
 Features:

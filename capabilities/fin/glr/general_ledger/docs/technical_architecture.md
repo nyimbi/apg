@@ -1,5 +1,5 @@
 # APG General Ledger - Technical Architecture
-**Revolutionary AI-powered General Ledger System**  
+**Advanced AI-powered General Ledger System**
 © 2025 Datacraft. All rights reserved.
 
 ## 🏗️ System Architecture Overview
@@ -41,7 +41,7 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
-## 🎯 Revolutionary Components
+## 🎯 Advanced Components
 
 ### 1. AI-Powered Engine
 **Location**: `ai_assistant.py`, `intelligence_dashboard.py`
@@ -98,7 +98,7 @@ def calculate_match_score(transaction1, transaction2):
     date_score = date_proximity(t1.date, t2.date)
     reference_score = fuzzy_match(t1.reference, t2.reference)
     vendor_score = vendor_similarity(t1.vendor, t2.vendor)
-    
+
     return weighted_average([
         (amount_score, 0.4),
         (date_score, 0.2),
@@ -118,7 +118,7 @@ def calculate_match_score(transaction1, transaction2):
 
 **Processing Pipeline:**
 ```
-Multi-Entity Transaction → Validation → Currency Conversion → 
+Multi-Entity Transaction → Validation → Currency Conversion →
 Transfer Pricing → Entity Allocation → Consolidation Entries
 ```
 
@@ -222,7 +222,7 @@ class GLEvent:
 
 **Event Flow:**
 ```
-Business Action → Event Generation → Event Bus → Event Handlers → 
+Business Action → Event Generation → Event Bus → Event Handlers →
 Side Effects (AI Learning, Notifications, Integrations)
 ```
 
@@ -432,9 +432,9 @@ async def health_check():
 
 **Database Optimization:**
 ```sql
--- Materialized views for complex reports
+-- Hierarchy views for complex reports
 CREATE MATERIALIZED VIEW mv_trial_balance AS
-SELECT 
+SELECT
     account_id,
     SUM(debit_amount) as total_debits,
     SUM(credit_amount) as total_credits,
@@ -477,4 +477,4 @@ As the system scales, consider splitting into:
 
 ---
 
-**This architecture delivers the revolutionary user experience while maintaining enterprise-grade performance, security, and scalability.**
+**This architecture delivers the advanced user experience while maintaining enterprise-grade performance, security, and scalability.**

@@ -1,60 +1,190 @@
 {
-  "agents": {},
   "app": {
     "description": "Financial Management General Ledger package-backed APG capability",
-    "entity_count": 0,
+    "entity_count": 9,
     "name": "glr_general_ledger",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "glr_general_ledger": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Glr",
-          "enabled": true,
-          "id": "glr_general_ledger",
-          "name": "Financial Management General Ledger",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/glr/general_ledger/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "composition_events": "bytewax",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "allocations": {
+          "basis_required": true,
+          "review_required": true,
+          "source_account_required": true,
+          "target_account_required": true
+        },
+        "balances": {
+          "maintain_running_balances": true,
+          "posting_emits_balance_events": true,
+          "trial_balance_must_balance": true
+        },
+        "chart_of_accounts": {
+          "account_code_required": true,
+          "account_name_required": true,
+          "account_type_required": true,
+          "parent_cycle_check_required": true,
+          "posting_account_required_for_journals": true,
+          "supported_account_types": [
+            "asset",
+            "liability",
+            "equity",
+            "revenue",
+            "expense"
+          ]
+        },
+        "currency": {
+          "base_currency": "USD",
+          "exchange_rate_required_for_foreign_currency": true,
+          "positive_exchange_rate_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "dimensions": {
+          "dimension_policy_required": true,
+          "enabled": true,
+          "supported_dimensions": [
+            "department",
+            "cost_center",
+            "project",
+            "location",
+            "product"
+          ]
+        },
+        "glr_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "journal_reviewer",
+            "posting_reviewer",
+            "period_close_reviewer",
+            "reconciliation_reviewer",
+            "allocation_reviewer",
+            "trial_balance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "journals": {
+          "approval_required_for_posting": true,
+          "balanced_entry_required": true,
+          "batch_required": true,
+          "description_required": true,
+          "idempotency_key_required": true,
+          "minimum_line_count": 2,
+          "segregation_of_duties": true,
+          "supported_sources": [
+            "manual",
+            "ap",
+            "ar",
+            "cash",
+            "payroll",
+            "allocation",
+            "reversal",
+            "import"
+          ]
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_balance_events": true,
+          "emit_journal_events": true,
+          "emit_period_events": true,
+          "emit_posting_events": true,
+          "event_stream": "apg.fin.glr.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "periods": {
+          "closed_period_adjustment_requires_approval": true,
+          "fiscal_year_required": true,
+          "open_period_required_for_posting": true,
+          "period_dates_required": true
+        },
+        "reversals": {
+          "approval_required": true,
+          "posted_entry_required": true,
+          "reason_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "glr_general_ledger_operations"
+          "default_theme": "glr_general_ledger_control"
         },
         "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_allocations": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_dimensions": true,
+          "enable_journal_batches": true,
+          "enable_journals": true,
+          "enable_periods": true,
+          "enable_postings": true,
+          "enable_reversals": true,
+          "enable_settings": true,
+          "enable_trial_balance": true
         }
       },
-      "erp_modules": [
-        "fin"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Financial Management General Ledger",
       "provides": [
-        "glr_general_ledger_operations"
+        "chart_of_accounts_lifecycle",
+        "ledger_dimension_management",
+        "accounting_period_lifecycle",
+        "journal_batch_lifecycle",
+        "journal_entry_lifecycle",
+        "journal_posting_workflow",
+        "ledger_balance_service",
+        "trial_balance_reporting",
+        "allocation_and_reversal_workflow",
+        "glr_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_management",
+        "business_intelligence",
+        "financial_reporting"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Financial Management General Ledger operations require tenant context.",
+            "description": "General ledger operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +197,458 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Financial Management General Ledger write operations require policy enforcement.",
+            "description": "General ledger writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "glr_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "account_code_present": false,
+              "operation": "create_account"
             },
-            "description": "High-risk Financial Management General Ledger operations require review.",
+            "description": "Ledger accounts require an account code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_code_required",
+              "required_action": "set_account_code"
+            },
+            "name": "account_requires_code"
+          },
+          {
+            "condition": {
+              "account_name_present": false,
+              "operation": "create_account"
+            },
+            "description": "Ledger accounts require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_name_required",
+              "required_action": "set_account_name"
+            },
+            "name": "account_requires_name"
+          },
+          {
+            "condition": {
+              "account_type_supported": false,
+              "operation": "create_account"
+            },
+            "description": "Ledger account type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_type_not_supported",
+              "required_action": "select_supported_account_type"
+            },
+            "name": "account_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_account",
+              "parent_cycle_detected": true
+            },
+            "description": "Account hierarchy must not contain cycles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_parent_cycle_detected",
+              "required_action": "select_valid_parent"
+            },
+            "name": "account_parent_cycle_blocked"
+          },
+          {
+            "condition": {
+              "operation": "open_period",
+              "period_name_present": false
+            },
+            "description": "Accounting periods require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_name_required",
+              "required_action": "name_period"
+            },
+            "name": "period_requires_name"
+          },
+          {
+            "condition": {
+              "fiscal_year_present": false,
+              "operation": "open_period"
+            },
+            "description": "Accounting periods require fiscal year.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fiscal_year_required",
+              "required_action": "set_fiscal_year"
+            },
+            "name": "period_requires_fiscal_year"
+          },
+          {
+            "condition": {
+              "operation": "open_period",
+              "period_dates_present": false
+            },
+            "description": "Accounting periods require start and end dates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_dates_required",
+              "required_action": "set_period_dates"
+            },
+            "name": "period_requires_dates"
+          },
+          {
+            "condition": {
+              "operation": "open_period",
+              "period_range_valid": false
+            },
+            "description": "Accounting period end must be after start.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_range_invalid",
+              "required_action": "set_valid_period_range"
+            },
+            "name": "period_end_after_start"
+          },
+          {
+            "condition": {
+              "operation": "create_journal_batch",
+              "period_open": false
+            },
+            "description": "Journal batches require an open period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_batch_open_period_required",
+              "required_action": "open_period"
+            },
+            "name": "journal_batch_requires_period"
+          },
+          {
+            "condition": {
+              "journal_source_supported": false,
+              "operation": "create_journal_batch"
+            },
+            "description": "Journal batch source must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_source_not_supported",
+              "required_action": "select_supported_source"
+            },
+            "name": "journal_batch_source_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_journal_batch"
+            },
+            "description": "Journal batch currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "journal_batch_currency_supported"
+          },
+          {
+            "condition": {
+              "batch_present": false,
+              "operation": "create_journal_entry"
+            },
+            "description": "Journal entries require a batch.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_batch_required",
+              "required_action": "attach_batch"
+            },
+            "name": "journal_requires_batch"
+          },
+          {
+            "condition": {
+              "journal_description_present": false,
+              "operation": "create_journal_entry"
+            },
+            "description": "Journal entries require a description.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_description_required",
+              "required_action": "describe_journal"
+            },
+            "name": "journal_requires_description"
+          },
+          {
+            "condition": {
+              "journal_line_count_lt": 2,
+              "operation": "create_journal_entry"
+            },
+            "description": "Journal entries require at least two lines.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_lines_required",
+              "required_action": "add_journal_lines"
+            },
+            "name": "journal_requires_two_lines"
+          },
+          {
+            "condition": {
+              "operation": "create_journal_entry",
+              "posting_accounts_valid": false
+            },
+            "description": "Journal lines require valid posting accounts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "posting_accounts_required",
+              "required_action": "select_posting_accounts"
+            },
+            "name": "journal_requires_posting_accounts"
+          },
+          {
+            "condition": {
+              "balanced": false,
+              "operation": "create_journal_entry"
+            },
+            "description": "Journal debits and credits must balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_not_balanced",
+              "required_action": "balance_journal"
+            },
+            "name": "journal_must_balance"
+          },
+          {
+            "condition": {
+              "exchange_rate_present": false,
+              "foreign_currency": true,
+              "operation": "create_journal_entry"
+            },
+            "description": "Foreign currency journals require an exchange rate.",
+            "effect": {
+              "decision": "deny",
+              "reason": "exchange_rate_required",
+              "required_action": "attach_exchange_rate"
+            },
+            "name": "foreign_currency_requires_rate"
+          },
+          {
+            "condition": {
+              "exchange_rate_lte": 0,
+              "operation": "record_currency_rate"
+            },
+            "description": "Exchange rates must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "exchange_rate_positive_required",
+              "required_action": "set_positive_exchange_rate"
+            },
+            "name": "exchange_rate_positive"
+          },
+          {
+            "condition": {
+              "journal_present": false,
+              "operation": "post_journal"
+            },
+            "description": "Posting requires a journal entry.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_entry_required",
+              "required_action": "select_journal"
+            },
+            "name": "post_requires_entry"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "post_journal"
+            },
+            "description": "Posting requires journal approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "journal_approval_required",
+              "required_action": "approve_journal"
+            },
+            "name": "post_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "post_journal",
+              "period_open": false
+            },
+            "description": "Posting requires an open accounting period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "open_period_required",
+              "required_action": "open_period"
+            },
+            "name": "post_requires_open_period"
+          },
+          {
+            "condition": {
+              "idempotency_key_present": false,
+              "operation": "post_journal"
+            },
+            "description": "Posting requires idempotency key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "idempotency_key_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "post_requires_idempotency_key"
+          },
+          {
+            "condition": {
+              "operation": "post_journal",
+              "same_preparer_and_poster": true
+            },
+            "description": "Posting requires segregation of duties.",
+            "effect": {
+              "decision": "deny",
+              "reason": "segregation_of_duties_required",
+              "required_action": "assign_independent_poster"
+            },
+            "name": "post_requires_sod"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "closed_period_adjustment": true,
+              "operation": "post_journal"
+            },
+            "description": "Closed-period adjustments require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "closed_period_adjustment_approval_required",
+              "required_action": "approve_adjustment"
+            },
+            "name": "closed_period_adjustment_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "reverse_journal",
+              "posted_entry_present": false
+            },
+            "description": "Reversals require a posted journal.",
+            "effect": {
+              "decision": "deny",
+              "reason": "posted_entry_required",
+              "required_action": "select_posted_entry"
+            },
+            "name": "reverse_requires_posted_entry"
+          },
+          {
+            "condition": {
+              "operation": "reverse_journal",
+              "reversal_reason_present": false
+            },
+            "description": "Reversals require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reversal_reason_required",
+              "required_action": "record_reversal_reason"
+            },
+            "name": "reverse_requires_reason"
+          },
+          {
+            "condition": {
+              "operation": "generate_trial_balance",
+              "trial_balance_balanced": false
+            },
+            "description": "Trial balance total debits and credits must balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "trial_balance_not_balanced",
+              "required_action": "investigate_balance"
+            },
+            "name": "trial_balance_must_balance"
+          },
+          {
+            "condition": {
+              "allocation_basis_present": false,
+              "operation": "create_allocation"
+            },
+            "description": "Allocations require a basis.",
+            "effect": {
+              "decision": "deny",
+              "reason": "allocation_basis_required",
+              "required_action": "define_allocation_basis"
+            },
+            "name": "allocation_requires_basis"
+          },
+          {
+            "condition": {
+              "allocation_review_recorded": false,
+              "operation": "create_allocation"
+            },
+            "description": "Allocations require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "allocation_review_required",
+              "required_action": "record_allocation_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "allocation_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "glr_batch"
+            },
+            "description": "General ledger batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_glr_batch_to_bytewax"
+            },
+            "name": "glr_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "glr_event"
+            },
+            "description": "General ledger lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_glr_event_to_bytewax"
+            },
+            "name": "glr_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_glr_agent"
+            },
+            "description": "GLR agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "glr_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "glr_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_glr_agent"
+            },
+            "description": "GLR agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "glr_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "glr_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_glr_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged GLR actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_glr_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +658,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Financial Management General Ledger operations require tenant context.",
+          "description": "General ledger operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +671,458 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Financial Management General Ledger write operations require policy enforcement.",
+          "description": "General ledger writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "glr_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "account_code_present": false,
+            "operation": "create_account"
           },
-          "description": "High-risk Financial Management General Ledger operations require review.",
+          "description": "Ledger accounts require an account code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_code_required",
+            "required_action": "set_account_code"
+          },
+          "name": "account_requires_code"
+        },
+        {
+          "condition": {
+            "account_name_present": false,
+            "operation": "create_account"
+          },
+          "description": "Ledger accounts require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_name_required",
+            "required_action": "set_account_name"
+          },
+          "name": "account_requires_name"
+        },
+        {
+          "condition": {
+            "account_type_supported": false,
+            "operation": "create_account"
+          },
+          "description": "Ledger account type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_type_not_supported",
+            "required_action": "select_supported_account_type"
+          },
+          "name": "account_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_account",
+            "parent_cycle_detected": true
+          },
+          "description": "Account hierarchy must not contain cycles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_parent_cycle_detected",
+            "required_action": "select_valid_parent"
+          },
+          "name": "account_parent_cycle_blocked"
+        },
+        {
+          "condition": {
+            "operation": "open_period",
+            "period_name_present": false
+          },
+          "description": "Accounting periods require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_name_required",
+            "required_action": "name_period"
+          },
+          "name": "period_requires_name"
+        },
+        {
+          "condition": {
+            "fiscal_year_present": false,
+            "operation": "open_period"
+          },
+          "description": "Accounting periods require fiscal year.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fiscal_year_required",
+            "required_action": "set_fiscal_year"
+          },
+          "name": "period_requires_fiscal_year"
+        },
+        {
+          "condition": {
+            "operation": "open_period",
+            "period_dates_present": false
+          },
+          "description": "Accounting periods require start and end dates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_dates_required",
+            "required_action": "set_period_dates"
+          },
+          "name": "period_requires_dates"
+        },
+        {
+          "condition": {
+            "operation": "open_period",
+            "period_range_valid": false
+          },
+          "description": "Accounting period end must be after start.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_range_invalid",
+            "required_action": "set_valid_period_range"
+          },
+          "name": "period_end_after_start"
+        },
+        {
+          "condition": {
+            "operation": "create_journal_batch",
+            "period_open": false
+          },
+          "description": "Journal batches require an open period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_batch_open_period_required",
+            "required_action": "open_period"
+          },
+          "name": "journal_batch_requires_period"
+        },
+        {
+          "condition": {
+            "journal_source_supported": false,
+            "operation": "create_journal_batch"
+          },
+          "description": "Journal batch source must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_source_not_supported",
+            "required_action": "select_supported_source"
+          },
+          "name": "journal_batch_source_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_journal_batch"
+          },
+          "description": "Journal batch currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "journal_batch_currency_supported"
+        },
+        {
+          "condition": {
+            "batch_present": false,
+            "operation": "create_journal_entry"
+          },
+          "description": "Journal entries require a batch.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_batch_required",
+            "required_action": "attach_batch"
+          },
+          "name": "journal_requires_batch"
+        },
+        {
+          "condition": {
+            "journal_description_present": false,
+            "operation": "create_journal_entry"
+          },
+          "description": "Journal entries require a description.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_description_required",
+            "required_action": "describe_journal"
+          },
+          "name": "journal_requires_description"
+        },
+        {
+          "condition": {
+            "journal_line_count_lt": 2,
+            "operation": "create_journal_entry"
+          },
+          "description": "Journal entries require at least two lines.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_lines_required",
+            "required_action": "add_journal_lines"
+          },
+          "name": "journal_requires_two_lines"
+        },
+        {
+          "condition": {
+            "operation": "create_journal_entry",
+            "posting_accounts_valid": false
+          },
+          "description": "Journal lines require valid posting accounts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "posting_accounts_required",
+            "required_action": "select_posting_accounts"
+          },
+          "name": "journal_requires_posting_accounts"
+        },
+        {
+          "condition": {
+            "balanced": false,
+            "operation": "create_journal_entry"
+          },
+          "description": "Journal debits and credits must balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_not_balanced",
+            "required_action": "balance_journal"
+          },
+          "name": "journal_must_balance"
+        },
+        {
+          "condition": {
+            "exchange_rate_present": false,
+            "foreign_currency": true,
+            "operation": "create_journal_entry"
+          },
+          "description": "Foreign currency journals require an exchange rate.",
+          "effect": {
+            "decision": "deny",
+            "reason": "exchange_rate_required",
+            "required_action": "attach_exchange_rate"
+          },
+          "name": "foreign_currency_requires_rate"
+        },
+        {
+          "condition": {
+            "exchange_rate_lte": 0,
+            "operation": "record_currency_rate"
+          },
+          "description": "Exchange rates must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "exchange_rate_positive_required",
+            "required_action": "set_positive_exchange_rate"
+          },
+          "name": "exchange_rate_positive"
+        },
+        {
+          "condition": {
+            "journal_present": false,
+            "operation": "post_journal"
+          },
+          "description": "Posting requires a journal entry.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_entry_required",
+            "required_action": "select_journal"
+          },
+          "name": "post_requires_entry"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "post_journal"
+          },
+          "description": "Posting requires journal approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "journal_approval_required",
+            "required_action": "approve_journal"
+          },
+          "name": "post_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "post_journal",
+            "period_open": false
+          },
+          "description": "Posting requires an open accounting period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "open_period_required",
+            "required_action": "open_period"
+          },
+          "name": "post_requires_open_period"
+        },
+        {
+          "condition": {
+            "idempotency_key_present": false,
+            "operation": "post_journal"
+          },
+          "description": "Posting requires idempotency key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "idempotency_key_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "post_requires_idempotency_key"
+        },
+        {
+          "condition": {
+            "operation": "post_journal",
+            "same_preparer_and_poster": true
+          },
+          "description": "Posting requires segregation of duties.",
+          "effect": {
+            "decision": "deny",
+            "reason": "segregation_of_duties_required",
+            "required_action": "assign_independent_poster"
+          },
+          "name": "post_requires_sod"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "closed_period_adjustment": true,
+            "operation": "post_journal"
+          },
+          "description": "Closed-period adjustments require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "closed_period_adjustment_approval_required",
+            "required_action": "approve_adjustment"
+          },
+          "name": "closed_period_adjustment_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "reverse_journal",
+            "posted_entry_present": false
+          },
+          "description": "Reversals require a posted journal.",
+          "effect": {
+            "decision": "deny",
+            "reason": "posted_entry_required",
+            "required_action": "select_posted_entry"
+          },
+          "name": "reverse_requires_posted_entry"
+        },
+        {
+          "condition": {
+            "operation": "reverse_journal",
+            "reversal_reason_present": false
+          },
+          "description": "Reversals require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reversal_reason_required",
+            "required_action": "record_reversal_reason"
+          },
+          "name": "reverse_requires_reason"
+        },
+        {
+          "condition": {
+            "operation": "generate_trial_balance",
+            "trial_balance_balanced": false
+          },
+          "description": "Trial balance total debits and credits must balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "trial_balance_not_balanced",
+            "required_action": "investigate_balance"
+          },
+          "name": "trial_balance_must_balance"
+        },
+        {
+          "condition": {
+            "allocation_basis_present": false,
+            "operation": "create_allocation"
+          },
+          "description": "Allocations require a basis.",
+          "effect": {
+            "decision": "deny",
+            "reason": "allocation_basis_required",
+            "required_action": "define_allocation_basis"
+          },
+          "name": "allocation_requires_basis"
+        },
+        {
+          "condition": {
+            "allocation_review_recorded": false,
+            "operation": "create_allocation"
+          },
+          "description": "Allocations require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "allocation_review_required",
+            "required_action": "record_allocation_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "allocation_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "glr_batch"
+          },
+          "description": "General ledger batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_glr_batch_to_bytewax"
+          },
+          "name": "glr_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "glr_event"
+          },
+          "description": "General ledger lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_glr_event_to_bytewax"
+          },
+          "name": "glr_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_glr_agent"
+          },
+          "description": "GLR agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "glr_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "glr_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_glr_agent"
+          },
+          "description": "GLR agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "glr_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "glr_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_glr_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged GLR actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_glr_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +1132,133 @@
         "views": "views.py"
       },
       "screens": {
+        "accounts": {
+          "component": "ChartOfAccountsWorkbench",
+          "permission": "glr_general_ledger:manage_accounts",
+          "route": "/glr-general-ledger/accounts"
+        },
+        "agents": {
+          "component": "GLRAgentWorkbench",
+          "permission": "glr_general_ledger:admin",
+          "route": "/glr-general-ledger/agents"
+        },
+        "allocations": {
+          "component": "AllocationWorkbench",
+          "permission": "glr_general_ledger:allocate",
+          "route": "/glr-general-ledger/allocations"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "GeneralLedgerDashboard",
           "permission": "glr_general_ledger:view",
           "route": "/glr-general-ledger/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "glr_general_ledger:operate",
-          "route": "/glr-general-ledger/operations"
+        "dimensions": {
+          "component": "LedgerDimensionConsole",
+          "permission": "glr_general_ledger:manage_dimensions",
+          "route": "/glr-general-ledger/dimensions"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "glr_general_ledger:govern",
-          "route": "/glr-general-ledger/rules"
+        "journal_batches": {
+          "component": "JournalBatchQueue",
+          "permission": "glr_general_ledger:enter_journals",
+          "route": "/glr-general-ledger/batches"
+        },
+        "journals": {
+          "component": "JournalEntryWorkbench",
+          "permission": "glr_general_ledger:enter_journals",
+          "route": "/glr-general-ledger/journals"
+        },
+        "periods": {
+          "component": "AccountingPeriodConsole",
+          "permission": "glr_general_ledger:manage_periods",
+          "route": "/glr-general-ledger/periods"
+        },
+        "postings": {
+          "component": "PostingControlDesk",
+          "permission": "glr_general_ledger:post",
+          "route": "/glr-general-ledger/postings"
+        },
+        "reversals": {
+          "component": "ReversalWorkbench",
+          "permission": "glr_general_ledger:reverse",
+          "route": "/glr-general-ledger/reversals"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "GeneralLedgerSettings",
           "permission": "glr_general_ledger:admin",
           "route": "/glr-general-ledger/settings"
+        },
+        "trial_balance": {
+          "component": "TrialBalanceConsole",
+          "permission": "glr_general_ledger:report",
+          "route": "/glr-general-ledger/trial-balance"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "account_created",
+          "dimension_recorded",
+          "period_opened",
+          "journal_batch_created",
+          "journal_entry_created",
+          "journal_approved",
+          "journal_posted",
+          "journal_reversed",
+          "trial_balance_generated",
+          "allocation_created",
+          "glr_agent_registered"
+        ],
+        "guardrails": [
+          "glr_batch_requires_bytewax",
+          "glr_event_requires_bytewax",
+          "privileged_agent_glr_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "open",
+          "balanced",
+          "approved",
+          "posted",
+          "reversed",
+          "closed",
+          "blocked"
+        ],
+        "stream": "apg.fin.glr.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "accounts": {
+            "icon": "book-open",
+            "risk_style": "ledger-band",
+            "status_indicator": "account-pill"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "allocations": {
+            "status_style": "review-chip",
+            "visual": "allocation-map"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "journals": {
+            "status_style": "journal-chip",
+            "visual": "balanced-entry-grid"
+          },
+          "periods": {
+            "status_style": "period-chip",
+            "visual": "period-calendar"
+          },
+          "postings": {
+            "status_style": "posting-chip",
+            "visual": "posting-queue"
+          },
+          "trial_balance": {
+            "status_style": "balance-chip",
+            "visual": "balance-grid"
           }
         },
-        "name": "glr_general_ledger_operations",
+        "name": "glr_general_ledger_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1278,84 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "GeneralLedgerDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/glr-general-ledger/dashboard",
             "permission": "glr_general_ledger:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/glr-general-ledger/operations",
-            "permission": "glr_general_ledger:operate"
+            "component": "ChartOfAccountsWorkbench",
+            "name": "accounts",
+            "nav_group": "Ledger",
+            "path": "/glr-general-ledger/accounts",
+            "permission": "glr_general_ledger:manage_accounts"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/glr-general-ledger/rules",
-            "permission": "glr_general_ledger:govern"
+            "component": "LedgerDimensionConsole",
+            "name": "dimensions",
+            "nav_group": "Ledger",
+            "path": "/glr-general-ledger/dimensions",
+            "permission": "glr_general_ledger:manage_dimensions"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "AccountingPeriodConsole",
+            "name": "periods",
+            "nav_group": "Close",
+            "path": "/glr-general-ledger/periods",
+            "permission": "glr_general_ledger:manage_periods"
+          },
+          {
+            "component": "JournalBatchQueue",
+            "name": "journal_batches",
+            "nav_group": "Journals",
+            "path": "/glr-general-ledger/batches",
+            "permission": "glr_general_ledger:enter_journals"
+          },
+          {
+            "component": "JournalEntryWorkbench",
+            "name": "journals",
+            "nav_group": "Journals",
+            "path": "/glr-general-ledger/journals",
+            "permission": "glr_general_ledger:enter_journals"
+          },
+          {
+            "component": "PostingControlDesk",
+            "name": "postings",
+            "nav_group": "Journals",
+            "path": "/glr-general-ledger/postings",
+            "permission": "glr_general_ledger:post"
+          },
+          {
+            "component": "TrialBalanceConsole",
+            "name": "trial_balance",
+            "nav_group": "Reports",
+            "path": "/glr-general-ledger/trial-balance",
+            "permission": "glr_general_ledger:report"
+          },
+          {
+            "component": "AllocationWorkbench",
+            "name": "allocations",
+            "nav_group": "Controls",
+            "path": "/glr-general-ledger/allocations",
+            "permission": "glr_general_ledger:allocate"
+          },
+          {
+            "component": "ReversalWorkbench",
+            "name": "reversals",
+            "nav_group": "Controls",
+            "path": "/glr-general-ledger/reversals",
+            "permission": "glr_general_ledger:reverse"
+          },
+          {
+            "component": "GLRAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/glr-general-ledger/agents",
+            "permission": "glr_general_ledger:admin"
+          },
+          {
+            "component": "GeneralLedgerSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/glr-general-ledger/settings",
@@ -234,50 +1368,216 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "glr_close_review": {
+        "roles": [
+          "journal_reviewer",
+          "posting_reviewer",
+          "period_close_reviewer",
+          "reconciliation_reviewer",
+          "allocation_reviewer",
+          "trial_balance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "glr_general_ledger": []
+      "glr_general_ledger": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_management",
+        "business_intelligence",
+        "financial_reporting"
+      ]
     }
   },
   "contracts": {
     "glr_general_ledger": {
       "configuration": {
-        "capability": {
-          "category": "Glr",
-          "enabled": true,
-          "id": "glr_general_ledger",
-          "name": "Financial Management General Ledger",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/glr/general_ledger/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "composition_events": "bytewax",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "allocations": {
+          "basis_required": true,
+          "review_required": true,
+          "source_account_required": true,
+          "target_account_required": true
+        },
+        "balances": {
+          "maintain_running_balances": true,
+          "posting_emits_balance_events": true,
+          "trial_balance_must_balance": true
+        },
+        "chart_of_accounts": {
+          "account_code_required": true,
+          "account_name_required": true,
+          "account_type_required": true,
+          "parent_cycle_check_required": true,
+          "posting_account_required_for_journals": true,
+          "supported_account_types": [
+            "asset",
+            "liability",
+            "equity",
+            "revenue",
+            "expense"
+          ]
+        },
+        "currency": {
+          "base_currency": "USD",
+          "exchange_rate_required_for_foreign_currency": true,
+          "positive_exchange_rate_required": true,
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "dimensions": {
+          "dimension_policy_required": true,
+          "enabled": true,
+          "supported_dimensions": [
+            "department",
+            "cost_center",
+            "project",
+            "location",
+            "product"
+          ]
+        },
+        "glr_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "journal_reviewer",
+            "posting_reviewer",
+            "period_close_reviewer",
+            "reconciliation_reviewer",
+            "allocation_reviewer",
+            "trial_balance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "journals": {
+          "approval_required_for_posting": true,
+          "balanced_entry_required": true,
+          "batch_required": true,
+          "description_required": true,
+          "idempotency_key_required": true,
+          "minimum_line_count": 2,
+          "segregation_of_duties": true,
+          "supported_sources": [
+            "manual",
+            "ap",
+            "ar",
+            "cash",
+            "payroll",
+            "allocation",
+            "reversal",
+            "import"
+          ]
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_balance_events": true,
+          "emit_journal_events": true,
+          "emit_period_events": true,
+          "emit_posting_events": true,
+          "event_stream": "apg.fin.glr.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "periods": {
+          "closed_period_adjustment_requires_approval": true,
+          "fiscal_year_required": true,
+          "open_period_required_for_posting": true,
+          "period_dates_required": true
+        },
+        "reversals": {
+          "approval_required": true,
+          "posted_entry_required": true,
+          "reason_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "glr_general_ledger_operations"
+          "default_theme": "glr_general_ledger_control"
         },
         "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_allocations": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_dimensions": true,
+          "enable_journal_batches": true,
+          "enable_journals": true,
+          "enable_periods": true,
+          "enable_postings": true,
+          "enable_reversals": true,
+          "enable_settings": true,
+          "enable_trial_balance": true
         }
       },
       "id": "glr_general_ledger",
       "provides": [
-        "glr_general_ledger_operations"
+        "chart_of_accounts_lifecycle",
+        "ledger_dimension_management",
+        "accounting_period_lifecycle",
+        "journal_batch_lifecycle",
+        "journal_entry_lifecycle",
+        "journal_posting_workflow",
+        "ledger_balance_service",
+        "trial_balance_reporting",
+        "allocation_and_reversal_workflow",
+        "glr_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_management",
+        "business_intelligence",
+        "financial_reporting"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1585,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 8,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "glr_general_ledger": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Financial Management General Ledger operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Financial Management General Ledger write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Financial Management General Ledger operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.glr_general_ledger": {
-      "file": "capability_contract.py",
-      "id": "capability.glr_general_ledger",
-      "kind": "capability",
-      "name": "Financial Management General Ledger",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

@@ -1,5 +1,5 @@
 # APG Financial Management General Ledger - Production Dockerfile
-# Revolutionary AI-powered General Ledger System
+# Advanced AI-powered General Ledger System
 # © 2025 Datacraft. All rights reserved.
 
 FROM python:3.11-slim AS builder
@@ -92,9 +92,9 @@ CMD ["python", "run.py", "--port", "8000", "--workers", "4"]
 # Labels for metadata
 LABEL maintainer="Nyimbi Odero <nyimbi@gmail.com>" \
       version="${VERSION}" \
-      description="APG Financial Management General Ledger - Revolutionary AI-powered GL system" \
+      description="APG Financial Management General Ledger - Advanced AI-powered GL system" \
       org.opencontainers.image.title="APG General Ledger" \
-      org.opencontainers.image.description="Revolutionary AI-powered General Ledger system" \
+      org.opencontainers.image.description="Advanced AI-powered General Ledger system" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.vendor="Datacraft" \
       org.opencontainers.image.licenses="Proprietary" \

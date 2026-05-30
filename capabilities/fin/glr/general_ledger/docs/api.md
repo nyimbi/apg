@@ -1,6 +1,6 @@
 # APG General Ledger API Documentation
 
-**Complete API Reference for the Revolutionary General Ledger System**
+**Complete API Reference for the Advanced General Ledger System**
 
 *Version 1.0 | Last Updated: January 2025*
 

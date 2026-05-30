@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Advanced Multi-Entity Transaction Support
 
-Revolutionary multi-entity transaction processing that automatically handles complex
+Advanced multi-entity transaction processing that automatically handles complex
 transactions across multiple legal entities, currencies, and jurisdictions with
 intelligent consolidation and compliance.
 

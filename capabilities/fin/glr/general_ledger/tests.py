@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Comprehensive Test Suite
 
-Complete test suite for the revolutionary General Ledger capability including
+Complete test suite for the advanced General Ledger capability including
 unit tests, integration tests, game-changer feature tests, and performance tests.
 
 © 2025 Datacraft. All rights reserved.

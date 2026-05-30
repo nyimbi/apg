@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Advanced Smart Period Close Automation
 
-Revolutionary period close automation that transforms month-end and year-end
+Advanced period close automation that transforms month-end and year-end
 closing from manual, time-consuming processes into intelligent, automated
 workflows with minimal human intervention and maximum accuracy.
 
@@ -148,7 +148,7 @@ class SmartPeriodCloseEngine:
 	"""
 	🎯 GAME CHANGER #9: Advanced Smart Period Close Automation
 	
-	Revolutionary period close automation that:
+	Advanced period close automation that:
 	- Automatically generates and executes close checklists
 	- Calculates and posts accruals with AI-powered accuracy
 	- Performs intelligent variance analysis and exception handling

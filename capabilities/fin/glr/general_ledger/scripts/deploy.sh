@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # APG Financial Management General Ledger - Deployment Script
-# Revolutionary AI-powered General Ledger System
+# Advanced AI-powered General Ledger System
 # © 2025 Datacraft. All rights reserved.
 # Author: Nyimbi Odero <nyimbi@gmail.com>
 
@@ -432,7 +432,7 @@ main() {
     fi
     
     print_success "🎉 APG General Ledger deployment completed successfully!"
-    print_status "The revolutionary AI-powered General Ledger is now running."
+    print_status "The advanced AI-powered General Ledger is now running."
 }
 
 # Trap to handle script interruption

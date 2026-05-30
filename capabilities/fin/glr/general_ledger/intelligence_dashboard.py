@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Contextual Financial Intelligence Dashboard
 
-Revolutionary intelligent dashboard that transforms raw GL data into actionable
+Advanced intelligent dashboard that transforms raw GL data into actionable
 business insights with contextual awareness and predictive analytics.
 
 Features:

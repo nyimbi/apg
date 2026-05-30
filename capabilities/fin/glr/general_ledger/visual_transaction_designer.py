@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Advanced Visual Transaction Flow Designer
 
-Revolutionary visual workflow designer that allows users to create, modify, and
+Advanced visual workflow designer that allows users to create, modify, and
 understand complex transaction flows through an intuitive drag-and-drop interface
 with intelligent validation and automated journal entry generation.
 
@@ -140,7 +140,7 @@ class VisualTransactionFlowDesigner:
 	"""
 	🎯 GAME CHANGER #8: Advanced Visual Transaction Flow Designer
 	
-	Revolutionary visual design environment for complex transactions:
+	Advanced visual design environment for complex transactions:
 	- Drag-and-drop interface for creating transaction flows
 	- Real-time validation and intelligent suggestions
 	- Template library with industry best practices

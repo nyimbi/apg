@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Advanced Transaction Contextual Search
 
-Revolutionary search engine that understands natural language and context to find
+Advanced search engine that understands natural language and context to find
 any transaction, pattern, or financial insight across the entire GL system.
 
 Features:
@@ -102,7 +102,7 @@ class AdvancedTransactionSearchEngine:
 	"""
 	🎯 GAME CHANGER #5: Advanced Transaction Contextual Search
 	
-	Revolutionary search that understands natural language and business context:
+	Advanced search that understands natural language and business context:
 	- "Show me all unusual office expenses last quarter"
 	- "Find transactions similar to the ABC Corp payment"
 	- "What caused the spike in travel expenses in March?"

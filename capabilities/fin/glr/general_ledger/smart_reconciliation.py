@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Intelligent Transaction Matching
 
-Revolutionary AI-powered reconciliation that transforms manual, time-consuming
+Advanced AI-powered reconciliation that transforms manual, time-consuming
 matching into intelligent, automated reconciliation with explanation.
 
 Features:

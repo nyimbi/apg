@@ -1,5 +1,5 @@
 # APG Financial Management General Ledger - Production Requirements
-# Revolutionary AI-powered General Ledger System
+# Advanced AI-powered General Ledger System
 # © 2025 Datacraft. All rights reserved.
 
 # Core Framework

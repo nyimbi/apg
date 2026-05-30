@@ -16,6 +16,108 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 00:04 EAT
+
+FIN GLR general ledger lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md`, replaced the package `README.md`,
+  and refreshed `cap_spec.md` with the active general-ledger packet summary.
+- Replaced the generated contract-factory wrapper with explicit chart of
+  accounts, dimensions, periods, journal batches, journal entries, postings,
+  reversals, allocations, trial balance, GLR-agent, governance, observability,
+  adapter, UI, theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  account code/name/type/hierarchy, period name/fiscal-year/dates/range,
+  journal batch period/source/currency, journal batch/description/line count/
+  posting account/balance/exchange-rate controls, posting approval/open period/
+  idempotency/separation of duties, closed-period adjustment approval, reversal
+  posted-entry/reason, trial-balance equality, allocation basis/review, GLR
+  batch/event Bytewax streams, GLR-agent runtime/role, and privileged
+  agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light GLR lifecycle helpers for accounts, dimensions, periods,
+  batches, journals, approval, posting, reversals, currency rates, allocations,
+  trial balance, GLR-agent registration, batch validation, dashboard summaries,
+  API helpers, and screen models.
+- Preserved `GLRService` as a compatibility alias while keeping optional web,
+  database, AI-provider, and rendering imports out of the top-level APG
+  surface.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the expanded contract.
+- Renamed and expanded focused package tests for contract, rule, service,
+  guardrail, API/view, app, semantic, GLR-agent, posting, trial-balance, and
+  Bytewax behavior.
+- Cleaned stale generated wording in GLR legacy docs, deployment files, helper
+  modules, and validation scripts so package hygiene scans are clean.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fin/glr/general_ledger/__init__.py
+  capabilities/fin/glr/general_ledger/capability_contract.py
+  capabilities/fin/glr/general_ledger/service.py
+  capabilities/fin/glr/general_ledger/api.py
+  capabilities/fin/glr/general_ledger/views.py
+  capabilities/fin/glr/general_ledger/app.py
+  capabilities/fin/glr/general_ledger/tests/test_package_contract.py`
+  passed.
+- Syntax-only compile for edited legacy helper modules
+  (`ai_assistant.py`, `collaborative_workspace.py`,
+  `compliance_audit_intelligence.py`, `contextual_search.py`,
+  `financial_health_monitor.py`, `intelligence_dashboard.py`, `models.py`,
+  `multi_entity_transactions.py`, `production_validation.py`,
+  `smart_period_close.py`, `smart_reconciliation.py`, `tests.py`, and
+  `visual_transaction_designer.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/fin/glr/general_ledger/tests/test_package_contract.py` passed
+  with 6 tests.
+- `./.venv/bin/python capabilities/fin/glr/general_ledger/app.py` passed package
+  self-test.
+- `./.venv/bin/apg capabilities inspect glr_general_ledger --json` confirmed
+  `ok: true`, 12 routes, 36 rules, and `glr_general_ledger_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fin/glr/general_ledger --json` passed after release evidence was
+  regenerated with `target: python` and self-test evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fin/glr/general_ledger --json` passed with `domain_specific`
+  implementation level and 0 baseline markers.
+- `jq '.capabilities.glr_general_ledger.streaming.processor,
+  .capabilities.glr_general_ledger.provides,
+  .capabilities.glr_general_ledger.requires,
+  .capabilities.glr_general_ledger.screens.agents.route,
+  (.capabilities.glr_general_ledger.rules[] |
+  select(.name=="glr_agent_runtime_supported") | .effect.reason),
+  (.capabilities.glr_general_ledger.rules[] |
+  select(.name=="glr_batch_requires_bytewax") | .effect.reason),
+  (.capabilities.glr_general_ledger.rules[] |
+  select(.name=="journal_must_balance") | .effect.reason)'
+  capabilities/fin/glr/general_ledger/semantic_model.json` confirmed
+  `bytewax`, GLR-agent provides, required services, `/glr-general-ledger/agents`,
+  `glr_agent_runtime_not_supported`, `bytewax_event_stream_required`, and
+  `journal_not_balanced`.
+- `./.venv/bin/python -c "from capabilities.fin.glr.general_ledger import
+  GeneralLedgerService; s=GeneralLedgerService();
+  cash=s.create_account('cash','tenant-proof','1000','Cash','asset');
+  rev=s.create_account('rev','tenant-proof','4000','Revenue','revenue');
+  p=s.open_period('p','tenant-proof','FY2026 M01',2026,'2026-01-01',
+  '2026-01-31'); b=s.create_journal_batch('b','tenant-proof',p['id'],
+  'manual'); j=s.create_journal_entry('j','tenant-proof',b['id'],
+  'Proof journal',[{'account_id':cash['id'],'debit':100,'credit':0},
+  {'account_id':rev['id'],'debit':0,'credit':100}],'preparer');
+  s.approve_journal(j['id'],'tenant-proof','approver');
+  s.post_journal(j['id'],'tenant-proof','poster','proof-key');
+  s.register_glr_agent('tenant-proof','Proof agent','codex',
+  'journal_reviewer','review journals');
+  print(s.dashboard_summary('tenant-proof'))"` passed and confirmed posting,
+  GLR-agent registration, audit event emission, and Bytewax stream metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- `git diff --check -- capabilities/fin/glr/general_ledger
+  docs/progress_log.md` passed.
+- Not run: durable ledger stores, live exchange-rate feeds, live auth/audit/
+  notification/document/BI/financial-reporting adapters, durable Bytewax
+  topology, rendered browser UI, GLR performance/failover checks, and full
+  repository tests.
+
 ### 2026-05-30 23:53 EAT
 
 FIN RPT financial reporting lifecycle/guardrail packet:

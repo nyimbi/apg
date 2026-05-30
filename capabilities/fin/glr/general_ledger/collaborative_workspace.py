@@ -1,7 +1,7 @@
 """
 APG Financial Management General Ledger - Real-Time Collaborative Workspace
 
-Revolutionary collaborative workspace that transforms GL work from isolated individual
+Advanced collaborative workspace that transforms GL work from isolated individual
 tasks into seamless team collaboration with real-time awareness and smart workflows.
 
 Features:

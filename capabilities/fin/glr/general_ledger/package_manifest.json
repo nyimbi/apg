@@ -4,7 +4,7 @@
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,40 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 12,
+  "rule_count": 36,
+  "streaming": {
+    "events": [
+      "account_created",
+      "dimension_recorded",
+      "period_opened",
+      "journal_batch_created",
+      "journal_entry_created",
+      "journal_approved",
+      "journal_posted",
+      "journal_reversed",
+      "trial_balance_generated",
+      "allocation_created",
+      "glr_agent_registered"
+    ],
+    "guardrails": [
+      "glr_batch_requires_bytewax",
+      "glr_event_requires_bytewax",
+      "privileged_agent_glr_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "open",
+      "balanced",
+      "approved",
+      "posted",
+      "reversed",
+      "closed",
+      "blocked"
+    ],
+    "stream": "apg.fin.glr.lifecycle"
+  },
+  "version": "2.1.0"
 }

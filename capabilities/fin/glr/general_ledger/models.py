@@ -325,7 +325,7 @@ class GLAccount(Model, AuditMixin, BaseMixin):
 	
 	# Hierarchy Management
 	level = Column(Integer, default=0)
-	path = Column(String(1000))  # Materialized path for efficient queries
+	path = Column(String(1000))  # Hierarchy path for efficient queries
 	sort_code = Column(String(100))  # Custom sorting within hierarchy
 	display_order = Column(Integer, default=0)
 	
@@ -557,7 +557,7 @@ class GLAccount(Model, AuditMixin, BaseMixin):
 			self.largest_credit = credit_amount
 	
 	def build_path(self):
-		"""Build materialized path for efficient hierarchy queries"""
+		"""Build hierarchy path for efficient hierarchy queries"""
 		if self.parent_account:
 			self.path = f"{self.parent_account.path}/{self.account_id}"
 			self.level = self.parent_account.level + 1
