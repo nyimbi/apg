@@ -8,11 +8,12 @@ Copyright: © 2025 Datacraft
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple, Set, AsyncGenerator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 import uuid
 from uuid_extensions import uuid7str
 
@@ -20,6 +21,609 @@ from .models import (
 	MQMessage, TopicConfiguration, Subscription, MessageEvent, BrokerNode,
 	MessagePriority, DeliveryMode, ProtocolType, MessageStatus, RetryPolicy
 )
+
+
+TOPIC_CLASSIFICATIONS = {"public", "internal", "restricted", "regulated"}
+TOPIC_STATUSES = {"active", "disabled", "deprecated"}
+SUBSCRIPTION_STATUSES = {"active", "paused", "disabled"}
+DELIVERY_OUTCOMES = {"delivered", "retry", "dead_letter"}
+DELIVERY_MODES = {"at_most_once", "at_least_once", "exactly_once"}
+PROTOCOLS = {"http_rest", "websocket", "mqtt", "amqp", "bytewax", "grpc"}
+
+
+def _utc_now() -> str:
+	return datetime.utcnow().isoformat() + "Z"
+
+
+def _stable_id(prefix: str, *parts: object) -> str:
+	payload = "|".join(str(part) for part in parts)
+	return f"{prefix}_{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _normalize_choice(value: str, allowed: set[str], default: str, error_prefix: str) -> str:
+	normalized = str(value or default).strip().lower()
+	if normalized not in allowed:
+		raise ValueError(f"{error_prefix}:{value}")
+	return normalized
+
+
+def _required_actions(result: dict[str, Any]) -> list[str]:
+	return [
+		str(action["required_action"])
+		for action in result.get("actions", [])
+		if action.get("required_action")
+	]
+
+
+@dataclass(slots=True)
+class TopicRecord:
+	id: str
+	tenant_id: str
+	name: str
+	owner: str
+	classification: str
+	retention_days: int
+	delivery_mode: str
+	encrypted: bool
+	schema_ref: str
+	dead_letter_topic: str
+	status: str = "active"
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class MessageRecord:
+	id: str
+	tenant_id: str
+	topic_id: str
+	producer: str
+	priority: str
+	delivery_mode: str
+	status: str
+	decision: str
+	matched_rules: list[str]
+	required_actions: list[str]
+	idempotency_key: str = ""
+	schema_ref: str = ""
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class SubscriptionRecord:
+	id: str
+	tenant_id: str
+	name: str
+	topic_pattern: str
+	consumer: str
+	delivery_mode: str
+	protocol: str
+	dead_letter_topic: str
+	status: str = "active"
+	lag_messages: int = 0
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class DeliveryAttemptRecord:
+	id: str
+	tenant_id: str
+	message_id: str
+	subscription_id: str
+	outcome: str
+	retry_count: int
+	reason: str
+	status: str
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class PriorityQuotaExceptionRecord:
+	id: str
+	tenant_id: str
+	topic_id: str
+	requested_by: str
+	reason: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class ReplayRequestRecord:
+	id: str
+	tenant_id: str
+	topic_id: str
+	requested_by: str
+	reason: str
+	range_start: str
+	range_end: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	evidence: str = ""
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class MqebAuditEventRecord:
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	actor: str
+	severity: str = "info"
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+class MqebService:
+	"""Dependency-light MQEB event-fabric service for generated APG applications."""
+
+	def __init__(self) -> None:
+		from .capability_contract import evaluate_capability_rules, get_capability_contract
+
+		self._evaluate_rules = evaluate_capability_rules
+		self._get_contract = get_capability_contract
+		self.topics: dict[str, TopicRecord] = {}
+		self.messages: dict[str, MessageRecord] = {}
+		self.subscriptions: dict[str, SubscriptionRecord] = {}
+		self.delivery_attempts: dict[str, DeliveryAttemptRecord] = {}
+		self.priority_exceptions: dict[str, PriorityQuotaExceptionRecord] = {}
+		self.replay_requests: dict[str, ReplayRequestRecord] = {}
+		self.audit_events: dict[str, MqebAuditEventRecord] = {}
+
+	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+		return self._get_contract(tenant_id, overrides)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return self._evaluate_rules(dict(context))
+
+	def create_topic(
+		self,
+		tenant_id: str,
+		topic_id: str,
+		name: str,
+		owner: str,
+		classification: str = "internal",
+		retention_days: int = 7,
+		delivery_mode: str = "at_least_once",
+		encrypted: bool = False,
+		schema_ref: str = "",
+		dead_letter_topic: str = "",
+		status: str = "active",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(topic_id or "").strip():
+			raise ValueError("topic_id_required")
+		if not str(name or "").strip():
+			raise ValueError("topic_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("topic_owner_required")
+		classification_value = _normalize_choice(classification, TOPIC_CLASSIFICATIONS, "internal", "unsupported_topic_classification")
+		status_value = _normalize_choice(status, TOPIC_STATUSES, "active", "unsupported_topic_status")
+		delivery_value = _normalize_choice(delivery_mode, DELIVERY_MODES, "at_least_once", "unsupported_delivery_mode")
+		retention_value = int(retention_days)
+		if retention_value <= 0:
+			raise ValueError("topic_retention_days_required")
+		record_id = _stable_id("mqeb_topic", tenant_id, topic_id)
+		if record_id in self.topics:
+			raise ValueError(f"topic_already_exists:{topic_id}")
+		record = TopicRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			owner=str(owner).strip(),
+			classification=classification_value,
+			retention_days=retention_value,
+			delivery_mode=delivery_value,
+			encrypted=bool(encrypted),
+			schema_ref=str(schema_ref or "").strip(),
+			dead_letter_topic=str(dead_letter_topic or "").strip(),
+			status=status_value,
+		)
+		self.topics[record.id] = record
+		self._record_event(tenant_id, "topic_created", record.id, f"Topic created: {record.name}", owner)
+		return record.to_dict()
+
+	def publish_message(
+		self,
+		tenant_id: str,
+		message_id: str,
+		topic_id: str,
+		producer: str,
+		priority: str = "normal",
+		delivery_mode: str | None = None,
+		encrypted: bool | None = None,
+		schema_ref: str = "",
+		idempotency_key: str = "",
+		payload_size: int = 1,
+		priority_messages_per_minute: int = 0,
+		cross_tenant_publish: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(message_id or "").strip():
+			raise ValueError("message_id_required")
+		if not str(producer or "").strip():
+			raise ValueError("message_producer_required")
+		if int(payload_size) <= 0:
+			raise ValueError("message_payload_required")
+		topic = self._get_topic(tenant_id, topic_id)
+		delivery_value = _normalize_choice(delivery_mode or topic.delivery_mode, DELIVERY_MODES, topic.delivery_mode, "unsupported_delivery_mode")
+		encrypted_value = topic.encrypted if encrypted is None else bool(encrypted)
+		schema_value = str(schema_ref or topic.schema_ref or "").strip()
+		context = {
+			"tenant_context_present": True,
+			"operation": "publish",
+			"topic_exists": True,
+			"topic_classification": topic.classification,
+			"message_encrypted": encrypted_value,
+			"schema_ref_present": bool(schema_value),
+			"cross_tenant_publish": bool(cross_tenant_publish),
+			"delivery_mode": delivery_value,
+			"dead_letter_queue_configured": bool(topic.dead_letter_topic),
+			"idempotency_key_present": bool(str(idempotency_key or "").strip()),
+			"topic_status": topic.status,
+			"priority_messages_per_minute": int(priority_messages_per_minute),
+			"quota_exception_recorded": self._priority_exception_approved(tenant_id, topic.id),
+		}
+		result = self.evaluate(context)
+		status = {"allow": "published", "deny": "denied", "require_review": "review_required"}[result["decision"]]
+		record = MessageRecord(
+			id=_stable_id("mqeb_message", tenant_id, message_id),
+			tenant_id=tenant_id,
+			topic_id=topic.id,
+			producer=str(producer).strip(),
+			priority=str(priority or "normal").strip().lower(),
+			delivery_mode=delivery_value,
+			status=status,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			required_actions=_required_actions(result),
+			idempotency_key=str(idempotency_key or "").strip(),
+			schema_ref=schema_value,
+		)
+		self.messages[record.id] = record
+		severity = "high" if status == "denied" else "medium" if status == "review_required" else "info"
+		self._record_event(tenant_id, f"message_{status}", record.id, f"Message {status}: {topic.name}", producer, severity)
+		return record.to_dict()
+
+	def create_subscription(
+		self,
+		tenant_id: str,
+		subscription_id: str,
+		name: str,
+		topic_pattern: str,
+		consumer: str,
+		delivery_mode: str = "at_least_once",
+		protocol: str = "bytewax",
+		dead_letter_topic: str = "",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(subscription_id or "").strip():
+			raise ValueError("subscription_id_required")
+		if not str(name or "").strip():
+			raise ValueError("subscription_name_required")
+		if not str(topic_pattern or "").strip():
+			raise ValueError("subscription_topic_pattern_required")
+		if not str(consumer or "").strip():
+			raise ValueError("subscription_consumer_required")
+		delivery_value = _normalize_choice(delivery_mode, DELIVERY_MODES, "at_least_once", "unsupported_delivery_mode")
+		protocol_value = _normalize_choice(protocol, PROTOCOLS, "bytewax", "unsupported_protocol")
+		if delivery_value == "exactly_once" and not str(dead_letter_topic or "").strip():
+			raise PermissionError("dead_letter_queue_required")
+		record_id = _stable_id("mqeb_subscription", tenant_id, subscription_id)
+		if record_id in self.subscriptions:
+			raise ValueError(f"subscription_already_exists:{subscription_id}")
+		record = SubscriptionRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			topic_pattern=str(topic_pattern).strip(),
+			consumer=str(consumer).strip(),
+			delivery_mode=delivery_value,
+			protocol=protocol_value,
+			dead_letter_topic=str(dead_letter_topic or "").strip(),
+		)
+		self.subscriptions[record.id] = record
+		self._record_event(tenant_id, "subscription_created", record.id, f"Subscription created: {record.name}", consumer)
+		return record.to_dict()
+
+	def pause_subscription(self, tenant_id: str, subscription_id: str, actor: str, reason: str) -> dict[str, Any]:
+		record = self._get_subscription(tenant_id, subscription_id)
+		if not str(actor or "").strip():
+			raise ValueError("subscription_actor_required")
+		if not str(reason or "").strip():
+			raise ValueError("subscription_pause_reason_required")
+		record.status = "paused"
+		self._record_event(tenant_id, "subscription_paused", record.id, reason, actor, "medium")
+		return record.to_dict()
+
+	def resume_subscription(self, tenant_id: str, subscription_id: str, actor: str, evidence: str) -> dict[str, Any]:
+		record = self._get_subscription(tenant_id, subscription_id)
+		if not str(actor or "").strip():
+			raise ValueError("subscription_actor_required")
+		if not str(evidence or "").strip():
+			raise ValueError("subscription_resume_evidence_required")
+		record.status = "active"
+		self._record_event(tenant_id, "subscription_resumed", record.id, evidence, actor)
+		return record.to_dict()
+
+	def record_delivery_attempt(
+		self,
+		tenant_id: str,
+		attempt_id: str,
+		message_id: str,
+		subscription_id: str,
+		outcome: str,
+		retry_count: int = 0,
+		reason: str = "",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		message = self._get_message(tenant_id, message_id)
+		subscription = self._get_subscription(tenant_id, subscription_id)
+		outcome_value = _normalize_choice(outcome, DELIVERY_OUTCOMES, "delivered", "unsupported_delivery_outcome")
+		context = {
+			"operation": "deliver",
+			"subscription_status": subscription.status,
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		if outcome_value in {"retry", "dead_letter"} and not str(reason or "").strip():
+			raise ValueError("delivery_failure_reason_required")
+		record = DeliveryAttemptRecord(
+			id=_stable_id("mqeb_delivery", tenant_id, attempt_id),
+			tenant_id=tenant_id,
+			message_id=message.id,
+			subscription_id=subscription.id,
+			outcome=outcome_value,
+			retry_count=max(0, int(retry_count)),
+			reason=str(reason or "").strip(),
+			status="dead_letter" if outcome_value == "dead_letter" else outcome_value,
+		)
+		self.delivery_attempts[record.id] = record
+		subscription.lag_messages = max(0, subscription.lag_messages - 1) if outcome_value == "delivered" else subscription.lag_messages + 1
+		if outcome_value == "dead_letter":
+			message.status = "dead_letter"
+		self._record_event(tenant_id, f"delivery_{outcome_value}", record.id, f"Delivery {outcome_value}: {subscription.name}", subscription.consumer, "medium")
+		return record.to_dict()
+
+	def request_priority_exception(self, tenant_id: str, exception_id: str, topic_id: str, requested_by: str, reason: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		topic = self._get_topic(tenant_id, topic_id)
+		if not str(exception_id or "").strip():
+			raise ValueError("priority_exception_id_required")
+		if not str(requested_by or "").strip():
+			raise ValueError("priority_exception_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("priority_exception_reason_required")
+		record_id = _stable_id("mqeb_priority_exception", tenant_id, exception_id)
+		if record_id in self.priority_exceptions:
+			raise ValueError(f"priority_exception_already_exists:{exception_id}")
+		record = PriorityQuotaExceptionRecord(record_id, tenant_id, topic.id, str(requested_by).strip(), str(reason).strip())
+		self.priority_exceptions[record.id] = record
+		self._record_event(tenant_id, "priority_exception_requested", record.id, f"Priority exception requested: {topic.name}", requested_by, "medium")
+		return record.to_dict()
+
+	def decide_priority_exception(self, tenant_id: str, exception_id: str, reviewer: str, decision: str, notes: str) -> dict[str, Any]:
+		record = self._get_priority_exception(tenant_id, exception_id)
+		self._decide_review_record(record, "decide_priority_exception", reviewer, decision, notes, "independent_priority_exception_reviewer_required")
+		self._record_event(tenant_id, "priority_exception_decided", record.id, f"Priority exception {record.status}: {record.topic_id}", reviewer, "medium")
+		return record.to_dict()
+
+	def request_replay(self, tenant_id: str, replay_id: str, topic_id: str, requested_by: str, reason: str, range_start: str, range_end: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		topic = self._get_topic(tenant_id, topic_id)
+		if not str(replay_id or "").strip():
+			raise ValueError("replay_id_required")
+		if not str(requested_by or "").strip():
+			raise ValueError("replay_requester_required")
+		context = {
+			"operation": "replay",
+			"replay_reason_present": bool(str(reason or "").strip()),
+			"replay_range_bounded": bool(str(range_start or "").strip() and str(range_end or "").strip()),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_id = _stable_id("mqeb_replay", tenant_id, replay_id)
+		if record_id in self.replay_requests:
+			raise ValueError(f"replay_already_exists:{replay_id}")
+		record = ReplayRequestRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			topic_id=topic.id,
+			requested_by=str(requested_by).strip(),
+			reason=str(reason).strip(),
+			range_start=str(range_start).strip(),
+			range_end=str(range_end).strip(),
+		)
+		self.replay_requests[record.id] = record
+		self._record_event(tenant_id, "replay_requested", record.id, f"Replay requested: {topic.name}", requested_by, "medium")
+		return record.to_dict()
+
+	def decide_replay(self, tenant_id: str, replay_id: str, reviewer: str, decision: str, evidence: str) -> dict[str, Any]:
+		record = self._get_replay(tenant_id, replay_id)
+		self._decide_review_record(record, "decide_replay", reviewer, decision, evidence, "independent_replay_reviewer_required", notes_field="evidence")
+		self._record_event(tenant_id, "replay_decided", record.id, f"Replay {record.status}: {record.topic_id}", reviewer, "medium")
+		return record.to_dict()
+
+	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
+		metadata = dict(metadata or {})
+		return self.create_topic(
+			tenant_id=tenant_id,
+			topic_id=record_id,
+			name=str(metadata.get("name") or record_id),
+			owner=str(metadata.get("owner") or metadata.get("created_by") or "system"),
+			classification=str(metadata.get("classification") or "internal"),
+			retention_days=int(metadata.get("retention_days", 7) or 7),
+			delivery_mode=str(metadata.get("delivery_mode") or "at_least_once"),
+			encrypted=bool(metadata.get("encrypted", False)),
+			schema_ref=str(metadata.get("schema_ref") or ""),
+			dead_letter_topic=str(metadata.get("dead_letter_topic") or ""),
+			status=status,
+		)
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.list_topics(tenant_id)
+
+	def list_topics(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.topics, tenant_id)
+
+	def list_messages(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.messages, tenant_id)
+
+	def list_subscriptions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.subscriptions, tenant_id)
+
+	def list_delivery_attempts(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.delivery_attempts, tenant_id)
+
+	def list_priority_exceptions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.priority_exceptions, tenant_id)
+
+	def list_replay_requests(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.replay_requests, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.audit_events, tenant_id)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		messages = self.list_messages(tenant_id)
+		subscriptions = self.list_subscriptions(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"topic_count": len(self.list_topics(tenant_id)),
+			"message_count": len(messages),
+			"denied_message_count": sum(1 for item in messages if item["status"] == "denied"),
+			"review_required_count": sum(1 for item in messages if item["status"] == "review_required"),
+			"subscription_count": len(subscriptions),
+			"paused_subscription_count": sum(1 for item in subscriptions if item["status"] == "paused"),
+			"dead_letter_count": sum(1 for item in self.list_delivery_attempts(tenant_id) if item["outcome"] == "dead_letter"),
+			"pending_priority_exception_count": sum(1 for item in self.list_priority_exceptions(tenant_id) if item["status"] == "pending"),
+			"pending_replay_count": sum(1 for item in self.list_replay_requests(tenant_id) if item["status"] == "pending"),
+			"recent_events": self.list_audit_events(tenant_id)[-5:],
+		}
+
+	def _require_tenant(self, tenant_id: str) -> None:
+		if not str(tenant_id or "").strip():
+			raise PermissionError("tenant_context_required")
+
+	def _get_topic(self, tenant_id: str, topic_id: str) -> TopicRecord:
+		record = self.topics.get(_stable_id("mqeb_topic", tenant_id, topic_id)) or self.topics.get(topic_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"topic_not_found:{topic_id}")
+		return record
+
+	def _get_message(self, tenant_id: str, message_id: str) -> MessageRecord:
+		record = self.messages.get(_stable_id("mqeb_message", tenant_id, message_id)) or self.messages.get(message_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"message_not_found:{message_id}")
+		return record
+
+	def _get_subscription(self, tenant_id: str, subscription_id: str) -> SubscriptionRecord:
+		record = self.subscriptions.get(_stable_id("mqeb_subscription", tenant_id, subscription_id)) or self.subscriptions.get(subscription_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"subscription_not_found:{subscription_id}")
+		return record
+
+	def _get_priority_exception(self, tenant_id: str, exception_id: str) -> PriorityQuotaExceptionRecord:
+		record = self.priority_exceptions.get(_stable_id("mqeb_priority_exception", tenant_id, exception_id)) or self.priority_exceptions.get(exception_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"priority_exception_not_found:{exception_id}")
+		return record
+
+	def _get_replay(self, tenant_id: str, replay_id: str) -> ReplayRequestRecord:
+		record = self.replay_requests.get(_stable_id("mqeb_replay", tenant_id, replay_id)) or self.replay_requests.get(replay_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"replay_not_found:{replay_id}")
+		return record
+
+	def _priority_exception_approved(self, tenant_id: str, topic_id: str) -> bool:
+		return any(item.tenant_id == tenant_id and item.topic_id == topic_id and item.status == "approved" for item in self.priority_exceptions.values())
+
+	def _decide_review_record(
+		self,
+		record: Any,
+		operation: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+		self_review_reason: str,
+		notes_field: str = "notes",
+	) -> None:
+		if record.status != "pending":
+			raise ValueError("review_already_decided")
+		decision_value = str(decision or "").strip().lower()
+		if decision_value not in {"approved", "rejected"}:
+			raise ValueError("review_decision_invalid")
+		reviewer_value = str(reviewer or "").strip()
+		notes_value = str(notes or "").strip()
+		if not reviewer_value:
+			raise ValueError("reviewer_required")
+		if not notes_value:
+			raise ValueError("review_notes_required")
+		requester_value = str(record.requested_by or "").strip()
+		result = self.evaluate({
+			"operation": operation,
+			"reviewer_same_as_requester": reviewer_value.casefold() == requester_value.casefold(),
+			"review_notes_attached": bool(notes_value),
+		})
+		if result["decision"] == "deny":
+			reason = self._first_reason(result)
+			raise PermissionError(self_review_reason if reason == "independent_reviewer_required" else reason)
+		record.status = decision_value
+		record.decision = decision_value
+		record.reviewer = reviewer_value
+		setattr(record, notes_field, notes_value)
+
+	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info") -> dict[str, Any]:
+		record = MqebAuditEventRecord(
+			id=_stable_id("mqeb_event", tenant_id, event_type, subject_id, len(self.audit_events)),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			actor=actor,
+			severity=severity,
+		)
+		self.audit_events[record.id] = record
+		return record.to_dict()
+
+	def _first_reason(self, result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "message_operation_denied"
+
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = [record.to_dict() for record in records.values()]
+		if tenant_id is not None:
+			items = [item for item in items if item["tenant_id"] == tenant_id]
+		return sorted(items, key=lambda item: item["id"])
 
 
 class MQEBService:
@@ -690,6 +1294,14 @@ async def create_mqeb_service(config: Dict[str, Any] | None = None) -> MQEBServi
 
 # Export main components
 __all__ = [
+	'DeliveryAttemptRecord',
+	'MessageRecord',
+	'MqebAuditEventRecord',
+	'MqebService',
 	'MQEBService',
+	'PriorityQuotaExceptionRecord',
+	'ReplayRequestRecord',
+	'SubscriptionRecord',
+	'TopicRecord',
 	'create_mqeb_service'
 ]

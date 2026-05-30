@@ -13188,3 +13188,63 @@ MQEB specification and plan packet started:
   Bytewax workers, live brokers, cloud queues, schema registries, SIEM/SOAR,
   and APG AUTH/MTEN/AUDL/CONF/KEYM/ENCR/SECU/MONI/HLTH integrations.
 - Added the new specification and plan artifacts to MQEB `package_manifest.json`.
+
+### 2026-05-30 04:18 EAT
+
+MQEB governed topic, publish, subscription, delivery, quota exception, and replay slice:
+
+- Replaced the over-broad MQEB README with current executable usage guidance,
+  Bytewax-first adapter boundaries, package helpers, view models, guardrails,
+  and focused proof commands.
+- Added dependency-light topic, message, subscription, delivery attempt,
+  priority quota exception, replay request, and MQEB audit event records to the
+  package runtime without disturbing the existing async `MQEBService`.
+- Added `MqebService` with tenant-qualified state for topics, messages,
+  subscriptions, delivery attempts, priority exceptions, replay requests, and
+  audit events.
+- Added topic creation guardrails for tenant context, topic ID, name, owner,
+  classification, retention, delivery mode, status, and duplicate tenant-local
+  topic IDs.
+- Added governed publish evaluation with MQEB-owned topic state, encryption,
+  schema, idempotency, dead-letter, cross-tenant, disabled-topic, priority
+  quota, matched-rule, required-action, and audit evidence.
+- Added subscription lifecycle and delivery evidence for Bytewax-first
+  subscriptions, pause/resume state, paused-delivery denial, retry/dead-letter
+  reasons, lag state, and audit evidence.
+- Added priority quota exception request/decision workflows and replay
+  request/decision workflows with independent reviewer normalization, reviewer
+  notes/evidence, approval, rejection, and audit evidence.
+- Added domain API helpers and dependency-light `view_models.py` for dashboards,
+  topic inventory, publish workbench, subscriptions, delivery/dead letters,
+  quota exceptions, replays, Bytewax bridge status, audit timelines, and
+  settings.
+- Extended the MQEB capability contract with operation governance configuration,
+  delivery/dead-letter/quota/replay/Bytewax routes, 15 deterministic rules, and
+  theme components for generated APG applications.
+- Extended MQEB registration with delivery guardrails, quota exception review,
+  replay governance, Bytewax event-fabric capabilities, endpoints, permissions,
+  and public service exports.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived
+  semantic evidence and refreshed `semantic_model.json`, `release_report.json`,
+  and `package_manifest.json`.
+- Renamed the stale package test file to `tests/test_package_contract.py`.
+- Added positive topic-publish-subscription-delivery-replay-audit coverage and
+  API-helper/view-model coverage.
+- Added negative missing tenant, missing owner, unsupported classification,
+  invalid retention, restricted/regulated publish guardrails, exactly-once
+  idempotency/dead-letter guardrails, disabled topic denial, cross-tenant
+  denial, priority quota review, self review, missing review notes, replay
+  range/reason denial, paused subscription delivery denial, retry reason
+  denial, and dead-letter coverage.
+- Updated `cap_spec.md` with the current executable package scope, Bytewax
+  boundary, lifecycle behavior, and focused proof commands.
+- Code review found and fixed missing regulated-topic encryption enforcement.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mqeb/__init__.py capabilities/common/mqeb/models.py capabilities/common/mqeb/service.py capabilities/common/mqeb/api.py capabilities/common/mqeb/capability_contract.py capabilities/common/mqeb/app.py capabilities/common/mqeb/view_models.py capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mqeb --json` passed with `ok: true`; MQEB remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mqeb --json` passed with delivery/dead-letter/quota/replay/Bytewax routes, 15 executable rules, Bytewax-first adapter evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized_contract_mqeb|materialized_app_mqeb|test_materialized" capabilities/common/mqeb` returned no stale MQEB package markers.
+- `git diff --check -- capabilities/common/mqeb docs/progress_log.md` passed with no whitespace errors.

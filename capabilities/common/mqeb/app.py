@@ -5,13 +5,137 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Message Queue Event Bus package-backed APG capability", "entity_count": 0, "name": "mqeb", "version": "1.0.0"}, "capabilities": {"mqeb": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"broker": {"dead_letter_queues_enabled": true, "default_protocol": "http_rest", "max_message_size_mb": 100, "max_topics_per_tenant": 1000}, "compliance": {"audit_publish_and_subscribe": true, "frameworks": ["GDPR", "HIPAA", "PCI_DSS", "SOX"], "retention_policy_required": true}, "delivery": {"default_mode": "at_least_once", "enable_idempotency_keys": true, "require_dead_letter_for_guaranteed_delivery": true, "retention_days": 7}, "routing": {"ai_routing_enabled": true, "cross_tenant_publish_allowed": false, "priority_quota_review_threshold": 10000, "schema_registry_required": true}, "scaling": {"edge_federation_enabled": true, "max_concurrent_connections": 1000000, "predictive_scaling_enabled": true}, "security": {"quantum_safe_encryption_enabled": true, "require_tenant_context": true, "restricted_topics_require_encryption": true, "sign_messages": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mqeb_event_fabric"}, "ui": {"enable_dashboard": true, "enable_routing_designer": true, "enable_scaling_console": true, "enable_topic_manager": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Message Queue Event Bus", "provides": ["mqeb_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All message operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "publish", "topic_exists": false}, "description": "Publish operations require an existing topic.", "effect": {"decision": "deny", "reason": "topic_required", "required_action": "create_or_select_topic"}, "name": "publish_requires_topic"}, {"condition": {"message_encrypted": false, "topic_classification": "restricted"}, "description": "Restricted topics require encrypted message transport.", "effect": {"decision": "deny", "reason": "message_encryption_required", "required_action": "enable_topic_encryption"}, "name": "restricted_topic_requires_encryption"}, {"condition": {"cross_tenant_publish": true}, "description": "Cross-tenant publish is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_publish_denied", "required_action": "route_through_authorized_exchange"}, "name": "cross_tenant_publish_denied"}, {"condition": {"dead_letter_queue_configured": false, "delivery_mode": "exactly_once"}, "description": "Guaranteed delivery requires a configured dead-letter queue.", "effect": {"decision": "deny", "reason": "dead_letter_queue_required", "required_action": "configure_dead_letter_queue"}, "name": "guaranteed_delivery_requires_dead_letter_queue"}, {"condition": {"priority_messages_per_minute_gt": 10000, "quota_exception_recorded": false}, "description": "High priority publish volume above quota requires review.", "effect": {"decision": "require_review", "reason": "priority_quota_review_required", "required_action": "record_priority_quota_exception"}, "name": "priority_quota_exhaustion_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All message operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "publish", "topic_exists": false}, "description": "Publish operations require an existing topic.", "effect": {"decision": "deny", "reason": "topic_required", "required_action": "create_or_select_topic"}, "name": "publish_requires_topic"}, {"condition": {"message_encrypted": false, "topic_classification": "restricted"}, "description": "Restricted topics require encrypted message transport.", "effect": {"decision": "deny", "reason": "message_encryption_required", "required_action": "enable_topic_encryption"}, "name": "restricted_topic_requires_encryption"}, {"condition": {"cross_tenant_publish": true}, "description": "Cross-tenant publish is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_publish_denied", "required_action": "route_through_authorized_exchange"}, "name": "cross_tenant_publish_denied"}, {"condition": {"dead_letter_queue_configured": false, "delivery_mode": "exactly_once"}, "description": "Guaranteed delivery requires a configured dead-letter queue.", "effect": {"decision": "deny", "reason": "dead_letter_queue_required", "required_action": "configure_dead_letter_queue"}, "name": "guaranteed_delivery_requires_dead_letter_queue"}, {"condition": {"priority_messages_per_minute_gt": 10000, "quota_exception_recorded": false}, "description": "High priority publish volume above quota requires review.", "effect": {"decision": "require_review", "reason": "priority_quota_review_required", "required_action": "record_priority_quota_exception"}, "name": "priority_quota_exhaustion_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "MQEBDashboard", "permission": "mqeb:view", "route": "/mqeb/dashboard"}, "monitoring": {"component": "MonitoringView", "permission": "mqeb:view_metrics", "route": "/mqeb/monitoring"}, "publish": {"component": "MessagePublishingView", "permission": "mqeb:publish", "route": "/mqeb/publish"}, "routing": {"component": "RoutingDesigner", "permission": "mqeb:manage_routing", "route": "/mqeb/routing"}, "scaling": {"component": "PredictiveScalingConsole", "permission": "mqeb:admin", "route": "/mqeb/scaling"}, "settings": {"component": "MQEBSettings", "permission": "mqeb:admin", "route": "/mqeb/settings"}, "subscriptions": {"component": "SubscriptionManagementView", "permission": "mqeb:subscribe", "route": "/mqeb/subscriptions"}, "topics": {"component": "TopicManagementView", "permission": "mqeb:manage_topics", "route": "/mqeb/topics"}}, "streaming": {}, "theme": {"components": {"consumer_lag_meter": {"threshold_style": "lag-bands", "visual": "segmented-meter"}, "message_flow_map": {"edge_style": "delivery-mode-line", "visual": "directed-event-graph"}, "routing_rule_trace": {"highlight": "selected-route-chip", "visual": "stacked-rule-list"}, "topic_health_card": {"icon": "radio-tower", "risk_style": "throughput-band", "status_indicator": "lag-pill"}}, "name": "mqeb_event_fabric", "tokens": {"border.radius": "8px", "color.accent": "#06A77D", "color.danger": "#C53030", "color.primary": "#26547C", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FB", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#53627A"}}, "ui": {"api_prefix": "/mqeb/api/v1", "requires_theme": true, "routes": [{"component": "MQEBDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/mqeb/dashboard", "permission": "mqeb:view"}, {"component": "TopicManagementView", "name": "topics", "nav_group": "Operations", "path": "/mqeb/topics", "permission": "mqeb:manage_topics"}, {"component": "MessagePublishingView", "name": "publish", "nav_group": "Operations", "path": "/mqeb/publish", "permission": "mqeb:publish"}, {"component": "SubscriptionManagementView", "name": "subscriptions", "nav_group": "Operations", "path": "/mqeb/subscriptions", "permission": "mqeb:subscribe"}, {"component": "RoutingDesigner", "name": "routing", "nav_group": "Governance", "path": "/mqeb/routing", "permission": "mqeb:manage_routing"}, {"component": "PredictiveScalingConsole", "name": "scaling", "nav_group": "Reliability", "path": "/mqeb/scaling", "permission": "mqeb:admin"}, {"component": "MonitoringView", "name": "monitoring", "nav_group": "Reliability", "path": "/mqeb/monitoring", "permission": "mqeb:view_metrics"}, {"component": "MQEBSettings", "name": "settings", "nav_group": "Administration", "path": "/mqeb/settings", "permission": "mqeb:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"mqeb": []}}, "contracts": {"mqeb": {"configuration": {"broker": {"dead_letter_queues_enabled": true, "default_protocol": "http_rest", "max_message_size_mb": 100, "max_topics_per_tenant": 1000}, "compliance": {"audit_publish_and_subscribe": true, "frameworks": ["GDPR", "HIPAA", "PCI_DSS", "SOX"], "retention_policy_required": true}, "delivery": {"default_mode": "at_least_once", "enable_idempotency_keys": true, "require_dead_letter_for_guaranteed_delivery": true, "retention_days": 7}, "routing": {"ai_routing_enabled": true, "cross_tenant_publish_allowed": false, "priority_quota_review_threshold": 10000, "schema_registry_required": true}, "scaling": {"edge_federation_enabled": true, "max_concurrent_connections": 1000000, "predictive_scaling_enabled": true}, "security": {"quantum_safe_encryption_enabled": true, "require_tenant_context": true, "restricted_topics_require_encryption": true, "sign_messages": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "mqeb_event_fabric"}, "ui": {"enable_dashboard": true, "enable_routing_designer": true, "enable_scaling_console": true, "enable_topic_manager": true}}, "id": "mqeb", "provides": ["mqeb_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"mqeb": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"cross_tenant_publish_denied": {"condition": {"cross_tenant_publish": true}, "description": "Cross-tenant publish is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_publish_denied", "required_action": "route_through_authorized_exchange"}, "name": "cross_tenant_publish_denied"}, "guaranteed_delivery_requires_dead_letter_queue": {"condition": {"dead_letter_queue_configured": false, "delivery_mode": "exactly_once"}, "description": "Guaranteed delivery requires a configured dead-letter queue.", "effect": {"decision": "deny", "reason": "dead_letter_queue_required", "required_action": "configure_dead_letter_queue"}, "name": "guaranteed_delivery_requires_dead_letter_queue"}, "priority_quota_exhaustion_requires_review": {"condition": {"priority_messages_per_minute_gt": 10000, "quota_exception_recorded": false}, "description": "High priority publish volume above quota requires review.", "effect": {"decision": "require_review", "reason": "priority_quota_review_required", "required_action": "record_priority_quota_exception"}, "name": "priority_quota_exhaustion_requires_review"}, "publish_requires_topic": {"condition": {"operation": "publish", "topic_exists": false}, "description": "Publish operations require an existing topic.", "effect": {"decision": "deny", "reason": "topic_required", "required_action": "create_or_select_topic"}, "name": "publish_requires_topic"}, "restricted_topic_requires_encryption": {"condition": {"message_encrypted": false, "topic_classification": "restricted"}, "description": "Restricted topics require encrypted message transport.", "effect": {"decision": "deny", "reason": "message_encryption_required", "required_action": "enable_topic_encryption"}, "name": "restricted_topic_requires_encryption"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All message operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.mqeb": {"file": "capability_contract.py", "id": "capability.mqeb", "kind": "capability", "name": "Message Queue Event Bus", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("mqeb_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "mqeb",
+			"version": "1.0.0",
+			"description": "Message Queue Event Bus package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"mqeb": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"mqeb": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["mqeb_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"priority_quota": "PriorityQuotaExceptionRecord",
+					"replay": "ReplayRequestRecord",
+				},
+				"delivery": {
+					"topic": "TopicRecord",
+					"message": "MessageRecord",
+					"subscription": "SubscriptionRecord",
+					"attempt": "DeliveryAttemptRecord",
+				},
+				"adapters": {
+					"preferred_stream_runtime": "bytewax",
+					"kafka_core_dependency_allowed": False,
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"mqeb": {
+				"id": "mqeb",
+				"configuration": contract["configuration"],
+				"provides": ["mqeb_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"mqeb": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.mqeb": {
+				"id": "capability.mqeb",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +160,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("mqeb", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "mqeb" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 13:
+		errors.append("MQEB semantic model route manifest is stale")
+	if len(rules) < 14:
+		errors.append("MQEB semantic model rule manifest is stale")
+	if adapters.get("preferred_stream_runtime") != "bytewax" or adapters.get("kafka_core_dependency_allowed") is not False:
+		errors.append("MQEB adapter manifest must remain Bytewax-first")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

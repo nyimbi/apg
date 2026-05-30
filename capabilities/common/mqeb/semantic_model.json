@@ -8,7 +8,14 @@
   },
   "capabilities": {
     "mqeb": {
-      "approvals": {},
+      "adapters": {
+        "kafka_core_dependency_allowed": false,
+        "preferred_stream_runtime": "bytewax"
+      },
+      "approvals": {
+        "priority_quota": "PriorityQuotaExceptionRecord",
+        "replay": "ReplayRequestRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -32,7 +39,15 @@
           "default_mode": "at_least_once",
           "enable_idempotency_keys": true,
           "require_dead_letter_for_guaranteed_delivery": true,
+          "require_idempotency_for_exactly_once": true,
           "retention_days": 7
+        },
+        "operation_governance": {
+          "bytewax_first_runtime": true,
+          "kafka_core_dependency_allowed": false,
+          "record_delivery_audit": true,
+          "require_independent_quota_review": true,
+          "require_independent_replay_review": true
         },
         "routing": {
           "ai_routing_enabled": true,
@@ -57,11 +72,21 @@
           "default_theme": "mqeb_event_fabric"
         },
         "ui": {
+          "enable_bytewax_bridge": true,
           "enable_dashboard": true,
+          "enable_dead_letter_console": true,
+          "enable_quota_exception_queue": true,
+          "enable_replay_console": true,
           "enable_routing_designer": true,
           "enable_scaling_console": true,
           "enable_topic_manager": true
         }
+      },
+      "delivery": {
+        "attempt": "DeliveryAttemptRecord",
+        "message": "MessageRecord",
+        "subscription": "SubscriptionRecord",
+        "topic": "TopicRecord"
       },
       "erp_modules": [
         "common"
@@ -115,6 +140,32 @@
           },
           {
             "condition": {
+              "schema_ref_present": false,
+              "topic_classification": "regulated"
+            },
+            "description": "Regulated topics require schema evidence before publish.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_reference_required",
+              "required_action": "attach_schema_reference"
+            },
+            "name": "regulated_topic_requires_schema"
+          },
+          {
+            "condition": {
+              "message_encrypted": false,
+              "topic_classification": "regulated"
+            },
+            "description": "Regulated topics require encrypted message transport.",
+            "effect": {
+              "decision": "deny",
+              "reason": "message_encryption_required",
+              "required_action": "enable_topic_encryption"
+            },
+            "name": "regulated_topic_requires_encryption"
+          },
+          {
+            "condition": {
               "cross_tenant_publish": true
             },
             "description": "Cross-tenant publish is denied by default.",
@@ -140,6 +191,45 @@
           },
           {
             "condition": {
+              "delivery_mode": "exactly_once",
+              "idempotency_key_present": false
+            },
+            "description": "Exactly-once publish requires an idempotency key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "idempotency_key_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "exactly_once_requires_idempotency_key"
+          },
+          {
+            "condition": {
+              "operation": "publish",
+              "topic_status": "disabled"
+            },
+            "description": "Disabled topics cannot accept new messages.",
+            "effect": {
+              "decision": "deny",
+              "reason": "topic_disabled",
+              "required_action": "reactivate_or_select_topic"
+            },
+            "name": "disabled_topic_blocks_publish"
+          },
+          {
+            "condition": {
+              "operation": "deliver",
+              "subscription_status": "paused"
+            },
+            "description": "Paused subscriptions cannot receive deliveries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "subscription_paused",
+              "required_action": "resume_subscription"
+            },
+            "name": "paused_subscription_blocks_delivery"
+          },
+          {
+            "condition": {
               "priority_messages_per_minute_gt": 10000,
               "quota_exception_recorded": false
             },
@@ -150,6 +240,56 @@
               "required_action": "record_priority_quota_exception"
             },
             "name": "priority_quota_exhaustion_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "replay",
+              "replay_range_bounded": false
+            },
+            "description": "Replay requests require a bounded range and reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "replay_range_required",
+              "required_action": "attach_replay_range"
+            },
+            "name": "replay_requires_bounded_range"
+          },
+          {
+            "condition": {
+              "operation": "replay",
+              "replay_reason_present": false
+            },
+            "description": "Replay requests require an operational reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "replay_reason_required",
+              "required_action": "attach_replay_reason"
+            },
+            "name": "replay_requires_reason"
+          },
+          {
+            "condition": {
+              "reviewer_same_as_requester": true
+            },
+            "description": "MQEB exceptions and replay approvals require independent review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "review_notes_attached": false
+            },
+            "description": "MQEB reviews require notes or evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "review_requires_notes"
           }
         ],
         "type": "deterministic"
@@ -195,6 +335,32 @@
         },
         {
           "condition": {
+            "schema_ref_present": false,
+            "topic_classification": "regulated"
+          },
+          "description": "Regulated topics require schema evidence before publish.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_reference_required",
+            "required_action": "attach_schema_reference"
+          },
+          "name": "regulated_topic_requires_schema"
+        },
+        {
+          "condition": {
+            "message_encrypted": false,
+            "topic_classification": "regulated"
+          },
+          "description": "Regulated topics require encrypted message transport.",
+          "effect": {
+            "decision": "deny",
+            "reason": "message_encryption_required",
+            "required_action": "enable_topic_encryption"
+          },
+          "name": "regulated_topic_requires_encryption"
+        },
+        {
+          "condition": {
             "cross_tenant_publish": true
           },
           "description": "Cross-tenant publish is denied by default.",
@@ -220,6 +386,45 @@
         },
         {
           "condition": {
+            "delivery_mode": "exactly_once",
+            "idempotency_key_present": false
+          },
+          "description": "Exactly-once publish requires an idempotency key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "idempotency_key_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "exactly_once_requires_idempotency_key"
+        },
+        {
+          "condition": {
+            "operation": "publish",
+            "topic_status": "disabled"
+          },
+          "description": "Disabled topics cannot accept new messages.",
+          "effect": {
+            "decision": "deny",
+            "reason": "topic_disabled",
+            "required_action": "reactivate_or_select_topic"
+          },
+          "name": "disabled_topic_blocks_publish"
+        },
+        {
+          "condition": {
+            "operation": "deliver",
+            "subscription_status": "paused"
+          },
+          "description": "Paused subscriptions cannot receive deliveries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "subscription_paused",
+            "required_action": "resume_subscription"
+          },
+          "name": "paused_subscription_blocks_delivery"
+        },
+        {
+          "condition": {
             "priority_messages_per_minute_gt": 10000,
             "quota_exception_recorded": false
           },
@@ -230,19 +435,84 @@
             "required_action": "record_priority_quota_exception"
           },
           "name": "priority_quota_exhaustion_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "replay",
+            "replay_range_bounded": false
+          },
+          "description": "Replay requests require a bounded range and reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "replay_range_required",
+            "required_action": "attach_replay_range"
+          },
+          "name": "replay_requires_bounded_range"
+        },
+        {
+          "condition": {
+            "operation": "replay",
+            "replay_reason_present": false
+          },
+          "description": "Replay requests require an operational reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "replay_reason_required",
+            "required_action": "attach_replay_reason"
+          },
+          "name": "replay_requires_reason"
+        },
+        {
+          "condition": {
+            "reviewer_same_as_requester": true
+          },
+          "description": "MQEB exceptions and replay approvals require independent review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "review_notes_attached": false
+          },
+          "description": "MQEB reviews require notes or evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "review_requires_notes"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "bytewax": {
+          "component": "BytewaxBridgeStatus",
+          "permission": "mqeb:admin",
+          "route": "/mqeb/bytewax"
+        },
         "dashboard": {
           "component": "MQEBDashboard",
           "permission": "mqeb:view",
           "route": "/mqeb/dashboard"
+        },
+        "dead_letters": {
+          "component": "DeadLetterQueue",
+          "permission": "mqeb:manage_routing",
+          "route": "/mqeb/dead-letters"
+        },
+        "delivery": {
+          "component": "DeliveryAttemptConsole",
+          "permission": "mqeb:view_metrics",
+          "route": "/mqeb/delivery"
         },
         "monitoring": {
           "component": "MonitoringView",
@@ -253,6 +523,16 @@
           "component": "MessagePublishingView",
           "permission": "mqeb:publish",
           "route": "/mqeb/publish"
+        },
+        "quota_exceptions": {
+          "component": "PriorityQuotaExceptionQueue",
+          "permission": "mqeb:admin",
+          "route": "/mqeb/quota-exceptions"
+        },
+        "replays": {
+          "component": "ReplayConsole",
+          "permission": "mqeb:admin",
+          "route": "/mqeb/replays"
         },
         "routing": {
           "component": "RoutingDesigner",
@@ -283,13 +563,33 @@
       "streaming": {},
       "theme": {
         "components": {
+          "bytewax_bridge_panel": {
+            "icon": "git-branch",
+            "status_indicator": "adapter-state",
+            "variant": "stream-runtime"
+          },
           "consumer_lag_meter": {
             "threshold_style": "lag-bands",
             "visual": "segmented-meter"
           },
+          "dead_letter_queue": {
+            "icon": "mail-warning",
+            "status_indicator": "failure-count",
+            "variant": "exception"
+          },
           "message_flow_map": {
             "edge_style": "delivery-mode-line",
             "visual": "directed-event-graph"
+          },
+          "quota_exception_queue": {
+            "icon": "gauge",
+            "status_indicator": "quota-band",
+            "variant": "review"
+          },
+          "replay_console": {
+            "icon": "history",
+            "status_indicator": "review-state",
+            "variant": "evidence"
           },
           "routing_rule_trace": {
             "highlight": "selected-route-chip",
@@ -347,6 +647,41 @@
             "nav_group": "Operations",
             "path": "/mqeb/subscriptions",
             "permission": "mqeb:subscribe"
+          },
+          {
+            "component": "DeliveryAttemptConsole",
+            "name": "delivery",
+            "nav_group": "Reliability",
+            "path": "/mqeb/delivery",
+            "permission": "mqeb:view_metrics"
+          },
+          {
+            "component": "DeadLetterQueue",
+            "name": "dead_letters",
+            "nav_group": "Reliability",
+            "path": "/mqeb/dead-letters",
+            "permission": "mqeb:manage_routing"
+          },
+          {
+            "component": "PriorityQuotaExceptionQueue",
+            "name": "quota_exceptions",
+            "nav_group": "Governance",
+            "path": "/mqeb/quota-exceptions",
+            "permission": "mqeb:admin"
+          },
+          {
+            "component": "ReplayConsole",
+            "name": "replays",
+            "nav_group": "Governance",
+            "path": "/mqeb/replays",
+            "permission": "mqeb:admin"
+          },
+          {
+            "component": "BytewaxBridgeStatus",
+            "name": "bytewax",
+            "nav_group": "Runtime",
+            "path": "/mqeb/bytewax",
+            "permission": "mqeb:admin"
           },
           {
             "component": "RoutingDesigner",
@@ -416,7 +751,15 @@
           "default_mode": "at_least_once",
           "enable_idempotency_keys": true,
           "require_dead_letter_for_guaranteed_delivery": true,
+          "require_idempotency_for_exactly_once": true,
           "retention_days": 7
+        },
+        "operation_governance": {
+          "bytewax_first_runtime": true,
+          "kafka_core_dependency_allowed": false,
+          "record_delivery_audit": true,
+          "require_independent_quota_review": true,
+          "require_independent_replay_review": true
         },
         "routing": {
           "ai_routing_enabled": true,
@@ -441,7 +784,11 @@
           "default_theme": "mqeb_event_fabric"
         },
         "ui": {
+          "enable_bytewax_bridge": true,
           "enable_dashboard": true,
+          "enable_dead_letter_console": true,
+          "enable_quota_exception_queue": true,
+          "enable_replay_console": true,
           "enable_routing_designer": true,
           "enable_scaling_console": true,
           "enable_topic_manager": true
@@ -496,6 +843,32 @@
       },
       "name": "cross_tenant_publish_denied"
     },
+    "disabled_topic_blocks_publish": {
+      "condition": {
+        "operation": "publish",
+        "topic_status": "disabled"
+      },
+      "description": "Disabled topics cannot accept new messages.",
+      "effect": {
+        "decision": "deny",
+        "reason": "topic_disabled",
+        "required_action": "reactivate_or_select_topic"
+      },
+      "name": "disabled_topic_blocks_publish"
+    },
+    "exactly_once_requires_idempotency_key": {
+      "condition": {
+        "delivery_mode": "exactly_once",
+        "idempotency_key_present": false
+      },
+      "description": "Exactly-once publish requires an idempotency key.",
+      "effect": {
+        "decision": "deny",
+        "reason": "idempotency_key_required",
+        "required_action": "attach_idempotency_key"
+      },
+      "name": "exactly_once_requires_idempotency_key"
+    },
     "guaranteed_delivery_requires_dead_letter_queue": {
       "condition": {
         "dead_letter_queue_configured": false,
@@ -508,6 +881,19 @@
         "required_action": "configure_dead_letter_queue"
       },
       "name": "guaranteed_delivery_requires_dead_letter_queue"
+    },
+    "paused_subscription_blocks_delivery": {
+      "condition": {
+        "operation": "deliver",
+        "subscription_status": "paused"
+      },
+      "description": "Paused subscriptions cannot receive deliveries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "subscription_paused",
+        "required_action": "resume_subscription"
+      },
+      "name": "paused_subscription_blocks_delivery"
     },
     "priority_quota_exhaustion_requires_review": {
       "condition": {
@@ -535,6 +921,58 @@
       },
       "name": "publish_requires_topic"
     },
+    "regulated_topic_requires_encryption": {
+      "condition": {
+        "message_encrypted": false,
+        "topic_classification": "regulated"
+      },
+      "description": "Regulated topics require encrypted message transport.",
+      "effect": {
+        "decision": "deny",
+        "reason": "message_encryption_required",
+        "required_action": "enable_topic_encryption"
+      },
+      "name": "regulated_topic_requires_encryption"
+    },
+    "regulated_topic_requires_schema": {
+      "condition": {
+        "schema_ref_present": false,
+        "topic_classification": "regulated"
+      },
+      "description": "Regulated topics require schema evidence before publish.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_reference_required",
+        "required_action": "attach_schema_reference"
+      },
+      "name": "regulated_topic_requires_schema"
+    },
+    "replay_requires_bounded_range": {
+      "condition": {
+        "operation": "replay",
+        "replay_range_bounded": false
+      },
+      "description": "Replay requests require a bounded range and reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "replay_range_required",
+        "required_action": "attach_replay_range"
+      },
+      "name": "replay_requires_bounded_range"
+    },
+    "replay_requires_reason": {
+      "condition": {
+        "operation": "replay",
+        "replay_reason_present": false
+      },
+      "description": "Replay requests require an operational reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "replay_reason_required",
+        "required_action": "attach_replay_reason"
+      },
+      "name": "replay_requires_reason"
+    },
     "restricted_topic_requires_encryption": {
       "condition": {
         "message_encrypted": false,
@@ -547,6 +985,30 @@
         "required_action": "enable_topic_encryption"
       },
       "name": "restricted_topic_requires_encryption"
+    },
+    "review_requires_independent_reviewer": {
+      "condition": {
+        "reviewer_same_as_requester": true
+      },
+      "description": "MQEB exceptions and replay approvals require independent review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "review_requires_independent_reviewer"
+    },
+    "review_requires_notes": {
+      "condition": {
+        "review_notes_attached": false
+      },
+      "description": "MQEB reviews require notes or evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "review_requires_notes"
     },
     "tenant_context_required": {
       "condition": {

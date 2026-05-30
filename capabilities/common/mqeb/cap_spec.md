@@ -25,6 +25,39 @@ The APG Message Queue Event Bus (MQEB) is a revolutionary event-driven messaging
 6. **Schema Evolution**: AI-assisted message schema management
 7. **Dead Letter Intelligence**: Smart failure analysis and auto-remediation
 
+## Current Executable Runtime
+
+The package now includes a dependency-light `MqebService` for generated APG
+applications. It is separate from the broader async `MQEBService` broker
+runtime and can be used without starting Flask, Bytewax workers, cloud queues,
+or live broker infrastructure.
+
+The executable package packet provides:
+
+- tenant-scoped topic records with classification, retention, encryption,
+  schema, delivery mode, dead-letter, and status state;
+- governed message publishing with rule-backed decisions, matched rules,
+  required actions, idempotency, priority quota, and audit evidence;
+- subscription lifecycle state with Bytewax-first protocol defaults,
+  pause/resume controls, lag evidence, and delivery rules;
+- delivery attempt records for delivered, retry, and dead-letter outcomes;
+- priority quota exception requests and independent reviews;
+- replay requests with bounded range, reason, independent review, and evidence;
+- package API helpers and generated-app view models;
+- contract-derived semantic model and release evidence.
+
+MQEB is Bytewax-first. Kafka-compatible bridging is allowed only as a future
+adapter and must not become the core APG event fabric dependency.
+
+### Focused Proof
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/mqeb/__init__.py capabilities/common/mqeb/models.py capabilities/common/mqeb/service.py capabilities/common/mqeb/api.py capabilities/common/mqeb/capability_contract.py capabilities/common/mqeb/app.py capabilities/common/mqeb/view_models.py capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mqeb --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/mqeb --json
+```
+
 ### APG Ecosystem Integration
 
 #### Dependencies

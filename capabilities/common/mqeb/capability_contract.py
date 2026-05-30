@@ -29,7 +29,8 @@ class CapabilityConfiguration:
 			"default_mode": "at_least_once",
 			"retention_days": 7,
 			"require_dead_letter_for_guaranteed_delivery": True,
-			"enable_idempotency_keys": True
+			"enable_idempotency_keys": True,
+			"require_idempotency_for_exactly_once": True
 		},
 		"routing": {
 			"ai_routing_enabled": True,
@@ -53,11 +54,22 @@ class CapabilityConfiguration:
 			"edge_federation_enabled": True,
 			"max_concurrent_connections": 1000000
 		},
+		"operation_governance": {
+			"bytewax_first_runtime": True,
+			"kafka_core_dependency_allowed": False,
+			"require_independent_quota_review": True,
+			"require_independent_replay_review": True,
+			"record_delivery_audit": True
+		},
 		"ui": {
 			"enable_dashboard": True,
 			"enable_topic_manager": True,
 			"enable_routing_designer": True,
-			"enable_scaling_console": True
+			"enable_scaling_console": True,
+			"enable_dead_letter_console": True,
+			"enable_replay_console": True,
+			"enable_quota_exception_queue": True,
+			"enable_bytewax_bridge": True
 		},
 		"theme": {
 			"default_theme": "mqeb_event_fabric",
@@ -74,6 +86,7 @@ class CapabilityConfiguration:
 			"security",
 			"compliance",
 			"scaling",
+			"operation_governance",
 			"ui",
 			"theme"
 		],
@@ -85,6 +98,7 @@ class CapabilityConfiguration:
 			"security": {"type": "object"},
 			"compliance": {"type": "object"},
 			"scaling": {"type": "object"},
+			"operation_governance": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -186,6 +200,26 @@ class CapabilityTheme:
 		"consumer_lag_meter": {
 			"visual": "segmented-meter",
 			"threshold_style": "lag-bands"
+		},
+		"dead_letter_queue": {
+			"icon": "mail-warning",
+			"status_indicator": "failure-count",
+			"variant": "exception"
+		},
+		"replay_console": {
+			"icon": "history",
+			"status_indicator": "review-state",
+			"variant": "evidence"
+		},
+		"quota_exception_queue": {
+			"icon": "gauge",
+			"status_indicator": "quota-band",
+			"variant": "review"
+		},
+		"bytewax_bridge_panel": {
+			"icon": "git-branch",
+			"status_indicator": "adapter-state",
+			"variant": "stream-runtime"
 		}
 	})
 
@@ -224,6 +258,26 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="regulated_topic_requires_schema",
+			description="Regulated topics require schema evidence before publish.",
+			condition={"topic_classification": "regulated", "schema_ref_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "schema_reference_required",
+				"required_action": "attach_schema_reference"
+			}
+		),
+		CapabilityRule(
+			name="regulated_topic_requires_encryption",
+			description="Regulated topics require encrypted message transport.",
+			condition={"topic_classification": "regulated", "message_encrypted": False},
+			effect={
+				"decision": "deny",
+				"reason": "message_encryption_required",
+				"required_action": "enable_topic_encryption"
+			}
+		),
+		CapabilityRule(
 			name="cross_tenant_publish_denied",
 			description="Cross-tenant publish is denied by default.",
 			condition={"cross_tenant_publish": True},
@@ -244,6 +298,36 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="exactly_once_requires_idempotency_key",
+			description="Exactly-once publish requires an idempotency key.",
+			condition={"delivery_mode": "exactly_once", "idempotency_key_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "idempotency_key_required",
+				"required_action": "attach_idempotency_key"
+			}
+		),
+		CapabilityRule(
+			name="disabled_topic_blocks_publish",
+			description="Disabled topics cannot accept new messages.",
+			condition={"operation": "publish", "topic_status": "disabled"},
+			effect={
+				"decision": "deny",
+				"reason": "topic_disabled",
+				"required_action": "reactivate_or_select_topic"
+			}
+		),
+		CapabilityRule(
+			name="paused_subscription_blocks_delivery",
+			description="Paused subscriptions cannot receive deliveries.",
+			condition={"operation": "deliver", "subscription_status": "paused"},
+			effect={
+				"decision": "deny",
+				"reason": "subscription_paused",
+				"required_action": "resume_subscription"
+			}
+		),
+		CapabilityRule(
 			name="priority_quota_exhaustion_requires_review",
 			description="High priority publish volume above quota requires review.",
 			condition={"priority_messages_per_minute_gt": 10000, "quota_exception_recorded": False},
@@ -251,6 +335,46 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "require_review",
 				"reason": "priority_quota_review_required",
 				"required_action": "record_priority_quota_exception"
+			}
+		),
+		CapabilityRule(
+			name="replay_requires_bounded_range",
+			description="Replay requests require a bounded range and reason.",
+			condition={"operation": "replay", "replay_range_bounded": False},
+			effect={
+				"decision": "deny",
+				"reason": "replay_range_required",
+				"required_action": "attach_replay_range"
+			}
+		),
+		CapabilityRule(
+			name="replay_requires_reason",
+			description="Replay requests require an operational reason.",
+			condition={"operation": "replay", "replay_reason_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "replay_reason_required",
+				"required_action": "attach_replay_reason"
+			}
+		),
+		CapabilityRule(
+			name="review_requires_independent_reviewer",
+			description="MQEB exceptions and replay approvals require independent review.",
+			condition={"reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="review_requires_notes",
+			description="MQEB reviews require notes or evidence.",
+			condition={"review_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "review_notes_required",
+				"required_action": "attach_review_notes"
 			}
 		)
 	]
@@ -263,6 +387,11 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("topics", "/mqeb/topics", "TopicManagementView", "mqeb:manage_topics", "Operations"),
 		CapabilityUIRoute("publish", "/mqeb/publish", "MessagePublishingView", "mqeb:publish", "Operations"),
 		CapabilityUIRoute("subscriptions", "/mqeb/subscriptions", "SubscriptionManagementView", "mqeb:subscribe", "Operations"),
+		CapabilityUIRoute("delivery", "/mqeb/delivery", "DeliveryAttemptConsole", "mqeb:view_metrics", "Reliability"),
+		CapabilityUIRoute("dead_letters", "/mqeb/dead-letters", "DeadLetterQueue", "mqeb:manage_routing", "Reliability"),
+		CapabilityUIRoute("quota_exceptions", "/mqeb/quota-exceptions", "PriorityQuotaExceptionQueue", "mqeb:admin", "Governance"),
+		CapabilityUIRoute("replays", "/mqeb/replays", "ReplayConsole", "mqeb:admin", "Governance"),
+		CapabilityUIRoute("bytewax", "/mqeb/bytewax", "BytewaxBridgeStatus", "mqeb:admin", "Runtime"),
 		CapabilityUIRoute("routing", "/mqeb/routing", "RoutingDesigner", "mqeb:manage_routing", "Governance"),
 		CapabilityUIRoute("scaling", "/mqeb/scaling", "PredictiveScalingConsole", "mqeb:admin", "Reliability"),
 		CapabilityUIRoute("monitoring", "/mqeb/monitoring", "MonitoringView", "mqeb:view_metrics", "Reliability"),

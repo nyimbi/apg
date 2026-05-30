@@ -10,6 +10,7 @@
     "models.py",
     "service.py",
     "api.py",
+    "view_models.py",
     "views.py",
     "app.py",
     "semantic_model.json",

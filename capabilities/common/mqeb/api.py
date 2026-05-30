@@ -19,10 +19,183 @@ from .models import (
 	MQMessage, TopicConfiguration, Subscription, MessageEvent,
 	MessagePriority, DeliveryMode, ProtocolType, MessageStatus
 )
-from .service import MQEBService, create_mqeb_service
+from .service import MQEBService, MqebService, create_mqeb_service
 
 # Create API blueprint
 mqeb_api_bp = Blueprint('mqeb_api', __name__, url_prefix='/mqeb/api/v1')
+SERVICE = MqebService()
+
+
+def _required_tenant_id(payload: Dict[str, Any]) -> str:
+	tenant_id = str(payload.get("tenant_id") or "").strip()
+	if not tenant_id:
+		raise PermissionError("tenant_context_required")
+	return tenant_id
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	contract = SERVICE.describe(tenant_id)
+	summary = SERVICE.dashboard_summary(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		"topic_count": summary["topic_count"],
+		"message_count": summary["message_count"],
+		"denied_message_count": summary["denied_message_count"],
+		"review_required_count": summary["review_required_count"],
+		"subscription_count": summary["subscription_count"],
+		"paused_subscription_count": summary["paused_subscription_count"],
+		"dead_letter_count": summary["dead_letter_count"],
+		"pending_priority_exception_count": summary["pending_priority_exception_count"],
+		"pending_replay_count": summary["pending_replay_count"],
+	}
+
+
+def create_topic_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.create_topic(
+		tenant_id=_required_tenant_id(payload),
+		topic_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload.get("owner") or ""),
+		classification=str(payload.get("classification") or "internal"),
+		retention_days=int(payload.get("retention_days", 7) or 7),
+		delivery_mode=str(payload.get("delivery_mode") or "at_least_once"),
+		encrypted=bool(payload.get("encrypted", False)),
+		schema_ref=str(payload.get("schema_ref") or ""),
+		dead_letter_topic=str(payload.get("dead_letter_topic") or ""),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def publish_message_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.publish_message(
+		tenant_id=_required_tenant_id(payload),
+		message_id=str(payload["id"]),
+		topic_id=str(payload["topic_id"]),
+		producer=str(payload.get("producer") or ""),
+		priority=str(payload.get("priority") or "normal"),
+		delivery_mode=str(payload["delivery_mode"]) if payload.get("delivery_mode") else None,
+		encrypted=bool(payload["encrypted"]) if "encrypted" in payload else None,
+		schema_ref=str(payload.get("schema_ref") or ""),
+		idempotency_key=str(payload.get("idempotency_key") or ""),
+		payload_size=int(payload.get("payload_size", 1) or 0),
+		priority_messages_per_minute=int(payload.get("priority_messages_per_minute", 0) or 0),
+		cross_tenant_publish=bool(payload.get("cross_tenant_publish", False)),
+	)
+
+
+def create_subscription_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.create_subscription(
+		tenant_id=_required_tenant_id(payload),
+		subscription_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		topic_pattern=str(payload.get("topic_pattern") or ""),
+		consumer=str(payload.get("consumer") or ""),
+		delivery_mode=str(payload.get("delivery_mode") or "at_least_once"),
+		protocol=str(payload.get("protocol") or "bytewax"),
+		dead_letter_topic=str(payload.get("dead_letter_topic") or ""),
+	)
+
+
+def pause_subscription_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.pause_subscription(
+		tenant_id=_required_tenant_id(payload),
+		subscription_id=str(payload["id"]),
+		actor=str(payload.get("actor") or ""),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def resume_subscription_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.resume_subscription(
+		tenant_id=_required_tenant_id(payload),
+		subscription_id=str(payload["id"]),
+		actor=str(payload.get("actor") or ""),
+		evidence=str(payload.get("evidence") or ""),
+	)
+
+
+def record_delivery_attempt(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.record_delivery_attempt(
+		tenant_id=_required_tenant_id(payload),
+		attempt_id=str(payload["id"]),
+		message_id=str(payload["message_id"]),
+		subscription_id=str(payload["subscription_id"]),
+		outcome=str(payload.get("outcome") or "delivered"),
+		retry_count=int(payload.get("retry_count", 0) or 0),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def request_priority_exception(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.request_priority_exception(
+		tenant_id=_required_tenant_id(payload),
+		exception_id=str(payload["id"]),
+		topic_id=str(payload["topic_id"]),
+		requested_by=str(payload.get("requested_by") or ""),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def decide_priority_exception(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.decide_priority_exception(
+		tenant_id=_required_tenant_id(payload),
+		exception_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
+def request_replay(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.request_replay(
+		tenant_id=_required_tenant_id(payload),
+		replay_id=str(payload["id"]),
+		topic_id=str(payload["topic_id"]),
+		requested_by=str(payload.get("requested_by") or ""),
+		reason=str(payload.get("reason") or ""),
+		range_start=str(payload.get("range_start") or ""),
+		range_end=str(payload.get("range_end") or ""),
+	)
+
+
+def decide_replay(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.decide_replay(
+		tenant_id=_required_tenant_id(payload),
+		replay_id=str(payload["id"]),
+		reviewer=str(payload.get("reviewer") or ""),
+		decision=str(payload.get("decision") or "approved"),
+		evidence=str(payload.get("evidence") or ""),
+	)
+
+
+def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.create_record(
+		record_id=str(payload["id"]),
+		tenant_id=_required_tenant_id(payload),
+		metadata=dict(payload.get("metadata") or {}),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def list_records(tenant_id: str | None = None) -> list[Dict[str, Any]]:
+	return SERVICE.list_records(tenant_id)
+
+
+def list_event_fabric(tenant_id: str = "default") -> Dict[str, Any]:
+	return {
+		"topics": SERVICE.list_topics(tenant_id),
+		"messages": SERVICE.list_messages(tenant_id),
+		"subscriptions": SERVICE.list_subscriptions(tenant_id),
+		"delivery_attempts": SERVICE.list_delivery_attempts(tenant_id),
+		"priority_exceptions": SERVICE.list_priority_exceptions(tenant_id),
+		"replay_requests": SERVICE.list_replay_requests(tenant_id),
+		"audit_events": SERVICE.list_audit_events(tenant_id),
+		"summary": SERVICE.dashboard_summary(tenant_id),
+	}
 
 
 def async_route(f):
@@ -600,6 +773,20 @@ def internal_server_error(error):
 # Export components
 __all__ = [
 	'mqeb_api_bp',
+	'capability_status',
+	'create_topic_record',
+	'publish_message_record',
+	'create_subscription_record',
+	'pause_subscription_record',
+	'resume_subscription_record',
+	'record_delivery_attempt',
+	'request_priority_exception',
+	'decide_priority_exception',
+	'request_replay',
+	'decide_replay',
+	'create_record',
+	'list_records',
+	'list_event_fabric',
 	'health_check',
 	'get_metrics',
 	'list_topics',

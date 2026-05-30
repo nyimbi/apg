@@ -21,7 +21,11 @@ from .models import (
     TopicType, EncryptionMode, RetryStrategy, CompressionType
 )
 
-from .service import MQEBService, create_mqeb_service
+from .service import (
+    DeliveryAttemptRecord, MessageRecord, MqebAuditEventRecord, MqebService,
+    MQEBService, PriorityQuotaExceptionRecord, ReplayRequestRecord,
+    SubscriptionRecord, TopicRecord, create_mqeb_service
+)
 
 from .capability_contract import (
     get_capability_contract,
@@ -213,6 +217,10 @@ def register_capability() -> dict:
             "message_routing": "Publish and route messages across tenant-aware topics",
             "event_streaming": "Expose durable event streams with delivery guarantees",
             "protocol_gateway": "Bridge HTTP, WebSocket, MQTT, AMQP, Bytewax, and gRPC traffic",
+            "delivery_guardrails": "Enforce topic encryption, schema, idempotency, dead-letter, and subscription state rules",
+            "quota_exception_review": "Review priority burst exceptions with independent approval evidence",
+            "replay_governance": "Govern message replay requests with bounded range, reason, reviewer, and evidence",
+            "bytewax_event_fabric": "Expose Bytewax-first adapter boundaries for APG event flows",
             "predictive_scaling": "Scale messaging infrastructure from demand signals",
             "capability_rules": "Evaluate deterministic message governance rules",
             "visual_theming": "Apply event-fabric theme tokens and components"
@@ -221,6 +229,11 @@ def register_capability() -> dict:
             "topics": "/mqeb/api/v1/topics",
             "messages": "/mqeb/api/v1/messages",
             "subscriptions": "/mqeb/api/v1/subscriptions",
+            "delivery": "/mqeb/api/v1/delivery",
+            "dead_letters": "/mqeb/api/v1/dead-letters",
+            "quota_exceptions": "/mqeb/api/v1/quota-exceptions",
+            "replays": "/mqeb/api/v1/replays",
+            "bytewax": "/mqeb/api/v1/bytewax",
             "routing": "/mqeb/api/v1/routing",
             "metrics": "/mqeb/api/v1/metrics",
             "health": "/mqeb/api/v1/health"
@@ -238,6 +251,10 @@ def register_capability() -> dict:
             "mqeb:manage_topics",
             "mqeb:manage_routing",
             "mqeb:view_metrics",
+            "mqeb:review_quota",
+            "mqeb:review_replay",
+            "mqeb:manage_delivery",
+            "mqeb:manage_bytewax",
             "mqeb:admin"
         ]
     }
@@ -258,7 +275,9 @@ __all__ = [
     'TopicType', 'EncryptionMode', 'RetryStrategy', 'CompressionType',
     
     # Service
-    'MQEBService', 'create_mqeb_service',
+    'DeliveryAttemptRecord', 'MessageRecord', 'MqebAuditEventRecord',
+    'MqebService', 'PriorityQuotaExceptionRecord', 'ReplayRequestRecord',
+    'SubscriptionRecord', 'TopicRecord', 'MQEBService', 'create_mqeb_service',
     
     # Flask-AppBuilder integration
     'MQEBBlueprint', 'MQEBAppBuilderConfig',
