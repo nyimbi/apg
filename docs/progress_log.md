@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 18:05 EAT
+
+BCLG blockchain-ledger lifecycle/guardrail packet:
+
+- Added a practical `README.md`, refreshed `SPECIFICATION.md` and `PLAN.md`,
+  and replaced `cap_spec.md` with a compatibility pointer to the active
+  specification.
+- Expanded `capability_contract.py` with first-class ledger-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for ledger-agent registration, supported
+  runtime, supported role, explicit scope, contribution disclosure, BCLG
+  state-change audit evidence, and Bytewax batch ledger mutation enforcement.
+- Added ledger-agent and analytics route metadata plus ledger-agent and stream
+  theme components.
+- Added `LedgerAgent` model support and extended `BclgService` with
+  tenant-qualified ledger-agent registration, listing, dashboard counts,
+  normalized runtime/role tokens, and batch mutation validation.
+- Extended API helpers and view models with ledger-agent, audit, analytics,
+  settings, and Bytewax stream surfaces.
+- Updated BCLG registration metadata with ledger-agent capability, agent
+  endpoint, streaming metadata, and ledger-agent provides metadata.
+- Expanded focused tests for ledger-agent registration, unsupported runtime,
+  Bytewax batch mutation, API helper exposure, view model exposure, generated
+  semantic stream metadata, and package documentation presence.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/bclg/__init__.py
+  capabilities/common/bclg/capability_contract.py capabilities/common/bclg/models.py
+  capabilities/common/bclg/ledger_engine.py capabilities/common/bclg/service.py
+  capabilities/common/bclg/api.py capabilities/common/bclg/views.py
+  capabilities/common/bclg/app.py capabilities/common/bclg/test_capability_contract.py
+  capabilities/common/bclg/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/bclg/test_capability_contract.py
+  capabilities/common/bclg/tests/test_package_contract.py` passed with 10 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.bclg import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.bclg.streaming.processor,
+  .capabilities.bclg.configuration.ledger_agents.supported_runtimes,
+  .capabilities.bclg.screens.ledger_agents.route'
+  capabilities/common/bclg/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/bclg/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/bclg --json` passed with `bclg` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/bclg --json`
+  passed with `side_effect_free: true` and no warnings.
+- BCLG stale-marker and unsupported stream search returned no matches for the
+  touched packet files.
+- `git diff --check -- capabilities/common/bclg docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live chain nodes, wallets, HSM/
+  custody providers, compliance engines, production ENCR/KEYM/COMP/AUDL/SECU/
+  WALT adapters, live Bytewax topology, rendered browser UI, and performance/
+  resilience checks.
+
 ### 2026-05-30 17:54 EAT
 
 AUTH authentication/security-agent lifecycle/guardrail packet:

@@ -29,12 +29,14 @@ def dashboard_model(
 		"contracts": service.list_contracts(tenant_id),
 		"contract_reviews": service.list_contract_deployment_approvals(tenant_id),
 		"key_custody": service.list_key_custody(tenant_id),
+		"ledger_agents": service.list_ledger_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"review_queue": [
 			item for item in service.list_transactions(tenant_id)
 			if item["status"] == "pending_review"
 		],
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -124,6 +126,50 @@ def audit_model(
 		"summary": service.ledger_summary(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"theme": contract["theme"],
+	}
+
+
+def ledger_agent_model(
+	service: BclgService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_ledger_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["ledger_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["ledger_agents"]["allowed_roles"],
+		"required_fields": ["name", "runtime", "role", "scope", "contribution_disclosed"],
+		"actions": ["register", "scope", "review_contribution", "deactivate"],
+	}
+
+
+def analytics_model(
+	service: BclgService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	summary = service.ledger_summary(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"summary": summary,
+		"commit_rate": _safe_ratio(summary["committed_transaction_count"], summary["transaction_count"]),
+		"review_rate": _safe_ratio(summary["transaction_review_count"], summary["transaction_count"]),
+		"deployment_rate": _safe_ratio(summary["deployed_contract_count"], summary["contract_count"]),
+		"agent_coverage": _safe_ratio(summary["ledger_agent_count"], max(summary["ledger_count"], 1)),
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -137,3 +183,7 @@ def _service_or_default(service: BclgService | None) -> BclgService:
 		return SERVICE
 	except ImportError:  # pragma: no cover - standalone package loading path
 		return BclgService()
+
+
+def _safe_ratio(numerator: int, denominator: int) -> float:
+	return round(numerator / denominator, 4) if denominator else 0.0

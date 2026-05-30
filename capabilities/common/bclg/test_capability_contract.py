@@ -14,8 +14,12 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "bclg"
 	assert contract["configuration"]["tenant_id"] == "tenant-bclg"
 	assert contract["configuration"]["transactions"]["high_value_review_threshold"] == 250000
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "ledgers", "transactions", "smart_contracts", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 8
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "ledgers", "transactions", "smart_contracts", "ledger_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["configuration"]["ledger_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert set(contract["provides"]) >= {"ledger_registry", "transaction_governance", "ledger_agents"}
+	assert contract["requires"] == ["encr", "keym", "comp"]
+	assert len(contract["rule_engine"]["rules"]) >= 15
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"ledgers",
@@ -24,7 +28,9 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"contracts",
 		"contract_reviews",
 		"keys",
+		"ledger_agents",
 		"audit",
+		"analytics",
 		"compliance",
 		"settings",
 	}
@@ -56,6 +62,10 @@ def test_rule_engine_enforces_bclg_guardrails():
 		"operation": "approve_contract_deployment",
 		"reviewer_same_as_requester": True,
 	})
+	batch_result = evaluate_capability_rules({
+		"requested_operation": "batch_ledger_mutation",
+		"event_stream": "memory",
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -67,6 +77,7 @@ def test_rule_engine_enforces_bclg_guardrails():
 	assert transaction_result["matched_rules"] == ["transaction_requires_signature"]
 	assert transaction_review_result["matched_rules"] == ["transaction_review_requires_independent_reviewer"]
 	assert contract_review_result["matched_rules"] == ["contract_deployment_review_requires_independent_reviewer"]
+	assert batch_result["matched_rules"] == ["batch_ledger_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -75,8 +86,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "bclg"
 	assert "keym" in registration["dependencies"]
 	assert registration["ui_components"]["contracts"] == "/bclg/contracts"
+	assert registration["ui_components"]["ledger_agents"] == "/bclg/agents"
 	assert registration["ui_components"]["transaction_reviews"] == "/bclg/transactions/reviews"
 	assert registration["ui_components"]["contract_reviews"] == "/bclg/contracts/reviews"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert "bclg:manage_contracts" in registration["permissions"]
 	assert "bclg:review_transactions" in registration["permissions"]
 	assert "bclg:review_contracts" in registration["permissions"]
@@ -186,6 +199,7 @@ def test_service_runs_ledger_transaction_review_contract_and_audit_lifecycle():
 	assert summary["transaction_review_count"] == 1
 	assert summary["deployed_contract_count"] == 1
 	assert summary["contract_review_count"] == 1
+	assert summary["ledger_agent_count"] == 0
 	assert model["summary"]["audit_event_count"] >= 8
 
 
@@ -401,6 +415,54 @@ def test_service_keeps_duplicate_ids_isolated_by_tenant():
 		)
 
 
+def test_service_registers_ledger_agents_and_enforces_bytewax_guardrail():
+	service = BclgService()
+	agent = service.register_ledger_agent(
+		agent_id="ledger-agent-1",
+		tenant_id="tenant-ledger-agent",
+		name="Transaction Review Assistant",
+		runtime="claude-code",
+		role="transaction-reviewer",
+		scope="summarize high-value transaction review evidence",
+		contribution_disclosed=True,
+		policy_ref="bclg-agent-policy",
+	)
+	batch = service.validate_batch_ledger_mutation(
+		tenant_id="tenant-ledger-agent",
+		event_stream="bytewax",
+		mutation_count=2,
+	)
+	dashboard = views.dashboard_model(service, "tenant-ledger-agent")
+	agents = views.ledger_agent_model(service, "tenant-ledger-agent")
+	analytics = views.analytics_model(service, "tenant-ledger-agent")
+	settings = views.settings_model("tenant-ledger-agent")
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "transaction_reviewer"
+	assert batch["accepted"] is True
+	assert dashboard["ledger_agents"][0]["id"] == "ledger-agent-1"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert analytics["summary"]["ledger_agent_count"] == 1
+	assert settings["streaming"]["processor"] == "bytewax"
+
+	with pytest.raises(PermissionError, match="ledger_agent_runtime_not_supported"):
+		service.register_ledger_agent(
+			agent_id="bad-runtime",
+			tenant_id="tenant-ledger-agent",
+			name="Bad Runtime",
+			runtime="unsupported",
+			role="ledger_reviewer",
+			scope="ledger review",
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_ledger_mutation(
+			tenant_id="tenant-ledger-agent",
+			event_stream="memory",
+			mutation_count=1,
+		)
+
+
 def test_api_helpers_and_view_models_expose_bclg_lifecycle():
 	tenant_id = "tenant-api-bclg"
 	ledger = api.register_ledger({
@@ -475,12 +537,31 @@ def test_api_helpers_and_view_models_expose_bclg_lifecycle():
 	dashboard = views.dashboard_model(tenant_id=tenant_id)
 	transaction_reviews = views.transaction_review_model(tenant_id=tenant_id)
 	contract_reviews = views.contract_review_model(tenant_id=tenant_id)
+	agent = api.register_ledger_agent({
+		"id": "api-ledger-agent",
+		"tenant_id": tenant_id,
+		"name": "API Ledger Agent",
+		"runtime": "opencode",
+		"role": "ledger_reviewer",
+		"scope": "ledger governance review",
+		"contribution_disclosed": True,
+	})
+	batch = api.validate_batch_ledger_mutation({
+		"tenant_id": tenant_id,
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+	})
 
 	assert transaction["status"] == "pending_review"
 	assert approved_transaction["status"] == "committed"
 	assert contract["status"] == "deployed"
 	assert api.capability_status(tenant_id)["transaction_review_count"] == 1
+	assert api.capability_status(tenant_id)["ledger_agent_count"] == 1
+	assert api.capability_status(tenant_id)["streaming"]["processor"] == "bytewax"
 	assert dashboard["summary"]["deployed_contract_count"] == 1
 	assert dashboard["transaction_reviews"][0]["id"] == "api-review"
 	assert transaction_reviews["decided_reviews"][0]["id"] == "api-review"
 	assert contract_reviews["decided_approvals"][0]["id"] == "api-contract-review"
+	assert agent["runtime"] == "opencode"
+	assert api.list_ledger_agents(tenant_id)[0]["id"] == "api-ledger-agent"
+	assert batch["accepted"] is True

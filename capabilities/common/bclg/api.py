@@ -18,6 +18,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"streaming": contract["streaming"],
 		**SERVICE.ledger_summary(tenant_id),
 	}
 
@@ -168,6 +169,33 @@ def list_contract_deployment_approvals(tenant_id: str | None = None) -> list[dic
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_audit_events(tenant_id)
+
+
+def register_ledger_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_ledger_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "ledger_reviewer"),
+		scope=str(payload.get("scope") or ""),
+		registered=_payload_bool(payload, "registered", True),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		policy_ref=str(payload["policy_ref"]) if payload.get("policy_ref") else None,
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def list_ledger_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_ledger_agents(tenant_id)
+
+
+def validate_batch_ledger_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_ledger_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+	)
 
 
 def _payload_bool(payload: dict[str, Any], key: str, default: bool) -> bool:

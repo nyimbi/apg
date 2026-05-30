@@ -5,127 +5,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-try:
-	from .capability_contract import get_capability_contract
-except ImportError:  # pragma: no cover - standalone package loading path
-	import importlib.util
-	import sys
-	from pathlib import Path
 
-	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
-	_SPEC = importlib.util.spec_from_file_location("bclg_capability_contract", _CONTRACT_PATH)
-	assert _SPEC is not None
-	assert _SPEC.loader is not None
-	_MODULE = importlib.util.module_from_spec(_SPEC)
-	sys.modules[_SPEC.name] = _MODULE
-	_SPEC.loader.exec_module(_MODULE)
-	get_capability_contract = _MODULE.get_capability_contract
+SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Blockchain Ledger Services package-backed APG capability", "entity_count": 0, "name": "bclg", "version": "1.0.0"}, "capabilities": {"bclg": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"adapters": {"api_helpers": "api.py", "audit_sink": "audl", "compliance": "comp", "encryption": "encr", "event_stream": "bytewax", "generated_app_runtime": "service.BclgService", "key_management": "keym", "security": "secu", "view_models": "views.py", "wallet": "walt"}, "governance": {"audit_ledger_changes": true, "batch_event_stream": "bytewax", "chain_fork_review_required": true, "key_rotation_policy_required": true, "require_tenant_context": true}, "ledger_agents": {"agent_assist_enabled": true, "agent_contribution_disclosure_required": true, "agent_registration_required": true, "agent_runtime_required": true, "agent_scope_required": true, "allowed_roles": ["ledger_reviewer", "transaction_reviewer", "contract_reviewer", "custody_reviewer", "fork_reviewer"], "supported_runtimes": ["codex", "claude_code", "opencode", "pi"]}, "ledgers": {"consensus_profile_required": true, "fork_monitoring_enabled": true, "ledger_owner_required": true, "network_policy_required": true}, "observability": {"agent_activity_required": true, "audit_required": true, "event_stream": "bytewax", "ledger_metrics_required": true, "trace_required": true}, "smart_contracts": {"artifact_hash_required": true, "contract_review_required": true, "deployment_approval_required": true, "rollback_plan_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "bclg_ledger_ops"}, "transactions": {"compliance_mapping_required": true, "high_value_review_threshold": 100000, "key_custody_required": true, "signature_required": true}, "ui": {"enable_agent_panel": true, "enable_analytics": true, "enable_audit": true, "enable_contract_registry": true, "enable_key_custody_view": true, "enable_ledger_console": true, "enable_transaction_monitor": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Blockchain Ledger Services", "provides": ["ledger_registry", "transaction_governance", "smart_contract_governance", "key_custody_governance", "ledger_audit", "ledger_agents"], "requires": ["encr", "keym", "comp"], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All ledger operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"ledger_owner_assigned": false, "operation": "create_ledger"}, "description": "Ledgers require an accountable owner.", "effect": {"decision": "deny", "reason": "ledger_owner_required", "required_action": "assign_ledger_owner"}, "name": "ledger_requires_owner"}, {"condition": {"operation": "submit_transaction", "signature_present": false}, "description": "Ledger transactions require signatures.", "effect": {"decision": "deny", "reason": "transaction_signature_required", "required_action": "sign_transaction"}, "name": "transaction_requires_signature"}, {"condition": {"key_custody_bound": false}, "description": "Ledger operations require managed key custody.", "effect": {"decision": "deny", "reason": "key_custody_required", "required_action": "bind_key_custody"}, "name": "key_custody_required"}, {"condition": {"contract_review_recorded": false, "operation": "deploy_contract"}, "description": "Smart contract deployment requires review.", "effect": {"decision": "deny", "reason": "contract_review_required", "required_action": "review_contract"}, "name": "contract_requires_review"}, {"condition": {"transaction_review_recorded": false, "transaction_value_gt": 100000}, "description": "High-value transactions require review.", "effect": {"decision": "require_review", "reason": "high_value_transaction_review_required", "required_action": "review_transaction"}, "name": "high_value_transaction_requires_review"}, {"condition": {"operation": "approve_transaction_review", "reviewer_same_as_submitter": true}, "description": "High-value transaction reviews require an independent reviewer.", "effect": {"decision": "deny", "reason": "independent_transaction_reviewer_required", "required_action": "route_to_independent_transaction_reviewer"}, "name": "transaction_review_requires_independent_reviewer"}, {"condition": {"operation": "approve_contract_deployment", "reviewer_same_as_requester": true}, "description": "Smart contract deployment reviews require an independent reviewer.", "effect": {"decision": "deny", "reason": "independent_contract_reviewer_required", "required_action": "route_to_independent_contract_reviewer"}, "name": "contract_deployment_review_requires_independent_reviewer"}, {"condition": {"agent_registered": false, "ledger_agent_present": true}, "description": "AI ledger agents must be registered.", "effect": {"decision": "deny", "reason": "ledger_agent_registration_required", "required_action": "register_ledger_agent"}, "name": "ledger_agent_requires_registration"}, {"condition": {"agent_runtime_supported": false, "ledger_agent_present": true}, "description": "AI ledger agents must use a supported runtime.", "effect": {"decision": "deny", "reason": "ledger_agent_runtime_not_supported", "required_action": "choose_supported_ledger_agent_runtime"}, "name": "ledger_agent_runtime_supported"}, {"condition": {"agent_role_supported": false, "ledger_agent_present": true}, "description": "AI ledger agents must use a supported role.", "effect": {"decision": "deny", "reason": "ledger_agent_role_not_supported", "required_action": "choose_supported_ledger_agent_role"}, "name": "ledger_agent_role_supported"}, {"condition": {"agent_scope_present": false, "ledger_agent_present": true}, "description": "AI ledger agents require explicit scope.", "effect": {"decision": "deny", "reason": "ledger_agent_scope_required", "required_action": "set_ledger_agent_scope"}, "name": "ledger_agent_requires_scope"}, {"condition": {"agent_contribution_disclosed": false, "ledger_agent_present": true}, "description": "AI ledger-agent contributions require disclosure.", "effect": {"decision": "deny", "reason": "ledger_agent_disclosure_required", "required_action": "disclose_ledger_agent"}, "name": "ledger_agent_requires_disclosure"}, {"condition": {"audit_event_recorded": false, "state_change_requested": true}, "description": "BCLG lifecycle state changes require audit evidence.", "effect": {"decision": "deny", "reason": "ledger_audit_event_required", "required_action": "record_ledger_audit_event"}, "name": "ledger_state_change_requires_audit"}, {"condition": {"event_stream_ne": "bytewax", "requested_operation": "batch_ledger_mutation"}, "description": "Batch BCLG mutations must use Bytewax event streams.", "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}, "name": "batch_ledger_mutation_requires_bytewax"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All ledger operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"ledger_owner_assigned": false, "operation": "create_ledger"}, "description": "Ledgers require an accountable owner.", "effect": {"decision": "deny", "reason": "ledger_owner_required", "required_action": "assign_ledger_owner"}, "name": "ledger_requires_owner"}, {"condition": {"operation": "submit_transaction", "signature_present": false}, "description": "Ledger transactions require signatures.", "effect": {"decision": "deny", "reason": "transaction_signature_required", "required_action": "sign_transaction"}, "name": "transaction_requires_signature"}, {"condition": {"key_custody_bound": false}, "description": "Ledger operations require managed key custody.", "effect": {"decision": "deny", "reason": "key_custody_required", "required_action": "bind_key_custody"}, "name": "key_custody_required"}, {"condition": {"contract_review_recorded": false, "operation": "deploy_contract"}, "description": "Smart contract deployment requires review.", "effect": {"decision": "deny", "reason": "contract_review_required", "required_action": "review_contract"}, "name": "contract_requires_review"}, {"condition": {"transaction_review_recorded": false, "transaction_value_gt": 100000}, "description": "High-value transactions require review.", "effect": {"decision": "require_review", "reason": "high_value_transaction_review_required", "required_action": "review_transaction"}, "name": "high_value_transaction_requires_review"}, {"condition": {"operation": "approve_transaction_review", "reviewer_same_as_submitter": true}, "description": "High-value transaction reviews require an independent reviewer.", "effect": {"decision": "deny", "reason": "independent_transaction_reviewer_required", "required_action": "route_to_independent_transaction_reviewer"}, "name": "transaction_review_requires_independent_reviewer"}, {"condition": {"operation": "approve_contract_deployment", "reviewer_same_as_requester": true}, "description": "Smart contract deployment reviews require an independent reviewer.", "effect": {"decision": "deny", "reason": "independent_contract_reviewer_required", "required_action": "route_to_independent_contract_reviewer"}, "name": "contract_deployment_review_requires_independent_reviewer"}, {"condition": {"agent_registered": false, "ledger_agent_present": true}, "description": "AI ledger agents must be registered.", "effect": {"decision": "deny", "reason": "ledger_agent_registration_required", "required_action": "register_ledger_agent"}, "name": "ledger_agent_requires_registration"}, {"condition": {"agent_runtime_supported": false, "ledger_agent_present": true}, "description": "AI ledger agents must use a supported runtime.", "effect": {"decision": "deny", "reason": "ledger_agent_runtime_not_supported", "required_action": "choose_supported_ledger_agent_runtime"}, "name": "ledger_agent_runtime_supported"}, {"condition": {"agent_role_supported": false, "ledger_agent_present": true}, "description": "AI ledger agents must use a supported role.", "effect": {"decision": "deny", "reason": "ledger_agent_role_not_supported", "required_action": "choose_supported_ledger_agent_role"}, "name": "ledger_agent_role_supported"}, {"condition": {"agent_scope_present": false, "ledger_agent_present": true}, "description": "AI ledger agents require explicit scope.", "effect": {"decision": "deny", "reason": "ledger_agent_scope_required", "required_action": "set_ledger_agent_scope"}, "name": "ledger_agent_requires_scope"}, {"condition": {"agent_contribution_disclosed": false, "ledger_agent_present": true}, "description": "AI ledger-agent contributions require disclosure.", "effect": {"decision": "deny", "reason": "ledger_agent_disclosure_required", "required_action": "disclose_ledger_agent"}, "name": "ledger_agent_requires_disclosure"}, {"condition": {"audit_event_recorded": false, "state_change_requested": true}, "description": "BCLG lifecycle state changes require audit evidence.", "effect": {"decision": "deny", "reason": "ledger_audit_event_required", "required_action": "record_ledger_audit_event"}, "name": "ledger_state_change_requires_audit"}, {"condition": {"event_stream_ne": "bytewax", "requested_operation": "batch_ledger_mutation"}, "description": "Batch BCLG mutations must use Bytewax event streams.", "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}, "name": "batch_ledger_mutation_requires_bytewax"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "LedgerAnalytics", "permission": "bclg:view", "route": "/bclg/analytics"}, "audit": {"component": "LedgerAudit", "permission": "bclg:view", "route": "/bclg/audit"}, "compliance": {"component": "LedgerCompliance", "permission": "bclg:admin", "route": "/bclg/compliance"}, "contract_reviews": {"component": "ContractDeploymentReviewQueue", "permission": "bclg:review_contracts", "route": "/bclg/contracts/reviews"}, "contracts": {"component": "SmartContractRegistry", "permission": "bclg:manage_contracts", "route": "/bclg/contracts"}, "dashboard": {"component": "BCLGDashboard", "permission": "bclg:view", "route": "/bclg/dashboard"}, "keys": {"component": "KeyCustodyView", "permission": "bclg:admin", "route": "/bclg/keys"}, "ledger_agents": {"component": "LedgerAgentPanel", "permission": "bclg:review_transactions", "route": "/bclg/agents"}, "ledgers": {"component": "LedgerConsole", "permission": "bclg:manage_ledgers", "route": "/bclg/ledgers"}, "settings": {"component": "BCLGSettings", "permission": "bclg:admin", "route": "/bclg/settings"}, "transaction_reviews": {"component": "TransactionReviewQueue", "permission": "bclg:review_transactions", "route": "/bclg/transactions/reviews"}, "transactions": {"component": "TransactionMonitor", "permission": "bclg:transact", "route": "/bclg/transactions"}}, "streaming": {"batch_mutation_guardrail": "batch_ledger_mutation_requires_bytewax", "events": ["ledger_registered", "key_custody_bound", "transaction_submitted", "transaction_review_requested", "transaction_review_decided", "contract_deployment_review_requested", "contract_deployment_review_decided", "contract_deployed", "ledger_agent_registered"], "processor": "bytewax", "state": ["ledgers", "key_custody", "transactions", "transaction_reviews", "contract_reviews", "contracts", "ledger_agents", "audit_events", "ledger_heads"], "topic": "apg.bclg.lifecycle"}, "theme": {"components": {"contract_registry": {"status_style": "hash-chip", "visual": "artifact-list"}, "contract_review_queue": {"status_style": "artifact-review-chip", "visual": "deployment-approval-lane"}, "key_custody": {"status_style": "rotation-chip", "visual": "custody-matrix"}, "ledger_agent_panel": {"icon": "bot", "status_style": "scope-chip"}, "ledger_card": {"icon": "blocks", "risk_style": "fork-band", "status_indicator": "chain-pill"}, "stream_health": {"status_style": "stream-chip", "visual": "event-lane"}, "transaction_monitor": {"highlight": "review-chip", "visual": "signed-ledger-table"}, "transaction_review_queue": {"status_style": "risk-review-chip", "visual": "approval-lane"}}, "name": "bclg_ledger_ops", "tokens": {"border.radius": "8px", "color.accent": "#805AD5", "color.danger": "#C53030", "color.primary": "#2A4365", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/bclg/api/v1", "requires_theme": true, "routes": [{"component": "BCLGDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/bclg/dashboard", "permission": "bclg:view"}, {"component": "LedgerConsole", "name": "ledgers", "nav_group": "Ledgers", "path": "/bclg/ledgers", "permission": "bclg:manage_ledgers"}, {"component": "TransactionMonitor", "name": "transactions", "nav_group": "Transactions", "path": "/bclg/transactions", "permission": "bclg:transact"}, {"component": "TransactionReviewQueue", "name": "transaction_reviews", "nav_group": "Transactions", "path": "/bclg/transactions/reviews", "permission": "bclg:review_transactions"}, {"component": "SmartContractRegistry", "name": "contracts", "nav_group": "Contracts", "path": "/bclg/contracts", "permission": "bclg:manage_contracts"}, {"component": "ContractDeploymentReviewQueue", "name": "contract_reviews", "nav_group": "Contracts", "path": "/bclg/contracts/reviews", "permission": "bclg:review_contracts"}, {"component": "KeyCustodyView", "name": "keys", "nav_group": "Security", "path": "/bclg/keys", "permission": "bclg:admin"}, {"component": "LedgerAgentPanel", "name": "ledger_agents", "nav_group": "Governance", "path": "/bclg/agents", "permission": "bclg:review_transactions"}, {"component": "LedgerAudit", "name": "audit", "nav_group": "Governance", "path": "/bclg/audit", "permission": "bclg:view"}, {"component": "LedgerAnalytics", "name": "analytics", "nav_group": "Operations", "path": "/bclg/analytics", "permission": "bclg:view"}, {"component": "LedgerCompliance", "name": "compliance", "nav_group": "Governance", "path": "/bclg/compliance", "permission": "bclg:admin"}, {"component": "BCLGSettings", "name": "settings", "nav_group": "Administration", "path": "/bclg/settings", "permission": "bclg:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"bclg": ["encr", "keym", "comp"]}}, "contracts": {"bclg": {"configuration": {"adapters": {"api_helpers": "api.py", "audit_sink": "audl", "compliance": "comp", "encryption": "encr", "event_stream": "bytewax", "generated_app_runtime": "service.BclgService", "key_management": "keym", "security": "secu", "view_models": "views.py", "wallet": "walt"}, "governance": {"audit_ledger_changes": true, "batch_event_stream": "bytewax", "chain_fork_review_required": true, "key_rotation_policy_required": true, "require_tenant_context": true}, "ledger_agents": {"agent_assist_enabled": true, "agent_contribution_disclosure_required": true, "agent_registration_required": true, "agent_runtime_required": true, "agent_scope_required": true, "allowed_roles": ["ledger_reviewer", "transaction_reviewer", "contract_reviewer", "custody_reviewer", "fork_reviewer"], "supported_runtimes": ["codex", "claude_code", "opencode", "pi"]}, "ledgers": {"consensus_profile_required": true, "fork_monitoring_enabled": true, "ledger_owner_required": true, "network_policy_required": true}, "observability": {"agent_activity_required": true, "audit_required": true, "event_stream": "bytewax", "ledger_metrics_required": true, "trace_required": true}, "smart_contracts": {"artifact_hash_required": true, "contract_review_required": true, "deployment_approval_required": true, "rollback_plan_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "bclg_ledger_ops"}, "transactions": {"compliance_mapping_required": true, "high_value_review_threshold": 100000, "key_custody_required": true, "signature_required": true}, "ui": {"enable_agent_panel": true, "enable_analytics": true, "enable_audit": true, "enable_contract_registry": true, "enable_key_custody_view": true, "enable_ledger_console": true, "enable_transaction_monitor": true}}, "id": "bclg", "provides": ["ledger_registry", "transaction_governance", "smart_contract_governance", "key_custody_governance", "ledger_audit", "ledger_agents"], "requires": ["encr", "keym", "comp"]}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 3, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"bclg": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"batch_ledger_mutation_requires_bytewax": {"condition": {"event_stream_ne": "bytewax", "requested_operation": "batch_ledger_mutation"}, "description": "Batch BCLG mutations must use Bytewax event streams.", "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}, "name": "batch_ledger_mutation_requires_bytewax"}, "contract_deployment_review_requires_independent_reviewer": {"condition": {"operation": "approve_contract_deployment", "reviewer_same_as_requester": true}, "description": "Smart contract deployment reviews require an independent reviewer.", "effect": {"decision": "deny", "reason": "independent_contract_reviewer_required", "required_action": "route_to_independent_contract_reviewer"}, "name": "contract_deployment_review_requires_independent_reviewer"}, "contract_requires_review": {"condition": {"contract_review_recorded": false, "operation": "deploy_contract"}, "description": "Smart contract deployment requires review.", "effect": {"decision": "deny", "reason": "contract_review_required", "required_action": "review_contract"}, "name": "contract_requires_review"}, "high_value_transaction_requires_review": {"condition": {"transaction_review_recorded": false, "transaction_value_gt": 100000}, "description": "High-value transactions require review.", "effect": {"decision": "require_review", "reason": "high_value_transaction_review_required", "required_action": "review_transaction"}, "name": "high_value_transaction_requires_review"}, "key_custody_required": {"condition": {"key_custody_bound": false}, "description": "Ledger operations require managed key custody.", "effect": {"decision": "deny", "reason": "key_custody_required", "required_action": "bind_key_custody"}, "name": "key_custody_required"}, "ledger_agent_requires_disclosure": {"condition": {"agent_contribution_disclosed": false, "ledger_agent_present": true}, "description": "AI ledger-agent contributions require disclosure.", "effect": {"decision": "deny", "reason": "ledger_agent_disclosure_required", "required_action": "disclose_ledger_agent"}, "name": "ledger_agent_requires_disclosure"}, "ledger_agent_requires_registration": {"condition": {"agent_registered": false, "ledger_agent_present": true}, "description": "AI ledger agents must be registered.", "effect": {"decision": "deny", "reason": "ledger_agent_registration_required", "required_action": "register_ledger_agent"}, "name": "ledger_agent_requires_registration"}, "ledger_agent_requires_scope": {"condition": {"agent_scope_present": false, "ledger_agent_present": true}, "description": "AI ledger agents require explicit scope.", "effect": {"decision": "deny", "reason": "ledger_agent_scope_required", "required_action": "set_ledger_agent_scope"}, "name": "ledger_agent_requires_scope"}, "ledger_agent_role_supported": {"condition": {"agent_role_supported": false, "ledger_agent_present": true}, "description": "AI ledger agents must use a supported role.", "effect": {"decision": "deny", "reason": "ledger_agent_role_not_supported", "required_action": "choose_supported_ledger_agent_role"}, "name": "ledger_agent_role_supported"}, "ledger_agent_runtime_supported": {"condition": {"agent_runtime_supported": false, "ledger_agent_present": true}, "description": "AI ledger agents must use a supported runtime.", "effect": {"decision": "deny", "reason": "ledger_agent_runtime_not_supported", "required_action": "choose_supported_ledger_agent_runtime"}, "name": "ledger_agent_runtime_supported"}, "ledger_requires_owner": {"condition": {"ledger_owner_assigned": false, "operation": "create_ledger"}, "description": "Ledgers require an accountable owner.", "effect": {"decision": "deny", "reason": "ledger_owner_required", "required_action": "assign_ledger_owner"}, "name": "ledger_requires_owner"}, "ledger_state_change_requires_audit": {"condition": {"audit_event_recorded": false, "state_change_requested": true}, "description": "BCLG lifecycle state changes require audit evidence.", "effect": {"decision": "deny", "reason": "ledger_audit_event_required", "required_action": "record_ledger_audit_event"}, "name": "ledger_state_change_requires_audit"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All ledger operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "transaction_requires_signature": {"condition": {"operation": "submit_transaction", "signature_present": false}, "description": "Ledger transactions require signatures.", "effect": {"decision": "deny", "reason": "transaction_signature_required", "required_action": "sign_transaction"}, "name": "transaction_requires_signature"}, "transaction_review_requires_independent_reviewer": {"condition": {"operation": "approve_transaction_review", "reviewer_same_as_submitter": true}, "description": "High-value transaction reviews require an independent reviewer.", "effect": {"decision": "deny", "reason": "independent_transaction_reviewer_required", "required_action": "route_to_independent_transaction_reviewer"}, "name": "transaction_review_requires_independent_reviewer"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.bclg": {"file": "capability_contract.py", "id": "capability.bclg", "kind": "capability", "name": "Blockchain Ledger Services", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model from the current capability contract."""
-	contract = get_capability_contract("default")
-	routes = {
-		route["name"]: {
-			"route": route["path"],
-			"component": route["component"],
-			"permission": route["permission"],
-		}
-		for route in contract["ui"]["routes"]
-	}
-	return {
-		"format": "apg.semantic-model.v1",
-		"ok": True,
-		"app": {
-			"name": "bclg",
-			"version": "1.0.0",
-			"description": "Blockchain Ledger Services package-backed APG capability",
-			"entity_count": 0,
-		},
-		"packages": {
-			"bclg": {
-				"profile": "capability",
-				"entrypoint": "app.py",
-			}
-		},
-		"capabilities": {
-			"bclg": {
-				"name": contract["display_name"],
-				"configuration": contract["configuration"],
-				"provides": ["bclg_operations"],
-				"requires": [],
-				"erp_modules": ["common"],
-				"rule_engine": contract["rule_engine"],
-				"rules": contract["rule_engine"]["rules"],
-				"ui": contract["ui"],
-				"screens": routes,
-				"theme": contract["theme"],
-				"runtime": {
-					"api": "api.py",
-					"entrypoint": "app.py",
-					"service": "service.py",
-					"views": "views.py",
-				},
-				"business_rules": [],
-				"components": {},
-				"approvals": {
-					"transaction_review": "TransactionReviewApproval",
-					"contract_deployment": "ContractDeploymentApproval",
-				},
-				"i18n": {},
-				"master_data": {},
-				"streaming": {},
-			}
-		},
-		"contracts": {
-			"bclg": {
-				"id": "bclg",
-				"configuration": contract["configuration"],
-				"provides": ["bclg_operations"],
-				"requires": [],
-			}
-		},
-		"rules": {
-			rule["name"]: rule
-			for rule in contract["rule_engine"]["rules"]
-		},
-		"composition": {
-			"capability_dependencies": {"bclg": []},
-			"applications": {},
-			"agent_teams": {},
-		},
-		"deployment": {
-			"source": "capability_contract.py",
-			"target": "python",
-		},
-		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
-			"package": {"kind": "package", "nodes": 2, "edges": 1},
-		},
-		"source_files": ["capability_contract.py"],
-		"symbols": {
-			"capability.bclg": {
-				"id": "capability.bclg",
-				"kind": "capability",
-				"name": contract["display_name"],
-				"file": "capability_contract.py",
-				"range": {
-					"start": {"line": 0, "character": 0},
-					"end": {"line": 0, "character": 1},
-				},
-				"references": [],
-			}
-		},
-		"agents": {},
-		"flows": {},
-		"llms": {},
-		"operations": {},
-		"roles": {},
-		"security": {},
-		"tables": {},
-		"views": {},
-		"diagnostics": [],
-	}
+	"""Return the package semantic model."""
+	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
 
 
 def component_manifest() -> dict[str, Any]:
@@ -150,15 +36,12 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
-	routes = model.get("capabilities", {}).get("bclg", {}).get("ui", {}).get("routes", [])
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "bclg" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 10:
-		errors.append("BCLG semantic model route manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

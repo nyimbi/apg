@@ -4,89 +4,90 @@
 
 BCLG has a dependency-light ledger runtime with ledger registration,
 key-custody binding, deterministic transaction/block hashes, high-value
-transaction review state, smart contract deployment, contract/rule/theme
-metadata, API helpers, view models, package evidence, and tests.
+transaction review state, smart contract deployment approval, contract/rule/
+theme metadata, API helpers, view models, package evidence, and focused tests.
 
-The package-level composition gap is that high-value transaction review and
-smart contract deployment review can be represented by caller-supplied strings
-or booleans instead of first-class approval state. Mutable stores are keyed by
-raw IDs instead of tenant plus ID, so duplicate tenant-local IDs can collide.
-Generated APG applications need a fail-closed, composable lifecycle for ledger
-registration, custody, signed transactions, explicit reviews, contract
-deployment, view models, semantic evidence, and audit state.
+The current packet closes the remaining composition gap for AI-assisted ledger
+governance: ledger agents must be first-class, governed participants; batch
+ledger mutation must declare the Bytewax lifecycle stream; generated evidence
+must expose practical provides/requires metadata; and the package needs a root
+README that explains how builders compose BCLG into executable applications.
 
-## Packet 1: Governed Ledger-Mutation Lifecycle
+## Packet: Ledger-Agent And Bytewax Governance
 
-Deliver a focused lifecycle packet:
+Deliver a focused lifecycle and guardrail packet:
 
-- add package-level high-value transaction review approval state;
-- add package-level smart contract deployment approval state;
-- key ledgers, custody bindings, transactions, contracts, approvals, ledger
-  heads, and audit events by tenant plus record ID;
-- prevent `transaction_review_recorded=True` from committing high-value
-  transactions without explicit approved review evidence;
-- approve or reject transaction review requests with independent reviewer notes;
-- commit reviewed transactions only when approved;
-- prevent duplicate pending transaction reviews and stale review decisions from
-  mutating rejected or committed transactions;
-- deploy smart contracts only with approved matching deployment approval
-  evidence, artifact hash, rollback plan, and active key custody;
-- update API helpers and view models for review queues and approval state;
-- update contract routes, rules, theme metadata, semantic evidence, and release
-  evidence;
-- rename generated-package tests to package contract naming;
-- update package documentation and progress evidence.
+- add a practical root `README.md`;
+- keep `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` aligned with the
+  executable package surface;
+- add first-class AI ledger-agent configuration for Codex, Claude Code,
+  OpenCode, and Pi style runtimes;
+- require ledger-agent registration, supported runtime, supported role,
+  explicit scope, and contribution disclosure;
+- add `LedgerAgent` model state;
+- add service, API-helper, and view-model methods for ledger-agent
+  registration and listing;
+- add Bytewax stream metadata to the contract and generated semantic model;
+- require Bytewax for batch ledger mutation intent;
+- expose ledger-agent, audit, analytics, settings, and stream UI state;
+- add provides/requires metadata for APG composition;
+- refresh generated package evidence from the live contract;
+- extend focused tests for the new rules and view/API surfaces;
+- record progress evidence and commit the verified slice.
 
 ## Implementation Steps
 
-1. Extend `models.py` with `TransactionReviewApproval` and
-   `ContractDeploymentApproval`.
-2. Update `service.py` so ledgers, custody bindings, transactions, transaction
-   approvals, contract approvals, contracts, ledger heads, and audit events are
-   tenant-qualified.
-3. Add transaction review request/decision behavior and enforce review evidence
-   before committing high-value transactions.
-4. Add contract deployment review request/decision behavior and enforce review
-   evidence before deployment.
-5. Preserve deterministic transaction, contract, and block hash behavior.
-6. Extend `api.py` for generated application calls.
-7. Extend `views.py` for dashboard, ledger console, transaction monitor,
-   transaction review queue, contract registry, contract approval queue, key
-   custody, compliance, and audit surfaces.
-8. Update `capability_contract.py` with review routes, independent-reviewer
-   rules, and theme components.
-9. Update registration metadata with review capabilities, endpoints, and
-   permissions.
-10. Replace stale embedded semantic evidence in `app.py` with contract-derived
-    evidence.
-11. Extend package tests with positive ledger-custody-standard-transaction,
-    high-value-review, contract-approval-deployment, API-helper, view-model, and
-    duplicate-ID tenant-isolation coverage.
-12. Add negative missing-owner, missing-signature, missing-custody,
-    caller-boolean review bypass, rejected transaction review, missing review
-    notes, self-review, missing contract approval, rejected contract approval,
-    tenant-mismatch, and duplicate same-tenant ID coverage.
-13. Rename generated-package tests to package contract naming.
-14. Update `cap_spec.md` with the current executable lifecycle and proof
-    commands.
-15. Run focused package proof, implementation audit, publish-plan, code review,
-    fixes, and diff checks.
+1. Extend `capability_contract.py` with ledger-agent, governance,
+   observability, adapter, UI, theme, provides/requires, and Bytewax stream
+   metadata.
+2. Extend the rule engine with ledger-agent registration/runtime/role/scope/
+   disclosure guardrails and Bytewax batch mutation enforcement.
+3. Add `LedgerAgent` to `models.py`.
+4. Extend `BclgService` with tenant-qualified ledger-agent state,
+   registration, listing, dashboard counts, token normalization, and batch
+   mutation validation.
+5. Extend `api.py` with ledger-agent and batch mutation helpers.
+6. Extend `views.py` with ledger-agent, analytics, audit, settings, and stream
+   surfaces.
+7. Update focused tests to cover contract shape, rule evaluation, service,
+   API helpers, view models, generated package evidence, and Bytewax metadata.
+8. Replace stale `cap_spec.md` content with a pointer to the active spec.
+9. Add `README.md` and update `SPECIFICATION.md`.
+10. Regenerate `app.py`, `semantic_model.json`, `package_manifest.json`, and
+    `release_report.json` from the contract.
+11. Run focused compile, package tests, self-test, implementation audit,
+    publish-plan, stale-marker scan for touched files, and diff checks.
 
 ## Review Checklist
 
-- Ledger, custody, transaction, approval, contract, head, and audit state is
-  tenant-qualified.
-- High-value transaction commit requires approved matching review evidence.
-- Contract deployment requires approved matching deployment evidence.
-- Reviewers cannot approve their own transaction or deployment requests.
-- Review decisions require reviewer identity and notes.
-- Rejected reviews cannot be converted into committed ledger changes.
-- Duplicate pending transaction reviews are rejected.
-- Caller-supplied booleans do not bypass review governance.
-- Missing tenant context, owner, signature, custody, artifact hash, and rollback
-  plan fail closed.
+- Ledger-agent runtime and role values normalize predictable CLI/provider
+  names.
+- Unsupported agent runtimes fail closed.
+- Unsupported agent roles fail closed.
+- Missing ledger-agent scope fails closed.
+- Undisclosed ledger-agent contribution fails closed.
+- Batch ledger mutation fails unless `event_stream` is `bytewax`.
+- Tenant-qualified state remains intact for ledger, custody, transaction,
+  approval, contract, ledger-agent, head, and audit records.
+- High-value transaction commit still requires approved matching review
+  evidence.
+- Contract deployment still requires approved matching deployment evidence.
+- Reviewers still cannot approve their own transaction or deployment requests.
 - API helpers expose the same behavior as service methods.
-- View models expose ledger, custody, transaction, approval, contract,
-  compliance, theme, and audit state.
+- View models expose dashboard, ledger, custody, transaction, approval,
+  contract, agent, analytics, settings, stream, theme, and audit state.
+- Generated semantic model exposes current route names, provides/requires
+  metadata, ledger-agent configuration, and Bytewax stream metadata.
 - Live chain nodes, HSMs, wallets, compliance engines, and web servers remain
   adapter boundaries.
+
+## Verification Commands
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/bclg/__init__.py capabilities/common/bclg/capability_contract.py capabilities/common/bclg/models.py capabilities/common/bclg/ledger_engine.py capabilities/common/bclg/service.py capabilities/common/bclg/api.py capabilities/common/bclg/views.py capabilities/common/bclg/app.py capabilities/common/bclg/test_capability_contract.py capabilities/common/bclg/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/bclg/test_capability_contract.py capabilities/common/bclg/tests/test_package_contract.py
+./.venv/bin/python -c "from capabilities.common.bclg import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/bclg --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/bclg --json
+git diff --check -- capabilities/common/bclg docs/progress_log.md
+```

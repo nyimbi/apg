@@ -30,6 +30,10 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "bclg"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["ledger_agents"]["supported_runtimes"]
+	for required_doc in ("README.md", "SPECIFICATION.md", "PLAN.md", "cap_spec.md"):
+		assert (PACKAGE_DIR / required_doc).exists()
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -44,3 +48,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "bclg" in model["capabilities"]
+	assert model["capabilities"]["bclg"]["streaming"]["processor"] == "bytewax"
+	assert model["capabilities"]["bclg"]["screens"]["ledger_agents"]["route"] == "/bclg/agents"

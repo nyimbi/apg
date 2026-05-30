@@ -5,12 +5,18 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_LEDGER_AGENT_ROLES,
+	SUPPORTED_LEDGER_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .ledger_engine import LedgerEngine
 from .models import (
 	ContractDeploymentApproval,
 	KeyCustodyBinding,
 	LedgerAuditEvent,
+	LedgerAgent,
 	LedgerNetwork,
 	LedgerTransaction,
 	SmartContractArtifact,
@@ -28,6 +34,7 @@ class BclgService:
 		self._transaction_reviews: dict[tuple[str, str], TransactionReviewApproval] = {}
 		self._contract_reviews: dict[tuple[str, str], ContractDeploymentApproval] = {}
 		self._contracts: dict[tuple[str, str], SmartContractArtifact] = {}
+		self._ledger_agents: dict[tuple[str, str], LedgerAgent] = {}
 		self._audit_events: dict[tuple[str, str], LedgerAuditEvent] = {}
 		self._ledger_heads: dict[tuple[str, str], str] = {}
 		self._engine = LedgerEngine()
@@ -479,6 +486,84 @@ class BclgService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events.values(), tenant_id)
 
+	def register_ledger_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		registered: bool = True,
+		contribution_disclosed: bool = True,
+		policy_ref: str | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"ledger_agent_present": True,
+			"agent_registered": registered,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_LEDGER_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_LEDGER_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		self._ensure_new(self._ledger_agents, tenant_id, agent_id, "ledger agent")
+		if not name:
+			raise ValueError("ledger_agent_name_required")
+		agent = LedgerAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+			status=status,
+		)
+		self._ledger_agents[self._tenant_key(tenant_id, agent_id)] = agent
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="ledger_agent_registered",
+			actor="system",
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"runtime": agent.runtime, "role": agent.role, "scope": scope},
+		)
+		return agent.to_dict()
+
+	def list_ledger_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._ledger_agents.values(), tenant_id)
+
+	def validate_batch_ledger_mutation(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "batch_ledger_mutation",
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+		})
+		self._raise_if_denied(result)
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+			"accepted": True,
+			"rule_result": result,
+		}
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		"""Compatibility surface exposing ledger transactions as BCLG records."""
 		return self.list_transactions(tenant_id)
@@ -522,6 +607,7 @@ class BclgService:
 			"deployed_contract_count": len([item for item in contracts if item["status"] == "deployed"]),
 			"contract_review_count": len(contract_reviews),
 			"pending_contract_review_count": len([item for item in contract_reviews if item["status"] == "pending"]),
+			"ledger_agent_count": len(self.list_ledger_agents(tenant_id)),
 			"audit_event_count": len(audit_events),
 		}
 
@@ -648,3 +734,7 @@ class BclgService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")

@@ -25,7 +25,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["ledger_registry", "transaction_signing", "smart_contract_governance", "key_custody", "ledger_audit"],
+	"provides": ["ledger_registry", "transaction_signing", "smart_contract_governance", "key_custody", "ledger_audit", "ledger_agents"],
 	"permissions": ["bclg:view", "bclg:transact", "bclg:review_transactions", "bclg:manage_ledgers", "bclg:manage_contracts", "bclg:review_contracts", "bclg:admin"]
 }
 
@@ -51,13 +51,16 @@ def register_capability() -> dict[str, Any]:
 			"smart_contract_governance": "Review, approve, deploy, and version smart contract artifacts",
 			"contract_deployment_reviews": "Require independent approval evidence before smart contract deployment",
 			"key_custody": "Bind ledger operations to APG key management and encryption policy",
+			"ledger_agents": "Register governed AI ledger agents for review support",
+			"bytewax_streaming": "Expose Bytewax lifecycle-stream metadata for batch ledger mutation",
 			"capability_rules": "Evaluate deterministic distributed-ledger governance rules",
 			"visual_theming": "Apply blockchain ledger theme tokens and components"
 		},
-		"endpoints": {"ledgers": "/bclg/api/v1/ledgers", "transactions": "/bclg/api/v1/transactions", "transaction_reviews": "/bclg/api/v1/transactions/reviews", "contracts": "/bclg/api/v1/contracts", "contract_reviews": "/bclg/api/v1/contracts/reviews", "keys": "/bclg/api/v1/keys", "audit": "/bclg/api/v1/audit"},
+		"endpoints": {"ledgers": "/bclg/api/v1/ledgers", "transactions": "/bclg/api/v1/transactions", "transaction_reviews": "/bclg/api/v1/transactions/reviews", "contracts": "/bclg/api/v1/contracts", "contract_reviews": "/bclg/api/v1/contracts/reviews", "keys": "/bclg/api/v1/keys", "ledger_agents": "/bclg/api/v1/agents", "audit": "/bclg/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 
