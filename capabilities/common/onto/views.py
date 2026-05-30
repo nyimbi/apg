@@ -23,8 +23,14 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"routes": capability_routes(tenant_id),
 		"ontologies": service.list_ontologies(tenant_id),
+		"namespaces": service.list_namespaces(tenant_id),
 		"terms": service.list_terms(tenant_id),
+		"taxonomy_edges": service.list_taxonomy_edges(tenant_id),
 		"mappings": service.list_mappings(tenant_id),
+		"validation_reports": service.list_validation_reports(tenant_id),
+		"publications": service.list_publications(tenant_id),
+		"exports": service.list_exports(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -53,6 +59,19 @@ def term_editor_model(
 		"terms": service.list_terms(tenant_id),
 		"reviews": service.list_reviews(tenant_id),
 		"route": "/onto/terms",
+	}
+
+
+def namespace_model(
+	service: OntoService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or OntoService()
+	return {
+		"tenant_id": tenant_id,
+		"ontologies": service.list_ontologies(tenant_id),
+		"namespaces": service.list_namespaces(tenant_id),
+		"route": "/onto/namespaces",
 	}
 
 
@@ -96,6 +115,44 @@ def publication_queue_model(
 	}
 
 
+def validation_model(
+	service: OntoService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or OntoService()
+	return {
+		"tenant_id": tenant_id,
+		"ontologies": service.list_ontologies(tenant_id),
+		"validation_reports": service.list_validation_reports(tenant_id),
+		"route": "/onto/validation",
+	}
+
+
+def exchange_model(
+	service: OntoService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or OntoService()
+	return {
+		"tenant_id": tenant_id,
+		"ontologies": service.list_ontologies(tenant_id),
+		"exports": service.list_exports(tenant_id),
+		"route": "/onto/exports",
+	}
+
+
+def audit_timeline_model(
+	service: OntoService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or OntoService()
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"route": "/onto/audit",
+	}
+
+
 def governance_model(
 	service: OntoService | None = None,
 	tenant_id: str = "default",
@@ -107,5 +164,22 @@ def governance_model(
 		"rules": contract["rule_engine"]["rules"],
 		"reviews": service.list_reviews(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
+		"configuration": contract["configuration"],
 		"route": "/onto/governance",
+	}
+
+
+def settings_model(
+	service: OntoService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or OntoService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"theme": contract["theme"],
+		"adapters": contract["configuration"]["adapters"],
+		"route": "/onto/settings",
 	}

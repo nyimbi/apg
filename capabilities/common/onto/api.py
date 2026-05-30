@@ -50,6 +50,19 @@ def create_term(payload: dict[str, Any]) -> dict[str, Any]:
 		synonyms=list(payload.get("synonyms") or []),
 		external_refs=list(payload.get("external_refs") or []),
 		metadata=dict(payload.get("metadata") or {}),
+		review_recorded=bool(payload.get("review_recorded", False)),
+	)
+
+
+def register_namespace(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_namespace(
+		namespace_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		ontology_id=str(payload["ontology_id"]),
+		prefix=str(payload["prefix"]),
+		uri=str(payload["uri"]),
+		owner=str(payload.get("owner") or ""),
+		metadata=dict(payload.get("metadata") or {}),
 	)
 
 
@@ -85,6 +98,18 @@ def add_taxonomy_edge(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def deprecate_term(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.deprecate_term(
+		review_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		term_id=str(payload["term_id"]),
+		replacement_term_id=str(payload.get("replacement_term_id") or ""),
+		reviewer=str(payload.get("reviewer") or ""),
+		review_recorded=bool(payload.get("review_recorded", False)),
+		notes=str(payload.get("notes") or ""),
+	)
+
+
 def create_mapping(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_mapping(
 		mapping_id=str(payload["id"]),
@@ -109,6 +134,16 @@ def review_mapping(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def validate_ontology(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_ontology(
+		report_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		ontology_id=str(payload["ontology_id"]),
+		review_recorded=bool(payload.get("review_recorded", False)),
+		review_ref=str(payload.get("review_ref") or ""),
+	)
+
+
 def publish_ontology(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.publish_ontology(
 		publication_id=str(payload["id"]),
@@ -116,6 +151,15 @@ def publish_ontology(payload: dict[str, Any]) -> dict[str, Any]:
 		ontology_id=str(payload["ontology_id"]),
 		approval_recorded=bool(payload.get("approval_recorded")),
 		approval_ref=str(payload.get("approval_ref") or ""),
+	)
+
+
+def export_ontology(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.export_ontology(
+		export_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		ontology_id=str(payload["ontology_id"]),
+		export_format=str(payload.get("format") or "jsonld"),
 	)
 
 

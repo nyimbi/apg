@@ -6,26 +6,32 @@ from capabilities.common.onto import register_capability
 from capabilities.common.onto.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.onto.service import OntoService
 from capabilities.common.onto.views import (
+	audit_timeline_model,
 	dashboard_model,
+	exchange_model,
 	governance_model,
 	mapping_workbench_model,
+	namespace_model,
 	ontology_registry_model,
 	publication_queue_model,
+	settings_model,
 	taxonomy_model,
 	term_editor_model,
+	validation_model,
 )
 
 
-def test_contract_exposes_configuration_rules_ui_and_theme():
-	contract = get_capability_contract("tenant-onto", {"mapping": {"confidence_threshold": 0.9}})
+def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
+	contract = get_capability_contract("tenant-onto", {"mappings": {"confidence_threshold": 0.9}})
 
 	assert contract["capability"] == "onto"
 	assert contract["configuration"]["tenant_id"] == "tenant-onto"
-	assert contract["configuration"]["mapping"]["confidence_threshold"] == 0.9
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "ontology", "vocabulary", "mapping", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "ontologies", "terms", "mappings", "publication", "governance", "settings"}
+	assert contract["configuration"]["mappings"]["confidence_threshold"] == 0.9
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "ontologies", "namespaces", "terms", "taxonomy", "mappings", "validation", "publication", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "ontologies", "namespaces", "terms", "taxonomy", "mappings", "validation", "imports", "exports", "publication", "governance", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/onto/api/v1"
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "taxonomy_tree" in contract["theme"]["components"]
 
@@ -36,27 +42,47 @@ def test_rule_engine_enforces_ontology_guardrails():
 		"operation": "publish_ontology",
 		"owner_assigned": False,
 		"approval_recorded": False,
+		"validation_recorded": False,
 		"change_type": "breaking",
 		"review_recorded": False,
 		"mapping_confidence": 0.2,
-		"duplicate_term_detected": True
+		"duplicate_term_detected": True,
+		"draft_terms_present": True,
+		"unreviewed_low_confidence_mappings_present": True,
 	})
 	term_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "create_term",
-		"owner_assigned": False
+		"owner_assigned": False,
+	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "batch_ontology_mutation",
+		"event_stream": "kafka",
+	})
+	mapping_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "create_mapping",
+		"mapping_confidence": 0.2,
+		"review_recorded": False,
 	})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert set(result["matched_rules"]) >= {
 		"tenant_context_required",
 		"publication_requires_approval",
+		"publication_requires_validation",
 		"breaking_change_requires_review",
-		"low_confidence_mapping_requires_review",
-		"duplicate_term_blocks_publication"
+		"duplicate_term_blocks_publication",
+		"draft_terms_block_publication",
+		"unreviewed_mappings_block_publication",
 	}
 	assert term_result["decision"] == "deny"
 	assert term_result["matched_rules"] == ["term_requires_owner"]
+	assert batch_result["decision"] == "deny"
+	assert batch_result["matched_rules"] == ["batch_ontology_mutation_requires_bytewax"]
+	assert mapping_result["decision"] == "require_review"
+	assert mapping_result["matched_rules"] == ["low_confidence_mapping_requires_review"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -69,7 +95,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "onto_vocabulary_workbench"
 	assert registration["ui_components"]["mappings"] == "/onto/mappings"
 	assert "kngr" in registration["dependencies"]
+	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["endpoints"]["audit"] == "/onto/api/v1/audit"
 	assert "onto:publish" in registration["permissions"]
+	assert "onto:audit" in registration["permissions"]
 
 
 def test_onto_lifecycle_is_executable():
@@ -83,6 +112,14 @@ def test_onto_lifecycle_is_executable():
 		owner="data-stewards",
 		domain="crm",
 		description="Customer vocabulary for CRM apps",
+	)
+	namespace = service.register_namespace(
+		namespace_id="ns-customer",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+		prefix="cust",
+		uri="https://example.com/ontology/customer#",
+		owner="data-stewards",
 	)
 	customer = service.create_term(
 		term_id="term-customer",
@@ -141,6 +178,11 @@ def test_onto_lifecycle_is_executable():
 		review_recorded=True,
 		review_ref="review:account-map",
 	)
+	validation = service.validate_ontology(
+		report_id="validation-customer-ontology",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+	)
 	publication = service.publish_ontology(
 		publication_id="publish-customer-ontology",
 		tenant_id=tenant_id,
@@ -148,27 +190,43 @@ def test_onto_lifecycle_is_executable():
 		approval_recorded=True,
 		approval_ref="approval:onto-42",
 	)
+	export = service.export_ontology(
+		export_id="export-customer-ontology",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+		export_format="jsonld",
+	)
 
+	assert namespace["prefix"] == "cust"
 	assert edge["relationship_type"] == "broader_than"
 	assert mapping["status"] == "active"
 	assert reviewed_mapping["status"] == "reviewed"
+	assert validation["status"] == "passed"
 	assert publication["status"] == "published"
 	assert publication["term_count"] == 2
+	assert export["format"] == "jsonld"
 	assert service.list_terms(tenant_id)[0]["status"] == "published"
 
 	summary = service.dashboard_summary(tenant_id)
 	assert summary["ontology_count"] == 1
+	assert summary["namespace_count"] == 1
 	assert summary["term_count"] == 2
 	assert summary["mapping_count"] == 2
 	assert summary["publication_count"] == 1
+	assert summary["export_count"] == 1
 
 	assert dashboard_model(service, tenant_id)["summary"]["term_count"] == 2
 	assert ontology_registry_model(service, tenant_id)["ontologies"][0]["id"] == "customer-ontology"
+	assert namespace_model(service, tenant_id)["namespaces"][0]["prefix"] == "cust"
 	assert term_editor_model(service, tenant_id)["reviews"]
 	assert taxonomy_model(service, tenant_id)["edges"][0]["id"] == "edge-customer-account"
 	assert mapping_workbench_model(service, tenant_id)["mappings"][0]["term_id"] == "term-account"
+	assert validation_model(service, tenant_id)["validation_reports"][0]["status"] == "passed"
 	assert publication_queue_model(service, tenant_id)["publications"][0]["approval_recorded"] is True
+	assert exchange_model(service, tenant_id)["exports"][0]["format"] == "jsonld"
 	assert governance_model(service, tenant_id)["audit_events"]
+	assert audit_timeline_model(service, tenant_id)["audit_events"]
+	assert settings_model(service, tenant_id)["adapters"]["event_stream"] == "bytewax"
 
 
 def test_onto_service_enforces_policy_guardrails():
@@ -191,6 +249,24 @@ def test_onto_service_enforces_policy_guardrails():
 		owner="steward",
 		domain="test",
 	)
+	service.register_namespace(
+		namespace_id="ns-guardrail",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+		prefix="guard",
+		uri="https://example.com/guard#",
+		owner="steward",
+	)
+	with pytest.raises(PermissionError, match="namespace_prefix_duplicate"):
+		service.register_namespace(
+			namespace_id="ns-guardrail-duplicate",
+			tenant_id=tenant_id,
+			ontology_id=ontology["id"],
+			prefix="guard",
+			uri="https://example.com/other#",
+			owner="steward",
+		)
+
 	with pytest.raises(PermissionError, match="term_owner_required"):
 		service.create_term(
 			term_id="ownerless",
@@ -269,6 +345,7 @@ def test_onto_service_enforces_policy_guardrails():
 		ontology_id=ontology["id"],
 		label="Parent",
 		owner="steward",
+		review_recorded=True,
 	)
 	service.curate_term(
 		review_id="review-duplicate",
@@ -284,12 +361,40 @@ def test_onto_service_enforces_policy_guardrails():
 			ontology_id=ontology["id"],
 			approval_recorded=False,
 		)
+	with pytest.raises(PermissionError, match="validation_required"):
+		service.publish_ontology(
+			publication_id="publish-no-validation",
+			tenant_id=tenant_id,
+			ontology_id=ontology["id"],
+			approval_recorded=True,
+		)
+	with pytest.raises(PermissionError, match="validation_review_required"):
+		service.validate_ontology(
+			report_id="validation-with-duplicates",
+			tenant_id=tenant_id,
+			ontology_id=ontology["id"],
+			review_recorded=False,
+		)
+	service.validate_ontology(
+		report_id="validation-with-reviewed-duplicates",
+		tenant_id=tenant_id,
+		ontology_id=ontology["id"],
+		review_recorded=True,
+	)
 	with pytest.raises(PermissionError, match="duplicate_term_detected"):
 		service.publish_ontology(
 			publication_id="publish-duplicates",
 			tenant_id=tenant_id,
 			ontology_id=ontology["id"],
 			approval_recorded=True,
+		)
+
+	with pytest.raises(PermissionError, match="export_format_invalid"):
+		service.export_ontology(
+			export_id="export-invalid",
+			tenant_id=tenant_id,
+			ontology_id=ontology["id"],
+			export_format="zip",
 		)
 
 	with pytest.raises(LookupError, match="ontology_term_not_found"):

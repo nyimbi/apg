@@ -79,6 +79,34 @@ class OntologyTerm:
 
 
 @dataclass
+class OntologyNamespace:
+	"""Namespace prefix and URI bound to an ontology."""
+
+	id: str
+	tenant_id: str
+	ontology_id: str
+	prefix: str
+	uri: str
+	owner: str
+	status: str = "active"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"ontology_id": self.ontology_id,
+			"prefix": self.prefix,
+			"uri": self.uri,
+			"owner": self.owner,
+			"status": self.status,
+			"metadata": dict(self.metadata),
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
 class TaxonomyEdge:
 	"""Parent-child relationship between ontology terms."""
 
@@ -194,6 +222,60 @@ class OntologyPublication:
 			"duplicate_count": self.duplicate_count,
 			"term_count": self.term_count,
 			"mapping_count": self.mapping_count,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class ValidationReport:
+	"""Validation result for ontology publication readiness."""
+
+	id: str
+	tenant_id: str
+	ontology_id: str
+	issue_count: int
+	issues: list[str] = field(default_factory=list)
+	status: str = "passed"
+	review_recorded: bool = False
+	review_ref: str = ""
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"ontology_id": self.ontology_id,
+			"issue_count": self.issue_count,
+			"issues": list(self.issues),
+			"status": self.status,
+			"review_recorded": self.review_recorded,
+			"review_ref": self.review_ref,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class OntologyExport:
+	"""Export event for an ontology in an interchange format."""
+
+	id: str
+	tenant_id: str
+	ontology_id: str
+	format: str
+	version: str
+	status: str = "ready"
+	artifact_ref: str = ""
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"ontology_id": self.ontology_id,
+			"format": self.format,
+			"version": self.version,
+			"status": self.status,
+			"artifact_ref": self.artifact_ref,
 			"created_at": self.created_at,
 		}
 

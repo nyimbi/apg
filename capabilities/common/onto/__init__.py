@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["ontology_registry", "taxonomy_management", "vocabulary_governance", "semantic_mapping", "term_curation"],
-	"permissions": ["onto:view", "onto:edit", "onto:map", "onto:publish", "onto:govern", "onto:admin"]
+	"provides": ["ontology_registry", "namespace_management", "taxonomy_management", "vocabulary_governance", "semantic_mapping", "ontology_validation", "term_curation", "ontology_exchange"],
+	"permissions": ["onto:view", "onto:edit", "onto:map", "onto:publish", "onto:govern", "onto:audit", "onto:admin"]
 }
 
 
@@ -39,25 +39,34 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "auth", "srch", "grph"],
+		"optional_dependencies": ["audl", "auth", "srch", "grph", "cach", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"ontology_registry": "Register tenant-scoped ontologies and versions",
+			"namespace_management": "Govern ontology namespace prefixes and URIs",
 			"taxonomy_management": "Curate hierarchical taxonomies and controlled vocabularies",
 			"semantic_mapping": "Map terms, entities, and metadata concepts across domains",
+			"ontology_validation": "Validate duplicates, draft terms, taxonomy integrity, and mapping reviews",
+			"ontology_exchange": "Prepare ontology export artifacts in configured interchange formats",
 			"term_curation": "Govern term ownership, status, synonyms, and publication",
 			"capability_rules": "Evaluate deterministic ontology-governance rules",
 			"visual_theming": "Apply ontology-workbench theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/onto/api/v1/status",
 			"ontologies": "/onto/api/v1/ontologies",
+			"namespaces": "/onto/api/v1/namespaces",
 			"terms": "/onto/api/v1/terms",
 			"mappings": "/onto/api/v1/mappings",
 			"taxonomies": "/onto/api/v1/taxonomies",
-			"publication": "/onto/api/v1/publication"
+			"validation": "/onto/api/v1/validation",
+			"exports": "/onto/api/v1/exports",
+			"publication": "/onto/api/v1/publication",
+			"audit": "/onto/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

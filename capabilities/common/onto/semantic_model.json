@@ -8,40 +8,178 @@
   },
   "capabilities": {
     "onto": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.OntoService",
+        "graph": "grph",
+        "helper_runtime": "ontology_runtime.py",
+        "http_api": "api.py",
+        "knowledge_graph": "kngr",
+        "metadata": "meta",
+        "metrics_sink": "moni",
+        "nlp": "nlpc",
+        "search": "srch"
+      },
+      "approvals": {
+        "duplicate_term_resolution": "CurationReview",
+        "external_mapping": "CurationReview",
+        "low_confidence_mapping": "CurationReview",
+        "ontology_retirement": "CurationReview",
+        "publication": "OntologyPublication",
+        "term_deprecation": "CurationReview",
+        "validation_issues": "ValidationReport"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.OntoService",
+          "graph": "grph",
+          "helper_runtime": "ontology_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "search": "srch"
+        },
+        "curation": {
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "curator_required": true,
+          "evidence_required": true
+        },
         "governance": {
+          "audit_mapping_changes": true,
+          "audit_ontology_changes": true,
+          "audit_publication": true,
           "audit_term_changes": true,
           "curation_required": true,
           "require_tenant_context": true
         },
-        "mapping": {
+        "import_export": {
+          "allowed_export_formats": [
+            "rdf",
+            "owl",
+            "jsonld",
+            "skos",
+            "csv"
+          ],
+          "allowed_import_formats": [
+            "rdf",
+            "owl",
+            "jsonld",
+            "skos",
+            "csv"
+          ],
+          "external_import_review_required": true,
+          "large_import_review_threshold": 1000
+        },
+        "mappings": {
+          "allowed_types": [
+            "exact",
+            "close",
+            "broad",
+            "narrow",
+            "related"
+          ],
           "breaking_change_review_required": true,
           "confidence_threshold": 0.8,
-          "external_mapping_review_required": true
+          "external_mapping_review_required": true,
+          "mapping_type_required": true,
+          "target_required": true
         },
-        "ontology": {
+        "namespaces": {
+          "owner_required": true,
+          "prefix_required": true,
+          "unique_prefix_required": true,
+          "uri_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "ontologies": {
+          "domain_required": true,
+          "id_required": true,
+          "name_required": true,
           "owner_required": true,
           "publication_approval_required": true,
+          "retire_requires_review": true,
           "versioning_enabled": true
         },
+        "publication": {
+          "approval_required": true,
+          "auditable_version_required": true,
+          "validation_required": true
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "rbac_required": true,
+          "tenant_isolation_required": true
+        },
+        "taxonomy": {
+          "allowed_relationships": [
+            "broader_than",
+            "narrower_than",
+            "related_to",
+            "equivalent_to"
+          ],
+          "cycle_detection_enabled": true,
+          "self_relation_allowed": false
+        },
         "tenant_id": "default",
+        "terms": {
+          "allowed_statuses": [
+            "draft",
+            "curated",
+            "published",
+            "deprecated"
+          ],
+          "definition_required_for_publication": true,
+          "deprecation_requires_replacement": true,
+          "duplicate_detection_enabled": true,
+          "label_required": true,
+          "owner_required": true,
+          "synonym_management_enabled": true
+        },
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "onto_vocabulary_workbench"
         },
         "ui": {
+          "enable_audit": true,
+          "enable_dashboard": true,
+          "enable_exports": true,
+          "enable_governance": true,
+          "enable_imports": true,
           "enable_mapping_workbench": true,
+          "enable_namespace_manager": true,
           "enable_ontology_registry": true,
           "enable_publication_queue": true,
-          "enable_term_editor": true
+          "enable_settings": true,
+          "enable_taxonomy_editor": true,
+          "enable_term_editor": true,
+          "enable_validation": true
         },
-        "vocabulary": {
-          "duplicate_detection_enabled": true,
-          "synonym_management_enabled": true,
-          "term_status_required": true
+        "validation": {
+          "draft_terms_block": true,
+          "duplicate_terms_block": true,
+          "required_before_publication": true,
+          "taxonomy_cycles_block": true,
+          "unreviewed_low_confidence_mappings_block": true
         }
       },
       "erp_modules": [
@@ -50,6 +188,18 @@
       "i18n": {},
       "master_data": {},
       "name": "Ontology Management",
+      "ontology_lifecycle": {
+        "audit": "OntoAuditEvent",
+        "export": "OntologyExport",
+        "mapping": "SemanticMapping",
+        "namespace": "OntologyNamespace",
+        "ontology": "Ontology",
+        "publication": "OntologyPublication",
+        "review": "CurationReview",
+        "taxonomy_edge": "TaxonomyEdge",
+        "term": "OntologyTerm",
+        "validation": "ValidationReport"
+      },
       "provides": [
         "onto_operations"
       ],
@@ -70,6 +220,162 @@
           },
           {
             "condition": {
+              "ontology_id_present": false,
+              "operation": "register_ontology"
+            },
+            "description": "Ontologies require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_id_required",
+              "required_action": "attach_ontology_id"
+            },
+            "name": "ontology_requires_id"
+          },
+          {
+            "condition": {
+              "ontology_name_present": false,
+              "operation": "register_ontology"
+            },
+            "description": "Ontologies require names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_name_required",
+              "required_action": "attach_ontology_name"
+            },
+            "name": "ontology_requires_name"
+          },
+          {
+            "condition": {
+              "ontology_owner_present": false,
+              "operation": "register_ontology"
+            },
+            "description": "Ontologies require accountable owners.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "ontology_requires_owner"
+          },
+          {
+            "condition": {
+              "ontology_domain_present": false,
+              "operation": "register_ontology"
+            },
+            "description": "Ontologies require domains.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_domain_required",
+              "required_action": "attach_domain"
+            },
+            "name": "ontology_requires_domain"
+          },
+          {
+            "condition": {
+              "operation": "retire_ontology",
+              "review_recorded": false
+            },
+            "description": "Retiring ontologies requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "ontology_retire_review_required",
+              "required_action": "record_ontology_review"
+            },
+            "name": "ontology_retire_requires_review"
+          },
+          {
+            "condition": {
+              "ontology_present": false,
+              "operation": "register_namespace"
+            },
+            "description": "Namespaces require an ontology.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_required",
+              "required_action": "select_ontology"
+            },
+            "name": "namespace_requires_ontology"
+          },
+          {
+            "condition": {
+              "namespace_prefix_present": false,
+              "operation": "register_namespace"
+            },
+            "description": "Namespaces require prefixes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_prefix_required",
+              "required_action": "attach_namespace_prefix"
+            },
+            "name": "namespace_requires_prefix"
+          },
+          {
+            "condition": {
+              "namespace_uri_present": false,
+              "operation": "register_namespace"
+            },
+            "description": "Namespaces require URIs.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_uri_required",
+              "required_action": "attach_namespace_uri"
+            },
+            "name": "namespace_requires_uri"
+          },
+          {
+            "condition": {
+              "operation": "register_namespace",
+              "owner_assigned": false
+            },
+            "description": "Namespaces require owners.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_owner_required",
+              "required_action": "assign_namespace_owner"
+            },
+            "name": "namespace_requires_owner"
+          },
+          {
+            "condition": {
+              "namespace_prefix_unique": false,
+              "operation": "register_namespace"
+            },
+            "description": "Namespace prefixes must be unique per ontology.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_prefix_duplicate",
+              "required_action": "choose_unique_prefix"
+            },
+            "name": "namespace_prefix_must_be_unique"
+          },
+          {
+            "condition": {
+              "ontology_present": false,
+              "operation": "create_term"
+            },
+            "description": "Ontology terms require an ontology.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_required",
+              "required_action": "select_ontology"
+            },
+            "name": "term_requires_ontology"
+          },
+          {
+            "condition": {
+              "operation": "create_term",
+              "term_label_present": false
+            },
+            "description": "Ontology terms require labels.",
+            "effect": {
+              "decision": "deny",
+              "reason": "term_label_required",
+              "required_action": "attach_term_label"
+            },
+            "name": "term_requires_label"
+          },
+          {
+            "condition": {
               "operation": "create_term",
               "owner_assigned": false
             },
@@ -83,16 +389,214 @@
           },
           {
             "condition": {
-              "approval_recorded": false,
-              "operation": "publish_ontology"
+              "operation": "create_term",
+              "term_status_allowed": false
             },
-            "description": "Ontology publication requires approval.",
+            "description": "Term status must be a configured value.",
             "effect": {
               "decision": "deny",
-              "reason": "publication_approval_required",
-              "required_action": "record_publication_approval"
+              "reason": "term_status_invalid",
+              "required_action": "choose_allowed_status"
             },
-            "name": "publication_requires_approval"
+            "name": "term_status_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "duplicate_term_detected": true,
+              "operation": "create_term",
+              "review_recorded": false
+            },
+            "description": "Duplicate term labels require resolution.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "duplicate_term_review_required",
+              "required_action": "record_duplicate_resolution"
+            },
+            "name": "duplicate_term_requires_resolution"
+          },
+          {
+            "condition": {
+              "operation": "deprecate_term",
+              "replacement_term_present": false
+            },
+            "description": "Deprecated terms require a replacement term.",
+            "effect": {
+              "decision": "deny",
+              "reason": "replacement_term_required",
+              "required_action": "select_replacement_term"
+            },
+            "name": "term_deprecation_requires_replacement"
+          },
+          {
+            "condition": {
+              "operation": "deprecate_term",
+              "review_recorded": false
+            },
+            "description": "Term deprecation requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "term_deprecation_review_required",
+              "required_action": "record_deprecation_review"
+            },
+            "name": "term_deprecation_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "add_synonym",
+              "term_present": false
+            },
+            "description": "Synonyms require existing terms.",
+            "effect": {
+              "decision": "deny",
+              "reason": "term_required",
+              "required_action": "select_term"
+            },
+            "name": "synonym_requires_term"
+          },
+          {
+            "condition": {
+              "operation": "add_synonym",
+              "synonym_present": false
+            },
+            "description": "Synonyms require a value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "synonym_required",
+              "required_action": "attach_synonym"
+            },
+            "name": "synonym_requires_value"
+          },
+          {
+            "condition": {
+              "operation": "add_taxonomy_edge",
+              "parent_term_present": false
+            },
+            "description": "Taxonomy edges require parent terms.",
+            "effect": {
+              "decision": "deny",
+              "reason": "parent_term_required",
+              "required_action": "select_parent_term"
+            },
+            "name": "taxonomy_requires_parent"
+          },
+          {
+            "condition": {
+              "child_term_present": false,
+              "operation": "add_taxonomy_edge"
+            },
+            "description": "Taxonomy edges require child terms.",
+            "effect": {
+              "decision": "deny",
+              "reason": "child_term_required",
+              "required_action": "select_child_term"
+            },
+            "name": "taxonomy_requires_child"
+          },
+          {
+            "condition": {
+              "operation": "add_taxonomy_edge",
+              "self_relation": true
+            },
+            "description": "Taxonomy self-relations are denied.",
+            "effect": {
+              "decision": "deny",
+              "reason": "taxonomy_self_relation_denied",
+              "required_action": "choose_distinct_terms"
+            },
+            "name": "taxonomy_self_relation_denied"
+          },
+          {
+            "condition": {
+              "operation": "add_taxonomy_edge",
+              "taxonomy_cycle_detected": true
+            },
+            "description": "Taxonomy cycles block edge creation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "taxonomy_cycle_detected",
+              "required_action": "remove_cycle"
+            },
+            "name": "taxonomy_cycle_blocks_edge"
+          },
+          {
+            "condition": {
+              "operation": "add_taxonomy_edge",
+              "relationship_type_allowed": false
+            },
+            "description": "Taxonomy relationship types must be configured values.",
+            "effect": {
+              "decision": "deny",
+              "reason": "taxonomy_relationship_invalid",
+              "required_action": "choose_allowed_relationship"
+            },
+            "name": "taxonomy_relationship_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "operation": "create_mapping",
+              "term_present": false
+            },
+            "description": "Semantic mappings require terms.",
+            "effect": {
+              "decision": "deny",
+              "reason": "term_required",
+              "required_action": "select_term"
+            },
+            "name": "mapping_requires_term"
+          },
+          {
+            "condition": {
+              "operation": "create_mapping",
+              "target_ref_present": false
+            },
+            "description": "Semantic mappings require target references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mapping_target_required",
+              "required_action": "attach_target_ref"
+            },
+            "name": "mapping_requires_target"
+          },
+          {
+            "condition": {
+              "mapping_type_allowed": false,
+              "operation": "create_mapping"
+            },
+            "description": "Mapping types must be configured values.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mapping_type_invalid",
+              "required_action": "choose_allowed_mapping_type"
+            },
+            "name": "mapping_type_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "mapping_confidence_lt": 0.8,
+              "operation": "create_mapping",
+              "review_recorded": false
+            },
+            "description": "Low-confidence semantic mappings require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "mapping_review_required",
+              "required_action": "record_mapping_review"
+            },
+            "name": "low_confidence_mapping_requires_review"
+          },
+          {
+            "condition": {
+              "mapping_scope": "external",
+              "operation": "create_mapping",
+              "review_recorded": false
+            },
+            "description": "External semantic mappings require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "external_mapping_review_required",
+              "required_action": "record_mapping_review"
+            },
+            "name": "external_mapping_requires_review"
           },
           {
             "condition": {
@@ -109,16 +613,82 @@
           },
           {
             "condition": {
-              "mapping_confidence_lt": 0.8,
+              "operation": "curate_term",
+              "reviewer_present": false
+            },
+            "description": "Curation requires a reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "curation_requires_reviewer"
+          },
+          {
+            "condition": {
+              "curation_evidence_present": false,
+              "operation": "curate_term"
+            },
+            "description": "Curation requires evidence for non-draft status changes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_evidence_required",
+              "required_action": "attach_curation_evidence"
+            },
+            "name": "curation_requires_evidence"
+          },
+          {
+            "condition": {
+              "ontology_present": false,
+              "operation": "validate_ontology"
+            },
+            "description": "Validation requires an ontology.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ontology_required",
+              "required_action": "select_ontology"
+            },
+            "name": "validation_requires_ontology"
+          },
+          {
+            "condition": {
+              "issue_count_gt": 0,
+              "operation": "validate_ontology",
               "review_recorded": false
             },
-            "description": "Low-confidence semantic mappings require review.",
+            "description": "Validation issues require review before publication.",
             "effect": {
               "decision": "require_review",
-              "reason": "mapping_review_required",
-              "required_action": "record_mapping_review"
+              "reason": "validation_review_required",
+              "required_action": "record_validation_review"
             },
-            "name": "low_confidence_mapping_requires_review"
+            "name": "validation_issue_count_requires_review"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "publish_ontology"
+            },
+            "description": "Ontology publication requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_approval_required",
+              "required_action": "record_publication_approval"
+            },
+            "name": "publication_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "publish_ontology",
+              "validation_recorded": false
+            },
+            "description": "Ontology publication requires a validation report.",
+            "effect": {
+              "decision": "deny",
+              "reason": "validation_required",
+              "required_action": "validate_ontology"
+            },
+            "name": "publication_requires_validation"
           },
           {
             "condition": {
@@ -132,6 +702,124 @@
               "required_action": "resolve_duplicate_term"
             },
             "name": "duplicate_term_blocks_publication"
+          },
+          {
+            "condition": {
+              "operation": "publish_ontology",
+              "taxonomy_cycle_detected": true
+            },
+            "description": "Taxonomy cycles block ontology publication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "taxonomy_cycle_detected",
+              "required_action": "resolve_taxonomy_cycle"
+            },
+            "name": "taxonomy_cycle_blocks_publication"
+          },
+          {
+            "condition": {
+              "draft_terms_present": true,
+              "operation": "publish_ontology"
+            },
+            "description": "Draft terms block ontology publication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "draft_terms_present",
+              "required_action": "curate_terms"
+            },
+            "name": "draft_terms_block_publication"
+          },
+          {
+            "condition": {
+              "operation": "publish_ontology",
+              "unreviewed_low_confidence_mappings_present": true
+            },
+            "description": "Unreviewed low-confidence mappings block publication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mapping_review_required",
+              "required_action": "review_low_confidence_mappings"
+            },
+            "name": "unreviewed_mappings_block_publication"
+          },
+          {
+            "condition": {
+              "operation": "import_ontology",
+              "record_count_gt": 1000,
+              "review_recorded": false
+            },
+            "description": "Large ontology imports require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_import_review_required",
+              "required_action": "record_import_review"
+            },
+            "name": "large_import_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "import_ontology",
+              "review_recorded": false,
+              "source_scope": "external"
+            },
+            "description": "External ontology imports require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "external_import_review_required",
+              "required_action": "record_import_review"
+            },
+            "name": "external_import_requires_review"
+          },
+          {
+            "condition": {
+              "export_format_allowed": false,
+              "operation": "export_ontology"
+            },
+            "description": "Ontology exports require configured formats.",
+            "effect": {
+              "decision": "deny",
+              "reason": "export_format_invalid",
+              "required_action": "choose_allowed_export_format"
+            },
+            "name": "export_requires_allowed_format"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_ontology_mutation"
+            },
+            "description": "Batch ontology mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_ontology_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Ontology operations may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_ontology_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_ontology_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Ontology state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "ontology_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -151,6 +839,162 @@
         },
         {
           "condition": {
+            "ontology_id_present": false,
+            "operation": "register_ontology"
+          },
+          "description": "Ontologies require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_id_required",
+            "required_action": "attach_ontology_id"
+          },
+          "name": "ontology_requires_id"
+        },
+        {
+          "condition": {
+            "ontology_name_present": false,
+            "operation": "register_ontology"
+          },
+          "description": "Ontologies require names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_name_required",
+            "required_action": "attach_ontology_name"
+          },
+          "name": "ontology_requires_name"
+        },
+        {
+          "condition": {
+            "ontology_owner_present": false,
+            "operation": "register_ontology"
+          },
+          "description": "Ontologies require accountable owners.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "ontology_requires_owner"
+        },
+        {
+          "condition": {
+            "ontology_domain_present": false,
+            "operation": "register_ontology"
+          },
+          "description": "Ontologies require domains.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_domain_required",
+            "required_action": "attach_domain"
+          },
+          "name": "ontology_requires_domain"
+        },
+        {
+          "condition": {
+            "operation": "retire_ontology",
+            "review_recorded": false
+          },
+          "description": "Retiring ontologies requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "ontology_retire_review_required",
+            "required_action": "record_ontology_review"
+          },
+          "name": "ontology_retire_requires_review"
+        },
+        {
+          "condition": {
+            "ontology_present": false,
+            "operation": "register_namespace"
+          },
+          "description": "Namespaces require an ontology.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_required",
+            "required_action": "select_ontology"
+          },
+          "name": "namespace_requires_ontology"
+        },
+        {
+          "condition": {
+            "namespace_prefix_present": false,
+            "operation": "register_namespace"
+          },
+          "description": "Namespaces require prefixes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_prefix_required",
+            "required_action": "attach_namespace_prefix"
+          },
+          "name": "namespace_requires_prefix"
+        },
+        {
+          "condition": {
+            "namespace_uri_present": false,
+            "operation": "register_namespace"
+          },
+          "description": "Namespaces require URIs.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_uri_required",
+            "required_action": "attach_namespace_uri"
+          },
+          "name": "namespace_requires_uri"
+        },
+        {
+          "condition": {
+            "operation": "register_namespace",
+            "owner_assigned": false
+          },
+          "description": "Namespaces require owners.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_owner_required",
+            "required_action": "assign_namespace_owner"
+          },
+          "name": "namespace_requires_owner"
+        },
+        {
+          "condition": {
+            "namespace_prefix_unique": false,
+            "operation": "register_namespace"
+          },
+          "description": "Namespace prefixes must be unique per ontology.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_prefix_duplicate",
+            "required_action": "choose_unique_prefix"
+          },
+          "name": "namespace_prefix_must_be_unique"
+        },
+        {
+          "condition": {
+            "ontology_present": false,
+            "operation": "create_term"
+          },
+          "description": "Ontology terms require an ontology.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_required",
+            "required_action": "select_ontology"
+          },
+          "name": "term_requires_ontology"
+        },
+        {
+          "condition": {
+            "operation": "create_term",
+            "term_label_present": false
+          },
+          "description": "Ontology terms require labels.",
+          "effect": {
+            "decision": "deny",
+            "reason": "term_label_required",
+            "required_action": "attach_term_label"
+          },
+          "name": "term_requires_label"
+        },
+        {
+          "condition": {
             "operation": "create_term",
             "owner_assigned": false
           },
@@ -164,16 +1008,214 @@
         },
         {
           "condition": {
-            "approval_recorded": false,
-            "operation": "publish_ontology"
+            "operation": "create_term",
+            "term_status_allowed": false
           },
-          "description": "Ontology publication requires approval.",
+          "description": "Term status must be a configured value.",
           "effect": {
             "decision": "deny",
-            "reason": "publication_approval_required",
-            "required_action": "record_publication_approval"
+            "reason": "term_status_invalid",
+            "required_action": "choose_allowed_status"
           },
-          "name": "publication_requires_approval"
+          "name": "term_status_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "duplicate_term_detected": true,
+            "operation": "create_term",
+            "review_recorded": false
+          },
+          "description": "Duplicate term labels require resolution.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "duplicate_term_review_required",
+            "required_action": "record_duplicate_resolution"
+          },
+          "name": "duplicate_term_requires_resolution"
+        },
+        {
+          "condition": {
+            "operation": "deprecate_term",
+            "replacement_term_present": false
+          },
+          "description": "Deprecated terms require a replacement term.",
+          "effect": {
+            "decision": "deny",
+            "reason": "replacement_term_required",
+            "required_action": "select_replacement_term"
+          },
+          "name": "term_deprecation_requires_replacement"
+        },
+        {
+          "condition": {
+            "operation": "deprecate_term",
+            "review_recorded": false
+          },
+          "description": "Term deprecation requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "term_deprecation_review_required",
+            "required_action": "record_deprecation_review"
+          },
+          "name": "term_deprecation_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "add_synonym",
+            "term_present": false
+          },
+          "description": "Synonyms require existing terms.",
+          "effect": {
+            "decision": "deny",
+            "reason": "term_required",
+            "required_action": "select_term"
+          },
+          "name": "synonym_requires_term"
+        },
+        {
+          "condition": {
+            "operation": "add_synonym",
+            "synonym_present": false
+          },
+          "description": "Synonyms require a value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "synonym_required",
+            "required_action": "attach_synonym"
+          },
+          "name": "synonym_requires_value"
+        },
+        {
+          "condition": {
+            "operation": "add_taxonomy_edge",
+            "parent_term_present": false
+          },
+          "description": "Taxonomy edges require parent terms.",
+          "effect": {
+            "decision": "deny",
+            "reason": "parent_term_required",
+            "required_action": "select_parent_term"
+          },
+          "name": "taxonomy_requires_parent"
+        },
+        {
+          "condition": {
+            "child_term_present": false,
+            "operation": "add_taxonomy_edge"
+          },
+          "description": "Taxonomy edges require child terms.",
+          "effect": {
+            "decision": "deny",
+            "reason": "child_term_required",
+            "required_action": "select_child_term"
+          },
+          "name": "taxonomy_requires_child"
+        },
+        {
+          "condition": {
+            "operation": "add_taxonomy_edge",
+            "self_relation": true
+          },
+          "description": "Taxonomy self-relations are denied.",
+          "effect": {
+            "decision": "deny",
+            "reason": "taxonomy_self_relation_denied",
+            "required_action": "choose_distinct_terms"
+          },
+          "name": "taxonomy_self_relation_denied"
+        },
+        {
+          "condition": {
+            "operation": "add_taxonomy_edge",
+            "taxonomy_cycle_detected": true
+          },
+          "description": "Taxonomy cycles block edge creation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "taxonomy_cycle_detected",
+            "required_action": "remove_cycle"
+          },
+          "name": "taxonomy_cycle_blocks_edge"
+        },
+        {
+          "condition": {
+            "operation": "add_taxonomy_edge",
+            "relationship_type_allowed": false
+          },
+          "description": "Taxonomy relationship types must be configured values.",
+          "effect": {
+            "decision": "deny",
+            "reason": "taxonomy_relationship_invalid",
+            "required_action": "choose_allowed_relationship"
+          },
+          "name": "taxonomy_relationship_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "operation": "create_mapping",
+            "term_present": false
+          },
+          "description": "Semantic mappings require terms.",
+          "effect": {
+            "decision": "deny",
+            "reason": "term_required",
+            "required_action": "select_term"
+          },
+          "name": "mapping_requires_term"
+        },
+        {
+          "condition": {
+            "operation": "create_mapping",
+            "target_ref_present": false
+          },
+          "description": "Semantic mappings require target references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mapping_target_required",
+            "required_action": "attach_target_ref"
+          },
+          "name": "mapping_requires_target"
+        },
+        {
+          "condition": {
+            "mapping_type_allowed": false,
+            "operation": "create_mapping"
+          },
+          "description": "Mapping types must be configured values.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mapping_type_invalid",
+            "required_action": "choose_allowed_mapping_type"
+          },
+          "name": "mapping_type_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "mapping_confidence_lt": 0.8,
+            "operation": "create_mapping",
+            "review_recorded": false
+          },
+          "description": "Low-confidence semantic mappings require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "mapping_review_required",
+            "required_action": "record_mapping_review"
+          },
+          "name": "low_confidence_mapping_requires_review"
+        },
+        {
+          "condition": {
+            "mapping_scope": "external",
+            "operation": "create_mapping",
+            "review_recorded": false
+          },
+          "description": "External semantic mappings require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "external_mapping_review_required",
+            "required_action": "record_mapping_review"
+          },
+          "name": "external_mapping_requires_review"
         },
         {
           "condition": {
@@ -190,16 +1232,82 @@
         },
         {
           "condition": {
-            "mapping_confidence_lt": 0.8,
+            "operation": "curate_term",
+            "reviewer_present": false
+          },
+          "description": "Curation requires a reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "curation_requires_reviewer"
+        },
+        {
+          "condition": {
+            "curation_evidence_present": false,
+            "operation": "curate_term"
+          },
+          "description": "Curation requires evidence for non-draft status changes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_evidence_required",
+            "required_action": "attach_curation_evidence"
+          },
+          "name": "curation_requires_evidence"
+        },
+        {
+          "condition": {
+            "ontology_present": false,
+            "operation": "validate_ontology"
+          },
+          "description": "Validation requires an ontology.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ontology_required",
+            "required_action": "select_ontology"
+          },
+          "name": "validation_requires_ontology"
+        },
+        {
+          "condition": {
+            "issue_count_gt": 0,
+            "operation": "validate_ontology",
             "review_recorded": false
           },
-          "description": "Low-confidence semantic mappings require review.",
+          "description": "Validation issues require review before publication.",
           "effect": {
             "decision": "require_review",
-            "reason": "mapping_review_required",
-            "required_action": "record_mapping_review"
+            "reason": "validation_review_required",
+            "required_action": "record_validation_review"
           },
-          "name": "low_confidence_mapping_requires_review"
+          "name": "validation_issue_count_requires_review"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "publish_ontology"
+          },
+          "description": "Ontology publication requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_approval_required",
+            "required_action": "record_publication_approval"
+          },
+          "name": "publication_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "publish_ontology",
+            "validation_recorded": false
+          },
+          "description": "Ontology publication requires a validation report.",
+          "effect": {
+            "decision": "deny",
+            "reason": "validation_required",
+            "required_action": "validate_ontology"
+          },
+          "name": "publication_requires_validation"
         },
         {
           "condition": {
@@ -213,29 +1321,168 @@
             "required_action": "resolve_duplicate_term"
           },
           "name": "duplicate_term_blocks_publication"
+        },
+        {
+          "condition": {
+            "operation": "publish_ontology",
+            "taxonomy_cycle_detected": true
+          },
+          "description": "Taxonomy cycles block ontology publication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "taxonomy_cycle_detected",
+            "required_action": "resolve_taxonomy_cycle"
+          },
+          "name": "taxonomy_cycle_blocks_publication"
+        },
+        {
+          "condition": {
+            "draft_terms_present": true,
+            "operation": "publish_ontology"
+          },
+          "description": "Draft terms block ontology publication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "draft_terms_present",
+            "required_action": "curate_terms"
+          },
+          "name": "draft_terms_block_publication"
+        },
+        {
+          "condition": {
+            "operation": "publish_ontology",
+            "unreviewed_low_confidence_mappings_present": true
+          },
+          "description": "Unreviewed low-confidence mappings block publication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mapping_review_required",
+            "required_action": "review_low_confidence_mappings"
+          },
+          "name": "unreviewed_mappings_block_publication"
+        },
+        {
+          "condition": {
+            "operation": "import_ontology",
+            "record_count_gt": 1000,
+            "review_recorded": false
+          },
+          "description": "Large ontology imports require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_import_review_required",
+            "required_action": "record_import_review"
+          },
+          "name": "large_import_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "import_ontology",
+            "review_recorded": false,
+            "source_scope": "external"
+          },
+          "description": "External ontology imports require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "external_import_review_required",
+            "required_action": "record_import_review"
+          },
+          "name": "external_import_requires_review"
+        },
+        {
+          "condition": {
+            "export_format_allowed": false,
+            "operation": "export_ontology"
+          },
+          "description": "Ontology exports require configured formats.",
+          "effect": {
+            "decision": "deny",
+            "reason": "export_format_invalid",
+            "required_action": "choose_allowed_export_format"
+          },
+          "name": "export_requires_allowed_format"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_ontology_mutation"
+          },
+          "description": "Batch ontology mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_ontology_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Ontology operations may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_ontology_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_ontology_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Ontology state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "ontology_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "ontology_runtime.py",
+        "service": "service.OntoService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "OntologyAuditTimeline",
+          "permission": "onto:audit",
+          "route": "/onto/audit"
+        },
         "dashboard": {
           "component": "ONTODashboard",
           "permission": "onto:view",
           "route": "/onto/dashboard"
+        },
+        "exports": {
+          "component": "OntologyExportWorkbench",
+          "permission": "onto:view",
+          "route": "/onto/exports"
         },
         "governance": {
           "component": "OntologyGovernance",
           "permission": "onto:govern",
           "route": "/onto/governance"
         },
+        "imports": {
+          "component": "OntologyImportWorkbench",
+          "permission": "onto:edit",
+          "route": "/onto/imports"
+        },
         "mappings": {
           "component": "MappingWorkbench",
           "permission": "onto:map",
           "route": "/onto/mappings"
+        },
+        "namespaces": {
+          "component": "NamespaceManager",
+          "permission": "onto:edit",
+          "route": "/onto/namespaces"
         },
         "ontologies": {
           "component": "OntologyRegistry",
@@ -252,18 +1499,47 @@
           "permission": "onto:admin",
           "route": "/onto/settings"
         },
+        "taxonomy": {
+          "component": "TaxonomyEditor",
+          "permission": "onto:edit",
+          "route": "/onto/taxonomy"
+        },
         "terms": {
           "component": "TermEditor",
           "permission": "onto:edit",
           "route": "/onto/terms"
+        },
+        "validation": {
+          "component": "OntologyValidation",
+          "permission": "onto:govern",
+          "route": "/onto/validation"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "governance-chip",
+            "visual": "event-timeline"
+          },
+          "exchange_panel": {
+            "status_style": "format-chip",
+            "visual": "import-export-list"
+          },
           "mapping_panel": {
             "threshold_style": "confidence-band",
             "visual": "concept-map"
+          },
+          "namespace_panel": {
+            "status_style": "uri-chip",
+            "visual": "prefix-list"
+          },
+          "ontology_card": {
+            "icon": "book-open",
+            "risk_style": "publication-band",
+            "status_indicator": "version-pill"
           },
           "publication_queue": {
             "status_style": "review-chip",
@@ -274,15 +1550,19 @@
             "visual": "hierarchy-tree"
           },
           "term_card": {
-            "icon": "book-open",
-            "risk_style": "publication-band",
+            "icon": "book-a",
+            "risk_style": "definition-band",
             "status_indicator": "term-status-pill"
+          },
+          "validation_report": {
+            "status_style": "readiness-chip",
+            "visual": "issue-list"
           }
         },
         "name": "onto_vocabulary_workbench",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#7A9E7E",
+          "color.accent": "#F2A541",
           "color.danger": "#C53030",
           "color.primary": "#4B5563",
           "color.success": "#2F855A",
@@ -313,10 +1593,24 @@
             "permission": "onto:view"
           },
           {
+            "component": "NamespaceManager",
+            "name": "namespaces",
+            "nav_group": "Registry",
+            "path": "/onto/namespaces",
+            "permission": "onto:edit"
+          },
+          {
             "component": "TermEditor",
             "name": "terms",
             "nav_group": "Vocabulary",
             "path": "/onto/terms",
+            "permission": "onto:edit"
+          },
+          {
+            "component": "TaxonomyEditor",
+            "name": "taxonomy",
+            "nav_group": "Vocabulary",
+            "path": "/onto/taxonomy",
             "permission": "onto:edit"
           },
           {
@@ -325,6 +1619,27 @@
             "nav_group": "Mappings",
             "path": "/onto/mappings",
             "permission": "onto:map"
+          },
+          {
+            "component": "OntologyValidation",
+            "name": "validation",
+            "nav_group": "Governance",
+            "path": "/onto/validation",
+            "permission": "onto:govern"
+          },
+          {
+            "component": "OntologyImportWorkbench",
+            "name": "imports",
+            "nav_group": "Exchange",
+            "path": "/onto/imports",
+            "permission": "onto:edit"
+          },
+          {
+            "component": "OntologyExportWorkbench",
+            "name": "exports",
+            "nav_group": "Exchange",
+            "path": "/onto/exports",
+            "permission": "onto:view"
           },
           {
             "component": "PublicationQueue",
@@ -341,6 +1656,13 @@
             "permission": "onto:govern"
           },
           {
+            "component": "OntologyAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/onto/audit",
+            "permission": "onto:audit"
+          },
+          {
             "component": "ONTOSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -353,7 +1675,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "__init__.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -367,36 +1689,151 @@
   "contracts": {
     "onto": {
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.OntoService",
+          "graph": "grph",
+          "helper_runtime": "ontology_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "search": "srch"
+        },
+        "curation": {
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "curator_required": true,
+          "evidence_required": true
+        },
         "governance": {
+          "audit_mapping_changes": true,
+          "audit_ontology_changes": true,
+          "audit_publication": true,
           "audit_term_changes": true,
           "curation_required": true,
           "require_tenant_context": true
         },
-        "mapping": {
+        "import_export": {
+          "allowed_export_formats": [
+            "rdf",
+            "owl",
+            "jsonld",
+            "skos",
+            "csv"
+          ],
+          "allowed_import_formats": [
+            "rdf",
+            "owl",
+            "jsonld",
+            "skos",
+            "csv"
+          ],
+          "external_import_review_required": true,
+          "large_import_review_threshold": 1000
+        },
+        "mappings": {
+          "allowed_types": [
+            "exact",
+            "close",
+            "broad",
+            "narrow",
+            "related"
+          ],
           "breaking_change_review_required": true,
           "confidence_threshold": 0.8,
-          "external_mapping_review_required": true
+          "external_mapping_review_required": true,
+          "mapping_type_required": true,
+          "target_required": true
         },
-        "ontology": {
+        "namespaces": {
+          "owner_required": true,
+          "prefix_required": true,
+          "unique_prefix_required": true,
+          "uri_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "ontologies": {
+          "domain_required": true,
+          "id_required": true,
+          "name_required": true,
           "owner_required": true,
           "publication_approval_required": true,
+          "retire_requires_review": true,
           "versioning_enabled": true
         },
+        "publication": {
+          "approval_required": true,
+          "auditable_version_required": true,
+          "validation_required": true
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "rbac_required": true,
+          "tenant_isolation_required": true
+        },
+        "taxonomy": {
+          "allowed_relationships": [
+            "broader_than",
+            "narrower_than",
+            "related_to",
+            "equivalent_to"
+          ],
+          "cycle_detection_enabled": true,
+          "self_relation_allowed": false
+        },
         "tenant_id": "default",
+        "terms": {
+          "allowed_statuses": [
+            "draft",
+            "curated",
+            "published",
+            "deprecated"
+          ],
+          "definition_required_for_publication": true,
+          "deprecation_requires_replacement": true,
+          "duplicate_detection_enabled": true,
+          "label_required": true,
+          "owner_required": true,
+          "synonym_management_enabled": true
+        },
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "onto_vocabulary_workbench"
         },
         "ui": {
+          "enable_audit": true,
+          "enable_dashboard": true,
+          "enable_exports": true,
+          "enable_governance": true,
+          "enable_imports": true,
           "enable_mapping_workbench": true,
+          "enable_namespace_manager": true,
           "enable_ontology_registry": true,
           "enable_publication_queue": true,
-          "enable_term_editor": true
+          "enable_settings": true,
+          "enable_taxonomy_editor": true,
+          "enable_term_editor": true,
+          "enable_validation": true
         },
-        "vocabulary": {
-          "duplicate_detection_enabled": true,
-          "synonym_management_enabled": true,
-          "term_status_required": true
+        "validation": {
+          "draft_terms_block": true,
+          "duplicate_terms_block": true,
+          "required_before_publication": true,
+          "taxonomy_cycles_block": true,
+          "unreviewed_low_confidence_mappings_block": true
         }
       },
       "id": "onto",
@@ -436,6 +1873,19 @@
   },
   "roles": {},
   "rules": {
+    "batch_ontology_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_ontology_mutation"
+      },
+      "description": "Batch ontology mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_ontology_mutation_requires_bytewax"
+    },
     "breaking_change_requires_review": {
       "condition": {
         "change_type": "breaking",
@@ -448,6 +1898,57 @@
         "required_action": "record_breaking_change_review"
       },
       "name": "breaking_change_requires_review"
+    },
+    "cross_tenant_ontology_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Ontology operations may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_ontology_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_ontology_access_denied"
+    },
+    "curation_requires_evidence": {
+      "condition": {
+        "curation_evidence_present": false,
+        "operation": "curate_term"
+      },
+      "description": "Curation requires evidence for non-draft status changes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_evidence_required",
+        "required_action": "attach_curation_evidence"
+      },
+      "name": "curation_requires_evidence"
+    },
+    "curation_requires_reviewer": {
+      "condition": {
+        "operation": "curate_term",
+        "reviewer_present": false
+      },
+      "description": "Curation requires a reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reviewer_required",
+        "required_action": "assign_reviewer"
+      },
+      "name": "curation_requires_reviewer"
+    },
+    "draft_terms_block_publication": {
+      "condition": {
+        "draft_terms_present": true,
+        "operation": "publish_ontology"
+      },
+      "description": "Draft terms block ontology publication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "draft_terms_present",
+        "required_action": "curate_terms"
+      },
+      "name": "draft_terms_block_publication"
     },
     "duplicate_term_blocks_publication": {
       "condition": {
@@ -462,9 +1963,79 @@
       },
       "name": "duplicate_term_blocks_publication"
     },
+    "duplicate_term_requires_resolution": {
+      "condition": {
+        "duplicate_term_detected": true,
+        "operation": "create_term",
+        "review_recorded": false
+      },
+      "description": "Duplicate term labels require resolution.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "duplicate_term_review_required",
+        "required_action": "record_duplicate_resolution"
+      },
+      "name": "duplicate_term_requires_resolution"
+    },
+    "export_requires_allowed_format": {
+      "condition": {
+        "export_format_allowed": false,
+        "operation": "export_ontology"
+      },
+      "description": "Ontology exports require configured formats.",
+      "effect": {
+        "decision": "deny",
+        "reason": "export_format_invalid",
+        "required_action": "choose_allowed_export_format"
+      },
+      "name": "export_requires_allowed_format"
+    },
+    "external_import_requires_review": {
+      "condition": {
+        "operation": "import_ontology",
+        "review_recorded": false,
+        "source_scope": "external"
+      },
+      "description": "External ontology imports require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "external_import_review_required",
+        "required_action": "record_import_review"
+      },
+      "name": "external_import_requires_review"
+    },
+    "external_mapping_requires_review": {
+      "condition": {
+        "mapping_scope": "external",
+        "operation": "create_mapping",
+        "review_recorded": false
+      },
+      "description": "External semantic mappings require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "external_mapping_review_required",
+        "required_action": "record_mapping_review"
+      },
+      "name": "external_mapping_requires_review"
+    },
+    "large_import_requires_review": {
+      "condition": {
+        "operation": "import_ontology",
+        "record_count_gt": 1000,
+        "review_recorded": false
+      },
+      "description": "Large ontology imports require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_import_review_required",
+        "required_action": "record_import_review"
+      },
+      "name": "large_import_requires_review"
+    },
     "low_confidence_mapping_requires_review": {
       "condition": {
         "mapping_confidence_lt": 0.8,
+        "operation": "create_mapping",
         "review_recorded": false
       },
       "description": "Low-confidence semantic mappings require review.",
@@ -474,6 +2045,188 @@
         "required_action": "record_mapping_review"
       },
       "name": "low_confidence_mapping_requires_review"
+    },
+    "mapping_requires_target": {
+      "condition": {
+        "operation": "create_mapping",
+        "target_ref_present": false
+      },
+      "description": "Semantic mappings require target references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mapping_target_required",
+        "required_action": "attach_target_ref"
+      },
+      "name": "mapping_requires_target"
+    },
+    "mapping_requires_term": {
+      "condition": {
+        "operation": "create_mapping",
+        "term_present": false
+      },
+      "description": "Semantic mappings require terms.",
+      "effect": {
+        "decision": "deny",
+        "reason": "term_required",
+        "required_action": "select_term"
+      },
+      "name": "mapping_requires_term"
+    },
+    "mapping_type_requires_allowed_value": {
+      "condition": {
+        "mapping_type_allowed": false,
+        "operation": "create_mapping"
+      },
+      "description": "Mapping types must be configured values.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mapping_type_invalid",
+        "required_action": "choose_allowed_mapping_type"
+      },
+      "name": "mapping_type_requires_allowed_value"
+    },
+    "namespace_prefix_must_be_unique": {
+      "condition": {
+        "namespace_prefix_unique": false,
+        "operation": "register_namespace"
+      },
+      "description": "Namespace prefixes must be unique per ontology.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_prefix_duplicate",
+        "required_action": "choose_unique_prefix"
+      },
+      "name": "namespace_prefix_must_be_unique"
+    },
+    "namespace_requires_ontology": {
+      "condition": {
+        "ontology_present": false,
+        "operation": "register_namespace"
+      },
+      "description": "Namespaces require an ontology.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_required",
+        "required_action": "select_ontology"
+      },
+      "name": "namespace_requires_ontology"
+    },
+    "namespace_requires_owner": {
+      "condition": {
+        "operation": "register_namespace",
+        "owner_assigned": false
+      },
+      "description": "Namespaces require owners.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_owner_required",
+        "required_action": "assign_namespace_owner"
+      },
+      "name": "namespace_requires_owner"
+    },
+    "namespace_requires_prefix": {
+      "condition": {
+        "namespace_prefix_present": false,
+        "operation": "register_namespace"
+      },
+      "description": "Namespaces require prefixes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_prefix_required",
+        "required_action": "attach_namespace_prefix"
+      },
+      "name": "namespace_requires_prefix"
+    },
+    "namespace_requires_uri": {
+      "condition": {
+        "namespace_uri_present": false,
+        "operation": "register_namespace"
+      },
+      "description": "Namespaces require URIs.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_uri_required",
+        "required_action": "attach_namespace_uri"
+      },
+      "name": "namespace_requires_uri"
+    },
+    "ontology_requires_domain": {
+      "condition": {
+        "ontology_domain_present": false,
+        "operation": "register_ontology"
+      },
+      "description": "Ontologies require domains.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_domain_required",
+        "required_action": "attach_domain"
+      },
+      "name": "ontology_requires_domain"
+    },
+    "ontology_requires_id": {
+      "condition": {
+        "ontology_id_present": false,
+        "operation": "register_ontology"
+      },
+      "description": "Ontologies require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_id_required",
+        "required_action": "attach_ontology_id"
+      },
+      "name": "ontology_requires_id"
+    },
+    "ontology_requires_name": {
+      "condition": {
+        "ontology_name_present": false,
+        "operation": "register_ontology"
+      },
+      "description": "Ontologies require names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_name_required",
+        "required_action": "attach_ontology_name"
+      },
+      "name": "ontology_requires_name"
+    },
+    "ontology_requires_owner": {
+      "condition": {
+        "ontology_owner_present": false,
+        "operation": "register_ontology"
+      },
+      "description": "Ontologies require accountable owners.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_owner_required",
+        "required_action": "assign_owner"
+      },
+      "name": "ontology_requires_owner"
+    },
+    "ontology_retire_requires_review": {
+      "condition": {
+        "operation": "retire_ontology",
+        "review_recorded": false
+      },
+      "description": "Retiring ontologies requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "ontology_retire_review_required",
+        "required_action": "record_ontology_review"
+      },
+      "name": "ontology_retire_requires_review"
+    },
+    "ontology_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Ontology state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "ontology_state_change_requires_audit"
     },
     "publication_requires_approval": {
       "condition": {
@@ -488,6 +2241,123 @@
       },
       "name": "publication_requires_approval"
     },
+    "publication_requires_validation": {
+      "condition": {
+        "operation": "publish_ontology",
+        "validation_recorded": false
+      },
+      "description": "Ontology publication requires a validation report.",
+      "effect": {
+        "decision": "deny",
+        "reason": "validation_required",
+        "required_action": "validate_ontology"
+      },
+      "name": "publication_requires_validation"
+    },
+    "synonym_requires_term": {
+      "condition": {
+        "operation": "add_synonym",
+        "term_present": false
+      },
+      "description": "Synonyms require existing terms.",
+      "effect": {
+        "decision": "deny",
+        "reason": "term_required",
+        "required_action": "select_term"
+      },
+      "name": "synonym_requires_term"
+    },
+    "synonym_requires_value": {
+      "condition": {
+        "operation": "add_synonym",
+        "synonym_present": false
+      },
+      "description": "Synonyms require a value.",
+      "effect": {
+        "decision": "deny",
+        "reason": "synonym_required",
+        "required_action": "attach_synonym"
+      },
+      "name": "synonym_requires_value"
+    },
+    "taxonomy_cycle_blocks_edge": {
+      "condition": {
+        "operation": "add_taxonomy_edge",
+        "taxonomy_cycle_detected": true
+      },
+      "description": "Taxonomy cycles block edge creation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "taxonomy_cycle_detected",
+        "required_action": "remove_cycle"
+      },
+      "name": "taxonomy_cycle_blocks_edge"
+    },
+    "taxonomy_cycle_blocks_publication": {
+      "condition": {
+        "operation": "publish_ontology",
+        "taxonomy_cycle_detected": true
+      },
+      "description": "Taxonomy cycles block ontology publication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "taxonomy_cycle_detected",
+        "required_action": "resolve_taxonomy_cycle"
+      },
+      "name": "taxonomy_cycle_blocks_publication"
+    },
+    "taxonomy_relationship_requires_allowed_value": {
+      "condition": {
+        "operation": "add_taxonomy_edge",
+        "relationship_type_allowed": false
+      },
+      "description": "Taxonomy relationship types must be configured values.",
+      "effect": {
+        "decision": "deny",
+        "reason": "taxonomy_relationship_invalid",
+        "required_action": "choose_allowed_relationship"
+      },
+      "name": "taxonomy_relationship_requires_allowed_value"
+    },
+    "taxonomy_requires_child": {
+      "condition": {
+        "child_term_present": false,
+        "operation": "add_taxonomy_edge"
+      },
+      "description": "Taxonomy edges require child terms.",
+      "effect": {
+        "decision": "deny",
+        "reason": "child_term_required",
+        "required_action": "select_child_term"
+      },
+      "name": "taxonomy_requires_child"
+    },
+    "taxonomy_requires_parent": {
+      "condition": {
+        "operation": "add_taxonomy_edge",
+        "parent_term_present": false
+      },
+      "description": "Taxonomy edges require parent terms.",
+      "effect": {
+        "decision": "deny",
+        "reason": "parent_term_required",
+        "required_action": "select_parent_term"
+      },
+      "name": "taxonomy_requires_parent"
+    },
+    "taxonomy_self_relation_denied": {
+      "condition": {
+        "operation": "add_taxonomy_edge",
+        "self_relation": true
+      },
+      "description": "Taxonomy self-relations are denied.",
+      "effect": {
+        "decision": "deny",
+        "reason": "taxonomy_self_relation_denied",
+        "required_action": "choose_distinct_terms"
+      },
+      "name": "taxonomy_self_relation_denied"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -499,6 +2369,58 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "term_deprecation_requires_replacement": {
+      "condition": {
+        "operation": "deprecate_term",
+        "replacement_term_present": false
+      },
+      "description": "Deprecated terms require a replacement term.",
+      "effect": {
+        "decision": "deny",
+        "reason": "replacement_term_required",
+        "required_action": "select_replacement_term"
+      },
+      "name": "term_deprecation_requires_replacement"
+    },
+    "term_deprecation_requires_review": {
+      "condition": {
+        "operation": "deprecate_term",
+        "review_recorded": false
+      },
+      "description": "Term deprecation requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "term_deprecation_review_required",
+        "required_action": "record_deprecation_review"
+      },
+      "name": "term_deprecation_requires_review"
+    },
+    "term_requires_label": {
+      "condition": {
+        "operation": "create_term",
+        "term_label_present": false
+      },
+      "description": "Ontology terms require labels.",
+      "effect": {
+        "decision": "deny",
+        "reason": "term_label_required",
+        "required_action": "attach_term_label"
+      },
+      "name": "term_requires_label"
+    },
+    "term_requires_ontology": {
+      "condition": {
+        "ontology_present": false,
+        "operation": "create_term"
+      },
+      "description": "Ontology terms require an ontology.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_required",
+        "required_action": "select_ontology"
+      },
+      "name": "term_requires_ontology"
     },
     "term_requires_owner": {
       "condition": {
@@ -512,11 +2434,69 @@
         "required_action": "assign_term_owner"
       },
       "name": "term_requires_owner"
+    },
+    "term_status_requires_allowed_value": {
+      "condition": {
+        "operation": "create_term",
+        "term_status_allowed": false
+      },
+      "description": "Term status must be a configured value.",
+      "effect": {
+        "decision": "deny",
+        "reason": "term_status_invalid",
+        "required_action": "choose_allowed_status"
+      },
+      "name": "term_status_requires_allowed_value"
+    },
+    "unreviewed_mappings_block_publication": {
+      "condition": {
+        "operation": "publish_ontology",
+        "unreviewed_low_confidence_mappings_present": true
+      },
+      "description": "Unreviewed low-confidence mappings block publication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mapping_review_required",
+        "required_action": "review_low_confidence_mappings"
+      },
+      "name": "unreviewed_mappings_block_publication"
+    },
+    "validation_issue_count_requires_review": {
+      "condition": {
+        "issue_count_gt": 0,
+        "operation": "validate_ontology",
+        "review_recorded": false
+      },
+      "description": "Validation issues require review before publication.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "validation_review_required",
+        "required_action": "record_validation_review"
+      },
+      "name": "validation_issue_count_requires_review"
+    },
+    "validation_requires_ontology": {
+      "condition": {
+        "ontology_present": false,
+        "operation": "validate_ontology"
+      },
+      "description": "Validation requires an ontology.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ontology_required",
+        "required_action": "select_ontology"
+      },
+      "name": "validation_requires_ontology"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "ontology_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py"
   ],
   "symbols": {
     "capability.onto": {

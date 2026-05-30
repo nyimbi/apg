@@ -14603,3 +14603,62 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Load, latency, retrieval-quality, reasoning-quality, authorization, and
   throughput benchmarks.
+
+### 2026-05-30 11:20 EAT
+
+ONTO lifecycle and guardrail packet:
+
+- Selected `capabilities/common/onto` as the next common capability after GRAG
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the active packet docs and executable
+  contract.
+- Expanded the ONTO contract to 47 deterministic guardrails, 13 UI routes,
+  ontology/namespace/term/taxonomy/mapping/validation/publication/import-export/
+  curation/security/governance/observability/adapter configuration, Bytewax
+  event-stream adapter evidence, and vocabulary-workbench theme components.
+- Extended `models.py` with ontology namespace, validation report, and export
+  records while preserving ontology, term, taxonomy, mapping, review,
+  publication, audit, and compatibility records.
+- Extended `OntoService` with namespace registration and uniqueness checks,
+  duplicate-term review gates, taxonomy relationship guardrails, external and
+  low-confidence mapping reviews, term deprecation review, validation reports,
+  publication validation requirements, export format checks, dashboard
+  counters, and tenant-scoped list surfaces.
+- Fixed a review-helper bug so deny decisions are raised even when the caller
+  uses a review-required path.
+- Added API helpers for namespaces, term deprecation, validation, and exports.
+- Added generated-app view models for namespaces, validation, exchange, audit,
+  and settings.
+- Updated capability registration with richer endpoints, adapter evidence,
+  namespace/validation/exchange capabilities, audit permission, and optional
+  AUTH/AUDL/SRCH/GRPH/CACH/MONI adapters.
+- Replaced static package evidence with contract-derived `app.py` semantics and
+  refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed package tests from materialized-package language to package-contract
+  language and expanded focused coverage for route/rule counts, Bytewax,
+  lifecycle execution, guardrails, UI models, package evidence, and API import.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/onto/__init__.py capabilities/common/onto/capability_contract.py capabilities/common/onto/models.py capabilities/common/onto/ontology_runtime.py capabilities/common/onto/service.py capabilities/common/onto/api.py capabilities/common/onto/views.py capabilities/common/onto/app.py capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and ONTO capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/onto --json` passed with `ok: true`; ONTO remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/onto --json` passed with 13 UI routes, 47 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/onto/README.md capabilities/common/onto/SPECIFICATION.md capabilities/common/onto/PLAN.md capabilities/common/onto/cap_spec.md capabilities/common/onto/__init__.py capabilities/common/onto/capability_contract.py capabilities/common/onto/models.py capabilities/common/onto/ontology_runtime.py capabilities/common/onto/service.py capabilities/common/onto/api.py capabilities/common/onto/views.py capabilities/common/onto/app.py capabilities/common/onto/test_capability_contract.py capabilities/common/onto/tests/test_package_contract.py capabilities/common/onto/package_manifest.json capabilities/common/onto/release_report.json capabilities/common/onto/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/onto docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live RDF/OWL/SKOS parser or serializer backends.
+- Live external ontology store, SPARQL endpoint, graph backend, metadata
+  catalog, search index, NLP assistant, approval workflow, or audit sink.
+- Live Bytewax stream execution.
+- External KNGR, META, NLPC, GRPH, SRCH, AUTH, AUDL, MONI, and CACH adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Load, latency, semantic-consistency, taxonomy-quality, authorization, and
+  throughput benchmarks.

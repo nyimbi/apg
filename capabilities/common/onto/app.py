@@ -5,13 +5,128 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Ontology Management package-backed APG capability", "entity_count": 0, "name": "onto", "version": "1.0.0"}, "capabilities": {"onto": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_term_changes": true, "curation_required": true, "require_tenant_context": true}, "mapping": {"breaking_change_review_required": true, "confidence_threshold": 0.8, "external_mapping_review_required": true}, "ontology": {"owner_required": true, "publication_approval_required": true, "versioning_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "onto_vocabulary_workbench"}, "ui": {"enable_mapping_workbench": true, "enable_ontology_registry": true, "enable_publication_queue": true, "enable_term_editor": true}, "vocabulary": {"duplicate_detection_enabled": true, "synonym_management_enabled": true, "term_status_required": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Ontology Management", "provides": ["onto_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All ontology operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_term", "owner_assigned": false}, "description": "Ontology terms require an owner.", "effect": {"decision": "deny", "reason": "term_owner_required", "required_action": "assign_term_owner"}, "name": "term_requires_owner"}, {"condition": {"approval_recorded": false, "operation": "publish_ontology"}, "description": "Ontology publication requires approval.", "effect": {"decision": "deny", "reason": "publication_approval_required", "required_action": "record_publication_approval"}, "name": "publication_requires_approval"}, {"condition": {"change_type": "breaking", "review_recorded": false}, "description": "Breaking ontology changes require review.", "effect": {"decision": "require_review", "reason": "breaking_change_review_required", "required_action": "record_breaking_change_review"}, "name": "breaking_change_requires_review"}, {"condition": {"mapping_confidence_lt": 0.8, "review_recorded": false}, "description": "Low-confidence semantic mappings require review.", "effect": {"decision": "require_review", "reason": "mapping_review_required", "required_action": "record_mapping_review"}, "name": "low_confidence_mapping_requires_review"}, {"condition": {"duplicate_term_detected": true, "operation": "publish_ontology"}, "description": "Duplicate terms block ontology publication.", "effect": {"decision": "deny", "reason": "duplicate_term_detected", "required_action": "resolve_duplicate_term"}, "name": "duplicate_term_blocks_publication"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All ontology operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_term", "owner_assigned": false}, "description": "Ontology terms require an owner.", "effect": {"decision": "deny", "reason": "term_owner_required", "required_action": "assign_term_owner"}, "name": "term_requires_owner"}, {"condition": {"approval_recorded": false, "operation": "publish_ontology"}, "description": "Ontology publication requires approval.", "effect": {"decision": "deny", "reason": "publication_approval_required", "required_action": "record_publication_approval"}, "name": "publication_requires_approval"}, {"condition": {"change_type": "breaking", "review_recorded": false}, "description": "Breaking ontology changes require review.", "effect": {"decision": "require_review", "reason": "breaking_change_review_required", "required_action": "record_breaking_change_review"}, "name": "breaking_change_requires_review"}, {"condition": {"mapping_confidence_lt": 0.8, "review_recorded": false}, "description": "Low-confidence semantic mappings require review.", "effect": {"decision": "require_review", "reason": "mapping_review_required", "required_action": "record_mapping_review"}, "name": "low_confidence_mapping_requires_review"}, {"condition": {"duplicate_term_detected": true, "operation": "publish_ontology"}, "description": "Duplicate terms block ontology publication.", "effect": {"decision": "deny", "reason": "duplicate_term_detected", "required_action": "resolve_duplicate_term"}, "name": "duplicate_term_blocks_publication"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "ONTODashboard", "permission": "onto:view", "route": "/onto/dashboard"}, "governance": {"component": "OntologyGovernance", "permission": "onto:govern", "route": "/onto/governance"}, "mappings": {"component": "MappingWorkbench", "permission": "onto:map", "route": "/onto/mappings"}, "ontologies": {"component": "OntologyRegistry", "permission": "onto:view", "route": "/onto/ontologies"}, "publication": {"component": "PublicationQueue", "permission": "onto:publish", "route": "/onto/publication"}, "settings": {"component": "ONTOSettings", "permission": "onto:admin", "route": "/onto/settings"}, "terms": {"component": "TermEditor", "permission": "onto:edit", "route": "/onto/terms"}}, "streaming": {}, "theme": {"components": {"mapping_panel": {"threshold_style": "confidence-band", "visual": "concept-map"}, "publication_queue": {"status_style": "review-chip", "visual": "approval-list"}, "taxonomy_tree": {"highlight": "selected-term-chip", "visual": "hierarchy-tree"}, "term_card": {"icon": "book-open", "risk_style": "publication-band", "status_indicator": "term-status-pill"}}, "name": "onto_vocabulary_workbench", "tokens": {"border.radius": "8px", "color.accent": "#7A9E7E", "color.danger": "#C53030", "color.primary": "#4B5563", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/onto/api/v1", "requires_theme": true, "routes": [{"component": "ONTODashboard", "name": "dashboard", "nav_group": "Overview", "path": "/onto/dashboard", "permission": "onto:view"}, {"component": "OntologyRegistry", "name": "ontologies", "nav_group": "Registry", "path": "/onto/ontologies", "permission": "onto:view"}, {"component": "TermEditor", "name": "terms", "nav_group": "Vocabulary", "path": "/onto/terms", "permission": "onto:edit"}, {"component": "MappingWorkbench", "name": "mappings", "nav_group": "Mappings", "path": "/onto/mappings", "permission": "onto:map"}, {"component": "PublicationQueue", "name": "publication", "nav_group": "Governance", "path": "/onto/publication", "permission": "onto:publish"}, {"component": "OntologyGovernance", "name": "governance", "nav_group": "Governance", "path": "/onto/governance", "permission": "onto:govern"}, {"component": "ONTOSettings", "name": "settings", "nav_group": "Administration", "path": "/onto/settings", "permission": "onto:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"onto": []}}, "contracts": {"onto": {"configuration": {"governance": {"audit_term_changes": true, "curation_required": true, "require_tenant_context": true}, "mapping": {"breaking_change_review_required": true, "confidence_threshold": 0.8, "external_mapping_review_required": true}, "ontology": {"owner_required": true, "publication_approval_required": true, "versioning_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "onto_vocabulary_workbench"}, "ui": {"enable_mapping_workbench": true, "enable_ontology_registry": true, "enable_publication_queue": true, "enable_term_editor": true}, "vocabulary": {"duplicate_detection_enabled": true, "synonym_management_enabled": true, "term_status_required": true}}, "id": "onto", "provides": ["onto_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"onto": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"breaking_change_requires_review": {"condition": {"change_type": "breaking", "review_recorded": false}, "description": "Breaking ontology changes require review.", "effect": {"decision": "require_review", "reason": "breaking_change_review_required", "required_action": "record_breaking_change_review"}, "name": "breaking_change_requires_review"}, "duplicate_term_blocks_publication": {"condition": {"duplicate_term_detected": true, "operation": "publish_ontology"}, "description": "Duplicate terms block ontology publication.", "effect": {"decision": "deny", "reason": "duplicate_term_detected", "required_action": "resolve_duplicate_term"}, "name": "duplicate_term_blocks_publication"}, "low_confidence_mapping_requires_review": {"condition": {"mapping_confidence_lt": 0.8, "review_recorded": false}, "description": "Low-confidence semantic mappings require review.", "effect": {"decision": "require_review", "reason": "mapping_review_required", "required_action": "record_mapping_review"}, "name": "low_confidence_mapping_requires_review"}, "publication_requires_approval": {"condition": {"approval_recorded": false, "operation": "publish_ontology"}, "description": "Ontology publication requires approval.", "effect": {"decision": "deny", "reason": "publication_approval_required", "required_action": "record_publication_approval"}, "name": "publication_requires_approval"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All ontology operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "term_requires_owner": {"condition": {"operation": "create_term", "owner_assigned": false}, "description": "Ontology terms require an owner.", "effect": {"decision": "deny", "reason": "term_owner_required", "required_action": "assign_term_owner"}, "name": "term_requires_owner"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.onto": {"file": "capability_contract.py", "id": "capability.onto", "kind": "capability", "name": "Ontology Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("onto_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "onto",
+			"version": "1.0.0",
+			"description": "Ontology Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"onto": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"onto": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["onto_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"ontology_retirement": "CurationReview",
+					"duplicate_term_resolution": "CurationReview",
+					"term_deprecation": "CurationReview",
+					"low_confidence_mapping": "CurationReview",
+					"external_mapping": "CurationReview",
+					"validation_issues": "ValidationReport",
+					"publication": "OntologyPublication",
+				},
+				"ontology_lifecycle": {
+					"ontology": "Ontology",
+					"namespace": "OntologyNamespace",
+					"term": "OntologyTerm",
+					"taxonomy_edge": "TaxonomyEdge",
+					"mapping": "SemanticMapping",
+					"review": "CurationReview",
+					"validation": "ValidationReport",
+					"publication": "OntologyPublication",
+					"export": "OntologyExport",
+					"audit": "OntoAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"onto": {
+				"id": "onto",
+				"configuration": contract["configuration"],
+				"provides": ["onto_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"onto": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "ontology_runtime.py", "service.py", "api.py", "views.py"],
+		"symbols": {
+			"capability.onto": {
+				"id": "capability.onto",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +151,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("onto", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "onto" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("ONTO semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("ONTO semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("ONTO adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.OntoService":
+		errors.append("ONTO generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
