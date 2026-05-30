@@ -1,60 +1,136 @@
 {
   "agents": {},
   "app": {
-    "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence package-backed APG capability",
-    "entity_count": 0,
+    "description": "Intelligence crawler package-backed APG capability",
+    "entity_count": 8,
     "name": "intel_crawler",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "intel_crawler": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "common",
-          "enabled": true,
-          "id": "intel_crawler",
-          "name": "Crawler Capability - Revolutionary Enterprise Web Intelligence",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/intel/crawler/cap_spec.md",
-          "version": "2.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "storage": "adapter",
+          "theme": "adapter",
+          "vector_index": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "crawl_jobs": {
+          "approval_required_for_high_risk": true,
+          "max_depth_limit": 8,
+          "positive_rate_limit_required": true,
+          "source_required": true
+        },
+        "crawler_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "source_strategy_reviewer",
+            "crawl_policy_reviewer",
+            "extraction_quality_reviewer",
+            "validation_reviewer",
+            "rag_pipeline_reviewer",
+            "risk_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "datasets": {
+          "lineage_required": true,
+          "pii_review_required": true,
+          "validation_required_before_publish": true
+        },
+        "extraction": {
+          "content_fingerprint_required": true,
+          "minimum_quality_score": 0.7,
+          "schema_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "respect_source_terms": true
+        },
+        "knowledge_graph": {
+          "entity_schema_required": true,
+          "relationship_evidence_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_crawl_events": true,
+          "emit_dataset_events": true,
+          "emit_source_events": true,
+          "emit_validation_events": true,
+          "event_stream": "apg.intel.crawler.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "rag": {
+          "chunk_plan_required": true,
+          "chunk_size_max": 4096,
+          "embedding_model_required": true
+        },
+        "sources": {
+          "allowed_domain_required": true,
+          "owner_required": true,
+          "robots_policy_review_required": true,
+          "url_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "intel_crawler_operations"
+          "default_theme": "intel_crawler_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_crawl_jobs": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_datasets": true,
+          "enable_extractions": true,
+          "enable_graph": true,
+          "enable_rag": true,
+          "enable_settings": true,
+          "enable_sources": true,
+          "enable_validation": true
+        },
+        "validation": {
+          "disagreement_requires_review": true,
+          "minimum_confidence": 0.75,
+          "reviewer_required": true
         }
       },
-      "erp_modules": [
-        "intel"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Crawler Capability - Revolutionary Enterprise Web Intelligence",
+      "name": "Intelligence Crawler",
       "provides": [
-        "intel_crawler_operations"
+        "source_intelligence_registry",
+        "crawl_job_lifecycle",
+        "extraction_pipeline",
+        "dataset_quality_control",
+        "validation_workflow",
+        "rag_graphrag_preparation",
+        "crawler_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_processing"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence operations require tenant context.",
+            "description": "Crawler operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +143,367 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence write operations require policy enforcement.",
+            "description": "Crawler writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "crawler_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "register_source",
+              "source_owner_assigned": false
             },
-            "description": "High-risk Crawler Capability - Revolutionary Enterprise Web Intelligence operations require review.",
+            "description": "Sources require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_url_present": false
+            },
+            "description": "Sources require at least one URL or feed endpoint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_url_required",
+              "required_action": "attach_source_url"
+            },
+            "name": "source_requires_url"
+          },
+          {
+            "condition": {
+              "allowed_domain_present": false,
+              "operation": "register_source"
+            },
+            "description": "Sources require explicit allowed domains.",
+            "effect": {
+              "decision": "deny",
+              "reason": "allowed_domain_required",
+              "required_action": "set_allowed_domain"
+            },
+            "name": "source_requires_allowed_domain"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "policy_review_recorded": false
+            },
+            "description": "Sources require crawl policy review before activation.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "crawl_policy_review_required",
+              "required_action": "record_source_policy_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "source_requires_policy_review"
+          },
+          {
+            "condition": {
+              "operation": "create_crawl_job",
+              "source_present": false
+            },
+            "description": "Crawl jobs require a registered source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crawl_source_required",
+              "required_action": "attach_source"
+            },
+            "name": "crawl_job_requires_source"
+          },
+          {
+            "condition": {
+              "cadence_present": false,
+              "operation": "create_crawl_job"
+            },
+            "description": "Crawl jobs require a cadence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crawl_cadence_required",
+              "required_action": "set_cadence"
+            },
+            "name": "crawl_job_requires_cadence"
+          },
+          {
+            "condition": {
+              "operation": "create_crawl_job",
+              "rate_limit_per_minute_lte": 0
+            },
+            "description": "Crawl rate limits must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crawl_rate_limit_must_be_positive",
+              "required_action": "set_positive_rate_limit"
+            },
+            "name": "crawl_rate_limit_positive"
+          },
+          {
+            "condition": {
+              "max_depth_gt": 8,
+              "operation": "create_crawl_job"
+            },
+            "description": "Crawl depth must stay within the configured limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crawl_depth_limit_exceeded",
+              "required_action": "reduce_crawl_depth"
+            },
+            "name": "crawl_depth_within_limit"
+          },
+          {
+            "condition": {
+              "approved": false,
+              "high_risk": true,
+              "operation": "create_crawl_job"
+            },
+            "description": "High-risk crawl jobs require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_risk_crawl_approval_required",
+              "required_action": "record_crawl_approval"
+            },
+            "name": "high_risk_crawl_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "record_extraction",
+              "schema_present": false
+            },
+            "description": "Extraction batches require a schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "extraction_schema_required",
+              "required_action": "attach_extraction_schema"
+            },
+            "name": "extraction_requires_schema"
+          },
+          {
+            "condition": {
+              "fingerprint_present": false,
+              "operation": "record_extraction"
+            },
+            "description": "Extraction batches require content fingerprinting.",
+            "effect": {
+              "decision": "deny",
+              "reason": "content_fingerprint_required",
+              "required_action": "attach_content_fingerprint"
+            },
+            "name": "extraction_requires_fingerprint"
+          },
+          {
+            "condition": {
+              "operation": "record_extraction",
+              "quality_score_lt": 0.7
+            },
+            "description": "Extraction quality must meet the configured minimum.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "extraction_quality_review_required",
+              "required_action": "review_extraction_quality"
+            },
+            "name": "extraction_quality_minimum"
+          },
+          {
+            "condition": {
+              "lineage_present": false,
+              "operation": "publish_dataset"
+            },
+            "description": "Datasets require source and job lineage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_lineage_required",
+              "required_action": "attach_dataset_lineage"
+            },
+            "name": "dataset_requires_lineage"
+          },
+          {
+            "condition": {
+              "operation": "publish_dataset",
+              "validation_recorded": false
+            },
+            "description": "Datasets require validation before publication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_validation_required",
+              "required_action": "record_dataset_validation"
+            },
+            "name": "dataset_requires_validation"
+          },
+          {
+            "condition": {
+              "contains_pii": true,
+              "operation": "publish_dataset",
+              "privacy_review_recorded": false
+            },
+            "description": "Datasets containing PII require privacy review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "privacy_review_required",
+              "required_action": "record_privacy_review"
+            },
+            "name": "pii_dataset_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "open_validation_session",
+              "reviewer_present": false
+            },
+            "description": "Validation sessions require a reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "validation_reviewer_required",
+              "required_action": "assign_reviewer"
+            },
+            "name": "validation_requires_reviewer"
+          },
+          {
+            "condition": {
+              "confidence_lt": 0.75,
+              "operation": "complete_validation_session"
+            },
+            "description": "Validation confidence must meet the configured minimum.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "validation_confidence_review_required",
+              "required_action": "review_validation_confidence"
+            },
+            "name": "validation_confidence_minimum"
+          },
+          {
+            "condition": {
+              "chunk_plan_present": false,
+              "operation": "record_rag_plan"
+            },
+            "description": "RAG preparation requires a chunk plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rag_chunk_plan_required",
+              "required_action": "attach_chunk_plan"
+            },
+            "name": "rag_requires_chunk_plan"
+          },
+          {
+            "condition": {
+              "chunk_size_gt": 4096,
+              "operation": "record_rag_plan"
+            },
+            "description": "RAG chunk size must stay within the configured limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rag_chunk_size_limit_exceeded",
+              "required_action": "reduce_chunk_size"
+            },
+            "name": "rag_chunk_size_within_limit"
+          },
+          {
+            "condition": {
+              "embedding_model_present": false,
+              "operation": "record_rag_plan"
+            },
+            "description": "RAG preparation requires an embedding model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "embedding_model_required",
+              "required_action": "select_embedding_model"
+            },
+            "name": "rag_requires_embedding_model"
+          },
+          {
+            "condition": {
+              "entity_schema_present": false,
+              "operation": "record_graph_projection"
+            },
+            "description": "Knowledge graph projection requires an entity schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "entity_schema_required",
+              "required_action": "attach_entity_schema"
+            },
+            "name": "graph_requires_entity_schema"
+          },
+          {
+            "condition": {
+              "operation": "record_graph_projection",
+              "relationship_evidence_present": false
+            },
+            "description": "Knowledge graph relationships require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "relationship_evidence_required",
+              "required_action": "attach_relationship_evidence"
+            },
+            "name": "graph_requires_relationship_evidence"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "crawler_batch"
+            },
+            "description": "Crawler batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_crawler_batch_to_bytewax"
+            },
+            "name": "crawler_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "crawler_event"
+            },
+            "description": "Crawler lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_crawler_event_to_bytewax"
+            },
+            "name": "crawler_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_crawler_agent"
+            },
+            "description": "Crawler agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crawler_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "crawler_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_crawler_agent"
+            },
+            "description": "Crawler agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crawler_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "crawler_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_crawler_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged crawler actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_crawler_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +513,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence operations require tenant context.",
+          "description": "Crawler operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +526,367 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence write operations require policy enforcement.",
+          "description": "Crawler writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "crawler_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "register_source",
+            "source_owner_assigned": false
           },
-          "description": "High-risk Crawler Capability - Revolutionary Enterprise Web Intelligence operations require review.",
+          "description": "Sources require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_url_present": false
+          },
+          "description": "Sources require at least one URL or feed endpoint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_url_required",
+            "required_action": "attach_source_url"
+          },
+          "name": "source_requires_url"
+        },
+        {
+          "condition": {
+            "allowed_domain_present": false,
+            "operation": "register_source"
+          },
+          "description": "Sources require explicit allowed domains.",
+          "effect": {
+            "decision": "deny",
+            "reason": "allowed_domain_required",
+            "required_action": "set_allowed_domain"
+          },
+          "name": "source_requires_allowed_domain"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "policy_review_recorded": false
+          },
+          "description": "Sources require crawl policy review before activation.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "crawl_policy_review_required",
+            "required_action": "record_source_policy_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "source_requires_policy_review"
+        },
+        {
+          "condition": {
+            "operation": "create_crawl_job",
+            "source_present": false
+          },
+          "description": "Crawl jobs require a registered source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crawl_source_required",
+            "required_action": "attach_source"
+          },
+          "name": "crawl_job_requires_source"
+        },
+        {
+          "condition": {
+            "cadence_present": false,
+            "operation": "create_crawl_job"
+          },
+          "description": "Crawl jobs require a cadence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crawl_cadence_required",
+            "required_action": "set_cadence"
+          },
+          "name": "crawl_job_requires_cadence"
+        },
+        {
+          "condition": {
+            "operation": "create_crawl_job",
+            "rate_limit_per_minute_lte": 0
+          },
+          "description": "Crawl rate limits must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crawl_rate_limit_must_be_positive",
+            "required_action": "set_positive_rate_limit"
+          },
+          "name": "crawl_rate_limit_positive"
+        },
+        {
+          "condition": {
+            "max_depth_gt": 8,
+            "operation": "create_crawl_job"
+          },
+          "description": "Crawl depth must stay within the configured limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crawl_depth_limit_exceeded",
+            "required_action": "reduce_crawl_depth"
+          },
+          "name": "crawl_depth_within_limit"
+        },
+        {
+          "condition": {
+            "approved": false,
+            "high_risk": true,
+            "operation": "create_crawl_job"
+          },
+          "description": "High-risk crawl jobs require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_risk_crawl_approval_required",
+            "required_action": "record_crawl_approval"
+          },
+          "name": "high_risk_crawl_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "record_extraction",
+            "schema_present": false
+          },
+          "description": "Extraction batches require a schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "extraction_schema_required",
+            "required_action": "attach_extraction_schema"
+          },
+          "name": "extraction_requires_schema"
+        },
+        {
+          "condition": {
+            "fingerprint_present": false,
+            "operation": "record_extraction"
+          },
+          "description": "Extraction batches require content fingerprinting.",
+          "effect": {
+            "decision": "deny",
+            "reason": "content_fingerprint_required",
+            "required_action": "attach_content_fingerprint"
+          },
+          "name": "extraction_requires_fingerprint"
+        },
+        {
+          "condition": {
+            "operation": "record_extraction",
+            "quality_score_lt": 0.7
+          },
+          "description": "Extraction quality must meet the configured minimum.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "extraction_quality_review_required",
+            "required_action": "review_extraction_quality"
+          },
+          "name": "extraction_quality_minimum"
+        },
+        {
+          "condition": {
+            "lineage_present": false,
+            "operation": "publish_dataset"
+          },
+          "description": "Datasets require source and job lineage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_lineage_required",
+            "required_action": "attach_dataset_lineage"
+          },
+          "name": "dataset_requires_lineage"
+        },
+        {
+          "condition": {
+            "operation": "publish_dataset",
+            "validation_recorded": false
+          },
+          "description": "Datasets require validation before publication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_validation_required",
+            "required_action": "record_dataset_validation"
+          },
+          "name": "dataset_requires_validation"
+        },
+        {
+          "condition": {
+            "contains_pii": true,
+            "operation": "publish_dataset",
+            "privacy_review_recorded": false
+          },
+          "description": "Datasets containing PII require privacy review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "privacy_review_required",
+            "required_action": "record_privacy_review"
+          },
+          "name": "pii_dataset_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "open_validation_session",
+            "reviewer_present": false
+          },
+          "description": "Validation sessions require a reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "validation_reviewer_required",
+            "required_action": "assign_reviewer"
+          },
+          "name": "validation_requires_reviewer"
+        },
+        {
+          "condition": {
+            "confidence_lt": 0.75,
+            "operation": "complete_validation_session"
+          },
+          "description": "Validation confidence must meet the configured minimum.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "validation_confidence_review_required",
+            "required_action": "review_validation_confidence"
+          },
+          "name": "validation_confidence_minimum"
+        },
+        {
+          "condition": {
+            "chunk_plan_present": false,
+            "operation": "record_rag_plan"
+          },
+          "description": "RAG preparation requires a chunk plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rag_chunk_plan_required",
+            "required_action": "attach_chunk_plan"
+          },
+          "name": "rag_requires_chunk_plan"
+        },
+        {
+          "condition": {
+            "chunk_size_gt": 4096,
+            "operation": "record_rag_plan"
+          },
+          "description": "RAG chunk size must stay within the configured limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rag_chunk_size_limit_exceeded",
+            "required_action": "reduce_chunk_size"
+          },
+          "name": "rag_chunk_size_within_limit"
+        },
+        {
+          "condition": {
+            "embedding_model_present": false,
+            "operation": "record_rag_plan"
+          },
+          "description": "RAG preparation requires an embedding model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "embedding_model_required",
+            "required_action": "select_embedding_model"
+          },
+          "name": "rag_requires_embedding_model"
+        },
+        {
+          "condition": {
+            "entity_schema_present": false,
+            "operation": "record_graph_projection"
+          },
+          "description": "Knowledge graph projection requires an entity schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "entity_schema_required",
+            "required_action": "attach_entity_schema"
+          },
+          "name": "graph_requires_entity_schema"
+        },
+        {
+          "condition": {
+            "operation": "record_graph_projection",
+            "relationship_evidence_present": false
+          },
+          "description": "Knowledge graph relationships require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "relationship_evidence_required",
+            "required_action": "attach_relationship_evidence"
+          },
+          "name": "graph_requires_relationship_evidence"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "crawler_batch"
+          },
+          "description": "Crawler batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_crawler_batch_to_bytewax"
+          },
+          "name": "crawler_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "crawler_event"
+          },
+          "description": "Crawler lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_crawler_event_to_bytewax"
+          },
+          "name": "crawler_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_crawler_agent"
+          },
+          "description": "Crawler agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crawler_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "crawler_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_crawler_agent"
+          },
+          "description": "Crawler agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crawler_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "crawler_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_crawler_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged crawler actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_crawler_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +896,125 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "CrawlerAgentWorkbench",
+          "permission": "intel_crawler:admin",
+          "route": "/intel-crawler/agents"
+        },
+        "crawl_jobs": {
+          "component": "CrawlerJobConsole",
+          "permission": "intel_crawler:operate",
+          "route": "/intel-crawler/crawl-jobs"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "CrawlerDashboard",
           "permission": "intel_crawler:view",
           "route": "/intel-crawler/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "intel_crawler:operate",
-          "route": "/intel-crawler/operations"
+        "datasets": {
+          "component": "DatasetPublicationConsole",
+          "permission": "intel_crawler:publish",
+          "route": "/intel-crawler/datasets"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "intel_crawler:govern",
-          "route": "/intel-crawler/rules"
+        "extractions": {
+          "component": "ExtractionWorkbench",
+          "permission": "intel_crawler:extract",
+          "route": "/intel-crawler/extractions"
+        },
+        "graph": {
+          "component": "KnowledgeGraphProjection",
+          "permission": "intel_crawler:graph",
+          "route": "/intel-crawler/graph"
+        },
+        "rag": {
+          "component": "RAGPreparationWorkbench",
+          "permission": "intel_crawler:rag",
+          "route": "/intel-crawler/rag"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "CrawlerSettings",
           "permission": "intel_crawler:admin",
           "route": "/intel-crawler/settings"
+        },
+        "sources": {
+          "component": "CrawlerSourceRegistry",
+          "permission": "intel_crawler:manage_sources",
+          "route": "/intel-crawler/sources"
+        },
+        "validation": {
+          "component": "ValidationWorkbench",
+          "permission": "intel_crawler:validate",
+          "route": "/intel-crawler/validation"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "source_registered",
+          "crawl_job_created",
+          "crawl_job_completed",
+          "extraction_recorded",
+          "dataset_published",
+          "validation_session_opened",
+          "rag_plan_recorded",
+          "graph_projection_recorded",
+          "crawler_agent_registered"
+        ],
+        "guardrails": [
+          "crawler_batch_requires_bytewax",
+          "crawler_event_requires_bytewax",
+          "privileged_agent_crawler_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "scheduled",
+          "running",
+          "review_required",
+          "validated",
+          "published",
+          "blocked"
+        ],
+        "stream": "apg.intel.crawler.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
+          "agent_workbench": {
+            "status_style": "agent-chip",
+            "visual": "approval-lane"
+          },
+          "crawl_jobs": {
+            "status_style": "crawl-chip",
+            "visual": "job-queue"
+          },
+          "datasets": {
+            "status_style": "publish-chip",
+            "visual": "lineage-table"
+          },
+          "extractions": {
+            "status_style": "quality-chip",
+            "visual": "schema-grid"
+          },
+          "graph": {
+            "status_style": "evidence-chip",
+            "visual": "entity-network"
+          },
+          "rag": {
+            "status_style": "embedding-chip",
+            "visual": "chunk-map"
+          },
+          "sources": {
+            "icon": "radar",
             "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+            "status_indicator": "source-pill"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
-          },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
-          },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "validation": {
+            "status_style": "confidence-chip",
+            "visual": "review-lane"
           }
         },
-        "name": "intel_crawler_operations",
+        "name": "intel_crawler_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1034,70 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "CrawlerDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/intel-crawler/dashboard",
             "permission": "intel_crawler:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/intel-crawler/operations",
+            "component": "CrawlerSourceRegistry",
+            "name": "sources",
+            "nav_group": "Sources",
+            "path": "/intel-crawler/sources",
+            "permission": "intel_crawler:manage_sources"
+          },
+          {
+            "component": "CrawlerJobConsole",
+            "name": "crawl_jobs",
+            "nav_group": "Crawling",
+            "path": "/intel-crawler/crawl-jobs",
             "permission": "intel_crawler:operate"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/intel-crawler/rules",
-            "permission": "intel_crawler:govern"
+            "component": "ExtractionWorkbench",
+            "name": "extractions",
+            "nav_group": "Processing",
+            "path": "/intel-crawler/extractions",
+            "permission": "intel_crawler:extract"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "DatasetPublicationConsole",
+            "name": "datasets",
+            "nav_group": "Processing",
+            "path": "/intel-crawler/datasets",
+            "permission": "intel_crawler:publish"
+          },
+          {
+            "component": "ValidationWorkbench",
+            "name": "validation",
+            "nav_group": "Quality",
+            "path": "/intel-crawler/validation",
+            "permission": "intel_crawler:validate"
+          },
+          {
+            "component": "RAGPreparationWorkbench",
+            "name": "rag",
+            "nav_group": "Knowledge",
+            "path": "/intel-crawler/rag",
+            "permission": "intel_crawler:rag"
+          },
+          {
+            "component": "KnowledgeGraphProjection",
+            "name": "graph",
+            "nav_group": "Knowledge",
+            "path": "/intel-crawler/graph",
+            "permission": "intel_crawler:graph"
+          },
+          {
+            "component": "CrawlerAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/intel-crawler/agents",
+            "permission": "intel_crawler:admin"
+          },
+          {
+            "component": "CrawlerSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/intel-crawler/settings",
@@ -238,46 +1114,153 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "intelligence_crawler": {
+        "supported_roles": [
+          "source_strategy_reviewer",
+          "crawl_policy_reviewer",
+          "extraction_quality_reviewer",
+          "validation_reviewer",
+          "rag_pipeline_reviewer",
+          "risk_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "intel_crawler": []
+      "intel_crawler": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_processing"
+      ]
     }
   },
   "contracts": {
     "intel_crawler": {
       "configuration": {
-        "capability": {
-          "category": "common",
-          "enabled": true,
-          "id": "intel_crawler",
-          "name": "Crawler Capability - Revolutionary Enterprise Web Intelligence",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/intel/crawler/cap_spec.md",
-          "version": "2.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "storage": "adapter",
+          "theme": "adapter",
+          "vector_index": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "crawl_jobs": {
+          "approval_required_for_high_risk": true,
+          "max_depth_limit": 8,
+          "positive_rate_limit_required": true,
+          "source_required": true
+        },
+        "crawler_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "source_strategy_reviewer",
+            "crawl_policy_reviewer",
+            "extraction_quality_reviewer",
+            "validation_reviewer",
+            "rag_pipeline_reviewer",
+            "risk_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "datasets": {
+          "lineage_required": true,
+          "pii_review_required": true,
+          "validation_required_before_publish": true
+        },
+        "extraction": {
+          "content_fingerprint_required": true,
+          "minimum_quality_score": 0.7,
+          "schema_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "respect_source_terms": true
+        },
+        "knowledge_graph": {
+          "entity_schema_required": true,
+          "relationship_evidence_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_crawl_events": true,
+          "emit_dataset_events": true,
+          "emit_source_events": true,
+          "emit_validation_events": true,
+          "event_stream": "apg.intel.crawler.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "rag": {
+          "chunk_plan_required": true,
+          "chunk_size_max": 4096,
+          "embedding_model_required": true
+        },
+        "sources": {
+          "allowed_domain_required": true,
+          "owner_required": true,
+          "robots_policy_review_required": true,
+          "url_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "intel_crawler_operations"
+          "default_theme": "intel_crawler_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_crawl_jobs": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_datasets": true,
+          "enable_extractions": true,
+          "enable_graph": true,
+          "enable_rag": true,
+          "enable_settings": true,
+          "enable_sources": true,
+          "enable_validation": true
+        },
+        "validation": {
+          "disagreement_requires_review": true,
+          "minimum_confidence": 0.75,
+          "reviewer_required": true
         }
       },
       "id": "intel_crawler",
       "provides": [
-        "intel_crawler_operations"
+        "source_intelligence_registry",
+        "crawl_job_lifecycle",
+        "extraction_pipeline",
+        "dataset_quality_control",
+        "validation_workflow",
+        "rag_graphrag_preparation",
+        "crawler_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "document_processing"
+      ]
     }
   },
   "deployment": {
@@ -289,89 +1272,397 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "intel_crawler": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "crawl_depth_within_limit": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "max_depth_gt": 8,
+        "operation": "create_crawl_job"
       },
-      "description": "High-risk Crawler Capability - Revolutionary Enterprise Web Intelligence operations require review.",
+      "description": "Crawl depth must stay within the configured limit.",
       "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "decision": "deny",
+        "reason": "crawl_depth_limit_exceeded",
+        "required_action": "reduce_crawl_depth"
       },
-      "name": "high_risk_requires_review"
+      "name": "crawl_depth_within_limit"
     },
-    "operation_policy_required": {
+    "crawl_job_requires_cadence": {
+      "condition": {
+        "cadence_present": false,
+        "operation": "create_crawl_job"
+      },
+      "description": "Crawl jobs require a cadence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crawl_cadence_required",
+        "required_action": "set_cadence"
+      },
+      "name": "crawl_job_requires_cadence"
+    },
+    "crawl_job_requires_source": {
+      "condition": {
+        "operation": "create_crawl_job",
+        "source_present": false
+      },
+      "description": "Crawl jobs require a registered source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crawl_source_required",
+        "required_action": "attach_source"
+      },
+      "name": "crawl_job_requires_source"
+    },
+    "crawl_rate_limit_positive": {
+      "condition": {
+        "operation": "create_crawl_job",
+        "rate_limit_per_minute_lte": 0
+      },
+      "description": "Crawl rate limits must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crawl_rate_limit_must_be_positive",
+        "required_action": "set_positive_rate_limit"
+      },
+      "name": "crawl_rate_limit_positive"
+    },
+    "crawler_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_crawler_agent"
+      },
+      "description": "Crawler agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crawler_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "crawler_agent_role_supported"
+    },
+    "crawler_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_crawler_agent"
+      },
+      "description": "Crawler agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crawler_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "crawler_agent_runtime_supported"
+    },
+    "crawler_batch_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "crawler_batch"
+      },
+      "description": "Crawler batches require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_crawler_batch_to_bytewax"
+      },
+      "name": "crawler_batch_requires_bytewax"
+    },
+    "crawler_event_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "crawler_event"
+      },
+      "description": "Crawler lifecycle events require Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_crawler_event_to_bytewax"
+      },
+      "name": "crawler_event_requires_bytewax"
+    },
+    "crawler_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence write operations require policy enforcement.",
+      "description": "Crawler writes require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "crawler_write_requires_policy"
+    },
+    "dataset_requires_lineage": {
+      "condition": {
+        "lineage_present": false,
+        "operation": "publish_dataset"
+      },
+      "description": "Datasets require source and job lineage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_lineage_required",
+        "required_action": "attach_dataset_lineage"
+      },
+      "name": "dataset_requires_lineage"
+    },
+    "dataset_requires_validation": {
+      "condition": {
+        "operation": "publish_dataset",
+        "validation_recorded": false
+      },
+      "description": "Datasets require validation before publication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_validation_required",
+        "required_action": "record_dataset_validation"
+      },
+      "name": "dataset_requires_validation"
+    },
+    "extraction_quality_minimum": {
+      "condition": {
+        "operation": "record_extraction",
+        "quality_score_lt": 0.7
+      },
+      "description": "Extraction quality must meet the configured minimum.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "extraction_quality_review_required",
+        "required_action": "review_extraction_quality"
+      },
+      "name": "extraction_quality_minimum"
+    },
+    "extraction_requires_fingerprint": {
+      "condition": {
+        "fingerprint_present": false,
+        "operation": "record_extraction"
+      },
+      "description": "Extraction batches require content fingerprinting.",
+      "effect": {
+        "decision": "deny",
+        "reason": "content_fingerprint_required",
+        "required_action": "attach_content_fingerprint"
+      },
+      "name": "extraction_requires_fingerprint"
+    },
+    "extraction_requires_schema": {
+      "condition": {
+        "operation": "record_extraction",
+        "schema_present": false
+      },
+      "description": "Extraction batches require a schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "extraction_schema_required",
+        "required_action": "attach_extraction_schema"
+      },
+      "name": "extraction_requires_schema"
+    },
+    "graph_requires_entity_schema": {
+      "condition": {
+        "entity_schema_present": false,
+        "operation": "record_graph_projection"
+      },
+      "description": "Knowledge graph projection requires an entity schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "entity_schema_required",
+        "required_action": "attach_entity_schema"
+      },
+      "name": "graph_requires_entity_schema"
+    },
+    "graph_requires_relationship_evidence": {
+      "condition": {
+        "operation": "record_graph_projection",
+        "relationship_evidence_present": false
+      },
+      "description": "Knowledge graph relationships require evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "relationship_evidence_required",
+        "required_action": "attach_relationship_evidence"
+      },
+      "name": "graph_requires_relationship_evidence"
+    },
+    "high_risk_crawl_requires_approval": {
+      "condition": {
+        "approved": false,
+        "high_risk": true,
+        "operation": "create_crawl_job"
+      },
+      "description": "High-risk crawl jobs require approval.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "high_risk_crawl_approval_required",
+        "required_action": "record_crawl_approval"
+      },
+      "name": "high_risk_crawl_requires_approval"
+    },
+    "pii_dataset_requires_review": {
+      "condition": {
+        "contains_pii": true,
+        "operation": "publish_dataset",
+        "privacy_review_recorded": false
+      },
+      "description": "Datasets containing PII require privacy review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "privacy_review_required",
+        "required_action": "record_privacy_review"
+      },
+      "name": "pii_dataset_requires_review"
+    },
+    "privileged_agent_crawler_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_crawler_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged crawler actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_crawler_action_requires_human_approval"
+    },
+    "rag_chunk_size_within_limit": {
+      "condition": {
+        "chunk_size_gt": 4096,
+        "operation": "record_rag_plan"
+      },
+      "description": "RAG chunk size must stay within the configured limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rag_chunk_size_limit_exceeded",
+        "required_action": "reduce_chunk_size"
+      },
+      "name": "rag_chunk_size_within_limit"
+    },
+    "rag_requires_chunk_plan": {
+      "condition": {
+        "chunk_plan_present": false,
+        "operation": "record_rag_plan"
+      },
+      "description": "RAG preparation requires a chunk plan.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rag_chunk_plan_required",
+        "required_action": "attach_chunk_plan"
+      },
+      "name": "rag_requires_chunk_plan"
+    },
+    "rag_requires_embedding_model": {
+      "condition": {
+        "embedding_model_present": false,
+        "operation": "record_rag_plan"
+      },
+      "description": "RAG preparation requires an embedding model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "embedding_model_required",
+        "required_action": "select_embedding_model"
+      },
+      "name": "rag_requires_embedding_model"
+    },
+    "source_requires_allowed_domain": {
+      "condition": {
+        "allowed_domain_present": false,
+        "operation": "register_source"
+      },
+      "description": "Sources require explicit allowed domains.",
+      "effect": {
+        "decision": "deny",
+        "reason": "allowed_domain_required",
+        "required_action": "set_allowed_domain"
+      },
+      "name": "source_requires_allowed_domain"
+    },
+    "source_requires_owner": {
+      "condition": {
+        "operation": "register_source",
+        "source_owner_assigned": false
+      },
+      "description": "Sources require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_owner_required",
+        "required_action": "assign_source_owner"
+      },
+      "name": "source_requires_owner"
+    },
+    "source_requires_policy_review": {
+      "condition": {
+        "operation": "register_source",
+        "policy_review_recorded": false
+      },
+      "description": "Sources require crawl policy review before activation.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "crawl_policy_review_required",
+        "required_action": "record_source_policy_review"
+      },
+      "name": "source_requires_policy_review"
+    },
+    "source_requires_url": {
+      "condition": {
+        "operation": "register_source",
+        "source_url_present": false
+      },
+      "description": "Sources require at least one URL or feed endpoint.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_url_required",
+        "required_action": "attach_source_url"
+      },
+      "name": "source_requires_url"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Crawler Capability - Revolutionary Enterprise Web Intelligence operations require tenant context.",
+      "description": "Crawler operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.intel_crawler": {
-      "file": "capability_contract.py",
-      "id": "capability.intel_crawler",
-      "kind": "capability",
-      "name": "Crawler Capability - Revolutionary Enterprise Web Intelligence",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+    },
+    "validation_confidence_minimum": {
+      "condition": {
+        "confidence_lt": 0.75,
+        "operation": "complete_validation_session"
       },
-      "references": []
+      "description": "Validation confidence must meet the configured minimum.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "validation_confidence_review_required",
+        "required_action": "review_validation_confidence"
+      },
+      "name": "validation_confidence_minimum"
+    },
+    "validation_requires_reviewer": {
+      "condition": {
+        "operation": "open_validation_session",
+        "reviewer_present": false
+      },
+      "description": "Validation sessions require a reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "validation_reviewer_required",
+        "required_action": "assign_reviewer"
+      },
+      "name": "validation_requires_reviewer"
     }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

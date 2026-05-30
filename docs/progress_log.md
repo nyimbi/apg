@@ -16,6 +16,87 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:16 EAT
+
+INTEL CRAWLER source collection lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the
+  `intel_crawler` capability, and replaced `cap_spec.md` with the active
+  package summary.
+- Replaced the generic contract with explicit source, crawl-job, extraction,
+  dataset, validation, RAG, knowledge-graph, crawler-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  source owner/URL/allowed-domain/policy review, crawl source/cadence/rate
+  limit/depth/high-risk approval, extraction schema/fingerprint/quality,
+  dataset lineage/validation/privacy, validation reviewer/confidence, RAG
+  chunk plan/chunk size/embedding model, graph entity schema/relationship
+  evidence, crawler batch/event Bytewax streams, crawler-agent runtime/role,
+  and privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light crawler lifecycle helpers for sources, crawl jobs,
+  completion evidence, extractions, validation sessions, datasets, RAG plans,
+  graph projections, batch validation, crawler-agent registration, dashboard
+  summaries, audit events, API helpers, and screen models.
+- Preserved `CrawlerDatabaseService` and `CrawlerService` compatibility exports
+  while removing optional package imports from the top-level APG surface.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, source, crawl-job, extraction, validation,
+  dataset, RAG, graph, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/intel/crawler/__init__.py
+  capabilities/intel/crawler/capability_contract.py
+  capabilities/intel/crawler/service.py capabilities/intel/crawler/api.py
+  capabilities/intel/crawler/views.py capabilities/intel/crawler/app.py
+  capabilities/intel/crawler/tests/test_package_contract.py
+  capabilities/intel/crawler/tests/conftest.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/intel/crawler/tests/test_package_contract.py` passed with 5
+  tests.
+- `./.venv/bin/python capabilities/intel/crawler/app.py` passed package
+  self-test.
+- `./.venv/bin/apg capabilities inspect intel_crawler --json` confirmed
+  `ok: true`, 10 routes, 29 rules, and `intel_crawler_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/intel/crawler
+  --json` confirmed side-effect-free publish planning with Bytewax stream
+  metadata and no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/intel/crawler --json` passed with `domain_specific`
+  implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "from capabilities.intel.crawler import
+  IntelligenceCrawlerService; service=IntelligenceCrawlerService();
+  source=service.register_source('source','tenant-proof','Source','owner',
+  'news',['https://example.com'],['example.com'],'reviewer');
+  service.register_crawler_agent('tenant-proof','Proof agent','codex',
+  'crawl_policy_reviewer','review crawls');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  crawler-agent registration, audit event emission, and Bytewax stream
+  metadata.
+- `jq '.capabilities.intel_crawler.streaming.processor,
+  .capabilities.intel_crawler.provides,
+  .capabilities.intel_crawler.requires,
+  .capabilities.intel_crawler.screens.agents.route,
+  (.capabilities.intel_crawler.rules[] |
+  select(.name=="crawler_agent_runtime_supported") | .effect.reason),
+  (.capabilities.intel_crawler.rules[] |
+  select(.name=="crawler_batch_requires_bytewax") | .effect.reason)'
+  capabilities/intel/crawler/semantic_model.json` confirmed `bytewax`,
+  crawler-agent provides, required services, `/intel-crawler/agents`,
+  `crawler_agent_runtime_not_supported`, and
+  `bytewax_event_stream_required`.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/intel/crawler` passed after trimming EOF
+  whitespace.
+- Not run: live crawler adapters, browser rendering, source-specific rate
+  governance, durable storage, durable Bytewax topology, crawler
+  performance/failover checks, and full repository tests.
+
 ### 2026-05-30 23:07 EAT
 
 EAM AST enterprise asset lifecycle/guardrail packet:

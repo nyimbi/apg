@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Crawler Capability - Revolutionary Enterprise Web Intelligence",
+  "display_name": "Intelligence Crawler",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,38 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "2.0.0"
+  "route_count": 10,
+  "rule_count": 29,
+  "streaming": {
+    "events": [
+      "source_registered",
+      "crawl_job_created",
+      "crawl_job_completed",
+      "extraction_recorded",
+      "dataset_published",
+      "validation_session_opened",
+      "rag_plan_recorded",
+      "graph_projection_recorded",
+      "crawler_agent_registered"
+    ],
+    "guardrails": [
+      "crawler_batch_requires_bytewax",
+      "crawler_event_requires_bytewax",
+      "privileged_agent_crawler_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "scheduled",
+      "running",
+      "review_required",
+      "validated",
+      "published",
+      "blocked"
+    ],
+    "stream": "apg.intel.crawler.lifecycle"
+  },
+  "version": "2.1.0"
 }

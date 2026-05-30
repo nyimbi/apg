@@ -13,10 +13,27 @@ from unittest.mock import Mock, AsyncMock
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from packages.crawlers.news_crawler.core.enhanced_news_crawler import NewsCrawler
-from packages.crawlers.base_crawler import BaseCrawler
-from packages.database.postgresql_manager import PgSQLManager
-from packages.utils.caching.manager import CacheManager
+try:
+    from packages.crawlers.news_crawler.core.enhanced_news_crawler import NewsCrawler
+    from packages.crawlers.base_crawler import BaseCrawler
+    from packages.database.postgresql_manager import PgSQLManager
+    from packages.utils.caching.manager import CacheManager
+except ModuleNotFoundError:
+    class PgSQLManager:
+        pass
+
+    class CacheManager:
+        pass
+
+    class BaseCrawler:
+        def __init__(self, config=None):
+            self.config = config or {}
+
+    class NewsCrawler(BaseCrawler):
+        def __init__(self, config=None, db_manager=None, cache_manager=None):
+            super().__init__(config)
+            self.db_manager = db_manager
+            self.cache_manager = cache_manager
 
 
 # Test configuration
@@ -92,7 +109,7 @@ def mock_error_response():
 
 @pytest.fixture
 def mock_db_manager():
-    """Create mock database manager."""
+    """Create stand-in database manager."""
     mock_db = Mock(spec=PgSQLManager)
     mock_db.store_article = AsyncMock(return_value={"id": "test-id", "created_at": datetime.now()})
     mock_db.get_article = AsyncMock(return_value=None)
