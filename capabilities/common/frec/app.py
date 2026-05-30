@@ -5,13 +5,125 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Facial Recognition package-backed APG capability", "entity_count": 0, "name": "frec", "version": "1.0.0"}, "capabilities": {"frec": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"emotion": {"aggregate_only_by_default": true, "emotion_analysis_enabled": false, "explicit_purpose_required": true}, "liveness": {"anti_spoofing_enabled": true, "deepfake_detection_enabled": true, "minimum_liveness_score": 0.84, "required_for_authentication": true}, "privacy": {"audit_identification": true, "explicit_consent_required": true, "template_encryption_required": true, "watchlist_policy_required": true}, "recognition": {"enabled_modes": ["verification", "identification", "watchlist_matching"], "identification_threshold": 0.92, "minimum_face_quality": 0.72, "verification_threshold": 0.88}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "frec_identity_vision"}, "ui": {"enable_enrollment_console": true, "enable_identity_dashboard": true, "enable_privacy_center": true, "enable_watchlist_manager": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Facial Recognition", "provides": ["frec_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All facial recognition operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"consent_recorded": false, "operation": "enroll_face"}, "description": "Face enrollment requires explicit consent.", "effect": {"decision": "deny", "reason": "face_consent_required", "required_action": "record_face_consent"}, "name": "face_enrollment_requires_consent"}, {"condition": {"operation": "identify_face", "watchlist_policy_attached": false}, "description": "Identification requires an active watchlist policy.", "effect": {"decision": "deny", "reason": "watchlist_policy_required", "required_action": "attach_watchlist_policy"}, "name": "identification_requires_watchlist_policy"}, {"condition": {"liveness_passed": false, "operation": "authenticate_face"}, "description": "Face authentication requires liveness evidence.", "effect": {"decision": "deny", "reason": "liveness_required", "required_action": "complete_liveness_check"}, "name": "authentication_requires_liveness"}, {"condition": {"approved_purpose_recorded": false, "emotion_analysis_requested": true}, "description": "Emotion analysis requires an explicit approved purpose.", "effect": {"decision": "deny", "reason": "emotion_purpose_required", "required_action": "record_approved_purpose"}, "name": "emotion_analysis_requires_explicit_purpose"}, {"condition": {"face_quality_lt": 0.72, "recapture_completed": false}, "description": "Low-quality face captures require recapture or review.", "effect": {"decision": "require_review", "reason": "low_face_quality", "required_action": "recapture_or_review"}, "name": "low_face_quality_requires_recapture"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All facial recognition operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"consent_recorded": false, "operation": "enroll_face"}, "description": "Face enrollment requires explicit consent.", "effect": {"decision": "deny", "reason": "face_consent_required", "required_action": "record_face_consent"}, "name": "face_enrollment_requires_consent"}, {"condition": {"operation": "identify_face", "watchlist_policy_attached": false}, "description": "Identification requires an active watchlist policy.", "effect": {"decision": "deny", "reason": "watchlist_policy_required", "required_action": "attach_watchlist_policy"}, "name": "identification_requires_watchlist_policy"}, {"condition": {"liveness_passed": false, "operation": "authenticate_face"}, "description": "Face authentication requires liveness evidence.", "effect": {"decision": "deny", "reason": "liveness_required", "required_action": "complete_liveness_check"}, "name": "authentication_requires_liveness"}, {"condition": {"approved_purpose_recorded": false, "emotion_analysis_requested": true}, "description": "Emotion analysis requires an explicit approved purpose.", "effect": {"decision": "deny", "reason": "emotion_purpose_required", "required_action": "record_approved_purpose"}, "name": "emotion_analysis_requires_explicit_purpose"}, {"condition": {"face_quality_lt": 0.72, "recapture_completed": false}, "description": "Low-quality face captures require recapture or review.", "effect": {"decision": "require_review", "reason": "low_face_quality", "required_action": "recapture_or_review"}, "name": "low_face_quality_requires_recapture"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "FRECDashboard", "permission": "frec:view", "route": "/frec/dashboard"}, "emotion": {"component": "EmotionGovernance", "permission": "frec:admin", "route": "/frec/emotion"}, "enrollment": {"component": "FaceEnrollment", "permission": "frec:enroll", "route": "/frec/enrollment"}, "identification": {"component": "FaceIdentification", "permission": "frec:identify", "route": "/frec/identification"}, "liveness": {"component": "FaceLiveness", "permission": "frec:verify", "route": "/frec/liveness"}, "settings": {"component": "FRECSettings", "permission": "frec:admin", "route": "/frec/settings"}, "verification": {"component": "FaceVerification", "permission": "frec:verify", "route": "/frec/verification"}, "watchlists": {"component": "WatchlistManager", "permission": "frec:manage_watchlists", "route": "/frec/watchlists"}}, "streaming": {}, "theme": {"components": {"face_quality_panel": {"icon": "scan-face", "risk_style": "capture-band", "status_indicator": "quality-pill"}, "liveness_trace": {"status_style": "spoof-chip", "visual": "challenge-timeline"}, "match_gallery": {"highlight": "confidence-chip", "visual": "ranked-face-grid"}, "watchlist_table": {"status_style": "policy-chip", "visual": "identity-list"}}, "name": "frec_identity_vision", "tokens": {"border.radius": "8px", "color.accent": "#C05621", "color.danger": "#C53030", "color.primary": "#234E70", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/frec/api/v1", "requires_theme": true, "routes": [{"component": "FRECDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/frec/dashboard", "permission": "frec:view"}, {"component": "FaceEnrollment", "name": "enrollment", "nav_group": "Identity", "path": "/frec/enrollment", "permission": "frec:enroll"}, {"component": "FaceVerification", "name": "verification", "nav_group": "Identity", "path": "/frec/verification", "permission": "frec:verify"}, {"component": "FaceIdentification", "name": "identification", "nav_group": "Identity", "path": "/frec/identification", "permission": "frec:identify"}, {"component": "FaceLiveness", "name": "liveness", "nav_group": "Security", "path": "/frec/liveness", "permission": "frec:verify"}, {"component": "EmotionGovernance", "name": "emotion", "nav_group": "Governance", "path": "/frec/emotion", "permission": "frec:admin"}, {"component": "WatchlistManager", "name": "watchlists", "nav_group": "Governance", "path": "/frec/watchlists", "permission": "frec:manage_watchlists"}, {"component": "FRECSettings", "name": "settings", "nav_group": "Administration", "path": "/frec/settings", "permission": "frec:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"frec": []}}, "contracts": {"frec": {"configuration": {"emotion": {"aggregate_only_by_default": true, "emotion_analysis_enabled": false, "explicit_purpose_required": true}, "liveness": {"anti_spoofing_enabled": true, "deepfake_detection_enabled": true, "minimum_liveness_score": 0.84, "required_for_authentication": true}, "privacy": {"audit_identification": true, "explicit_consent_required": true, "template_encryption_required": true, "watchlist_policy_required": true}, "recognition": {"enabled_modes": ["verification", "identification", "watchlist_matching"], "identification_threshold": 0.92, "minimum_face_quality": 0.72, "verification_threshold": 0.88}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "frec_identity_vision"}, "ui": {"enable_enrollment_console": true, "enable_identity_dashboard": true, "enable_privacy_center": true, "enable_watchlist_manager": true}}, "id": "frec", "provides": ["frec_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"frec": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"authentication_requires_liveness": {"condition": {"liveness_passed": false, "operation": "authenticate_face"}, "description": "Face authentication requires liveness evidence.", "effect": {"decision": "deny", "reason": "liveness_required", "required_action": "complete_liveness_check"}, "name": "authentication_requires_liveness"}, "emotion_analysis_requires_explicit_purpose": {"condition": {"approved_purpose_recorded": false, "emotion_analysis_requested": true}, "description": "Emotion analysis requires an explicit approved purpose.", "effect": {"decision": "deny", "reason": "emotion_purpose_required", "required_action": "record_approved_purpose"}, "name": "emotion_analysis_requires_explicit_purpose"}, "face_enrollment_requires_consent": {"condition": {"consent_recorded": false, "operation": "enroll_face"}, "description": "Face enrollment requires explicit consent.", "effect": {"decision": "deny", "reason": "face_consent_required", "required_action": "record_face_consent"}, "name": "face_enrollment_requires_consent"}, "identification_requires_watchlist_policy": {"condition": {"operation": "identify_face", "watchlist_policy_attached": false}, "description": "Identification requires an active watchlist policy.", "effect": {"decision": "deny", "reason": "watchlist_policy_required", "required_action": "attach_watchlist_policy"}, "name": "identification_requires_watchlist_policy"}, "low_face_quality_requires_recapture": {"condition": {"face_quality_lt": 0.72, "recapture_completed": false}, "description": "Low-quality face captures require recapture or review.", "effect": {"decision": "require_review", "reason": "low_face_quality", "required_action": "recapture_or_review"}, "name": "low_face_quality_requires_recapture"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All facial recognition operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.frec": {"file": "capability_contract.py", "id": "capability.frec", "kind": "capability", "name": "Facial Recognition", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("frec_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "frec",
+			"version": "1.0.0",
+			"description": "Facial Recognition package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"frec": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"frec": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["frec_operations"],
+				"requires": ["biop", "cvsn", "aicr"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api_helpers": "api_helpers.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
+					"views": contract["configuration"]["adapters"]["view_models"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"low_quality_capture": "FaceReview",
+					"low_confidence_match": "FaceReview",
+					"watchlist_hit": "FaceReview",
+					"emotion_analysis": "PurposeApproval",
+				},
+				"face_lifecycle": {
+					"consent": "FaceConsent",
+					"template": "FaceTemplate",
+					"liveness": "FaceLiveness",
+					"verification": "FaceVerification",
+					"watchlist": "FaceWatchlist",
+					"identification": "FaceIdentification",
+					"review": "FaceReview",
+					"emotion": "EmotionGovernance",
+					"audit": "FaceAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"frec": {
+				"id": "frec",
+				"configuration": contract["configuration"],
+				"provides": ["frec_operations"],
+				"requires": ["biop", "cvsn", "aicr"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"frec": ["biop", "cvsn", "aicr"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 3},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "face_runtime.py", "service.py", "api_helpers.py", "view_models.py", "api.py", "views.py"],
+		"symbols": {
+			"capability.frec": {
+				"id": "capability.frec",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +148,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("frec", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "frec" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("FREC semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("FREC semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("FREC adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "face_runtime.FrecService":
+		errors.append("FREC generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

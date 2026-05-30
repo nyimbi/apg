@@ -8,14 +8,79 @@
   },
   "capabilities": {
     "frec": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "api_helpers": "api_helpers.py",
+        "audit_sink": "audl",
+        "biometric_processing": "biop",
+        "cache": "cach",
+        "computer_vision": "cvsn",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "face_runtime.FrecService",
+        "helper_runtime": "face_runtime.py",
+        "metrics_sink": "moni",
+        "mfa_provider": "mfau",
+        "production_api": "api.py",
+        "production_runtime": "service.py",
+        "production_views": "views.py",
+        "view_models": "view_models.py"
+      },
+      "approvals": {
+        "emotion_analysis": "PurposeApproval",
+        "low_confidence_match": "FaceReview",
+        "low_quality_capture": "FaceReview",
+        "watchlist_hit": "FaceReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "biometric_processing": "biop",
+          "cache": "cach",
+          "computer_vision": "cvsn",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "face_runtime.FrecService",
+          "helper_runtime": "face_runtime.py",
+          "metrics_sink": "moni",
+          "mfa_provider": "mfau",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "view_models": "view_models.py"
+        },
+        "consent": {
+          "explicit_consent_required": true,
+          "purpose_required": true,
+          "revocation_supported": true
+        },
         "emotion": {
           "aggregate_only_by_default": true,
           "emotion_analysis_enabled": false,
-          "explicit_purpose_required": true
+          "explicit_purpose_required": true,
+          "raw_emotion_retention": "disabled"
+        },
+        "enrollment": {
+          "active_consent_required": true,
+          "retention_policy_required": true,
+          "template_encryption_required": true,
+          "template_hash_required": true
+        },
+        "governance": {
+          "audit_enrollment": true,
+          "audit_identification": true,
+          "audit_verification": true,
+          "audit_watchlists": true,
+          "require_tenant_context": true
+        },
+        "identification": {
+          "review_low_confidence_matches": true,
+          "review_watchlist_hits": true,
+          "watchlist_policy_required": true
         },
         "liveness": {
           "anti_spoofing_enabled": true,
@@ -23,9 +88,16 @@
           "minimum_liveness_score": 0.84,
           "required_for_authentication": true
         },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
         "privacy": {
           "audit_identification": true,
           "explicit_consent_required": true,
+          "privacy_review_for_sensitive_watchlists": true,
           "template_encryption_required": true,
           "watchlist_policy_required": true
         },
@@ -36,8 +108,25 @@
             "watchlist_matching"
           ],
           "identification_threshold": 0.92,
+          "low_confidence_review_threshold": 0.8,
           "minimum_face_quality": 0.72,
           "verification_threshold": 0.88
+        },
+        "reviews": {
+          "duplicate_pending_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true
+        },
+        "security": {
+          "audit_state_changes": true,
+          "raw_face_image_retention_allowed": false,
+          "tenant_isolation_required": true
+        },
+        "templates": {
+          "encrypted_storage_required": true,
+          "raw_image_retention": "disabled",
+          "retirement_supported": true,
+          "template_rotation_days": 365
         },
         "tenant_id": "default",
         "theme": {
@@ -45,22 +134,58 @@
           "default_theme": "frec_identity_vision"
         },
         "ui": {
+          "enable_audit": true,
+          "enable_consent_center": true,
+          "enable_emotion_governance": true,
           "enable_enrollment_console": true,
+          "enable_identification_workbench": true,
           "enable_identity_dashboard": true,
-          "enable_privacy_center": true,
+          "enable_liveness_console": true,
+          "enable_review_queue": true,
+          "enable_settings": true,
+          "enable_subject_registry": true,
+          "enable_template_gallery": true,
+          "enable_verification_workbench": true,
           "enable_watchlist_manager": true
+        },
+        "verification": {
+          "active_template_required": true,
+          "liveness_required": true,
+          "review_low_confidence": true,
+          "subject_template_match_required": true
+        },
+        "watchlists": {
+          "audit_membership_changes": true,
+          "owner_required": true,
+          "policy_required": true,
+          "reason_required": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "face_lifecycle": {
+        "audit": "FaceAuditEvent",
+        "consent": "FaceConsent",
+        "emotion": "EmotionGovernance",
+        "identification": "FaceIdentification",
+        "liveness": "FaceLiveness",
+        "review": "FaceReview",
+        "template": "FaceTemplate",
+        "verification": "FaceVerification",
+        "watchlist": "FaceWatchlist"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Facial Recognition",
       "provides": [
         "frec_operations"
       ],
-      "requires": [],
+      "requires": [
+        "biop",
+        "cvsn",
+        "aicr"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -77,6 +202,45 @@
           },
           {
             "condition": {
+              "operation": "record_face_consent",
+              "subject_present": false
+            },
+            "description": "Face consent requires a subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_subject_required",
+              "required_action": "select_subject"
+            },
+            "name": "face_consent_requires_subject"
+          },
+          {
+            "condition": {
+              "operation": "record_face_consent",
+              "purpose_present": false
+            },
+            "description": "Face consent requires a purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_consent_purpose_required",
+              "required_action": "record_consent_purpose"
+            },
+            "name": "face_consent_requires_purpose"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_face_consent"
+            },
+            "description": "Face consent requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_consent_evidence_required",
+              "required_action": "attach_consent_evidence"
+            },
+            "name": "face_consent_requires_evidence"
+          },
+          {
+            "condition": {
               "consent_recorded": false,
               "operation": "enroll_face"
             },
@@ -90,16 +254,119 @@
           },
           {
             "condition": {
-              "operation": "identify_face",
-              "watchlist_policy_attached": false
+              "active_consent_present": false,
+              "operation": "enroll_face"
             },
-            "description": "Identification requires an active watchlist policy.",
+            "description": "Face enrollment requires active consent.",
             "effect": {
               "decision": "deny",
-              "reason": "watchlist_policy_required",
-              "required_action": "attach_watchlist_policy"
+              "reason": "active_face_consent_required",
+              "required_action": "record_or_restore_face_consent"
             },
-            "name": "identification_requires_watchlist_policy"
+            "name": "face_enrollment_requires_active_consent"
+          },
+          {
+            "condition": {
+              "operation": "enroll_face",
+              "template_hash_present": false
+            },
+            "description": "Face enrollment requires a template hash.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_template_hash_required",
+              "required_action": "attach_face_template_hash"
+            },
+            "name": "face_template_requires_hash"
+          },
+          {
+            "condition": {
+              "operation": "enroll_face",
+              "template_encrypted": false
+            },
+            "description": "Face templates require encryption evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_template_encryption_required",
+              "required_action": "encrypt_face_template"
+            },
+            "name": "face_template_requires_encryption"
+          },
+          {
+            "condition": {
+              "face_quality_lt": 0.72,
+              "operation": "enroll_face"
+            },
+            "description": "Face quality must meet tenant threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_quality_too_low",
+              "required_action": "recapture_face"
+            },
+            "name": "face_quality_requires_threshold"
+          },
+          {
+            "condition": {
+              "face_quality_lt": 0.72,
+              "recapture_completed": false
+            },
+            "description": "Low-quality face captures require recapture or review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_face_quality",
+              "required_action": "recapture_or_review"
+            },
+            "name": "low_face_quality_requires_recapture"
+          },
+          {
+            "condition": {
+              "raw_face_image_retention_requested": true
+            },
+            "description": "Raw face images may not be retained in the package runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "raw_face_image_retention_denied",
+              "required_action": "store_template_metadata_only"
+            },
+            "name": "raw_face_image_retention_denied"
+          },
+          {
+            "condition": {
+              "active_template_present": false,
+              "operation": "verify_face"
+            },
+            "description": "Face verification requires an active template.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_face_template_required",
+              "required_action": "enroll_active_face_template"
+            },
+            "name": "verification_requires_active_template"
+          },
+          {
+            "condition": {
+              "operation": "verify_face",
+              "subject_matches_template": false
+            },
+            "description": "Face verification subject must match template subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_template_subject_mismatch",
+              "required_action": "select_subject_template"
+            },
+            "name": "verification_requires_subject_template_match"
+          },
+          {
+            "condition": {
+              "liveness_present": false,
+              "operation": "verify_face"
+            },
+            "description": "Face verification requires liveness evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "liveness_required",
+              "required_action": "complete_liveness_check"
+            },
+            "name": "verification_requires_liveness"
           },
           {
             "condition": {
@@ -116,6 +383,139 @@
           },
           {
             "condition": {
+              "liveness_score_lt": 0.84,
+              "operation": "authenticate_face"
+            },
+            "description": "Liveness score must meet tenant threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "liveness_required",
+              "required_action": "complete_liveness_check"
+            },
+            "name": "liveness_score_requires_threshold"
+          },
+          {
+            "condition": {
+              "operation": "authenticate_face",
+              "spoof_detected": true
+            },
+            "description": "Spoof signals block facial authentication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_spoof_detected",
+              "required_action": "escalate_security_review"
+            },
+            "name": "spoof_signal_blocks_face_authentication"
+          },
+          {
+            "condition": {
+              "deepfake_detected": true,
+              "operation": "authenticate_face"
+            },
+            "description": "Deepfake signals block facial authentication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_deepfake_detected",
+              "required_action": "escalate_security_review"
+            },
+            "name": "deepfake_signal_blocks_face_authentication"
+          },
+          {
+            "condition": {
+              "match_confidence_lt": 0.88,
+              "operation": "verify_face",
+              "review_recorded": false
+            },
+            "description": "Face verification confidence must meet tenant threshold.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_face_match_confidence",
+              "required_action": "review_face_match"
+            },
+            "name": "verification_confidence_requires_threshold"
+          },
+          {
+            "condition": {
+              "operation": "identify_face",
+              "watchlist_policy_attached": false
+            },
+            "description": "Identification requires an active watchlist policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "watchlist_policy_required",
+              "required_action": "attach_watchlist_policy"
+            },
+            "name": "identification_requires_watchlist_policy"
+          },
+          {
+            "condition": {
+              "operation": "create_watchlist",
+              "owner_present": false
+            },
+            "description": "Watchlists require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "watchlist_owner_required",
+              "required_action": "assign_watchlist_owner"
+            },
+            "name": "watchlist_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_watchlist",
+              "reason_present": false
+            },
+            "description": "Watchlists require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "watchlist_reason_required",
+              "required_action": "record_watchlist_reason"
+            },
+            "name": "watchlist_requires_reason"
+          },
+          {
+            "condition": {
+              "active_template_present": false,
+              "operation": "add_watchlist_subject"
+            },
+            "description": "Watchlist subjects require active face templates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_face_template_required",
+              "required_action": "enroll_active_face_template"
+            },
+            "name": "watchlist_subject_requires_active_template"
+          },
+          {
+            "condition": {
+              "operation": "identify_face",
+              "review_recorded": false,
+              "watchlist_hit": true
+            },
+            "description": "Watchlist hits require review evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "watchlist_hit_review_required",
+              "required_action": "review_watchlist_hit"
+            },
+            "name": "watchlist_hit_requires_review"
+          },
+          {
+            "condition": {
+              "identification_confidence_lt": 0.92,
+              "operation": "identify_face",
+              "review_recorded": false
+            },
+            "description": "Face identification confidence must meet tenant threshold.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_identification_confidence",
+              "required_action": "review_identification_match"
+            },
+            "name": "identification_confidence_requires_threshold"
+          },
+          {
+            "condition": {
               "approved_purpose_recorded": false,
               "emotion_analysis_requested": true
             },
@@ -129,16 +529,120 @@
           },
           {
             "condition": {
-              "face_quality_lt": 0.72,
-              "recapture_completed": false
+              "aggregate_only": false,
+              "individual_emotion_approval_recorded": false,
+              "operation": "analyze_emotion"
             },
-            "description": "Low-quality face captures require recapture or review.",
+            "description": "Emotion analysis defaults to aggregate-only outputs.",
             "effect": {
-              "decision": "require_review",
-              "reason": "low_face_quality",
-              "required_action": "recapture_or_review"
+              "decision": "deny",
+              "reason": "individual_emotion_approval_required",
+              "required_action": "record_individual_emotion_approval"
             },
-            "name": "low_face_quality_requires_recapture"
+            "name": "emotion_analysis_requires_aggregate_mode"
+          },
+          {
+            "condition": {
+              "operation": "decide_review",
+              "reviewer_same_as_requester": true
+            },
+            "description": "Face recognition reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_face_review_required",
+              "required_action": "route_to_independent_reviewer"
+            },
+            "name": "review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "notes_present": false,
+              "operation": "decide_review"
+            },
+            "description": "Face recognition review decisions require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_review_notes_required",
+              "required_action": "record_review_notes"
+            },
+            "name": "review_decision_requires_notes"
+          },
+          {
+            "condition": {
+              "operation": "request_review",
+              "pending_review_exists": true
+            },
+            "description": "Duplicate pending face recognition reviews are blocked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_review_already_pending",
+              "required_action": "complete_existing_review"
+            },
+            "name": "duplicate_pending_review_blocked"
+          },
+          {
+            "condition": {
+              "operation": "retire_template",
+              "retirement_reason_present": false
+            },
+            "description": "Face template retirement requires a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_template_retirement_reason_required",
+              "required_action": "record_retirement_reason"
+            },
+            "name": "template_retirement_requires_reason"
+          },
+          {
+            "condition": {
+              "active_templates_retired": false,
+              "operation": "revoke_face_consent"
+            },
+            "description": "Face consent revocation requires active templates to be retired.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_consent_revocation_requires_template_retirement",
+              "required_action": "retire_templates_for_consent"
+            },
+            "name": "consent_revocation_retires_templates"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_face_mutation"
+            },
+            "description": "Batch facial recognition mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_face_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Facial recognition records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_face_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_face_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Facial recognition state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "face_audit_event_required",
+              "required_action": "record_face_audit_event"
+            },
+            "name": "face_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -158,6 +662,45 @@
         },
         {
           "condition": {
+            "operation": "record_face_consent",
+            "subject_present": false
+          },
+          "description": "Face consent requires a subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_subject_required",
+            "required_action": "select_subject"
+          },
+          "name": "face_consent_requires_subject"
+        },
+        {
+          "condition": {
+            "operation": "record_face_consent",
+            "purpose_present": false
+          },
+          "description": "Face consent requires a purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_consent_purpose_required",
+            "required_action": "record_consent_purpose"
+          },
+          "name": "face_consent_requires_purpose"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_face_consent"
+          },
+          "description": "Face consent requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_consent_evidence_required",
+            "required_action": "attach_consent_evidence"
+          },
+          "name": "face_consent_requires_evidence"
+        },
+        {
+          "condition": {
             "consent_recorded": false,
             "operation": "enroll_face"
           },
@@ -171,16 +714,119 @@
         },
         {
           "condition": {
-            "operation": "identify_face",
-            "watchlist_policy_attached": false
+            "active_consent_present": false,
+            "operation": "enroll_face"
           },
-          "description": "Identification requires an active watchlist policy.",
+          "description": "Face enrollment requires active consent.",
           "effect": {
             "decision": "deny",
-            "reason": "watchlist_policy_required",
-            "required_action": "attach_watchlist_policy"
+            "reason": "active_face_consent_required",
+            "required_action": "record_or_restore_face_consent"
           },
-          "name": "identification_requires_watchlist_policy"
+          "name": "face_enrollment_requires_active_consent"
+        },
+        {
+          "condition": {
+            "operation": "enroll_face",
+            "template_hash_present": false
+          },
+          "description": "Face enrollment requires a template hash.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_template_hash_required",
+            "required_action": "attach_face_template_hash"
+          },
+          "name": "face_template_requires_hash"
+        },
+        {
+          "condition": {
+            "operation": "enroll_face",
+            "template_encrypted": false
+          },
+          "description": "Face templates require encryption evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_template_encryption_required",
+            "required_action": "encrypt_face_template"
+          },
+          "name": "face_template_requires_encryption"
+        },
+        {
+          "condition": {
+            "face_quality_lt": 0.72,
+            "operation": "enroll_face"
+          },
+          "description": "Face quality must meet tenant threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_quality_too_low",
+            "required_action": "recapture_face"
+          },
+          "name": "face_quality_requires_threshold"
+        },
+        {
+          "condition": {
+            "face_quality_lt": 0.72,
+            "recapture_completed": false
+          },
+          "description": "Low-quality face captures require recapture or review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_face_quality",
+            "required_action": "recapture_or_review"
+          },
+          "name": "low_face_quality_requires_recapture"
+        },
+        {
+          "condition": {
+            "raw_face_image_retention_requested": true
+          },
+          "description": "Raw face images may not be retained in the package runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "raw_face_image_retention_denied",
+            "required_action": "store_template_metadata_only"
+          },
+          "name": "raw_face_image_retention_denied"
+        },
+        {
+          "condition": {
+            "active_template_present": false,
+            "operation": "verify_face"
+          },
+          "description": "Face verification requires an active template.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_face_template_required",
+            "required_action": "enroll_active_face_template"
+          },
+          "name": "verification_requires_active_template"
+        },
+        {
+          "condition": {
+            "operation": "verify_face",
+            "subject_matches_template": false
+          },
+          "description": "Face verification subject must match template subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_template_subject_mismatch",
+            "required_action": "select_subject_template"
+          },
+          "name": "verification_requires_subject_template_match"
+        },
+        {
+          "condition": {
+            "liveness_present": false,
+            "operation": "verify_face"
+          },
+          "description": "Face verification requires liveness evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "liveness_required",
+            "required_action": "complete_liveness_check"
+          },
+          "name": "verification_requires_liveness"
         },
         {
           "condition": {
@@ -197,6 +843,139 @@
         },
         {
           "condition": {
+            "liveness_score_lt": 0.84,
+            "operation": "authenticate_face"
+          },
+          "description": "Liveness score must meet tenant threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "liveness_required",
+            "required_action": "complete_liveness_check"
+          },
+          "name": "liveness_score_requires_threshold"
+        },
+        {
+          "condition": {
+            "operation": "authenticate_face",
+            "spoof_detected": true
+          },
+          "description": "Spoof signals block facial authentication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_spoof_detected",
+            "required_action": "escalate_security_review"
+          },
+          "name": "spoof_signal_blocks_face_authentication"
+        },
+        {
+          "condition": {
+            "deepfake_detected": true,
+            "operation": "authenticate_face"
+          },
+          "description": "Deepfake signals block facial authentication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_deepfake_detected",
+            "required_action": "escalate_security_review"
+          },
+          "name": "deepfake_signal_blocks_face_authentication"
+        },
+        {
+          "condition": {
+            "match_confidence_lt": 0.88,
+            "operation": "verify_face",
+            "review_recorded": false
+          },
+          "description": "Face verification confidence must meet tenant threshold.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_face_match_confidence",
+            "required_action": "review_face_match"
+          },
+          "name": "verification_confidence_requires_threshold"
+        },
+        {
+          "condition": {
+            "operation": "identify_face",
+            "watchlist_policy_attached": false
+          },
+          "description": "Identification requires an active watchlist policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "watchlist_policy_required",
+            "required_action": "attach_watchlist_policy"
+          },
+          "name": "identification_requires_watchlist_policy"
+        },
+        {
+          "condition": {
+            "operation": "create_watchlist",
+            "owner_present": false
+          },
+          "description": "Watchlists require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "watchlist_owner_required",
+            "required_action": "assign_watchlist_owner"
+          },
+          "name": "watchlist_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_watchlist",
+            "reason_present": false
+          },
+          "description": "Watchlists require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "watchlist_reason_required",
+            "required_action": "record_watchlist_reason"
+          },
+          "name": "watchlist_requires_reason"
+        },
+        {
+          "condition": {
+            "active_template_present": false,
+            "operation": "add_watchlist_subject"
+          },
+          "description": "Watchlist subjects require active face templates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_face_template_required",
+            "required_action": "enroll_active_face_template"
+          },
+          "name": "watchlist_subject_requires_active_template"
+        },
+        {
+          "condition": {
+            "operation": "identify_face",
+            "review_recorded": false,
+            "watchlist_hit": true
+          },
+          "description": "Watchlist hits require review evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "watchlist_hit_review_required",
+            "required_action": "review_watchlist_hit"
+          },
+          "name": "watchlist_hit_requires_review"
+        },
+        {
+          "condition": {
+            "identification_confidence_lt": 0.92,
+            "operation": "identify_face",
+            "review_recorded": false
+          },
+          "description": "Face identification confidence must meet tenant threshold.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_identification_confidence",
+            "required_action": "review_identification_match"
+          },
+          "name": "identification_confidence_requires_threshold"
+        },
+        {
+          "condition": {
             "approved_purpose_recorded": false,
             "emotion_analysis_requested": true
           },
@@ -210,25 +989,141 @@
         },
         {
           "condition": {
-            "face_quality_lt": 0.72,
-            "recapture_completed": false
+            "aggregate_only": false,
+            "individual_emotion_approval_recorded": false,
+            "operation": "analyze_emotion"
           },
-          "description": "Low-quality face captures require recapture or review.",
+          "description": "Emotion analysis defaults to aggregate-only outputs.",
           "effect": {
-            "decision": "require_review",
-            "reason": "low_face_quality",
-            "required_action": "recapture_or_review"
+            "decision": "deny",
+            "reason": "individual_emotion_approval_required",
+            "required_action": "record_individual_emotion_approval"
           },
-          "name": "low_face_quality_requires_recapture"
+          "name": "emotion_analysis_requires_aggregate_mode"
+        },
+        {
+          "condition": {
+            "operation": "decide_review",
+            "reviewer_same_as_requester": true
+          },
+          "description": "Face recognition reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_face_review_required",
+            "required_action": "route_to_independent_reviewer"
+          },
+          "name": "review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "notes_present": false,
+            "operation": "decide_review"
+          },
+          "description": "Face recognition review decisions require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_review_notes_required",
+            "required_action": "record_review_notes"
+          },
+          "name": "review_decision_requires_notes"
+        },
+        {
+          "condition": {
+            "operation": "request_review",
+            "pending_review_exists": true
+          },
+          "description": "Duplicate pending face recognition reviews are blocked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_review_already_pending",
+            "required_action": "complete_existing_review"
+          },
+          "name": "duplicate_pending_review_blocked"
+        },
+        {
+          "condition": {
+            "operation": "retire_template",
+            "retirement_reason_present": false
+          },
+          "description": "Face template retirement requires a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_template_retirement_reason_required",
+            "required_action": "record_retirement_reason"
+          },
+          "name": "template_retirement_requires_reason"
+        },
+        {
+          "condition": {
+            "active_templates_retired": false,
+            "operation": "revoke_face_consent"
+          },
+          "description": "Face consent revocation requires active templates to be retired.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_consent_revocation_requires_template_retirement",
+            "required_action": "retire_templates_for_consent"
+          },
+          "name": "consent_revocation_retires_templates"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_face_mutation"
+          },
+          "description": "Batch facial recognition mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_face_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Facial recognition records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_face_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_face_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Facial recognition state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "face_audit_event_required",
+            "required_action": "record_face_audit_event"
+          },
+          "name": "face_state_change_requires_audit"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "helper_runtime": "face_runtime.py",
+        "production_service": "service.py",
+        "service": "face_runtime.FrecService",
+        "views": "view_models.py"
       },
       "screens": {
+        "audit": {
+          "component": "FRECAuditTrail",
+          "permission": "frec:audit",
+          "route": "/frec/audit"
+        },
+        "consents": {
+          "component": "FaceConsentCenter",
+          "permission": "frec:enroll",
+          "route": "/frec/consents"
+        },
         "dashboard": {
           "component": "FRECDashboard",
           "permission": "frec:view",
@@ -254,10 +1149,25 @@
           "permission": "frec:verify",
           "route": "/frec/liveness"
         },
+        "reviews": {
+          "component": "FaceReviewQueue",
+          "permission": "frec:review",
+          "route": "/frec/reviews"
+        },
         "settings": {
           "component": "FRECSettings",
           "permission": "frec:admin",
           "route": "/frec/settings"
+        },
+        "subjects": {
+          "component": "FaceSubjectRegistry",
+          "permission": "frec:view",
+          "route": "/frec/subjects"
+        },
+        "templates": {
+          "component": "FaceTemplateGallery",
+          "permission": "frec:enroll",
+          "route": "/frec/templates"
         },
         "verification": {
           "component": "FaceVerification",
@@ -270,9 +1180,23 @@
           "route": "/frec/watchlists"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "identity-chip",
+            "visual": "event-timeline"
+          },
+          "consent_scope": {
+            "status_style": "consent-chip",
+            "visual": "scope-ledger"
+          },
+          "emotion_governance": {
+            "status_style": "aggregate-chip",
+            "visual": "purpose-ledger"
+          },
           "face_quality_panel": {
             "icon": "scan-face",
             "risk_style": "capture-band",
@@ -285,6 +1209,14 @@
           "match_gallery": {
             "highlight": "confidence-chip",
             "visual": "ranked-face-grid"
+          },
+          "review_queue": {
+            "status_style": "review-chip",
+            "visual": "decision-lane"
+          },
+          "template_gallery": {
+            "status_style": "template-chip",
+            "visual": "encrypted-face-grid"
           },
           "watchlist_table": {
             "status_style": "policy-chip",
@@ -318,10 +1250,31 @@
             "permission": "frec:view"
           },
           {
+            "component": "FaceSubjectRegistry",
+            "name": "subjects",
+            "nav_group": "Identity",
+            "path": "/frec/subjects",
+            "permission": "frec:view"
+          },
+          {
+            "component": "FaceConsentCenter",
+            "name": "consents",
+            "nav_group": "Identity",
+            "path": "/frec/consents",
+            "permission": "frec:enroll"
+          },
+          {
             "component": "FaceEnrollment",
             "name": "enrollment",
             "nav_group": "Identity",
             "path": "/frec/enrollment",
+            "permission": "frec:enroll"
+          },
+          {
+            "component": "FaceTemplateGallery",
+            "name": "templates",
+            "nav_group": "Identity",
+            "path": "/frec/templates",
             "permission": "frec:enroll"
           },
           {
@@ -346,6 +1299,20 @@
             "permission": "frec:verify"
           },
           {
+            "component": "WatchlistManager",
+            "name": "watchlists",
+            "nav_group": "Governance",
+            "path": "/frec/watchlists",
+            "permission": "frec:manage_watchlists"
+          },
+          {
+            "component": "FaceReviewQueue",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/frec/reviews",
+            "permission": "frec:review"
+          },
+          {
             "component": "EmotionGovernance",
             "name": "emotion",
             "nav_group": "Governance",
@@ -353,11 +1320,11 @@
             "permission": "frec:admin"
           },
           {
-            "component": "WatchlistManager",
-            "name": "watchlists",
+            "component": "FRECAuditTrail",
+            "name": "audit",
             "nav_group": "Governance",
-            "path": "/frec/watchlists",
-            "permission": "frec:manage_watchlists"
+            "path": "/frec/audit",
+            "permission": "frec:audit"
           },
           {
             "component": "FRECSettings",
@@ -372,7 +1339,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -380,16 +1347,62 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "frec": []
+      "frec": [
+        "biop",
+        "cvsn",
+        "aicr"
+      ]
     }
   },
   "contracts": {
     "frec": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "biometric_processing": "biop",
+          "cache": "cach",
+          "computer_vision": "cvsn",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "face_runtime.FrecService",
+          "helper_runtime": "face_runtime.py",
+          "metrics_sink": "moni",
+          "mfa_provider": "mfau",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "view_models": "view_models.py"
+        },
+        "consent": {
+          "explicit_consent_required": true,
+          "purpose_required": true,
+          "revocation_supported": true
+        },
         "emotion": {
           "aggregate_only_by_default": true,
           "emotion_analysis_enabled": false,
-          "explicit_purpose_required": true
+          "explicit_purpose_required": true,
+          "raw_emotion_retention": "disabled"
+        },
+        "enrollment": {
+          "active_consent_required": true,
+          "retention_policy_required": true,
+          "template_encryption_required": true,
+          "template_hash_required": true
+        },
+        "governance": {
+          "audit_enrollment": true,
+          "audit_identification": true,
+          "audit_verification": true,
+          "audit_watchlists": true,
+          "require_tenant_context": true
+        },
+        "identification": {
+          "review_low_confidence_matches": true,
+          "review_watchlist_hits": true,
+          "watchlist_policy_required": true
         },
         "liveness": {
           "anti_spoofing_enabled": true,
@@ -397,9 +1410,16 @@
           "minimum_liveness_score": 0.84,
           "required_for_authentication": true
         },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
         "privacy": {
           "audit_identification": true,
           "explicit_consent_required": true,
+          "privacy_review_for_sensitive_watchlists": true,
           "template_encryption_required": true,
           "watchlist_policy_required": true
         },
@@ -410,8 +1430,25 @@
             "watchlist_matching"
           ],
           "identification_threshold": 0.92,
+          "low_confidence_review_threshold": 0.8,
           "minimum_face_quality": 0.72,
           "verification_threshold": 0.88
+        },
+        "reviews": {
+          "duplicate_pending_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true
+        },
+        "security": {
+          "audit_state_changes": true,
+          "raw_face_image_retention_allowed": false,
+          "tenant_isolation_required": true
+        },
+        "templates": {
+          "encrypted_storage_required": true,
+          "raw_image_retention": "disabled",
+          "retirement_supported": true,
+          "template_rotation_days": 365
         },
         "tenant_id": "default",
         "theme": {
@@ -419,17 +1456,42 @@
           "default_theme": "frec_identity_vision"
         },
         "ui": {
+          "enable_audit": true,
+          "enable_consent_center": true,
+          "enable_emotion_governance": true,
           "enable_enrollment_console": true,
+          "enable_identification_workbench": true,
           "enable_identity_dashboard": true,
-          "enable_privacy_center": true,
+          "enable_liveness_console": true,
+          "enable_review_queue": true,
+          "enable_settings": true,
+          "enable_subject_registry": true,
+          "enable_template_gallery": true,
+          "enable_verification_workbench": true,
           "enable_watchlist_manager": true
+        },
+        "verification": {
+          "active_template_required": true,
+          "liveness_required": true,
+          "review_low_confidence": true,
+          "subject_template_match_required": true
+        },
+        "watchlists": {
+          "audit_membership_changes": true,
+          "owner_required": true,
+          "policy_required": true,
+          "reason_required": true
         }
       },
       "id": "frec",
       "provides": [
         "frec_operations"
       ],
-      "requires": []
+      "requires": [
+        "biop",
+        "cvsn",
+        "aicr"
+      ]
     }
   },
   "deployment": {
@@ -441,7 +1503,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -475,6 +1537,84 @@
       },
       "name": "authentication_requires_liveness"
     },
+    "batch_face_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_face_mutation"
+      },
+      "description": "Batch facial recognition mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_face_mutation_requires_bytewax"
+    },
+    "consent_revocation_retires_templates": {
+      "condition": {
+        "active_templates_retired": false,
+        "operation": "revoke_face_consent"
+      },
+      "description": "Face consent revocation requires active templates to be retired.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_consent_revocation_requires_template_retirement",
+        "required_action": "retire_templates_for_consent"
+      },
+      "name": "consent_revocation_retires_templates"
+    },
+    "cross_tenant_face_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Facial recognition records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_face_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_face_access_denied"
+    },
+    "deepfake_signal_blocks_face_authentication": {
+      "condition": {
+        "deepfake_detected": true,
+        "operation": "authenticate_face"
+      },
+      "description": "Deepfake signals block facial authentication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_deepfake_detected",
+        "required_action": "escalate_security_review"
+      },
+      "name": "deepfake_signal_blocks_face_authentication"
+    },
+    "duplicate_pending_review_blocked": {
+      "condition": {
+        "operation": "request_review",
+        "pending_review_exists": true
+      },
+      "description": "Duplicate pending face recognition reviews are blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_review_already_pending",
+        "required_action": "complete_existing_review"
+      },
+      "name": "duplicate_pending_review_blocked"
+    },
+    "emotion_analysis_requires_aggregate_mode": {
+      "condition": {
+        "aggregate_only": false,
+        "individual_emotion_approval_recorded": false,
+        "operation": "analyze_emotion"
+      },
+      "description": "Emotion analysis defaults to aggregate-only outputs.",
+      "effect": {
+        "decision": "deny",
+        "reason": "individual_emotion_approval_required",
+        "required_action": "record_individual_emotion_approval"
+      },
+      "name": "emotion_analysis_requires_aggregate_mode"
+    },
     "emotion_analysis_requires_explicit_purpose": {
       "condition": {
         "approved_purpose_recorded": false,
@@ -487,6 +1627,58 @@
         "required_action": "record_approved_purpose"
       },
       "name": "emotion_analysis_requires_explicit_purpose"
+    },
+    "face_consent_requires_evidence": {
+      "condition": {
+        "evidence_present": false,
+        "operation": "record_face_consent"
+      },
+      "description": "Face consent requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_consent_evidence_required",
+        "required_action": "attach_consent_evidence"
+      },
+      "name": "face_consent_requires_evidence"
+    },
+    "face_consent_requires_purpose": {
+      "condition": {
+        "operation": "record_face_consent",
+        "purpose_present": false
+      },
+      "description": "Face consent requires a purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_consent_purpose_required",
+        "required_action": "record_consent_purpose"
+      },
+      "name": "face_consent_requires_purpose"
+    },
+    "face_consent_requires_subject": {
+      "condition": {
+        "operation": "record_face_consent",
+        "subject_present": false
+      },
+      "description": "Face consent requires a subject.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_subject_required",
+        "required_action": "select_subject"
+      },
+      "name": "face_consent_requires_subject"
+    },
+    "face_enrollment_requires_active_consent": {
+      "condition": {
+        "active_consent_present": false,
+        "operation": "enroll_face"
+      },
+      "description": "Face enrollment requires active consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_face_consent_required",
+        "required_action": "record_or_restore_face_consent"
+      },
+      "name": "face_enrollment_requires_active_consent"
     },
     "face_enrollment_requires_consent": {
       "condition": {
@@ -501,6 +1693,72 @@
       },
       "name": "face_enrollment_requires_consent"
     },
+    "face_quality_requires_threshold": {
+      "condition": {
+        "face_quality_lt": 0.72,
+        "operation": "enroll_face"
+      },
+      "description": "Face quality must meet tenant threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_quality_too_low",
+        "required_action": "recapture_face"
+      },
+      "name": "face_quality_requires_threshold"
+    },
+    "face_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Facial recognition state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_audit_event_required",
+        "required_action": "record_face_audit_event"
+      },
+      "name": "face_state_change_requires_audit"
+    },
+    "face_template_requires_encryption": {
+      "condition": {
+        "operation": "enroll_face",
+        "template_encrypted": false
+      },
+      "description": "Face templates require encryption evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_template_encryption_required",
+        "required_action": "encrypt_face_template"
+      },
+      "name": "face_template_requires_encryption"
+    },
+    "face_template_requires_hash": {
+      "condition": {
+        "operation": "enroll_face",
+        "template_hash_present": false
+      },
+      "description": "Face enrollment requires a template hash.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_template_hash_required",
+        "required_action": "attach_face_template_hash"
+      },
+      "name": "face_template_requires_hash"
+    },
+    "identification_confidence_requires_threshold": {
+      "condition": {
+        "identification_confidence_lt": 0.92,
+        "operation": "identify_face",
+        "review_recorded": false
+      },
+      "description": "Face identification confidence must meet tenant threshold.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_identification_confidence",
+        "required_action": "review_identification_match"
+      },
+      "name": "identification_confidence_requires_threshold"
+    },
     "identification_requires_watchlist_policy": {
       "condition": {
         "operation": "identify_face",
@@ -513,6 +1771,19 @@
         "required_action": "attach_watchlist_policy"
       },
       "name": "identification_requires_watchlist_policy"
+    },
+    "liveness_score_requires_threshold": {
+      "condition": {
+        "liveness_score_lt": 0.84,
+        "operation": "authenticate_face"
+      },
+      "description": "Liveness score must meet tenant threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "liveness_required",
+        "required_action": "complete_liveness_check"
+      },
+      "name": "liveness_score_requires_threshold"
     },
     "low_face_quality_requires_recapture": {
       "condition": {
@@ -527,6 +1798,70 @@
       },
       "name": "low_face_quality_requires_recapture"
     },
+    "raw_face_image_retention_denied": {
+      "condition": {
+        "raw_face_image_retention_requested": true
+      },
+      "description": "Raw face images may not be retained in the package runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "raw_face_image_retention_denied",
+        "required_action": "store_template_metadata_only"
+      },
+      "name": "raw_face_image_retention_denied"
+    },
+    "review_decision_requires_notes": {
+      "condition": {
+        "notes_present": false,
+        "operation": "decide_review"
+      },
+      "description": "Face recognition review decisions require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_review_notes_required",
+        "required_action": "record_review_notes"
+      },
+      "name": "review_decision_requires_notes"
+    },
+    "review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "decide_review",
+        "reviewer_same_as_requester": true
+      },
+      "description": "Face recognition reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_face_review_required",
+        "required_action": "route_to_independent_reviewer"
+      },
+      "name": "review_requires_independent_reviewer"
+    },
+    "spoof_signal_blocks_face_authentication": {
+      "condition": {
+        "operation": "authenticate_face",
+        "spoof_detected": true
+      },
+      "description": "Spoof signals block facial authentication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_spoof_detected",
+        "required_action": "escalate_security_review"
+      },
+      "name": "spoof_signal_blocks_face_authentication"
+    },
+    "template_retirement_requires_reason": {
+      "condition": {
+        "operation": "retire_template",
+        "retirement_reason_present": false
+      },
+      "description": "Face template retirement requires a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_template_retirement_reason_required",
+        "required_action": "record_retirement_reason"
+      },
+      "name": "template_retirement_requires_reason"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -538,11 +1873,124 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "verification_confidence_requires_threshold": {
+      "condition": {
+        "match_confidence_lt": 0.88,
+        "operation": "verify_face",
+        "review_recorded": false
+      },
+      "description": "Face verification confidence must meet tenant threshold.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_face_match_confidence",
+        "required_action": "review_face_match"
+      },
+      "name": "verification_confidence_requires_threshold"
+    },
+    "verification_requires_active_template": {
+      "condition": {
+        "active_template_present": false,
+        "operation": "verify_face"
+      },
+      "description": "Face verification requires an active template.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_face_template_required",
+        "required_action": "enroll_active_face_template"
+      },
+      "name": "verification_requires_active_template"
+    },
+    "verification_requires_liveness": {
+      "condition": {
+        "liveness_present": false,
+        "operation": "verify_face"
+      },
+      "description": "Face verification requires liveness evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "liveness_required",
+        "required_action": "complete_liveness_check"
+      },
+      "name": "verification_requires_liveness"
+    },
+    "verification_requires_subject_template_match": {
+      "condition": {
+        "operation": "verify_face",
+        "subject_matches_template": false
+      },
+      "description": "Face verification subject must match template subject.",
+      "effect": {
+        "decision": "deny",
+        "reason": "face_template_subject_mismatch",
+        "required_action": "select_subject_template"
+      },
+      "name": "verification_requires_subject_template_match"
+    },
+    "watchlist_hit_requires_review": {
+      "condition": {
+        "operation": "identify_face",
+        "review_recorded": false,
+        "watchlist_hit": true
+      },
+      "description": "Watchlist hits require review evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "watchlist_hit_review_required",
+        "required_action": "review_watchlist_hit"
+      },
+      "name": "watchlist_hit_requires_review"
+    },
+    "watchlist_requires_owner": {
+      "condition": {
+        "operation": "create_watchlist",
+        "owner_present": false
+      },
+      "description": "Watchlists require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "watchlist_owner_required",
+        "required_action": "assign_watchlist_owner"
+      },
+      "name": "watchlist_requires_owner"
+    },
+    "watchlist_requires_reason": {
+      "condition": {
+        "operation": "create_watchlist",
+        "reason_present": false
+      },
+      "description": "Watchlists require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "watchlist_reason_required",
+        "required_action": "record_watchlist_reason"
+      },
+      "name": "watchlist_requires_reason"
+    },
+    "watchlist_subject_requires_active_template": {
+      "condition": {
+        "active_template_present": false,
+        "operation": "add_watchlist_subject"
+      },
+      "description": "Watchlist subjects require active face templates.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_face_template_required",
+        "required_action": "enroll_active_face_template"
+      },
+      "name": "watchlist_subject_requires_active_template"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "face_runtime.py",
+    "service.py",
+    "api_helpers.py",
+    "view_models.py",
+    "api.py",
+    "views.py"
   ],
   "symbols": {
     "capability.frec": {

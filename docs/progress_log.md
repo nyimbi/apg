@@ -14785,3 +14785,66 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Load, latency, biometric-quality, liveness-quality, privacy, authorization,
   and throughput benchmarks.
+
+### 2026-05-30 12:07 EAT
+
+FREC lifecycle and guardrail packet:
+
+- Selected `capabilities/common/frec` as the next common capability after BIOP
+  in the development order.
+- Added root `README.md` for generated-app usage, composition boundaries,
+  consent/enrollment/liveness/verification/watchlist/review/emotion/audit
+  examples, and adapter notes.
+- Added `SPECIFICATION.md` and `PLAN.md`, and replaced `cap_spec.md` with a
+  pointer to the active specification.
+- Expanded the FREC contract to cover tenant context, consent, recognition,
+  enrollment, template storage, liveness, verification, identification,
+  watchlists, emotion governance, privacy, review, security, governance,
+  observability, adapters, UI routes, and visual theme tokens.
+- Expanded deterministic guardrails to 35 rules covering consent evidence,
+  active consent, template hashes, template encryption, face quality, raw-image
+  retention denial, liveness, spoof/deepfake detection, match-confidence review,
+  watchlist policy, watchlist ownership/reason, watchlist-hit review, emotion
+  approval, independent review, duplicate review blocking, template retirement,
+  Bytewax batch mutation, tenant isolation, and audit requirements.
+- Added `face_runtime.py` with a deterministic tenant-scoped generated-app
+  runtime for consent, templates, liveness, verification, watchlists,
+  identification, reviews, emotion events, dashboard summaries, packages, and
+  audit events.
+- Hardened runtime storage to key records by tenant and record ID, allowing
+  same record IDs in separate tenants while denying cross-tenant record access.
+- Added `api_helpers.py` and `view_models.py` for generated API and screen
+  payloads.
+- Replaced static `app.py` evidence with a contract-derived semantic model and
+  self-test that checks rule count, route count, Bytewax event streaming, and
+  generated runtime metadata.
+- Updated capability registration with richer provides, permissions, UI
+  components, endpoints, optional dependencies, and adapter evidence.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale materialized terminology.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/frec/__init__.py capabilities/common/frec/capability_contract.py capabilities/common/frec/face_runtime.py capabilities/common/frec/api_helpers.py capabilities/common/frec/view_models.py capabilities/common/frec/app.py capabilities/common/frec/test_capability_contract.py capabilities/common/frec/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/frec/test_capability_contract.py capabilities/common/frec/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and FREC capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/frec --json` passed with `ok: true`; FREC remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/frec --json` passed with 13 UI routes, 35 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/frec/README.md capabilities/common/frec/SPECIFICATION.md capabilities/common/frec/PLAN.md capabilities/common/frec/cap_spec.md capabilities/common/frec/__init__.py capabilities/common/frec/capability_contract.py capabilities/common/frec/face_runtime.py capabilities/common/frec/api_helpers.py capabilities/common/frec/view_models.py capabilities/common/frec/app.py capabilities/common/frec/test_capability_contract.py capabilities/common/frec/tests/test_package_contract.py capabilities/common/frec/package_manifest.json capabilities/common/frec/release_report.json capabilities/common/frec/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/frec docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Legacy deep FREC service, Flask, Flask-AppBuilder, production API/views, face
+  engines, privacy engines, encryption adapters, and older generated docs/tests
+  outside the primary packet.
+- Live camera capture hardware, face recognition models, liveness/deepfake
+  providers, template vaults, model inference, or external privacy engines.
+- Live Bytewax stream execution.
+- External BIOP, CVSN, AICR, AUTH, AUDL, ENCR, MFAU, CACH, and MONI adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Load, latency, match-quality, liveness-quality, privacy, authorization,
+  accuracy, bias, and throughput benchmarks.

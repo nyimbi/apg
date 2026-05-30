@@ -24,8 +24,18 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["face_enrollment", "face_verification", "face_identification", "face_liveness", "watchlist_matching"],
-	"permissions": ["frec:view", "frec:enroll", "frec:verify", "frec:identify", "frec:manage_watchlists", "frec:admin"]
+	"provides": [
+		"face_consent",
+		"face_enrollment",
+		"face_verification",
+		"face_identification",
+		"face_liveness",
+		"watchlist_matching",
+		"emotion_governance",
+		"face_reviews",
+		"face_audit",
+	],
+	"permissions": ["frec:view", "frec:enroll", "frec:verify", "frec:identify", "frec:manage_watchlists", "frec:review", "frec:audit", "frec:admin"]
 }
 
 
@@ -39,25 +49,35 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "encr", "mfau"],
+		"optional_dependencies": ["auth", "audl", "encr", "mfau", "moni", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
+			"face_consent": "Record, revoke, and audit facial-recognition consent",
 			"face_enrollment": "Enroll tenant-scoped facial templates with consent and quality gates",
 			"face_verification": "Verify one-to-one face matches with governed thresholds",
 			"face_identification": "Run one-to-many identification with watchlist policy controls",
-			"face_liveness": "Validate liveness and anti-spoofing evidence for authentication",
+			"face_liveness": "Validate liveness, anti-spoofing, and deepfake evidence for authentication",
+			"emotion_governance": "Gate emotion analysis behind explicit approved purpose",
+			"face_reviews": "Route low-confidence matches and watchlist hits to review",
 			"capability_rules": "Evaluate deterministic facial-recognition rules",
 			"visual_theming": "Apply identity-vision theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/frec/api/v1/status",
+			"consents": "/frec/api/v1/consents",
 			"enrollment": "/frec/api/v1/enrollment",
+			"templates": "/frec/api/v1/templates",
 			"verification": "/frec/api/v1/verification",
 			"identification": "/frec/api/v1/identification",
 			"liveness": "/frec/api/v1/liveness",
-			"watchlists": "/frec/api/v1/watchlists"
+			"watchlists": "/frec/api/v1/watchlists",
+			"reviews": "/frec/api/v1/reviews",
+			"emotion": "/frec/api/v1/emotion",
+			"audit": "/frec/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
