@@ -8,6 +8,11 @@ package-level composition gap is a dependency-light lifecycle facade that can
 execute audit governance without starting external storage, web servers, ML
 providers, or compliance systems.
 
+Packet 1 is implemented. The current packet extends that lifecycle with
+first-class audit agents, Bytewax stream guardrails, and UI/view metadata so
+generated applications can compose AUDL as an executable audit-governance
+building block.
+
 ## Packet 1: Governed Audit Evidence Lifecycle
 
 Deliver a focused lifecycle packet:
@@ -47,10 +52,33 @@ Deliver a focused lifecycle packet:
 9. Run focused package proof, implementation audit, publish-plan, and diff
    checks.
 
+## Packet 2: Audit Agent Composition And Bytewax Guardrails
+
+Deliver a focused agent and streaming packet:
+
+- add `AuditAgentRecord` as a tenant-scoped first-class AUDL model;
+- register audit agents for `codex`, `claude_code`, `opencode`, and `pi`
+  runtimes;
+- constrain audit agents to supported review roles;
+- require human approval for privileged legal-hold, export, purge,
+  investigation, and compliance roles;
+- validate audit batches before ingestion and require the Bytewax lifecycle
+  stream for batch work;
+- expose `/audit/agents`, agent roster theme metadata, and view models;
+- publish agent-team and streaming metadata in the semantic model;
+- remove stale generated overclaiming from AUDL package docs and file names;
+- run the focused contract, package, self-test, implementation-audit,
+  publish-plan, stale-marker, and diff checks.
+
 ## Review Checklist
 
 - Event, legal hold, export, purge, investigation, and governance state is
   tenant-qualified.
+- Audit-agent state is tenant-qualified and duplicate IDs remain isolated by
+  tenant.
+- Audit agents use supported runtimes and roles.
+- Privileged audit-agent roles require human approval.
+- Audit batch validation requires the Bytewax lifecycle stream.
 - Immutable event append verifies checksum when a checksum is supplied.
 - PII-bearing exports require masking.
 - Export decisions require reviewer identity and notes.

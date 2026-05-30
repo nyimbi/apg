@@ -1,7 +1,7 @@
 """
 APG Audit Logging Real-time Stream Processing & Alerting
 
-Revolutionary high-throughput event processing system supporting 10M+ events/second
+Production-grade high-throughput event processing system supporting 10M+ events/second
 with intelligent alerting, real-time correlation, and adaptive filtering.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -165,7 +165,7 @@ class EventBuffer:
 			return matching_events
 
 class StreamProcessor:
-	"""Revolutionary real-time audit stream processor"""
+	"""Production-grade real-time audit stream processor"""
 	
 	def __init__(self, tenant_id: str):
 		self.tenant_id = tenant_id

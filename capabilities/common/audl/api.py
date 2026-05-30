@@ -1,7 +1,7 @@
 """
 APG Audit Logging REST API
 
-Revolutionary audit logging API with natural language querying, real-time streaming,
+Production-grade audit logging API with natural language querying, real-time streaming,
 and comprehensive APG integration. Provides enterprise-grade audit management
 exceeding industry leader capabilities.
 
@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 # FastAPI app for high-performance async API
 app = FastAPI(
 	title="APG Audit Logging API",
-	description="Revolutionary audit trail management with ML-powered analytics",
+	description="Production-grade audit trail management with ML-powered analytics",
 	version="1.0.0",
 	openapi_tags=[
 		{"name": "events", "description": "Audit event operations"},
@@ -400,7 +400,7 @@ async def natural_language_search(
 	"""
 	Natural language audit log queries using APG NLP
 	
-	Revolutionary features:
+	Production-grade features:
 	- Conversational audit analysis with 95%+ query accuracy
 	- Intelligent query translation to complex search operations
 	- Context-aware query expansion and refinement

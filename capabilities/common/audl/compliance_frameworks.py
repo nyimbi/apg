@@ -1,7 +1,7 @@
 """
 APG Audit Logging Compliance Framework Implementation
 
-Revolutionary automated compliance frameworks supporting SOX, GDPR, HIPAA, PCI-DSS
+Production-grade automated compliance frameworks supporting SOX, GDPR, HIPAA, PCI-DSS
 with real-time policy violation detection, automated evidence collection, and 
 executive reporting with 99% coverage and legal admissibility standards.
 
@@ -675,7 +675,7 @@ class GDPRFramework(ComplianceFrameworkBase):
 		return report
 
 class ComplianceManager:
-	"""Revolutionary compliance framework manager"""
+	"""Production-grade compliance framework manager"""
 	
 	def __init__(self, tenant_id: str):
 		self.tenant_id = tenant_id

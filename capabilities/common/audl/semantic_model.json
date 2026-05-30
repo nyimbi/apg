@@ -1,5 +1,45 @@
 {
-  "agents": {},
+  "agents": {
+    "audl_agent_contract": {
+      "composition_points": [
+        "event_review",
+        "evidence_review",
+        "legal_hold_review",
+        "export_review",
+        "purge_review",
+        "investigation_review",
+        "compliance_review"
+      ],
+      "first_class": true,
+      "guardrails": [
+        "audit_agent_runtime_supported",
+        "audit_agent_role_supported",
+        "audit_agent_privileged_action_requires_approval"
+      ],
+      "privileged_roles": [
+        "compliance_reviewer",
+        "export_reviewer",
+        "investigation_reviewer",
+        "legal_hold_reviewer",
+        "purge_reviewer"
+      ],
+      "supported_roles": [
+        "audit_reviewer",
+        "evidence_reviewer",
+        "legal_hold_reviewer",
+        "export_reviewer",
+        "purge_reviewer",
+        "investigation_reviewer",
+        "compliance_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Audit Logging package-backed APG capability",
     "entity_count": 0,
@@ -8,10 +48,68 @@
   },
   "capabilities": {
     "audl": {
+      "agents": {
+        "composition_points": [
+          "event_review",
+          "evidence_review",
+          "legal_hold_review",
+          "export_review",
+          "purge_review",
+          "investigation_review",
+          "compliance_review"
+        ],
+        "first_class": true,
+        "guardrails": [
+          "audit_agent_runtime_supported",
+          "audit_agent_role_supported",
+          "audit_agent_privileged_action_requires_approval"
+        ],
+        "privileged_roles": [
+          "compliance_reviewer",
+          "export_reviewer",
+          "investigation_reviewer",
+          "legal_hold_reviewer",
+          "purge_reviewer"
+        ],
+        "supported_roles": [
+          "audit_reviewer",
+          "evidence_reviewer",
+          "legal_hold_reviewer",
+          "export_reviewer",
+          "purge_reviewer",
+          "investigation_reviewer",
+          "compliance_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
+        "agents": {
+          "enabled": true,
+          "privileged_roles_require_human_approval": true,
+          "supported_roles": [
+            "audit_reviewer",
+            "evidence_reviewer",
+            "legal_hold_reviewer",
+            "export_reviewer",
+            "purge_reviewer",
+            "investigation_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "compliance": {
           "enabled_frameworks": [
             "SOX",
@@ -27,6 +125,7 @@
           "checksum_verification_required": true,
           "default_batch_size": 1000,
           "immutable_storage_required": true,
+          "lifecycle_stream": "bytewax",
           "max_batch_size": 50000,
           "stream_processing_enabled": true
         },
@@ -49,6 +148,19 @@
           "default_retention_days": 2555,
           "legal_hold_enabled": true,
           "purge_requires_dual_control": true
+        },
+        "streaming": {
+          "engine": "bytewax",
+          "required_for_operations": [
+            "audit_batch",
+            "high_volume_ingestion"
+          ],
+          "topics": [
+            "audl.events",
+            "audl.governance",
+            "audl.agents"
+          ],
+          "watermark_field": "timestamp"
         },
         "tenant_id": "default",
         "theme": {
@@ -151,6 +263,59 @@
               "required_action": "enable_stream_processing"
             },
             "name": "high_volume_ingestion_requires_stream_processing"
+          },
+          {
+            "condition": {
+              "event_stream": "non_bytewax",
+              "requested_operation": "audit_batch"
+            },
+            "description": "Audit batch ingestion must use the Bytewax lifecycle stream.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_through_bytewax"
+            },
+            "name": "bytewax_event_stream_required"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "requested_operation": "register_audit_agent"
+            },
+            "description": "Audit agents must run on an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_agent_runtime_unsupported",
+              "required_action": "select_supported_audit_agent_runtime"
+            },
+            "name": "audit_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "requested_operation": "register_audit_agent"
+            },
+            "description": "Audit agents must use an approved AUDL role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_agent_role_unsupported",
+              "required_action": "select_supported_audit_agent_role"
+            },
+            "name": "audit_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "privileged_action": true,
+              "requested_operation": "register_audit_agent"
+            },
+            "description": "Privileged audit-agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_agent_human_approval_required",
+              "required_action": "enable_human_approval_for_privileged_audit_agent"
+            },
+            "name": "audit_agent_privileged_action_requires_approval"
           }
         ],
         "type": "deterministic"
@@ -233,6 +398,59 @@
             "required_action": "enable_stream_processing"
           },
           "name": "high_volume_ingestion_requires_stream_processing"
+        },
+        {
+          "condition": {
+            "event_stream": "non_bytewax",
+            "requested_operation": "audit_batch"
+          },
+          "description": "Audit batch ingestion must use the Bytewax lifecycle stream.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_through_bytewax"
+          },
+          "name": "bytewax_event_stream_required"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "requested_operation": "register_audit_agent"
+          },
+          "description": "Audit agents must run on an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_agent_runtime_unsupported",
+            "required_action": "select_supported_audit_agent_runtime"
+          },
+          "name": "audit_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "requested_operation": "register_audit_agent"
+          },
+          "description": "Audit agents must use an approved AUDL role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_agent_role_unsupported",
+            "required_action": "select_supported_audit_agent_role"
+          },
+          "name": "audit_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "privileged_action": true,
+            "requested_operation": "register_audit_agent"
+          },
+          "description": "Privileged audit-agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_agent_human_approval_required",
+            "required_action": "enable_human_approval_for_privileged_audit_agent"
+          },
+          "name": "audit_agent_privileged_action_requires_approval"
         }
       ],
       "runtime": {
@@ -245,6 +463,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "AuditAgentRoster",
+          "permission": "audl:admin",
+          "route": "/audit/agents"
+        },
         "compliance": {
           "component": "ComplianceControlCenter",
           "permission": "audl:compliance",
@@ -301,13 +524,40 @@
           "route": "/audit/timeline"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax",
+        "guardrails": [
+          "bytewax_event_stream_required",
+          "high_volume_ingestion_requires_stream_processing"
+        ],
+        "lifecycle_stream": "audl.lifecycle",
+        "required_for_operations": [
+          "audit_batch",
+          "high_volume_ingestion"
+        ],
+        "topics": [
+          "audl.events",
+          "audl.governance",
+          "audl.agents"
+        ],
+        "watermark_field": "timestamp"
+      },
       "theme": {
         "components": {
+          "audit_agent_roster": {
+            "approval_state": "human-review-chip",
+            "icon": "bot",
+            "runtime_badge": "inline"
+          },
           "audit_timeline": {
             "chain_of_custody_badge": "inline",
             "event_marker": "severity-dot",
             "orientation": "vertical"
+          },
+          "bytewax_stream_indicator": {
+            "icon": "activity",
+            "status_style": "stream-health",
+            "variant": "compact-meter"
           },
           "compliance_scorecard": {
             "status_variant": "stacked",
@@ -337,7 +587,7 @@
         },
         "name": "audl_forensics",
         "tokens": {
-          "border.radius": "10px",
+          "border.radius": "8px",
           "color.accent": "#C97A2B",
           "color.danger": "#B42318",
           "color.primary": "#0F4C5C",
@@ -412,6 +662,13 @@
             "permission": "audl:compliance"
           },
           {
+            "component": "AuditAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/audit/agents",
+            "permission": "audl:admin"
+          },
+          {
             "component": "AuditReportingStudio",
             "name": "reports",
             "nav_group": "Governance",
@@ -442,7 +699,31 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "audl_evidence_review": {
+        "capability": "audl",
+        "guardrails": [
+          "audit_agent_runtime_supported",
+          "audit_agent_role_supported",
+          "audit_agent_privileged_action_requires_approval"
+        ],
+        "roles": [
+          "audit_reviewer",
+          "evidence_reviewer",
+          "legal_hold_reviewer",
+          "export_reviewer",
+          "purge_reviewer",
+          "investigation_reviewer",
+          "compliance_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "audl": []
@@ -451,6 +732,25 @@
   "contracts": {
     "audl": {
       "configuration": {
+        "agents": {
+          "enabled": true,
+          "privileged_roles_require_human_approval": true,
+          "supported_roles": [
+            "audit_reviewer",
+            "evidence_reviewer",
+            "legal_hold_reviewer",
+            "export_reviewer",
+            "purge_reviewer",
+            "investigation_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "compliance": {
           "enabled_frameworks": [
             "SOX",
@@ -466,6 +766,7 @@
           "checksum_verification_required": true,
           "default_batch_size": 1000,
           "immutable_storage_required": true,
+          "lifecycle_stream": "bytewax",
           "max_batch_size": 50000,
           "stream_processing_enabled": true
         },
@@ -488,6 +789,19 @@
           "default_retention_days": 2555,
           "legal_hold_enabled": true,
           "purge_requires_dual_control": true
+        },
+        "streaming": {
+          "engine": "bytewax",
+          "required_for_operations": [
+            "audit_batch",
+            "high_volume_ingestion"
+          ],
+          "topics": [
+            "audl.events",
+            "audl.governance",
+            "audl.agents"
+          ],
+          "watermark_field": "timestamp"
         },
         "tenant_id": "default",
         "theme": {
@@ -538,6 +852,59 @@
   },
   "roles": {},
   "rules": {
+    "audit_agent_privileged_action_requires_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "privileged_action": true,
+        "requested_operation": "register_audit_agent"
+      },
+      "description": "Privileged audit-agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_agent_human_approval_required",
+        "required_action": "enable_human_approval_for_privileged_audit_agent"
+      },
+      "name": "audit_agent_privileged_action_requires_approval"
+    },
+    "audit_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "requested_operation": "register_audit_agent"
+      },
+      "description": "Audit agents must use an approved AUDL role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_agent_role_unsupported",
+        "required_action": "select_supported_audit_agent_role"
+      },
+      "name": "audit_agent_role_supported"
+    },
+    "audit_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "requested_operation": "register_audit_agent"
+      },
+      "description": "Audit agents must run on an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_agent_runtime_unsupported",
+        "required_action": "select_supported_audit_agent_runtime"
+      },
+      "name": "audit_agent_runtime_supported"
+    },
+    "bytewax_event_stream_required": {
+      "condition": {
+        "event_stream": "non_bytewax",
+        "requested_operation": "audit_batch"
+      },
+      "description": "Audit batch ingestion must use the Bytewax lifecycle stream.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_through_bytewax"
+      },
+      "name": "bytewax_event_stream_required"
+    },
     "critical_events_require_escalation": {
       "condition": {
         "escalation_configured": false,

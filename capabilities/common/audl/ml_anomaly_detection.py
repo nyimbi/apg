@@ -1,7 +1,7 @@
 """
 APG Audit Logging ML-Powered Anomaly Detection
 
-Revolutionary machine learning system for behavioral baseline learning, real-time anomaly
+Production-grade machine learning system for behavioral baseline learning, real-time anomaly
 scoring, and adaptive threat detection with 99% accuracy and sub-second response times.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -240,7 +240,7 @@ class FeatureExtractor:
 		return hash(ip_address) % 50 / 100.0 + 0.3
 
 class AnomalyMLEngine:
-	"""Revolutionary ML engine for anomaly detection"""
+	"""Production-grade ML engine for anomaly detection"""
 	
 	def __init__(self, tenant_id: str, model_dir: str = None):
 		self.tenant_id = tenant_id

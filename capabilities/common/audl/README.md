@@ -6,6 +6,64 @@
 
 The Audit Logging capability (`audl`) is a foundational security and compliance capability that provides comprehensive audit trail functionality for the APG platform. It captures, stores, and manages audit events across all system components with integrity verification, multi-tenant isolation, and advanced querying capabilities.
 
+## Current Executable Package
+
+The package-backed AUDL slice is dependency-light and can be composed by
+generated APG applications without starting Elasticsearch, Flask/FastAPI,
+external SIEM systems, ML providers, or a running Bytewax worker. The local
+runtime is `audit_runtime.AudlService`; generated apps should use
+`api_helpers.py` and `view_models.py` when they need a stable package surface.
+
+It currently provides:
+
+- tenant-scoped audit event append with checksum enforcement;
+- legal hold, regulated export, dual-control purge, and investigation
+  lifecycles;
+- first-class audit agent registration for `codex`, `claude_code`,
+  `opencode`, and `pi`;
+- role and approval guardrails for audit agents;
+- Bytewax lifecycle-stream metadata and batch validation guardrails;
+- UI/view-model surfaces for dashboards, evidence timelines, review queues,
+  compliance, rules, settings, and audit-agent rosters.
+
+### Dependency-Light Usage
+
+```python
+from capabilities.common.audl.audit_runtime import AudlService
+
+service = AudlService()
+
+event = service.append_event(
+    event_id="evt-001",
+    tenant_id="tenant-audl",
+    actor="security-analyst",
+    action="review_access",
+    resource_type="account",
+    resource_id="acct-001",
+    severity="critical",
+    escalation_configured=True,
+)
+
+agent = service.register_audit_agent(
+    agent_id="agent-001",
+    tenant_id="tenant-audl",
+    name="Evidence Reviewer",
+    runtime="codex",
+    role="evidence_reviewer",
+    purpose="Review chain-of-custody evidence before release.",
+    owner="security-lead",
+)
+
+batch = service.validate_batch(
+    tenant_id="tenant-audl",
+    record_count=12000,
+    event_stream="bytewax",
+)
+```
+
+Use `service.describe("tenant-audl")` to inspect the configuration schema,
+rules, UI routes, theme tokens, agent contract, and Bytewax stream metadata.
+
 ## Features
 
 ### ✅ Core Features

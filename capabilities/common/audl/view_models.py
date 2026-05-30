@@ -37,8 +37,10 @@ def dashboard_model(
 		"exports": service.list_exports(tenant_id),
 		"purges": service.list_purges(tenant_id),
 		"investigations": service.list_investigations(tenant_id),
+		"agents": service.list_audit_agents(tenant_id),
 		"governance_events": service.list_governance_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -128,6 +130,24 @@ def compliance_center_model(
 		"legal_holds": service.list_legal_holds(tenant_id),
 		"exports": service.list_exports(tenant_id),
 		"purges": service.list_purges(tenant_id),
+	}
+
+
+def audit_agent_model(
+	service: AudlService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AudlService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"agents": service.list_audit_agents(tenant_id),
+		"agent_contract": contract["agents"],
+		"streaming": contract["streaming"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"required_fields": ["id", "name", "runtime", "role", "purpose", "owner"],
+		"approval_required_roles": contract["agents"]["privileged_roles"],
+		"theme_component": contract["theme"]["components"]["audit_agent_roster"],
 	}
 
 

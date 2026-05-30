@@ -1,7 +1,7 @@
 """
 APG Audit Logging Automated Reporting & Analytics
 
-Revolutionary automated compliance reporting system with intelligent delivery,
+Production-grade automated compliance reporting system with intelligent delivery,
 custom report builders, executive dashboards, and predictive analytics.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -170,7 +170,7 @@ class ReportInsight:
 	business_impact: str = "low"  # low, medium, high, critical
 
 class ReportGenerator:
-	"""Revolutionary automated report generation engine"""
+	"""Production-grade automated report generation engine"""
 	
 	def __init__(self, tenant_id: str):
 		self.tenant_id = tenant_id

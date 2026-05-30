@@ -30,6 +30,8 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "audl"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -44,3 +46,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "audl" in model["capabilities"]
+	assert model["agents"]["audl_agent_contract"]["first_class"] is True
+	assert model["capabilities"]["audl"]["streaming"]["engine"] == "bytewax"

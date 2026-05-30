@@ -13,14 +13,15 @@
 
 AUDL is the tenant-scoped audit evidence backbone for APG applications. It
 captures immutable audit events, verifies checksums, governs export and purge
-operations, tracks legal hold, supports investigations, and exposes audit state
-through dependency-light API helpers and view models.
+operations, tracks legal hold, supports investigations, registers first-class
+audit agents, and exposes audit state through dependency-light API helpers and
+view models.
 
-The package must remain usable without Elasticsearch, Kafka, external SIEM
-systems, blockchain services, machine-learning providers, or Flask/FastAPI
-servers. Those systems remain adapter boundaries. Local package proof focuses
-on deterministic audit lifecycle governance, chain-of-custody evidence,
-tenant isolation, and composability.
+The package must remain usable without Elasticsearch, a running Bytewax worker,
+external SIEM systems, blockchain services, machine-learning providers, or
+Flask/FastAPI servers. Those systems remain adapter boundaries. Local package
+proof focuses on deterministic audit lifecycle governance, chain-of-custody
+evidence, tenant isolation, agent composition, and composability.
 
 ## Users And Outcomes
 
@@ -32,6 +33,8 @@ tenant isolation, and composability.
   enabled for PII-bearing evidence.
 - Retention operators can request purges, but legal hold and dual-control
   rules block unsafe deletion.
+- AI agents can be registered as governed AUDL workers for evidence, export,
+  purge, investigation, compliance, and legal-hold review.
 - Generated APG applications can compose AUDL with AUTH, MTEN, CONF, SECU,
   NTFY, WFLO, MONI, APIG, and AICR without binding to one storage or UI stack.
 
@@ -44,6 +47,8 @@ AUDL owns these package-level records:
 - `AuditExportRequest`: governed export request, masking decision, and review.
 - `AuditPurgeRequest`: dual-control purge request and outcome.
 - `AuditInvestigationRecord`: investigation lifecycle over audit event IDs.
+- `AuditAgentRecord`: first-class audit agent with runtime, role, owner,
+  purpose, approval gate, and configuration.
 - `AuditGovernanceEvent`: tenant-scoped evidence event for AUDL decisions.
 
 All mutable package-level state must be tenant-qualified so duplicate IDs in
@@ -63,7 +68,11 @@ The focused lifecycle is:
 7. Request purge with requester, reviewer, reason, and scope.
 8. Deny purge while legal hold is active or dual-control evidence is missing.
 9. Open and close investigations with assigned owner and resolution evidence.
-10. Emit tenant-scoped governance events for every lifecycle decision.
+10. Register audit agents on approved runtimes and roles.
+11. Deny privileged audit-agent roles unless human approval is required.
+12. Validate audit batches before ingestion and require the Bytewax lifecycle
+    stream for high-volume batch work.
+13. Emit tenant-scoped governance events for every lifecycle decision.
 
 ## Rules And Guardrails
 
@@ -78,6 +87,13 @@ The contract rules are executable guardrails:
   routing.
 - `high_volume_ingestion_requires_stream_processing`: large batches require
   stream-processing safeguards.
+- `bytewax_event_stream_required`: audit batch ingestion must use the Bytewax
+  lifecycle stream.
+- `audit_agent_runtime_supported`: audit agents must use one of `codex`,
+  `claude_code`, `opencode`, or `pi`.
+- `audit_agent_role_supported`: audit agents must use an AUDL review role.
+- `audit_agent_privileged_action_requires_approval`: privileged audit-agent
+  roles require human approval.
 
 Service methods must enforce these rules and expose the same decisions through
 API helpers and view models.
@@ -94,19 +110,21 @@ AUDL exposes route and view-model surfaces for:
 - export review queue;
 - purge review queue;
 - compliance center;
+- audit agent roster;
 - reporting studio;
 - rule workbench and settings.
 
 The `audl_forensics` theme must provide semantic tokens and component metadata
 for audit timelines, investigation case cards, compliance scorecards, severity
-badges, hold indicators, export review panels, and purge approval warnings.
+badges, hold indicators, export review panels, purge approval warnings, audit
+agent rosters, and Bytewax stream indicators.
 
 ## Adapter Boundaries
 
 These integrations remain replaceable:
 
 - Elasticsearch, OpenSearch, data lake, and immutable object storage;
-- ByteWax stream processors and queue/event-bus adapters;
+- Bytewax stream processors and queue/event-bus adapters;
 - SIEM, GRC, DLP, notification, and case-management exporters;
 - cryptographic timestamping and blockchain proof providers;
 - ML anomaly detection and natural-language search providers;

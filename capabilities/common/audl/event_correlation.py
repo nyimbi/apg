@@ -1,7 +1,7 @@
 """
 APG Audit Logging Event Correlation & Timeline Analysis
 
-Revolutionary graph neural networks for event relationship discovery, automated incident
+Production-grade graph neural networks for event relationship discovery, automated incident
 timeline reconstruction, and cross-system correlation with semantic analysis.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -538,8 +538,9 @@ class CorrelationEngine:
 			relationships = []
 			for result in rag_results.get("relationships", []):
 				if result.get("confidence", 0) > self.min_correlation_confidence:
+					relationship_key = f"{result['source']}_{result['target']}"
 					relationship = EventRelationship(
-						id=f"semantic_{hash(f'{result['source']}_{result['target']}') % 1000000}",
+						id=f"semantic_{hash(relationship_key) % 1000000}",
 						source_event_id=result["source"],
 						target_event_id=result["target"],
 						relationship_type=RelationshipType.CAUSAL if "causal" in result["type"] else RelationshipType.TEMPORAL,

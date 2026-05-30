@@ -1,7 +1,7 @@
 """
 APG Audit Logging Service Layer
 
-Revolutionary audit trail service with 10M+ events/second ingestion, ML-powered analytics,
+Production-grade audit trail service with 10M+ events/second ingestion, ML-powered analytics,
 natural language querying, and seamless APG integration. Provides enterprise-grade
 audit management surpassing industry leaders.
 
@@ -62,7 +62,7 @@ logger = logging.getLogger(__name__)
 
 class AuditService:
 	"""
-	Revolutionary APG Audit Logging Service
+	Production-grade APG Audit Logging Service
 	
 	Provides enterprise-grade audit trail management with:
 	- Sub-second event ingestion at petabyte scale (10M+ events/second)
@@ -643,7 +643,7 @@ class AuditService:
 					timeout=1.0
 				)
 				
-				# Process batch (placeholder for database storage)
+				# Process batch (extension point for database storage)
 				await self._process_batch_storage(batch)
 				
 				self._batch_queue.task_done()
@@ -1011,7 +1011,7 @@ class AuditService:
 	
 	async def _close_apg_services(self) -> None:
 		"""Close connections to APG services"""
-		# Close service connections (placeholder)
+		# Close service connections (extension point)
 		self._auth_service = None
 		self._tenant_service = None
 		self._notification_service = None

@@ -7,8 +7,15 @@ import json
 from datetime import datetime
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_AUDIT_AGENT_ROLES,
+	SUPPORTED_AUDIT_AGENT_ROLES,
+	SUPPORTED_AUDIT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
+	AuditAgentRecord,
 	AuditExportRequest,
 	AuditGovernanceEvent,
 	AuditInvestigationRecord,
@@ -27,6 +34,7 @@ class AudlService:
 		self._exports: dict[tuple[str, str], AuditExportRequest] = {}
 		self._purges: dict[tuple[str, str], AuditPurgeRequest] = {}
 		self._investigations: dict[tuple[str, str], AuditInvestigationRecord] = {}
+		self._agents: dict[tuple[str, str], AuditAgentRecord] = {}
 		self._governance_events: list[AuditGovernanceEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -100,6 +108,94 @@ class AudlService:
 			subject_id=event_id,
 			message=f"Appended audit event {event_id}.",
 			evidence={"severity": severity, "resource_type": resource_type, "contains_pii": contains_pii},
+		)
+		return record.model_dump(mode="json")
+
+	def validate_batch(
+		self,
+		tenant_id: str,
+		record_count: int,
+		event_stream: str = "bytewax",
+		stream_processing_enabled: bool = True,
+	) -> dict[str, Any]:
+		"""Validate a batch-ingestion request before events enter AUDL."""
+		self._enforce_tenant(tenant_id)
+		if record_count < 1:
+			raise ValueError("audit batch must contain at least one event")
+		stream_name = event_stream.strip().lower()
+		result = self.evaluate({
+			"tenant_id_missing": not bool(tenant_id),
+			"requested_operation": "audit_batch",
+			"batch_size": record_count,
+			"stream_processing_enabled": stream_processing_enabled,
+			"event_stream": stream_name if stream_name == "bytewax" else "non_bytewax",
+		})
+		_raise_if_blocked(result)
+		return {
+			"tenant_id": tenant_id,
+			"record_count": record_count,
+			"event_stream": "bytewax",
+			"stream_processing_enabled": stream_processing_enabled,
+			"accepted": True,
+			"matched_rules": result["matched_rules"],
+		}
+
+	def register_audit_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		purpose: str,
+		owner: str,
+		human_approval_required: bool = True,
+		configuration: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Register a first-class audit agent under AUDL governance."""
+		self._enforce_tenant(tenant_id)
+		if self._tenant_key(tenant_id, agent_id) in self._agents:
+			raise ValueError(f"audit agent already exists for tenant: {agent_id}")
+		if not name:
+			raise ValueError("audit agent name is required")
+		if not purpose:
+			raise ValueError("audit agent purpose is required")
+		if not owner:
+			raise ValueError("audit agent owner is required")
+		runtime = runtime.strip()
+		role = role.strip()
+		result = self.evaluate({
+			"tenant_id_missing": not bool(tenant_id),
+			"requested_operation": "register_audit_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_AUDIT_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_AUDIT_AGENT_ROLES,
+			"privileged_action": role in PRIVILEGED_AUDIT_AGENT_ROLES,
+			"human_approval_required": human_approval_required,
+		})
+		_raise_if_blocked(result)
+		record = AuditAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			purpose=purpose,
+			owner=owner,
+			human_approval_required=human_approval_required,
+			configuration=dict(configuration or {}),
+		)
+		self._agents[self._tenant_key(tenant_id, agent_id)] = record
+		self._record_governance(
+			tenant_id=tenant_id,
+			event_type="audit_agent_registered",
+			subject_id=agent_id,
+			message=f"Registered audit agent {agent_id}.",
+			evidence={
+				"runtime": runtime,
+				"role": role,
+				"owner": owner,
+				"human_approval_required": human_approval_required,
+			},
 		)
 		return record.model_dump(mode="json")
 
@@ -428,6 +524,9 @@ class AudlService:
 	def list_investigations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._investigations, tenant_id)
 
+	def list_audit_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._agents, tenant_id)
+
 	def list_governance_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = list(self._governance_events)
 		if tenant_id is not None:
@@ -440,6 +539,7 @@ class AudlService:
 		exports = self.list_exports(tenant_id)
 		purges = self.list_purges(tenant_id)
 		investigations = self.list_investigations(tenant_id)
+		agents = self.list_audit_agents(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"event_count": len(events),
@@ -449,6 +549,7 @@ class AudlService:
 			"pending_export_count": len([item for item in exports if item["decision"] == "pending"]),
 			"pending_purge_count": len([item for item in purges if item["decision"] == "pending"]),
 			"open_investigation_count": len([item for item in investigations if item["status"] == "open"]),
+			"agent_count": len(agents),
 			"governance_event_count": len(self.list_governance_events(tenant_id)),
 		}
 

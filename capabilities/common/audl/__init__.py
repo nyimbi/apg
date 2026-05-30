@@ -2,8 +2,7 @@
 APG Audit Logging Capability
 
 Enterprise-grade audit trail management with real-time analytics, natural language querying,
-and automated compliance reporting. Provides 10x better performance than industry leaders
-through intelligent event correlation, predictive anomaly detection, and seamless APG integration.
+agent-governed review, and automated compliance reporting for composed APG applications.
 
 © 2025 Datacraft - www.datacraft.co.ke
 Author: Nyimbi Odero <nyimbi@gmail.com>
@@ -331,7 +330,8 @@ APG_CAPABILITY_METADATA = {
 			"investigation_workflows",
 			"legal_hold_governance",
 			"regulated_export_review",
-			"dual_control_purge_review"
+			"dual_control_purge_review",
+			"audit_agent_composition"
 		],
 		"apis": [
 			"/api/v1/audit/events",
@@ -342,7 +342,8 @@ APG_CAPABILITY_METADATA = {
 			"/api/v1/audit/legal-holds",
 			"/api/v1/audit/exports",
 			"/api/v1/audit/purges",
-			"/api/v1/audit/governance-events"
+			"/api/v1/audit/governance-events",
+			"/api/v1/audit/agents"
 		],
 		"ui_components": [
 			"audit_dashboard",
@@ -351,13 +352,14 @@ APG_CAPABILITY_METADATA = {
 			"natural_language_query",
 			"legal_hold_console",
 			"export_review_queue",
-			"purge_review_queue"
+			"purge_review_queue",
+			"audit_agent_roster"
 		]
 	},
 	
 	# Performance and Scaling
 	"performance": {
-		"ingestion_rate": "10M+ events/second",
+		"ingestion_rate": "Bytewax-governed high-volume ingestion",
 		"query_response": "<500ms for 99% of queries",
 		"storage_efficiency": "70% compression ratio",
 		"concurrent_users": "10,000+ per tenant"
@@ -367,7 +369,7 @@ APG_CAPABILITY_METADATA = {
 	"security": {
 		"encryption": "AES-256 at rest and in transit",
 		"access_control": "APG auth_rbac integration",
-		"audit_trails": "Immutable blockchain verification",
+		"audit_trails": "Immutable checksum verification",
 		"compliance": ["SOX", "GDPR", "HIPAA", "PCI-DSS", "ISO-27001"]
 	},
 	
@@ -392,6 +394,8 @@ def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str
 		"rule_engine": contract["rule_engine"],
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 	}
 
 # APG Health Check Interface

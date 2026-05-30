@@ -1,7 +1,7 @@
 """
 APG Audit Logging Views
 
-Flask-AppBuilder views for revolutionary audit logging UI with real-time dashboards,
+Flask-AppBuilder views for governed audit logging UI with real-time dashboards,
 natural language search, and collaborative investigation interfaces.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -118,7 +118,7 @@ class ComplianceReportForm(Form):
 	)
 
 class AuditDashboardView(BaseView):
-	"""Revolutionary real-time audit dashboard"""
+	"""Production-grade real-time audit dashboard"""
 	
 	route_base = "/audit"
 	default_view = "dashboard"
@@ -224,7 +224,7 @@ class AuditDashboardView(BaseView):
 		}
 
 class AuditSearchView(BaseView):
-	"""Revolutionary natural language search interface"""
+	"""Production-grade natural language search interface"""
 	
 	route_base = "/audit/search"
 	

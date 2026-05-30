@@ -1,7 +1,7 @@
 """
 APG Audit Logging Data Models
 
-Revolutionary audit trail data structures with ML-powered analytics, natural language processing,
+Production-grade audit trail data structures with ML-powered analytics, natural language processing,
 and immutable blockchain verification. Designed for 10M+ events/second ingestion with
 sub-second query response times.
 
@@ -428,6 +428,23 @@ class AuditInvestigationRecord(BaseModel):
 	closed_at: Optional[datetime] = Field(None, description="Close timestamp")
 
 
+class AuditAgentRecord(BaseModel):
+	"""First-class audit agent registered for tenant-scoped evidence work."""
+	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
+
+	id: str = Field(..., description="Audit agent identifier")
+	tenant_id: str = Field(..., description="APG tenant identifier")
+	name: str = Field(..., description="Human-readable agent name")
+	runtime: str = Field(..., description="Agent runtime identifier")
+	role: str = Field(..., description="AUDL agent role")
+	purpose: str = Field(..., description="Agent purpose and operating boundary")
+	owner: str = Field(..., description="Accountable human owner")
+	human_approval_required: bool = Field(True, description="Whether human approval gates privileged work")
+	status: str = Field("active", description="active or disabled")
+	configuration: Dict[str, Any] = Field(default_factory=dict, description="Runtime-specific configuration")
+	registered_at: datetime = Field(default_factory=datetime.utcnow, description="Registration timestamp")
+
+
 class AuditGovernanceEvent(BaseModel):
 	"""Tenant-scoped AUDL governance evidence event."""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
@@ -450,7 +467,8 @@ __all__ = [
 	# Core Models
 	"AuditEvent", "AuditEventBatch", "ComplianceRule",
 	"AuditLifecycleEvent", "AuditLegalHoldRecord", "AuditExportRequest",
-	"AuditPurgeRequest", "AuditInvestigationRecord", "AuditGovernanceEvent",
+	"AuditPurgeRequest", "AuditInvestigationRecord", "AuditAgentRecord",
+	"AuditGovernanceEvent",
 	
 	# Validators
 	"validate_tenant_id", "validate_event_severity", "validate_risk_score",

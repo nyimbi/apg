@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # FastAPI app for advanced search
 search_app = FastAPI(
 	title="APG Audit Advanced Search API",
-	description="Revolutionary search capabilities with Elasticsearch backend",
+	description="Production-grade search capabilities with Elasticsearch backend",
 	version="1.0.0"
 )
 
@@ -166,7 +166,7 @@ async def faceted_search(
 	"""
 	Advanced faceted search with drill-down capabilities
 	
-	Revolutionary features:
+	Production-grade features:
 	- Multi-dimensional faceted navigation with real-time counts
 	- Drill-down filtering with breadcrumb navigation
 	- Dynamic facet computation based on current result set

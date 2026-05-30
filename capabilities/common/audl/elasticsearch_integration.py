@@ -1,7 +1,7 @@
 """
 APG Audit Logging Elasticsearch Integration
 
-Revolutionary high-performance search and analytics engine supporting 10M+ events
+Production-grade high-performance search and analytics engine supporting 10M+ events
 with sub-second query response times, advanced faceted search, and real-time indexing.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -111,7 +111,7 @@ class SearchResult(BaseModel):
 	scroll_id: Optional[str] = Field(None, description="Scroll ID for pagination")
 
 class ElasticsearchAuditService:
-	"""Revolutionary Elasticsearch-powered audit service"""
+	"""Production-grade Elasticsearch-powered audit service"""
 	
 	def __init__(self, hosts: List[str] = None, tenant_id: str = None):
 		"""Initialize Elasticsearch audit service"""
@@ -570,7 +570,7 @@ class ElasticsearchAuditService:
 			raise
 	
 	async def natural_language_search(self, query_text: str, tenant_id: str = None) -> SearchResult:
-		"""Revolutionary natural language search with 95%+ accuracy"""
+		"""Production-grade natural language search with 95%+ accuracy"""
 		try:
 			tenant_id = tenant_id or self.tenant_id
 			

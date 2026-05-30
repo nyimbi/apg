@@ -13,7 +13,9 @@
     "view_models.py",
     "app.py",
     "semantic_model.json",
-    "release_report.json"
+    "release_report.json",
+    "PRODUCTION_IMPROVEMENTS.md",
+    "production_improvements.py"
   ],
   "name": "audl",
   "profile": "capability",

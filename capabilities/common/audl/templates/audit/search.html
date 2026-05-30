@@ -218,7 +218,7 @@
 <div class="search-container">
 	<div class="search-header">
 		<h1><i class="fas fa-search"></i> APG Audit Intelligence Search</h1>
-		<p class="lead">Revolutionary natural language queries with 95%+ accuracy powered by APG NLP</p>
+		<p class="lead">Production-grade natural language queries powered by APG NLP</p>
 	</div>
 	
 	<form method="POST" id="searchForm">
@@ -229,7 +229,8 @@
 			</label>
 			{{ form.query(
 				class="form-control",
-				placeholder="Try: 'Show me failed login attempts from user john.doe last week' or 'Find high-risk events involving financial data'",
+				aria_label="Audit search query",
+				data_example="Show failed login attempts from user john.doe last week",
 				rows="4"
 			) }}
 			

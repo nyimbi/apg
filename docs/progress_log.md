@@ -20253,3 +20253,70 @@ Not run to preserve battery:
 - Live GitOps repositories, cloud provider deployment, secret manager/HSM,
   rendered browser UI, persistent storage, live Bytewax stream execution, and
   performance/load tests.
+
+### 2026-05-31 03:05 EAT
+
+AUDL audit-agent composition and Bytewax guardrail packet:
+
+- Selected `capabilities/common/audl` as the next common capability hardening
+  target.
+- Added first-class audit agents to the executable contract, runtime model,
+  service, API helpers, view models, app semantic model, package evidence,
+  docs, and focused tests.
+- Added supported AUDL agent runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`, with governed roles for audit, evidence, legal-hold, export, purge,
+  investigation, and compliance review.
+- Added deterministic guardrails for unsupported AUDL agent runtime,
+  unsupported AUDL agent role, privileged audit-agent registration without
+  human approval, and non-Bytewax audit batch routing.
+- Added Bytewax lifecycle stream metadata and batch validation for AUDL
+  high-volume audit ingestion.
+- Added `/audit/agents`, agent roster view models, and theme component metadata
+  while aligning the AUDL border-radius token to the current 8px UI standard.
+- Replaced legacy `cap_spec.md` with a source-of-truth pointer to
+  `SPECIFICATION.md`.
+- Renamed legacy improvement artifacts to `PRODUCTION_IMPROVEMENTS.md` and
+  `production_improvements.py`.
+- Removed stale generated-promotion markers from the AUDL package files
+  touched by this slice while preserving the existing production-oriented
+  adapters.
+- Performed a focused self-review of the AUDL contract, runtime, API helper,
+  view model, semantic model, package evidence, tests, and syntax-fix diff; no
+  blocking defects remained after the compile, test, audit, marker, and diff
+  gates below.
+
+Battery-conscious verification:
+
+- Initial focused AUDL contract/package pytest run found one rule-test issue
+  caused by an invalid duplicate `requested_operation` context; the test was
+  corrected to evaluate export and batch policies separately.
+- `./.venv/bin/python -m py_compile capabilities/common/audl/capability_contract.py capabilities/common/audl/models.py capabilities/common/audl/audit_runtime.py capabilities/common/audl/api_helpers.py capabilities/common/audl/view_models.py capabilities/common/audl/app.py capabilities/common/audl/__init__.py capabilities/common/audl/production_improvements.py capabilities/common/audl/tests/test_capability_contract.py capabilities/common/audl/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/audl/tests/test_capability_contract.py capabilities/common/audl/tests/test_package_contract.py`
+  passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/audl/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect audl --json` passed with `ok: true`,
+  12 APG Python routes, 10 deterministic rules, Bytewax streaming, and AUDL
+  agent runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/audl --json`
+  passed with `ok: true`; AUDL remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/audl --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/audl -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed after fixing an existing f-string quoting error in
+  `event_correlation.py`.
+- `./.venv/bin/python -c "... AudlService ... validate_batch ... register_audit_agent ... append_event ..."`
+  returned one agent, one event, `opencode` runtime, `bytewax` stream evidence,
+  and a verified checksum.
+- Package-doc scan over capability-like directories returned `count 0`.
+- Stale-marker scan over `capabilities/common/audl` returned no matches.
+- `git diff --check -- capabilities/common/audl docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Elasticsearch/OpenSearch, SIEM/GRC/DLP exporters, cryptographic
+  timestamping services, rendered browser UI, persistent storage, live Bytewax
+  stream execution, and performance/load tests.

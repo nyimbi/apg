@@ -20,14 +20,16 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["configuration_schema"]["required"] == [
 		"tenant_id",
 		"ingestion",
+		"agents",
 		"retention",
 		"compliance",
 		"investigations",
 		"notifications",
 		"ui",
-		"theme"
+		"theme",
+		"streaming"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
+	assert len(contract["rule_engine"]["rules"]) >= 10
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"events",
@@ -37,19 +39,23 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"exports",
 		"purges",
 		"compliance",
+		"agents",
 		"reports",
 		"rules",
 		"settings"
 	}
 	assert contract["ui"]["api_prefix"] == "/api/v1/audit"
-	assert contract["theme"]["tokens"]["border.radius"] == "10px"
+	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "audit_timeline" in contract["theme"]["components"]
 	assert "compliance_scorecard" in contract["theme"]["components"]
 	assert "legal_hold_indicator" in contract["theme"]["components"]
+	assert "audit_agent_roster" in contract["theme"]["components"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_rule_engine_denies_unsafe_audit_operations():
-	result = evaluate_capability_rules({
+	export_result = evaluate_capability_rules({
 		"tenant_id_missing": True,
 		"immutable_storage": True,
 		"checksum_verified": False,
@@ -61,14 +67,26 @@ def test_rule_engine_denies_unsafe_audit_operations():
 		"batch_size": 20000,
 		"stream_processing_enabled": False,
 	})
+	batch_result = evaluate_capability_rules({
+		"tenant_id_missing": False,
+		"requested_operation": "audit_batch",
+		"batch_size": 20000,
+		"stream_processing_enabled": False,
+		"event_stream": "non_bytewax",
+	})
 
-	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert export_result["decision"] == "deny"
+	assert set(export_result["matched_rules"]) == {
 		"require_tenant_context",
 		"immutable_events_require_checksum",
 		"regulated_exports_require_masking",
 		"critical_events_require_escalation",
 		"high_volume_ingestion_requires_stream_processing",
+	}
+	assert batch_result["decision"] == "deny"
+	assert set(batch_result["matched_rules"]) == {
+		"high_volume_ingestion_requires_stream_processing",
+		"bytewax_event_stream_required",
 	}
 
 
@@ -80,9 +98,12 @@ def test_capability_info_includes_manifest_and_theme():
 	assert info["rule_engine"]["type"] == "deterministic"
 	assert info["ui_manifest"]["requires_theme"] is True
 	assert info["theme"]["name"] == "audl_forensics"
+	assert info["agents"]["first_class"] is True
+	assert info["streaming"]["engine"] == "bytewax"
 	assert {route["name"] for route in info["ui_manifest"]["routes"]} >= {
 		"timeline",
 		"investigations",
+		"agents",
 		"reports",
 	}
 
@@ -99,6 +120,21 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 		severity="critical",
 		contains_pii=True,
 		escalation_configured=True,
+	)
+	batch = service.validate_batch(
+		tenant_id="tenant-audl",
+		record_count=12000,
+		event_stream="bytewax",
+		stream_processing_enabled=True,
+	)
+	agent = service.register_audit_agent(
+		agent_id="agent-001",
+		tenant_id="tenant-audl",
+		name="Audit Evidence Reviewer",
+		runtime="codex",
+		role="evidence_reviewer",
+		purpose="Review chain-of-custody evidence before export.",
+		owner="security-lead",
 	)
 	hold = service.apply_legal_hold(
 		hold_id="hold-001",
@@ -169,14 +205,20 @@ def test_service_runs_governed_audit_evidence_lifecycle():
 	dashboard = view_models.dashboard_model(service, "tenant-audl")
 
 	assert event["checksum"]
+	assert batch["accepted"] is True
+	assert agent["runtime"] == "codex"
 	assert hold["status"] == "active"
 	assert export_decision["decision"] == "approved"
 	assert closed["status"] == "closed"
 	assert purge_decision["decision"] == "approved"
 	assert dashboard["summary"]["event_count"] == 1
+	assert dashboard["summary"]["agent_count"] == 1
 	assert dashboard["summary"]["active_legal_hold_count"] == 0
+	assert dashboard["streaming"]["engine"] == "bytewax"
+	assert view_models.audit_agent_model(service, "tenant-audl")["agents"][0]["id"] == "agent-001"
 	assert {event["event_type"] for event in dashboard["governance_events"]} >= {
 		"audit_event_appended",
+		"audit_agent_registered",
 		"legal_hold_applied",
 		"export_requested",
 		"export_decided",
@@ -223,6 +265,37 @@ def test_service_blocks_audit_guardrail_violations():
 			contains_pii=True,
 			masking_enabled=False,
 			reason="Unsafe export.",
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch(
+			tenant_id="tenant-audl",
+			record_count=25000,
+			event_stream="queue",
+			stream_processing_enabled=True,
+		)
+
+	with pytest.raises(PermissionError, match="audit_agent_runtime_unsupported"):
+		service.register_audit_agent(
+			agent_id="agent-bad-runtime",
+			tenant_id="tenant-audl",
+			name="Unsupported Agent",
+			runtime="unsupported",
+			role="audit_reviewer",
+			purpose="Invalid runtime proof.",
+			owner="security-lead",
+		)
+
+	with pytest.raises(PermissionError, match="audit_agent_human_approval_required"):
+		service.register_audit_agent(
+			agent_id="agent-no-approval",
+			tenant_id="tenant-audl",
+			name="Privileged Agent",
+			runtime="codex",
+			role="purge_reviewer",
+			purpose="Privileged purge review.",
+			owner="records-lead",
+			human_approval_required=False,
 		)
 
 	event = service.append_event(
@@ -358,6 +431,16 @@ def test_api_helpers_and_view_models_expose_audit_lifecycle():
 		"masking_enabled": "true",
 		"reason": "Evidence export.",
 	})
+	agent = api_helpers.register_audit_agent({
+		"id": "api-agent",
+		"tenant_id": event["tenant_id"],
+		"name": "Export Evidence Assistant",
+		"runtime": "claude_code",
+		"role": "export_reviewer",
+		"purpose": "Review masked export evidence before release.",
+		"owner": "privacy-reviewer",
+		"human_approval_required": "true",
+	})
 	decision = api_helpers.decide_export({
 		"id": export["id"],
 		"tenant_id": event["tenant_id"],
@@ -366,7 +449,11 @@ def test_api_helpers_and_view_models_expose_audit_lifecycle():
 		"notes": "Masking verified.",
 	})
 	model = view_models.export_review_model(api_helpers.SERVICE, event["tenant_id"])
+	agent_model = view_models.audit_agent_model(api_helpers.SERVICE, event["tenant_id"])
 
 	assert decision["decision"] == "approved"
 	assert api_helpers.capability_status(event["tenant_id"])["event_count"] == 1
+	assert api_helpers.capability_status(event["tenant_id"])["agent_count"] == 1
 	assert model["exports"][0]["id"] == "api-export"
+	assert agent["role"] == "export_reviewer"
+	assert agent_model["agents"][0]["id"] == "api-agent"

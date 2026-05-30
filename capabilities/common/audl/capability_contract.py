@@ -12,6 +12,25 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_AUDIT_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_AUDIT_AGENT_ROLES = [
+	"audit_reviewer",
+	"evidence_reviewer",
+	"legal_hold_reviewer",
+	"export_reviewer",
+	"purge_reviewer",
+	"investigation_reviewer",
+	"compliance_reviewer",
+]
+PRIVILEGED_AUDIT_AGENT_ROLES = {
+	"legal_hold_reviewer",
+	"export_reviewer",
+	"purge_reviewer",
+	"investigation_reviewer",
+	"compliance_reviewer",
+}
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped AUDL configuration defaults and schema."""
@@ -22,8 +41,15 @@ class CapabilityConfiguration:
 			"default_batch_size": 1000,
 			"max_batch_size": 50000,
 			"stream_processing_enabled": True,
+			"lifecycle_stream": "bytewax",
 			"immutable_storage_required": True,
 			"checksum_verification_required": True
+		},
+		"agents": {
+			"enabled": True,
+			"supported_runtimes": list(SUPPORTED_AUDIT_AGENT_RUNTIMES),
+			"supported_roles": list(SUPPORTED_AUDIT_AGENT_ROLES),
+			"privileged_roles_require_human_approval": True
 		},
 		"retention": {
 			"default_retention_days": 2555,
@@ -57,6 +83,12 @@ class CapabilityConfiguration:
 		"theme": {
 			"default_theme": "audl_forensics",
 			"allow_tenant_overrides": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"required_for_operations": ["audit_batch", "high_volume_ingestion"],
+			"topics": ["audl.events", "audl.governance", "audl.agents"],
+			"watermark_field": "timestamp"
 		}
 	})
 	schema: dict[str, Any] = field(default_factory=lambda: {
@@ -64,22 +96,26 @@ class CapabilityConfiguration:
 		"required": [
 			"tenant_id",
 			"ingestion",
+			"agents",
 			"retention",
 			"compliance",
 			"investigations",
 			"notifications",
 			"ui",
-			"theme"
+			"theme",
+			"streaming"
 		],
 		"properties": {
 			"tenant_id": {"type": "string", "minLength": 1},
 			"ingestion": {"type": "object"},
+			"agents": {"type": "object"},
 			"retention": {"type": "object"},
 			"compliance": {"type": "object"},
 			"investigations": {"type": "object"},
 			"notifications": {"type": "object"},
 			"ui": {"type": "object"},
-			"theme": {"type": "object"}
+			"theme": {"type": "object"},
+			"streaming": {"type": "object"}
 		}
 	})
 
@@ -159,7 +195,7 @@ class CapabilityTheme:
 		"surface.panel": "#FFFFFF",
 		"text.primary": "#13232F",
 		"text.secondary": "#526371",
-		"border.radius": "10px",
+		"border.radius": "8px",
 		"density": "compact"
 	})
 	components: dict[str, dict[str, str]] = field(default_factory=lambda: {
@@ -192,6 +228,16 @@ class CapabilityTheme:
 		"purge_approval_warning": {
 			"icon": "trash-2",
 			"confirmation_style": "dual-control-banner"
+		},
+		"audit_agent_roster": {
+			"icon": "bot",
+			"runtime_badge": "inline",
+			"approval_state": "human-review-chip"
+		},
+		"bytewax_stream_indicator": {
+			"icon": "activity",
+			"variant": "compact-meter",
+			"status_style": "stream-health"
 		}
 	})
 
@@ -258,6 +304,50 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "stream_processing_required",
 				"required_action": "enable_stream_processing"
 			}
+		),
+		CapabilityRule(
+			name="bytewax_event_stream_required",
+			description="Audit batch ingestion must use the Bytewax lifecycle stream.",
+			condition={"requested_operation": "audit_batch", "event_stream": "non_bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_event_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
+		),
+		CapabilityRule(
+			name="audit_agent_runtime_supported",
+			description="Audit agents must run on an approved runtime.",
+			condition={"requested_operation": "register_audit_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "audit_agent_runtime_unsupported",
+				"required_action": "select_supported_audit_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="audit_agent_role_supported",
+			description="Audit agents must use an approved AUDL role.",
+			condition={"requested_operation": "register_audit_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "audit_agent_role_unsupported",
+				"required_action": "select_supported_audit_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="audit_agent_privileged_action_requires_approval",
+			description="Privileged audit-agent roles require human approval.",
+			condition={
+				"requested_operation": "register_audit_agent",
+				"privileged_action": True,
+				"human_approval_required": False
+			},
+			effect={
+				"decision": "deny",
+				"reason": "audit_agent_human_approval_required",
+				"required_action": "enable_human_approval_for_privileged_audit_agent"
+			}
 		)
 	]
 
@@ -273,6 +363,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("exports", "/audit/exports", "AuditExportReviewQueue", "audl:export", "Governance"),
 		CapabilityUIRoute("purges", "/audit/purges", "AuditPurgeReviewQueue", "audl:purge", "Governance"),
 		CapabilityUIRoute("compliance", "/audit/compliance", "ComplianceControlCenter", "audl:compliance", "Governance"),
+		CapabilityUIRoute("agents", "/audit/agents", "AuditAgentRoster", "audl:admin", "Governance"),
 		CapabilityUIRoute("reports", "/audit/reports", "AuditReportingStudio", "audl:report", "Governance"),
 		CapabilityUIRoute("rules", "/audit/rules", "AuditRuleWorkbench", "audl:admin", "Governance"),
 		CapabilityUIRoute("settings", "/audit/settings", "AuditCapabilitySettings", "audl:admin", "Administration")
@@ -284,6 +375,45 @@ def ui_manifest() -> dict[str, Any]:
 		"routes": [route.__dict__ for route in routes],
 		"template_roots": ["templates/", "frontend/"],
 		"requires_theme": True
+	}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class AUDL agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_AUDIT_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_AUDIT_AGENT_ROLES),
+		"privileged_roles": sorted(PRIVILEGED_AUDIT_AGENT_ROLES),
+		"composition_points": [
+			"event_review",
+			"evidence_review",
+			"legal_hold_review",
+			"export_review",
+			"purge_review",
+			"investigation_review",
+			"compliance_review"
+		],
+		"guardrails": [
+			"audit_agent_runtime_supported",
+			"audit_agent_role_supported",
+			"audit_agent_privileged_action_requires_approval"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return AUDL lifecycle stream metadata."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "audl.lifecycle",
+		"required_for_operations": ["audit_batch", "high_volume_ingestion"],
+		"topics": ["audl.events", "audl.governance", "audl.agents"],
+		"watermark_field": "timestamp",
+		"guardrails": [
+			"bytewax_event_stream_required",
+			"high_volume_ingestion_requires_stream_processing"
+		]
 	}
 
 
@@ -305,7 +435,9 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
-		}
+		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest()
 	}
 
 

@@ -1,7 +1,7 @@
 """
 APG Audit Logging Blueprint
 
-Flask-AppBuilder blueprint registration for revolutionary audit logging UI.
+Flask-AppBuilder blueprint registration for governed audit logging UI.
 Integrates all views into APG platform with proper authentication and routing.
 
 © 2025 Datacraft - www.datacraft.co.ke
@@ -27,7 +27,7 @@ def register_audit_views(appbuilder: AppBuilder) -> None:
 	"""
 	Register all audit logging views with Flask-AppBuilder
 	
-	This function integrates the revolutionary audit logging capability
+	This function integrates the governed audit logging capability
 	into the APG platform with proper authentication, authorization,
 	and UI patterns.
 	
