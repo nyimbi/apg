@@ -16,6 +16,88 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:03 EAT
+
+Composition EVENTS event-streaming lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md` for the `composition_events`
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with stream, schema, publishing,
+  subscription, processor, event-agent, governance, observability, adapter, UI,
+  theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  stream ownership, stream retention policy, PII stream schemas, stream Bytewax
+  routing, breaking schema review, publish source capability, publish
+  correlation, publish Bytewax routing, batch publish limits, batch Bytewax
+  routing, subscription owner, retry dead-letter stream, stateful processor
+  review, processor checkpoints, Bytewax processor runtime, replay approval,
+  event-agent runtime/role, and privileged agent-action approval.
+- Preserved the existing Bytewax runtime services while adding
+  `CompositionEventsService`, a dependency-light APG lifecycle facade for
+  stream creation, schema registration, event publishing, batch validation,
+  subscriptions, processors, event agents, dashboard summaries, audit events,
+  and compatibility record helpers.
+- Replaced API, view, app, and package-registration entrypoints with
+  dependency-light APG surfaces that expose stream console, schema registry,
+  subscription console, processor topology, agent workbench, dashboard, and
+  Bytewax metadata.
+- Refreshed package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, stream, schema, publish, subscription,
+  processor, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/composition/events/__init__.py
+  capabilities/composition/events/capability_contract.py
+  capabilities/composition/events/service.py capabilities/composition/events/api.py
+  capabilities/composition/events/views.py capabilities/composition/events/app.py
+  capabilities/composition/events/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/composition/events/tests/test_package_contract.py` passed with 5
+  tests and only an adjacent SQLAlchemy declarative-base deprecation warning.
+- `./.venv/bin/apg capabilities inspect composition_events --json | jq '.ok,
+  .summary.route_count, .summary.rule_count, .summary.theme'` confirmed `true`,
+  8 routes, 21 rules, and `composition_events_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/composition/events
+  --json | jq '.ok, .side_effect_free, .warnings, .errors,
+  (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'` confirmed
+  `true`, `true`, no warnings, no errors, `composition_events`, `bytewax`,
+  `bytewax`, and runtime evidence loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/composition/events --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "from capabilities.composition.events import
+  CompositionEventsService; service=CompositionEventsService();
+  service.register_event_agent('tenant-proof','Proof agent','codex',
+  'stream_architect','review streams'); print(service.dashboard_summary(
+  'tenant-proof'))"` passed and confirmed event-agent registration, audit event
+  emission, and Bytewax stream metadata.
+- `jq '.capabilities.composition_events.streaming.processor,
+  .capabilities.composition_events.provides,
+  .capabilities.composition_events.requires,
+  .capabilities.composition_events.screens.agents.route,
+  (.capabilities.composition_events.rules[] |
+  select(.name=="event_agent_runtime_supported") | .effect.reason),
+  (.capabilities.composition_events.rules[] |
+  select(.name=="publish_requires_bytewax") | .effect.reason)'
+  capabilities/composition/events/semantic_model.json` confirmed `bytewax`,
+  event-agent provides, required services, `/composition-events/agents`,
+  `event_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/python capabilities/composition/events/app.py` passed package
+  self-test.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/composition/events` passed before this
+  progress entry; rerun staged diff check before commit.
+- Not run: live distributed Bytewax topology, durable event stores, schema
+  stores, durable audit sinks, rendered browser UI, load/performance checks, and
+  full repository tests.
+
 ### 2026-05-30 22:42 EAT
 
 Composition CONFIG central-configuration lifecycle/guardrail packet:

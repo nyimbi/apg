@@ -4,23 +4,228 @@
       "capability_contract": {
         "display_name": "Event Streaming Bus",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 8,
+        "rule_count": 21
       }
     },
     "self_test": {
       "capability": "composition_events",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
       "capability": "composition_events",
-      "format": "apg.semantic-model.v1"
+      "format": "apg.semantic-model.v1",
+      "streaming": {
+        "events": [
+          "stream_created",
+          "schema_registered",
+          "event_published",
+          "event_batch_published",
+          "subscription_created",
+          "processor_registered",
+          "dead_letter_recorded",
+          "events_replayed",
+          "event_agent_registered"
+        ],
+        "guardrails": [
+          "stream_requires_bytewax",
+          "publish_requires_bytewax",
+          "batch_publish_requires_bytewax",
+          "processor_requires_bytewax",
+          "privileged_agent_event_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "paused",
+          "review_required",
+          "processing",
+          "degraded",
+          "blocked",
+          "retired"
+        ],
+        "stream": "apg.composition.events.lifecycle"
+      }
     }
   },
   "format": "apg.release-report.v1",
   "ok": true,
   "package": "composition_events",
+  "registration": {
+    "capability": "composition_events",
+    "display_name": "Event Streaming Bus",
+    "provides": [
+      "event_stream_registry",
+      "bytewax_event_publishing",
+      "event_schema_registry",
+      "subscription_lifecycle",
+      "stream_processor_topology",
+      "dead_letter_operations",
+      "event_agents"
+    ],
+    "requires": [
+      "auth",
+      "audl",
+      "ntfy",
+      "registry",
+      "composition_access"
+    ],
+    "streaming": {
+      "events": [
+        "stream_created",
+        "schema_registered",
+        "event_published",
+        "event_batch_published",
+        "subscription_created",
+        "processor_registered",
+        "dead_letter_recorded",
+        "events_replayed",
+        "event_agent_registered"
+      ],
+      "guardrails": [
+        "stream_requires_bytewax",
+        "publish_requires_bytewax",
+        "batch_publish_requires_bytewax",
+        "processor_requires_bytewax",
+        "privileged_agent_event_action_requires_human_approval"
+      ],
+      "key": "tenant_id",
+      "processor": "bytewax",
+      "states": [
+        "draft",
+        "active",
+        "paused",
+        "review_required",
+        "processing",
+        "degraded",
+        "blocked",
+        "retired"
+      ],
+      "stream": "apg.composition.events.lifecycle"
+    },
+    "theme": {
+      "components": {
+        "agent_workbench": {
+          "status_style": "approval-chip",
+          "visual": "review-lane"
+        },
+        "dead_letter_console": {
+          "status_style": "retry-chip",
+          "visual": "error-queue"
+        },
+        "processor_topology": {
+          "status_style": "checkpoint-chip",
+          "visual": "dataflow-map"
+        },
+        "schema_registry": {
+          "status_style": "compatibility-chip",
+          "visual": "schema-grid"
+        },
+        "stream_console": {
+          "icon": "route",
+          "risk_style": "throughput-band",
+          "status_indicator": "stream-pill"
+        },
+        "subscription_console": {
+          "status_style": "lag-chip",
+          "visual": "consumer-lanes"
+        }
+      },
+      "name": "composition_events_control",
+      "tokens": {
+        "border.radius": "8px",
+        "color.accent": "#C44536",
+        "color.danger": "#C53030",
+        "color.primary": "#28536B",
+        "color.success": "#2F855A",
+        "color.warning": "#B7791F",
+        "density": "compact",
+        "surface.canvas": "#F7F8FA",
+        "surface.panel": "#FFFFFF",
+        "text.primary": "#172033",
+        "text.secondary": "#52606D"
+      }
+    },
+    "ui": {
+      "api_prefix": "/composition-events/api/v1",
+      "requires_theme": true,
+      "routes": [
+        {
+          "component": "EventBusDashboard",
+          "name": "dashboard",
+          "nav_group": "Overview",
+          "path": "/composition-events/dashboard",
+          "permission": "composition_events:view"
+        },
+        {
+          "component": "EventStreamConsole",
+          "name": "streams",
+          "nav_group": "Streams",
+          "path": "/composition-events/streams",
+          "permission": "composition_events:manage_streams"
+        },
+        {
+          "component": "EventSchemaRegistry",
+          "name": "schemas",
+          "nav_group": "Governance",
+          "path": "/composition-events/schemas",
+          "permission": "composition_events:govern"
+        },
+        {
+          "component": "EventSubscriptionConsole",
+          "name": "subscriptions",
+          "nav_group": "Consumers",
+          "path": "/composition-events/subscriptions",
+          "permission": "composition_events:operate"
+        },
+        {
+          "component": "EventProcessorTopology",
+          "name": "processors",
+          "nav_group": "Processing",
+          "path": "/composition-events/processors",
+          "permission": "composition_events:operate"
+        },
+        {
+          "component": "DeadLetterConsole",
+          "name": "dead_letters",
+          "nav_group": "Operations",
+          "path": "/composition-events/dead-letters",
+          "permission": "composition_events:operate"
+        },
+        {
+          "component": "EventAgentWorkbench",
+          "name": "agents",
+          "nav_group": "Automation",
+          "path": "/composition-events/agents",
+          "permission": "composition_events:admin"
+        },
+        {
+          "component": "EventBusSettings",
+          "name": "settings",
+          "nav_group": "Administration",
+          "path": "/composition-events/settings",
+          "permission": "composition_events:admin"
+        }
+      ],
+      "shell": "apg_python",
+      "template_roots": [
+        "templates/",
+        "static/"
+      ],
+      "view_module": "views.py"
+    },
+    "version": "2.1.0"
+  },
   "source": "capability_contract.py",
   "target": "python"
 }

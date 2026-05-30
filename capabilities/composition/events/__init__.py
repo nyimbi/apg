@@ -1,121 +1,64 @@
-"""
-APG Event Streaming Bus - Package Initialization
+"""APG event streaming capability package."""
 
-Enterprise-grade event streaming platform providing real-time event-driven
-communication, stream processing, and message orchestration for the APG ecosystem.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
-
-__version__ = "1.0.0"
-__author__ = "Nyimbi Odero"
-__email__ = "nyimbi@gmail.com"
-__description__ = "APG Event Streaming Bus - Real-time event-driven communication platform"
-
-# Core service imports
+from .capability_contract import (
+	EVENT_BUS_STREAM,
+	SUPPORTED_EVENT_AGENT_ROLES,
+	SUPPORTED_EVENT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .service import (
-    EventStreamingService,
-    EventPublishingService,
-    EventConsumptionService,
-    StreamProcessingService,
-    EventSourcingService,
-    SchemaRegistryService
+	BytewaxDataflowRuntime,
+	CompositionEventsService,
+	EventConsumptionService,
+	EventPublishingService,
+	EventSourcingService,
+	EventStreamingService,
+	SchemaRegistryService,
+	StreamProcessingService,
 )
 
-# Model imports
-from .models import (
-    ESEvent,
-    ESStream,
-    ESSubscription,
-    ESConsumerGroup,
-    ESSchema,
-    ESMetrics,
-    ESAuditLog,
-    EventStatus,
-    StreamStatus,
-    SubscriptionStatus,
-    EventType,
-    DeliveryMode
-)
 
-try:
-    from .api import api_app, router
-except Exception:
-    api_app = None
-    router = None
+__version__ = "2.1.0"
+__capability_id__ = "composition_events"
+__apg_dependencies__ = ["auth", "audl", "ntfy", "registry", "composition_access"]
+__apg_optional_dependencies__ = ["i18n", "mchn"]
 
-try:
-    from .views import (
-        EventStreamView,
-        SubscriptionView,
-        ConsumerGroupView,
-        SchemaView,
-        MetricsView,
-        StreamingDashboardView
-    )
-except Exception:
-    EventStreamView = None
-    SubscriptionView = None
-    ConsumerGroupView = None
-    SchemaView = None
-    MetricsView = None
-    StreamingDashboardView = None
 
-try:
-    from .apg_integration import (
-        APGEventStreamingIntegration,
-        APGCapabilityInfo,
-        EventRoutingRule,
-        CrossCapabilityWorkflow,
-        EventCompositionPattern
-    )
-except Exception:
-    APGEventStreamingIntegration = None
-    APGCapabilityInfo = None
-    EventRoutingRule = None
-    CrossCapabilityWorkflow = None
-    EventCompositionPattern = None
+def register_capability() -> dict[str, object]:
+	"""Return package metadata used by APG capability discovery."""
+	contract = get_capability_contract()
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"version": __version__,
+		"provides": contract["provides"],
+		"requires": contract["requires"],
+		"ui": contract["ui"],
+		"theme": contract["theme"],
+		"streaming": contract["streaming"],
+	}
+
 
 __all__ = [
-    # Core services
-    "EventStreamingService",
-    "EventPublishingService", 
-    "EventConsumptionService",
-    "StreamProcessingService",
-    "EventSourcingService",
-    "SchemaRegistryService",
-    
-    # Data models
-    "ESEvent",
-    "ESStream",
-    "ESSubscription", 
-    "ESConsumerGroup",
-    "ESSchema",
-    "ESMetrics",
-    "ESAuditLog",
-    "EventStatus",
-    "StreamStatus",
-    "SubscriptionStatus",
-    "EventType",
-    "DeliveryMode",
-    
-    # API components
-    "api_app",
-    "router",
-    
-    # UI views
-    "EventStreamView",
-    "SubscriptionView",
-    "ConsumerGroupView", 
-    "SchemaView",
-    "MetricsView",
-    "StreamingDashboardView",
-    
-    # APG integration
-    "APGEventStreamingIntegration",
-    "APGCapabilityInfo",
-    "EventRoutingRule",
-    "CrossCapabilityWorkflow",
-    "EventCompositionPattern"
+	"BytewaxDataflowRuntime",
+	"CompositionEventsService",
+	"EVENT_BUS_STREAM",
+	"EventConsumptionService",
+	"EventPublishingService",
+	"EventSourcingService",
+	"EventStreamingService",
+	"SUPPORTED_EVENT_AGENT_ROLES",
+	"SUPPORTED_EVENT_AGENT_RUNTIMES",
+	"SchemaRegistryService",
+	"StreamProcessingService",
+	"evaluate_capability_rules",
+	"event_stream_name",
+	"get_capability_contract",
+	"register_capability",
+	"streaming_manifest",
 ]

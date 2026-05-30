@@ -1,60 +1,122 @@
 {
   "agents": {},
   "app": {
-    "description": "Event Streaming Bus package-backed APG capability",
-    "entity_count": 0,
+    "description": "Event streaming package-backed APG capability",
+    "entity_count": 6,
     "name": "composition_events",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "composition_events": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Composition & Orchestration",
-          "enabled": true,
-          "id": "composition_events",
-          "name": "Event Streaming Bus",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/events/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "event_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_and_validate",
+          "supported_roles": [
+            "stream_architect",
+            "schema_reviewer",
+            "processor_reviewer",
+            "subscription_reviewer",
+            "dead_letter_reviewer",
+            "replay_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "replay_requires_approval": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_processor_events": true,
+          "emit_schema_events": true,
+          "emit_stream_events": true,
+          "emit_subscription_events": true,
+          "event_stream": "apg.composition.events.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "processors": {
+          "bytewax_required": true,
+          "checkpoint_required": true,
+          "review_required_for_stateful": true
+        },
+        "publishing": {
+          "batch_size_limit": 1000,
+          "bytewax_required": true,
+          "correlation_required": true,
+          "source_capability_required": true
+        },
+        "schemas": {
+          "compatibility_required": true,
+          "review_required_for_breaking_change": true,
+          "versioning_enabled": true
+        },
+        "streams": {
+          "bytewax_stream_required": true,
+          "owner_required": true,
+          "partition_key_required": true,
+          "retention_policy_required": true,
+          "schema_required_for_pii": true
+        },
+        "subscriptions": {
+          "consumer_owner_required": true,
+          "dead_letter_required_for_retrying": true,
+          "delivery_mode_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_events_operations"
+          "default_theme": "composition_events_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_dead_letter_console": true,
+          "enable_processor_topology": true,
+          "enable_schema_registry": true,
+          "enable_settings": true,
+          "enable_stream_console": true,
+          "enable_subscription_console": true
         }
       },
-      "erp_modules": [
-        "composition"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Event Streaming Bus",
       "provides": [
-        "composition_events_operations"
+        "event_stream_registry",
+        "bytewax_event_publishing",
+        "event_schema_registry",
+        "subscription_lifecycle",
+        "stream_processor_topology",
+        "dead_letter_operations",
+        "event_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Event Streaming Bus operations require tenant context.",
+            "description": "All event-bus operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +129,265 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Event Streaming Bus write operations require policy enforcement.",
+            "description": "Event-bus write operations require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "event_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "create_stream",
+              "stream_owner_assigned": false
             },
-            "description": "High-risk Event Streaming Bus operations require review.",
+            "description": "Streams require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "stream_owner_required",
+              "required_action": "assign_stream_owner"
+            },
+            "name": "stream_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_stream",
+              "retention_policy_present": false
+            },
+            "description": "Streams require a retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "stream_retention_policy_required",
+              "required_action": "attach_retention_policy"
+            },
+            "name": "stream_requires_retention_policy"
+          },
+          {
+            "condition": {
+              "operation": "create_stream",
+              "pii_stream": true,
+              "schema_attached": false
+            },
+            "description": "Streams carrying PII require a schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "stream_schema_required",
+              "required_action": "attach_event_schema"
+            },
+            "name": "pii_stream_requires_schema"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "create_stream"
+            },
+            "description": "Stream lifecycle events must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_stream_lifecycle_to_bytewax"
+            },
+            "name": "stream_requires_bytewax"
+          },
+          {
+            "condition": {
+              "breaking_change": true,
+              "operation": "register_schema",
+              "review_recorded": false
+            },
+            "description": "Breaking schema changes require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "schema_review_required",
+              "required_action": "record_schema_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "breaking_schema_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "publish_event",
+              "source_capability_present": false
+            },
+            "description": "Published events require source-capability attribution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_capability_required",
+              "required_action": "attach_source_capability"
+            },
+            "name": "publish_requires_source_capability"
+          },
+          {
+            "condition": {
+              "correlation_present": false,
+              "operation": "publish_event"
+            },
+            "description": "Published events require correlation or causation context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_correlation_required",
+              "required_action": "attach_correlation_context"
+            },
+            "name": "publish_requires_correlation"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "publish_event"
+            },
+            "description": "Published events must be appended through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "append_event_to_bytewax"
+            },
+            "name": "publish_requires_bytewax"
+          },
+          {
+            "condition": {
+              "batch_size_gt": 1000,
+              "operation": "batch_publish"
+            },
+            "description": "Batch publishing must stay within configured limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "batch_size_limit_exceeded",
+              "required_action": "split_event_batch"
+            },
+            "name": "batch_publish_limit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_publish"
+            },
+            "description": "Batch publishing requires Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "append_batch_to_bytewax"
+            },
+            "name": "batch_publish_requires_bytewax"
+          },
+          {
+            "condition": {
+              "consumer_owner_assigned": false,
+              "operation": "create_subscription"
+            },
+            "description": "Subscriptions require a consumer owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_owner_required",
+              "required_action": "assign_consumer_owner"
+            },
+            "name": "subscription_requires_owner"
+          },
+          {
+            "condition": {
+              "dead_letter_attached": false,
+              "operation": "create_subscription",
+              "retry_enabled": true
+            },
+            "description": "Retrying subscriptions require a dead-letter stream.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dead_letter_required",
+              "required_action": "attach_dead_letter_stream"
+            },
+            "name": "retry_subscription_requires_dead_letter"
+          },
+          {
+            "condition": {
+              "operation": "register_processor",
+              "review_recorded": false,
+              "stateful_processor": true
+            },
+            "description": "Stateful processors require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "processor_review_required",
+              "required_action": "record_processor_review"
+            },
+            "name": "stateful_processor_requires_review"
+          },
+          {
+            "condition": {
+              "checkpoint_configured": false,
+              "operation": "register_processor"
+            },
+            "description": "Processors require checkpoint configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "processor_checkpoint_required",
+              "required_action": "configure_processor_checkpoint"
+            },
+            "name": "processor_requires_checkpoint"
+          },
+          {
+            "condition": {
+              "operation": "register_processor",
+              "processor_runtime_ne": "bytewax"
+            },
+            "description": "Processors must run on Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_processor_required",
+              "required_action": "select_bytewax_processor"
+            },
+            "name": "processor_requires_bytewax"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "replay_events"
+            },
+            "description": "Event replay requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_replay_approval_required",
+              "required_action": "record_replay_approval"
+            },
+            "name": "replay_requires_approval"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_event_agent"
+            },
+            "description": "Event agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "event_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_event_agent"
+            },
+            "description": "Event agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "event_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_event_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged event actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_event_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +397,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Event Streaming Bus operations require tenant context.",
+          "description": "All event-bus operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +410,265 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Event Streaming Bus write operations require policy enforcement.",
+          "description": "Event-bus write operations require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "event_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "create_stream",
+            "stream_owner_assigned": false
           },
-          "description": "High-risk Event Streaming Bus operations require review.",
+          "description": "Streams require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "stream_owner_required",
+            "required_action": "assign_stream_owner"
+          },
+          "name": "stream_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_stream",
+            "retention_policy_present": false
+          },
+          "description": "Streams require a retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "stream_retention_policy_required",
+            "required_action": "attach_retention_policy"
+          },
+          "name": "stream_requires_retention_policy"
+        },
+        {
+          "condition": {
+            "operation": "create_stream",
+            "pii_stream": true,
+            "schema_attached": false
+          },
+          "description": "Streams carrying PII require a schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "stream_schema_required",
+            "required_action": "attach_event_schema"
+          },
+          "name": "pii_stream_requires_schema"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "create_stream"
+          },
+          "description": "Stream lifecycle events must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_stream_lifecycle_to_bytewax"
+          },
+          "name": "stream_requires_bytewax"
+        },
+        {
+          "condition": {
+            "breaking_change": true,
+            "operation": "register_schema",
+            "review_recorded": false
+          },
+          "description": "Breaking schema changes require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "schema_review_required",
+            "required_action": "record_schema_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "breaking_schema_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "publish_event",
+            "source_capability_present": false
+          },
+          "description": "Published events require source-capability attribution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_capability_required",
+            "required_action": "attach_source_capability"
+          },
+          "name": "publish_requires_source_capability"
+        },
+        {
+          "condition": {
+            "correlation_present": false,
+            "operation": "publish_event"
+          },
+          "description": "Published events require correlation or causation context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_correlation_required",
+            "required_action": "attach_correlation_context"
+          },
+          "name": "publish_requires_correlation"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "publish_event"
+          },
+          "description": "Published events must be appended through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "append_event_to_bytewax"
+          },
+          "name": "publish_requires_bytewax"
+        },
+        {
+          "condition": {
+            "batch_size_gt": 1000,
+            "operation": "batch_publish"
+          },
+          "description": "Batch publishing must stay within configured limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "batch_size_limit_exceeded",
+            "required_action": "split_event_batch"
+          },
+          "name": "batch_publish_limit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_publish"
+          },
+          "description": "Batch publishing requires Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "append_batch_to_bytewax"
+          },
+          "name": "batch_publish_requires_bytewax"
+        },
+        {
+          "condition": {
+            "consumer_owner_assigned": false,
+            "operation": "create_subscription"
+          },
+          "description": "Subscriptions require a consumer owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_owner_required",
+            "required_action": "assign_consumer_owner"
+          },
+          "name": "subscription_requires_owner"
+        },
+        {
+          "condition": {
+            "dead_letter_attached": false,
+            "operation": "create_subscription",
+            "retry_enabled": true
+          },
+          "description": "Retrying subscriptions require a dead-letter stream.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dead_letter_required",
+            "required_action": "attach_dead_letter_stream"
+          },
+          "name": "retry_subscription_requires_dead_letter"
+        },
+        {
+          "condition": {
+            "operation": "register_processor",
+            "review_recorded": false,
+            "stateful_processor": true
+          },
+          "description": "Stateful processors require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "processor_review_required",
+            "required_action": "record_processor_review"
+          },
+          "name": "stateful_processor_requires_review"
+        },
+        {
+          "condition": {
+            "checkpoint_configured": false,
+            "operation": "register_processor"
+          },
+          "description": "Processors require checkpoint configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "processor_checkpoint_required",
+            "required_action": "configure_processor_checkpoint"
+          },
+          "name": "processor_requires_checkpoint"
+        },
+        {
+          "condition": {
+            "operation": "register_processor",
+            "processor_runtime_ne": "bytewax"
+          },
+          "description": "Processors must run on Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_processor_required",
+            "required_action": "select_bytewax_processor"
+          },
+          "name": "processor_requires_bytewax"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "replay_events"
+          },
+          "description": "Event replay requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_replay_approval_required",
+            "required_action": "record_replay_approval"
+          },
+          "name": "replay_requires_approval"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_event_agent"
+          },
+          "description": "Event agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "event_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_event_agent"
+          },
+          "description": "Event agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "event_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_event_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged event actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_event_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +678,109 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "EventAgentWorkbench",
+          "permission": "composition_events:admin",
+          "route": "/composition-events/agents"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "EventBusDashboard",
           "permission": "composition_events:view",
           "route": "/composition-events/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
+        "dead_letters": {
+          "component": "DeadLetterConsole",
           "permission": "composition_events:operate",
-          "route": "/composition-events/operations"
+          "route": "/composition-events/dead-letters"
         },
-        "rules": {
-          "component": "CapabilityRules",
+        "processors": {
+          "component": "EventProcessorTopology",
+          "permission": "composition_events:operate",
+          "route": "/composition-events/processors"
+        },
+        "schemas": {
+          "component": "EventSchemaRegistry",
           "permission": "composition_events:govern",
-          "route": "/composition-events/rules"
+          "route": "/composition-events/schemas"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "EventBusSettings",
           "permission": "composition_events:admin",
           "route": "/composition-events/settings"
+        },
+        "streams": {
+          "component": "EventStreamConsole",
+          "permission": "composition_events:manage_streams",
+          "route": "/composition-events/streams"
+        },
+        "subscriptions": {
+          "component": "EventSubscriptionConsole",
+          "permission": "composition_events:operate",
+          "route": "/composition-events/subscriptions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "stream_created",
+          "schema_registered",
+          "event_published",
+          "event_batch_published",
+          "subscription_created",
+          "processor_registered",
+          "dead_letter_recorded",
+          "events_replayed",
+          "event_agent_registered"
+        ],
+        "guardrails": [
+          "stream_requires_bytewax",
+          "publish_requires_bytewax",
+          "batch_publish_requires_bytewax",
+          "processor_requires_bytewax",
+          "privileged_agent_event_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "paused",
+          "review_required",
+          "processing",
+          "degraded",
+          "blocked",
+          "retired"
+        ],
+        "stream": "apg.composition.events.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "dead_letter_console": {
+            "status_style": "retry-chip",
+            "visual": "error-queue"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "processor_topology": {
+            "status_style": "checkpoint-chip",
+            "visual": "dataflow-map"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "schema_registry": {
+            "status_style": "compatibility-chip",
+            "visual": "schema-grid"
+          },
+          "stream_console": {
+            "icon": "route",
+            "risk_style": "throughput-band",
+            "status_indicator": "stream-pill"
+          },
+          "subscription_console": {
+            "status_style": "lag-chip",
+            "visual": "consumer-lanes"
           }
         },
-        "name": "composition_events_operations",
+        "name": "composition_events_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +800,56 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "EventBusDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/composition-events/dashboard",
             "permission": "composition_events:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/composition-events/operations",
-            "permission": "composition_events:operate"
+            "component": "EventStreamConsole",
+            "name": "streams",
+            "nav_group": "Streams",
+            "path": "/composition-events/streams",
+            "permission": "composition_events:manage_streams"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "EventSchemaRegistry",
+            "name": "schemas",
             "nav_group": "Governance",
-            "path": "/composition-events/rules",
+            "path": "/composition-events/schemas",
             "permission": "composition_events:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "EventSubscriptionConsole",
+            "name": "subscriptions",
+            "nav_group": "Consumers",
+            "path": "/composition-events/subscriptions",
+            "permission": "composition_events:operate"
+          },
+          {
+            "component": "EventProcessorTopology",
+            "name": "processors",
+            "nav_group": "Processing",
+            "path": "/composition-events/processors",
+            "permission": "composition_events:operate"
+          },
+          {
+            "component": "DeadLetterConsole",
+            "name": "dead_letters",
+            "nav_group": "Operations",
+            "path": "/composition-events/dead-letters",
+            "permission": "composition_events:operate"
+          },
+          {
+            "component": "EventAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/composition-events/agents",
+            "permission": "composition_events:admin"
+          },
+          {
+            "component": "EventBusSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/composition-events/settings",
@@ -238,46 +866,138 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "event_streaming": {
+        "supported_roles": [
+          "stream_architect",
+          "schema_reviewer",
+          "processor_reviewer",
+          "subscription_reviewer",
+          "dead_letter_reviewer",
+          "replay_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "composition_events": []
+      "composition_events": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access"
+      ]
     }
   },
   "contracts": {
     "composition_events": {
       "configuration": {
-        "capability": {
-          "category": "Composition & Orchestration",
-          "enabled": true,
-          "id": "composition_events",
-          "name": "Event Streaming Bus",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/events/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "event_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_and_validate",
+          "supported_roles": [
+            "stream_architect",
+            "schema_reviewer",
+            "processor_reviewer",
+            "subscription_reviewer",
+            "dead_letter_reviewer",
+            "replay_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "replay_requires_approval": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_processor_events": true,
+          "emit_schema_events": true,
+          "emit_stream_events": true,
+          "emit_subscription_events": true,
+          "event_stream": "apg.composition.events.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "processors": {
+          "bytewax_required": true,
+          "checkpoint_required": true,
+          "review_required_for_stateful": true
+        },
+        "publishing": {
+          "batch_size_limit": 1000,
+          "bytewax_required": true,
+          "correlation_required": true,
+          "source_capability_required": true
+        },
+        "schemas": {
+          "compatibility_required": true,
+          "review_required_for_breaking_change": true,
+          "versioning_enabled": true
+        },
+        "streams": {
+          "bytewax_stream_required": true,
+          "owner_required": true,
+          "partition_key_required": true,
+          "retention_policy_required": true,
+          "schema_required_for_pii": true
+        },
+        "subscriptions": {
+          "consumer_owner_required": true,
+          "dead_letter_required_for_retrying": true,
+          "delivery_mode_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_events_operations"
+          "default_theme": "composition_events_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_dead_letter_console": true,
+          "enable_processor_topology": true,
+          "enable_schema_registry": true,
+          "enable_settings": true,
+          "enable_stream_console": true,
+          "enable_subscription_console": true
         }
       },
       "id": "composition_events",
       "provides": [
-        "composition_events_operations"
+        "event_stream_registry",
+        "bytewax_event_publishing",
+        "event_schema_registry",
+        "subscription_lifecycle",
+        "stream_processor_topology",
+        "dead_letter_operations",
+        "event_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access"
+      ]
     }
   },
   "deployment": {
@@ -289,58 +1009,289 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "composition_events": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "batch_publish_limit": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "batch_size_gt": 1000,
+        "operation": "batch_publish"
       },
-      "description": "High-risk Event Streaming Bus operations require review.",
+      "description": "Batch publishing must stay within configured limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "batch_size_limit_exceeded",
+        "required_action": "split_event_batch"
+      },
+      "name": "batch_publish_limit"
+    },
+    "batch_publish_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_publish"
+      },
+      "description": "Batch publishing requires Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "append_batch_to_bytewax"
+      },
+      "name": "batch_publish_requires_bytewax"
+    },
+    "breaking_schema_requires_review": {
+      "condition": {
+        "breaking_change": true,
+        "operation": "register_schema",
+        "review_recorded": false
+      },
+      "description": "Breaking schema changes require review.",
       "effect": {
         "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "reason": "schema_review_required",
+        "required_action": "record_schema_review"
       },
-      "name": "high_risk_requires_review"
+      "name": "breaking_schema_requires_review"
     },
-    "operation_policy_required": {
+    "event_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_event_agent"
+      },
+      "description": "Event agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "event_agent_role_supported"
+    },
+    "event_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_event_agent"
+      },
+      "description": "Event agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "event_agent_runtime_supported"
+    },
+    "event_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Event Streaming Bus write operations require policy enforcement.",
+      "description": "Event-bus write operations require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "event_write_requires_policy"
+    },
+    "pii_stream_requires_schema": {
+      "condition": {
+        "operation": "create_stream",
+        "pii_stream": true,
+        "schema_attached": false
+      },
+      "description": "Streams carrying PII require a schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "stream_schema_required",
+        "required_action": "attach_event_schema"
+      },
+      "name": "pii_stream_requires_schema"
+    },
+    "privileged_agent_event_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_event_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged event actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_event_action_requires_human_approval"
+    },
+    "processor_requires_bytewax": {
+      "condition": {
+        "operation": "register_processor",
+        "processor_runtime_ne": "bytewax"
+      },
+      "description": "Processors must run on Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_processor_required",
+        "required_action": "select_bytewax_processor"
+      },
+      "name": "processor_requires_bytewax"
+    },
+    "processor_requires_checkpoint": {
+      "condition": {
+        "checkpoint_configured": false,
+        "operation": "register_processor"
+      },
+      "description": "Processors require checkpoint configuration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "processor_checkpoint_required",
+        "required_action": "configure_processor_checkpoint"
+      },
+      "name": "processor_requires_checkpoint"
+    },
+    "publish_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "publish_event"
+      },
+      "description": "Published events must be appended through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "append_event_to_bytewax"
+      },
+      "name": "publish_requires_bytewax"
+    },
+    "publish_requires_correlation": {
+      "condition": {
+        "correlation_present": false,
+        "operation": "publish_event"
+      },
+      "description": "Published events require correlation or causation context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_correlation_required",
+        "required_action": "attach_correlation_context"
+      },
+      "name": "publish_requires_correlation"
+    },
+    "publish_requires_source_capability": {
+      "condition": {
+        "operation": "publish_event",
+        "source_capability_present": false
+      },
+      "description": "Published events require source-capability attribution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_capability_required",
+        "required_action": "attach_source_capability"
+      },
+      "name": "publish_requires_source_capability"
+    },
+    "replay_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "replay_events"
+      },
+      "description": "Event replay requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_replay_approval_required",
+        "required_action": "record_replay_approval"
+      },
+      "name": "replay_requires_approval"
+    },
+    "retry_subscription_requires_dead_letter": {
+      "condition": {
+        "dead_letter_attached": false,
+        "operation": "create_subscription",
+        "retry_enabled": true
+      },
+      "description": "Retrying subscriptions require a dead-letter stream.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dead_letter_required",
+        "required_action": "attach_dead_letter_stream"
+      },
+      "name": "retry_subscription_requires_dead_letter"
+    },
+    "stateful_processor_requires_review": {
+      "condition": {
+        "operation": "register_processor",
+        "review_recorded": false,
+        "stateful_processor": true
+      },
+      "description": "Stateful processors require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "processor_review_required",
+        "required_action": "record_processor_review"
+      },
+      "name": "stateful_processor_requires_review"
+    },
+    "stream_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "create_stream"
+      },
+      "description": "Stream lifecycle events must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_stream_lifecycle_to_bytewax"
+      },
+      "name": "stream_requires_bytewax"
+    },
+    "stream_requires_owner": {
+      "condition": {
+        "operation": "create_stream",
+        "stream_owner_assigned": false
+      },
+      "description": "Streams require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "stream_owner_required",
+        "required_action": "assign_stream_owner"
+      },
+      "name": "stream_requires_owner"
+    },
+    "stream_requires_retention_policy": {
+      "condition": {
+        "operation": "create_stream",
+        "retention_policy_present": false
+      },
+      "description": "Streams require a retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "stream_retention_policy_required",
+        "required_action": "attach_retention_policy"
+      },
+      "name": "stream_requires_retention_policy"
+    },
+    "subscription_requires_owner": {
+      "condition": {
+        "consumer_owner_assigned": false,
+        "operation": "create_subscription"
+      },
+      "description": "Subscriptions require a consumer owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "consumer_owner_required",
+        "required_action": "assign_consumer_owner"
+      },
+      "name": "subscription_requires_owner"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Event Streaming Bus operations require tenant context.",
+      "description": "All event-bus operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
@@ -348,30 +1299,5 @@
       },
       "name": "tenant_context_required"
     }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.composition_events": {
-      "file": "capability_contract.py",
-      "id": "capability.composition_events",
-      "kind": "capability",
-      "name": "Event Streaming Bus",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

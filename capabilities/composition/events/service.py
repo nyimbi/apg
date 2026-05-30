@@ -3173,8 +3173,378 @@ async def create_event_streaming_service(
     redis_client = redis.from_url(redis_url)
     return EventStreamingService(db_session, redis_client, bytewax_config)
 
+
+# =============================================================================
+# Dependency-light APG capability lifecycle facade
+# =============================================================================
+
+from .capability_contract import (
+	SUPPORTED_EVENT_AGENT_ROLES,
+	SUPPORTED_EVENT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
+
+
+class CompositionEventsService:
+	"""Small APG-facing event-bus lifecycle service backed by Bytewax ledgers."""
+
+	def __init__(self) -> None:
+		self._streams: Dict[str, Dict[str, Any]] = {}
+		self._schemas: Dict[str, Dict[str, Any]] = {}
+		self._subscriptions: Dict[str, Dict[str, Any]] = {}
+		self._processors: Dict[str, Dict[str, Any]] = {}
+		self._dead_letters: Dict[str, Dict[str, Any]] = {}
+		self._agents: Dict[str, Dict[str, Any]] = {}
+		self._audit_events: List[Dict[str, Any]] = []
+		self._runtime = BytewaxDataflowRuntime()
+
+	def describe(self, tenant_id: str = "default") -> Dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: Dict[str, Any]) -> Dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def create_stream(
+		self,
+		stream_key: str,
+		tenant_id: str,
+		name: str,
+		owner_id: str,
+		source_capability: str,
+		retention_policy: str,
+		partition_key: str,
+		pii_stream: bool = False,
+		schema_id: Optional[str] = None,
+		event_stream: str = "bytewax",
+		metadata: Optional[Dict[str, Any]] = None,
+	) -> Dict[str, Any]:
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "create_stream",
+			"stream_owner_assigned": bool(owner_id),
+			"retention_policy_present": bool(retention_policy),
+			"pii_stream": bool(pii_stream),
+			"schema_attached": bool(schema_id),
+			"event_stream": event_stream,
+		})
+		if not partition_key:
+			raise PermissionError("partition_key_required")
+		stream_id = f"event_stream_{uuid7str()}"
+		record = {
+			"id": stream_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"owner_id": owner_id,
+			"source_capability": source_capability,
+			"retention_policy": retention_policy,
+			"partition_key": partition_key,
+			"pii_stream": pii_stream,
+			"schema_id": schema_id,
+			"status": "active",
+			"bytewax_stream": f"apg.{tenant_id}.{stream_key}",
+			"metadata": dict(metadata or {}),
+			"created_at": datetime.now(timezone.utc).isoformat(),
+		}
+		self._streams[stream_id] = record
+		self._runtime.register_streams([record["bytewax_stream"]])
+		self._audit(tenant_id, "stream_created", stream_id, owner_id, {"bytewax_stream": record["bytewax_stream"]})
+		return dict(record)
+
+	def register_schema(
+		self,
+		schema_key: str,
+		tenant_id: str,
+		name: str,
+		version: str,
+		definition: Dict[str, Any],
+		breaking_change: bool = False,
+		reviewed_by: Optional[str] = None,
+	) -> Dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_schema",
+			"breaking_change": breaking_change,
+			"review_recorded": bool(reviewed_by),
+		})
+		if result["decision"] == "deny" or (result["decision"] == "require_review" and not reviewed_by):
+			raise PermissionError(",".join(result["matched_rules"]))
+		schema_id = f"event_schema_{uuid7str()}"
+		record = {
+			"id": schema_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"version": version,
+			"definition": dict(definition),
+			"breaking_change": breaking_change,
+			"reviewed_by": reviewed_by,
+			"schema_key": schema_key,
+			"status": "active",
+			"created_at": datetime.now(timezone.utc).isoformat(),
+		}
+		self._schemas[schema_id] = record
+		self._audit(tenant_id, "schema_registered", schema_id, reviewed_by or "system", {"version": version})
+		return dict(record)
+
+	async def publish_event(
+		self,
+		stream_id: str,
+		tenant_id: str,
+		event_type: str,
+		payload: Dict[str, Any],
+		source_capability: str,
+		correlation_id: str,
+		partition_key: str,
+		event_stream: str = "bytewax",
+	) -> Dict[str, Any]:
+		stream = self._get_stream(stream_id)
+		if stream["tenant_id"] != tenant_id:
+			raise ValueError("stream_tenant_mismatch")
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "publish_event",
+			"source_capability_present": bool(source_capability),
+			"correlation_present": bool(correlation_id),
+			"event_stream": event_stream,
+		})
+		event_id = f"event_{uuid7str()}"
+		event = {
+			"id": event_id,
+			"tenant_id": tenant_id,
+			"stream_id": stream_id,
+			"event_type": event_type,
+			"payload": dict(payload),
+			"source_capability": source_capability,
+			"correlation_id": correlation_id,
+			"partition_key": partition_key,
+			"created_at": datetime.now(timezone.utc).isoformat(),
+		}
+		future = await self._runtime.append(stream["bytewax_stream"], event, key=partition_key)
+		metadata = await future
+		self._audit(tenant_id, "event_published", event_id, source_capability, {"stream": metadata.stream, "offset": metadata.offset})
+		return {**event, "bytewax": {"stream": metadata.stream, "offset": metadata.offset}}
+
+	def validate_batch_publish(self, tenant_id: str, batch_size: int, event_stream: str = "bytewax") -> Dict[str, Any]:
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "batch_publish",
+			"batch_size": batch_size,
+			"event_stream": event_stream,
+		})
+		return {"tenant_id": tenant_id, "batch_size": batch_size, "event_stream": event_stream, "stream": event_stream_name(), "processor": "bytewax"}
+
+	def create_subscription(
+		self,
+		subscription_key: str,
+		tenant_id: str,
+		stream_id: str,
+		consumer_owner_id: str,
+		delivery_mode: str,
+		retry_enabled: bool = False,
+		dead_letter_stream_id: Optional[str] = None,
+	) -> Dict[str, Any]:
+		stream = self._get_stream(stream_id)
+		if stream["tenant_id"] != tenant_id:
+			raise ValueError("stream_tenant_mismatch")
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_subscription",
+			"consumer_owner_assigned": bool(consumer_owner_id),
+			"retry_enabled": retry_enabled,
+			"dead_letter_attached": bool(dead_letter_stream_id),
+		})
+		subscription_id = f"event_subscription_{uuid7str()}"
+		record = {
+			"id": subscription_id,
+			"subscription_key": subscription_key,
+			"tenant_id": tenant_id,
+			"stream_id": stream_id,
+			"consumer_owner_id": consumer_owner_id,
+			"delivery_mode": delivery_mode,
+			"retry_enabled": retry_enabled,
+			"dead_letter_stream_id": dead_letter_stream_id,
+			"status": "active",
+		}
+		self._subscriptions[subscription_id] = record
+		self._audit(tenant_id, "subscription_created", subscription_id, consumer_owner_id, {"delivery_mode": delivery_mode})
+		return dict(record)
+
+	def register_processor(
+		self,
+		processor_key: str,
+		tenant_id: str,
+		name: str,
+		stream_id: str,
+		stateful: bool,
+		checkpoint_configured: bool,
+		reviewed_by: Optional[str] = None,
+		processor_runtime: str = "bytewax",
+	) -> Dict[str, Any]:
+		stream = self._get_stream(stream_id)
+		if stream["tenant_id"] != tenant_id:
+			raise ValueError("stream_tenant_mismatch")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_processor",
+			"stateful_processor": stateful,
+			"review_recorded": bool(reviewed_by),
+			"checkpoint_configured": checkpoint_configured,
+			"processor_runtime": processor_runtime,
+		})
+		if result["decision"] == "deny" or (result["decision"] == "require_review" and not reviewed_by):
+			raise PermissionError(",".join(result["matched_rules"]))
+		processor_id = f"event_processor_{uuid7str()}"
+		record = {
+			"id": processor_id,
+			"processor_key": processor_key,
+			"tenant_id": tenant_id,
+			"name": name,
+			"stream_id": stream_id,
+			"stateful": stateful,
+			"checkpoint_configured": checkpoint_configured,
+			"reviewed_by": reviewed_by,
+			"processor_runtime": processor_runtime,
+			"status": "active",
+		}
+		self._processors[processor_id] = record
+		self._audit(tenant_id, "processor_registered", processor_id, reviewed_by or "system", {"runtime": processor_runtime})
+		return dict(record)
+
+	def register_event_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		instructions: str,
+	) -> Dict[str, Any]:
+		self._enforce({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_event_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_EVENT_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_EVENT_AGENT_ROLES,
+		})
+		agent_id = f"event_agent_{uuid7str()}"
+		record = {
+			"id": agent_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"runtime": runtime,
+			"role": role,
+			"instructions": instructions,
+			"status": "active",
+		}
+		self._agents[agent_id] = record
+		self._audit(tenant_id, "event_agent_registered", agent_id, name, {"runtime": runtime, "role": role})
+		return dict(record)
+
+	def validate_agent_event_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		action: str,
+		privileged_scope: bool,
+		human_approval_recorded: bool,
+	) -> Dict[str, Any]:
+		agent = self._agents[agent_id]
+		if agent["tenant_id"] != tenant_id:
+			raise ValueError("agent_tenant_mismatch")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "agent_event_action",
+			"privileged_scope": privileged_scope,
+			"human_approval_recorded": human_approval_recorded,
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(",".join(result["matched_rules"]))
+		return {"tenant_id": tenant_id, "agent_id": agent_id, "action": action, "decision": result["decision"], "matched_rules": result["matched_rules"]}
+
+	def dashboard_summary(self, tenant_id: str = "default") -> Dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"stream_count": len(self.list_streams(tenant_id)),
+			"schema_count": len(self.list_schemas(tenant_id)),
+			"subscription_count": len(self.list_subscriptions(tenant_id)),
+			"processor_count": len(self.list_processors(tenant_id)),
+			"event_agent_count": len(self.list_event_agents(tenant_id)),
+			"audit_event_count": len(self.audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
+		}
+
+	def list_streams(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._streams, tenant_id)
+
+	def list_schemas(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._schemas, tenant_id)
+
+	def list_subscriptions(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._subscriptions, tenant_id)
+
+	def list_processors(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._processors, tenant_id)
+
+	def list_event_agents(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def audit_events(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return [event for event in self._audit_events if tenant_id is None or event["tenant_id"] == tenant_id]
+
+	def create_record(
+		self,
+		record_id: str,
+		tenant_id: str,
+		metadata: Optional[Dict[str, Any]] = None,
+		status: str = "active",
+	) -> Dict[str, Any]:
+		stream = self.create_stream(
+			stream_key=record_id,
+			tenant_id=tenant_id,
+			name=str((metadata or {}).get("name") or record_id),
+			owner_id=str((metadata or {}).get("owner_id") or "system"),
+			source_capability=str((metadata or {}).get("source_capability") or "composition_events"),
+			retention_policy=str((metadata or {}).get("retention_policy") or "7d"),
+			partition_key=str((metadata or {}).get("partition_key") or "tenant_id"),
+			metadata=metadata,
+		)
+		stream["status"] = status
+		return stream
+
+	def list_records(self, tenant_id: Optional[str] = None) -> List[Dict[str, Any]]:
+		return self.list_streams(tenant_id)
+
+	def _enforce(self, context: Dict[str, Any]) -> None:
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			raise PermissionError(",".join(result["matched_rules"]))
+
+	def _audit(self, tenant_id: str, event_type: str, entity_id: str, actor_id: str, metadata: Dict[str, Any]) -> None:
+		self._audit_events.append({
+			"id": f"event_audit_{uuid7str()}",
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"entity_id": entity_id,
+			"actor_id": actor_id,
+			"metadata": dict(metadata),
+			"created_at": datetime.now(timezone.utc).isoformat(),
+		})
+
+	def _list(self, records: Dict[str, Dict[str, Any]], tenant_id: Optional[str]) -> List[Dict[str, Any]]:
+		return [dict(record) for record in records.values() if tenant_id is None or record["tenant_id"] == tenant_id]
+
+	def _get_stream(self, stream_id: str) -> Dict[str, Any]:
+		try:
+			return self._streams[stream_id]
+		except KeyError as exc:
+			raise KeyError(f"unknown_stream:{stream_id}") from exc
+
+
 # Export service classes
 __all__ = [
+    "CompositionEventsService",
     "EventStreamingService",
     "EventPublishingService",
     "EventConsumptionService", 
