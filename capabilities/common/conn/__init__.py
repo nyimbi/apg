@@ -1,23 +1,4 @@
-"""
-APG Connection Management Capability
-
-A revolutionary integration platform that transforms how enterprises connect,
-synchronize, and orchestrate data across systems using locally hosted Singer.io
-infrastructure with AI-driven automation.
-
-Key Features:
-- Local Singer.io tap ecosystem with 20+ connectors
-- Zero-configuration AI-powered schema detection
-- Real-time bi-directional data synchronization
-- Visual flow designer with collaborative editing
-- Self-healing connections with predictive analytics
-- Enterprise security with end-to-end encryption
-- Complete APG platform integration
-
-Author: APG Platform Team
-Version: 1.0.0
-License: Proprietary - Datacraft © 2025
-"""
+"""APG Connection Management capability."""
 
 from .models import (
 	Connection,
@@ -39,6 +20,7 @@ from .capability_contract import (
 	get_capability_contract,
 	evaluate_capability_rules
 )
+from .conn_runtime import ConnService
 
 # APG Composition Engine Registration
 def register_capability() -> dict:
@@ -47,19 +29,20 @@ def register_capability() -> dict:
 	return {
 		'name': 'conn',
 		'display_name': 'Connection Management',
-		'description': 'Enterprise integration platform with Singer.io ecosystem',
+		'description': 'Governed connector, connection, flow, and Singer tap lifecycle control plane',
 		'version': '1.0.0',
-		'dependencies': ['apig', 'auth', 'encr', 'audl'],
+		'dependencies': ['apig', 'auth', 'encr', 'audl', 'keym', 'moni', 'regy'],
 		'configuration': contract['configuration'],
 		'configuration_schema': contract['configuration_schema'],
 		'rule_engine': contract['rule_engine'],
 		'capabilities': {
-			'connections': 'Manage data source connections',
-			'transformations': 'Real-time data transformation',
-			'monitoring': 'Connection health monitoring',
-			'singer_taps': 'Local Singer.io tap management',
-			'ai_mapping': 'AI-powered schema mapping',
-			'visual_designer': 'Drag-and-drop flow design',
+			'connectors': 'Register local Singer, APG, HTTP, database, file, and stream connectors',
+			'connections': 'Manage tenant-scoped data source and target connections',
+			'flows': 'Compose governed data flows with mapping, lineage, and quality gates',
+			'sync_runs': 'Track sync, replay, schedule, and batch lifecycle records',
+			'monitoring': 'Connection health and sync monitoring adapter surface',
+			'singer_taps': 'Local Singer.io tap management and registry integration',
+			'visual_designer': 'Generated-app flow design and composition metadata',
 			'capability_rules': 'Capability-specific rule evaluation',
 			'visual_theming': 'Tenant-aware UI theme tokens and components'
 		},
@@ -67,14 +50,12 @@ def register_capability() -> dict:
 			'connections': '/api/v1/connections',
 			'flows': '/api/v1/flows',
 			'taps': '/api/v1/taps',
-			'monitoring': '/api/v1/monitoring'
+			'monitoring': '/api/v1/monitoring',
+			'lineage': '/api/v1/lineage'
 		},
 		'ui_components': {
-			'designer': '/conn/designer',
-			'dashboard': '/conn/dashboard',
-			'monitoring': '/conn/monitoring',
-			'rules': '/conn/rules',
-			'settings': '/conn/settings'
+			route['name']: route['path']
+			for route in contract['ui']['routes']
 		},
 		'ui_manifest': contract['ui'],
 		'theme': contract['theme'],
@@ -98,6 +79,7 @@ __all__ = [
 	'SingerRuntimeManager',
 	'FlowExecutor',
 	'IntelligentConnector',
+	'ConnService',
 	'register_capability',
 	'get_capability_contract',
 	'evaluate_capability_rules'

@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.cors import CORSMiddleware
 
 from .service import ConnectionManager, FlowExecutor, IntelligentConnector
+from .conn_runtime import ConnService
 from .models import ConnectionStatus, ConnectionType, SyncMode
 from .visual_designer import VisualFlowDesigner
 from .data_lineage import DataLineageTracker
@@ -50,6 +51,7 @@ connection_manager = ConnectionManager()
 flow_executor = FlowExecutor(connection_manager=connection_manager)
 intelligent_connector = IntelligentConnector()
 lineage_tracker = DataLineageTracker()
+generated_conn_service = ConnService()
 
 # Pydantic Models for API
 class CreateConnectionRequest(BaseModel):
@@ -905,6 +907,171 @@ async def get_leaf_destinations(current_user: dict = Depends(get_current_user)):
 		]}
 	except Exception as e:
 		raise HTTPException(status_code=400, detail=str(e))
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return dependency-light CONN generated-app status."""
+	contract = generated_conn_service.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		**generated_conn_service.dashboard_summary(tenant_id),
+	}
+
+
+def register_generated_connector(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Register a connector through the generated-app control plane."""
+	return generated_conn_service.register_connector(
+		connector_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "singer"),
+		source_ref=str(payload["source_ref"]),
+		checksum=str(payload["checksum"]),
+		owner=str(payload["owner"]),
+		verified_source=_payload_bool(payload, "verified_source", True),
+		marketplace_review_recorded=_payload_bool(payload, "marketplace_review_recorded", False),
+		auth_policy_attached=_payload_bool(payload, "auth_policy_attached", True),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
+def register_generated_connection(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Register a connection through the generated-app control plane."""
+	return generated_conn_service.register_connection(
+		connection_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		connector_id=str(payload["connector_id"]),
+		owner=str(payload["owner"]),
+		environment=str(payload.get("environment") or "development"),
+		contains_credentials=_payload_bool(payload, "contains_credentials", True),
+		credential_vault_ref=str(payload.get("credential_vault_ref") or ""),
+		credentials_encrypted=_payload_bool(payload, "credentials_encrypted", True),
+		cross_tenant_connection=_payload_bool(payload, "cross_tenant_connection", False),
+		metadata=dict(payload.get("metadata") or {}),
+	)
+
+
+def record_generated_connection_test(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Record generated-app connection test evidence."""
+	return generated_conn_service.record_connection_test(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		connection_id=str(payload["id"]),
+		passed=_payload_bool(payload, "passed", False),
+		evidence=dict(payload.get("evidence") or {}),
+	)
+
+
+def activate_generated_connection(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Activate a generated-app connection."""
+	return generated_conn_service.activate_connection(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		connection_id=str(payload["id"]),
+		secret_rotation_recorded=_payload_bool(payload, "secret_rotation_recorded", False),
+		activation_review_recorded=_payload_bool(payload, "activation_review_recorded", False),
+	)
+
+
+def create_generated_flow(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Create a governed generated-app data flow."""
+	return generated_conn_service.create_flow(
+		flow_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		source_connection_id=str(payload["source_connection_id"]),
+		target_connection_id=str(payload["target_connection_id"]),
+		owner=str(payload["owner"]),
+		mapping_ref=str(payload["mapping_ref"]),
+		lineage_enabled=_payload_bool(payload, "lineage_enabled", True),
+		quality_gate_ref=str(payload.get("quality_gate_ref") or ""),
+		pii_detected=_payload_bool(payload, "pii_detected", False),
+		pii_policy_attached=_payload_bool(payload, "pii_policy_attached", True),
+	)
+
+
+def start_generated_sync(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Start a generated-app sync run."""
+	return generated_conn_service.start_sync(
+		run_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		flow_id=str(payload["flow_id"]),
+		mode=str(payload.get("mode") or "incremental"),
+		batch_size=int(payload.get("batch_size") or 1000),
+		monitoring_enabled=_payload_bool(payload, "monitoring_enabled", True),
+		schema_change_detected=_payload_bool(payload, "schema_change_detected", False),
+		schema_review_recorded=_payload_bool(payload, "schema_review_recorded", False),
+	)
+
+
+def schedule_generated_flow(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Schedule a generated-app flow."""
+	return generated_conn_service.schedule_flow(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		schedule_id=str(payload["id"]),
+		flow_id=str(payload["flow_id"]),
+		cron=str(payload["cron"]),
+		timezone=str(payload.get("timezone") or ""),
+	)
+
+
+def replay_generated_sync(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Replay a generated-app sync run."""
+	return generated_conn_service.replay_sync(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		run_id=str(payload["run_id"]),
+		replay_id=str(payload["id"]),
+		idempotency_key=str(payload.get("idempotency_key") or ""),
+	)
+
+
+def retire_generated_connection(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Retire a generated-app connection."""
+	return generated_conn_service.retire_connection(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		connection_id=str(payload["id"]),
+		actor=str(payload["actor"]),
+		impact_review_recorded=_payload_bool(payload, "impact_review_recorded", False),
+	)
+
+
+def list_generated_connectors(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_connectors(tenant_id)
+
+
+def list_generated_connections(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_connections(tenant_id)
+
+
+def list_generated_flows(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_flows(tenant_id)
+
+
+def list_generated_sync_runs(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_sync_runs(tenant_id)
+
+
+def list_generated_schedules(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_schedules(tenant_id)
+
+
+def list_generated_reviews(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_reviews(tenant_id)
+
+
+def list_generated_audit_events(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_audit_events(tenant_id)
+
+
+def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)
+
 
 if __name__ == "__main__":
 	import uvicorn

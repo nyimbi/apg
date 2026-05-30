@@ -13811,3 +13811,58 @@ Not run to preserve battery:
 - Rendered Flask-AppBuilder UI/browser behavior.
 - Advanced legacy enhancement modules and their dedicated heavy tests.
 - Load, latency, and service-discovery scale benchmarks.
+
+### 2026-05-30 07:32 EAT
+
+CONN lifecycle and guardrail packet:
+
+- Selected `capabilities/common/conn` as the next common capability after REGY
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the governed
+  connector, connection, flow, sync, schedule, replay, review, and retirement
+  lifecycle.
+- Replaced the primary CONN package docs with practical generated-app usage,
+  deployment, operations, and production guidance.
+- Expanded the CONN contract to 31 deterministic guardrails, 12 UI routes,
+  connector/connection/flow/sync/security/quality/governance/observability
+  configuration, Bytewax event-stream adapter evidence, and tenant theme
+  components.
+- Added `conn_runtime.ConnService` with dependency-light connector,
+  connection, flow, sync run, schedule, review, retirement, owner-transfer,
+  dashboard, and audit lifecycle behavior for generated applications.
+- Added generated-app API helper functions while preserving the existing
+  FastAPI runtime surface.
+- Added `view_models.py` for dashboard, connector catalog, connection
+  workbench, flow designer, sync monitor, quality, lineage, marketplace,
+  security, audit, and settings screens.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded focused tests for contract shape, Bytewax adapter evidence,
+  rule-engine denials, happy-path connector-to-sync flow, missing evidence,
+  marketplace and activation reviews, schema reviews, schedules, replay,
+  retirement, generated-app UI models, and package evidence.
+- Manual review found and fixed unsupported connector runtime and sync mode
+  allowlist bypasses, pending schema-review sync completion, stale plan wording,
+  and missing generated-app list helpers for schedules and reviews.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/conn/__init__.py capabilities/common/conn/capability_contract.py capabilities/common/conn/models.py capabilities/common/conn/conn_runtime.py capabilities/common/conn/api.py capabilities/common/conn/view_models.py capabilities/common/conn/app.py capabilities/common/conn/tests/test_capability_contract.py capabilities/common/conn/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/conn/tests/test_capability_contract.py capabilities/common/conn/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, 12 routes, 31 rules, Bytewax event stream, and `conn_runtime.ConnService`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conn --json` passed with `ok: true`; CONN remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conn --json` passed with 12 UI routes, 31 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "MuleSoft" -e "Zapier" -e "materialized" -e "Materialized" -e "This package materializes" -e "mock data" -e "mock calculation" -e "placeholder" capabilities/common/conn/README.md capabilities/common/conn/SPECIFICATION.md capabilities/common/conn/PLAN.md capabilities/common/conn/cap_spec.md capabilities/common/conn/app.py capabilities/common/conn/api.py capabilities/common/conn/conn_runtime.py capabilities/common/conn/view_models.py capabilities/common/conn/tests/test_capability_contract.py capabilities/common/conn/tests/test_package_contract.py capabilities/common/conn/package_manifest.json capabilities/common/conn/release_report.json capabilities/common/conn/semantic_model.json capabilities/common/conn/__init__.py capabilities/common/conn/capability_contract.py capabilities/common/conn/docs/README.md capabilities/common/conn/docs/USER_GUIDE.md capabilities/common/conn/docs/DEPLOYMENT.md capabilities/common/conn/docs/PRODUCTION_DEPLOYMENT.md` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/conn docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Singer connector execution.
+- Live Bytewax stream execution.
+- External key vault, encryption, audit, registry, gateway, quality, lineage,
+  and monitoring adapters.
+- Rendered FastAPI/browser UI behavior.
+- Legacy enhancement module heavy tests.
+- Load, latency, throughput, and connector marketplace scale benchmarks.

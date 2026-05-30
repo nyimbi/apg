@@ -1,27 +1,16 @@
 # CONN Documentation
 
-This directory contains generated and operational documentation for the APG
-Connection Management (`conn`) capability.
+This directory contains operational notes for the APG Connection Management
+capability. The authoritative package contract is `../capability_contract.py`.
 
-## Guides
+Current primary docs:
 
-- [User Guide](USER_GUIDE.md)
-- [Deployment](DEPLOYMENT.md)
-- [Production Deployment](PRODUCTION_DEPLOYMENT.md)
-- [Enterprise Deployment Guide](ENTERPRISE_DEPLOYMENT_GUIDE.md)
+- `../README.md` - package overview and generated-app usage.
+- `../SPECIFICATION.md` - current functional specification.
+- `../PLAN.md` - current lifecycle packet plan.
+- `USER_GUIDE.md` - generated-app operator workflow.
+- `DEPLOYMENT.md` - generated-app and production-adapter deployment guidance.
 
-## Implementation Reports
-
-- [AI Integration Complete](AI_INTEGRATION_COMPLETE.md)
-- [Enterprise ERP Complete](ENTERPRISE_ERP_COMPLETE.md)
-- [ERP Connectors Summary](ERP_CONNECTORS_SUMMARY.md)
-- [Final Implementation Summary](FINAL_IMPLEMENTATION_SUMMARY.md)
-- [Ollama Integration Report](OLLAMA_INTEGRATION_REPORT.md)
-- [UI/UX Enhancement Complete](UI_UX_ENHANCEMENT_COMPLETE.md)
-- [Visual Lineage Implementation Complete](VISUAL_LINEAGE_IMPLEMENTATION_COMPLETE.md)
-
-## Examples
-
-Runnable demo scripts that require optional live services, such as Ollama, live
-under [examples](examples/). They are documentation examples, not default pytest
-suite tests.
+Older completion reports in this directory are historical implementation notes.
+Use the current contract, tests, and release evidence before relying on those
+reports for present behavior.

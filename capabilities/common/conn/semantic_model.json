@@ -8,37 +8,149 @@
   },
   "capabilities": {
     "conn": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "credential_vault": "keym",
+        "data_quality": "dqol",
+        "encryption_provider": "encr",
+        "event_stream": "bytewax",
+        "gateway": "apig",
+        "generated_app_runtime": "conn_runtime.ConnService",
+        "http_api": "api.app",
+        "lineage_store": "meta",
+        "metrics_sink": "moni",
+        "production_runtime": "service.ConnectionManager",
+        "registry": "regy",
+        "singer_runtime": "singer_runtime.SingerRuntime",
+        "singer_tap_registry": "singer_taps.erp_registry"
+      },
+      "approvals": {
+        "activation_review": "ReviewRecord",
+        "connection_retirement": "ConnectionRecord",
+        "marketplace_review": "ReviewRecord",
+        "owner_transfer": "ReviewRecord",
+        "schema_review": "ReviewRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
-        "ai": {
-          "enabled": true,
-          "model": "qwen3:1.7b",
-          "schema_mapping_confidence_threshold": 0.75
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "credential_vault": "keym",
+          "data_quality": "dqol",
+          "encryption_provider": "encr",
+          "event_stream": "bytewax",
+          "gateway": "apig",
+          "generated_app_runtime": "conn_runtime.ConnService",
+          "http_api": "api.app",
+          "lineage_store": "meta",
+          "metrics_sink": "moni",
+          "production_runtime": "service.ConnectionManager",
+          "registry": "regy",
+          "singer_runtime": "singer_runtime.SingerRuntime",
+          "singer_tap_registry": "singer_taps.erp_registry"
+        },
+        "connections": {
+          "credential_vault_required": true,
+          "cross_tenant_connections_allowed": false,
+          "owner_required": true,
+          "production_activation_review_required": true,
+          "secret_rotation_required": true,
+          "test_required_before_activation": true
+        },
+        "connectors": {
+          "checksum_required": true,
+          "local_singer_runtime_required": true,
+          "marketplace_review_required_for_unverified": true,
+          "max_connectors_per_tenant": 500,
+          "owner_required": true,
+          "runtime_required": true,
+          "source_required": true,
+          "supported_runtimes": [
+            "singer",
+            "apg",
+            "http",
+            "database",
+            "file",
+            "stream",
+            "webhook"
+          ]
+        },
+        "flows": {
+          "idempotency_required_for_replay": true,
+          "lineage_required": true,
+          "mapping_required": true,
+          "quality_gate_required": true,
+          "source_and_target_required": true
+        },
+        "governance": {
+          "audit_enabled": true,
+          "lineage_capture_required": true,
+          "owner_transfer_review_required": true,
+          "require_tenant_context": true,
+          "retirement_impact_review_required": true
+        },
+        "observability": {
+          "alerts_required_for_production": true,
+          "health_check_interval_seconds": 60,
+          "metrics_required": true,
+          "sync_audit_required": true
+        },
+        "quality": {
+          "default_min_quality_score": 0.95,
+          "quality_gates_enabled": true,
+          "sample_validation_required": true,
+          "schema_change_review_required": true
         },
         "security": {
-          "audit_enabled": true,
+          "credential_vault": "keym",
+          "destructive_delete_review_required": true,
           "encrypt_credentials": true,
-          "require_connection_test_before_activation": true
+          "pii_policy_required": true,
+          "webhook_auth_required": true
         },
-        "singer": {
+        "sync": {
+          "allowed_modes": [
+            "full_refresh",
+            "incremental",
+            "cdc",
+            "event_stream"
+          ],
           "default_batch_size": 1000,
-          "health_check_interval_seconds": 60,
+          "default_mode": "incremental",
           "max_batch_size": 100000,
-          "sync_mode": "incremental"
+          "monitoring_required_for_large_batch": true,
+          "review_batch_threshold": 10000
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "conn_enterprise"
+          "default_theme": "conn_integration_console"
         },
         "ui": {
-          "enable_data_quality_view": true,
+          "enable_audit_timeline": true,
+          "enable_connection_workbench": true,
+          "enable_connector_catalog": true,
+          "enable_dashboard": true,
           "enable_lineage_view": true,
           "enable_marketplace": true,
+          "enable_quality_console": true,
+          "enable_security_console": true,
+          "enable_settings": true,
+          "enable_sync_monitor": true,
           "enable_visual_designer": true
         }
+      },
+      "connector_lifecycle": {
+        "audit": "ConnectorAuditEvent",
+        "connection": "ConnectionRecord",
+        "connector": "ConnectorRecord",
+        "flow": "FlowRecord",
+        "review": "ReviewRecord",
+        "schedule": "ScheduleRecord",
+        "sync_run": "SyncRunRecord"
       },
       "erp_modules": [
         "common"
@@ -54,8 +166,166 @@
         "rules": [
           {
             "condition": {
+              "tenant_context_present": false
+            },
+            "description": "All connector operations require tenant context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_context_required",
+              "required_action": "attach_tenant_context"
+            },
+            "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "operation": "register_connector",
+              "owner_assigned": false
+            },
+            "description": "Connectors require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_owner_required",
+              "required_action": "assign_connector_owner"
+            },
+            "name": "connector_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_connector",
+              "runtime_present": false
+            },
+            "description": "Connectors require a declared runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_runtime_required",
+              "required_action": "declare_connector_runtime"
+            },
+            "name": "connector_requires_runtime"
+          },
+          {
+            "condition": {
+              "connector_runtime_supported": false,
+              "operation": "register_connector"
+            },
+            "description": "Connectors require a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_connector_runtime",
+              "required_action": "choose_supported_connector_runtime"
+            },
+            "name": "connector_runtime_must_be_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_connector",
+              "source_present": false
+            },
+            "description": "Connectors require a source package or local tap reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_source_required",
+              "required_action": "attach_connector_source"
+            },
+            "name": "connector_requires_source"
+          },
+          {
+            "condition": {
+              "checksum_present": false,
+              "operation": "register_connector"
+            },
+            "description": "Connector packages require checksum evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_checksum_required",
+              "required_action": "attach_connector_checksum"
+            },
+            "name": "connector_requires_checksum"
+          },
+          {
+            "condition": {
+              "marketplace_review_recorded": false,
+              "operation": "register_connector",
+              "verified_source": false
+            },
+            "description": "Unverified connector sources require marketplace review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "marketplace_review_required",
+              "required_action": "record_marketplace_review"
+            },
+            "name": "unverified_connector_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "register_connection",
+              "owner_assigned": false
+            },
+            "description": "Connections require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connection_owner_required",
+              "required_action": "assign_connection_owner"
+            },
+            "name": "connection_requires_owner"
+          },
+          {
+            "condition": {
+              "connector_registered": false,
+              "operation": "register_connection"
+            },
+            "description": "Connections require a registered connector.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_connector_required",
+              "required_action": "register_connector"
+            },
+            "name": "connection_requires_registered_connector"
+          },
+          {
+            "condition": {
+              "contains_credentials": true,
+              "credential_vault_ref_present": false,
+              "operation": "register_connection"
+            },
+            "description": "Credential-bearing connections require vault references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "credential_vault_required",
+              "required_action": "store_credentials_in_vault"
+            },
+            "name": "credential_vault_required"
+          },
+          {
+            "condition": {
+              "contains_credentials": true,
+              "credentials_encrypted": false,
+              "operation": "register_connection"
+            },
+            "description": "Credential-bearing connections require encrypted storage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "credentials_must_be_encrypted",
+              "required_action": "enable_encryption"
+            },
+            "name": "encrypt_credentials"
+          },
+          {
+            "condition": {
+              "operation": "activate_connection",
+              "secret_rotation_recorded": false
+            },
+            "description": "Connections require secret rotation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secret_rotation_required",
+              "required_action": "record_secret_rotation"
+            },
+            "name": "secret_rotation_required"
+          },
+          {
+            "condition": {
               "last_test_passed": false,
-              "requested_status": "active"
+              "operation": "activate_connection"
             },
             "description": "Connections must pass a test before activation.",
             "effect": {
@@ -67,21 +337,101 @@
           },
           {
             "condition": {
-              "contains_credentials": true,
-              "credentials_encrypted": false
+              "activation_review_recorded": false,
+              "environment": "production",
+              "operation": "activate_connection"
             },
-            "description": "Credential-bearing connectors require encrypted storage.",
+            "description": "Production connection activation requires review evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "activation_review_required",
+              "required_action": "record_activation_review"
+            },
+            "name": "production_activation_requires_review"
+          },
+          {
+            "condition": {
+              "cross_tenant_connection": true,
+              "operation": "register_connection"
+            },
+            "description": "Cross-tenant connections are denied by default.",
             "effect": {
               "decision": "deny",
-              "reason": "credentials_must_be_encrypted",
-              "required_action": "enable_encryption"
+              "reason": "cross_tenant_connection_denied",
+              "required_action": "use_tenant_scoped_connection"
             },
-            "name": "encrypt_credentials"
+            "name": "cross_tenant_connection_denied"
+          },
+          {
+            "condition": {
+              "operation": "create_flow",
+              "source_connection_active": false
+            },
+            "description": "Flows require an active source connection.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_connection_required",
+              "required_action": "activate_source_connection"
+            },
+            "name": "flow_requires_source_connection"
+          },
+          {
+            "condition": {
+              "operation": "create_flow",
+              "target_connection_active": false
+            },
+            "description": "Flows require an active target connection.",
+            "effect": {
+              "decision": "deny",
+              "reason": "target_connection_required",
+              "required_action": "activate_target_connection"
+            },
+            "name": "flow_requires_target_connection"
+          },
+          {
+            "condition": {
+              "mapping_present": false,
+              "operation": "create_flow"
+            },
+            "description": "Flows require field mapping evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "field_mapping_required",
+              "required_action": "attach_field_mapping"
+            },
+            "name": "flow_requires_mapping"
+          },
+          {
+            "condition": {
+              "lineage_enabled": false,
+              "operation": "create_flow"
+            },
+            "description": "Flows require lineage capture configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lineage_required",
+              "required_action": "enable_lineage_capture"
+            },
+            "name": "flow_requires_lineage"
+          },
+          {
+            "condition": {
+              "operation": "create_flow",
+              "quality_gate_present": false
+            },
+            "description": "Flows require a data quality gate.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_gate_required",
+              "required_action": "attach_quality_gate"
+            },
+            "name": "flow_requires_quality_gate"
           },
           {
             "condition": {
               "batch_size_gt": 10000,
-              "monitoring_enabled": false
+              "monitoring_enabled": false,
+              "operation": "start_sync"
             },
             "description": "Large synchronization batches require monitoring.",
             "effect": {
@@ -90,6 +440,140 @@
               "required_action": "enable_monitoring"
             },
             "name": "large_batch_requires_monitoring"
+          },
+          {
+            "condition": {
+              "batch_size_gt": 100000,
+              "operation": "start_sync"
+            },
+            "description": "Synchronization batch size cannot exceed the tenant maximum.",
+            "effect": {
+              "decision": "deny",
+              "reason": "batch_size_limit_exceeded",
+              "required_action": "reduce_batch_size"
+            },
+            "name": "oversized_batch_denied"
+          },
+          {
+            "condition": {
+              "operation": "start_sync",
+              "sync_mode_supported": false
+            },
+            "description": "Synchronization runs require a supported mode.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_sync_mode",
+              "required_action": "choose_supported_sync_mode"
+            },
+            "name": "sync_mode_must_be_supported"
+          },
+          {
+            "condition": {
+              "operation": "start_sync",
+              "schema_change_detected": true,
+              "schema_review_recorded": false
+            },
+            "description": "Schema changes require review before sync.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "schema_review_required",
+              "required_action": "record_schema_review"
+            },
+            "name": "schema_change_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "create_flow",
+              "pii_detected": true,
+              "pii_policy_attached": false
+            },
+            "description": "PII-bearing flows require data protection policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pii_policy_required",
+              "required_action": "attach_pii_policy"
+            },
+            "name": "pii_requires_policy"
+          },
+          {
+            "condition": {
+              "auth_policy_attached": false,
+              "connector_runtime": "webhook",
+              "operation": "register_connector"
+            },
+            "description": "Webhook connectors require authentication policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_auth_policy_required",
+              "required_action": "attach_webhook_auth_policy"
+            },
+            "name": "webhook_requires_auth_policy"
+          },
+          {
+            "condition": {
+              "operation": "schedule_flow",
+              "timezone_present": false
+            },
+            "description": "Scheduled flows require a timezone.",
+            "effect": {
+              "decision": "deny",
+              "reason": "timezone_required",
+              "required_action": "declare_schedule_timezone"
+            },
+            "name": "schedule_requires_timezone"
+          },
+          {
+            "condition": {
+              "idempotency_key_present": false,
+              "operation": "replay_sync"
+            },
+            "description": "Replay operations require idempotency evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "idempotency_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "replay_requires_idempotency"
+          },
+          {
+            "condition": {
+              "delete_review_recorded": false,
+              "destructive": true,
+              "operation": "delete_connection"
+            },
+            "description": "Destructive connector deletes require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "delete_review_required",
+              "required_action": "record_delete_review"
+            },
+            "name": "destructive_delete_requires_review"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_connection"
+            },
+            "description": "Retiring a connection requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_review_required",
+              "required_action": "record_retirement_impact_review"
+            },
+            "name": "connection_retirement_requires_impact_review"
+          },
+          {
+            "condition": {
+              "operation": "transfer_owner",
+              "owner_transfer_review_recorded": false
+            },
+            "description": "Connection owner transfer requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "owner_transfer_review_required",
+              "required_action": "record_owner_transfer_review"
+            },
+            "name": "owner_transfer_requires_review"
           }
         ],
         "type": "deterministic"
@@ -97,8 +581,166 @@
       "rules": [
         {
           "condition": {
+            "tenant_context_present": false
+          },
+          "description": "All connector operations require tenant context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_context_required",
+            "required_action": "attach_tenant_context"
+          },
+          "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "operation": "register_connector",
+            "owner_assigned": false
+          },
+          "description": "Connectors require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_owner_required",
+            "required_action": "assign_connector_owner"
+          },
+          "name": "connector_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_connector",
+            "runtime_present": false
+          },
+          "description": "Connectors require a declared runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_runtime_required",
+            "required_action": "declare_connector_runtime"
+          },
+          "name": "connector_requires_runtime"
+        },
+        {
+          "condition": {
+            "connector_runtime_supported": false,
+            "operation": "register_connector"
+          },
+          "description": "Connectors require a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_connector_runtime",
+            "required_action": "choose_supported_connector_runtime"
+          },
+          "name": "connector_runtime_must_be_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_connector",
+            "source_present": false
+          },
+          "description": "Connectors require a source package or local tap reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_source_required",
+            "required_action": "attach_connector_source"
+          },
+          "name": "connector_requires_source"
+        },
+        {
+          "condition": {
+            "checksum_present": false,
+            "operation": "register_connector"
+          },
+          "description": "Connector packages require checksum evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_checksum_required",
+            "required_action": "attach_connector_checksum"
+          },
+          "name": "connector_requires_checksum"
+        },
+        {
+          "condition": {
+            "marketplace_review_recorded": false,
+            "operation": "register_connector",
+            "verified_source": false
+          },
+          "description": "Unverified connector sources require marketplace review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "marketplace_review_required",
+            "required_action": "record_marketplace_review"
+          },
+          "name": "unverified_connector_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "register_connection",
+            "owner_assigned": false
+          },
+          "description": "Connections require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connection_owner_required",
+            "required_action": "assign_connection_owner"
+          },
+          "name": "connection_requires_owner"
+        },
+        {
+          "condition": {
+            "connector_registered": false,
+            "operation": "register_connection"
+          },
+          "description": "Connections require a registered connector.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_connector_required",
+            "required_action": "register_connector"
+          },
+          "name": "connection_requires_registered_connector"
+        },
+        {
+          "condition": {
+            "contains_credentials": true,
+            "credential_vault_ref_present": false,
+            "operation": "register_connection"
+          },
+          "description": "Credential-bearing connections require vault references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "credential_vault_required",
+            "required_action": "store_credentials_in_vault"
+          },
+          "name": "credential_vault_required"
+        },
+        {
+          "condition": {
+            "contains_credentials": true,
+            "credentials_encrypted": false,
+            "operation": "register_connection"
+          },
+          "description": "Credential-bearing connections require encrypted storage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "credentials_must_be_encrypted",
+            "required_action": "enable_encryption"
+          },
+          "name": "encrypt_credentials"
+        },
+        {
+          "condition": {
+            "operation": "activate_connection",
+            "secret_rotation_recorded": false
+          },
+          "description": "Connections require secret rotation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secret_rotation_required",
+            "required_action": "record_secret_rotation"
+          },
+          "name": "secret_rotation_required"
+        },
+        {
+          "condition": {
             "last_test_passed": false,
-            "requested_status": "active"
+            "operation": "activate_connection"
           },
           "description": "Connections must pass a test before activation.",
           "effect": {
@@ -110,21 +752,101 @@
         },
         {
           "condition": {
-            "contains_credentials": true,
-            "credentials_encrypted": false
+            "activation_review_recorded": false,
+            "environment": "production",
+            "operation": "activate_connection"
           },
-          "description": "Credential-bearing connectors require encrypted storage.",
+          "description": "Production connection activation requires review evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "activation_review_required",
+            "required_action": "record_activation_review"
+          },
+          "name": "production_activation_requires_review"
+        },
+        {
+          "condition": {
+            "cross_tenant_connection": true,
+            "operation": "register_connection"
+          },
+          "description": "Cross-tenant connections are denied by default.",
           "effect": {
             "decision": "deny",
-            "reason": "credentials_must_be_encrypted",
-            "required_action": "enable_encryption"
+            "reason": "cross_tenant_connection_denied",
+            "required_action": "use_tenant_scoped_connection"
           },
-          "name": "encrypt_credentials"
+          "name": "cross_tenant_connection_denied"
+        },
+        {
+          "condition": {
+            "operation": "create_flow",
+            "source_connection_active": false
+          },
+          "description": "Flows require an active source connection.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_connection_required",
+            "required_action": "activate_source_connection"
+          },
+          "name": "flow_requires_source_connection"
+        },
+        {
+          "condition": {
+            "operation": "create_flow",
+            "target_connection_active": false
+          },
+          "description": "Flows require an active target connection.",
+          "effect": {
+            "decision": "deny",
+            "reason": "target_connection_required",
+            "required_action": "activate_target_connection"
+          },
+          "name": "flow_requires_target_connection"
+        },
+        {
+          "condition": {
+            "mapping_present": false,
+            "operation": "create_flow"
+          },
+          "description": "Flows require field mapping evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "field_mapping_required",
+            "required_action": "attach_field_mapping"
+          },
+          "name": "flow_requires_mapping"
+        },
+        {
+          "condition": {
+            "lineage_enabled": false,
+            "operation": "create_flow"
+          },
+          "description": "Flows require lineage capture configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lineage_required",
+            "required_action": "enable_lineage_capture"
+          },
+          "name": "flow_requires_lineage"
+        },
+        {
+          "condition": {
+            "operation": "create_flow",
+            "quality_gate_present": false
+          },
+          "description": "Flows require a data quality gate.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_gate_required",
+            "required_action": "attach_quality_gate"
+          },
+          "name": "flow_requires_quality_gate"
         },
         {
           "condition": {
             "batch_size_gt": 10000,
-            "monitoring_enabled": false
+            "monitoring_enabled": false,
+            "operation": "start_sync"
           },
           "description": "Large synchronization batches require monitoring.",
           "effect": {
@@ -133,24 +855,168 @@
             "required_action": "enable_monitoring"
           },
           "name": "large_batch_requires_monitoring"
+        },
+        {
+          "condition": {
+            "batch_size_gt": 100000,
+            "operation": "start_sync"
+          },
+          "description": "Synchronization batch size cannot exceed the tenant maximum.",
+          "effect": {
+            "decision": "deny",
+            "reason": "batch_size_limit_exceeded",
+            "required_action": "reduce_batch_size"
+          },
+          "name": "oversized_batch_denied"
+        },
+        {
+          "condition": {
+            "operation": "start_sync",
+            "sync_mode_supported": false
+          },
+          "description": "Synchronization runs require a supported mode.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_sync_mode",
+            "required_action": "choose_supported_sync_mode"
+          },
+          "name": "sync_mode_must_be_supported"
+        },
+        {
+          "condition": {
+            "operation": "start_sync",
+            "schema_change_detected": true,
+            "schema_review_recorded": false
+          },
+          "description": "Schema changes require review before sync.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "schema_review_required",
+            "required_action": "record_schema_review"
+          },
+          "name": "schema_change_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "create_flow",
+            "pii_detected": true,
+            "pii_policy_attached": false
+          },
+          "description": "PII-bearing flows require data protection policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pii_policy_required",
+            "required_action": "attach_pii_policy"
+          },
+          "name": "pii_requires_policy"
+        },
+        {
+          "condition": {
+            "auth_policy_attached": false,
+            "connector_runtime": "webhook",
+            "operation": "register_connector"
+          },
+          "description": "Webhook connectors require authentication policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_auth_policy_required",
+            "required_action": "attach_webhook_auth_policy"
+          },
+          "name": "webhook_requires_auth_policy"
+        },
+        {
+          "condition": {
+            "operation": "schedule_flow",
+            "timezone_present": false
+          },
+          "description": "Scheduled flows require a timezone.",
+          "effect": {
+            "decision": "deny",
+            "reason": "timezone_required",
+            "required_action": "declare_schedule_timezone"
+          },
+          "name": "schedule_requires_timezone"
+        },
+        {
+          "condition": {
+            "idempotency_key_present": false,
+            "operation": "replay_sync"
+          },
+          "description": "Replay operations require idempotency evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "idempotency_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "replay_requires_idempotency"
+        },
+        {
+          "condition": {
+            "delete_review_recorded": false,
+            "destructive": true,
+            "operation": "delete_connection"
+          },
+          "description": "Destructive connector deletes require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "delete_review_required",
+            "required_action": "record_delete_review"
+          },
+          "name": "destructive_delete_requires_review"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_connection"
+          },
+          "description": "Retiring a connection requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_review_required",
+            "required_action": "record_retirement_impact_review"
+          },
+          "name": "connection_retirement_requires_impact_review"
+        },
+        {
+          "condition": {
+            "operation": "transfer_owner",
+            "owner_transfer_review_recorded": false
+          },
+          "description": "Connection owner transfer requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "owner_transfer_review_required",
+            "required_action": "record_owner_transfer_review"
+          },
+          "name": "owner_transfer_requires_review"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "service": "conn_runtime.py",
+        "views": "view_models.py"
       },
       "screens": {
+        "audit": {
+          "component": "ConnectionAuditTimeline",
+          "permission": "conn:view",
+          "route": "/conn/audit"
+        },
+        "connections": {
+          "component": "ConnectionWorkbench",
+          "permission": "conn:create",
+          "route": "/conn/connections"
+        },
+        "connectors": {
+          "component": "ConnectorCatalog",
+          "permission": "conn:view",
+          "route": "/conn/connectors"
+        },
         "dashboard": {
           "component": "ConnectionDashboard",
           "permission": "conn:view",
           "route": "/conn/dashboard"
-        },
-        "data_quality": {
-          "component": "DataQualityWorkbench",
-          "permission": "conn:view",
-          "route": "/conn/data-quality"
         },
         "designer": {
           "component": "VisualFlowDesigner",
@@ -164,53 +1030,95 @@
         },
         "marketplace": {
           "component": "ConnectorMarketplace",
-          "permission": "conn:view",
+          "permission": "conn:admin",
           "route": "/conn/marketplace"
+        },
+        "quality": {
+          "component": "DataQualityConsole",
+          "permission": "conn:view",
+          "route": "/conn/quality"
         },
         "rules": {
           "component": "CapabilityRuleWorkbench",
           "permission": "conn:admin",
           "route": "/conn/rules"
         },
+        "security": {
+          "component": "ConnectionSecurityConsole",
+          "permission": "conn:admin",
+          "route": "/conn/security"
+        },
         "settings": {
           "component": "CapabilitySettings",
           "permission": "conn:admin",
           "route": "/conn/settings"
+        },
+        "sync_runs": {
+          "component": "SyncRunMonitor",
+          "permission": "conn:view",
+          "route": "/conn/sync-runs"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
-          "connection_node": {
+          "audit_timeline": {
+            "status_style": "decision-pill",
+            "visual": "event-timeline"
+          },
+          "connection_workbench": {
+            "status_indicator": "test-chip",
+            "visual": "connection-table"
+          },
+          "connector_catalog_row": {
             "icon": "plug",
-            "shape": "rounded-rectangle",
-            "status_indicator": "left-border"
+            "risk_style": "verification-band",
+            "status_indicator": "runtime-pill"
           },
-          "data_flow_edge": {
-            "animated_when_active": "true",
-            "line_style": "solid"
+          "flow_designer_canvas": {
+            "edge_style": "lineage-edge",
+            "visual": "node-graph"
           },
-          "rule_badge": {
-            "icon": "shield-check",
-            "variant": "subtle"
+          "lineage_map": {
+            "edge_style": "dataset-flow",
+            "visual": "dependency-graph"
+          },
+          "marketplace_review_queue": {
+            "status_indicator": "source-chip",
+            "visual": "review-list"
+          },
+          "quality_gate_panel": {
+            "highlight": "threshold-chip",
+            "visual": "score-grid"
+          },
+          "security_console": {
+            "status_indicator": "rotation-chip",
+            "visual": "credential-matrix"
+          },
+          "sync_monitor": {
+            "status_indicator": "batch-chip",
+            "visual": "run-timeline"
           }
         },
-        "name": "conn_enterprise",
+        "name": "conn_integration_console",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#8B5E34",
-          "color.danger": "#B42318",
+          "color.accent": "#C86F2D",
+          "color.danger": "#C53030",
           "color.primary": "#176B87",
-          "color.success": "#2E7D32",
-          "color.warning": "#B26A00",
+          "color.success": "#2F855A",
+          "color.warning": "#B7791F",
           "density": "compact",
-          "surface.canvas": "#F7F9FB",
+          "surface.canvas": "#F6F8FA",
           "surface.panel": "#FFFFFF",
-          "text.primary": "#1F2933",
-          "text.secondary": "#52616B"
+          "text.primary": "#172033",
+          "text.secondary": "#52606D"
         }
       },
       "ui": {
+        "api_prefix": "/api/v1",
         "frontend_bundle": "frontend/src/App.tsx",
         "requires_theme": true,
         "routes": [
@@ -222,6 +1130,20 @@
             "permission": "conn:view"
           },
           {
+            "component": "ConnectorCatalog",
+            "name": "connectors",
+            "nav_group": "Catalog",
+            "path": "/conn/connectors",
+            "permission": "conn:view"
+          },
+          {
+            "component": "ConnectionWorkbench",
+            "name": "connections",
+            "nav_group": "Catalog",
+            "path": "/conn/connections",
+            "permission": "conn:create"
+          },
+          {
             "component": "VisualFlowDesigner",
             "name": "designer",
             "nav_group": "Build",
@@ -229,10 +1151,17 @@
             "permission": "conn:create"
           },
           {
-            "component": "ConnectorMarketplace",
-            "name": "marketplace",
-            "nav_group": "Extend",
-            "path": "/conn/marketplace",
+            "component": "SyncRunMonitor",
+            "name": "sync_runs",
+            "nav_group": "Operations",
+            "path": "/conn/sync-runs",
+            "permission": "conn:view"
+          },
+          {
+            "component": "DataQualityConsole",
+            "name": "quality",
+            "nav_group": "Governance",
+            "path": "/conn/quality",
             "permission": "conn:view"
           },
           {
@@ -243,10 +1172,24 @@
             "permission": "conn:view"
           },
           {
-            "component": "DataQualityWorkbench",
-            "name": "data_quality",
+            "component": "ConnectorMarketplace",
+            "name": "marketplace",
+            "nav_group": "Extend",
+            "path": "/conn/marketplace",
+            "permission": "conn:admin"
+          },
+          {
+            "component": "ConnectionSecurityConsole",
+            "name": "security",
+            "nav_group": "Security",
+            "path": "/conn/security",
+            "permission": "conn:admin"
+          },
+          {
+            "component": "ConnectionAuditTimeline",
+            "name": "audit",
             "nav_group": "Governance",
-            "path": "/conn/data-quality",
+            "path": "/conn/audit",
             "permission": "conn:view"
           },
           {
@@ -268,7 +1211,8 @@
         "template_roots": [
           "templates/",
           "frontend/"
-        ]
+        ],
+        "view_module": "view_models.py"
       }
     }
   },
@@ -282,31 +1226,111 @@
   "contracts": {
     "conn": {
       "configuration": {
-        "ai": {
-          "enabled": true,
-          "model": "qwen3:1.7b",
-          "schema_mapping_confidence_threshold": 0.75
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "credential_vault": "keym",
+          "data_quality": "dqol",
+          "encryption_provider": "encr",
+          "event_stream": "bytewax",
+          "gateway": "apig",
+          "generated_app_runtime": "conn_runtime.ConnService",
+          "http_api": "api.app",
+          "lineage_store": "meta",
+          "metrics_sink": "moni",
+          "production_runtime": "service.ConnectionManager",
+          "registry": "regy",
+          "singer_runtime": "singer_runtime.SingerRuntime",
+          "singer_tap_registry": "singer_taps.erp_registry"
+        },
+        "connections": {
+          "credential_vault_required": true,
+          "cross_tenant_connections_allowed": false,
+          "owner_required": true,
+          "production_activation_review_required": true,
+          "secret_rotation_required": true,
+          "test_required_before_activation": true
+        },
+        "connectors": {
+          "checksum_required": true,
+          "local_singer_runtime_required": true,
+          "marketplace_review_required_for_unverified": true,
+          "max_connectors_per_tenant": 500,
+          "owner_required": true,
+          "runtime_required": true,
+          "source_required": true,
+          "supported_runtimes": [
+            "singer",
+            "apg",
+            "http",
+            "database",
+            "file",
+            "stream",
+            "webhook"
+          ]
+        },
+        "flows": {
+          "idempotency_required_for_replay": true,
+          "lineage_required": true,
+          "mapping_required": true,
+          "quality_gate_required": true,
+          "source_and_target_required": true
+        },
+        "governance": {
+          "audit_enabled": true,
+          "lineage_capture_required": true,
+          "owner_transfer_review_required": true,
+          "require_tenant_context": true,
+          "retirement_impact_review_required": true
+        },
+        "observability": {
+          "alerts_required_for_production": true,
+          "health_check_interval_seconds": 60,
+          "metrics_required": true,
+          "sync_audit_required": true
+        },
+        "quality": {
+          "default_min_quality_score": 0.95,
+          "quality_gates_enabled": true,
+          "sample_validation_required": true,
+          "schema_change_review_required": true
         },
         "security": {
-          "audit_enabled": true,
+          "credential_vault": "keym",
+          "destructive_delete_review_required": true,
           "encrypt_credentials": true,
-          "require_connection_test_before_activation": true
+          "pii_policy_required": true,
+          "webhook_auth_required": true
         },
-        "singer": {
+        "sync": {
+          "allowed_modes": [
+            "full_refresh",
+            "incremental",
+            "cdc",
+            "event_stream"
+          ],
           "default_batch_size": 1000,
-          "health_check_interval_seconds": 60,
+          "default_mode": "incremental",
           "max_batch_size": 100000,
-          "sync_mode": "incremental"
+          "monitoring_required_for_large_batch": true,
+          "review_batch_threshold": 10000
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "conn_enterprise"
+          "default_theme": "conn_integration_console"
         },
         "ui": {
-          "enable_data_quality_view": true,
+          "enable_audit_timeline": true,
+          "enable_connection_workbench": true,
+          "enable_connector_catalog": true,
+          "enable_dashboard": true,
           "enable_lineage_view": true,
           "enable_marketplace": true,
+          "enable_quality_console": true,
+          "enable_security_console": true,
+          "enable_settings": true,
+          "enable_sync_monitor": true,
           "enable_visual_designer": true
         }
       },
@@ -347,12 +1371,158 @@
   },
   "roles": {},
   "rules": {
+    "connection_requires_owner": {
+      "condition": {
+        "operation": "register_connection",
+        "owner_assigned": false
+      },
+      "description": "Connections require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connection_owner_required",
+        "required_action": "assign_connection_owner"
+      },
+      "name": "connection_requires_owner"
+    },
+    "connection_requires_registered_connector": {
+      "condition": {
+        "connector_registered": false,
+        "operation": "register_connection"
+      },
+      "description": "Connections require a registered connector.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_connector_required",
+        "required_action": "register_connector"
+      },
+      "name": "connection_requires_registered_connector"
+    },
+    "connection_retirement_requires_impact_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_connection"
+      },
+      "description": "Retiring a connection requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "impact_review_required",
+        "required_action": "record_retirement_impact_review"
+      },
+      "name": "connection_retirement_requires_impact_review"
+    },
+    "connector_requires_checksum": {
+      "condition": {
+        "checksum_present": false,
+        "operation": "register_connector"
+      },
+      "description": "Connector packages require checksum evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_checksum_required",
+        "required_action": "attach_connector_checksum"
+      },
+      "name": "connector_requires_checksum"
+    },
+    "connector_requires_owner": {
+      "condition": {
+        "operation": "register_connector",
+        "owner_assigned": false
+      },
+      "description": "Connectors require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_owner_required",
+        "required_action": "assign_connector_owner"
+      },
+      "name": "connector_requires_owner"
+    },
+    "connector_requires_runtime": {
+      "condition": {
+        "operation": "register_connector",
+        "runtime_present": false
+      },
+      "description": "Connectors require a declared runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_runtime_required",
+        "required_action": "declare_connector_runtime"
+      },
+      "name": "connector_requires_runtime"
+    },
+    "connector_requires_source": {
+      "condition": {
+        "operation": "register_connector",
+        "source_present": false
+      },
+      "description": "Connectors require a source package or local tap reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_source_required",
+        "required_action": "attach_connector_source"
+      },
+      "name": "connector_requires_source"
+    },
+    "connector_runtime_must_be_supported": {
+      "condition": {
+        "connector_runtime_supported": false,
+        "operation": "register_connector"
+      },
+      "description": "Connectors require a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_connector_runtime",
+        "required_action": "choose_supported_connector_runtime"
+      },
+      "name": "connector_runtime_must_be_supported"
+    },
+    "credential_vault_required": {
+      "condition": {
+        "contains_credentials": true,
+        "credential_vault_ref_present": false,
+        "operation": "register_connection"
+      },
+      "description": "Credential-bearing connections require vault references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "credential_vault_required",
+        "required_action": "store_credentials_in_vault"
+      },
+      "name": "credential_vault_required"
+    },
+    "cross_tenant_connection_denied": {
+      "condition": {
+        "cross_tenant_connection": true,
+        "operation": "register_connection"
+      },
+      "description": "Cross-tenant connections are denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_connection_denied",
+        "required_action": "use_tenant_scoped_connection"
+      },
+      "name": "cross_tenant_connection_denied"
+    },
+    "destructive_delete_requires_review": {
+      "condition": {
+        "delete_review_recorded": false,
+        "destructive": true,
+        "operation": "delete_connection"
+      },
+      "description": "Destructive connector deletes require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "delete_review_required",
+        "required_action": "record_delete_review"
+      },
+      "name": "destructive_delete_requires_review"
+    },
     "encrypt_credentials": {
       "condition": {
         "contains_credentials": true,
-        "credentials_encrypted": false
+        "credentials_encrypted": false,
+        "operation": "register_connection"
       },
-      "description": "Credential-bearing connectors require encrypted storage.",
+      "description": "Credential-bearing connections require encrypted storage.",
       "effect": {
         "decision": "deny",
         "reason": "credentials_must_be_encrypted",
@@ -360,10 +1530,76 @@
       },
       "name": "encrypt_credentials"
     },
+    "flow_requires_lineage": {
+      "condition": {
+        "lineage_enabled": false,
+        "operation": "create_flow"
+      },
+      "description": "Flows require lineage capture configuration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "lineage_required",
+        "required_action": "enable_lineage_capture"
+      },
+      "name": "flow_requires_lineage"
+    },
+    "flow_requires_mapping": {
+      "condition": {
+        "mapping_present": false,
+        "operation": "create_flow"
+      },
+      "description": "Flows require field mapping evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "field_mapping_required",
+        "required_action": "attach_field_mapping"
+      },
+      "name": "flow_requires_mapping"
+    },
+    "flow_requires_quality_gate": {
+      "condition": {
+        "operation": "create_flow",
+        "quality_gate_present": false
+      },
+      "description": "Flows require a data quality gate.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quality_gate_required",
+        "required_action": "attach_quality_gate"
+      },
+      "name": "flow_requires_quality_gate"
+    },
+    "flow_requires_source_connection": {
+      "condition": {
+        "operation": "create_flow",
+        "source_connection_active": false
+      },
+      "description": "Flows require an active source connection.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_connection_required",
+        "required_action": "activate_source_connection"
+      },
+      "name": "flow_requires_source_connection"
+    },
+    "flow_requires_target_connection": {
+      "condition": {
+        "operation": "create_flow",
+        "target_connection_active": false
+      },
+      "description": "Flows require an active target connection.",
+      "effect": {
+        "decision": "deny",
+        "reason": "target_connection_required",
+        "required_action": "activate_target_connection"
+      },
+      "name": "flow_requires_target_connection"
+    },
     "large_batch_requires_monitoring": {
       "condition": {
         "batch_size_gt": 10000,
-        "monitoring_enabled": false
+        "monitoring_enabled": false,
+        "operation": "start_sync"
       },
       "description": "Large synchronization batches require monitoring.",
       "effect": {
@@ -373,10 +1609,77 @@
       },
       "name": "large_batch_requires_monitoring"
     },
+    "oversized_batch_denied": {
+      "condition": {
+        "batch_size_gt": 100000,
+        "operation": "start_sync"
+      },
+      "description": "Synchronization batch size cannot exceed the tenant maximum.",
+      "effect": {
+        "decision": "deny",
+        "reason": "batch_size_limit_exceeded",
+        "required_action": "reduce_batch_size"
+      },
+      "name": "oversized_batch_denied"
+    },
+    "owner_transfer_requires_review": {
+      "condition": {
+        "operation": "transfer_owner",
+        "owner_transfer_review_recorded": false
+      },
+      "description": "Connection owner transfer requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "owner_transfer_review_required",
+        "required_action": "record_owner_transfer_review"
+      },
+      "name": "owner_transfer_requires_review"
+    },
+    "pii_requires_policy": {
+      "condition": {
+        "operation": "create_flow",
+        "pii_detected": true,
+        "pii_policy_attached": false
+      },
+      "description": "PII-bearing flows require data protection policy evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pii_policy_required",
+        "required_action": "attach_pii_policy"
+      },
+      "name": "pii_requires_policy"
+    },
+    "production_activation_requires_review": {
+      "condition": {
+        "activation_review_recorded": false,
+        "environment": "production",
+        "operation": "activate_connection"
+      },
+      "description": "Production connection activation requires review evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "activation_review_required",
+        "required_action": "record_activation_review"
+      },
+      "name": "production_activation_requires_review"
+    },
+    "replay_requires_idempotency": {
+      "condition": {
+        "idempotency_key_present": false,
+        "operation": "replay_sync"
+      },
+      "description": "Replay operations require idempotency evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "idempotency_required",
+        "required_action": "attach_idempotency_key"
+      },
+      "name": "replay_requires_idempotency"
+    },
     "require_connection_test_before_activation": {
       "condition": {
         "last_test_passed": false,
-        "requested_status": "active"
+        "operation": "activate_connection"
       },
       "description": "Connections must pass a test before activation.",
       "effect": {
@@ -385,6 +1688,99 @@
         "required_action": "run_connection_test"
       },
       "name": "require_connection_test_before_activation"
+    },
+    "schedule_requires_timezone": {
+      "condition": {
+        "operation": "schedule_flow",
+        "timezone_present": false
+      },
+      "description": "Scheduled flows require a timezone.",
+      "effect": {
+        "decision": "deny",
+        "reason": "timezone_required",
+        "required_action": "declare_schedule_timezone"
+      },
+      "name": "schedule_requires_timezone"
+    },
+    "schema_change_requires_review": {
+      "condition": {
+        "operation": "start_sync",
+        "schema_change_detected": true,
+        "schema_review_recorded": false
+      },
+      "description": "Schema changes require review before sync.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "schema_review_required",
+        "required_action": "record_schema_review"
+      },
+      "name": "schema_change_requires_review"
+    },
+    "secret_rotation_required": {
+      "condition": {
+        "operation": "activate_connection",
+        "secret_rotation_recorded": false
+      },
+      "description": "Connections require secret rotation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secret_rotation_required",
+        "required_action": "record_secret_rotation"
+      },
+      "name": "secret_rotation_required"
+    },
+    "sync_mode_must_be_supported": {
+      "condition": {
+        "operation": "start_sync",
+        "sync_mode_supported": false
+      },
+      "description": "Synchronization runs require a supported mode.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_sync_mode",
+        "required_action": "choose_supported_sync_mode"
+      },
+      "name": "sync_mode_must_be_supported"
+    },
+    "tenant_context_required": {
+      "condition": {
+        "tenant_context_present": false
+      },
+      "description": "All connector operations require tenant context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_context_required",
+        "required_action": "attach_tenant_context"
+      },
+      "name": "tenant_context_required"
+    },
+    "unverified_connector_requires_review": {
+      "condition": {
+        "marketplace_review_recorded": false,
+        "operation": "register_connector",
+        "verified_source": false
+      },
+      "description": "Unverified connector sources require marketplace review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "marketplace_review_required",
+        "required_action": "record_marketplace_review"
+      },
+      "name": "unverified_connector_requires_review"
+    },
+    "webhook_requires_auth_policy": {
+      "condition": {
+        "auth_policy_attached": false,
+        "connector_runtime": "webhook",
+        "operation": "register_connector"
+      },
+      "description": "Webhook connectors require authentication policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "webhook_auth_policy_required",
+        "required_action": "attach_webhook_auth_policy"
+      },
+      "name": "webhook_requires_auth_policy"
     }
   },
   "security": {},
