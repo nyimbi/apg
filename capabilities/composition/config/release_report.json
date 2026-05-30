@@ -4,23 +4,226 @@
       "capability_contract": {
         "display_name": "Central Configuration Management",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 8,
+        "rule_count": 17
       }
     },
     "self_test": {
       "capability": "composition_config",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
       "capability": "composition_config",
-      "format": "apg.semantic-model.v1"
+      "format": "apg.semantic-model.v1",
+      "streaming": {
+        "events": [
+          "namespace_registered",
+          "configuration_created",
+          "configuration_validated",
+          "configuration_activated",
+          "configuration_deployed",
+          "configuration_rolled_back",
+          "template_created",
+          "drift_detected",
+          "config_agent_registered"
+        ],
+        "guardrails": [
+          "deployment_requires_bytewax_stream",
+          "rollback_requires_bytewax_stream",
+          "batch_change_requires_bytewax",
+          "privileged_agent_config_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "validated",
+          "active",
+          "release_pending",
+          "deployed",
+          "rolled_back",
+          "drifted",
+          "blocked"
+        ],
+        "stream": "apg.composition.config.lifecycle"
+      }
     }
   },
   "format": "apg.release-report.v1",
   "ok": true,
   "package": "composition_config",
+  "registration": {
+    "capability": "composition_config",
+    "display_name": "Central Configuration Management",
+    "provides": [
+      "configuration_namespace_registry",
+      "configuration_value_lifecycle",
+      "configuration_schema_validation",
+      "configuration_release_workflows",
+      "configuration_template_library",
+      "configuration_drift_monitoring",
+      "config_agents"
+    ],
+    "requires": [
+      "auth",
+      "audl",
+      "ntfy",
+      "registry",
+      "composition_access"
+    ],
+    "streaming": {
+      "events": [
+        "namespace_registered",
+        "configuration_created",
+        "configuration_validated",
+        "configuration_activated",
+        "configuration_deployed",
+        "configuration_rolled_back",
+        "template_created",
+        "drift_detected",
+        "config_agent_registered"
+      ],
+      "guardrails": [
+        "deployment_requires_bytewax_stream",
+        "rollback_requires_bytewax_stream",
+        "batch_change_requires_bytewax",
+        "privileged_agent_config_action_requires_human_approval"
+      ],
+      "key": "tenant_id",
+      "processor": "bytewax",
+      "states": [
+        "draft",
+        "validated",
+        "active",
+        "release_pending",
+        "deployed",
+        "rolled_back",
+        "drifted",
+        "blocked"
+      ],
+      "stream": "apg.composition.config.lifecycle"
+    },
+    "theme": {
+      "components": {
+        "agent_workbench": {
+          "status_style": "approval-chip",
+          "visual": "review-lane"
+        },
+        "config_editor": {
+          "status_style": "version-chip",
+          "visual": "schema-editor"
+        },
+        "drift_monitor": {
+          "status_style": "drift-chip",
+          "visual": "diff-timeline"
+        },
+        "namespace_console": {
+          "icon": "folder-tree",
+          "risk_style": "boundary-band",
+          "status_indicator": "namespace-pill"
+        },
+        "release_board": {
+          "status_style": "approval-chip",
+          "visual": "release-lanes"
+        },
+        "template_library": {
+          "status_style": "template-chip",
+          "visual": "template-grid"
+        }
+      },
+      "name": "composition_config_control",
+      "tokens": {
+        "border.radius": "8px",
+        "color.accent": "#C44536",
+        "color.danger": "#C53030",
+        "color.primary": "#28536B",
+        "color.success": "#2F855A",
+        "color.warning": "#B7791F",
+        "density": "compact",
+        "surface.canvas": "#F7F8FA",
+        "surface.panel": "#FFFFFF",
+        "text.primary": "#172033",
+        "text.secondary": "#52606D"
+      }
+    },
+    "ui": {
+      "api_prefix": "/composition-config/api/v1",
+      "requires_theme": true,
+      "routes": [
+        {
+          "component": "ConfigDashboard",
+          "name": "dashboard",
+          "nav_group": "Overview",
+          "path": "/composition-config/dashboard",
+          "permission": "composition_config:view"
+        },
+        {
+          "component": "ConfigNamespaceConsole",
+          "name": "namespaces",
+          "nav_group": "Namespaces",
+          "path": "/composition-config/namespaces",
+          "permission": "composition_config:admin"
+        },
+        {
+          "component": "ConfigEditor",
+          "name": "configurations",
+          "nav_group": "Configuration",
+          "path": "/composition-config/configurations",
+          "permission": "composition_config:edit"
+        },
+        {
+          "component": "ConfigReleaseBoard",
+          "name": "releases",
+          "nav_group": "Release",
+          "path": "/composition-config/releases",
+          "permission": "composition_config:release"
+        },
+        {
+          "component": "ConfigTemplateLibrary",
+          "name": "templates",
+          "nav_group": "Configuration",
+          "path": "/composition-config/templates",
+          "permission": "composition_config:edit"
+        },
+        {
+          "component": "ConfigDriftMonitor",
+          "name": "drift",
+          "nav_group": "Operations",
+          "path": "/composition-config/drift",
+          "permission": "composition_config:operate"
+        },
+        {
+          "component": "ConfigAgentWorkbench",
+          "name": "agents",
+          "nav_group": "Automation",
+          "path": "/composition-config/agents",
+          "permission": "composition_config:admin"
+        },
+        {
+          "component": "ConfigSettings",
+          "name": "settings",
+          "nav_group": "Administration",
+          "path": "/composition-config/settings",
+          "permission": "composition_config:admin"
+        }
+      ],
+      "shell": "apg_python",
+      "template_roots": [
+        "templates/",
+        "static/"
+      ],
+      "view_module": "views.py"
+    },
+    "version": "2.1.0"
+  },
   "source": "capability_contract.py",
   "target": "python"
 }

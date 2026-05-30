@@ -16,6 +16,97 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 22:42 EAT
+
+Composition CONFIG central-configuration lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the
+  `composition_config` capability, and replaced `cap_spec.md` with the active
+  packet summary.
+- Expanded `capability_contract.py` with namespace, configuration,
+  deployment, template, drift, config-agent, governance, observability, adapter,
+  UI, theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, namespace ownership,
+  namespace environment, write policy attachment, restricted configuration
+  schemas, secret references, activation validation evidence, production
+  deployment approval, high-impact canary evidence, deployment Bytewax streams,
+  rollback reason, rollback Bytewax streams, shared-template review, batch
+  configuration-change Bytewax streams, config-agent runtime/role, and
+  privileged agent-action approval.
+- Replaced heavyweight package entrypoints with dependency-light
+  `CompositionConfigService` records and operations for namespaces,
+  configurations, validation, activation, updates, deployments, rollbacks,
+  templates, drift, agents, audit events, dashboard summaries, and
+  compatibility record helpers.
+- Preserved lightweight compatibility names used by composition imports:
+  `CentralConfigurationManager`, `ConfigurationApplet`, `ConfigurationField`,
+  `ConfigurationScope`, `ConfigurationDataType`, `get_configuration_manager`,
+  and `register_configuration_applet`.
+- Extended API helpers and view models with namespace console, configuration
+  editor, release board, template library, drift monitor, agent workbench,
+  dashboard, and Bytewax metadata surfaces.
+- Updated package registration to expose config agents, required dependencies,
+  route contracts, theme contracts, and streaming metadata without importing
+  optional platform services.
+- Refreshed package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, namespace, configuration, deployment, rollback,
+  template, drift, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/composition/config/__init__.py
+  capabilities/composition/config/capability_contract.py
+  capabilities/composition/config/models.py
+  capabilities/composition/config/service.py
+  capabilities/composition/config/api.py capabilities/composition/config/views.py
+  capabilities/composition/config/app.py
+  capabilities/composition/config/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/composition/config/tests/test_package_contract.py` passed with 5
+  tests.
+- `./.venv/bin/apg capabilities inspect composition_config --json | jq '.ok,
+  .summary.route_count, .summary.rule_count, .summary.theme'` confirmed `true`,
+  8 routes, 17 rules, and `composition_config_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/composition/config
+  --json | jq '.ok, .side_effect_free, .warnings, .errors,
+  (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'` confirmed
+  `true`, `true`, no warnings, no errors, `composition_config`, `bytewax`,
+  `bytewax`, and runtime evidence loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/composition/config --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "from capabilities.composition.config import
+  CompositionConfigService; service=CompositionConfigService();
+  service.register_config_agent('tenant-proof','Proof agent','codex',
+  'release_reviewer','review releases'); print(service.dashboard_summary(
+  'tenant-proof'))"` passed and confirmed config-agent registration, audit
+  event emission, and Bytewax stream metadata.
+- `jq '.capabilities.composition_config.streaming.processor,
+  .capabilities.composition_config.provides,
+  .capabilities.composition_config.requires,
+  .capabilities.composition_config.screens.agents.route,
+  (.capabilities.composition_config.rules[] |
+  select(.name=="config_agent_runtime_supported") | .effect.reason),
+  (.capabilities.composition_config.rules[] |
+  select(.name=="deployment_requires_bytewax_stream") | .effect.reason)'
+  capabilities/composition/config/semantic_model.json` confirmed `bytewax`,
+  config-agent provides, required services, `/composition-config/agents`,
+  `config_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/python capabilities/composition/config/app.py` passed package
+  self-test.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/composition/config` passed before this
+  progress entry; rerun staged diff check before commit.
+- Not run: live configuration stores, secret managers, notification adapters,
+  durable audit sinks, live Bytewax topology, rendered browser UI, performance
+  checks, and full repository tests.
+
 ### 2026-05-30 22:18 EAT
 
 Composition ACCESS access-control lifecycle/guardrail packet:

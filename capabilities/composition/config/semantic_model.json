@@ -1,60 +1,119 @@
 {
   "agents": {},
   "app": {
-    "description": "Central Configuration Management package-backed APG capability",
-    "entity_count": 0,
+    "description": "Central configuration package-backed APG capability",
+    "entity_count": 6,
     "name": "composition_config",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "composition_config": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Composition",
-          "enabled": true,
-          "id": "composition_config",
-          "name": "Central Configuration Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/config/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "secrets": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "config_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_and_validate",
+          "supported_roles": [
+            "config_architect",
+            "schema_reviewer",
+            "release_reviewer",
+            "drift_reviewer",
+            "security_reviewer",
+            "rollback_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "configurations": {
+          "drift_detection_enabled": true,
+          "schema_required_for_restricted": true,
+          "secret_reference_required": true,
+          "validation_required_before_activation": true,
+          "versioning_enabled": true
+        },
+        "deployments": {
+          "approval_required_for_production": true,
+          "canary_required_for_high_impact": true,
+          "deployment_stream_required": true,
+          "rollback_supported": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "redact_secret_values": true,
           "require_tenant_context": true
+        },
+        "namespaces": {
+          "capability_boundary_required": true,
+          "environment_required": true,
+          "owner_required": true,
+          "path_prefix_required": true
+        },
+        "observability": {
+          "emit_config_events": true,
+          "emit_deployment_events": true,
+          "emit_drift_events": true,
+          "emit_namespace_events": true,
+          "event_stream": "apg.composition.config.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "templates": {
+          "owner_required": true,
+          "review_required_for_shared": true,
+          "variable_schema_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_config_operations"
+          "default_theme": "composition_config_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_config_editor": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_drift_monitor": true,
+          "enable_namespace_console": true,
+          "enable_release_board": true,
+          "enable_settings": true,
+          "enable_template_library": true
         }
       },
-      "erp_modules": [
-        "composition"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Central Configuration Management",
       "provides": [
-        "composition_config_operations"
+        "configuration_namespace_registry",
+        "configuration_value_lifecycle",
+        "configuration_schema_validation",
+        "configuration_release_workflows",
+        "configuration_template_library",
+        "configuration_drift_monitoring",
+        "config_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Central Configuration Management operations require tenant context.",
+            "description": "All central-configuration operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -64,29 +123,217 @@
           },
           {
             "condition": {
+              "namespace_owner_assigned": false,
+              "operation": "register_namespace"
+            },
+            "description": "Configuration namespaces require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_owner_required",
+              "required_action": "assign_namespace_owner"
+            },
+            "name": "namespace_requires_owner"
+          },
+          {
+            "condition": {
+              "environment_present": false,
+              "operation": "register_namespace"
+            },
+            "description": "Configuration namespaces require an environment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_environment_required",
+              "required_action": "select_environment"
+            },
+            "name": "namespace_requires_environment"
+          },
+          {
+            "condition": {
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Central Configuration Management write operations require policy enforcement.",
+            "description": "Configuration writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "configuration_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "create_configuration",
+              "restricted_config": true,
+              "schema_present": false
             },
-            "description": "High-risk Central Configuration Management operations require review.",
+            "description": "Restricted configuration values require a schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "configuration_schema_required",
+              "required_action": "attach_configuration_schema"
+            },
+            "name": "restricted_configuration_requires_schema"
+          },
+          {
+            "condition": {
+              "operation": "create_configuration",
+              "secret_config": true,
+              "secret_reference_present": false
+            },
+            "description": "Secret configuration values must use a secret reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "secret_reference_required",
+              "required_action": "attach_secret_reference"
+            },
+            "name": "secret_configuration_requires_reference"
+          },
+          {
+            "condition": {
+              "operation": "activate_configuration",
+              "validation_evidence_present": false
+            },
+            "description": "Configurations require validation evidence before activation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "configuration_validation_required",
+              "required_action": "attach_validation_evidence"
+            },
+            "name": "activation_requires_validation"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "environment": "production",
+              "operation": "deploy_configuration"
+            },
+            "description": "Production deployments require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "production_deployment_approval_required",
+              "required_action": "record_deployment_approval"
+            },
+            "name": "production_deployment_requires_approval"
+          },
+          {
+            "condition": {
+              "canary_evidence_present": false,
+              "impact_level": "high",
+              "operation": "deploy_configuration"
+            },
+            "description": "High-impact configuration deployments require canary evidence.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "canary_evidence_required",
+              "required_action": "attach_canary_evidence"
             },
-            "name": "high_risk_requires_review"
+            "name": "high_impact_deployment_requires_canary"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "deploy_configuration"
+            },
+            "description": "Configuration deployment events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_config_deployment_to_bytewax"
+            },
+            "name": "deployment_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "rollback_configuration",
+              "rollback_reason_present": false
+            },
+            "description": "Configuration rollback requires a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_reason_required",
+              "required_action": "attach_rollback_reason"
+            },
+            "name": "rollback_requires_reason"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "rollback_configuration"
+            },
+            "description": "Configuration rollback events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_config_rollback_to_bytewax"
+            },
+            "name": "rollback_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "create_template",
+              "review_recorded": false,
+              "shared_template": true
+            },
+            "description": "Shared templates require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "shared_template_review_required",
+              "required_action": "record_template_review"
+            },
+            "name": "shared_template_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_configuration_change"
+            },
+            "description": "Batch configuration changes require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_config_change_to_bytewax"
+            },
+            "name": "batch_change_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_config_agent"
+            },
+            "description": "Configuration agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "config_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "config_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_config_agent"
+            },
+            "description": "Configuration agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "config_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "config_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_config_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged configuration actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_config_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +343,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Central Configuration Management operations require tenant context.",
+          "description": "All central-configuration operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -106,29 +353,217 @@
         },
         {
           "condition": {
+            "namespace_owner_assigned": false,
+            "operation": "register_namespace"
+          },
+          "description": "Configuration namespaces require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_owner_required",
+            "required_action": "assign_namespace_owner"
+          },
+          "name": "namespace_requires_owner"
+        },
+        {
+          "condition": {
+            "environment_present": false,
+            "operation": "register_namespace"
+          },
+          "description": "Configuration namespaces require an environment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_environment_required",
+            "required_action": "select_environment"
+          },
+          "name": "namespace_requires_environment"
+        },
+        {
+          "condition": {
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Central Configuration Management write operations require policy enforcement.",
+          "description": "Configuration writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "configuration_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "create_configuration",
+            "restricted_config": true,
+            "schema_present": false
           },
-          "description": "High-risk Central Configuration Management operations require review.",
+          "description": "Restricted configuration values require a schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "configuration_schema_required",
+            "required_action": "attach_configuration_schema"
+          },
+          "name": "restricted_configuration_requires_schema"
+        },
+        {
+          "condition": {
+            "operation": "create_configuration",
+            "secret_config": true,
+            "secret_reference_present": false
+          },
+          "description": "Secret configuration values must use a secret reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "secret_reference_required",
+            "required_action": "attach_secret_reference"
+          },
+          "name": "secret_configuration_requires_reference"
+        },
+        {
+          "condition": {
+            "operation": "activate_configuration",
+            "validation_evidence_present": false
+          },
+          "description": "Configurations require validation evidence before activation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "configuration_validation_required",
+            "required_action": "attach_validation_evidence"
+          },
+          "name": "activation_requires_validation"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "environment": "production",
+            "operation": "deploy_configuration"
+          },
+          "description": "Production deployments require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "production_deployment_approval_required",
+            "required_action": "record_deployment_approval"
+          },
+          "name": "production_deployment_requires_approval"
+        },
+        {
+          "condition": {
+            "canary_evidence_present": false,
+            "impact_level": "high",
+            "operation": "deploy_configuration"
+          },
+          "description": "High-impact configuration deployments require canary evidence.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "canary_evidence_required",
+            "required_action": "attach_canary_evidence"
           },
-          "name": "high_risk_requires_review"
+          "name": "high_impact_deployment_requires_canary"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "deploy_configuration"
+          },
+          "description": "Configuration deployment events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_config_deployment_to_bytewax"
+          },
+          "name": "deployment_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "rollback_configuration",
+            "rollback_reason_present": false
+          },
+          "description": "Configuration rollback requires a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_reason_required",
+            "required_action": "attach_rollback_reason"
+          },
+          "name": "rollback_requires_reason"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "rollback_configuration"
+          },
+          "description": "Configuration rollback events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_config_rollback_to_bytewax"
+          },
+          "name": "rollback_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "create_template",
+            "review_recorded": false,
+            "shared_template": true
+          },
+          "description": "Shared templates require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "shared_template_review_required",
+            "required_action": "record_template_review"
+          },
+          "name": "shared_template_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_configuration_change"
+          },
+          "description": "Batch configuration changes require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_config_change_to_bytewax"
+          },
+          "name": "batch_change_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_config_agent"
+          },
+          "description": "Configuration agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "config_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "config_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_config_agent"
+          },
+          "description": "Configuration agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "config_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "config_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_config_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged configuration actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_config_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +573,108 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "ConfigAgentWorkbench",
+          "permission": "composition_config:admin",
+          "route": "/composition-config/agents"
+        },
+        "configurations": {
+          "component": "ConfigEditor",
+          "permission": "composition_config:edit",
+          "route": "/composition-config/configurations"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "ConfigDashboard",
           "permission": "composition_config:view",
           "route": "/composition-config/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
+        "drift": {
+          "component": "ConfigDriftMonitor",
           "permission": "composition_config:operate",
-          "route": "/composition-config/operations"
+          "route": "/composition-config/drift"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "composition_config:govern",
-          "route": "/composition-config/rules"
+        "namespaces": {
+          "component": "ConfigNamespaceConsole",
+          "permission": "composition_config:admin",
+          "route": "/composition-config/namespaces"
+        },
+        "releases": {
+          "component": "ConfigReleaseBoard",
+          "permission": "composition_config:release",
+          "route": "/composition-config/releases"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "ConfigSettings",
           "permission": "composition_config:admin",
           "route": "/composition-config/settings"
+        },
+        "templates": {
+          "component": "ConfigTemplateLibrary",
+          "permission": "composition_config:edit",
+          "route": "/composition-config/templates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "namespace_registered",
+          "configuration_created",
+          "configuration_validated",
+          "configuration_activated",
+          "configuration_deployed",
+          "configuration_rolled_back",
+          "template_created",
+          "drift_detected",
+          "config_agent_registered"
+        ],
+        "guardrails": [
+          "deployment_requires_bytewax_stream",
+          "rollback_requires_bytewax_stream",
+          "batch_change_requires_bytewax",
+          "privileged_agent_config_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "validated",
+          "active",
+          "release_pending",
+          "deployed",
+          "rolled_back",
+          "drifted",
+          "blocked"
+        ],
+        "stream": "apg.composition.config.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "config_editor": {
+            "status_style": "version-chip",
+            "visual": "schema-editor"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "drift_monitor": {
+            "status_style": "drift-chip",
+            "visual": "diff-timeline"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "namespace_console": {
+            "icon": "folder-tree",
+            "risk_style": "boundary-band",
+            "status_indicator": "namespace-pill"
+          },
+          "release_board": {
+            "status_style": "approval-chip",
+            "visual": "release-lanes"
+          },
+          "template_library": {
+            "status_style": "template-chip",
+            "visual": "template-grid"
           }
         },
-        "name": "composition_config_operations",
+        "name": "composition_config_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +694,56 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "ConfigDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/composition-config/dashboard",
             "permission": "composition_config:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
+            "component": "ConfigNamespaceConsole",
+            "name": "namespaces",
+            "nav_group": "Namespaces",
+            "path": "/composition-config/namespaces",
+            "permission": "composition_config:admin"
+          },
+          {
+            "component": "ConfigEditor",
+            "name": "configurations",
+            "nav_group": "Configuration",
+            "path": "/composition-config/configurations",
+            "permission": "composition_config:edit"
+          },
+          {
+            "component": "ConfigReleaseBoard",
+            "name": "releases",
+            "nav_group": "Release",
+            "path": "/composition-config/releases",
+            "permission": "composition_config:release"
+          },
+          {
+            "component": "ConfigTemplateLibrary",
+            "name": "templates",
+            "nav_group": "Configuration",
+            "path": "/composition-config/templates",
+            "permission": "composition_config:edit"
+          },
+          {
+            "component": "ConfigDriftMonitor",
+            "name": "drift",
             "nav_group": "Operations",
-            "path": "/composition-config/operations",
+            "path": "/composition-config/drift",
             "permission": "composition_config:operate"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/composition-config/rules",
-            "permission": "composition_config:govern"
+            "component": "ConfigAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/composition-config/agents",
+            "permission": "composition_config:admin"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ConfigSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/composition-config/settings",
@@ -238,46 +760,135 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "central_configuration": {
+        "supported_roles": [
+          "config_architect",
+          "schema_reviewer",
+          "release_reviewer",
+          "drift_reviewer",
+          "security_reviewer",
+          "rollback_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "composition_config": []
+      "composition_config": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access"
+      ]
     }
   },
   "contracts": {
     "composition_config": {
       "configuration": {
-        "capability": {
-          "category": "Composition",
-          "enabled": true,
-          "id": "composition_config",
-          "name": "Central Configuration Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/config/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "secrets": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "config_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_and_validate",
+          "supported_roles": [
+            "config_architect",
+            "schema_reviewer",
+            "release_reviewer",
+            "drift_reviewer",
+            "security_reviewer",
+            "rollback_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "configurations": {
+          "drift_detection_enabled": true,
+          "schema_required_for_restricted": true,
+          "secret_reference_required": true,
+          "validation_required_before_activation": true,
+          "versioning_enabled": true
+        },
+        "deployments": {
+          "approval_required_for_production": true,
+          "canary_required_for_high_impact": true,
+          "deployment_stream_required": true,
+          "rollback_supported": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "redact_secret_values": true,
           "require_tenant_context": true
+        },
+        "namespaces": {
+          "capability_boundary_required": true,
+          "environment_required": true,
+          "owner_required": true,
+          "path_prefix_required": true
+        },
+        "observability": {
+          "emit_config_events": true,
+          "emit_deployment_events": true,
+          "emit_drift_events": true,
+          "emit_namespace_events": true,
+          "event_stream": "apg.composition.config.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "templates": {
+          "owner_required": true,
+          "review_required_for_shared": true,
+          "variable_schema_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_config_operations"
+          "default_theme": "composition_config_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_config_editor": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_drift_monitor": true,
+          "enable_namespace_console": true,
+          "enable_release_board": true,
+          "enable_settings": true,
+          "enable_template_library": true
         }
       },
       "id": "composition_config",
       "provides": [
-        "composition_config_operations"
+        "configuration_namespace_registry",
+        "configuration_value_lifecycle",
+        "configuration_schema_validation",
+        "configuration_release_workflows",
+        "configuration_template_library",
+        "configuration_drift_monitoring",
+        "config_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_access"
+      ]
     }
   },
   "deployment": {
@@ -289,58 +900,238 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "composition_config": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "activation_requires_validation": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "operation": "activate_configuration",
+        "validation_evidence_present": false
       },
-      "description": "High-risk Central Configuration Management operations require review.",
+      "description": "Configurations require validation evidence before activation.",
       "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "decision": "deny",
+        "reason": "configuration_validation_required",
+        "required_action": "attach_validation_evidence"
       },
-      "name": "high_risk_requires_review"
+      "name": "activation_requires_validation"
     },
-    "operation_policy_required": {
+    "batch_change_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_configuration_change"
+      },
+      "description": "Batch configuration changes require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_config_change_to_bytewax"
+      },
+      "name": "batch_change_requires_bytewax"
+    },
+    "config_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_config_agent"
+      },
+      "description": "Configuration agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "config_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "config_agent_role_supported"
+    },
+    "config_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_config_agent"
+      },
+      "description": "Configuration agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "config_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "config_agent_runtime_supported"
+    },
+    "configuration_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Central Configuration Management write operations require policy enforcement.",
+      "description": "Configuration writes require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "configuration_requires_policy"
+    },
+    "deployment_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "deploy_configuration"
+      },
+      "description": "Configuration deployment events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_config_deployment_to_bytewax"
+      },
+      "name": "deployment_requires_bytewax_stream"
+    },
+    "high_impact_deployment_requires_canary": {
+      "condition": {
+        "canary_evidence_present": false,
+        "impact_level": "high",
+        "operation": "deploy_configuration"
+      },
+      "description": "High-impact configuration deployments require canary evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "canary_evidence_required",
+        "required_action": "attach_canary_evidence"
+      },
+      "name": "high_impact_deployment_requires_canary"
+    },
+    "namespace_requires_environment": {
+      "condition": {
+        "environment_present": false,
+        "operation": "register_namespace"
+      },
+      "description": "Configuration namespaces require an environment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_environment_required",
+        "required_action": "select_environment"
+      },
+      "name": "namespace_requires_environment"
+    },
+    "namespace_requires_owner": {
+      "condition": {
+        "namespace_owner_assigned": false,
+        "operation": "register_namespace"
+      },
+      "description": "Configuration namespaces require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_owner_required",
+        "required_action": "assign_namespace_owner"
+      },
+      "name": "namespace_requires_owner"
+    },
+    "privileged_agent_config_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_config_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged configuration actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_config_action_requires_human_approval"
+    },
+    "production_deployment_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "environment": "production",
+        "operation": "deploy_configuration"
+      },
+      "description": "Production deployments require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "production_deployment_approval_required",
+        "required_action": "record_deployment_approval"
+      },
+      "name": "production_deployment_requires_approval"
+    },
+    "restricted_configuration_requires_schema": {
+      "condition": {
+        "operation": "create_configuration",
+        "restricted_config": true,
+        "schema_present": false
+      },
+      "description": "Restricted configuration values require a schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "configuration_schema_required",
+        "required_action": "attach_configuration_schema"
+      },
+      "name": "restricted_configuration_requires_schema"
+    },
+    "rollback_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "rollback_configuration"
+      },
+      "description": "Configuration rollback events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_config_rollback_to_bytewax"
+      },
+      "name": "rollback_requires_bytewax_stream"
+    },
+    "rollback_requires_reason": {
+      "condition": {
+        "operation": "rollback_configuration",
+        "rollback_reason_present": false
+      },
+      "description": "Configuration rollback requires a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_reason_required",
+        "required_action": "attach_rollback_reason"
+      },
+      "name": "rollback_requires_reason"
+    },
+    "secret_configuration_requires_reference": {
+      "condition": {
+        "operation": "create_configuration",
+        "secret_config": true,
+        "secret_reference_present": false
+      },
+      "description": "Secret configuration values must use a secret reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "secret_reference_required",
+        "required_action": "attach_secret_reference"
+      },
+      "name": "secret_configuration_requires_reference"
+    },
+    "shared_template_requires_review": {
+      "condition": {
+        "operation": "create_template",
+        "review_recorded": false,
+        "shared_template": true
+      },
+      "description": "Shared templates require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "shared_template_review_required",
+        "required_action": "record_template_review"
+      },
+      "name": "shared_template_requires_review"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Central Configuration Management operations require tenant context.",
+      "description": "All central-configuration operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
@@ -348,30 +1139,5 @@
       },
       "name": "tenant_context_required"
     }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.composition_config": {
-      "file": "capability_contract.py",
-      "id": "capability.composition_config",
-      "kind": "capability",
-      "name": "Central Configuration Management",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }
