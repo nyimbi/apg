@@ -23,6 +23,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"mapped_tenant_count": summary["mapped_tenant_count"],
 		"migration_count": summary["migration_count"],
 		"deprecation_count": summary["deprecation_count"],
+		"tens_agent_count": summary["tens_agent_count"],
 	}
 
 
@@ -46,6 +47,7 @@ def map_tenant(payload: dict[str, Any]) -> dict[str, Any]:
 		validated_by=str(payload.get("validated_by") or ""),
 		validation_ref=str(payload.get("validation_ref") or ""),
 		mapping_validated=bool(payload.get("mapping_validated", True)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -79,6 +81,7 @@ def complete_migration(payload: dict[str, Any]) -> dict[str, Any]:
 		migration_id=str(payload["migration_id"]),
 		actor=str(payload.get("actor") or ""),
 		post_migration_validation_ref=str(payload.get("post_migration_validation_ref") or ""),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -89,6 +92,35 @@ def record_deprecation_plan(payload: dict[str, Any]) -> dict[str, Any]:
 		owner=str(payload.get("owner") or ""),
 		deprecation_ref=str(payload.get("deprecation_ref") or ""),
 		target_date=str(payload.get("target_date") or ""),
+	)
+
+
+def register_tens_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_tens_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or "tenant-admin"),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+	)
+
+
+def validate_agent_tenant_action(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_agent_tenant_action(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["agent_id"]),
+		privileged_scope=bool(payload.get("privileged_scope", False)),
+		human_approval_recorded=bool(payload.get("human_approval_recorded", False)),
+	)
+
+
+def validate_batch_tenant_mapping(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_tenant_mapping(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		legacy_tenant_ids=list(payload.get("legacy_tenant_ids") or []),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -112,6 +144,7 @@ def list_tenant_legacy(tenant_id: str = "default") -> dict[str, Any]:
 		"boundaries": SERVICE.list_boundaries(tenant_id),
 		"migrations": SERVICE.list_migrations(tenant_id),
 		"deprecations": SERVICE.list_deprecations(tenant_id),
+		"tens_agents": SERVICE.list_tens_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

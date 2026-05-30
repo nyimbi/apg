@@ -5,12 +5,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_TENS_AGENT_ROLES,
+	SUPPORTED_TENS_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+	streaming_manifest,
+)
+from .models import TensAgentRecord
+from .service import TensService
 
 __version__ = "1.0.0"
 __capability_id__ = "tens"
 __capability_name__ = "Tenants Legacy"
-__apg_dependencies__ = ["mten", "auth"]
+__apg_dependencies__ = ["mten", "auth", "audl", "idfd", "usrm"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "tens",
@@ -24,7 +32,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["legacy_tenant_registry", "tenant_mapping", "migration_controls", "access_boundaries", "deprecation_governance"],
+	"provides": ["legacy_tenant_registry", "tenant_mapping", "migration_controls", "access_boundaries", "deprecation_governance", "tens_agents"],
 	"permissions": ["tens:view", "tens:map", "tens:migrate", "tens:approve", "tens:admin"]
 }
 
@@ -39,7 +47,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["usrm", "cons", "audl", "idfd"],
+		"optional_dependencies": ["cons"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,13 +56,15 @@ def register_capability() -> dict[str, Any]:
 			"tenant_mapping": "Map legacy tenant identifiers to APG multi-tenant boundaries",
 			"migration_controls": "Govern migration plans, approvals, validation, and rollback",
 			"access_boundaries": "Validate tenant auth boundaries and compatibility scopes",
+			"tens_agents": "Compose governed AI agents into tenant mapping, boundary review, migration review, deprecation review, compatibility review, and audit review lanes",
 			"capability_rules": "Evaluate deterministic legacy-tenant governance rules",
 			"visual_theming": "Apply legacy-tenant migration theme tokens and components"
 		},
-		"endpoints": {"tenants": "/tens/api/v1/tenants", "mappings": "/tens/api/v1/mappings", "migrations": "/tens/api/v1/migrations", "boundaries": "/tens/api/v1/boundaries", "deprecation": "/tens/api/v1/deprecation"},
+		"endpoints": {"tenants": "/tens/api/v1/tenants", "mappings": "/tens/api/v1/mappings", "migrations": "/tens/api/v1/migrations", "boundaries": "/tens/api/v1/boundaries", "deprecation": "/tens/api/v1/deprecation", "agents": "/tens/api/v1/agents", "policy": "/tens/api/v1/policy"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": streaming_manifest(),
 		"permissions": capability_metadata["permissions"]
 	}
 
@@ -66,4 +76,19 @@ def get_capability_info() -> dict[str, Any]:
 	return info
 
 
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+	"SUPPORTED_TENS_AGENT_ROLES",
+	"SUPPORTED_TENS_AGENT_RUNTIMES",
+	"TensAgentRecord",
+	"TensService",
+	"capability_metadata",
+	"register_capability",
+	"get_capability_info",
+	"get_capability_contract",
+	"evaluate_capability_rules",
+	"streaming_manifest",
+	"__version__",
+	"__capability_id__",
+	"__capability_name__",
+	"__apg_dependencies__",
+]

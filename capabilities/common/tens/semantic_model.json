@@ -18,13 +18,22 @@
           "privileged_access_review_required": true,
           "tenant_isolation_validation_required": true
         },
+        "adapters": {
+          "access_control": "adapter",
+          "audit": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "migration": "adapter"
+        },
         "governance": {
           "audit_legacy_tenant_changes": true,
           "deprecation_plan_required": true,
           "require_tenant_context": true,
-          "stale_tenant_review_days": 180
+          "stale_tenant_review_days": 180,
+          "state_change_audit_required": true
         },
         "legacy_mapping": {
+          "batch_mapping_review_required": true,
           "compatibility_scope_required": true,
           "legacy_owner_required": true,
           "mapping_validation_required": true,
@@ -33,19 +42,49 @@
         "migration": {
           "approval_required": true,
           "migration_plan_required": true,
+          "migration_stream_required": true,
           "post_migration_validation_required": true,
           "rollback_plan_required": true
         },
+        "observability": {
+          "emit_deprecation_events": true,
+          "emit_mapping_events": true,
+          "emit_migration_events": true,
+          "event_stream": "apg.tens.lifecycle",
+          "stream_processor": "bytewax"
+        },
         "tenant_id": "default",
+        "tens_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "tenant_mapper",
+            "boundary_reviewer",
+            "migration_reviewer",
+            "deprecation_reviewer",
+            "compatibility_reviewer",
+            "audit_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "tens_legacy_tenant_migration"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_boundary_review": true,
           "enable_legacy_tenant_registry": true,
           "enable_mapping_workbench": true,
-          "enable_migration_queue": true
+          "enable_migration_queue": true,
+          "enable_policy_center": true
         }
       },
       "erp_modules": [
@@ -55,9 +94,20 @@
       "master_data": {},
       "name": "Tenants Legacy",
       "provides": [
-        "tens_operations"
+        "legacy_tenant_registry",
+        "tenant_mapping",
+        "migration_controls",
+        "access_boundaries",
+        "deprecation_governance",
+        "tens_agents"
       ],
-      "requires": [],
+      "requires": [
+        "mten",
+        "auth",
+        "audl",
+        "idfd",
+        "usrm"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +137,32 @@
           },
           {
             "condition": {
+              "operation": "register_legacy_tenant",
+              "source_system_present": false
+            },
+            "description": "Legacy tenants require source-system lineage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legacy_source_system_required",
+              "required_action": "attach_source_system"
+            },
+            "name": "legacy_tenant_requires_source_system"
+          },
+          {
+            "condition": {
+              "compatibility_scope_present": false,
+              "operation": "register_legacy_tenant"
+            },
+            "description": "Legacy tenants require an explicit compatibility scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compatibility_scope_required",
+              "required_action": "attach_compatibility_scope"
+            },
+            "name": "legacy_tenant_requires_compatibility_scope"
+          },
+          {
+            "condition": {
               "mapping_validated": false,
               "operation": "map_tenant"
             },
@@ -97,6 +173,19 @@
               "required_action": "validate_tenant_mapping"
             },
             "name": "mapping_requires_validation"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "map_tenant"
+            },
+            "description": "Tenant mapping lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_mapping_lifecycle_to_bytewax"
+            },
+            "name": "mapping_requires_bytewax_stream"
           },
           {
             "condition": {
@@ -113,7 +202,47 @@
           },
           {
             "condition": {
-              "auth_boundary_validated": false
+              "operation": "migrate_tenant",
+              "rollback_plan_present": false
+            },
+            "description": "Legacy tenant migrations require rollback planning.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_plan_required",
+              "required_action": "attach_rollback_plan"
+            },
+            "name": "migration_requires_rollback_plan"
+          },
+          {
+            "condition": {
+              "operation": "complete_migration",
+              "post_migration_validation_present": false
+            },
+            "description": "Completed migrations require post-migration validation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "post_migration_validation_required",
+              "required_action": "attach_post_migration_validation"
+            },
+            "name": "migration_completion_requires_post_validation"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "complete_migration"
+            },
+            "description": "Migration completion lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_migration_lifecycle_to_bytewax"
+            },
+            "name": "migration_completion_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "auth_boundary_validated": false,
+              "operation": "validate_access_boundary"
             },
             "description": "Legacy tenant access requires validated auth boundaries.",
             "effect": {
@@ -122,6 +251,45 @@
               "required_action": "validate_auth_boundary"
             },
             "name": "access_boundary_required"
+          },
+          {
+            "condition": {
+              "operation": "validate_access_boundary",
+              "role_mapping_present": false
+            },
+            "description": "Legacy tenant access requires role mapping evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legacy_role_mapping_required",
+              "required_action": "attach_role_mapping"
+            },
+            "name": "role_mapping_required"
+          },
+          {
+            "condition": {
+              "isolation_validation_present": false,
+              "operation": "validate_access_boundary"
+            },
+            "description": "Legacy tenant access requires tenant-isolation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_isolation_validation_required",
+              "required_action": "attach_tenant_isolation_validation"
+            },
+            "name": "isolation_validation_required"
+          },
+          {
+            "condition": {
+              "operation": "validate_access_boundary",
+              "privileged_review_present": false
+            },
+            "description": "Legacy privileged access requires review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privileged_access_review_required",
+              "required_action": "attach_privileged_access_review"
+            },
+            "name": "privileged_access_review_required"
           },
           {
             "condition": {
@@ -135,6 +303,59 @@
               "required_action": "review_legacy_tenant"
             },
             "name": "stale_legacy_tenant_requires_review"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_tens_agent"
+            },
+            "description": "Legacy tenant agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tens_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "tens_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_tens_agent"
+            },
+            "description": "Legacy tenant agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tens_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "tens_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_tenant_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged tenant mapping actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_mapping_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_tenant_mapping"
+            },
+            "description": "Batch legacy tenant mapping requires Bytewax stream coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_tenant_mapping_to_bytewax"
+            },
+            "name": "batch_tenant_mapping_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -167,6 +388,32 @@
         },
         {
           "condition": {
+            "operation": "register_legacy_tenant",
+            "source_system_present": false
+          },
+          "description": "Legacy tenants require source-system lineage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legacy_source_system_required",
+            "required_action": "attach_source_system"
+          },
+          "name": "legacy_tenant_requires_source_system"
+        },
+        {
+          "condition": {
+            "compatibility_scope_present": false,
+            "operation": "register_legacy_tenant"
+          },
+          "description": "Legacy tenants require an explicit compatibility scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compatibility_scope_required",
+            "required_action": "attach_compatibility_scope"
+          },
+          "name": "legacy_tenant_requires_compatibility_scope"
+        },
+        {
+          "condition": {
             "mapping_validated": false,
             "operation": "map_tenant"
           },
@@ -177,6 +424,19 @@
             "required_action": "validate_tenant_mapping"
           },
           "name": "mapping_requires_validation"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "map_tenant"
+          },
+          "description": "Tenant mapping lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_mapping_lifecycle_to_bytewax"
+          },
+          "name": "mapping_requires_bytewax_stream"
         },
         {
           "condition": {
@@ -193,7 +453,47 @@
         },
         {
           "condition": {
-            "auth_boundary_validated": false
+            "operation": "migrate_tenant",
+            "rollback_plan_present": false
+          },
+          "description": "Legacy tenant migrations require rollback planning.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_plan_required",
+            "required_action": "attach_rollback_plan"
+          },
+          "name": "migration_requires_rollback_plan"
+        },
+        {
+          "condition": {
+            "operation": "complete_migration",
+            "post_migration_validation_present": false
+          },
+          "description": "Completed migrations require post-migration validation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "post_migration_validation_required",
+            "required_action": "attach_post_migration_validation"
+          },
+          "name": "migration_completion_requires_post_validation"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "complete_migration"
+          },
+          "description": "Migration completion lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_migration_lifecycle_to_bytewax"
+          },
+          "name": "migration_completion_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "auth_boundary_validated": false,
+            "operation": "validate_access_boundary"
           },
           "description": "Legacy tenant access requires validated auth boundaries.",
           "effect": {
@@ -202,6 +502,45 @@
             "required_action": "validate_auth_boundary"
           },
           "name": "access_boundary_required"
+        },
+        {
+          "condition": {
+            "operation": "validate_access_boundary",
+            "role_mapping_present": false
+          },
+          "description": "Legacy tenant access requires role mapping evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legacy_role_mapping_required",
+            "required_action": "attach_role_mapping"
+          },
+          "name": "role_mapping_required"
+        },
+        {
+          "condition": {
+            "isolation_validation_present": false,
+            "operation": "validate_access_boundary"
+          },
+          "description": "Legacy tenant access requires tenant-isolation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_isolation_validation_required",
+            "required_action": "attach_tenant_isolation_validation"
+          },
+          "name": "isolation_validation_required"
+        },
+        {
+          "condition": {
+            "operation": "validate_access_boundary",
+            "privileged_review_present": false
+          },
+          "description": "Legacy privileged access requires review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privileged_access_review_required",
+            "required_action": "attach_privileged_access_review"
+          },
+          "name": "privileged_access_review_required"
         },
         {
           "condition": {
@@ -215,6 +554,59 @@
             "required_action": "review_legacy_tenant"
           },
           "name": "stale_legacy_tenant_requires_review"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_tens_agent"
+          },
+          "description": "Legacy tenant agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tens_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "tens_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_tens_agent"
+          },
+          "description": "Legacy tenant agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tens_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "tens_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_tenant_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged tenant mapping actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_mapping_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_tenant_mapping"
+          },
+          "description": "Batch legacy tenant mapping requires Bytewax stream coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_tenant_mapping_to_bytewax"
+          },
+          "name": "batch_tenant_mapping_requires_bytewax"
         }
       ],
       "runtime": {
@@ -224,6 +616,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "TENSAgentWorkbench",
+          "permission": "tens:admin",
+          "route": "/tens/agents"
+        },
         "audit": {
           "component": "LegacyTenantAudit",
           "permission": "tens:view",
@@ -254,6 +651,11 @@
           "permission": "tens:migrate",
           "route": "/tens/migrations"
         },
+        "policy": {
+          "component": "TENSPolicyCenter",
+          "permission": "tens:admin",
+          "route": "/tens/policy"
+        },
         "settings": {
           "component": "TENSSettings",
           "permission": "tens:admin",
@@ -265,9 +667,41 @@
           "route": "/tens/tenants"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "legacy_tenant_registered",
+          "tenant_mapped",
+          "boundary_validated",
+          "migration_plan_created",
+          "migration_completed",
+          "deprecation_planned",
+          "tens_agent_registered"
+        ],
+        "guardrails": [
+          "mapping_requires_bytewax_stream",
+          "migration_completion_requires_bytewax_stream",
+          "batch_tenant_mapping_requires_bytewax",
+          "privileged_agent_mapping_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "active",
+          "stale",
+          "mapped",
+          "migration_ready",
+          "migrated",
+          "deprecated",
+          "blocked"
+        ],
+        "stream": "apg.tens.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
+          },
           "boundary_review": {
             "status_style": "isolation-chip",
             "visual": "access-matrix"
@@ -279,6 +713,10 @@
           "migration_queue": {
             "status_style": "approval-chip",
             "visual": "migration-lanes"
+          },
+          "policy_center": {
+            "status_style": "guardrail-chip",
+            "visual": "rule-grid"
           },
           "tenant_card": {
             "icon": "building-2",
@@ -348,6 +786,20 @@
             "permission": "tens:approve"
           },
           {
+            "component": "TENSAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/tens/agents",
+            "permission": "tens:admin"
+          },
+          {
+            "component": "TENSPolicyCenter",
+            "name": "policy",
+            "nav_group": "Governance",
+            "path": "/tens/policy",
+            "permission": "tens:admin"
+          },
+          {
             "component": "LegacyTenantAudit",
             "name": "audit",
             "nav_group": "Governance",
@@ -375,7 +827,13 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "tens": []
+      "tens": [
+        "mten",
+        "auth",
+        "audl",
+        "idfd",
+        "usrm"
+      ]
     }
   },
   "contracts": {
@@ -387,13 +845,22 @@
           "privileged_access_review_required": true,
           "tenant_isolation_validation_required": true
         },
+        "adapters": {
+          "access_control": "adapter",
+          "audit": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "migration": "adapter"
+        },
         "governance": {
           "audit_legacy_tenant_changes": true,
           "deprecation_plan_required": true,
           "require_tenant_context": true,
-          "stale_tenant_review_days": 180
+          "stale_tenant_review_days": 180,
+          "state_change_audit_required": true
         },
         "legacy_mapping": {
+          "batch_mapping_review_required": true,
           "compatibility_scope_required": true,
           "legacy_owner_required": true,
           "mapping_validation_required": true,
@@ -402,26 +869,67 @@
         "migration": {
           "approval_required": true,
           "migration_plan_required": true,
+          "migration_stream_required": true,
           "post_migration_validation_required": true,
           "rollback_plan_required": true
         },
+        "observability": {
+          "emit_deprecation_events": true,
+          "emit_mapping_events": true,
+          "emit_migration_events": true,
+          "event_stream": "apg.tens.lifecycle",
+          "stream_processor": "bytewax"
+        },
         "tenant_id": "default",
+        "tens_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "tenant_mapper",
+            "boundary_reviewer",
+            "migration_reviewer",
+            "deprecation_reviewer",
+            "compatibility_reviewer",
+            "audit_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "tens_legacy_tenant_migration"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_boundary_review": true,
           "enable_legacy_tenant_registry": true,
           "enable_mapping_workbench": true,
-          "enable_migration_queue": true
+          "enable_migration_queue": true,
+          "enable_policy_center": true
         }
       },
       "id": "tens",
       "provides": [
-        "tens_operations"
+        "legacy_tenant_registry",
+        "tenant_mapping",
+        "migration_controls",
+        "access_boundaries",
+        "deprecation_governance",
+        "tens_agents"
       ],
-      "requires": []
+      "requires": [
+        "mten",
+        "auth",
+        "audl",
+        "idfd",
+        "usrm"
+      ]
     }
   },
   "deployment": {
@@ -433,7 +941,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,7 +964,8 @@
   "rules": {
     "access_boundary_required": {
       "condition": {
-        "auth_boundary_validated": false
+        "auth_boundary_validated": false,
+        "operation": "validate_access_boundary"
       },
       "description": "Legacy tenant access requires validated auth boundaries.",
       "effect": {
@@ -465,6 +974,45 @@
         "required_action": "validate_auth_boundary"
       },
       "name": "access_boundary_required"
+    },
+    "batch_tenant_mapping_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_tenant_mapping"
+      },
+      "description": "Batch legacy tenant mapping requires Bytewax stream coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_tenant_mapping_to_bytewax"
+      },
+      "name": "batch_tenant_mapping_requires_bytewax"
+    },
+    "isolation_validation_required": {
+      "condition": {
+        "isolation_validation_present": false,
+        "operation": "validate_access_boundary"
+      },
+      "description": "Legacy tenant access requires tenant-isolation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_isolation_validation_required",
+        "required_action": "attach_tenant_isolation_validation"
+      },
+      "name": "isolation_validation_required"
+    },
+    "legacy_tenant_requires_compatibility_scope": {
+      "condition": {
+        "compatibility_scope_present": false,
+        "operation": "register_legacy_tenant"
+      },
+      "description": "Legacy tenants require an explicit compatibility scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compatibility_scope_required",
+        "required_action": "attach_compatibility_scope"
+      },
+      "name": "legacy_tenant_requires_compatibility_scope"
     },
     "legacy_tenant_requires_owner": {
       "condition": {
@@ -479,6 +1027,32 @@
       },
       "name": "legacy_tenant_requires_owner"
     },
+    "legacy_tenant_requires_source_system": {
+      "condition": {
+        "operation": "register_legacy_tenant",
+        "source_system_present": false
+      },
+      "description": "Legacy tenants require source-system lineage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "legacy_source_system_required",
+        "required_action": "attach_source_system"
+      },
+      "name": "legacy_tenant_requires_source_system"
+    },
+    "mapping_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "map_tenant"
+      },
+      "description": "Tenant mapping lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_mapping_lifecycle_to_bytewax"
+      },
+      "name": "mapping_requires_bytewax_stream"
+    },
     "mapping_requires_validation": {
       "condition": {
         "mapping_validated": false,
@@ -492,6 +1066,32 @@
       },
       "name": "mapping_requires_validation"
     },
+    "migration_completion_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "complete_migration"
+      },
+      "description": "Migration completion lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_migration_lifecycle_to_bytewax"
+      },
+      "name": "migration_completion_requires_bytewax_stream"
+    },
+    "migration_completion_requires_post_validation": {
+      "condition": {
+        "operation": "complete_migration",
+        "post_migration_validation_present": false
+      },
+      "description": "Completed migrations require post-migration validation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "post_migration_validation_required",
+        "required_action": "attach_post_migration_validation"
+      },
+      "name": "migration_completion_requires_post_validation"
+    },
     "migration_requires_approval": {
       "condition": {
         "approval_recorded": false,
@@ -504,6 +1104,59 @@
         "required_action": "record_migration_approval"
       },
       "name": "migration_requires_approval"
+    },
+    "migration_requires_rollback_plan": {
+      "condition": {
+        "operation": "migrate_tenant",
+        "rollback_plan_present": false
+      },
+      "description": "Legacy tenant migrations require rollback planning.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_plan_required",
+        "required_action": "attach_rollback_plan"
+      },
+      "name": "migration_requires_rollback_plan"
+    },
+    "privileged_access_review_required": {
+      "condition": {
+        "operation": "validate_access_boundary",
+        "privileged_review_present": false
+      },
+      "description": "Legacy privileged access requires review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privileged_access_review_required",
+        "required_action": "attach_privileged_access_review"
+      },
+      "name": "privileged_access_review_required"
+    },
+    "privileged_agent_mapping_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_tenant_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged tenant mapping actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_mapping_requires_human_approval"
+    },
+    "role_mapping_required": {
+      "condition": {
+        "operation": "validate_access_boundary",
+        "role_mapping_present": false
+      },
+      "description": "Legacy tenant access requires role mapping evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "legacy_role_mapping_required",
+        "required_action": "attach_role_mapping"
+      },
+      "name": "role_mapping_required"
     },
     "stale_legacy_tenant_requires_review": {
       "condition": {
@@ -529,6 +1182,32 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "tens_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_tens_agent"
+      },
+      "description": "Legacy tenant agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tens_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "tens_agent_role_supported"
+    },
+    "tens_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_tens_agent"
+      },
+      "description": "Legacy tenant agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tens_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "tens_agent_runtime_supported"
     }
   },
   "security": {},

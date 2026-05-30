@@ -16,6 +16,81 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 21:08 EAT
+
+Common TENS legacy-tenant lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the TENS
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with TENS-agent, legacy mapping,
+  migration, access boundary, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, legacy tenant owner,
+  source-system lineage, compatibility scope, mapping validation, mapping
+  Bytewax streams, migration approval, rollback plans, post-migration
+  validation, migration completion Bytewax streams, auth boundaries, role
+  mappings, tenant isolation evidence, privileged access review, stale tenant
+  review, TENS-agent runtime/role, privileged agent-action approval, and
+  Bytewax batch tenant mapping.
+- Added `TensAgentRecord` and metadata-rich audit event support, then extended
+  `TensService` with agent registration, privileged agent-action validation,
+  batch tenant mapping validation, audit counts, Bytewax stream metadata, and
+  stronger mapping/migration/access guardrails.
+- Extended API helpers and view models with TENS-agent, policy center,
+  dashboard, settings, and Bytewax metadata surfaces.
+- Updated package registration to expose TENS agents, policy endpoints,
+  required dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, batch, source/scope, access-boundary, rollback, and
+  migration-completion guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/tens/__init__.py
+  capabilities/common/tens/capability_contract.py
+  capabilities/common/tens/models.py capabilities/common/tens/tenant_runtime.py
+  capabilities/common/tens/service.py capabilities/common/tens/api.py
+  capabilities/common/tens/views.py capabilities/common/tens/app.py
+  capabilities/common/tens/test_capability_contract.py
+  capabilities/common/tens/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/tens/test_capability_contract.py
+  capabilities/common/tens/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.tens import TensService;
+  service=TensService(); service.register_tens_agent('tenant-proof',
+  'Proof agent', 'codex', 'tenant_mapper', 'review tenant mapping gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  TENS-agent registration, audit event emission, and Bytewax stream metadata.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.tens.streaming.processor,
+  .capabilities.tens.provides, .capabilities.tens.requires,
+  .capabilities.tens.screens.agents.route,
+  (.capabilities.tens.rules[] |
+  select(.name=="tens_agent_runtime_supported") | .effect.reason),
+  (.capabilities.tens.rules[] |
+  select(.name=="mapping_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/tens/semantic_model.json` confirmed `bytewax`, TENS-agent
+  provides, required services, `/tens/agents`,
+  `tens_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/tens --json` passed with `tens` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/tens --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `tens`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/tens docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: live identity providers, tenant catalogs, role stores, migration
+  engines, approval systems, audit sinks, live Bytewax topology, rendered
+  browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 20:57 EAT
 
 Common SHDN shutdown/lifecycle-control packet:

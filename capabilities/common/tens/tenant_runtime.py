@@ -128,6 +128,24 @@ class TenantAuditEventRecord:
 	message: str
 	actor: str
 	severity: str = "low"
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize(self)
+
+
+@dataclass(slots=True)
+class TensAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	status: str = "active"
+	human_approval_required: bool = True
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -143,6 +161,7 @@ __all__ = [
 	"DeprecationPlanRecord",
 	"LegacyTenantRecord",
 	"MigrationPlanRecord",
+	"TensAgentRecord",
 	"TenantAuditEventRecord",
 	"TenantMappingRecord",
 	"stable_id",

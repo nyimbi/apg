@@ -7,6 +7,7 @@ from .tenant_runtime import (
 	DeprecationPlanRecord,
 	LegacyTenantRecord,
 	MigrationPlanRecord,
+	TensAgentRecord,
 	TenantAuditEventRecord,
 	TenantMappingRecord,
 )
@@ -20,6 +21,7 @@ __all__ = [
 	"DeprecationPlanRecord",
 	"LegacyTenantRecord",
 	"MigrationPlanRecord",
+	"TensAgentRecord",
 	"TenantAuditEventRecord",
 	"TenantMappingRecord",
 	"TensRecord",

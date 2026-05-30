@@ -25,17 +25,19 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_tens", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_tens", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "tens"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "tens_agents" in contract["provides"]
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_tens", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_tens", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -97,6 +99,14 @@ def test_legacy_tenant_migration_lifecycle_executes():
 		deprecation_ref="deprecation://legacy-001",
 		target_date="2026-12-31",
 	)
+	agent = service.register_tens_agent(
+		tenant_id="tenant-a",
+		name="Boundary reviewer",
+		runtime="codex",
+		role="boundary_reviewer",
+		scope="review tenant isolation and privileged access evidence",
+		owner="security-lead",
+	)
 	summary = service.dashboard_summary("tenant-a")
 
 	assert legacy["status"] == "active"
@@ -105,10 +115,13 @@ def test_legacy_tenant_migration_lifecycle_executes():
 	assert migration["status"] == "approved"
 	assert completed["status"] == "completed"
 	assert deprecation["status"] == "planned"
+	assert agent["runtime"] == "codex"
 	assert summary["legacy_tenant_count"] == 1
 	assert summary["mapped_tenant_count"] == 1
 	assert summary["completed_migration_count"] == 1
 	assert summary["deprecation_count"] == 1
+	assert summary["tens_agent_count"] == 1
+	assert summary["streaming"]["processor"] == "bytewax"
 
 
 def test_guardrails_require_tenant_owner_mapping_boundary_approval_and_deprecation():
@@ -128,6 +141,20 @@ def test_guardrails_require_tenant_owner_mapping_boundary_approval_and_deprecati
 	else:
 		raise AssertionError("missing owner was accepted")
 
+	try:
+		service.register_legacy_tenant("tenant-a", "legacy-source", "", "owner", "scope")
+	except PermissionError as exc:
+		assert str(exc) == "legacy_source_system_required"
+	else:
+		raise AssertionError("missing source system was accepted")
+
+	try:
+		service.register_legacy_tenant("tenant-a", "legacy-scope", "system", "owner", "")
+	except PermissionError as exc:
+		assert str(exc) == "compatibility_scope_required"
+	else:
+		raise AssertionError("missing compatibility scope was accepted")
+
 	stale = service.register_legacy_tenant("tenant-a", "legacy-stale", "system", "owner", "scope", days_since_activity=240)
 	assert stale["status"] == "stale"
 	assert stale["required_actions"] == ["review_legacy_tenant"]
@@ -139,6 +166,13 @@ def test_guardrails_require_tenant_owner_mapping_boundary_approval_and_deprecati
 	else:
 		raise AssertionError("unvalidated mapping was accepted")
 
+	try:
+		service.map_tenant("tenant-a", stale["id"], "apg-tenant", "validator", "validation://mapping", event_stream="memory")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("mapping without Bytewax stream was accepted")
+
 	mapping = service.map_tenant("tenant-a", stale["id"], "apg-tenant", "validator", "validation://mapping")
 
 	try:
@@ -147,6 +181,13 @@ def test_guardrails_require_tenant_owner_mapping_boundary_approval_and_deprecati
 		assert str(exc) == "auth_boundary_required"
 	else:
 		raise AssertionError("missing auth boundary was accepted")
+
+	try:
+		service.validate_access_boundary("tenant-a", stale["id"], "auth://boundary", "", "isolation://tenant", "review://privileged", "actor")
+	except PermissionError as exc:
+		assert str(exc) == "legacy_role_mapping_required"
+	else:
+		raise AssertionError("missing role mapping was accepted")
 
 	service.validate_access_boundary("tenant-a", stale["id"], "auth://boundary", "roles://mapping", "isolation://tenant", "review://privileged", "actor")
 
@@ -158,11 +199,50 @@ def test_guardrails_require_tenant_owner_mapping_boundary_approval_and_deprecati
 		raise AssertionError("unapproved migration was accepted")
 
 	try:
+		service.create_migration_plan("tenant-a", stale["id"], mapping["id"], "owner", "approval://tenant", "", "validation://post")
+	except PermissionError as exc:
+		assert str(exc) == "rollback_plan_required"
+	else:
+		raise AssertionError("migration without rollback was accepted")
+
+	migration = service.create_migration_plan("tenant-a", stale["id"], mapping["id"], "owner", "approval://tenant", "rollback://tenant", "validation://post")
+
+	try:
+		service.complete_migration("tenant-a", migration["id"], "actor", "")
+	except PermissionError as exc:
+		assert str(exc) == "post_migration_validation_required"
+	else:
+		raise AssertionError("migration completion without post validation was accepted")
+
+	try:
+		service.complete_migration("tenant-a", migration["id"], "actor", "validation://post", event_stream="memory")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("migration completion without Bytewax stream was accepted")
+
+	try:
 		service.record_deprecation_plan("tenant-a", stale["id"], "owner", "", "2026-12-31")
 	except PermissionError as exc:
 		assert str(exc) == "deprecation_plan_required"
 	else:
 		raise AssertionError("missing deprecation plan was accepted")
+
+	try:
+		service.register_tens_agent("tenant-a", "Bad agent", "unsupported", "tenant_mapper", "map tenants")
+	except PermissionError as exc:
+		assert str(exc) == "tens_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported TENS agent runtime was accepted")
+
+	agent = service.register_tens_agent("tenant-a", "Privileged reviewer", "opencode", "boundary_reviewer", "review privileged access")
+	decision = service.validate_agent_tenant_action("tenant-a", agent["id"], privileged_scope=True, human_approval_recorded=False)
+	assert decision["decision"] == "deny"
+	assert decision["matched_rules"] == ["privileged_agent_mapping_requires_human_approval"]
+
+	batch = service.validate_batch_tenant_mapping("tenant-a", [stale["id"]], event_stream="memory")
+	assert batch["decision"] == "deny"
+	assert batch["matched_rules"] == ["batch_tenant_mapping_requires_bytewax"]
 
 
 def test_api_and_view_models_expose_legacy_tenant_surfaces():
@@ -214,6 +294,14 @@ def test_api_and_view_models_expose_legacy_tenant_surfaces():
 		"deprecation_ref": "deprecation://legacy-002",
 		"target_date": "2026-12-31",
 	})
+	agent = api.register_tens_agent({
+		"tenant_id": "tenant-b",
+		"name": "Tenant mapper",
+		"runtime": "claude_code",
+		"role": "tenant_mapper",
+		"scope": "prepare validated tenant mappings",
+		"owner": "migration-lead",
+	})
 
 	status = api.capability_status("tenant-b")
 	legacy_payload = api.list_tenant_legacy("tenant-b")
@@ -223,16 +311,23 @@ def test_api_and_view_models_expose_legacy_tenant_surfaces():
 	migrations = views.migration_queue_model(local_service, "tenant-b")
 	boundaries = views.boundary_review_model(local_service, "tenant-b")
 	deprecations = views.deprecation_model(local_service, "tenant-b")
+	agents = views.agent_workbench_model(local_service, "tenant-b")
+	policy = views.policy_center_model(local_service, "tenant-b")
 	audit = views.audit_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["legacy_tenant_count"] == 1
+	assert status["tens_agent_count"] == 1
 	assert legacy_payload["summary"]["completed_migration_count"] == 1
+	assert legacy_payload["tens_agents"][0]["id"] == agent["id"]
 	assert dashboard["summary"]["deprecation_count"] == 1
 	assert registry["route"] == "/tens/tenants"
 	assert mappings["validation_required"] is True
 	assert migrations["states"] == ["planned", "approved", "executing", "completed", "blocked"]
 	assert boundaries["required_evidence"] == ["auth_boundary", "role_mapping", "tenant_isolation", "privileged_access_review"]
 	assert deprecations["plan_required"] is True
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert policy["streaming"]["processor"] == "bytewax"
 	assert audit["events"]
 	assert settings["theme"]["name"] == "tens_legacy_tenant_migration"
+	assert settings["streaming"]["processor"] == "bytewax"
