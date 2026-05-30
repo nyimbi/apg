@@ -16,6 +16,84 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 22:54 EAT
+
+CRM ADV advanced CRM analytics lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the `crm_adv`
+  capability, and replaced `cap_spec.md` with the active package summary.
+- Replaced the generic spec-backed contract with explicit account, contact,
+  lead, opportunity, activity, campaign, forecast, CRM-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  account owner/segment, contact outreach consent, lead source, lead score and
+  assignment policy, opportunity account/stage/amount/positive amount/close
+  date, activity owner and open-pipeline next step, forecast evidence/confidence
+  and confidence bounds, campaign audience/consent/privacy review/large-budget
+  review, CRM import Bytewax streams, CRM event Bytewax streams, CRM-agent
+  runtime/role, and privileged agent-action approval.
+- Replaced dependency-heavy publishable service/API/view/app surfaces with
+  dependency-light CRM lifecycle helpers for accounts, contacts, leads,
+  assignments, opportunities, activities, campaigns, forecasts, import
+  validation, CRM-agent registration, dashboard summaries, audit events, API
+  helpers, and screen models.
+- Narrowed the CRM test package bootstrap so focused package tests do not
+  require optional database dependencies.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, account, contact, lead, opportunity, activity,
+  campaign, forecast, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/crm/adv/__init__.py
+  capabilities/crm/adv/capability_contract.py capabilities/crm/adv/service.py
+  capabilities/crm/adv/api.py capabilities/crm/adv/views.py
+  capabilities/crm/adv/app.py
+  capabilities/crm/adv/tests/test_package_contract.py
+  capabilities/crm/adv/tests/__init__.py
+  capabilities/crm/adv/tests/conftest.py` passed.
+- `./.venv/bin/pytest -q capabilities/crm/adv/tests/test_package_contract.py`
+  passed with 5 tests.
+- `./.venv/bin/apg capabilities inspect crm_adv --json | jq '.ok,
+  .summary.route_count, .summary.rule_count, .summary.theme'` confirmed
+  `true`, 10 routes, 28 rules, and `crm_adv_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/crm/adv --json | jq
+  '.ok, .side_effect_free, .warnings, .errors, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'` confirmed
+  `true`, `true`, no warnings, no errors, `crm_adv`, `bytewax`, `bytewax`,
+  and runtime evidence loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/crm/adv --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python capabilities/crm/adv/app.py` passed package self-test.
+- `./.venv/bin/python -c "from capabilities.crm.adv import
+  AdvancedCRMService; service=AdvancedCRMService();
+  service.register_crm_agent('tenant-proof','Proof agent','codex',
+  'pipeline_analyst','review pipeline');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  CRM-agent registration, audit event emission, and Bytewax stream metadata.
+- `jq '.capabilities.crm_adv.streaming.processor,
+  .capabilities.crm_adv.provides, .capabilities.crm_adv.requires,
+  .capabilities.crm_adv.screens.agents.route,
+  (.capabilities.crm_adv.rules[] |
+  select(.name=="crm_agent_runtime_supported") | .effect.reason),
+  (.capabilities.crm_adv.rules[] |
+  select(.name=="crm_batch_import_requires_bytewax") | .effect.reason)'
+  capabilities/crm/adv/semantic_model.json` confirmed `bytewax`, CRM-agent
+  provides, required services, `/crm-adv/agents`,
+  `crm_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/crm/adv` passed.
+- Not run: durable CRM stores, live campaign delivery, durable audit sinks,
+  live Bytewax topology, rendered browser UI, CRM performance/failover checks,
+  and full repository tests.
+
 ### 2026-05-30 22:46 EAT
 
 Composition REGISTRY capability-catalog lifecycle/guardrail packet:

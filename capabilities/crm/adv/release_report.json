@@ -2,25 +2,249 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
-        "display_name": "Customer Relationship Management - Revolutionary",
+        "display_name": "Advanced CRM Analytics",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 10,
+        "rule_count": 28
       }
     },
     "self_test": {
       "capability": "crm_adv",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
       "capability": "crm_adv",
-      "format": "apg.semantic-model.v1"
+      "format": "apg.semantic-model.v1",
+      "streaming": {
+        "events": [
+          "account_created",
+          "contact_created",
+          "lead_created",
+          "lead_assigned",
+          "opportunity_created",
+          "activity_recorded",
+          "campaign_launched",
+          "forecast_recorded",
+          "crm_agent_registered"
+        ],
+        "guardrails": [
+          "crm_batch_import_requires_bytewax",
+          "crm_event_requires_bytewax",
+          "privileged_agent_crm_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "qualified",
+          "assigned",
+          "open",
+          "won",
+          "lost",
+          "archived"
+        ],
+        "stream": "apg.crm.adv.lifecycle"
+      }
     }
   },
   "format": "apg.release-report.v1",
   "ok": true,
   "package": "crm_adv",
+  "registration": {
+    "capability": "crm_adv",
+    "display_name": "Advanced CRM Analytics",
+    "provides": [
+      "account_lifecycle",
+      "contact_relationship_management",
+      "lead_scoring_and_assignment",
+      "sales_pipeline_management",
+      "activity_timeline",
+      "campaign_governance",
+      "forecast_analytics",
+      "crm_agents"
+    ],
+    "requires": [
+      "auth",
+      "audl",
+      "ntfy",
+      "composition_events",
+      "composition_config",
+      "common_mdm"
+    ],
+    "streaming": {
+      "events": [
+        "account_created",
+        "contact_created",
+        "lead_created",
+        "lead_assigned",
+        "opportunity_created",
+        "activity_recorded",
+        "campaign_launched",
+        "forecast_recorded",
+        "crm_agent_registered"
+      ],
+      "guardrails": [
+        "crm_batch_import_requires_bytewax",
+        "crm_event_requires_bytewax",
+        "privileged_agent_crm_action_requires_human_approval"
+      ],
+      "key": "tenant_id",
+      "processor": "bytewax",
+      "states": [
+        "draft",
+        "active",
+        "qualified",
+        "assigned",
+        "open",
+        "won",
+        "lost",
+        "archived"
+      ],
+      "stream": "apg.crm.adv.lifecycle"
+    },
+    "theme": {
+      "components": {
+        "accounts": {
+          "icon": "building-2",
+          "risk_style": "segment-band",
+          "status_indicator": "account-pill"
+        },
+        "activities": {
+          "status_style": "next-step-chip",
+          "visual": "timeline"
+        },
+        "agent_workbench": {
+          "status_style": "approval-chip",
+          "visual": "review-lane"
+        },
+        "campaigns": {
+          "status_style": "privacy-chip",
+          "visual": "audience-list"
+        },
+        "contacts": {
+          "status_style": "consent-chip",
+          "visual": "relationship-map"
+        },
+        "forecasts": {
+          "status_style": "confidence-chip",
+          "visual": "forecast-grid"
+        },
+        "leads": {
+          "status_style": "quality-chip",
+          "visual": "score-lanes"
+        },
+        "pipeline": {
+          "status_style": "stage-chip",
+          "visual": "stage-board"
+        }
+      },
+      "name": "crm_adv_control",
+      "tokens": {
+        "border.radius": "8px",
+        "color.accent": "#C44536",
+        "color.danger": "#C53030",
+        "color.primary": "#28536B",
+        "color.success": "#2F855A",
+        "color.warning": "#B7791F",
+        "density": "compact",
+        "surface.canvas": "#F7F8FA",
+        "surface.panel": "#FFFFFF",
+        "text.primary": "#172033",
+        "text.secondary": "#52606D"
+      }
+    },
+    "ui": {
+      "api_prefix": "/crm-adv/api/v1",
+      "requires_theme": true,
+      "routes": [
+        {
+          "component": "AdvancedCRMDashboard",
+          "name": "dashboard",
+          "nav_group": "Overview",
+          "path": "/crm-adv/dashboard",
+          "permission": "crm_adv:view"
+        },
+        {
+          "component": "AccountCommandCenter",
+          "name": "accounts",
+          "nav_group": "Accounts",
+          "path": "/crm-adv/accounts",
+          "permission": "crm_adv:manage_accounts"
+        },
+        {
+          "component": "ContactRelationshipMap",
+          "name": "contacts",
+          "nav_group": "Contacts",
+          "path": "/crm-adv/contacts",
+          "permission": "crm_adv:manage_contacts"
+        },
+        {
+          "component": "LeadScoringConsole",
+          "name": "leads",
+          "nav_group": "Pipeline",
+          "path": "/crm-adv/leads",
+          "permission": "crm_adv:manage_leads"
+        },
+        {
+          "component": "SalesPipelineConsole",
+          "name": "pipeline",
+          "nav_group": "Pipeline",
+          "path": "/crm-adv/pipeline",
+          "permission": "crm_adv:manage_pipeline"
+        },
+        {
+          "component": "ActivityTimeline",
+          "name": "activities",
+          "nav_group": "Engagement",
+          "path": "/crm-adv/activities",
+          "permission": "crm_adv:manage_activities"
+        },
+        {
+          "component": "CampaignConsole",
+          "name": "campaigns",
+          "nav_group": "Engagement",
+          "path": "/crm-adv/campaigns",
+          "permission": "crm_adv:manage_campaigns"
+        },
+        {
+          "component": "ForecastWorkbench",
+          "name": "forecasts",
+          "nav_group": "Analytics",
+          "path": "/crm-adv/forecasts",
+          "permission": "crm_adv:forecast"
+        },
+        {
+          "component": "CRMAgentWorkbench",
+          "name": "agents",
+          "nav_group": "Automation",
+          "path": "/crm-adv/agents",
+          "permission": "crm_adv:admin"
+        },
+        {
+          "component": "CRMSettings",
+          "name": "settings",
+          "nav_group": "Administration",
+          "path": "/crm-adv/settings",
+          "permission": "crm_adv:admin"
+        }
+      ],
+      "shell": "apg_python",
+      "template_roots": [
+        "templates/",
+        "static/"
+      ],
+      "view_module": "views.py"
+    }
+  },
   "source": "capability_contract.py",
   "target": "python"
 }

@@ -1,60 +1,133 @@
 {
   "agents": {},
   "app": {
-    "description": "Customer Relationship Management - Revolutionary package-backed APG capability",
-    "entity_count": 0,
+    "description": "Advanced CRM analytics package-backed APG capability",
+    "entity_count": 8,
     "name": "crm_adv",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "crm_adv": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Crm",
-          "enabled": true,
-          "id": "crm_adv",
-          "name": "Customer Relationship Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv/cap_spec.md",
-          "version": "1.0.0"
+        "accounts": {
+          "owner_required": true,
+          "segment_required": true,
+          "territory_supported": true
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "activities": {
+          "next_step_required_for_open_pipeline": true,
+          "owner_required": true
+        },
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "customer_data": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "theme": "adapter"
+        },
+        "analytics": {
+          "confidence_required": true,
+          "forecast_evidence_required": true,
+          "pipeline_health_supported": true
+        },
+        "campaigns": {
+          "audience_required": true,
+          "budget_review_required": true,
+          "consent_required": true
+        },
+        "contacts": {
+          "consent_required_for_outreach": true,
+          "relationship_mapping_supported": true
+        },
+        "crm_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "pipeline_analyst",
+            "lead_quality_reviewer",
+            "account_strategist",
+            "forecast_reviewer",
+            "campaign_reviewer",
+            "privacy_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privacy_review_for_bulk_outreach": true,
           "require_tenant_context": true
+        },
+        "leads": {
+          "assignment_policy_required": true,
+          "score_required_for_assignment": true,
+          "source_required": true
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_lead_events": true,
+          "emit_opportunity_events": true,
+          "event_stream": "apg.crm.adv.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "opportunities": {
+          "account_required": true,
+          "amount_required": true,
+          "close_date_required": true,
+          "stage_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "crm_adv_operations"
+          "default_theme": "crm_adv_control"
         },
         "ui": {
+          "enable_accounts": true,
+          "enable_activities": true,
+          "enable_agents": true,
+          "enable_campaigns": true,
+          "enable_contacts": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_forecasts": true,
+          "enable_leads": true,
+          "enable_pipeline": true,
           "enable_settings": true
         }
       },
-      "erp_modules": [
-        "crm"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Customer Relationship Management - Revolutionary",
+      "name": "Advanced CRM Analytics",
       "provides": [
-        "crm_adv_operations"
+        "account_lifecycle",
+        "contact_relationship_management",
+        "lead_scoring_and_assignment",
+        "sales_pipeline_management",
+        "activity_timeline",
+        "campaign_governance",
+        "forecast_analytics",
+        "crm_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "common_mdm"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Customer Relationship Management - Revolutionary operations require tenant context.",
+            "description": "Advanced CRM operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +140,356 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Customer Relationship Management - Revolutionary write operations require policy enforcement.",
+            "description": "Advanced CRM write operations require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "crm_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "account_owner_assigned": false,
+              "operation": "create_account"
             },
-            "description": "High-risk Customer Relationship Management - Revolutionary operations require review.",
+            "description": "Accounts require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_owner_required",
+              "required_action": "assign_account_owner"
+            },
+            "name": "account_requires_owner"
+          },
+          {
+            "condition": {
+              "account_segment_present": false,
+              "operation": "create_account"
+            },
+            "description": "Accounts require a segment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_segment_required",
+              "required_action": "set_account_segment"
+            },
+            "name": "account_requires_segment"
+          },
+          {
+            "condition": {
+              "consent_recorded": false,
+              "operation": "create_contact",
+              "outreach_enabled": true
+            },
+            "description": "Outreach contacts require consent evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_consent_required",
+              "required_action": "record_contact_consent"
+            },
+            "name": "contact_outreach_requires_consent"
+          },
+          {
+            "condition": {
+              "lead_source_present": false,
+              "operation": "create_lead"
+            },
+            "description": "Leads require a source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lead_source_required",
+              "required_action": "set_lead_source"
+            },
+            "name": "lead_requires_source"
+          },
+          {
+            "condition": {
+              "lead_score_present": false,
+              "operation": "assign_lead"
+            },
+            "description": "Lead assignment requires a score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lead_score_required",
+              "required_action": "score_lead"
+            },
+            "name": "lead_assignment_requires_score"
+          },
+          {
+            "condition": {
+              "assignment_policy_present": false,
+              "operation": "assign_lead"
+            },
+            "description": "Lead assignment requires an assignment policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "lead_assignment_policy_required",
+              "required_action": "attach_assignment_policy"
+            },
+            "name": "lead_assignment_requires_policy"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "create_opportunity"
+            },
+            "description": "Opportunities require an account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "opportunity_account_required",
+              "required_action": "attach_account"
+            },
+            "name": "opportunity_requires_account"
+          },
+          {
+            "condition": {
+              "operation": "create_opportunity",
+              "stage_present": false
+            },
+            "description": "Opportunities require a sales stage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "opportunity_stage_required",
+              "required_action": "set_sales_stage"
+            },
+            "name": "opportunity_requires_stage"
+          },
+          {
+            "condition": {
+              "amount_present": false,
+              "operation": "create_opportunity"
+            },
+            "description": "Opportunities require an amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "opportunity_amount_required",
+              "required_action": "set_opportunity_amount"
+            },
+            "name": "opportunity_requires_amount"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "create_opportunity"
+            },
+            "description": "Opportunities require positive amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "opportunity_amount_positive_required",
+              "required_action": "set_positive_opportunity_amount"
+            },
+            "name": "opportunity_amount_must_be_positive"
+          },
+          {
+            "condition": {
+              "close_date_present": false,
+              "operation": "create_opportunity"
+            },
+            "description": "Opportunities require a close date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "opportunity_close_date_required",
+              "required_action": "set_close_date"
+            },
+            "name": "opportunity_requires_close_date"
+          },
+          {
+            "condition": {
+              "activity_owner_assigned": false,
+              "operation": "record_activity"
+            },
+            "description": "CRM activities require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "activity_owner_required",
+              "required_action": "assign_activity_owner"
+            },
+            "name": "activity_requires_owner"
+          },
+          {
+            "condition": {
+              "next_step_present": false,
+              "open_pipeline": true,
+              "operation": "record_activity"
+            },
+            "description": "Open pipeline opportunities require a next step.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "next_step_required",
+              "required_action": "record_next_step"
             },
-            "name": "high_risk_requires_review"
+            "name": "open_pipeline_requires_next_step"
+          },
+          {
+            "condition": {
+              "forecast_evidence_present": false,
+              "operation": "record_forecast"
+            },
+            "description": "Forecasts require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_evidence_required",
+              "required_action": "attach_forecast_evidence"
+            },
+            "name": "forecast_requires_evidence"
+          },
+          {
+            "condition": {
+              "confidence_present": false,
+              "operation": "record_forecast"
+            },
+            "description": "Forecasts require confidence level.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_confidence_required",
+              "required_action": "set_forecast_confidence"
+            },
+            "name": "forecast_requires_confidence"
+          },
+          {
+            "condition": {
+              "confidence_lt": 0,
+              "operation": "record_forecast"
+            },
+            "description": "Forecast confidence cannot be below zero.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_confidence_out_of_range",
+              "required_action": "set_forecast_confidence_between_zero_and_one"
+            },
+            "name": "forecast_confidence_minimum"
+          },
+          {
+            "condition": {
+              "confidence_gt": 1,
+              "operation": "record_forecast"
+            },
+            "description": "Forecast confidence cannot exceed one.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_confidence_out_of_range",
+              "required_action": "set_forecast_confidence_between_zero_and_one"
+            },
+            "name": "forecast_confidence_maximum"
+          },
+          {
+            "condition": {
+              "audience_present": false,
+              "operation": "launch_campaign"
+            },
+            "description": "Campaigns require an audience.",
+            "effect": {
+              "decision": "deny",
+              "reason": "campaign_audience_required",
+              "required_action": "define_campaign_audience"
+            },
+            "name": "campaign_requires_audience"
+          },
+          {
+            "condition": {
+              "consent_evidence_present": false,
+              "operation": "launch_campaign"
+            },
+            "description": "Campaigns require consent evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "campaign_consent_required",
+              "required_action": "attach_consent_evidence"
+            },
+            "name": "campaign_requires_consent"
+          },
+          {
+            "condition": {
+              "bulk_outreach": true,
+              "operation": "launch_campaign",
+              "privacy_review_recorded": false
+            },
+            "description": "Bulk outreach requires privacy review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "privacy_review_required",
+              "required_action": "record_privacy_review"
+            },
+            "name": "bulk_outreach_requires_privacy_review"
+          },
+          {
+            "condition": {
+              "budget_gt": 50000,
+              "budget_review_recorded": false,
+              "operation": "launch_campaign"
+            },
+            "description": "Large campaigns require budget review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "campaign_budget_review_required",
+              "required_action": "record_budget_review"
+            },
+            "name": "large_campaign_requires_budget_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "crm_batch_import"
+            },
+            "description": "CRM batch imports require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_crm_import_to_bytewax"
+            },
+            "name": "crm_batch_import_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "crm_event"
+            },
+            "description": "CRM lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_crm_event_to_bytewax"
+            },
+            "name": "crm_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_crm_agent"
+            },
+            "description": "CRM agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crm_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "crm_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_crm_agent"
+            },
+            "description": "CRM agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crm_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "crm_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_crm_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged CRM actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_crm_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +499,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Customer Relationship Management - Revolutionary operations require tenant context.",
+          "description": "Advanced CRM operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +512,356 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Customer Relationship Management - Revolutionary write operations require policy enforcement.",
+          "description": "Advanced CRM write operations require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "crm_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "account_owner_assigned": false,
+            "operation": "create_account"
           },
-          "description": "High-risk Customer Relationship Management - Revolutionary operations require review.",
+          "description": "Accounts require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_owner_required",
+            "required_action": "assign_account_owner"
+          },
+          "name": "account_requires_owner"
+        },
+        {
+          "condition": {
+            "account_segment_present": false,
+            "operation": "create_account"
+          },
+          "description": "Accounts require a segment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_segment_required",
+            "required_action": "set_account_segment"
+          },
+          "name": "account_requires_segment"
+        },
+        {
+          "condition": {
+            "consent_recorded": false,
+            "operation": "create_contact",
+            "outreach_enabled": true
+          },
+          "description": "Outreach contacts require consent evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_consent_required",
+            "required_action": "record_contact_consent"
+          },
+          "name": "contact_outreach_requires_consent"
+        },
+        {
+          "condition": {
+            "lead_source_present": false,
+            "operation": "create_lead"
+          },
+          "description": "Leads require a source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lead_source_required",
+            "required_action": "set_lead_source"
+          },
+          "name": "lead_requires_source"
+        },
+        {
+          "condition": {
+            "lead_score_present": false,
+            "operation": "assign_lead"
+          },
+          "description": "Lead assignment requires a score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lead_score_required",
+            "required_action": "score_lead"
+          },
+          "name": "lead_assignment_requires_score"
+        },
+        {
+          "condition": {
+            "assignment_policy_present": false,
+            "operation": "assign_lead"
+          },
+          "description": "Lead assignment requires an assignment policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "lead_assignment_policy_required",
+            "required_action": "attach_assignment_policy"
+          },
+          "name": "lead_assignment_requires_policy"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "create_opportunity"
+          },
+          "description": "Opportunities require an account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "opportunity_account_required",
+            "required_action": "attach_account"
+          },
+          "name": "opportunity_requires_account"
+        },
+        {
+          "condition": {
+            "operation": "create_opportunity",
+            "stage_present": false
+          },
+          "description": "Opportunities require a sales stage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "opportunity_stage_required",
+            "required_action": "set_sales_stage"
+          },
+          "name": "opportunity_requires_stage"
+        },
+        {
+          "condition": {
+            "amount_present": false,
+            "operation": "create_opportunity"
+          },
+          "description": "Opportunities require an amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "opportunity_amount_required",
+            "required_action": "set_opportunity_amount"
+          },
+          "name": "opportunity_requires_amount"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "create_opportunity"
+          },
+          "description": "Opportunities require positive amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "opportunity_amount_positive_required",
+            "required_action": "set_positive_opportunity_amount"
+          },
+          "name": "opportunity_amount_must_be_positive"
+        },
+        {
+          "condition": {
+            "close_date_present": false,
+            "operation": "create_opportunity"
+          },
+          "description": "Opportunities require a close date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "opportunity_close_date_required",
+            "required_action": "set_close_date"
+          },
+          "name": "opportunity_requires_close_date"
+        },
+        {
+          "condition": {
+            "activity_owner_assigned": false,
+            "operation": "record_activity"
+          },
+          "description": "CRM activities require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "activity_owner_required",
+            "required_action": "assign_activity_owner"
+          },
+          "name": "activity_requires_owner"
+        },
+        {
+          "condition": {
+            "next_step_present": false,
+            "open_pipeline": true,
+            "operation": "record_activity"
+          },
+          "description": "Open pipeline opportunities require a next step.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "next_step_required",
+            "required_action": "record_next_step"
           },
-          "name": "high_risk_requires_review"
+          "name": "open_pipeline_requires_next_step"
+        },
+        {
+          "condition": {
+            "forecast_evidence_present": false,
+            "operation": "record_forecast"
+          },
+          "description": "Forecasts require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_evidence_required",
+            "required_action": "attach_forecast_evidence"
+          },
+          "name": "forecast_requires_evidence"
+        },
+        {
+          "condition": {
+            "confidence_present": false,
+            "operation": "record_forecast"
+          },
+          "description": "Forecasts require confidence level.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_confidence_required",
+            "required_action": "set_forecast_confidence"
+          },
+          "name": "forecast_requires_confidence"
+        },
+        {
+          "condition": {
+            "confidence_lt": 0,
+            "operation": "record_forecast"
+          },
+          "description": "Forecast confidence cannot be below zero.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_confidence_out_of_range",
+            "required_action": "set_forecast_confidence_between_zero_and_one"
+          },
+          "name": "forecast_confidence_minimum"
+        },
+        {
+          "condition": {
+            "confidence_gt": 1,
+            "operation": "record_forecast"
+          },
+          "description": "Forecast confidence cannot exceed one.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_confidence_out_of_range",
+            "required_action": "set_forecast_confidence_between_zero_and_one"
+          },
+          "name": "forecast_confidence_maximum"
+        },
+        {
+          "condition": {
+            "audience_present": false,
+            "operation": "launch_campaign"
+          },
+          "description": "Campaigns require an audience.",
+          "effect": {
+            "decision": "deny",
+            "reason": "campaign_audience_required",
+            "required_action": "define_campaign_audience"
+          },
+          "name": "campaign_requires_audience"
+        },
+        {
+          "condition": {
+            "consent_evidence_present": false,
+            "operation": "launch_campaign"
+          },
+          "description": "Campaigns require consent evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "campaign_consent_required",
+            "required_action": "attach_consent_evidence"
+          },
+          "name": "campaign_requires_consent"
+        },
+        {
+          "condition": {
+            "bulk_outreach": true,
+            "operation": "launch_campaign",
+            "privacy_review_recorded": false
+          },
+          "description": "Bulk outreach requires privacy review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "privacy_review_required",
+            "required_action": "record_privacy_review"
+          },
+          "name": "bulk_outreach_requires_privacy_review"
+        },
+        {
+          "condition": {
+            "budget_gt": 50000,
+            "budget_review_recorded": false,
+            "operation": "launch_campaign"
+          },
+          "description": "Large campaigns require budget review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "campaign_budget_review_required",
+            "required_action": "record_budget_review"
+          },
+          "name": "large_campaign_requires_budget_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "crm_batch_import"
+          },
+          "description": "CRM batch imports require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_crm_import_to_bytewax"
+          },
+          "name": "crm_batch_import_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "crm_event"
+          },
+          "description": "CRM lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_crm_event_to_bytewax"
+          },
+          "name": "crm_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_crm_agent"
+          },
+          "description": "CRM agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crm_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "crm_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_crm_agent"
+          },
+          "description": "CRM agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crm_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "crm_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_crm_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged CRM actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_crm_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +871,125 @@
         "views": "views.py"
       },
       "screens": {
+        "accounts": {
+          "component": "AccountCommandCenter",
+          "permission": "crm_adv:manage_accounts",
+          "route": "/crm-adv/accounts"
+        },
+        "activities": {
+          "component": "ActivityTimeline",
+          "permission": "crm_adv:manage_activities",
+          "route": "/crm-adv/activities"
+        },
+        "agents": {
+          "component": "CRMAgentWorkbench",
+          "permission": "crm_adv:admin",
+          "route": "/crm-adv/agents"
+        },
+        "campaigns": {
+          "component": "CampaignConsole",
+          "permission": "crm_adv:manage_campaigns",
+          "route": "/crm-adv/campaigns"
+        },
+        "contacts": {
+          "component": "ContactRelationshipMap",
+          "permission": "crm_adv:manage_contacts",
+          "route": "/crm-adv/contacts"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "AdvancedCRMDashboard",
           "permission": "crm_adv:view",
           "route": "/crm-adv/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "crm_adv:operate",
-          "route": "/crm-adv/operations"
+        "forecasts": {
+          "component": "ForecastWorkbench",
+          "permission": "crm_adv:forecast",
+          "route": "/crm-adv/forecasts"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "crm_adv:govern",
-          "route": "/crm-adv/rules"
+        "leads": {
+          "component": "LeadScoringConsole",
+          "permission": "crm_adv:manage_leads",
+          "route": "/crm-adv/leads"
+        },
+        "pipeline": {
+          "component": "SalesPipelineConsole",
+          "permission": "crm_adv:manage_pipeline",
+          "route": "/crm-adv/pipeline"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "CRMSettings",
           "permission": "crm_adv:admin",
           "route": "/crm-adv/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "account_created",
+          "contact_created",
+          "lead_created",
+          "lead_assigned",
+          "opportunity_created",
+          "activity_recorded",
+          "campaign_launched",
+          "forecast_recorded",
+          "crm_agent_registered"
+        ],
+        "guardrails": [
+          "crm_batch_import_requires_bytewax",
+          "crm_event_requires_bytewax",
+          "privileged_agent_crm_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "qualified",
+          "assigned",
+          "open",
+          "won",
+          "lost",
+          "archived"
+        ],
+        "stream": "apg.crm.adv.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "accounts": {
+            "icon": "building-2",
+            "risk_style": "segment-band",
+            "status_indicator": "account-pill"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "activities": {
+            "status_style": "next-step-chip",
+            "visual": "timeline"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "campaigns": {
+            "status_style": "privacy-chip",
+            "visual": "audience-list"
+          },
+          "contacts": {
+            "status_style": "consent-chip",
+            "visual": "relationship-map"
+          },
+          "forecasts": {
+            "status_style": "confidence-chip",
+            "visual": "forecast-grid"
+          },
+          "leads": {
+            "status_style": "quality-chip",
+            "visual": "score-lanes"
+          },
+          "pipeline": {
+            "status_style": "stage-chip",
+            "visual": "stage-board"
           }
         },
-        "name": "crm_adv_operations",
+        "name": "crm_adv_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1009,70 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "AdvancedCRMDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/crm-adv/dashboard",
             "permission": "crm_adv:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/crm-adv/operations",
-            "permission": "crm_adv:operate"
+            "component": "AccountCommandCenter",
+            "name": "accounts",
+            "nav_group": "Accounts",
+            "path": "/crm-adv/accounts",
+            "permission": "crm_adv:manage_accounts"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/crm-adv/rules",
-            "permission": "crm_adv:govern"
+            "component": "ContactRelationshipMap",
+            "name": "contacts",
+            "nav_group": "Contacts",
+            "path": "/crm-adv/contacts",
+            "permission": "crm_adv:manage_contacts"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "LeadScoringConsole",
+            "name": "leads",
+            "nav_group": "Pipeline",
+            "path": "/crm-adv/leads",
+            "permission": "crm_adv:manage_leads"
+          },
+          {
+            "component": "SalesPipelineConsole",
+            "name": "pipeline",
+            "nav_group": "Pipeline",
+            "path": "/crm-adv/pipeline",
+            "permission": "crm_adv:manage_pipeline"
+          },
+          {
+            "component": "ActivityTimeline",
+            "name": "activities",
+            "nav_group": "Engagement",
+            "path": "/crm-adv/activities",
+            "permission": "crm_adv:manage_activities"
+          },
+          {
+            "component": "CampaignConsole",
+            "name": "campaigns",
+            "nav_group": "Engagement",
+            "path": "/crm-adv/campaigns",
+            "permission": "crm_adv:manage_campaigns"
+          },
+          {
+            "component": "ForecastWorkbench",
+            "name": "forecasts",
+            "nav_group": "Analytics",
+            "path": "/crm-adv/forecasts",
+            "permission": "crm_adv:forecast"
+          },
+          {
+            "component": "CRMAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/crm-adv/agents",
+            "permission": "crm_adv:admin"
+          },
+          {
+            "component": "CRMSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/crm-adv/settings",
@@ -238,46 +1089,150 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "advanced_crm": {
+        "supported_roles": [
+          "pipeline_analyst",
+          "lead_quality_reviewer",
+          "account_strategist",
+          "forecast_reviewer",
+          "campaign_reviewer",
+          "privacy_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "crm_adv": []
+      "crm_adv": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "common_mdm"
+      ]
     }
   },
   "contracts": {
     "crm_adv": {
       "configuration": {
-        "capability": {
-          "category": "Crm",
-          "enabled": true,
-          "id": "crm_adv",
-          "name": "Customer Relationship Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/crm/adv/cap_spec.md",
-          "version": "1.0.0"
+        "accounts": {
+          "owner_required": true,
+          "segment_required": true,
+          "territory_supported": true
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "activities": {
+          "next_step_required_for_open_pipeline": true,
+          "owner_required": true
+        },
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "customer_data": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "theme": "adapter"
+        },
+        "analytics": {
+          "confidence_required": true,
+          "forecast_evidence_required": true,
+          "pipeline_health_supported": true
+        },
+        "campaigns": {
+          "audience_required": true,
+          "budget_review_required": true,
+          "consent_required": true
+        },
+        "contacts": {
+          "consent_required_for_outreach": true,
+          "relationship_mapping_supported": true
+        },
+        "crm_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "pipeline_analyst",
+            "lead_quality_reviewer",
+            "account_strategist",
+            "forecast_reviewer",
+            "campaign_reviewer",
+            "privacy_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privacy_review_for_bulk_outreach": true,
           "require_tenant_context": true
+        },
+        "leads": {
+          "assignment_policy_required": true,
+          "score_required_for_assignment": true,
+          "source_required": true
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_lead_events": true,
+          "emit_opportunity_events": true,
+          "event_stream": "apg.crm.adv.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "opportunities": {
+          "account_required": true,
+          "amount_required": true,
+          "close_date_required": true,
+          "stage_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "crm_adv_operations"
+          "default_theme": "crm_adv_control"
         },
         "ui": {
+          "enable_accounts": true,
+          "enable_activities": true,
+          "enable_agents": true,
+          "enable_campaigns": true,
+          "enable_contacts": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_forecasts": true,
+          "enable_leads": true,
+          "enable_pipeline": true,
           "enable_settings": true
         }
       },
       "id": "crm_adv",
       "provides": [
-        "crm_adv_operations"
+        "account_lifecycle",
+        "contact_relationship_management",
+        "lead_scoring_and_assignment",
+        "sales_pipeline_management",
+        "activity_timeline",
+        "campaign_governance",
+        "forecast_analytics",
+        "crm_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "common_mdm"
+      ]
     }
   },
   "deployment": {
@@ -289,58 +1244,380 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "crm_adv": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "account_requires_owner": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "account_owner_assigned": false,
+        "operation": "create_account"
       },
-      "description": "High-risk Customer Relationship Management - Revolutionary operations require review.",
+      "description": "Accounts require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "account_owner_required",
+        "required_action": "assign_account_owner"
+      },
+      "name": "account_requires_owner"
+    },
+    "account_requires_segment": {
+      "condition": {
+        "account_segment_present": false,
+        "operation": "create_account"
+      },
+      "description": "Accounts require a segment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "account_segment_required",
+        "required_action": "set_account_segment"
+      },
+      "name": "account_requires_segment"
+    },
+    "activity_requires_owner": {
+      "condition": {
+        "activity_owner_assigned": false,
+        "operation": "record_activity"
+      },
+      "description": "CRM activities require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "activity_owner_required",
+        "required_action": "assign_activity_owner"
+      },
+      "name": "activity_requires_owner"
+    },
+    "bulk_outreach_requires_privacy_review": {
+      "condition": {
+        "bulk_outreach": true,
+        "operation": "launch_campaign",
+        "privacy_review_recorded": false
+      },
+      "description": "Bulk outreach requires privacy review.",
       "effect": {
         "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "reason": "privacy_review_required",
+        "required_action": "record_privacy_review"
       },
-      "name": "high_risk_requires_review"
+      "name": "bulk_outreach_requires_privacy_review"
     },
-    "operation_policy_required": {
+    "campaign_requires_audience": {
+      "condition": {
+        "audience_present": false,
+        "operation": "launch_campaign"
+      },
+      "description": "Campaigns require an audience.",
+      "effect": {
+        "decision": "deny",
+        "reason": "campaign_audience_required",
+        "required_action": "define_campaign_audience"
+      },
+      "name": "campaign_requires_audience"
+    },
+    "campaign_requires_consent": {
+      "condition": {
+        "consent_evidence_present": false,
+        "operation": "launch_campaign"
+      },
+      "description": "Campaigns require consent evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "campaign_consent_required",
+        "required_action": "attach_consent_evidence"
+      },
+      "name": "campaign_requires_consent"
+    },
+    "contact_outreach_requires_consent": {
+      "condition": {
+        "consent_recorded": false,
+        "operation": "create_contact",
+        "outreach_enabled": true
+      },
+      "description": "Outreach contacts require consent evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "contact_consent_required",
+        "required_action": "record_contact_consent"
+      },
+      "name": "contact_outreach_requires_consent"
+    },
+    "crm_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_crm_agent"
+      },
+      "description": "CRM agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crm_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "crm_agent_role_supported"
+    },
+    "crm_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_crm_agent"
+      },
+      "description": "CRM agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crm_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "crm_agent_runtime_supported"
+    },
+    "crm_batch_import_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "crm_batch_import"
+      },
+      "description": "CRM batch imports require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_crm_import_to_bytewax"
+      },
+      "name": "crm_batch_import_requires_bytewax"
+    },
+    "crm_event_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "crm_event"
+      },
+      "description": "CRM lifecycle events require Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_crm_event_to_bytewax"
+      },
+      "name": "crm_event_requires_bytewax"
+    },
+    "crm_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Customer Relationship Management - Revolutionary write operations require policy enforcement.",
+      "description": "Advanced CRM write operations require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "crm_write_requires_policy"
+    },
+    "forecast_confidence_maximum": {
+      "condition": {
+        "confidence_gt": 1,
+        "operation": "record_forecast"
+      },
+      "description": "Forecast confidence cannot exceed one.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_confidence_out_of_range",
+        "required_action": "set_forecast_confidence_between_zero_and_one"
+      },
+      "name": "forecast_confidence_maximum"
+    },
+    "forecast_confidence_minimum": {
+      "condition": {
+        "confidence_lt": 0,
+        "operation": "record_forecast"
+      },
+      "description": "Forecast confidence cannot be below zero.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_confidence_out_of_range",
+        "required_action": "set_forecast_confidence_between_zero_and_one"
+      },
+      "name": "forecast_confidence_minimum"
+    },
+    "forecast_requires_confidence": {
+      "condition": {
+        "confidence_present": false,
+        "operation": "record_forecast"
+      },
+      "description": "Forecasts require confidence level.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_confidence_required",
+        "required_action": "set_forecast_confidence"
+      },
+      "name": "forecast_requires_confidence"
+    },
+    "forecast_requires_evidence": {
+      "condition": {
+        "forecast_evidence_present": false,
+        "operation": "record_forecast"
+      },
+      "description": "Forecasts require evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_evidence_required",
+        "required_action": "attach_forecast_evidence"
+      },
+      "name": "forecast_requires_evidence"
+    },
+    "large_campaign_requires_budget_review": {
+      "condition": {
+        "budget_gt": 50000,
+        "budget_review_recorded": false,
+        "operation": "launch_campaign"
+      },
+      "description": "Large campaigns require budget review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "campaign_budget_review_required",
+        "required_action": "record_budget_review"
+      },
+      "name": "large_campaign_requires_budget_review"
+    },
+    "lead_assignment_requires_policy": {
+      "condition": {
+        "assignment_policy_present": false,
+        "operation": "assign_lead"
+      },
+      "description": "Lead assignment requires an assignment policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "lead_assignment_policy_required",
+        "required_action": "attach_assignment_policy"
+      },
+      "name": "lead_assignment_requires_policy"
+    },
+    "lead_assignment_requires_score": {
+      "condition": {
+        "lead_score_present": false,
+        "operation": "assign_lead"
+      },
+      "description": "Lead assignment requires a score.",
+      "effect": {
+        "decision": "deny",
+        "reason": "lead_score_required",
+        "required_action": "score_lead"
+      },
+      "name": "lead_assignment_requires_score"
+    },
+    "lead_requires_source": {
+      "condition": {
+        "lead_source_present": false,
+        "operation": "create_lead"
+      },
+      "description": "Leads require a source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "lead_source_required",
+        "required_action": "set_lead_source"
+      },
+      "name": "lead_requires_source"
+    },
+    "open_pipeline_requires_next_step": {
+      "condition": {
+        "next_step_present": false,
+        "open_pipeline": true,
+        "operation": "record_activity"
+      },
+      "description": "Open pipeline opportunities require a next step.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "next_step_required",
+        "required_action": "record_next_step"
+      },
+      "name": "open_pipeline_requires_next_step"
+    },
+    "opportunity_amount_must_be_positive": {
+      "condition": {
+        "amount_lte": 0,
+        "operation": "create_opportunity"
+      },
+      "description": "Opportunities require positive amount.",
+      "effect": {
+        "decision": "deny",
+        "reason": "opportunity_amount_positive_required",
+        "required_action": "set_positive_opportunity_amount"
+      },
+      "name": "opportunity_amount_must_be_positive"
+    },
+    "opportunity_requires_account": {
+      "condition": {
+        "account_present": false,
+        "operation": "create_opportunity"
+      },
+      "description": "Opportunities require an account.",
+      "effect": {
+        "decision": "deny",
+        "reason": "opportunity_account_required",
+        "required_action": "attach_account"
+      },
+      "name": "opportunity_requires_account"
+    },
+    "opportunity_requires_amount": {
+      "condition": {
+        "amount_present": false,
+        "operation": "create_opportunity"
+      },
+      "description": "Opportunities require an amount.",
+      "effect": {
+        "decision": "deny",
+        "reason": "opportunity_amount_required",
+        "required_action": "set_opportunity_amount"
+      },
+      "name": "opportunity_requires_amount"
+    },
+    "opportunity_requires_close_date": {
+      "condition": {
+        "close_date_present": false,
+        "operation": "create_opportunity"
+      },
+      "description": "Opportunities require a close date.",
+      "effect": {
+        "decision": "deny",
+        "reason": "opportunity_close_date_required",
+        "required_action": "set_close_date"
+      },
+      "name": "opportunity_requires_close_date"
+    },
+    "opportunity_requires_stage": {
+      "condition": {
+        "operation": "create_opportunity",
+        "stage_present": false
+      },
+      "description": "Opportunities require a sales stage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "opportunity_stage_required",
+        "required_action": "set_sales_stage"
+      },
+      "name": "opportunity_requires_stage"
+    },
+    "privileged_agent_crm_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_crm_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged CRM actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_crm_action_requires_human_approval"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Customer Relationship Management - Revolutionary operations require tenant context.",
+      "description": "Advanced CRM operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
@@ -348,30 +1625,5 @@
       },
       "name": "tenant_context_required"
     }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.crm_adv": {
-      "file": "capability_contract.py",
-      "id": "capability.crm_adv",
-      "kind": "capability",
-      "name": "Customer Relationship Management - Revolutionary",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }
