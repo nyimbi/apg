@@ -3,7 +3,7 @@ Advanced Generative AI Design Assistant for PLM
 
 WORLD-CLASS IMPROVEMENT 1: Advanced Generative AI Design Assistant
 
-Revolutionary AI-powered design generation system that transforms natural language briefs
+Governed AI-powered design generation system that transforms natural language briefs
 into innovative product concepts using multi-modal inputs, evolutionary algorithms,
 and collaborative intelligence.
 
@@ -33,7 +33,7 @@ class AdvancedGenerativeAIDesignAssistant:
 	"""
 	WORLD-CLASS IMPROVEMENT 1: Advanced Generative AI Design Assistant
 	
-	Revolutionary AI system that transforms product development through:
+	Governed AI system that transforms product development through:
 	- Multi-modal design generation (text, sketches, voice, 3D models)
 	- Evolutionary design optimization with user feedback loops
 	- Real-time collaborative design with AI mediation

@@ -1,10 +1,14 @@
-"""
-Product Information Management (PIM)
+"""Product Information Management APG capability packet."""
 
-Part of the APG ERP capabilities suite.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-"""
+from .capability_contract import CAPABILITY_ID, evaluate_capability_rules, get_capability_contract
+from .service import PIMService, PLMProductService, ProductInformationLifecycleService, ProductInformationService
 
-__version__ = "1.0.0"
-__all__ = []
+
+__version__ = "2.1.0"
+__capability_code__ = "PDE_PIM"
+__capability_name__ = "Product Information Management"
+
+
+__all__ = ["CAPABILITY_ID", "PIMService", "PLMProductService", "ProductInformationLifecycleService", "ProductInformationService", "evaluate_capability_rules", "get_capability_contract"]

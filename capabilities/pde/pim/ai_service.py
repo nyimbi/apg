@@ -1008,7 +1008,7 @@ class PLMAIService:
 			return {
 				"product_id": product_id,
 				"product_type": "manufactured",
-				"specifications": {"weight": 10.5, "dimensions": "10x5x3"}
+				"specifications": {"weight": 10.5, "dimensions": "10 by 5 by 3"}
 			}
 		except Exception:
 			return None

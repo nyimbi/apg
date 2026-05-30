@@ -48,8 +48,8 @@ class LifecyclePhase(str, Enum):
 	DECLINE = "decline"
 	RETIREMENT = "retirement"
 
-class WorldClassSystemType(str, Enum):
-	"""World-class PLM system types"""
+class ProductionSystemType(str, Enum):
+	"""Production-grade PLM system types"""
 	GENERATIVE_AI_DESIGN = "generative_ai_design"
 	XR_COLLABORATION = "xr_collaboration"
 	SUSTAINABILITY_INTELLIGENCE = "sustainability_intelligence"
@@ -1054,16 +1054,16 @@ class APGDatabaseIndexes:
 
 # WORLD-CLASS PLM ENHANCEMENT MODELS
 
-class PLWorldClassSystem(APGBaseModel):
+class PLProductionSystem(APGBaseModel):
 	"""
 	World-Class PLM System Integration Model
 	
-	Tracks integration and performance of all 10 world-class PLM improvements
+	Tracks integration and performance of all 10 production-grade PLM improvements
 	for exponential value creation and competitive advantage.
 	"""
 	
 	# APG standard fields
-	system_id: str = Field(default_factory=uuid7str, description="World-class system identifier")
+	system_id: str = Field(default_factory=uuid7str, description="Production-grade system identifier")
 	tenant_id: str = Field(..., description="APG tenant isolation identifier")
 	created_at: datetime = Field(default_factory=datetime.utcnow)
 	updated_at: Optional[datetime] = None
@@ -1073,8 +1073,8 @@ class PLWorldClassSystem(APGBaseModel):
 	version: int = Field(default=1)
 	
 	# System identification
-	system_name: str = Field(..., max_length=200, description="Name of the world-class system")
-	system_type: WorldClassSystemType = Field(..., description="Type of world-class system")
+	system_name: str = Field(..., max_length=200, description="Name of the production-grade system")
+	system_type: ProductionSystemType = Field(..., description="Type of production-grade system")
 	integration_session_id: str = Field(..., description="Integration session identifier")
 	
 	# System configuration
@@ -1355,7 +1355,7 @@ class PLDigitalProductPassport(APGBaseModel):
 		validate_by_alias=True
 	)
 
-# Export all world-class enhancement models
+# Export all production-grade enhancement models
 __all__ = [
 	# Original PLM models
 	"ProductType", "LifecyclePhase", "ChangeType", "ChangeStatus", "ChangePriority", "ChangeUrgency",
@@ -1363,8 +1363,8 @@ __all__ = [
 	"PLProduct", "PLProductStructure", "PLEngineeringChange", "PLProductConfiguration",
 	"PLCollaborationSession", "PLComplianceRecord", "PLManufacturingIntegration", "PLDigitalTwinBinding",
 	
-	# World-class enhancement models
-	"WorldClassSystemType", "OptimizationStatus",
-	"PLWorldClassSystem", "PLGenerativeAISession", "PLXRCollaborationSession", 
+	# Production-grade enhancement models
+	"ProductionSystemType", "OptimizationStatus",
+	"PLProductionSystem", "PLGenerativeAISession", "PLXRCollaborationSession",
 	"PLSustainabilityProfile", "PLQuantumOptimization", "PLDigitalProductPassport"
 ]

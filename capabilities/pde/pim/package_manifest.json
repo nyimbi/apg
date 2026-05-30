@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Product Lifecycle Management (PLM)",
+  "display_name": "Product Information Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,43 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 13,
+  "rule_count": 48,
+  "streaming": {
+    "events": [
+      "catalog_created",
+      "product_created",
+      "attribute_defined",
+      "attribute_value_set",
+      "variant_created",
+      "content_enriched",
+      "asset_attached",
+      "compliance_recorded",
+      "channel_listing_created",
+      "product_published",
+      "quality_issue_recorded",
+      "change_request_created",
+      "change_request_approved",
+      "pim_agent_registered"
+    ],
+    "guardrails": [
+      "pim_batch_requires_bytewax",
+      "generated_content_requires_review",
+      "product_publish_requires_approved_content_and_channel",
+      "pim_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "review",
+      "approved",
+      "published",
+      "open",
+      "requested",
+      "blocked"
+    ],
+    "stream": "apg.pde.pim.lifecycle"
+  },
+  "version": "2.1.0"
 }

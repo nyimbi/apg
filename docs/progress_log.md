@@ -20078,3 +20078,74 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, AUDL, NTFY, COMP, WFLO, document, supplier, carbon-data,
   regulatory-content, risk-policy, theme, or AGNT adapters.
+
+### 2026-05-31 02:11 EAT
+
+PDE Product Information Management lifecycle and guardrail packet:
+
+- Selected `capabilities/pde/pim` after ESG because it was the remaining real
+  capability package missing README, specification, and plan packet docs.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and converted
+  `cap_spec.md` into a compatibility pointer to the active specification.
+- Replaced generated contract metadata with an executable APG contract covering
+  catalogs, product records, attributes, localized values, variants, content,
+  assets, compliance, channel listings, publishing, data quality, change
+  control, PIM agents, rule engine, UI routes, compact visual theme,
+  configuration schema, dependencies, and Bytewax event-stream metadata.
+- Added deterministic guardrails for tenant context, policy attachment, audit
+  evidence, catalog/product/attribute/value/content/asset/compliance/channel
+  completeness, supported product and attribute types, supported channels,
+  generated-content review, high-risk compliance review, publish approval,
+  high-severity quality ownership, change approval, Bytewax batch routing,
+  PIM-agent runtime and role support, and privileged agent action review.
+- Replaced top-level service, API, views, app, and package exports with
+  dependency-light surfaces that APG composition tooling can import without
+  media, commerce, ERP, translation-memory, taxonomy, workflow, audit,
+  notification, web, or persistence adapters.
+- Retired legacy adapter-bound tests into explicit skipped compatibility
+  modules and added focused package tests for contract shape, Bytewax
+  streaming, rule decisions, full PIM lifecycle execution, guardrail failures,
+  API helpers, view models, app metadata, and publishability.
+- Refreshed `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` from the live contract.
+- Renamed legacy advanced PIM artifacts from generated promotional names to
+  production-oriented names and cleaned stale generated-baseline, promotional,
+  disallowed-broker, and unfinished markers from the PIM package.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/pde/pim/__init__.py capabilities/pde/pim/capability_contract.py capabilities/pde/pim/service.py capabilities/pde/pim/api.py capabilities/pde/pim/views.py capabilities/pde/pim/app.py capabilities/pde/pim/tests/conftest.py capabilities/pde/pim/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/pde/pim/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/pytest -q capabilities/pde/pim/tests` passed with 6 tests and 3
+  skipped legacy adapter modules.
+- `./.venv/bin/python capabilities/pde/pim/app.py` passed with `passed: true`.
+- `./.venv/bin/apg capabilities inspect pde_pim --json` passed with `ok:
+  true`, 13 APG Python routes, 48 deterministic rules, Bytewax streaming, and
+  PIM-agent runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/pde/pim --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/pde/pim --json`
+  passed with `ok: true`; PIM remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/python -m py_compile $(find capabilities/pde/pim -name '*.py' -not -path '*/__pycache__/*')`
+  passed.
+- `./.venv/bin/python -c "... ProductInformationLifecycleService ... register_pim_agent ... dashboard_summary ..."`
+  returned dashboard evidence with one product, one PIM agent, and `bytewax`
+  streaming metadata.
+- Semantic metadata probe confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`,
+  `/pde/pim/agents`, and `bytewax_event_stream_required`.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and
+  unfinished markers returned no matches.
+- `git diff --check -- capabilities/pde/pim docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live media asset stores, commerce channels, ERP item masters, translation
+  memory, taxonomy services, durable audit, notification, workflow, rendered
+  browser UI, and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, AUDL, NTFY, WFLO, media, commerce, ERP, translation-memory,
+  taxonomy, theme, or AGNT adapters.

@@ -1,60 +1,211 @@
 {
-  "agents": {},
   "app": {
-    "description": "Product Lifecycle Management (PLM) package-backed APG capability",
-    "entity_count": 0,
+    "description": "Product Information Management package-backed APG capability",
+    "entity_count": 13,
     "name": "pde_pim",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "pde_pim": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Pde",
-          "enabled": true,
-          "id": "pde_pim",
-          "name": "Product Lifecycle Management (PLM)",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/pde/pim/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "commerce": "adapter",
+          "erp": "adapter",
+          "event_stream": "bytewax",
+          "media": "adapter",
+          "notification": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "assets": {
+          "asset_type_required": true,
+          "product_required": true,
+          "rights_basis_required": true,
+          "url_required": true
+        },
+        "attribute_values": {
+          "attribute_required": true,
+          "locale_required_for_rich_text": true,
+          "product_required": true,
+          "value_required": true
+        },
+        "attributes": {
+          "code_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "text",
+            "number",
+            "boolean",
+            "date",
+            "enum",
+            "money",
+            "media",
+            "rich_text"
+          ]
+        },
+        "catalogs": {
+          "code_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "changes": {
+          "approval_required": true,
+          "product_required": true,
+          "reason_required": true
+        },
+        "channels": {
+          "approval_required": true,
+          "listing_id_required": true,
+          "product_required": true,
+          "supported_channels": [
+            "web",
+            "marketplace",
+            "erp",
+            "pos",
+            "print",
+            "api"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "framework_required": true,
+          "product_required": true,
+          "review_required_for_high_risk": true,
+          "status_required": true
+        },
+        "content": {
+          "locale_required": true,
+          "product_required": true,
+          "review_required_for_generated_content": true,
+          "title_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_content_events": true,
+          "emit_product_events": true,
+          "emit_publish_events": true,
+          "event_stream": "apg.pde.pim.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "pim_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "catalog_reviewer",
+            "data_quality_reviewer",
+            "enrichment_reviewer",
+            "channel_reviewer",
+            "compliance_reviewer",
+            "product_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "products": {
+          "catalog_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "sku_required": true,
+          "supported_types": [
+            "physical",
+            "digital",
+            "service",
+            "bundle",
+            "component",
+            "raw_material"
+          ]
+        },
+        "publishing": {
+          "approval_required": true,
+          "approved_channel_required": true,
+          "approved_content_required": true
+        },
+        "quality": {
+          "severity_owner_required": [
+            "high",
+            "critical"
+          ],
+          "supported_statuses": [
+            "draft",
+            "review",
+            "approved",
+            "published"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "pde_pim_operations"
+          "default_theme": "pim_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_assets": true,
+          "enable_attributes": true,
+          "enable_catalogs": true,
+          "enable_changes": true,
+          "enable_channels": true,
+          "enable_compliance": true,
+          "enable_content": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_products": true,
+          "enable_quality": true,
           "enable_settings": true
+        },
+        "variants": {
+          "option_values_required": true,
+          "parent_required": true,
+          "sku_required": true
         }
       },
-      "erp_modules": [
-        "pde"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Product Lifecycle Management (PLM)",
+      "name": "Product Information Management",
       "provides": [
-        "pde_pim_operations"
+        "product_catalog_lifecycle",
+        "product_record_lifecycle",
+        "product_attribute_lifecycle",
+        "product_variant_lifecycle",
+        "product_content_lifecycle",
+        "product_asset_lifecycle",
+        "product_compliance_lifecycle",
+        "product_channel_listing_lifecycle",
+        "product_publish_workflow",
+        "product_data_quality_workflow",
+        "product_change_workflow",
+        "pim_dashboard_service",
+        "pim_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "media_asset_lifecycle",
+        "commerce_channel_lifecycle",
+        "erp_item_master",
+        "translation_memory",
+        "taxonomy_management"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Product Lifecycle Management (PLM) operations require tenant context.",
+            "description": "PIM operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,7 +218,7 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Product Lifecycle Management (PLM) write operations require policy enforcement.",
+            "description": "PIM write operations require policy enforcement.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
@@ -77,16 +228,606 @@
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "code_present": false,
+              "operation": "create_catalog"
             },
-            "description": "High-risk Product Lifecycle Management (PLM) operations require review.",
+            "description": "Catalogs require a code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "catalog_code_required",
+              "required_action": "provide_catalog_code"
+            },
+            "name": "catalog_code_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_catalog"
+            },
+            "description": "Catalogs require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "catalog_name_required",
+              "required_action": "provide_catalog_name"
+            },
+            "name": "catalog_name_required"
+          },
+          {
+            "condition": {
+              "operation": "create_catalog",
+              "owner_present": false
+            },
+            "description": "Catalogs require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "catalog_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "catalog_owner_required"
+          },
+          {
+            "condition": {
+              "catalog_present": false,
+              "operation": "create_product"
+            },
+            "description": "Products require a catalog.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_catalog_required",
+              "required_action": "select_catalog"
+            },
+            "name": "product_catalog_required"
+          },
+          {
+            "condition": {
+              "operation": "create_product",
+              "sku_present": false
+            },
+            "description": "Products require a SKU.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_sku_required",
+              "required_action": "provide_sku"
+            },
+            "name": "product_sku_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_product"
+            },
+            "description": "Products require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_name_required",
+              "required_action": "provide_name"
+            },
+            "name": "product_name_required"
+          },
+          {
+            "condition": {
+              "operation": "create_product",
+              "product_type_supported": false
+            },
+            "description": "Product type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_type_not_supported",
+              "required_action": "choose_supported_product_type"
+            },
+            "name": "product_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_product",
+              "owner_present": false
+            },
+            "description": "Products require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "product_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "product_owner_required"
+          },
+          {
+            "condition": {
+              "code_present": false,
+              "operation": "define_attribute"
+            },
+            "description": "Attributes require a code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_code_required",
+              "required_action": "provide_attribute_code"
+            },
+            "name": "attribute_code_required"
+          },
+          {
+            "condition": {
+              "attribute_type_supported": false,
+              "operation": "define_attribute"
+            },
+            "description": "Attribute type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_type_not_supported",
+              "required_action": "choose_supported_attribute_type"
+            },
+            "name": "attribute_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "define_attribute",
+              "owner_present": false
+            },
+            "description": "Attributes require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "attribute_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "set_attribute_value",
+              "product_present": false
+            },
+            "description": "Attribute values require a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_value_product_required",
+              "required_action": "select_product"
+            },
+            "name": "attribute_value_product_required"
+          },
+          {
+            "condition": {
+              "attribute_present": false,
+              "operation": "set_attribute_value"
+            },
+            "description": "Attribute values require an attribute.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_value_attribute_required",
+              "required_action": "select_attribute"
+            },
+            "name": "attribute_value_attribute_required"
+          },
+          {
+            "condition": {
+              "operation": "set_attribute_value",
+              "value_present": false
+            },
+            "description": "Attribute values require a value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_value_required",
+              "required_action": "provide_value"
+            },
+            "name": "attribute_value_required"
+          },
+          {
+            "condition": {
+              "locale_present": false,
+              "operation": "set_attribute_value",
+              "rich_text": true
+            },
+            "description": "Rich text values require locale.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attribute_locale_required",
+              "required_action": "provide_locale"
+            },
+            "name": "rich_text_locale_required"
+          },
+          {
+            "condition": {
+              "operation": "create_variant",
+              "parent_present": false
+            },
+            "description": "Variants require a parent product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "variant_parent_required",
+              "required_action": "select_parent_product"
+            },
+            "name": "variant_parent_required"
+          },
+          {
+            "condition": {
+              "operation": "create_variant",
+              "sku_present": false
+            },
+            "description": "Variants require a SKU.",
+            "effect": {
+              "decision": "deny",
+              "reason": "variant_sku_required",
+              "required_action": "provide_sku"
+            },
+            "name": "variant_sku_required"
+          },
+          {
+            "condition": {
+              "operation": "create_variant",
+              "options_present": false
+            },
+            "description": "Variants require option values.",
+            "effect": {
+              "decision": "deny",
+              "reason": "variant_options_required",
+              "required_action": "provide_options"
+            },
+            "name": "variant_options_required"
+          },
+          {
+            "condition": {
+              "operation": "enrich_content",
+              "product_present": false
+            },
+            "description": "Content requires a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "content_product_required",
+              "required_action": "select_product"
+            },
+            "name": "content_product_required"
+          },
+          {
+            "condition": {
+              "locale_present": false,
+              "operation": "enrich_content"
+            },
+            "description": "Content requires locale.",
+            "effect": {
+              "decision": "deny",
+              "reason": "content_locale_required",
+              "required_action": "provide_locale"
+            },
+            "name": "content_locale_required"
+          },
+          {
+            "condition": {
+              "operation": "enrich_content",
+              "title_present": false
+            },
+            "description": "Content requires title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "content_title_required",
+              "required_action": "provide_title"
+            },
+            "name": "content_title_required"
+          },
+          {
+            "condition": {
+              "generated_content": true,
+              "operation": "enrich_content",
+              "review_recorded": false
+            },
+            "description": "Generated product content requires review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "generated_content_review_required",
+              "required_action": "record_content_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "generated_content_review_required"
+          },
+          {
+            "condition": {
+              "operation": "attach_asset",
+              "product_present": false
+            },
+            "description": "Assets require a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_product_required",
+              "required_action": "select_product"
+            },
+            "name": "asset_product_required"
+          },
+          {
+            "condition": {
+              "operation": "attach_asset",
+              "url_present": false
+            },
+            "description": "Assets require a URL.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_url_required",
+              "required_action": "provide_url"
+            },
+            "name": "asset_url_required"
+          },
+          {
+            "condition": {
+              "operation": "attach_asset",
+              "rights_basis_present": false
+            },
+            "description": "Assets require rights basis.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_rights_basis_required",
+              "required_action": "provide_rights_basis"
+            },
+            "name": "asset_rights_required"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance",
+              "product_present": false
+            },
+            "description": "Compliance records require a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_product_required",
+              "required_action": "select_product"
+            },
+            "name": "compliance_product_required"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_compliance"
+            },
+            "description": "Compliance records require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "compliance_evidence_required"
+          },
+          {
+            "condition": {
+              "high_risk": true,
+              "operation": "record_compliance",
+              "review_recorded": false
+            },
+            "description": "High-risk compliance requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "compliance_review_required",
+              "required_action": "record_compliance_review"
+            },
+            "name": "compliance_high_risk_review"
+          },
+          {
+            "condition": {
+              "operation": "create_channel_listing",
+              "product_present": false
+            },
+            "description": "Channel listings require a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_product_required",
+              "required_action": "select_product"
+            },
+            "name": "channel_product_required"
+          },
+          {
+            "condition": {
+              "channel_supported": false,
+              "operation": "create_channel_listing"
+            },
+            "description": "Channel must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_not_supported",
+              "required_action": "choose_supported_channel"
+            },
+            "name": "channel_supported"
+          },
+          {
+            "condition": {
+              "listing_id_present": false,
+              "operation": "create_channel_listing"
+            },
+            "description": "Channel listings require listing id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_listing_id_required",
+              "required_action": "provide_listing_id"
+            },
+            "name": "channel_listing_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_channel_listing"
+            },
+            "description": "Channel listings require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_approval_required",
+              "required_action": "record_channel_approval"
+            },
+            "name": "channel_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "publish_product",
+              "product_present": false
+            },
+            "description": "Publishing requires a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publish_product_required",
+              "required_action": "select_product"
+            },
+            "name": "publish_product_required"
+          },
+          {
+            "condition": {
+              "approved_content_present": false,
+              "operation": "publish_product"
+            },
+            "description": "Publishing requires approved content.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approved_content_required",
+              "required_action": "approve_content"
+            },
+            "name": "publish_content_required"
+          },
+          {
+            "condition": {
+              "approved_channel_present": false,
+              "operation": "publish_product"
+            },
+            "description": "Publishing requires approved channel.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approved_channel_required",
+              "required_action": "approve_channel"
+            },
+            "name": "publish_channel_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "publish_product"
+            },
+            "description": "Publishing requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publish_approval_required",
+              "required_action": "record_publish_approval"
+            },
+            "name": "publish_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "record_quality_issue",
+              "product_present": false
+            },
+            "description": "Quality issues require a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_product_required",
+              "required_action": "select_product"
+            },
+            "name": "quality_product_required"
+          },
+          {
+            "condition": {
+              "high_or_critical": true,
+              "operation": "record_quality_issue",
+              "owner_present": false
+            },
+            "description": "High or critical quality issues require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "quality_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "create_change_request",
+              "product_present": false
+            },
+            "description": "Change requests require a product.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_product_required",
+              "required_action": "select_product"
+            },
+            "name": "change_product_required"
+          },
+          {
+            "condition": {
+              "operation": "create_change_request",
+              "reason_present": false
+            },
+            "description": "Change requests require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_reason_required",
+              "required_action": "provide_reason"
+            },
+            "name": "change_reason_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "approve_change"
+            },
+            "description": "Change approval requires an approver.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_approval_required",
+              "required_action": "record_approver"
+            },
+            "name": "change_approval_required"
+          },
+          {
+            "condition": {
+              "event_stream": "queue",
+              "operation": "pim_batch"
+            },
+            "description": "PIM batches must use Bytewax event stream metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_to_bytewax_stream"
+            },
+            "name": "bytewax_event_stream_required"
+          },
+          {
+            "condition": {
+              "operation": "register_pim_agent",
+              "runtime_supported": false
+            },
+            "description": "PIM agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pim_agent_runtime_not_supported",
+              "required_action": "choose_supported_runtime"
+            },
+            "name": "agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_pim_agent",
+              "role_supported": false
+            },
+            "description": "PIM agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pim_agent_role_not_supported",
+              "required_action": "choose_supported_role"
+            },
+            "name": "agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approved": false,
+              "operation": "agent_action",
+              "privileged_action": true
+            },
+            "description": "PIM agents cannot autonomously post privileged state changes.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "pim_agent_human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "agent_scope_limited"
+          },
+          {
+            "condition": {
+              "audit_enabled": false,
+              "operation_type": "write"
+            },
+            "description": "PIM state changes must be auditable.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pim_audit_required",
+              "required_action": "enable_audit"
+            },
+            "name": "audit_required_for_state_change"
           }
         ],
         "type": "deterministic"
@@ -96,7 +837,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Product Lifecycle Management (PLM) operations require tenant context.",
+          "description": "PIM operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,7 +850,7 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Product Lifecycle Management (PLM) write operations require policy enforcement.",
+          "description": "PIM write operations require policy enforcement.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
@@ -119,16 +860,606 @@
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "code_present": false,
+            "operation": "create_catalog"
           },
-          "description": "High-risk Product Lifecycle Management (PLM) operations require review.",
+          "description": "Catalogs require a code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "catalog_code_required",
+            "required_action": "provide_catalog_code"
+          },
+          "name": "catalog_code_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_catalog"
+          },
+          "description": "Catalogs require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "catalog_name_required",
+            "required_action": "provide_catalog_name"
+          },
+          "name": "catalog_name_required"
+        },
+        {
+          "condition": {
+            "operation": "create_catalog",
+            "owner_present": false
+          },
+          "description": "Catalogs require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "catalog_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "catalog_owner_required"
+        },
+        {
+          "condition": {
+            "catalog_present": false,
+            "operation": "create_product"
+          },
+          "description": "Products require a catalog.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_catalog_required",
+            "required_action": "select_catalog"
+          },
+          "name": "product_catalog_required"
+        },
+        {
+          "condition": {
+            "operation": "create_product",
+            "sku_present": false
+          },
+          "description": "Products require a SKU.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_sku_required",
+            "required_action": "provide_sku"
+          },
+          "name": "product_sku_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_product"
+          },
+          "description": "Products require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_name_required",
+            "required_action": "provide_name"
+          },
+          "name": "product_name_required"
+        },
+        {
+          "condition": {
+            "operation": "create_product",
+            "product_type_supported": false
+          },
+          "description": "Product type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_type_not_supported",
+            "required_action": "choose_supported_product_type"
+          },
+          "name": "product_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_product",
+            "owner_present": false
+          },
+          "description": "Products require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "product_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "product_owner_required"
+        },
+        {
+          "condition": {
+            "code_present": false,
+            "operation": "define_attribute"
+          },
+          "description": "Attributes require a code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_code_required",
+            "required_action": "provide_attribute_code"
+          },
+          "name": "attribute_code_required"
+        },
+        {
+          "condition": {
+            "attribute_type_supported": false,
+            "operation": "define_attribute"
+          },
+          "description": "Attribute type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_type_not_supported",
+            "required_action": "choose_supported_attribute_type"
+          },
+          "name": "attribute_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "define_attribute",
+            "owner_present": false
+          },
+          "description": "Attributes require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "attribute_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "set_attribute_value",
+            "product_present": false
+          },
+          "description": "Attribute values require a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_value_product_required",
+            "required_action": "select_product"
+          },
+          "name": "attribute_value_product_required"
+        },
+        {
+          "condition": {
+            "attribute_present": false,
+            "operation": "set_attribute_value"
+          },
+          "description": "Attribute values require an attribute.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_value_attribute_required",
+            "required_action": "select_attribute"
+          },
+          "name": "attribute_value_attribute_required"
+        },
+        {
+          "condition": {
+            "operation": "set_attribute_value",
+            "value_present": false
+          },
+          "description": "Attribute values require a value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_value_required",
+            "required_action": "provide_value"
+          },
+          "name": "attribute_value_required"
+        },
+        {
+          "condition": {
+            "locale_present": false,
+            "operation": "set_attribute_value",
+            "rich_text": true
+          },
+          "description": "Rich text values require locale.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attribute_locale_required",
+            "required_action": "provide_locale"
+          },
+          "name": "rich_text_locale_required"
+        },
+        {
+          "condition": {
+            "operation": "create_variant",
+            "parent_present": false
+          },
+          "description": "Variants require a parent product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "variant_parent_required",
+            "required_action": "select_parent_product"
+          },
+          "name": "variant_parent_required"
+        },
+        {
+          "condition": {
+            "operation": "create_variant",
+            "sku_present": false
+          },
+          "description": "Variants require a SKU.",
+          "effect": {
+            "decision": "deny",
+            "reason": "variant_sku_required",
+            "required_action": "provide_sku"
+          },
+          "name": "variant_sku_required"
+        },
+        {
+          "condition": {
+            "operation": "create_variant",
+            "options_present": false
+          },
+          "description": "Variants require option values.",
+          "effect": {
+            "decision": "deny",
+            "reason": "variant_options_required",
+            "required_action": "provide_options"
+          },
+          "name": "variant_options_required"
+        },
+        {
+          "condition": {
+            "operation": "enrich_content",
+            "product_present": false
+          },
+          "description": "Content requires a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "content_product_required",
+            "required_action": "select_product"
+          },
+          "name": "content_product_required"
+        },
+        {
+          "condition": {
+            "locale_present": false,
+            "operation": "enrich_content"
+          },
+          "description": "Content requires locale.",
+          "effect": {
+            "decision": "deny",
+            "reason": "content_locale_required",
+            "required_action": "provide_locale"
+          },
+          "name": "content_locale_required"
+        },
+        {
+          "condition": {
+            "operation": "enrich_content",
+            "title_present": false
+          },
+          "description": "Content requires title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "content_title_required",
+            "required_action": "provide_title"
+          },
+          "name": "content_title_required"
+        },
+        {
+          "condition": {
+            "generated_content": true,
+            "operation": "enrich_content",
+            "review_recorded": false
+          },
+          "description": "Generated product content requires review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "generated_content_review_required",
+            "required_action": "record_content_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "generated_content_review_required"
+        },
+        {
+          "condition": {
+            "operation": "attach_asset",
+            "product_present": false
+          },
+          "description": "Assets require a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_product_required",
+            "required_action": "select_product"
+          },
+          "name": "asset_product_required"
+        },
+        {
+          "condition": {
+            "operation": "attach_asset",
+            "url_present": false
+          },
+          "description": "Assets require a URL.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_url_required",
+            "required_action": "provide_url"
+          },
+          "name": "asset_url_required"
+        },
+        {
+          "condition": {
+            "operation": "attach_asset",
+            "rights_basis_present": false
+          },
+          "description": "Assets require rights basis.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_rights_basis_required",
+            "required_action": "provide_rights_basis"
+          },
+          "name": "asset_rights_required"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance",
+            "product_present": false
+          },
+          "description": "Compliance records require a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_product_required",
+            "required_action": "select_product"
+          },
+          "name": "compliance_product_required"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_compliance"
+          },
+          "description": "Compliance records require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "compliance_evidence_required"
+        },
+        {
+          "condition": {
+            "high_risk": true,
+            "operation": "record_compliance",
+            "review_recorded": false
+          },
+          "description": "High-risk compliance requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "compliance_review_required",
+            "required_action": "record_compliance_review"
+          },
+          "name": "compliance_high_risk_review"
+        },
+        {
+          "condition": {
+            "operation": "create_channel_listing",
+            "product_present": false
+          },
+          "description": "Channel listings require a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_product_required",
+            "required_action": "select_product"
+          },
+          "name": "channel_product_required"
+        },
+        {
+          "condition": {
+            "channel_supported": false,
+            "operation": "create_channel_listing"
+          },
+          "description": "Channel must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_not_supported",
+            "required_action": "choose_supported_channel"
+          },
+          "name": "channel_supported"
+        },
+        {
+          "condition": {
+            "listing_id_present": false,
+            "operation": "create_channel_listing"
+          },
+          "description": "Channel listings require listing id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_listing_id_required",
+            "required_action": "provide_listing_id"
+          },
+          "name": "channel_listing_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_channel_listing"
+          },
+          "description": "Channel listings require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_approval_required",
+            "required_action": "record_channel_approval"
+          },
+          "name": "channel_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "publish_product",
+            "product_present": false
+          },
+          "description": "Publishing requires a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publish_product_required",
+            "required_action": "select_product"
+          },
+          "name": "publish_product_required"
+        },
+        {
+          "condition": {
+            "approved_content_present": false,
+            "operation": "publish_product"
+          },
+          "description": "Publishing requires approved content.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approved_content_required",
+            "required_action": "approve_content"
+          },
+          "name": "publish_content_required"
+        },
+        {
+          "condition": {
+            "approved_channel_present": false,
+            "operation": "publish_product"
+          },
+          "description": "Publishing requires approved channel.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approved_channel_required",
+            "required_action": "approve_channel"
+          },
+          "name": "publish_channel_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "publish_product"
+          },
+          "description": "Publishing requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publish_approval_required",
+            "required_action": "record_publish_approval"
+          },
+          "name": "publish_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "record_quality_issue",
+            "product_present": false
+          },
+          "description": "Quality issues require a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_product_required",
+            "required_action": "select_product"
+          },
+          "name": "quality_product_required"
+        },
+        {
+          "condition": {
+            "high_or_critical": true,
+            "operation": "record_quality_issue",
+            "owner_present": false
+          },
+          "description": "High or critical quality issues require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "quality_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "create_change_request",
+            "product_present": false
+          },
+          "description": "Change requests require a product.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_product_required",
+            "required_action": "select_product"
+          },
+          "name": "change_product_required"
+        },
+        {
+          "condition": {
+            "operation": "create_change_request",
+            "reason_present": false
+          },
+          "description": "Change requests require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_reason_required",
+            "required_action": "provide_reason"
+          },
+          "name": "change_reason_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "approve_change"
+          },
+          "description": "Change approval requires an approver.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_approval_required",
+            "required_action": "record_approver"
+          },
+          "name": "change_approval_required"
+        },
+        {
+          "condition": {
+            "event_stream": "queue",
+            "operation": "pim_batch"
+          },
+          "description": "PIM batches must use Bytewax event stream metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_to_bytewax_stream"
+          },
+          "name": "bytewax_event_stream_required"
+        },
+        {
+          "condition": {
+            "operation": "register_pim_agent",
+            "runtime_supported": false
+          },
+          "description": "PIM agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pim_agent_runtime_not_supported",
+            "required_action": "choose_supported_runtime"
+          },
+          "name": "agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_pim_agent",
+            "role_supported": false
+          },
+          "description": "PIM agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pim_agent_role_not_supported",
+            "required_action": "choose_supported_role"
+          },
+          "name": "agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approved": false,
+            "operation": "agent_action",
+            "privileged_action": true
+          },
+          "description": "PIM agents cannot autonomously post privileged state changes.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "pim_agent_human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "agent_scope_limited"
+        },
+        {
+          "condition": {
+            "audit_enabled": false,
+            "operation_type": "write"
+          },
+          "description": "PIM state changes must be auditable.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pim_audit_required",
+            "required_action": "enable_audit"
+          },
+          "name": "audit_required_for_state_change"
         }
       ],
       "runtime": {
@@ -138,52 +1469,141 @@
         "views": "views.py"
       },
       "screens": {
-        "dashboard": {
-          "component": "CapabilityDashboard",
-          "permission": "pde_pim:view",
-          "route": "/pde-pim/dashboard"
+        "agents": {
+          "component": "PIMAgentWorkbench",
+          "permission": "pde_pim:agent_manage",
+          "route": "/pde/pim/agents"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "pde_pim:operate",
-          "route": "/pde-pim/operations"
+        "assets": {
+          "component": "ProductAssetDesk",
+          "permission": "pde_pim:manage_assets",
+          "route": "/pde/pim/assets"
+        },
+        "attributes": {
+          "component": "AttributeCatalog",
+          "permission": "pde_pim:manage_attributes",
+          "route": "/pde/pim/attributes"
+        },
+        "catalogs": {
+          "component": "CatalogWorkbench",
+          "permission": "pde_pim:manage_catalogs",
+          "route": "/pde/pim/catalogs"
+        },
+        "changes": {
+          "component": "ProductChangeDesk",
+          "permission": "pde_pim:approve_changes",
+          "route": "/pde/pim/changes"
+        },
+        "channels": {
+          "component": "ChannelListingDesk",
+          "permission": "pde_pim:publish",
+          "route": "/pde/pim/channels"
+        },
+        "compliance": {
+          "component": "ProductComplianceDesk",
+          "permission": "pde_pim:govern",
+          "route": "/pde/pim/compliance"
+        },
+        "content": {
+          "component": "ProductContentDesk",
+          "permission": "pde_pim:manage_content",
+          "route": "/pde/pim/content"
+        },
+        "dashboard": {
+          "component": "PIMDashboard",
+          "permission": "pde_pim:view",
+          "route": "/pde/pim/dashboard"
+        },
+        "products": {
+          "component": "ProductWorkbench",
+          "permission": "pde_pim:manage_products",
+          "route": "/pde/pim/products"
+        },
+        "quality": {
+          "component": "DataQualityCenter",
+          "permission": "pde_pim:quality",
+          "route": "/pde/pim/quality"
         },
         "rules": {
-          "component": "CapabilityRules",
+          "component": "PIMRules",
           "permission": "pde_pim:govern",
-          "route": "/pde-pim/rules"
+          "route": "/pde/pim/rules"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "PIMSettings",
           "permission": "pde_pim:admin",
-          "route": "/pde-pim/settings"
+          "route": "/pde/pim/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "delivery": "at_least_once",
+        "event_stream": "apg.pde.pim.lifecycle",
+        "events": [
+          "catalog_created",
+          "product_created",
+          "attribute_defined",
+          "attribute_value_set",
+          "variant_created",
+          "content_enriched",
+          "asset_attached",
+          "compliance_recorded",
+          "channel_listing_created",
+          "product_published",
+          "quality_issue_recorded",
+          "change_request_created",
+          "change_request_approved",
+          "pim_agent_registered"
+        ],
+        "ordering_key": "tenant_id",
+        "processor": "bytewax"
+      },
       "theme": {
         "components": {
+          "agents": {
+            "icon": "bot",
+            "status_style": "agent-chip",
+            "visual": "agent-roster"
+          },
+          "channels": {
+            "icon": "send",
+            "status_style": "channel-chip",
+            "visual": "listing-board"
+          },
+          "content": {
+            "icon": "file-text",
+            "status_style": "content-chip",
+            "visual": "content-workbench"
+          },
           "dashboard": {
             "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+            "status_indicator": "health-pill",
+            "visual": "catalog-grid"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "products": {
+            "icon": "package",
+            "status_style": "product-chip",
+            "visual": "product-table"
+          },
+          "quality": {
+            "icon": "badge-check",
+            "status_style": "quality-chip",
+            "visual": "issue-list"
           },
           "rules": {
+            "icon": "list-checks",
             "status_style": "decision-chip",
             "visual": "rule-list"
           },
           "settings": {
             "density": "compact",
+            "icon": "settings",
             "visual": "settings-panel"
           }
         },
-        "name": "pde_pim_operations",
+        "name": "pim_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
+          "color.accent": "#8A5A20",
           "color.danger": "#C53030",
           "color.primary": "#28536B",
           "color.success": "#2F855A",
@@ -196,35 +1616,98 @@
         }
       },
       "ui": {
-        "api_prefix": "/pde-pim/api/v1",
+        "api_prefix": "/pde/pim/api/v1",
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "PIMDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
-            "path": "/pde-pim/dashboard",
+            "path": "/pde/pim/dashboard",
             "permission": "pde_pim:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/pde-pim/operations",
-            "permission": "pde_pim:operate"
+            "component": "CatalogWorkbench",
+            "name": "catalogs",
+            "nav_group": "Setup",
+            "path": "/pde/pim/catalogs",
+            "permission": "pde_pim:manage_catalogs"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "ProductWorkbench",
+            "name": "products",
+            "nav_group": "Products",
+            "path": "/pde/pim/products",
+            "permission": "pde_pim:manage_products"
+          },
+          {
+            "component": "AttributeCatalog",
+            "name": "attributes",
+            "nav_group": "Setup",
+            "path": "/pde/pim/attributes",
+            "permission": "pde_pim:manage_attributes"
+          },
+          {
+            "component": "ProductContentDesk",
+            "name": "content",
+            "nav_group": "Content",
+            "path": "/pde/pim/content",
+            "permission": "pde_pim:manage_content"
+          },
+          {
+            "component": "ProductAssetDesk",
+            "name": "assets",
+            "nav_group": "Content",
+            "path": "/pde/pim/assets",
+            "permission": "pde_pim:manage_assets"
+          },
+          {
+            "component": "ProductComplianceDesk",
+            "name": "compliance",
             "nav_group": "Governance",
-            "path": "/pde-pim/rules",
+            "path": "/pde/pim/compliance",
             "permission": "pde_pim:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ChannelListingDesk",
+            "name": "channels",
+            "nav_group": "Publishing",
+            "path": "/pde/pim/channels",
+            "permission": "pde_pim:publish"
+          },
+          {
+            "component": "DataQualityCenter",
+            "name": "quality",
+            "nav_group": "Governance",
+            "path": "/pde/pim/quality",
+            "permission": "pde_pim:quality"
+          },
+          {
+            "component": "ProductChangeDesk",
+            "name": "changes",
+            "nav_group": "Governance",
+            "path": "/pde/pim/changes",
+            "permission": "pde_pim:approve_changes"
+          },
+          {
+            "component": "PIMAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/pde/pim/agents",
+            "permission": "pde_pim:agent_manage"
+          },
+          {
+            "component": "PIMRules",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/pde/pim/rules",
+            "permission": "pde_pim:govern"
+          },
+          {
+            "component": "PIMSettings",
             "name": "settings",
             "nav_group": "Administration",
-            "path": "/pde-pim/settings",
+            "path": "/pde/pim/settings",
             "permission": "pde_pim:admin"
           }
         ],
@@ -234,50 +1717,240 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "pim_review": {
+        "roles": [
+          "catalog_reviewer",
+          "data_quality_reviewer",
+          "enrichment_reviewer",
+          "channel_reviewer",
+          "compliance_reviewer",
+          "product_query_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "pde_pim": []
+      "pde_pim": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "media_asset_lifecycle",
+        "commerce_channel_lifecycle",
+        "erp_item_master",
+        "translation_memory",
+        "taxonomy_management"
+      ]
     }
   },
   "contracts": {
     "pde_pim": {
       "configuration": {
-        "capability": {
-          "category": "Pde",
-          "enabled": true,
-          "id": "pde_pim",
-          "name": "Product Lifecycle Management (PLM)",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/pde/pim/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "commerce": "adapter",
+          "erp": "adapter",
+          "event_stream": "bytewax",
+          "media": "adapter",
+          "notification": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+        "assets": {
+          "asset_type_required": true,
+          "product_required": true,
+          "rights_basis_required": true,
+          "url_required": true
+        },
+        "attribute_values": {
+          "attribute_required": true,
+          "locale_required_for_rich_text": true,
+          "product_required": true,
+          "value_required": true
+        },
+        "attributes": {
+          "code_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "text",
+            "number",
+            "boolean",
+            "date",
+            "enum",
+            "money",
+            "media",
+            "rich_text"
+          ]
+        },
+        "catalogs": {
+          "code_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "changes": {
+          "approval_required": true,
+          "product_required": true,
+          "reason_required": true
+        },
+        "channels": {
+          "approval_required": true,
+          "listing_id_required": true,
+          "product_required": true,
+          "supported_channels": [
+            "web",
+            "marketplace",
+            "erp",
+            "pos",
+            "print",
+            "api"
+          ]
+        },
+        "compliance": {
+          "evidence_required": true,
+          "framework_required": true,
+          "product_required": true,
+          "review_required_for_high_risk": true,
+          "status_required": true
+        },
+        "content": {
+          "locale_required": true,
+          "product_required": true,
+          "review_required_for_generated_content": true,
+          "title_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_content_events": true,
+          "emit_product_events": true,
+          "emit_publish_events": true,
+          "event_stream": "apg.pde.pim.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "pim_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "catalog_reviewer",
+            "data_quality_reviewer",
+            "enrichment_reviewer",
+            "channel_reviewer",
+            "compliance_reviewer",
+            "product_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "products": {
+          "catalog_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "sku_required": true,
+          "supported_types": [
+            "physical",
+            "digital",
+            "service",
+            "bundle",
+            "component",
+            "raw_material"
+          ]
+        },
+        "publishing": {
+          "approval_required": true,
+          "approved_channel_required": true,
+          "approved_content_required": true
+        },
+        "quality": {
+          "severity_owner_required": [
+            "high",
+            "critical"
+          ],
+          "supported_statuses": [
+            "draft",
+            "review",
+            "approved",
+            "published"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "pde_pim_operations"
+          "default_theme": "pim_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_assets": true,
+          "enable_attributes": true,
+          "enable_catalogs": true,
+          "enable_changes": true,
+          "enable_channels": true,
+          "enable_compliance": true,
+          "enable_content": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_products": true,
+          "enable_quality": true,
           "enable_settings": true
+        },
+        "variants": {
+          "option_values_required": true,
+          "parent_required": true,
+          "sku_required": true
         }
       },
       "id": "pde_pim",
       "provides": [
-        "pde_pim_operations"
+        "product_catalog_lifecycle",
+        "product_record_lifecycle",
+        "product_attribute_lifecycle",
+        "product_variant_lifecycle",
+        "product_content_lifecycle",
+        "product_asset_lifecycle",
+        "product_compliance_lifecycle",
+        "product_channel_listing_lifecycle",
+        "product_publish_workflow",
+        "product_data_quality_workflow",
+        "product_change_workflow",
+        "pim_dashboard_service",
+        "pim_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "media_asset_lifecycle",
+        "commerce_channel_lifecycle",
+        "erp_item_master",
+        "translation_memory",
+        "taxonomy_management"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1958,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 11,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "pde_pim": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Product Lifecycle Management (PLM) operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Product Lifecycle Management (PLM) write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Product Lifecycle Management (PLM) operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.pde_pim": {
-      "file": "capability_contract.py",
-      "id": "capability.pde_pim",
-      "kind": "capability",
-      "name": "Product Lifecycle Management (PLM)",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

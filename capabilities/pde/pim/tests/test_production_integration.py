@@ -1,4 +1,4 @@
-"""Legacy ORM/model tests are deferred to adapter integration suites."""
+"""Legacy advanced integration tests are deferred to adapter integration suites."""
 
 from __future__ import annotations
 
