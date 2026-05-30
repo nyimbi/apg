@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 APG Cache Management (CACH) - Core Service Implementation
-Revolutionary AI-powered cache service with APG integration
+Tenant-scoped cache runtime and governance service with APG integration
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
@@ -22,7 +22,7 @@ except ImportError:
 	zstandard = None
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple, Set, AsyncGenerator, Union
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from uuid_extensions import uuid7str
 
 from .models import (
@@ -30,6 +30,7 @@ from .models import (
 	CacheBackendType, CompressionAlgorithm, EvictionPolicy, CacheAccessPattern,
 	SecurityLevel, CacheTier
 )
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 
 @dataclass
@@ -63,10 +64,530 @@ class CacheServiceConfig:
 	health_checks_enabled: bool = True
 
 
+@dataclass
+class CacheNamespaceRecord:
+	"""Tenant-scoped cache namespace policy."""
+
+	namespace_id: str
+	tenant_id: str
+	namespace: str
+	owner: str
+	data_classification: str = "internal"
+	default_ttl_seconds: int = 3600
+	max_ttl_seconds: int = 86400
+	max_entries: int = 100000
+	default_tier: str = "memory"
+	allowed_tiers: list[str] = field(default_factory=lambda: ["memory", "distributed", "edge"])
+	encryption_required: bool = False
+	critical_reads_require_freshness: bool = True
+	stale_while_revalidate_allowed: bool = True
+	source_registration_required: bool = True
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class CacheEntryRecord:
+	"""Governed cache-entry metadata record."""
+
+	entry_id: str
+	tenant_id: str
+	namespace: str
+	key: str
+	value_ref: str
+	producer: str
+	ttl_seconds: int
+	size_bytes: int
+	tier: str
+	data_classification: str
+	encrypted: bool
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	expires_at: datetime | None = None
+	last_accessed_at: datetime | None = None
+	access_count: int = 0
+	invalidated_at: datetime | None = None
+
+
+@dataclass
+class CacheWarmingPlanRecord:
+	"""Cache warming request and review state."""
+
+	plan_id: str
+	tenant_id: str
+	namespace: str
+	source_name: str
+	key_count: int
+	requester: str
+	reason: str
+	source_registered: bool
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	reviewer: str | None = None
+	review_notes: str | None = None
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	decided_at: datetime | None = None
+
+
+@dataclass
+class CacheEvictionReviewRecord:
+	"""Eviction or capacity review state."""
+
+	review_id: str
+	tenant_id: str
+	namespace: str
+	requester: str
+	memory_utilization_percent: float
+	proposed_action: str
+	reason: str
+	decision: str = "pending"
+	status: str = "pending_review"
+	reviewer: str | None = None
+	review_notes: str | None = None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	decided_at: datetime | None = None
+
+
+@dataclass
+class CacheAuditEventRecord:
+	"""Dependency-light audit event for CACH lifecycle decisions."""
+
+	event_id: str
+	tenant_id: str
+	event_type: str
+	subject: str
+	actor: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	details: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class CacheGovernanceService:
+	"""Dependency-light CACH lifecycle and guardrail control plane."""
+
+	def __init__(self, tenant_id: str = "default"):
+		self.tenant_id = tenant_id
+		self.contract = get_capability_contract(tenant_id)
+		self.namespaces: dict[str, CacheNamespaceRecord] = {}
+		self.entries: dict[str, CacheEntryRecord] = {}
+		self.warming_plans: dict[str, CacheWarmingPlanRecord] = {}
+		self.eviction_reviews: dict[str, CacheEvictionReviewRecord] = {}
+		self.audit_events: list[CacheAuditEventRecord] = []
+
+	def create_namespace(
+		self,
+		*,
+		tenant_id: str,
+		namespace: str,
+		owner: str,
+		data_classification: str = "internal",
+		default_ttl_seconds: int = 3600,
+		max_ttl_seconds: int = 86400,
+		max_entries: int = 100000,
+		default_tier: str = "memory",
+		allowed_tiers: list[str] | None = None,
+		encryption_required: bool | None = None,
+		critical_reads_require_freshness: bool = True,
+		stale_while_revalidate_allowed: bool = True,
+		source_registration_required: bool = True,
+		status: str = "active",
+	) -> CacheNamespaceRecord:
+		"""Create or replace a tenant-scoped namespace policy."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		namespace = self._require_text(namespace, "namespace")
+		owner = self._require_text(owner, "owner")
+		if status not in {"active", "disabled", "retiring"}:
+			raise ValueError("status must be active, disabled, or retiring")
+		if default_ttl_seconds <= 0 or max_ttl_seconds <= 0:
+			raise ValueError("TTL values must be positive")
+		if max_ttl_seconds < default_ttl_seconds:
+			default_ttl_seconds = max_ttl_seconds
+		if max_entries <= 0:
+			raise ValueError("max_entries must be positive")
+		if encryption_required is None:
+			encryption_required = data_classification in {"sensitive", "restricted", "regulated", "credential"}
+		record = CacheNamespaceRecord(
+			namespace_id=uuid7str(),
+			tenant_id=tenant_id,
+			namespace=namespace,
+			owner=owner,
+			data_classification=data_classification,
+			default_ttl_seconds=default_ttl_seconds,
+			max_ttl_seconds=max_ttl_seconds,
+			max_entries=max_entries,
+			default_tier=default_tier,
+			allowed_tiers=allowed_tiers or ["memory", "distributed", "edge"],
+			encryption_required=encryption_required,
+			critical_reads_require_freshness=critical_reads_require_freshness,
+			stale_while_revalidate_allowed=stale_while_revalidate_allowed,
+			source_registration_required=source_registration_required,
+			status=status,
+		)
+		self.namespaces[self._namespace_key(tenant_id, namespace)] = record
+		self._audit(tenant_id, "namespace.created", namespace, owner, "allow", [], asdict(record))
+		return record
+
+	def write_entry(
+		self,
+		*,
+		tenant_id: str,
+		namespace: str,
+		key: str,
+		value_ref: str,
+		producer: str,
+		ttl_seconds: int | None = None,
+		size_bytes: int = 0,
+		tier: str | None = None,
+		data_classification: str | None = None,
+		encrypted: bool = False,
+		cross_tenant_access: bool = False,
+	) -> CacheEntryRecord:
+		"""Admit cache-entry metadata after deterministic guardrail evaluation."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		namespace = self._require_text(namespace, "namespace")
+		key = self._require_text(key, "key")
+		value_ref = self._require_text(value_ref, "value_ref")
+		producer = self._require_text(producer, "producer")
+		namespace_record = self.namespaces.get(self._namespace_key(tenant_id, namespace))
+		effective_ttl = ttl_seconds if ttl_seconds is not None else (
+			namespace_record.default_ttl_seconds if namespace_record else 3600
+		)
+		if effective_ttl <= 0:
+			raise ValueError("ttl_seconds must be positive")
+		if size_bytes < 0:
+			raise ValueError("size_bytes cannot be negative")
+		effective_classification = data_classification or (
+			namespace_record.data_classification if namespace_record else "internal"
+		)
+		effective_tier = tier or (namespace_record.default_tier if namespace_record else "memory")
+		if namespace_record and effective_tier not in namespace_record.allowed_tiers:
+			raise ValueError(f"tier {effective_tier} is not allowed for namespace {namespace}")
+		namespace_status = namespace_record.status if namespace_record else "missing"
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "write",
+			"namespace_present": namespace_record is not None,
+			"namespace_status": namespace_status,
+			"data_classification": effective_classification,
+			"entry_encrypted": encrypted,
+			"cross_tenant_access": cross_tenant_access,
+			"ttl_above_namespace_limit": bool(namespace_record and effective_ttl > namespace_record.max_ttl_seconds),
+		}
+		decision = evaluate_capability_rules(context)
+		status = "active" if decision["decision"] == "allow" else (
+			"pending_review" if decision["decision"] == "require_review" else "denied"
+		)
+		record = CacheEntryRecord(
+			entry_id=uuid7str(),
+			tenant_id=tenant_id,
+			namespace=namespace,
+			key=key,
+			value_ref=value_ref,
+			producer=producer,
+			ttl_seconds=effective_ttl,
+			size_bytes=size_bytes,
+			tier=effective_tier,
+			data_classification=effective_classification,
+			encrypted=encrypted,
+			status=status,
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			expires_at=datetime.utcnow() + timedelta(seconds=effective_ttl),
+		)
+		self.entries[self._entry_key(tenant_id, namespace, key)] = record
+		self._audit(tenant_id, "entry.write", f"{namespace}/{key}", producer, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def read_entry(
+		self,
+		*,
+		tenant_id: str,
+		namespace: str,
+		key: str,
+		actor: str = "system",
+		entry_stale: bool | None = None,
+		cross_tenant_access: bool = False,
+	) -> dict[str, Any]:
+		"""Read entry metadata and enforce freshness guardrails."""
+		entry = self.entries.get(self._entry_key(tenant_id, namespace, key))
+		namespace_record = self.namespaces.get(self._namespace_key(tenant_id, namespace))
+		now = datetime.utcnow()
+		stale = entry_stale if entry_stale is not None else bool(entry and entry.expires_at and entry.expires_at <= now)
+		data_criticality = "critical" if namespace_record and namespace_record.critical_reads_require_freshness else "standard"
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "read",
+			"namespace_present": namespace_record is not None,
+			"cross_tenant_access": cross_tenant_access,
+			"data_criticality": data_criticality,
+			"entry_stale": stale,
+		}
+		decision = evaluate_capability_rules(context)
+		if entry and decision["decision"] == "allow":
+			entry.access_count += 1
+			entry.last_accessed_at = now
+			if stale:
+				entry.status = "expired"
+		elif entry and decision["decision"] == "deny" and stale:
+			entry.status = "refresh_required"
+		self._audit(tenant_id, "entry.read", f"{namespace}/{key}", actor, decision["decision"], decision["matched_rules"], context)
+		return {
+			"hit": entry is not None,
+			"entry": asdict(entry) if entry else None,
+			"decision": decision,
+		}
+
+	def delete_entry(self, *, tenant_id: str, namespace: str, key: str, actor: str = "system") -> dict[str, Any]:
+		"""Invalidate an entry record."""
+		entry_key = self._entry_key(tenant_id, namespace, key)
+		entry = self.entries.get(entry_key)
+		if entry:
+			entry.status = "invalidated"
+			entry.invalidated_at = datetime.utcnow()
+		self._audit(tenant_id, "entry.delete", f"{namespace}/{key}", actor, "allow", [], {"found": entry is not None})
+		return {"deleted": entry is not None, "entry": asdict(entry) if entry else None}
+
+	def request_warming_plan(
+		self,
+		*,
+		tenant_id: str,
+		namespace: str,
+		source_name: str,
+		key_count: int,
+		requester: str,
+		reason: str,
+		source_registered: bool,
+	) -> CacheWarmingPlanRecord:
+		"""Create a warming plan and capture guardrail decision."""
+		namespace_record = self.namespaces.get(self._namespace_key(tenant_id, namespace))
+		max_batch = self.contract["configuration"]["warming"]["max_warming_batch_size"]
+		if key_count <= 0:
+			raise ValueError("key_count must be positive")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "warm",
+			"namespace_present": namespace_record is not None,
+			"namespace_status": namespace_record.status if namespace_record else "missing",
+			"source_registered": source_registered,
+			"warming_batch_above_limit": key_count > max_batch,
+		}
+		decision = evaluate_capability_rules(context)
+		status = "ready" if decision["decision"] == "allow" else (
+			"pending_review" if decision["decision"] == "require_review" else "denied"
+		)
+		record = CacheWarmingPlanRecord(
+			plan_id=uuid7str(),
+			tenant_id=tenant_id,
+			namespace=namespace,
+			source_name=self._require_text(source_name, "source_name"),
+			key_count=key_count,
+			requester=self._require_text(requester, "requester"),
+			reason=self._require_text(reason, "reason"),
+			source_registered=source_registered,
+			decision=decision["decision"],
+			status=status,
+			matched_rules=decision["matched_rules"],
+		)
+		self.warming_plans[record.plan_id] = record
+		self._audit(tenant_id, "warming.requested", namespace, requester, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def decide_warming_plan(
+		self,
+		*,
+		plan_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> CacheWarmingPlanRecord:
+		"""Approve or reject a warming plan with review evidence."""
+		if plan_id not in self.warming_plans:
+			raise KeyError(f"Warming plan {plan_id} not found")
+		record = self.warming_plans[plan_id]
+		reviewer = self._require_text(reviewer, "reviewer")
+		notes = self._require_text(notes, "notes")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("decision must be approved or rejected")
+		context = {
+			"tenant_context_present": bool(record.tenant_id),
+			"operation": "review",
+			"reviewer_same_as_requester": reviewer == record.requester,
+			"review_notes_attached": bool(notes),
+		}
+		rule_decision = evaluate_capability_rules(context)
+		if rule_decision["decision"] == "deny":
+			record.decision = "denied"
+			record.status = "review_denied"
+			record.matched_rules = rule_decision["matched_rules"]
+		else:
+			record.decision = decision
+			record.status = decision
+			record.matched_rules = rule_decision["matched_rules"]
+		record.reviewer = reviewer
+		record.review_notes = notes
+		record.decided_at = datetime.utcnow()
+		self._audit(record.tenant_id, "warming.decided", record.namespace, reviewer, record.decision, record.matched_rules, context)
+		return record
+
+	def request_eviction_review(
+		self,
+		*,
+		tenant_id: str,
+		namespace: str,
+		requester: str,
+		memory_utilization_percent: float,
+		proposed_action: str,
+		reason: str,
+	) -> CacheEvictionReviewRecord:
+		"""Request eviction or capacity review under memory pressure."""
+		if memory_utilization_percent < 0 or memory_utilization_percent > 100:
+			raise ValueError("memory_utilization_percent must be between 0 and 100")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "evict",
+			"memory_utilization_percent": memory_utilization_percent,
+			"eviction_plan_ready": bool(proposed_action),
+		}
+		decision = evaluate_capability_rules(context)
+		record = CacheEvictionReviewRecord(
+			review_id=uuid7str(),
+			tenant_id=tenant_id,
+			namespace=self._require_text(namespace, "namespace"),
+			requester=self._require_text(requester, "requester"),
+			memory_utilization_percent=memory_utilization_percent,
+			proposed_action=self._require_text(proposed_action, "proposed_action"),
+			reason=self._require_text(reason, "reason"),
+			matched_rules=decision["matched_rules"],
+		)
+		self.eviction_reviews[record.review_id] = record
+		self._audit(tenant_id, "eviction.requested", namespace, requester, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def decide_eviction_review(
+		self,
+		*,
+		review_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> CacheEvictionReviewRecord:
+		"""Approve or reject an eviction review with independent reviewer evidence."""
+		if review_id not in self.eviction_reviews:
+			raise KeyError(f"Eviction review {review_id} not found")
+		record = self.eviction_reviews[review_id]
+		reviewer = self._require_text(reviewer, "reviewer")
+		notes = self._require_text(notes, "notes")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("decision must be approved or rejected")
+		context = {
+			"tenant_context_present": bool(record.tenant_id),
+			"operation": "review",
+			"reviewer_same_as_requester": reviewer == record.requester,
+			"review_notes_attached": bool(notes),
+		}
+		rule_decision = evaluate_capability_rules(context)
+		if rule_decision["decision"] == "deny":
+			record.decision = "denied"
+			record.status = "review_denied"
+			record.matched_rules = rule_decision["matched_rules"]
+		else:
+			record.decision = decision
+			record.status = decision
+			record.matched_rules = rule_decision["matched_rules"]
+		record.reviewer = reviewer
+		record.review_notes = notes
+		record.decided_at = datetime.utcnow()
+		self._audit(record.tenant_id, "eviction.decided", record.namespace, reviewer, record.decision, record.matched_rules, context)
+		return record
+
+	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		"""Return summary metrics for generated CACH dashboards."""
+		tenant_id = tenant_id or self.tenant_id
+		entries = [entry for entry in self.entries.values() if entry.tenant_id == tenant_id]
+		namespaces = [record for record in self.namespaces.values() if record.tenant_id == tenant_id]
+		pending_warming = [
+			plan for plan in self.warming_plans.values()
+			if plan.tenant_id == tenant_id and plan.status == "pending_review"
+		]
+		pending_evictions = [
+			review for review in self.eviction_reviews.values()
+			if review.tenant_id == tenant_id and review.status == "pending_review"
+		]
+		return {
+			"tenant_id": tenant_id,
+			"namespace_count": len(namespaces),
+			"entry_count": len(entries),
+			"active_entry_count": sum(1 for entry in entries if entry.status == "active"),
+			"denied_entry_count": sum(1 for entry in entries if entry.status == "denied"),
+			"pending_warming_reviews": len(pending_warming),
+			"pending_eviction_reviews": len(pending_evictions),
+			"audit_event_count": sum(1 for event in self.audit_events if event.tenant_id == tenant_id),
+		}
+
+	def list_records(self, record_type: str, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		"""List lifecycle records for APIs and view models."""
+		tenant_id = tenant_id or self.tenant_id
+		collections = {
+			"namespaces": self.namespaces.values(),
+			"entries": self.entries.values(),
+			"warming_plans": self.warming_plans.values(),
+			"eviction_reviews": self.eviction_reviews.values(),
+			"audit_events": self.audit_events,
+		}
+		if record_type not in collections:
+			raise ValueError(f"Unsupported record_type {record_type}")
+		return [
+			asdict(record)
+			for record in collections[record_type]
+			if getattr(record, "tenant_id", None) == tenant_id
+		]
+
+	def _audit(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject: str,
+		actor: str,
+		decision: str,
+		matched_rules: list[str],
+		details: dict[str, Any],
+	) -> None:
+		self.audit_events.append(CacheAuditEventRecord(
+			event_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject=subject,
+			actor=actor,
+			decision=decision,
+			matched_rules=list(matched_rules),
+			details=details,
+		))
+
+	@staticmethod
+	def _require_text(value: str, field_name: str) -> str:
+		if not isinstance(value, str) or not value.strip():
+			raise ValueError(f"{field_name} is required")
+		return value.strip()
+
+	@staticmethod
+	def _namespace_key(tenant_id: str, namespace: str) -> str:
+		return f"{tenant_id}:{namespace}"
+
+	@staticmethod
+	def _entry_key(tenant_id: str, namespace: str, key: str) -> str:
+		return f"{tenant_id}:{namespace}:{key}"
+
+
 class CacheService:
 	"""
-	Revolutionary AI-powered cache management service
-	Provides autonomous optimization, predictive prefetching, and intelligent caching
+	Async cache management service.
+	Provides optimization hooks, predictive prefetching, and tenant-aware caching.
 	"""
 	
 	def __init__(self, config: CacheServiceConfig | None = None):

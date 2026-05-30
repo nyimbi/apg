@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """
 APG Cache Management (CACH) Capability
-Revolutionary AI-powered cache management with autonomous optimization
+Tenant-scoped cache governance, lifecycle records, and runtime adapters
 
 This capability provides:
-- Autonomous Cache Intelligence with AI-powered self-optimization
-- Predictive Content Delivery with ML-driven prefetching  
-- Intelligent Cache Warming with smart cold start elimination
-- Adaptive Multi-Tier Orchestration with dynamic management
-- Content-Aware Optimization with semantic understanding
-- Real-Time Performance Analytics with live insights
-- Zero-Configuration Intelligence with self-configuring policies
-- Distributed Consensus Optimization with smart consistency
-- Behavior-Driven Security with adaptive policies
-- Quantum-Ready Architecture with future-proof platform
+- Cache namespace lifecycle governance
+- Cache entry admission, freshness, and invalidation records
+- Warming and eviction review workflows
+- Deterministic cache guardrail evaluation
+- Generated-application UI and theme metadata
+- Adapter boundaries for memory, Redis-compatible, edge, CDN, and query caches
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
@@ -24,13 +20,29 @@ from .capability_contract import (
 	evaluate_capability_rules
 )
 try:
-	from .service import CacheService, CacheServiceConfig, create_cache_service
+	from .service import (
+		CacheAuditEventRecord,
+		CacheEntryRecord,
+		CacheEvictionReviewRecord,
+		CacheGovernanceService,
+		CacheNamespaceRecord,
+		CacheService,
+		CacheServiceConfig,
+		CacheWarmingPlanRecord,
+		create_cache_service,
+	)
 	_SERVICE_IMPORT_ERROR = None
 except ModuleNotFoundError as exc:
 	if exc.name not in {'lz4', 'zstandard'}:
 		raise
 	CacheService = None
 	CacheServiceConfig = None
+	CacheGovernanceService = None
+	CacheNamespaceRecord = None
+	CacheEntryRecord = None
+	CacheWarmingPlanRecord = None
+	CacheEvictionReviewRecord = None
+	CacheAuditEventRecord = None
 	_SERVICE_IMPORT_ERROR = exc
 
 	def create_cache_service(*args, **kwargs):
@@ -59,7 +71,7 @@ except (ImportError, ModuleNotFoundError) as exc:
 	CAPABILITY_METADATA = {
 		"name": "cach",
 		"display_name": "Cache Management",
-		"description": "AI-powered cache management with autonomous optimization",
+		"description": "Tenant-scoped cache governance, warming, eviction review, and runtime adapter control",
 		"version": "1.0.0",
 		"category": "infrastructure",
 		"dependencies": ["auth", "audl", "mten", "moni", "conf"],
@@ -73,7 +85,7 @@ except (ImportError, ModuleNotFoundError) as exc:
 # Capability metadata for APG composition engine
 __capability_name__ = "cach"
 __capability_version__ = "1.0.0"
-__capability_description__ = "AI-powered cache management with autonomous optimization"
+__capability_description__ = "Tenant-scoped cache governance, warming, eviction review, and runtime adapter control"
 __capability_dependencies__ = ["auth", "audl", "mten", "moni", "conf"]
 __capability_optional_dependencies__ = ["aicr", "pred", "anom", "agnt"]
 
@@ -82,6 +94,12 @@ __all__ = [
 	# Service components
 	'CacheService',
 	'CacheServiceConfig', 
+	'CacheGovernanceService',
+	'CacheNamespaceRecord',
+	'CacheEntryRecord',
+	'CacheWarmingPlanRecord',
+	'CacheEvictionReviewRecord',
+	'CacheAuditEventRecord',
 	'create_cache_service',
 	
 	# Data models
@@ -160,17 +178,23 @@ def register_capability() -> dict:
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"cache_operations": "Read, write, delete, and inspect tenant-aware cache entries",
+			"cache_namespace_lifecycle": "Register, disable, retire, and govern tenant cache namespaces",
 			"cache_policy_governance": "Apply namespace, TTL, eviction, and security policies",
 			"intelligent_warming": "Warm cache namespaces from configured data sources",
+			"eviction_review": "Capture memory pressure, eviction plans, independent review, and audit notes",
 			"adaptive_optimization": "Tune cache tiers from performance and access signals",
 			"capability_rules": "Evaluate deterministic cache governance rules",
 			"visual_theming": "Apply cache-control theme tokens and components"
 		},
 		"endpoints": {
 			"entries": "/cach/api/v1/entries",
+			"namespaces": "/cach/api/v1/namespaces",
 			"policies": "/cach/api/v1/policies",
 			"warming": "/cach/api/v1/warming",
+			"evictions": "/cach/api/v1/evictions",
 			"tiers": "/cach/api/v1/tiers",
+			"adapters": "/cach/api/v1/adapters",
+			"audit": "/cach/api/v1/audit",
 			"analytics": "/cach/api/v1/analytics",
 			"health": "/cach/api/v1/health"
 		},
@@ -185,8 +209,10 @@ def register_capability() -> dict:
 			"cach:read",
 			"cach:write",
 			"cach:delete",
+			"cach:manage_namespaces",
 			"cach:manage_policies",
 			"cach:warm",
+			"cach:review_eviction",
 			"cach:view_analytics",
 			"cach:admin"
 		]
@@ -200,11 +226,11 @@ def get_capability_info() -> dict:
 		"contract": get_capability_contract(),
 		"features": [
 			"Tenant-aware cache namespaces",
-			"Autonomous cache optimization",
-			"Predictive content warming",
-			"Adaptive multi-tier orchestration",
-			"Content-aware security controls",
-			"Real-time performance analytics"
+			"Deterministic cache admission guardrails",
+			"Cache warming request and review workflows",
+			"Eviction and capacity review evidence",
+			"Generated-application UI and theme metadata",
+			"Backend-neutral cache adapter boundaries"
 		]
 	}
 

@@ -8,10 +8,44 @@
   },
   "capabilities": {
     "cach": {
-      "approvals": {},
+      "adapters": {
+        "backend_binding_required_for_production": true,
+        "default_backend": "memory",
+        "emit_mqeb_events": true,
+        "supported_backends": [
+          "memory",
+          "redis",
+          "valkey",
+          "edge",
+          "cdn",
+          "query_cache"
+        ]
+      },
+      "approvals": {
+        "eviction": "CacheEvictionReviewRecord",
+        "warming": "CacheWarmingPlanRecord"
+      },
       "business_rules": [],
+      "cache_lifecycle": {
+        "audit": "CacheAuditEventRecord",
+        "entry": "CacheEntryRecord",
+        "namespace": "CacheNamespaceRecord"
+      },
       "components": {},
       "configuration": {
+        "adapters": {
+          "backend_binding_required_for_production": true,
+          "default_backend": "memory",
+          "emit_mqeb_events": true,
+          "supported_backends": [
+            "memory",
+            "redis",
+            "valkey",
+            "edge",
+            "cdn",
+            "query_cache"
+          ]
+        },
         "hierarchy": {
           "default_tier": "memory",
           "max_memory_mb": 1024,
@@ -25,23 +59,30 @@
         "optimization": {
           "ai_optimization_enabled": true,
           "auto_evict_on_pressure": true,
-          "memory_pressure_review_threshold_percent": 90
+          "memory_pressure_review_threshold_percent": 90,
+          "require_independent_eviction_review": true
         },
         "policy": {
+          "allow_stale_while_revalidate": true,
           "critical_reads_require_freshness": true,
           "default_eviction_policy": "adaptive_lru",
           "default_ttl_seconds": 3600,
+          "max_ttl_seconds": 86400,
           "namespace_required": true
         },
         "security": {
           "cross_tenant_access_allowed": false,
           "quantum_ready_security": true,
+          "regulated_entries_require_encryption": true,
           "require_tenant_context": true,
+          "restricted_entries_require_encryption": true,
           "sensitive_entries_require_encryption": true
         },
         "telemetry": {
           "emit_cache_events": true,
           "metrics_enabled": true,
+          "record_lifecycle_audit": true,
+          "record_rule_decisions": true,
           "track_access_patterns": true
         },
         "tenant_id": "default",
@@ -50,14 +91,20 @@
           "default_theme": "cach_memory_fabric"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
+          "enable_eviction_review_queue": true,
           "enable_hierarchy_map": true,
+          "enable_namespace_inventory": true,
           "enable_policy_manager": true,
           "enable_warming_console": true
         },
         "warming": {
           "max_warming_batch_size": 10000,
           "predictive_prefetching_enabled": true,
+          "require_reason": true,
+          "require_review_above_batch_limit": true,
           "source_registration_required": true
         }
       },
@@ -113,6 +160,32 @@
           },
           {
             "condition": {
+              "data_classification": "regulated",
+              "entry_encrypted": false
+            },
+            "description": "Regulated cache entries require encryption at rest.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_entry_encryption_required",
+              "required_action": "enable_entry_encryption"
+            },
+            "name": "regulated_entry_requires_encryption"
+          },
+          {
+            "condition": {
+              "data_classification": "restricted",
+              "entry_encrypted": false
+            },
+            "description": "Restricted cache entries require encryption at rest.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_entry_encryption_required",
+              "required_action": "enable_entry_encryption"
+            },
+            "name": "restricted_entry_requires_encryption"
+          },
+          {
+            "condition": {
               "cross_tenant_access": true
             },
             "description": "Cross-tenant cache access is denied by default.",
@@ -122,6 +195,44 @@
               "required_action": "use_tenant_scoped_namespace"
             },
             "name": "cross_tenant_cache_access_denied"
+          },
+          {
+            "condition": {
+              "namespace_status": "disabled",
+              "operation": "write"
+            },
+            "description": "Disabled namespaces cannot accept writes or warming plans.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_disabled",
+              "required_action": "reactivate_or_select_namespace"
+            },
+            "name": "disabled_namespace_blocks_cache_writes"
+          },
+          {
+            "condition": {
+              "namespace_status": "disabled",
+              "operation": "warm"
+            },
+            "description": "Disabled namespaces cannot accept warming plans.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_disabled",
+              "required_action": "reactivate_or_select_namespace"
+            },
+            "name": "disabled_namespace_blocks_cache_warming"
+          },
+          {
+            "condition": {
+              "ttl_above_namespace_limit": true
+            },
+            "description": "Entries above the namespace TTL limit require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "ttl_review_required",
+              "required_action": "request_ttl_exception"
+            },
+            "name": "ttl_above_namespace_limit_requires_review"
           },
           {
             "condition": {
@@ -139,6 +250,44 @@
           },
           {
             "condition": {
+              "operation": "warm",
+              "source_registered": false
+            },
+            "description": "Cache warming requires registered source evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "warming_source_required",
+              "required_action": "register_warming_source"
+            },
+            "name": "warming_requires_registered_source"
+          },
+          {
+            "condition": {
+              "namespace_present": false,
+              "operation": "warm"
+            },
+            "description": "Cache warming requires a registered namespace.",
+            "effect": {
+              "decision": "deny",
+              "reason": "namespace_required",
+              "required_action": "create_or_select_namespace"
+            },
+            "name": "warming_requires_namespace"
+          },
+          {
+            "condition": {
+              "warming_batch_above_limit": true
+            },
+            "description": "Large cache warming batches require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "warming_batch_review_required",
+              "required_action": "request_warming_review"
+            },
+            "name": "warming_batch_limit_requires_review"
+          },
+          {
+            "condition": {
               "eviction_plan_ready": false,
               "memory_utilization_percent_gt": 90
             },
@@ -149,6 +298,30 @@
               "required_action": "prepare_eviction_or_capacity_plan"
             },
             "name": "high_memory_pressure_requires_review"
+          },
+          {
+            "condition": {
+              "reviewer_same_as_requester": true
+            },
+            "description": "Eviction and capacity approvals require independent review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_reviewer_required",
+              "required_action": "assign_independent_reviewer"
+            },
+            "name": "eviction_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "review_notes_attached": false
+            },
+            "description": "Eviction, capacity, and warming reviews require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "review_notes_required"
           }
         ],
         "type": "deterministic"
@@ -194,6 +367,32 @@
         },
         {
           "condition": {
+            "data_classification": "regulated",
+            "entry_encrypted": false
+          },
+          "description": "Regulated cache entries require encryption at rest.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_entry_encryption_required",
+            "required_action": "enable_entry_encryption"
+          },
+          "name": "regulated_entry_requires_encryption"
+        },
+        {
+          "condition": {
+            "data_classification": "restricted",
+            "entry_encrypted": false
+          },
+          "description": "Restricted cache entries require encryption at rest.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_entry_encryption_required",
+            "required_action": "enable_entry_encryption"
+          },
+          "name": "restricted_entry_requires_encryption"
+        },
+        {
+          "condition": {
             "cross_tenant_access": true
           },
           "description": "Cross-tenant cache access is denied by default.",
@@ -203,6 +402,44 @@
             "required_action": "use_tenant_scoped_namespace"
           },
           "name": "cross_tenant_cache_access_denied"
+        },
+        {
+          "condition": {
+            "namespace_status": "disabled",
+            "operation": "write"
+          },
+          "description": "Disabled namespaces cannot accept writes or warming plans.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_disabled",
+            "required_action": "reactivate_or_select_namespace"
+          },
+          "name": "disabled_namespace_blocks_cache_writes"
+        },
+        {
+          "condition": {
+            "namespace_status": "disabled",
+            "operation": "warm"
+          },
+          "description": "Disabled namespaces cannot accept warming plans.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_disabled",
+            "required_action": "reactivate_or_select_namespace"
+          },
+          "name": "disabled_namespace_blocks_cache_warming"
+        },
+        {
+          "condition": {
+            "ttl_above_namespace_limit": true
+          },
+          "description": "Entries above the namespace TTL limit require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "ttl_review_required",
+            "required_action": "request_ttl_exception"
+          },
+          "name": "ttl_above_namespace_limit_requires_review"
         },
         {
           "condition": {
@@ -220,6 +457,44 @@
         },
         {
           "condition": {
+            "operation": "warm",
+            "source_registered": false
+          },
+          "description": "Cache warming requires registered source evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "warming_source_required",
+            "required_action": "register_warming_source"
+          },
+          "name": "warming_requires_registered_source"
+        },
+        {
+          "condition": {
+            "namespace_present": false,
+            "operation": "warm"
+          },
+          "description": "Cache warming requires a registered namespace.",
+          "effect": {
+            "decision": "deny",
+            "reason": "namespace_required",
+            "required_action": "create_or_select_namespace"
+          },
+          "name": "warming_requires_namespace"
+        },
+        {
+          "condition": {
+            "warming_batch_above_limit": true
+          },
+          "description": "Large cache warming batches require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "warming_batch_review_required",
+            "required_action": "request_warming_review"
+          },
+          "name": "warming_batch_limit_requires_review"
+        },
+        {
+          "condition": {
             "eviction_plan_ready": false,
             "memory_utilization_percent_gt": 90
           },
@@ -230,19 +505,53 @@
             "required_action": "prepare_eviction_or_capacity_plan"
           },
           "name": "high_memory_pressure_requires_review"
+        },
+        {
+          "condition": {
+            "reviewer_same_as_requester": true
+          },
+          "description": "Eviction and capacity approvals require independent review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_reviewer_required",
+            "required_action": "assign_independent_reviewer"
+          },
+          "name": "eviction_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "review_notes_attached": false
+          },
+          "description": "Eviction, capacity, and warming reviews require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "review_notes_required"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "CacheAdapterHealth",
+          "permission": "cach:admin",
+          "route": "/cach/adapters"
+        },
         "analytics": {
           "component": "CacheAnalytics",
           "permission": "cach:view_analytics",
           "route": "/cach/analytics"
+        },
+        "audit": {
+          "component": "CacheAuditTimeline",
+          "permission": "cach:admin",
+          "route": "/cach/audit"
         },
         "dashboard": {
           "component": "CacheDashboard",
@@ -254,10 +563,20 @@
           "permission": "cach:read",
           "route": "/cach/entries"
         },
+        "evictions": {
+          "component": "CacheEvictionReviewQueue",
+          "permission": "cach:review_eviction",
+          "route": "/cach/evictions"
+        },
         "hierarchy": {
           "component": "CacheHierarchyMap",
           "permission": "cach:view",
           "route": "/cach/hierarchy"
+        },
+        "namespaces": {
+          "component": "CacheNamespaceInventory",
+          "permission": "cach:manage_namespaces",
+          "route": "/cach/namespaces"
         },
         "policies": {
           "component": "CachePolicyManager",
@@ -283,10 +602,28 @@
       "streaming": {},
       "theme": {
         "components": {
+          "adapter_health_panel": {
+            "status_indicator": "adapter-state",
+            "variant": "runtime-binding",
+            "visual": "backend-grid"
+          },
+          "audit_event_timeline": {
+            "highlight": "matched-rule-chip",
+            "visual": "decision-timeline"
+          },
           "cache_hit_card": {
             "icon": "gauge",
             "risk_style": "trend-sparkline",
             "status_indicator": "hit-rate-pill"
+          },
+          "entry_freshness_badge": {
+            "status_indicator": "freshness-state",
+            "visual": "age-band"
+          },
+          "eviction_review_queue": {
+            "status_indicator": "pressure-band",
+            "variant": "capacity-control",
+            "visual": "review-queue"
           },
           "namespace_policy_trace": {
             "highlight": "ttl-chip",
@@ -328,6 +665,13 @@
             "permission": "cach:view"
           },
           {
+            "component": "CacheNamespaceInventory",
+            "name": "namespaces",
+            "nav_group": "Operations",
+            "path": "/cach/namespaces",
+            "permission": "cach:manage_namespaces"
+          },
+          {
             "component": "CacheEntryExplorer",
             "name": "entries",
             "nav_group": "Operations",
@@ -349,6 +693,13 @@
             "permission": "cach:warm"
           },
           {
+            "component": "CacheEvictionReviewQueue",
+            "name": "evictions",
+            "nav_group": "Governance",
+            "path": "/cach/evictions",
+            "permission": "cach:review_eviction"
+          },
+          {
             "component": "CacheHierarchyMap",
             "name": "hierarchy",
             "nav_group": "Architecture",
@@ -367,6 +718,20 @@
             "name": "security",
             "nav_group": "Governance",
             "path": "/cach/security",
+            "permission": "cach:admin"
+          },
+          {
+            "component": "CacheAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Runtime",
+            "path": "/cach/adapters",
+            "permission": "cach:admin"
+          },
+          {
+            "component": "CacheAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/cach/audit",
             "permission": "cach:admin"
           },
           {
@@ -396,6 +761,19 @@
   "contracts": {
     "cach": {
       "configuration": {
+        "adapters": {
+          "backend_binding_required_for_production": true,
+          "default_backend": "memory",
+          "emit_mqeb_events": true,
+          "supported_backends": [
+            "memory",
+            "redis",
+            "valkey",
+            "edge",
+            "cdn",
+            "query_cache"
+          ]
+        },
         "hierarchy": {
           "default_tier": "memory",
           "max_memory_mb": 1024,
@@ -409,23 +787,30 @@
         "optimization": {
           "ai_optimization_enabled": true,
           "auto_evict_on_pressure": true,
-          "memory_pressure_review_threshold_percent": 90
+          "memory_pressure_review_threshold_percent": 90,
+          "require_independent_eviction_review": true
         },
         "policy": {
+          "allow_stale_while_revalidate": true,
           "critical_reads_require_freshness": true,
           "default_eviction_policy": "adaptive_lru",
           "default_ttl_seconds": 3600,
+          "max_ttl_seconds": 86400,
           "namespace_required": true
         },
         "security": {
           "cross_tenant_access_allowed": false,
           "quantum_ready_security": true,
+          "regulated_entries_require_encryption": true,
           "require_tenant_context": true,
+          "restricted_entries_require_encryption": true,
           "sensitive_entries_require_encryption": true
         },
         "telemetry": {
           "emit_cache_events": true,
           "metrics_enabled": true,
+          "record_lifecycle_audit": true,
+          "record_rule_decisions": true,
           "track_access_patterns": true
         },
         "tenant_id": "default",
@@ -434,14 +819,20 @@
           "default_theme": "cach_memory_fabric"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
+          "enable_eviction_review_queue": true,
           "enable_hierarchy_map": true,
+          "enable_namespace_inventory": true,
           "enable_policy_manager": true,
           "enable_warming_console": true
         },
         "warming": {
           "max_warming_batch_size": 10000,
           "predictive_prefetching_enabled": true,
+          "require_reason": true,
+          "require_review_above_batch_limit": true,
           "source_registration_required": true
         }
       },
@@ -508,6 +899,44 @@
       },
       "name": "cross_tenant_cache_access_denied"
     },
+    "disabled_namespace_blocks_cache_warming": {
+      "condition": {
+        "namespace_status": "disabled",
+        "operation": "warm"
+      },
+      "description": "Disabled namespaces cannot accept warming plans.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_disabled",
+        "required_action": "reactivate_or_select_namespace"
+      },
+      "name": "disabled_namespace_blocks_cache_warming"
+    },
+    "disabled_namespace_blocks_cache_writes": {
+      "condition": {
+        "namespace_status": "disabled",
+        "operation": "write"
+      },
+      "description": "Disabled namespaces cannot accept writes or warming plans.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_disabled",
+        "required_action": "reactivate_or_select_namespace"
+      },
+      "name": "disabled_namespace_blocks_cache_writes"
+    },
+    "eviction_review_requires_independent_reviewer": {
+      "condition": {
+        "reviewer_same_as_requester": true
+      },
+      "description": "Eviction and capacity approvals require independent review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_reviewer_required",
+        "required_action": "assign_independent_reviewer"
+      },
+      "name": "eviction_review_requires_independent_reviewer"
+    },
     "high_memory_pressure_requires_review": {
       "condition": {
         "eviction_plan_ready": false,
@@ -520,6 +949,44 @@
         "required_action": "prepare_eviction_or_capacity_plan"
       },
       "name": "high_memory_pressure_requires_review"
+    },
+    "regulated_entry_requires_encryption": {
+      "condition": {
+        "data_classification": "regulated",
+        "entry_encrypted": false
+      },
+      "description": "Regulated cache entries require encryption at rest.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_entry_encryption_required",
+        "required_action": "enable_entry_encryption"
+      },
+      "name": "regulated_entry_requires_encryption"
+    },
+    "restricted_entry_requires_encryption": {
+      "condition": {
+        "data_classification": "restricted",
+        "entry_encrypted": false
+      },
+      "description": "Restricted cache entries require encryption at rest.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_entry_encryption_required",
+        "required_action": "enable_entry_encryption"
+      },
+      "name": "restricted_entry_requires_encryption"
+    },
+    "review_notes_required": {
+      "condition": {
+        "review_notes_attached": false
+      },
+      "description": "Eviction, capacity, and warming reviews require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "review_notes_required"
     },
     "sensitive_entry_requires_encryption": {
       "condition": {
@@ -545,6 +1012,56 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "ttl_above_namespace_limit_requires_review": {
+      "condition": {
+        "ttl_above_namespace_limit": true
+      },
+      "description": "Entries above the namespace TTL limit require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "ttl_review_required",
+        "required_action": "request_ttl_exception"
+      },
+      "name": "ttl_above_namespace_limit_requires_review"
+    },
+    "warming_batch_limit_requires_review": {
+      "condition": {
+        "warming_batch_above_limit": true
+      },
+      "description": "Large cache warming batches require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "warming_batch_review_required",
+        "required_action": "request_warming_review"
+      },
+      "name": "warming_batch_limit_requires_review"
+    },
+    "warming_requires_namespace": {
+      "condition": {
+        "namespace_present": false,
+        "operation": "warm"
+      },
+      "description": "Cache warming requires a registered namespace.",
+      "effect": {
+        "decision": "deny",
+        "reason": "namespace_required",
+        "required_action": "create_or_select_namespace"
+      },
+      "name": "warming_requires_namespace"
+    },
+    "warming_requires_registered_source": {
+      "condition": {
+        "operation": "warm",
+        "source_registered": false
+      },
+      "description": "Cache warming requires registered source evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "warming_source_required",
+        "required_action": "register_warming_source"
+      },
+      "name": "warming_requires_registered_source"
     },
     "write_requires_namespace": {
       "condition": {

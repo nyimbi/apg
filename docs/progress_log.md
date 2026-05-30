@@ -13248,3 +13248,61 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/mqeb --json` passed with delivery/dead-letter/quota/replay/Bytewax routes, 15 executable rules, Bytewax-first adapter evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized_contract_mqeb|materialized_app_mqeb|test_materialized" capabilities/common/mqeb` returned no stale MQEB package markers.
 - `git diff --check -- capabilities/common/mqeb docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 03:54 EAT
+
+CACH specification, plan, and executable cache-governance packet:
+
+- Selected `capabilities/common/cach` as the next common capability after MQEB
+  in the development order.
+- Added `SPECIFICATION.md` to define CACH as APG's tenant-scoped cache
+  governance and runtime-adapter capability, with namespace, entry, warming,
+  eviction, rule, UI, theme, audit, and adapter boundaries.
+- Added `PLAN.md` with the build sequence for documentation, contract
+  expansion, lifecycle service, API helpers, view models, package evidence, and
+  focused proof.
+- Replaced the marketing-heavy README with practical usage guidance, direct
+  helper examples, view-model usage, permissions, adapter boundaries, and
+  focused verification commands.
+- Replaced overclaiming `cap_spec.md` content with current executable package
+  scope, lifecycle records, deterministic guardrails, adapter boundaries, and
+  verification scope.
+- Expanded the CACH capability contract with adapter configuration, telemetry
+  audit settings, namespace inventory, eviction review, adapter health, audit
+  routes, 16 deterministic rules, and cache-control theme components.
+- Added `CacheGovernanceService` and dependency-light namespace, entry,
+  warming plan, eviction review, and audit event records beside the existing
+  async cache runtime.
+- Added lifecycle enforcement for namespace registration, encrypted regulated
+  entries, disabled namespace writes/warming, TTL review, warming source
+  registration, warming batch review, independent eviction review, and review
+  notes.
+- Added direct generated-application API helpers for capability status,
+  namespace creation, entry write/read/delete, warming plans, eviction reviews,
+  record listing, and governance summaries.
+- Added `view_models.py` for dashboard, namespace inventory, entry explorer,
+  policy manager, warming console, eviction review, tier hierarchy, adapter
+  health, audit timeline, and settings surfaces.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived
+  semantic evidence and refreshed `semantic_model.json` and
+  `release_report.json`.
+- Renamed the stale package test file to `tests/test_package_contract.py`.
+- Fixed a discovered API service-instantiation bug where `get_cache_service()`
+  stored the return value of `initialize()` instead of the initialized service.
+- Fixed a lifecycle edge case so namespace max TTL can be tightened without
+  forcing callers to restate the default TTL.
+- Code review found and fixed runtime input validation gaps for explicit zero
+  TTLs, negative sizes, disallowed tiers, empty warming batches, and invalid
+  memory utilization percentages.
+- Code review also found and fixed missing namespace denial for warming plans,
+  non-persisted denied/pending/invalidated entry records, missing warming plan
+  review decisions, and stale exported metadata language.
+
+Battery-conscious verification so far:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cach/capability_contract.py capabilities/common/cach/service.py capabilities/common/cach/api.py capabilities/common/cach/view_models.py capabilities/common/cach/app.py capabilities/common/cach/tests/test_capability_contract.py capabilities/common/cach/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/cach/tests/test_capability_contract.py capabilities/common/cach/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/cach --json` passed with `ok: true`; CACH remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cach --json` passed with 12 routes, 16 deterministic rules, adapter boundary evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "10x|Gartner|Revolutionary|microsecond|99\\.9|test_materialized_package|materialized_contract_cach|materialized_app_cach|Materialized capability package|This package materializes|mock data|placeholder" capabilities/common/cach/README.md capabilities/common/cach/SPECIFICATION.md capabilities/common/cach/PLAN.md capabilities/common/cach/cap_spec.md capabilities/common/cach/app.py capabilities/common/cach/api.py capabilities/common/cach/service.py capabilities/common/cach/view_models.py capabilities/common/cach/tests/test_capability_contract.py capabilities/common/cach/tests/test_package_contract.py capabilities/common/cach/package_manifest.json capabilities/common/cach/release_report.json capabilities/common/cach/semantic_model.json` returned no stale primary CACH package markers.
+- `git diff --check -- capabilities/common/cach docs/progress_log.md` passed with no whitespace errors.

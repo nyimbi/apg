@@ -19,7 +19,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from uuid_extensions import uuid7str
 
-from .service import CacheService, CacheServiceConfig
+from .service import (
+	CacheEvictionReviewRecord,
+	CacheGovernanceService,
+	CacheNamespaceRecord,
+	CacheEntryRecord,
+	CacheService,
+	CacheServiceConfig,
+	CacheWarmingPlanRecord,
+)
 from .models import (
 	CacheEntry, CacheCluster, CachePolicy, CacheMetrics,
 	CacheBackendType, CompressionAlgorithm, EvictionPolicy, SecurityLevel
@@ -125,6 +133,7 @@ class AIInsightsResponse(BaseModel):
 
 # Dependency injection
 cache_service: Optional[CacheService] = None
+SERVICE = CacheGovernanceService()
 
 
 async def get_cache_service() -> CacheService:
@@ -132,8 +141,76 @@ async def get_cache_service() -> CacheService:
 	global cache_service
 	if cache_service is None:
 		config = CacheServiceConfig()
-		cache_service = await CacheService(config).initialize()
+		cache_service = CacheService(config)
+		await cache_service.initialize()
 	return cache_service
+
+
+def capability_status() -> dict[str, Any]:
+	"""Return dependency-light CACH capability status for generated apps."""
+	return {
+		"capability": "cach",
+		"service": "cache_governance",
+		"status": "ready",
+		"summary": SERVICE.dashboard_summary(),
+	}
+
+
+def create_namespace_record(**kwargs: Any) -> CacheNamespaceRecord:
+	"""Create a CACH namespace policy record."""
+	return SERVICE.create_namespace(**kwargs)
+
+
+def write_cache_entry_record(**kwargs: Any) -> CacheEntryRecord:
+	"""Evaluate and admit cache-entry metadata."""
+	return SERVICE.write_entry(**kwargs)
+
+
+def read_cache_entry_record(**kwargs: Any) -> dict[str, Any]:
+	"""Read governed cache-entry metadata."""
+	return SERVICE.read_entry(**kwargs)
+
+
+def delete_cache_entry_record(**kwargs: Any) -> dict[str, Any]:
+	"""Invalidate governed cache-entry metadata."""
+	return SERVICE.delete_entry(**kwargs)
+
+
+def request_warming_plan(**kwargs: Any) -> CacheWarmingPlanRecord:
+	"""Create a cache warming request."""
+	return SERVICE.request_warming_plan(**kwargs)
+
+
+def decide_warming_plan(**kwargs: Any) -> CacheWarmingPlanRecord:
+	"""Approve or reject a cache warming request with evidence."""
+	return SERVICE.decide_warming_plan(**kwargs)
+
+
+def request_eviction_review(**kwargs: Any) -> CacheEvictionReviewRecord:
+	"""Create an eviction or capacity review request."""
+	return SERVICE.request_eviction_review(**kwargs)
+
+
+def decide_eviction_review(**kwargs: Any) -> CacheEvictionReviewRecord:
+	"""Approve or reject an eviction review with evidence."""
+	return SERVICE.decide_eviction_review(**kwargs)
+
+
+def list_records(record_type: str, tenant_id: str | None = None) -> list[dict[str, Any]]:
+	"""List dependency-light CACH records."""
+	return SERVICE.list_records(record_type, tenant_id)
+
+
+def list_cache_governance(tenant_id: str | None = None) -> dict[str, Any]:
+	"""Return all generated-app governance records for a tenant."""
+	return {
+		"summary": SERVICE.dashboard_summary(tenant_id),
+		"namespaces": SERVICE.list_records("namespaces", tenant_id),
+		"entries": SERVICE.list_records("entries", tenant_id),
+		"warming_plans": SERVICE.list_records("warming_plans", tenant_id),
+		"eviction_reviews": SERVICE.list_records("eviction_reviews", tenant_id),
+		"audit_events": SERVICE.list_records("audit_events", tenant_id),
+	}
 
 
 def _clean_text(value: Any) -> Optional[str]:
@@ -200,7 +277,7 @@ def get_current_user(request: Request) -> str:
 # Create FastAPI app
 app = FastAPI(
 	title="APG Cache Management API",
-	description="Revolutionary AI-powered cache management with autonomous optimization",
+	description="Tenant-scoped cache management, governance, warming, and eviction review",
 	version="1.0.0",
 	docs_url="/api/v1/cache/docs",
 	redoc_url="/api/v1/cache/redoc"
@@ -749,7 +826,7 @@ async def cache_api_root():
 	return {
 		"service": "APG Cache Management API",
 		"version": "1.0.0",
-		"description": "Revolutionary AI-powered cache management with autonomous optimization",
+		"description": "Tenant-scoped cache governance and runtime adapter API",
 		"endpoints": {
 			"health": "/api/v1/cache/health",
 			"set": "/api/v1/cache/set",

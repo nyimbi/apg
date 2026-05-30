@@ -5,13 +5,133 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Cache Management package-backed APG capability", "entity_count": 0, "name": "cach", "version": "1.0.0"}, "capabilities": {"cach": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"hierarchy": {"default_tier": "memory", "max_memory_mb": 1024, "multi_tenant_isolation": true, "tiers": ["memory", "distributed", "edge"]}, "optimization": {"ai_optimization_enabled": true, "auto_evict_on_pressure": true, "memory_pressure_review_threshold_percent": 90}, "policy": {"critical_reads_require_freshness": true, "default_eviction_policy": "adaptive_lru", "default_ttl_seconds": 3600, "namespace_required": true}, "security": {"cross_tenant_access_allowed": false, "quantum_ready_security": true, "require_tenant_context": true, "sensitive_entries_require_encryption": true}, "telemetry": {"emit_cache_events": true, "metrics_enabled": true, "track_access_patterns": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "cach_memory_fabric"}, "ui": {"enable_dashboard": true, "enable_hierarchy_map": true, "enable_policy_manager": true, "enable_warming_console": true}, "warming": {"max_warming_batch_size": 10000, "predictive_prefetching_enabled": true, "source_registration_required": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Cache Management", "provides": ["cach_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All cache operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"namespace_present": false, "operation": "write"}, "description": "Cache writes require an explicit namespace.", "effect": {"decision": "deny", "reason": "namespace_required", "required_action": "select_cache_namespace"}, "name": "write_requires_namespace"}, {"condition": {"data_classification": "sensitive", "entry_encrypted": false}, "description": "Sensitive cache entries require encryption at rest.", "effect": {"decision": "deny", "reason": "cache_entry_encryption_required", "required_action": "enable_entry_encryption"}, "name": "sensitive_entry_requires_encryption"}, {"condition": {"cross_tenant_access": true}, "description": "Cross-tenant cache access is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_cache_access_denied", "required_action": "use_tenant_scoped_namespace"}, "name": "cross_tenant_cache_access_denied"}, {"condition": {"data_criticality": "critical", "entry_stale": true, "operation": "read"}, "description": "Critical stale reads require refresh before serving.", "effect": {"decision": "deny", "reason": "critical_entry_refresh_required", "required_action": "refresh_cache_entry"}, "name": "critical_stale_read_requires_refresh"}, {"condition": {"eviction_plan_ready": false, "memory_utilization_percent_gt": 90}, "description": "High memory pressure requires eviction or review.", "effect": {"decision": "require_review", "reason": "memory_pressure_review_required", "required_action": "prepare_eviction_or_capacity_plan"}, "name": "high_memory_pressure_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All cache operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"namespace_present": false, "operation": "write"}, "description": "Cache writes require an explicit namespace.", "effect": {"decision": "deny", "reason": "namespace_required", "required_action": "select_cache_namespace"}, "name": "write_requires_namespace"}, {"condition": {"data_classification": "sensitive", "entry_encrypted": false}, "description": "Sensitive cache entries require encryption at rest.", "effect": {"decision": "deny", "reason": "cache_entry_encryption_required", "required_action": "enable_entry_encryption"}, "name": "sensitive_entry_requires_encryption"}, {"condition": {"cross_tenant_access": true}, "description": "Cross-tenant cache access is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_cache_access_denied", "required_action": "use_tenant_scoped_namespace"}, "name": "cross_tenant_cache_access_denied"}, {"condition": {"data_criticality": "critical", "entry_stale": true, "operation": "read"}, "description": "Critical stale reads require refresh before serving.", "effect": {"decision": "deny", "reason": "critical_entry_refresh_required", "required_action": "refresh_cache_entry"}, "name": "critical_stale_read_requires_refresh"}, {"condition": {"eviction_plan_ready": false, "memory_utilization_percent_gt": 90}, "description": "High memory pressure requires eviction or review.", "effect": {"decision": "require_review", "reason": "memory_pressure_review_required", "required_action": "prepare_eviction_or_capacity_plan"}, "name": "high_memory_pressure_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "CacheAnalytics", "permission": "cach:view_analytics", "route": "/cach/analytics"}, "dashboard": {"component": "CacheDashboard", "permission": "cach:view", "route": "/cach/dashboard"}, "entries": {"component": "CacheEntryExplorer", "permission": "cach:read", "route": "/cach/entries"}, "hierarchy": {"component": "CacheHierarchyMap", "permission": "cach:view", "route": "/cach/hierarchy"}, "policies": {"component": "CachePolicyManager", "permission": "cach:manage_policies", "route": "/cach/policies"}, "security": {"component": "CacheSecurityView", "permission": "cach:admin", "route": "/cach/security"}, "settings": {"component": "CacheSettings", "permission": "cach:admin", "route": "/cach/settings"}, "warming": {"component": "CacheWarmingConsole", "permission": "cach:warm", "route": "/cach/warming"}}, "streaming": {}, "theme": {"components": {"cache_hit_card": {"icon": "gauge", "risk_style": "trend-sparkline", "status_indicator": "hit-rate-pill"}, "namespace_policy_trace": {"highlight": "ttl-chip", "visual": "rule-ladder"}, "tier_hierarchy_map": {"edge_style": "promotion-path", "visual": "layered-topology"}, "warming_plan_timeline": {"threshold_style": "source-readiness", "visual": "batch-timeline"}}, "name": "cach_memory_fabric", "tokens": {"border.radius": "8px", "color.accent": "#4D908E", "color.danger": "#C53030", "color.primary": "#31572C", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7FAF8", "surface.panel": "#FFFFFF", "text.primary": "#152017", "text.secondary": "#53635A"}}, "ui": {"api_prefix": "/cach/api/v1", "requires_theme": true, "routes": [{"component": "CacheDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/cach/dashboard", "permission": "cach:view"}, {"component": "CacheEntryExplorer", "name": "entries", "nav_group": "Operations", "path": "/cach/entries", "permission": "cach:read"}, {"component": "CachePolicyManager", "name": "policies", "nav_group": "Governance", "path": "/cach/policies", "permission": "cach:manage_policies"}, {"component": "CacheWarmingConsole", "name": "warming", "nav_group": "Operations", "path": "/cach/warming", "permission": "cach:warm"}, {"component": "CacheHierarchyMap", "name": "hierarchy", "nav_group": "Architecture", "path": "/cach/hierarchy", "permission": "cach:view"}, {"component": "CacheAnalytics", "name": "analytics", "nav_group": "Intelligence", "path": "/cach/analytics", "permission": "cach:view_analytics"}, {"component": "CacheSecurityView", "name": "security", "nav_group": "Governance", "path": "/cach/security", "permission": "cach:admin"}, {"component": "CacheSettings", "name": "settings", "nav_group": "Administration", "path": "/cach/settings", "permission": "cach:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "dashboard.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"cach": []}}, "contracts": {"cach": {"configuration": {"hierarchy": {"default_tier": "memory", "max_memory_mb": 1024, "multi_tenant_isolation": true, "tiers": ["memory", "distributed", "edge"]}, "optimization": {"ai_optimization_enabled": true, "auto_evict_on_pressure": true, "memory_pressure_review_threshold_percent": 90}, "policy": {"critical_reads_require_freshness": true, "default_eviction_policy": "adaptive_lru", "default_ttl_seconds": 3600, "namespace_required": true}, "security": {"cross_tenant_access_allowed": false, "quantum_ready_security": true, "require_tenant_context": true, "sensitive_entries_require_encryption": true}, "telemetry": {"emit_cache_events": true, "metrics_enabled": true, "track_access_patterns": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "cach_memory_fabric"}, "ui": {"enable_dashboard": true, "enable_hierarchy_map": true, "enable_policy_manager": true, "enable_warming_console": true}, "warming": {"max_warming_batch_size": 10000, "predictive_prefetching_enabled": true, "source_registration_required": true}}, "id": "cach", "provides": ["cach_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"cach": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"critical_stale_read_requires_refresh": {"condition": {"data_criticality": "critical", "entry_stale": true, "operation": "read"}, "description": "Critical stale reads require refresh before serving.", "effect": {"decision": "deny", "reason": "critical_entry_refresh_required", "required_action": "refresh_cache_entry"}, "name": "critical_stale_read_requires_refresh"}, "cross_tenant_cache_access_denied": {"condition": {"cross_tenant_access": true}, "description": "Cross-tenant cache access is denied by default.", "effect": {"decision": "deny", "reason": "cross_tenant_cache_access_denied", "required_action": "use_tenant_scoped_namespace"}, "name": "cross_tenant_cache_access_denied"}, "high_memory_pressure_requires_review": {"condition": {"eviction_plan_ready": false, "memory_utilization_percent_gt": 90}, "description": "High memory pressure requires eviction or review.", "effect": {"decision": "require_review", "reason": "memory_pressure_review_required", "required_action": "prepare_eviction_or_capacity_plan"}, "name": "high_memory_pressure_requires_review"}, "sensitive_entry_requires_encryption": {"condition": {"data_classification": "sensitive", "entry_encrypted": false}, "description": "Sensitive cache entries require encryption at rest.", "effect": {"decision": "deny", "reason": "cache_entry_encryption_required", "required_action": "enable_entry_encryption"}, "name": "sensitive_entry_requires_encryption"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All cache operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "write_requires_namespace": {"condition": {"namespace_present": false, "operation": "write"}, "description": "Cache writes require an explicit namespace.", "effect": {"decision": "deny", "reason": "namespace_required", "required_action": "select_cache_namespace"}, "name": "write_requires_namespace"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.cach": {"file": "capability_contract.py", "id": "capability.cach", "kind": "capability", "name": "Cache Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("cach_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "cach",
+			"version": "1.0.0",
+			"description": "Cache Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"cach": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"cach": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["cach_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"warming": "CacheWarmingPlanRecord",
+					"eviction": "CacheEvictionReviewRecord",
+				},
+				"cache_lifecycle": {
+					"namespace": "CacheNamespaceRecord",
+					"entry": "CacheEntryRecord",
+					"audit": "CacheAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"cach": {
+				"id": "cach",
+				"configuration": contract["configuration"],
+				"provides": ["cach_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"cach": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.cach": {
+				"id": "capability.cach",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +156,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("cach", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "cach" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("CACH semantic model route manifest is stale")
+	if len(rules) < 13:
+		errors.append("CACH semantic model rule manifest is stale")
+	if "memory" not in adapters.get("supported_backends", []):
+		errors.append("CACH adapter manifest must include memory backend")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

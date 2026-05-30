@@ -27,36 +27,55 @@ class CapabilityConfiguration:
 		},
 		"policy": {
 			"default_ttl_seconds": 3600,
+			"max_ttl_seconds": 86400,
 			"default_eviction_policy": "adaptive_lru",
 			"namespace_required": True,
-			"critical_reads_require_freshness": True
+			"critical_reads_require_freshness": True,
+			"allow_stale_while_revalidate": True
 		},
 		"warming": {
 			"predictive_prefetching_enabled": True,
 			"source_registration_required": True,
-			"max_warming_batch_size": 10000
+			"max_warming_batch_size": 10000,
+			"require_reason": True,
+			"require_review_above_batch_limit": True
 		},
 		"security": {
 			"require_tenant_context": True,
 			"sensitive_entries_require_encryption": True,
+			"regulated_entries_require_encryption": True,
+			"restricted_entries_require_encryption": True,
 			"cross_tenant_access_allowed": False,
 			"quantum_ready_security": True
 		},
 		"optimization": {
 			"ai_optimization_enabled": True,
 			"memory_pressure_review_threshold_percent": 90,
-			"auto_evict_on_pressure": True
+			"auto_evict_on_pressure": True,
+			"require_independent_eviction_review": True
+		},
+		"adapters": {
+			"default_backend": "memory",
+			"supported_backends": ["memory", "redis", "valkey", "edge", "cdn", "query_cache"],
+			"backend_binding_required_for_production": True,
+			"emit_mqeb_events": True
 		},
 		"telemetry": {
 			"metrics_enabled": True,
 			"track_access_patterns": True,
-			"emit_cache_events": True
+			"emit_cache_events": True,
+			"record_rule_decisions": True,
+			"record_lifecycle_audit": True
 		},
 		"ui": {
 			"enable_dashboard": True,
+			"enable_namespace_inventory": True,
 			"enable_policy_manager": True,
 			"enable_warming_console": True,
-			"enable_hierarchy_map": True
+			"enable_eviction_review_queue": True,
+			"enable_hierarchy_map": True,
+			"enable_adapter_health": True,
+			"enable_audit_timeline": True
 		},
 		"theme": {
 			"default_theme": "cach_memory_fabric",
@@ -72,6 +91,7 @@ class CapabilityConfiguration:
 			"warming",
 			"security",
 			"optimization",
+			"adapters",
 			"telemetry",
 			"ui",
 			"theme"
@@ -83,6 +103,7 @@ class CapabilityConfiguration:
 			"warming": {"type": "object"},
 			"security": {"type": "object"},
 			"optimization": {"type": "object"},
+			"adapters": {"type": "object"},
 			"telemetry": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -185,6 +206,24 @@ class CapabilityTheme:
 		"namespace_policy_trace": {
 			"visual": "rule-ladder",
 			"highlight": "ttl-chip"
+		},
+		"entry_freshness_badge": {
+			"visual": "age-band",
+			"status_indicator": "freshness-state"
+		},
+		"eviction_review_queue": {
+			"visual": "review-queue",
+			"status_indicator": "pressure-band",
+			"variant": "capacity-control"
+		},
+		"adapter_health_panel": {
+			"visual": "backend-grid",
+			"status_indicator": "adapter-state",
+			"variant": "runtime-binding"
+		},
+		"audit_event_timeline": {
+			"visual": "decision-timeline",
+			"highlight": "matched-rule-chip"
 		}
 	})
 
@@ -223,6 +262,26 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="regulated_entry_requires_encryption",
+			description="Regulated cache entries require encryption at rest.",
+			condition={"data_classification": "regulated", "entry_encrypted": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_entry_encryption_required",
+				"required_action": "enable_entry_encryption"
+			}
+		),
+		CapabilityRule(
+			name="restricted_entry_requires_encryption",
+			description="Restricted cache entries require encryption at rest.",
+			condition={"data_classification": "restricted", "entry_encrypted": False},
+			effect={
+				"decision": "deny",
+				"reason": "cache_entry_encryption_required",
+				"required_action": "enable_entry_encryption"
+			}
+		),
+		CapabilityRule(
 			name="cross_tenant_cache_access_denied",
 			description="Cross-tenant cache access is denied by default.",
 			condition={"cross_tenant_access": True},
@@ -230,6 +289,36 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "deny",
 				"reason": "cross_tenant_cache_access_denied",
 				"required_action": "use_tenant_scoped_namespace"
+			}
+		),
+		CapabilityRule(
+			name="disabled_namespace_blocks_cache_writes",
+			description="Disabled namespaces cannot accept writes or warming plans.",
+			condition={"operation": "write", "namespace_status": "disabled"},
+			effect={
+				"decision": "deny",
+				"reason": "namespace_disabled",
+				"required_action": "reactivate_or_select_namespace"
+			}
+		),
+		CapabilityRule(
+			name="disabled_namespace_blocks_cache_warming",
+			description="Disabled namespaces cannot accept warming plans.",
+			condition={"operation": "warm", "namespace_status": "disabled"},
+			effect={
+				"decision": "deny",
+				"reason": "namespace_disabled",
+				"required_action": "reactivate_or_select_namespace"
+			}
+		),
+		CapabilityRule(
+			name="ttl_above_namespace_limit_requires_review",
+			description="Entries above the namespace TTL limit require review.",
+			condition={"ttl_above_namespace_limit": True},
+			effect={
+				"decision": "require_review",
+				"reason": "ttl_review_required",
+				"required_action": "request_ttl_exception"
 			}
 		),
 		CapabilityRule(
@@ -243,6 +332,36 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="warming_requires_registered_source",
+			description="Cache warming requires registered source evidence.",
+			condition={"operation": "warm", "source_registered": False},
+			effect={
+				"decision": "deny",
+				"reason": "warming_source_required",
+				"required_action": "register_warming_source"
+			}
+		),
+		CapabilityRule(
+			name="warming_requires_namespace",
+			description="Cache warming requires a registered namespace.",
+			condition={"operation": "warm", "namespace_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "namespace_required",
+				"required_action": "create_or_select_namespace"
+			}
+		),
+		CapabilityRule(
+			name="warming_batch_limit_requires_review",
+			description="Large cache warming batches require review.",
+			condition={"warming_batch_above_limit": True},
+			effect={
+				"decision": "require_review",
+				"reason": "warming_batch_review_required",
+				"required_action": "request_warming_review"
+			}
+		),
+		CapabilityRule(
 			name="high_memory_pressure_requires_review",
 			description="High memory pressure requires eviction or review.",
 			condition={"memory_utilization_percent_gt": 90, "eviction_plan_ready": False},
@@ -250,6 +369,26 @@ def default_rules() -> list[CapabilityRule]:
 				"decision": "require_review",
 				"reason": "memory_pressure_review_required",
 				"required_action": "prepare_eviction_or_capacity_plan"
+			}
+		),
+		CapabilityRule(
+			name="eviction_review_requires_independent_reviewer",
+			description="Eviction and capacity approvals require independent review.",
+			condition={"reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_reviewer_required",
+				"required_action": "assign_independent_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="review_notes_required",
+			description="Eviction, capacity, and warming reviews require notes.",
+			condition={"review_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "review_notes_required",
+				"required_action": "attach_review_notes"
 			}
 		)
 	]
@@ -259,12 +398,16 @@ def ui_manifest() -> dict[str, Any]:
 	"""Return CACH UI surface manifest."""
 	routes = [
 		CapabilityUIRoute("dashboard", "/cach/dashboard", "CacheDashboard", "cach:view", "Overview"),
+		CapabilityUIRoute("namespaces", "/cach/namespaces", "CacheNamespaceInventory", "cach:manage_namespaces", "Operations"),
 		CapabilityUIRoute("entries", "/cach/entries", "CacheEntryExplorer", "cach:read", "Operations"),
 		CapabilityUIRoute("policies", "/cach/policies", "CachePolicyManager", "cach:manage_policies", "Governance"),
 		CapabilityUIRoute("warming", "/cach/warming", "CacheWarmingConsole", "cach:warm", "Operations"),
+		CapabilityUIRoute("evictions", "/cach/evictions", "CacheEvictionReviewQueue", "cach:review_eviction", "Governance"),
 		CapabilityUIRoute("hierarchy", "/cach/hierarchy", "CacheHierarchyMap", "cach:view", "Architecture"),
 		CapabilityUIRoute("analytics", "/cach/analytics", "CacheAnalytics", "cach:view_analytics", "Intelligence"),
 		CapabilityUIRoute("security", "/cach/security", "CacheSecurityView", "cach:admin", "Governance"),
+		CapabilityUIRoute("adapters", "/cach/adapters", "CacheAdapterHealth", "cach:admin", "Runtime"),
+		CapabilityUIRoute("audit", "/cach/audit", "CacheAuditTimeline", "cach:admin", "Governance"),
 		CapabilityUIRoute("settings", "/cach/settings", "CacheSettings", "cach:admin", "Administration")
 	]
 	return {

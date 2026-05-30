@@ -1,9 +1,19 @@
 """Regression coverage for the CACH executable capability contract."""
 
+import pytest
+
 from capabilities.common.cach import register_capability
 from capabilities.common.cach.capability_contract import (
 	evaluate_capability_rules,
 	get_capability_contract
+)
+from capabilities.common.cach.service import CacheGovernanceService
+from capabilities.common.cach.view_models import (
+	adapter_health_model,
+	dashboard_model,
+	eviction_review_model,
+	namespace_inventory_model,
+	warming_console_model,
 )
 
 
@@ -23,19 +33,24 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"warming",
 		"security",
 		"optimization",
+		"adapters",
 		"telemetry",
 		"ui",
 		"theme"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
+	assert len(contract["rule_engine"]["rules"]) >= 16
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
+		"namespaces",
 		"entries",
 		"policies",
 		"warming",
+		"evictions",
 		"hierarchy",
 		"analytics",
 		"security",
+		"adapters",
+		"audit",
 		"settings"
 	}
 	assert contract["ui"]["api_prefix"] == "/cach/api/v1"
@@ -58,13 +73,240 @@ def test_rule_engine_enforces_cache_governance_guardrails():
 	})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert set(result["matched_rules"]) >= {
 		"tenant_context_required",
 		"write_requires_namespace",
 		"sensitive_entry_requires_encryption",
 		"cross_tenant_cache_access_denied",
 		"high_memory_pressure_requires_review"
 	}
+
+
+def test_governance_service_enforces_namespace_entry_warming_and_eviction_lifecycle():
+	service = CacheGovernanceService("tenant-cache")
+	namespace = service.create_namespace(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		owner="platform",
+		data_classification="regulated",
+		max_ttl_seconds=900,
+		encryption_required=True,
+	)
+
+	denied_entry = service.write_entry(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		key="order:1001",
+		value_ref="memory://orders/order:1001",
+		producer="orders-api",
+		ttl_seconds=300,
+		data_classification="regulated",
+		encrypted=False,
+	)
+	allowed_entry = service.write_entry(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		key="order:1002",
+		value_ref="memory://orders/order:1002",
+		producer="orders-api",
+		ttl_seconds=300,
+		data_classification="regulated",
+		encrypted=True,
+	)
+	read_result = service.read_entry(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		key="order:1002",
+	)
+	warming = service.request_warming_plan(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		source_name="orders-db",
+		key_count=25000,
+		requester="platform",
+		reason="morning order dashboard",
+		source_registered=True,
+	)
+	warming_status = warming.status
+	warming_rules = list(warming.matched_rules)
+	unknown_warming = service.request_warming_plan(
+		tenant_id="tenant-cache",
+		namespace="missing",
+		source_name="orders-db",
+		key_count=10,
+		requester="platform",
+		reason="missing namespace should fail",
+		source_registered=True,
+	)
+	denied_warming_review = service.decide_warming_plan(
+		plan_id=warming.plan_id,
+		reviewer="platform",
+		decision="approved",
+		notes="same reviewer should fail",
+	)
+	denied_warming_status = denied_warming_review.status
+	approved_warming = service.decide_warming_plan(
+		plan_id=warming.plan_id,
+		reviewer="cache-sre",
+		decision="approved",
+		notes="source is registered and review limit is understood",
+	)
+	service.create_namespace(
+		tenant_id="tenant-cache",
+		namespace="disabled",
+		owner="platform",
+		status="disabled",
+	)
+	disabled_warming = service.request_warming_plan(
+		tenant_id="tenant-cache",
+		namespace="disabled",
+		source_name="orders-db",
+		key_count=10,
+		requester="platform",
+		reason="should be denied",
+		source_registered=True,
+	)
+	ttl_review_entry = service.write_entry(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		key="order:long",
+		value_ref="memory://orders/order:long",
+		producer="orders-api",
+		ttl_seconds=1200,
+		data_classification="regulated",
+		encrypted=True,
+	)
+	review = service.request_eviction_review(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		requester="platform",
+		memory_utilization_percent=94,
+		proposed_action="evict cold entries",
+		reason="tenant memory pressure",
+	)
+	denied_review = service.decide_eviction_review(
+		review_id=review.review_id,
+		reviewer="platform",
+		decision="approved",
+		notes="same reviewer should fail",
+	)
+	denied_status = denied_review.status
+	denied_rules = list(denied_review.matched_rules)
+	approved_review = service.decide_eviction_review(
+		review_id=review.review_id,
+		reviewer="cache-sre",
+		decision="approved",
+		notes="cold entries are backed by source of truth",
+	)
+
+	assert namespace.namespace == "orders"
+	assert denied_entry.status == "denied"
+	assert "regulated_entry_requires_encryption" in denied_entry.matched_rules
+	assert allowed_entry.status == "active"
+	assert read_result["hit"] is True
+	assert warming_status == "pending_review"
+	assert "warming_batch_limit_requires_review" in warming_rules
+	assert unknown_warming.status == "denied"
+	assert "warming_requires_namespace" in unknown_warming.matched_rules
+	assert denied_warming_status == "review_denied"
+	assert approved_warming.status == "approved"
+	assert disabled_warming.status == "denied"
+	assert "disabled_namespace_blocks_cache_warming" in disabled_warming.matched_rules
+	assert ttl_review_entry.status == "pending_review"
+	assert "ttl_above_namespace_limit_requires_review" in ttl_review_entry.matched_rules
+	assert denied_status == "review_denied"
+	assert "eviction_review_requires_independent_reviewer" in denied_rules
+	assert approved_review.status == "approved"
+	assert service.dashboard_summary("tenant-cache")["active_entry_count"] == 1
+	assert service.dashboard_summary("tenant-cache")["denied_entry_count"] == 1
+	assert {
+		record["status"]
+		for record in service.list_records("entries", "tenant-cache")
+	} >= {"active", "denied", "pending_review"}
+
+	deleted = service.delete_entry(
+		tenant_id="tenant-cache",
+		namespace="orders",
+		key="order:1002",
+		actor="orders-api",
+	)
+	assert deleted["deleted"] is True
+	assert {
+		record["status"]
+		for record in service.list_records("entries", "tenant-cache")
+	} >= {"invalidated", "denied", "pending_review"}
+
+
+def test_generated_view_models_are_operable():
+	service = CacheGovernanceService("tenant-cache")
+	service.create_namespace(
+		tenant_id="tenant-cache",
+		namespace="profiles",
+		owner="identity",
+	)
+	service.request_warming_plan(
+		tenant_id="tenant-cache",
+		namespace="profiles",
+		source_name="identity-db",
+		key_count=25,
+		requester="identity",
+		reason="login path",
+		source_registered=True,
+	)
+
+	assert dashboard_model(service, "tenant-cache")["summary"]["namespace_count"] == 1
+	assert namespace_inventory_model(service, "tenant-cache")["rows"][0]["namespace"] == "profiles"
+	assert warming_console_model(service, "tenant-cache")["rows"][0]["status"] == "ready"
+	assert eviction_review_model(service, "tenant-cache")["review_actions"] == ["approved", "rejected"]
+	assert "redis" in adapter_health_model("tenant-cache")["supported_backends"]
+
+
+def test_governance_service_rejects_invalid_runtime_inputs():
+	service = CacheGovernanceService("tenant-cache")
+	service.create_namespace(
+		tenant_id="tenant-cache",
+		namespace="profiles",
+		owner="identity",
+		allowed_tiers=["memory"],
+	)
+
+	with pytest.raises(ValueError, match="ttl_seconds"):
+		service.write_entry(
+			tenant_id="tenant-cache",
+			namespace="profiles",
+			key="profile:1",
+			value_ref="memory://profiles/profile:1",
+			producer="identity",
+			ttl_seconds=0,
+		)
+	with pytest.raises(ValueError, match="not allowed"):
+		service.write_entry(
+			tenant_id="tenant-cache",
+			namespace="profiles",
+			key="profile:2",
+			value_ref="memory://profiles/profile:2",
+			producer="identity",
+			tier="edge",
+		)
+	with pytest.raises(ValueError, match="key_count"):
+		service.request_warming_plan(
+			tenant_id="tenant-cache",
+			namespace="profiles",
+			source_name="identity-db",
+			key_count=0,
+			requester="identity",
+			reason="login path",
+			source_registered=True,
+		)
+	with pytest.raises(ValueError, match="memory_utilization_percent"):
+		service.request_eviction_review(
+			tenant_id="tenant-cache",
+			namespace="profiles",
+			requester="identity",
+			memory_utilization_percent=101,
+			proposed_action="evict cold entries",
+			reason="invalid metric",
+		)
 
 
 def test_registration_includes_full_capability_contract():
@@ -75,4 +317,5 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "cach_memory_fabric"
 	assert registration["ui_components"]["warming"] == "/cach/warming"
+	assert registration["ui_components"]["evictions"] == "/cach/evictions"
 	assert "auth" in registration["dependencies"]
