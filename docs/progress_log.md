@@ -16210,3 +16210,60 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External MQEB, MONI, CONF, LOGT, CACH, EDGE, SCHD, AUDL, or THEM adapters.
+
+### 2026-05-30 17:22 EAT
+
+DTWN lifecycle and guardrail packet:
+
+- Selected `capabilities/common/dtwn` as the next common capability after
+  DIST.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable DTWN contract to cover digital twins, simulation
+  models, telemetry fusion, topology links, simulation runs, predictions,
+  twin agents, governance, observability, APG adapters, UI routes, visual
+  theme tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, twin owner,
+  asset identity, model calibration evidence, model confidence, approved
+  model usage, authenticated telemetry, telemetry measurement content,
+  production simulation approval, high-risk prediction review,
+  twin-agent registration/runtime/role/scope/disclosure, state-change
+  reason and audit evidence, tenant isolation, and Bytewax batch mutation.
+- Added the `TwinAgent` runtime model and service methods for twin-agent
+  registration, guarded twin state changes, Bytewax batch-mutation
+  validation, and tenant-qualified object keys.
+- Hardened `DtwnService` so duplicate IDs are tenant-local across twins,
+  models, telemetry samples, topology links, simulations, predictions, and
+  agents.
+- Added API helper coverage for twin agents, twin state changes, batch
+  mutation validation, listing state, and status summaries.
+- Added agent-panel, audit, analytics, and settings view models, plus richer
+  dashboard metadata with stream and theme information.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, guardrails, telemetry
+  measurements, twin agents, tenant-safe duplicate IDs, Bytewax policy, view
+  models, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dtwn/__init__.py capabilities/common/dtwn/models.py capabilities/common/dtwn/twin_engine.py capabilities/common/dtwn/service.py capabilities/common/dtwn/api.py capabilities/common/dtwn/views.py capabilities/common/dtwn/capability_contract.py capabilities/common/dtwn/app.py capabilities/common/dtwn/test_capability_contract.py capabilities/common/dtwn/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dtwn/test_capability_contract.py capabilities/common/dtwn/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and DTWN capability evidence.
+- `jq '.capabilities.dtwn.streaming.processor, .capabilities.dtwn.configuration.twin_agents.supported_runtimes, .capabilities.dtwn.screens.agents.route' capabilities/common/dtwn/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, and `/dtwn/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/dtwn --json` passed with `ok: true`; DTWN remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dtwn --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/dtwn docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live IoT brokers, geospatial services, computer-vision pipelines, machine
+  controllers, external simulators, time-series databases, prediction
+  services, external AI-agent CLIs, durable twin databases, browser-rendered
+  twin UI, and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External PRED, IOTD, GEOS, CVSN, MCHN, ANOM, EDGE, AUDL, or THEM
+  adapters.

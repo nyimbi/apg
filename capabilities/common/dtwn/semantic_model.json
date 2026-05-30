@@ -12,11 +12,35 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "anomaly": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "edge": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DtwnService",
+          "geospatial": "geos",
+          "iot": "iotd",
+          "machine": "mchn",
+          "prediction": "pred",
+          "view_models": "views.py",
+          "vision": "cvsn"
+        },
         "governance": {
           "audit_twin_changes": true,
+          "batch_event_stream": "bytewax",
           "high_risk_prediction_review_required": true,
           "model_drift_monitoring": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "telemetry_metrics_required": true,
+          "trace_required": true
         },
         "simulation": {
           "calibration_evidence_required": true,
@@ -35,6 +59,26 @@
           "allow_tenant_overrides": true,
           "default_theme": "dtwn_digital_twin_ops"
         },
+        "twin_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "twin_designer",
+            "telemetry_reviewer",
+            "simulation_operator",
+            "prediction_reviewer",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "twins": {
           "asset_identity_required": true,
           "state_versioning_enabled": true,
@@ -42,6 +86,9 @@
           "twin_owner_required": true
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_model_library": true,
           "enable_simulation_lab": true,
           "enable_topology_view": true,
@@ -55,9 +102,19 @@
       "master_data": {},
       "name": "Digital Twin Framework",
       "provides": [
-        "dtwn_operations"
+        "twin_registry",
+        "simulation_models",
+        "telemetry_fusion",
+        "prediction_workflows",
+        "asset_topology",
+        "twin_agents"
       ],
-      "requires": [],
+      "requires": [
+        "pred",
+        "iotd",
+        "geos",
+        "cvsn"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +144,45 @@
           },
           {
             "condition": {
+              "asset_identity_present": false,
+              "operation": "create_twin"
+            },
+            "description": "Digital twins require asset identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "asset_identity_required",
+              "required_action": "attach_asset_identity"
+            },
+            "name": "twin_requires_asset_identity"
+          },
+          {
+            "condition": {
+              "calibration_evidence_present": false,
+              "operation": "register_simulation_model"
+            },
+            "description": "Simulation models require calibration evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "calibration_evidence_required",
+              "required_action": "attach_calibration_evidence"
+            },
+            "name": "simulation_model_requires_calibration"
+          },
+          {
+            "condition": {
+              "model_confidence_lt": 0.75,
+              "operation": "register_simulation_model"
+            },
+            "description": "Simulation models must meet confidence threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "prediction_confidence_threshold",
+              "required_action": "raise_model_confidence"
+            },
+            "name": "simulation_model_requires_confidence"
+          },
+          {
+            "condition": {
               "model_present": false,
               "operation": "run_simulation"
             },
@@ -109,6 +205,19 @@
               "required_action": "authenticate_telemetry_source"
             },
             "name": "telemetry_requires_authenticated_source"
+          },
+          {
+            "condition": {
+              "measurement_count_lte": 0,
+              "operation": "ingest_telemetry"
+            },
+            "description": "Telemetry ingestion requires measurements.",
+            "effect": {
+              "decision": "deny",
+              "reason": "telemetry_measurements_required",
+              "required_action": "attach_telemetry_measurements"
+            },
+            "name": "telemetry_requires_measurements"
           },
           {
             "condition": {
@@ -135,6 +244,122 @@
               "required_action": "review_prediction"
             },
             "name": "high_risk_prediction_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "twin_agent_present": true
+            },
+            "description": "AI twin agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "twin_agent_registration_required",
+              "required_action": "register_twin_agent"
+            },
+            "name": "twin_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "twin_agent_present": true
+            },
+            "description": "AI twin agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "twin_agent_runtime_not_supported",
+              "required_action": "choose_supported_twin_agent_runtime"
+            },
+            "name": "twin_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "twin_agent_present": true
+            },
+            "description": "AI twin agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "twin_agent_role_not_supported",
+              "required_action": "choose_supported_twin_agent_role"
+            },
+            "name": "twin_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "twin_agent_present": true
+            },
+            "description": "AI twin agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "twin_agent_scope_required",
+              "required_action": "set_twin_agent_scope"
+            },
+            "name": "twin_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "twin_agent_present": true
+            },
+            "description": "AI twin-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "twin_agent_disclosure_required",
+              "required_action": "disclose_twin_agent"
+            },
+            "name": "twin_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Digital-twin lifecycle state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dtwn_state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "dtwn_state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Digital-twin lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dtwn_audit_event_required",
+              "required_action": "record_twin_audit_event"
+            },
+            "name": "dtwn_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Digital-twin records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_twin_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_twin_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_twin_mutation"
+            },
+            "description": "Batch twin mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_twin_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -167,6 +392,45 @@
         },
         {
           "condition": {
+            "asset_identity_present": false,
+            "operation": "create_twin"
+          },
+          "description": "Digital twins require asset identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "asset_identity_required",
+            "required_action": "attach_asset_identity"
+          },
+          "name": "twin_requires_asset_identity"
+        },
+        {
+          "condition": {
+            "calibration_evidence_present": false,
+            "operation": "register_simulation_model"
+          },
+          "description": "Simulation models require calibration evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "calibration_evidence_required",
+            "required_action": "attach_calibration_evidence"
+          },
+          "name": "simulation_model_requires_calibration"
+        },
+        {
+          "condition": {
+            "model_confidence_lt": 0.75,
+            "operation": "register_simulation_model"
+          },
+          "description": "Simulation models must meet confidence threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "prediction_confidence_threshold",
+            "required_action": "raise_model_confidence"
+          },
+          "name": "simulation_model_requires_confidence"
+        },
+        {
+          "condition": {
             "model_present": false,
             "operation": "run_simulation"
           },
@@ -189,6 +453,19 @@
             "required_action": "authenticate_telemetry_source"
           },
           "name": "telemetry_requires_authenticated_source"
+        },
+        {
+          "condition": {
+            "measurement_count_lte": 0,
+            "operation": "ingest_telemetry"
+          },
+          "description": "Telemetry ingestion requires measurements.",
+          "effect": {
+            "decision": "deny",
+            "reason": "telemetry_measurements_required",
+            "required_action": "attach_telemetry_measurements"
+          },
+          "name": "telemetry_requires_measurements"
         },
         {
           "condition": {
@@ -215,6 +492,122 @@
             "required_action": "review_prediction"
           },
           "name": "high_risk_prediction_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "twin_agent_present": true
+          },
+          "description": "AI twin agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "twin_agent_registration_required",
+            "required_action": "register_twin_agent"
+          },
+          "name": "twin_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "twin_agent_present": true
+          },
+          "description": "AI twin agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "twin_agent_runtime_not_supported",
+            "required_action": "choose_supported_twin_agent_runtime"
+          },
+          "name": "twin_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "twin_agent_present": true
+          },
+          "description": "AI twin agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "twin_agent_role_not_supported",
+            "required_action": "choose_supported_twin_agent_role"
+          },
+          "name": "twin_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "twin_agent_present": true
+          },
+          "description": "AI twin agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "twin_agent_scope_required",
+            "required_action": "set_twin_agent_scope"
+          },
+          "name": "twin_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "twin_agent_present": true
+          },
+          "description": "AI twin-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "twin_agent_disclosure_required",
+            "required_action": "disclose_twin_agent"
+          },
+          "name": "twin_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Digital-twin lifecycle state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dtwn_state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "dtwn_state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Digital-twin lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dtwn_audit_event_required",
+            "required_action": "record_twin_audit_event"
+          },
+          "name": "dtwn_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Digital-twin records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_twin_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_twin_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_twin_mutation"
+          },
+          "description": "Batch twin mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_twin_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -224,6 +617,21 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "TwinAgentPanel",
+          "permission": "dtwn:model",
+          "route": "/dtwn/agents"
+        },
+        "analytics": {
+          "component": "TwinAnalytics",
+          "permission": "dtwn:view",
+          "route": "/dtwn/analytics"
+        },
+        "audit": {
+          "component": "TwinAuditTrail",
+          "permission": "dtwn:audit",
+          "route": "/dtwn/audit"
+        },
         "dashboard": {
           "component": "DTWNDashboard",
           "permission": "dtwn:view",
@@ -265,9 +673,42 @@
           "route": "/dtwn/twins"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_twin_mutation_requires_bytewax",
+        "events": [
+          "twin_created",
+          "model_registered",
+          "telemetry_ingested",
+          "topology_linked",
+          "simulation_completed",
+          "prediction_recorded",
+          "prediction_reviewed",
+          "twin_status_changed",
+          "twin_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "twins",
+          "models",
+          "telemetry",
+          "topology",
+          "simulations",
+          "predictions",
+          "twin_agents",
+          "audit_events"
+        ],
+        "topic": "apg.dtwn.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
+          "audit_timeline": {
+            "icon": "list-checks",
+            "status_style": "governance-chip"
+          },
           "simulation_lab": {
             "status_style": "approval-chip",
             "visual": "scenario-timeline"
@@ -355,6 +796,27 @@
             "permission": "dtwn:view"
           },
           {
+            "component": "TwinAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/dtwn/agents",
+            "permission": "dtwn:model"
+          },
+          {
+            "component": "TwinAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/dtwn/audit",
+            "permission": "dtwn:audit"
+          },
+          {
+            "component": "TwinAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/dtwn/analytics",
+            "permission": "dtwn:view"
+          },
+          {
             "component": "DTWNSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -375,17 +837,46 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "dtwn": []
+      "dtwn": [
+        "pred",
+        "iotd",
+        "geos",
+        "cvsn"
+      ]
     }
   },
   "contracts": {
     "dtwn": {
       "configuration": {
+        "adapters": {
+          "anomaly": "anom",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "edge": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DtwnService",
+          "geospatial": "geos",
+          "iot": "iotd",
+          "machine": "mchn",
+          "prediction": "pred",
+          "view_models": "views.py",
+          "vision": "cvsn"
+        },
         "governance": {
           "audit_twin_changes": true,
+          "batch_event_stream": "bytewax",
           "high_risk_prediction_review_required": true,
           "model_drift_monitoring": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "telemetry_metrics_required": true,
+          "trace_required": true
         },
         "simulation": {
           "calibration_evidence_required": true,
@@ -404,6 +895,26 @@
           "allow_tenant_overrides": true,
           "default_theme": "dtwn_digital_twin_ops"
         },
+        "twin_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "twin_designer",
+            "telemetry_reviewer",
+            "simulation_operator",
+            "prediction_reviewer",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "twins": {
           "asset_identity_required": true,
           "state_versioning_enabled": true,
@@ -411,6 +922,9 @@
           "twin_owner_required": true
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_model_library": true,
           "enable_simulation_lab": true,
           "enable_topology_view": true,
@@ -419,9 +933,19 @@
       },
       "id": "dtwn",
       "provides": [
-        "dtwn_operations"
+        "twin_registry",
+        "simulation_models",
+        "telemetry_fusion",
+        "prediction_workflows",
+        "asset_topology",
+        "twin_agents"
       ],
-      "requires": []
+      "requires": [
+        "pred",
+        "iotd",
+        "geos",
+        "cvsn"
+      ]
     }
   },
   "deployment": {
@@ -433,7 +957,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -454,6 +978,57 @@
   },
   "roles": {},
   "rules": {
+    "batch_twin_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_twin_mutation"
+      },
+      "description": "Batch twin mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_twin_mutation_requires_bytewax"
+    },
+    "cross_tenant_twin_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Digital-twin records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_twin_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_twin_access_denied"
+    },
+    "dtwn_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Digital-twin lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dtwn_audit_event_required",
+        "required_action": "record_twin_audit_event"
+      },
+      "name": "dtwn_state_change_requires_audit"
+    },
+    "dtwn_state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Digital-twin lifecycle state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dtwn_state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "dtwn_state_change_requires_reason"
+    },
     "high_risk_prediction_requires_review": {
       "condition": {
         "prediction_review_recorded": false,
@@ -466,6 +1041,32 @@
         "required_action": "review_prediction"
       },
       "name": "high_risk_prediction_requires_review"
+    },
+    "simulation_model_requires_calibration": {
+      "condition": {
+        "calibration_evidence_present": false,
+        "operation": "register_simulation_model"
+      },
+      "description": "Simulation models require calibration evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "calibration_evidence_required",
+        "required_action": "attach_calibration_evidence"
+      },
+      "name": "simulation_model_requires_calibration"
+    },
+    "simulation_model_requires_confidence": {
+      "condition": {
+        "model_confidence_lt": 0.75,
+        "operation": "register_simulation_model"
+      },
+      "description": "Simulation models must meet confidence threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "prediction_confidence_threshold",
+        "required_action": "raise_model_confidence"
+      },
+      "name": "simulation_model_requires_confidence"
     },
     "simulation_requires_approval": {
       "condition": {
@@ -505,6 +1106,19 @@
       },
       "name": "telemetry_requires_authenticated_source"
     },
+    "telemetry_requires_measurements": {
+      "condition": {
+        "measurement_count_lte": 0,
+        "operation": "ingest_telemetry"
+      },
+      "description": "Telemetry ingestion requires measurements.",
+      "effect": {
+        "decision": "deny",
+        "reason": "telemetry_measurements_required",
+        "required_action": "attach_telemetry_measurements"
+      },
+      "name": "telemetry_requires_measurements"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -516,6 +1130,84 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "twin_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "twin_agent_present": true
+      },
+      "description": "AI twin-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "twin_agent_disclosure_required",
+        "required_action": "disclose_twin_agent"
+      },
+      "name": "twin_agent_requires_disclosure"
+    },
+    "twin_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "twin_agent_present": true
+      },
+      "description": "AI twin agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "twin_agent_registration_required",
+        "required_action": "register_twin_agent"
+      },
+      "name": "twin_agent_requires_registration"
+    },
+    "twin_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "twin_agent_present": true
+      },
+      "description": "AI twin agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "twin_agent_scope_required",
+        "required_action": "set_twin_agent_scope"
+      },
+      "name": "twin_agent_requires_scope"
+    },
+    "twin_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "twin_agent_present": true
+      },
+      "description": "AI twin agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "twin_agent_role_not_supported",
+        "required_action": "choose_supported_twin_agent_role"
+      },
+      "name": "twin_agent_role_supported"
+    },
+    "twin_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "twin_agent_present": true
+      },
+      "description": "AI twin agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "twin_agent_runtime_not_supported",
+        "required_action": "choose_supported_twin_agent_runtime"
+      },
+      "name": "twin_agent_runtime_supported"
+    },
+    "twin_requires_asset_identity": {
+      "condition": {
+        "asset_identity_present": false,
+        "operation": "create_twin"
+      },
+      "description": "Digital twins require asset identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "asset_identity_required",
+        "required_action": "attach_asset_identity"
+      },
+      "name": "twin_requires_asset_identity"
     },
     "twin_requires_owner": {
       "condition": {

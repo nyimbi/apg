@@ -23,6 +23,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"model_count": summary["model_count"],
 		"simulation_count": summary["simulation_count"],
 		"review_required_prediction_count": summary["review_required_prediction_count"],
+		"twin_agent_count": summary["twin_agent_count"],
+		"audit_event_count": summary["audit_event_count"],
 	}
 
 
@@ -112,6 +114,39 @@ def review_prediction(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_twin_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_twin_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+	)
+
+
+def change_twin_status(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_twin_status(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		twin_id=str(payload["twin_id"]),
+		status=str(payload["status"]),
+		reason=str(payload.get("reason") or ""),
+		actor=str(payload.get("actor") or "twin-operator"),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
+	)
+
+
+def validate_batch_twin_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_twin_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or ""),
+		actor=str(payload.get("actor") or "twin-operator"),
+	)
+
+
 def twin_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": SERVICE.dashboard_summary(tenant_id),
@@ -121,5 +156,6 @@ def twin_state(tenant_id: str = "default") -> dict[str, Any]:
 		"topology": SERVICE.list_topology(tenant_id),
 		"simulations": SERVICE.list_simulations(tenant_id),
 		"predictions": SERVICE.list_predictions(tenant_id),
+		"twin_agents": SERVICE.list_twin_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}
