@@ -8,29 +8,127 @@
   },
   "capabilities": {
     "grag": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "grag_runtime.GragService",
+        "graph": "grph",
+        "helper_runtime": "grag_runtime.py",
+        "http_api": "api.py",
+        "knowledge_graph": "kngr",
+        "metadata": "meta",
+        "metrics_sink": "moni",
+        "nlp": "nlpc",
+        "ontology": "onto",
+        "production_runtime": "service.GraphRAGService",
+        "rag": "ragn",
+        "search": "srch"
+      },
+      "approvals": {
+        "answer_publication": "GragRecord",
+        "deep_reasoning_path": "GragRecord",
+        "graph_source_retirement": "GragRecord",
+        "large_result_window": "GragRecord",
+        "low_answer_confidence": "GragRecord",
+        "low_retrieval_confidence": "GragRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "grag_runtime.GragService",
+          "graph": "grph",
+          "helper_runtime": "grag_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "ontology": "onto",
+          "production_runtime": "service.GraphRAGService",
+          "rag": "ragn",
+          "search": "srch"
+        },
         "curation": {
-          "confidence_threshold": 0.75,
-          "expert_review_required": true,
-          "provenance_required": true
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "curator_required": true,
+          "evidence_required": true,
+          "publication_requires_approval": true,
+          "review_required_for_low_confidence": true
+        },
+        "generation": {
+          "citations_required": true,
+          "external_model_requires_policy": true,
+          "minimum_answer_confidence": 0.75,
+          "model_policy_required": true,
+          "provenance_required": true,
+          "reasoning_path_required": true,
+          "unsafe_generation_blocking": true
         },
         "governance": {
+          "audit_curation": true,
+          "audit_generation": true,
+          "audit_graph_sources": true,
+          "audit_queries": true,
           "audit_reasoning": true,
-          "graph_access_filter_required": true,
+          "audit_vector_sources": true,
           "require_tenant_context": true
         },
-        "reasoning": {
-          "evidence_required": true,
-          "explanation_required": true,
-          "max_hops": 4
+        "graph_sources": {
+          "default_classification": "internal",
+          "id_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "provenance_required": true,
+          "registered_graph_required": true,
+          "retire_requires_review": true
         },
-        "retrieval": {
+        "hybrid_retrieval": {
+          "enabled": true,
           "graph_index_required": true,
-          "hybrid_retrieval_enabled": true,
+          "large_result_window_review_threshold": 50,
+          "max_result_window": 50,
+          "minimum_retrieval_confidence": 0.7,
+          "restricted_source_filter_required": true,
           "vector_index_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "provenance": {
+          "citation_refs_required": true,
+          "lineage_export_enabled": true,
+          "path_refs_required": true,
+          "source_refs_required": true
+        },
+        "reasoning": {
+          "evidence_path_required": true,
+          "explanation_required": true,
+          "max_hops": 4,
+          "minimum_hops": 1,
+          "multi_hop_review_threshold": 4,
+          "start_node_required": true
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "restricted_source_filter_required": true,
+          "tenant_isolation_required": true,
+          "unsafe_generation_blocking": true
         },
         "tenant_id": "default",
         "theme": {
@@ -38,15 +136,41 @@
           "default_theme": "grag_reasoning_console"
         },
         "ui": {
-          "enable_explanations": true,
-          "enable_graph_curation": true,
+          "enable_audit": true,
+          "enable_curation": true,
+          "enable_dashboard": true,
+          "enable_generation": true,
+          "enable_governance": true,
+          "enable_graph_sources": true,
+          "enable_hybrid_retrieval": true,
+          "enable_provenance": true,
           "enable_query_console": true,
-          "enable_reasoning_paths": true
+          "enable_reasoning_paths": true,
+          "enable_settings": true,
+          "enable_vector_sources": true
+        },
+        "vector_sources": {
+          "default_embedding_model": "text-embedding-3-large",
+          "embedding_model_required": true,
+          "id_required": true,
+          "index_required": true,
+          "minimum_documents": 1,
+          "source_documents_required": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "graph_rag_lifecycle": {
+        "answer": "GragRecord",
+        "audit": "GragRecord",
+        "curation": "GragRecord",
+        "graph_source": "GragRecord",
+        "hybrid_query": "GragRecord",
+        "publication": "GragRecord",
+        "reasoning_path": "GragRecord",
+        "vector_source": "GragRecord"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Graph-based RAG",
@@ -70,23 +194,192 @@
           },
           {
             "condition": {
-              "query_type": "hybrid",
+              "graph_source_id_present": false,
+              "operation": "register_graph_source"
+            },
+            "description": "Graph sources require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "graph_source_id_required",
+              "required_action": "attach_graph_source_id"
+            },
+            "name": "graph_source_requires_id"
+          },
+          {
+            "condition": {
+              "graph_source_name_present": false,
+              "operation": "register_graph_source"
+            },
+            "description": "Graph sources require names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "graph_source_name_required",
+              "required_action": "attach_graph_source_name"
+            },
+            "name": "graph_source_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "register_graph_source",
+              "owner_assigned": false
+            },
+            "description": "Graph sources require accountable owners.",
+            "effect": {
+              "decision": "deny",
+              "reason": "graph_source_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "graph_source_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_graph_source",
+              "registered_graph_present": false
+            },
+            "description": "Graph sources must reference a registered graph.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_graph_required",
+              "required_action": "attach_graph_id"
+            },
+            "name": "graph_source_requires_registered_graph"
+          },
+          {
+            "condition": {
+              "operation": "register_graph_source",
+              "provenance_attached": false
+            },
+            "description": "Graph sources require provenance references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "graph_source_provenance_required",
+              "required_action": "attach_provenance"
+            },
+            "name": "graph_source_requires_provenance"
+          },
+          {
+            "condition": {
+              "operation": "retire_graph_source",
+              "review_recorded": false
+            },
+            "description": "Retiring graph sources requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "graph_source_retire_review_required",
+              "required_action": "record_graph_source_review"
+            },
+            "name": "graph_source_retire_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "register_vector_source",
+              "vector_source_id_present": false
+            },
+            "description": "Vector sources require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vector_source_id_required",
+              "required_action": "attach_vector_source_id"
+            },
+            "name": "vector_source_requires_id"
+          },
+          {
+            "condition": {
+              "operation": "register_vector_source",
+              "vector_index_present": false
+            },
+            "description": "Vector sources require an index id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vector_index_required",
+              "required_action": "attach_vector_index"
+            },
+            "name": "vector_source_requires_index"
+          },
+          {
+            "condition": {
+              "embedding_model_present": false,
+              "operation": "register_vector_source"
+            },
+            "description": "Vector sources require an embedding model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "embedding_model_required",
+              "required_action": "attach_embedding_model"
+            },
+            "name": "vector_source_requires_embedding_model"
+          },
+          {
+            "condition": {
+              "operation": "register_vector_source",
+              "source_documents_present": false
+            },
+            "description": "Vector sources require source document references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_documents_required",
+              "required_action": "attach_source_documents"
+            },
+            "name": "vector_source_requires_source_documents"
+          },
+          {
+            "condition": {
+              "operation": "hybrid_query",
+              "query_present": false
+            },
+            "description": "Hybrid retrieval requires a query.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hybrid_query_required",
+              "required_action": "attach_query"
+            },
+            "name": "hybrid_query_requires_query"
+          },
+          {
+            "condition": {
+              "graph_source_present": false,
+              "operation": "hybrid_query"
+            },
+            "description": "Hybrid retrieval requires a graph source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "graph_source_required",
+              "required_action": "select_graph_source"
+            },
+            "name": "hybrid_query_requires_graph_source"
+          },
+          {
+            "condition": {
+              "operation": "hybrid_query",
+              "vector_source_present": false
+            },
+            "description": "Hybrid retrieval requires a vector source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vector_source_required",
+              "required_action": "select_vector_source"
+            },
+            "name": "hybrid_query_requires_vector_source"
+          },
+          {
+            "condition": {
+              "operation": "hybrid_query",
               "vector_index_ready": false
             },
-            "description": "Hybrid GraphRAG requires vector and graph indexes.",
+            "description": "Hybrid retrieval requires vector index readiness.",
             "effect": {
               "decision": "deny",
               "reason": "vector_index_required",
               "required_action": "build_vector_index"
             },
-            "name": "hybrid_query_requires_vector_and_graph"
+            "name": "hybrid_query_requires_vector_index"
           },
           {
             "condition": {
               "graph_index_ready": false,
-              "query_type": "hybrid"
+              "operation": "hybrid_query"
             },
-            "description": "Hybrid GraphRAG requires graph index readiness.",
+            "description": "Hybrid retrieval requires graph index readiness.",
             "effect": {
               "decision": "deny",
               "reason": "graph_index_required",
@@ -96,8 +389,75 @@
           },
           {
             "condition": {
+              "access_filter_applied": false,
+              "source_classification": "restricted"
+            },
+            "description": "Restricted graph/vector sources require access filters.",
+            "effect": {
+              "decision": "deny",
+              "reason": "access_filter_required",
+              "required_action": "apply_access_filter"
+            },
+            "name": "hybrid_query_requires_access_filter_for_restricted"
+          },
+          {
+            "condition": {
+              "operation": "hybrid_query",
+              "result_window_gt": 50,
+              "review_recorded": false
+            },
+            "description": "Large hybrid result windows require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_result_window_review_required",
+              "required_action": "record_retrieval_review"
+            },
+            "name": "hybrid_query_requires_result_window_review"
+          },
+          {
+            "condition": {
+              "operation": "hybrid_query",
+              "retrieval_confidence_lt": 0.7,
+              "review_recorded": false
+            },
+            "description": "Low confidence hybrid retrieval requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_retrieval_confidence_review_required",
+              "required_action": "record_retrieval_review"
+            },
+            "name": "low_retrieval_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "build_reasoning_path",
+              "query_present": false
+            },
+            "description": "Reasoning paths require a recorded hybrid query.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reasoning_query_required",
+              "required_action": "select_hybrid_query"
+            },
+            "name": "reasoning_requires_query"
+          },
+          {
+            "condition": {
+              "operation": "build_reasoning_path",
+              "start_node_present": false
+            },
+            "description": "Reasoning paths require a graph start node.",
+            "effect": {
+              "decision": "deny",
+              "reason": "start_node_required",
+              "required_action": "attach_start_node"
+            },
+            "name": "reasoning_requires_start_node"
+          },
+          {
+            "condition": {
               "evidence_path_present": false,
-              "operation": "reason"
+              "operation": "build_reasoning_path"
             },
             "description": "Graph reasoning requires evidence paths.",
             "effect": {
@@ -109,7 +469,21 @@
           },
           {
             "condition": {
+              "hop_count_lte": 0,
+              "operation": "build_reasoning_path"
+            },
+            "description": "Reasoning paths require at least one hop.",
+            "effect": {
+              "decision": "deny",
+              "reason": "positive_hop_count_required",
+              "required_action": "increase_hop_count"
+            },
+            "name": "reasoning_requires_positive_hops"
+          },
+          {
+            "condition": {
               "hop_count_gt": 4,
+              "operation": "build_reasoning_path",
               "review_recorded": false
             },
             "description": "Deep multi-hop reasoning requires review.",
@@ -119,6 +493,71 @@
               "required_action": "record_reasoning_review"
             },
             "name": "multi_hop_requires_review"
+          },
+          {
+            "condition": {
+              "explanation_present": false,
+              "operation": "build_reasoning_path"
+            },
+            "description": "Reasoning paths require a human-readable explanation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reasoning_explanation_required",
+              "required_action": "attach_explanation"
+            },
+            "name": "reasoning_requires_explanation"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "query_present": false
+            },
+            "description": "Graph-grounded generation requires a user query.",
+            "effect": {
+              "decision": "deny",
+              "reason": "generation_query_required",
+              "required_action": "attach_query"
+            },
+            "name": "generation_requires_query"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "retrieval_context_present": false
+            },
+            "description": "Graph-grounded generation requires hybrid retrieval context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retrieval_context_required",
+              "required_action": "run_hybrid_query"
+            },
+            "name": "generation_requires_retrieval_context"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "reasoning_path_present": false
+            },
+            "description": "Graph-grounded generation requires a reasoning path.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reasoning_path_required",
+              "required_action": "build_reasoning_path"
+            },
+            "name": "generation_requires_reasoning_path"
+          },
+          {
+            "condition": {
+              "answer_text_present": false,
+              "operation": "generate_answer"
+            },
+            "description": "Graph-grounded generation requires answer text.",
+            "effect": {
+              "decision": "deny",
+              "reason": "answer_text_required",
+              "required_action": "attach_answer_text"
+            },
+            "name": "generation_requires_answer_text"
           },
           {
             "condition": {
@@ -132,6 +571,150 @@
               "required_action": "attach_provenance"
             },
             "name": "answer_requires_provenance"
+          },
+          {
+            "condition": {
+              "citations_attached": false,
+              "operation": "generate_answer"
+            },
+            "description": "Graph-grounded answers require citations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "citations_required",
+              "required_action": "attach_citations"
+            },
+            "name": "generation_requires_citations"
+          },
+          {
+            "condition": {
+              "model_location": "external",
+              "model_policy_attached": false,
+              "operation": "generate_answer"
+            },
+            "description": "External generation models require policy approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_policy_required",
+              "required_action": "attach_model_policy"
+            },
+            "name": "external_model_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "unsafe_answer_detected": true
+            },
+            "description": "Unsafe answer classifications block generation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsafe_generation_blocked",
+              "required_action": "block_answer"
+            },
+            "name": "unsafe_generation_requires_block"
+          },
+          {
+            "condition": {
+              "answer_confidence_lt": 0.75,
+              "operation": "generate_answer",
+              "review_recorded": false
+            },
+            "description": "Low confidence graph-grounded answers require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_answer_confidence_review_required",
+              "required_action": "record_answer_review"
+            },
+            "name": "low_answer_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "curator_present": false,
+              "operation": "curate_answer"
+            },
+            "description": "Curation requires a curator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curator_required",
+              "required_action": "assign_curator"
+            },
+            "name": "curation_requires_curator"
+          },
+          {
+            "condition": {
+              "curation_decision_present": false,
+              "operation": "curate_answer"
+            },
+            "description": "Curation requires an allowed decision.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_decision_required",
+              "required_action": "choose_curation_decision"
+            },
+            "name": "curation_requires_decision"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "curate_answer"
+            },
+            "description": "Curation requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_evidence_required",
+              "required_action": "attach_curation_evidence"
+            },
+            "name": "curation_requires_evidence"
+          },
+          {
+            "condition": {
+              "curated_answer_present": false,
+              "operation": "publish_answer"
+            },
+            "description": "Published graph-grounded answers require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curated_answer_required",
+              "required_action": "approve_answer"
+            },
+            "name": "publication_requires_curated_answer"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_grag_mutation"
+            },
+            "description": "Batch GraphRAG mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_grag_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "GraphRAG operations may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_graph_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_graph_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "GraphRAG state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "graph_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -151,23 +734,192 @@
         },
         {
           "condition": {
-            "query_type": "hybrid",
+            "graph_source_id_present": false,
+            "operation": "register_graph_source"
+          },
+          "description": "Graph sources require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "graph_source_id_required",
+            "required_action": "attach_graph_source_id"
+          },
+          "name": "graph_source_requires_id"
+        },
+        {
+          "condition": {
+            "graph_source_name_present": false,
+            "operation": "register_graph_source"
+          },
+          "description": "Graph sources require names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "graph_source_name_required",
+            "required_action": "attach_graph_source_name"
+          },
+          "name": "graph_source_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "register_graph_source",
+            "owner_assigned": false
+          },
+          "description": "Graph sources require accountable owners.",
+          "effect": {
+            "decision": "deny",
+            "reason": "graph_source_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "graph_source_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_graph_source",
+            "registered_graph_present": false
+          },
+          "description": "Graph sources must reference a registered graph.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_graph_required",
+            "required_action": "attach_graph_id"
+          },
+          "name": "graph_source_requires_registered_graph"
+        },
+        {
+          "condition": {
+            "operation": "register_graph_source",
+            "provenance_attached": false
+          },
+          "description": "Graph sources require provenance references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "graph_source_provenance_required",
+            "required_action": "attach_provenance"
+          },
+          "name": "graph_source_requires_provenance"
+        },
+        {
+          "condition": {
+            "operation": "retire_graph_source",
+            "review_recorded": false
+          },
+          "description": "Retiring graph sources requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "graph_source_retire_review_required",
+            "required_action": "record_graph_source_review"
+          },
+          "name": "graph_source_retire_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "register_vector_source",
+            "vector_source_id_present": false
+          },
+          "description": "Vector sources require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vector_source_id_required",
+            "required_action": "attach_vector_source_id"
+          },
+          "name": "vector_source_requires_id"
+        },
+        {
+          "condition": {
+            "operation": "register_vector_source",
+            "vector_index_present": false
+          },
+          "description": "Vector sources require an index id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vector_index_required",
+            "required_action": "attach_vector_index"
+          },
+          "name": "vector_source_requires_index"
+        },
+        {
+          "condition": {
+            "embedding_model_present": false,
+            "operation": "register_vector_source"
+          },
+          "description": "Vector sources require an embedding model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "embedding_model_required",
+            "required_action": "attach_embedding_model"
+          },
+          "name": "vector_source_requires_embedding_model"
+        },
+        {
+          "condition": {
+            "operation": "register_vector_source",
+            "source_documents_present": false
+          },
+          "description": "Vector sources require source document references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_documents_required",
+            "required_action": "attach_source_documents"
+          },
+          "name": "vector_source_requires_source_documents"
+        },
+        {
+          "condition": {
+            "operation": "hybrid_query",
+            "query_present": false
+          },
+          "description": "Hybrid retrieval requires a query.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hybrid_query_required",
+            "required_action": "attach_query"
+          },
+          "name": "hybrid_query_requires_query"
+        },
+        {
+          "condition": {
+            "graph_source_present": false,
+            "operation": "hybrid_query"
+          },
+          "description": "Hybrid retrieval requires a graph source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "graph_source_required",
+            "required_action": "select_graph_source"
+          },
+          "name": "hybrid_query_requires_graph_source"
+        },
+        {
+          "condition": {
+            "operation": "hybrid_query",
+            "vector_source_present": false
+          },
+          "description": "Hybrid retrieval requires a vector source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vector_source_required",
+            "required_action": "select_vector_source"
+          },
+          "name": "hybrid_query_requires_vector_source"
+        },
+        {
+          "condition": {
+            "operation": "hybrid_query",
             "vector_index_ready": false
           },
-          "description": "Hybrid GraphRAG requires vector and graph indexes.",
+          "description": "Hybrid retrieval requires vector index readiness.",
           "effect": {
             "decision": "deny",
             "reason": "vector_index_required",
             "required_action": "build_vector_index"
           },
-          "name": "hybrid_query_requires_vector_and_graph"
+          "name": "hybrid_query_requires_vector_index"
         },
         {
           "condition": {
             "graph_index_ready": false,
-            "query_type": "hybrid"
+            "operation": "hybrid_query"
           },
-          "description": "Hybrid GraphRAG requires graph index readiness.",
+          "description": "Hybrid retrieval requires graph index readiness.",
           "effect": {
             "decision": "deny",
             "reason": "graph_index_required",
@@ -177,8 +929,75 @@
         },
         {
           "condition": {
+            "access_filter_applied": false,
+            "source_classification": "restricted"
+          },
+          "description": "Restricted graph/vector sources require access filters.",
+          "effect": {
+            "decision": "deny",
+            "reason": "access_filter_required",
+            "required_action": "apply_access_filter"
+          },
+          "name": "hybrid_query_requires_access_filter_for_restricted"
+        },
+        {
+          "condition": {
+            "operation": "hybrid_query",
+            "result_window_gt": 50,
+            "review_recorded": false
+          },
+          "description": "Large hybrid result windows require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_result_window_review_required",
+            "required_action": "record_retrieval_review"
+          },
+          "name": "hybrid_query_requires_result_window_review"
+        },
+        {
+          "condition": {
+            "operation": "hybrid_query",
+            "retrieval_confidence_lt": 0.7,
+            "review_recorded": false
+          },
+          "description": "Low confidence hybrid retrieval requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_retrieval_confidence_review_required",
+            "required_action": "record_retrieval_review"
+          },
+          "name": "low_retrieval_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "build_reasoning_path",
+            "query_present": false
+          },
+          "description": "Reasoning paths require a recorded hybrid query.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reasoning_query_required",
+            "required_action": "select_hybrid_query"
+          },
+          "name": "reasoning_requires_query"
+        },
+        {
+          "condition": {
+            "operation": "build_reasoning_path",
+            "start_node_present": false
+          },
+          "description": "Reasoning paths require a graph start node.",
+          "effect": {
+            "decision": "deny",
+            "reason": "start_node_required",
+            "required_action": "attach_start_node"
+          },
+          "name": "reasoning_requires_start_node"
+        },
+        {
+          "condition": {
             "evidence_path_present": false,
-            "operation": "reason"
+            "operation": "build_reasoning_path"
           },
           "description": "Graph reasoning requires evidence paths.",
           "effect": {
@@ -190,7 +1009,21 @@
         },
         {
           "condition": {
+            "hop_count_lte": 0,
+            "operation": "build_reasoning_path"
+          },
+          "description": "Reasoning paths require at least one hop.",
+          "effect": {
+            "decision": "deny",
+            "reason": "positive_hop_count_required",
+            "required_action": "increase_hop_count"
+          },
+          "name": "reasoning_requires_positive_hops"
+        },
+        {
+          "condition": {
             "hop_count_gt": 4,
+            "operation": "build_reasoning_path",
             "review_recorded": false
           },
           "description": "Deep multi-hop reasoning requires review.",
@@ -200,6 +1033,71 @@
             "required_action": "record_reasoning_review"
           },
           "name": "multi_hop_requires_review"
+        },
+        {
+          "condition": {
+            "explanation_present": false,
+            "operation": "build_reasoning_path"
+          },
+          "description": "Reasoning paths require a human-readable explanation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reasoning_explanation_required",
+            "required_action": "attach_explanation"
+          },
+          "name": "reasoning_requires_explanation"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "query_present": false
+          },
+          "description": "Graph-grounded generation requires a user query.",
+          "effect": {
+            "decision": "deny",
+            "reason": "generation_query_required",
+            "required_action": "attach_query"
+          },
+          "name": "generation_requires_query"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "retrieval_context_present": false
+          },
+          "description": "Graph-grounded generation requires hybrid retrieval context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retrieval_context_required",
+            "required_action": "run_hybrid_query"
+          },
+          "name": "generation_requires_retrieval_context"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "reasoning_path_present": false
+          },
+          "description": "Graph-grounded generation requires a reasoning path.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reasoning_path_required",
+            "required_action": "build_reasoning_path"
+          },
+          "name": "generation_requires_reasoning_path"
+        },
+        {
+          "condition": {
+            "answer_text_present": false,
+            "operation": "generate_answer"
+          },
+          "description": "Graph-grounded generation requires answer text.",
+          "effect": {
+            "decision": "deny",
+            "reason": "answer_text_required",
+            "required_action": "attach_answer_text"
+          },
+          "name": "generation_requires_answer_text"
         },
         {
           "condition": {
@@ -213,17 +1111,168 @@
             "required_action": "attach_provenance"
           },
           "name": "answer_requires_provenance"
+        },
+        {
+          "condition": {
+            "citations_attached": false,
+            "operation": "generate_answer"
+          },
+          "description": "Graph-grounded answers require citations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "citations_required",
+            "required_action": "attach_citations"
+          },
+          "name": "generation_requires_citations"
+        },
+        {
+          "condition": {
+            "model_location": "external",
+            "model_policy_attached": false,
+            "operation": "generate_answer"
+          },
+          "description": "External generation models require policy approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_policy_required",
+            "required_action": "attach_model_policy"
+          },
+          "name": "external_model_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "unsafe_answer_detected": true
+          },
+          "description": "Unsafe answer classifications block generation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsafe_generation_blocked",
+            "required_action": "block_answer"
+          },
+          "name": "unsafe_generation_requires_block"
+        },
+        {
+          "condition": {
+            "answer_confidence_lt": 0.75,
+            "operation": "generate_answer",
+            "review_recorded": false
+          },
+          "description": "Low confidence graph-grounded answers require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_answer_confidence_review_required",
+            "required_action": "record_answer_review"
+          },
+          "name": "low_answer_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "curator_present": false,
+            "operation": "curate_answer"
+          },
+          "description": "Curation requires a curator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curator_required",
+            "required_action": "assign_curator"
+          },
+          "name": "curation_requires_curator"
+        },
+        {
+          "condition": {
+            "curation_decision_present": false,
+            "operation": "curate_answer"
+          },
+          "description": "Curation requires an allowed decision.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_decision_required",
+            "required_action": "choose_curation_decision"
+          },
+          "name": "curation_requires_decision"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "curate_answer"
+          },
+          "description": "Curation requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_evidence_required",
+            "required_action": "attach_curation_evidence"
+          },
+          "name": "curation_requires_evidence"
+        },
+        {
+          "condition": {
+            "curated_answer_present": false,
+            "operation": "publish_answer"
+          },
+          "description": "Published graph-grounded answers require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curated_answer_required",
+            "required_action": "approve_answer"
+          },
+          "name": "publication_requires_curated_answer"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_grag_mutation"
+          },
+          "description": "Batch GraphRAG mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_grag_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "GraphRAG operations may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_graph_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_graph_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "GraphRAG state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "graph_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "grag_runtime.py",
+        "production_service": "service.GraphRAGService",
+        "service": "grag_runtime.GragService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "GRAGAuditTimeline",
+          "permission": "grag:audit",
+          "route": "/grag/audit"
+        },
         "curation": {
-          "component": "GraphCuration",
+          "component": "GraphAnswerCuration",
           "permission": "grag:curate",
           "route": "/grag/curation"
         },
@@ -232,18 +1281,33 @@
           "permission": "grag:view",
           "route": "/grag/dashboard"
         },
-        "explanations": {
-          "component": "ExplanationWorkbench",
-          "permission": "grag:reason",
-          "route": "/grag/explanations"
+        "generation": {
+          "component": "GroundedGenerationWorkbench",
+          "permission": "grag:generate",
+          "route": "/grag/generation"
         },
-        "graphs": {
-          "component": "GraphContextManager",
+        "governance": {
+          "component": "GRAGGovernance",
+          "permission": "grag:govern",
+          "route": "/grag/governance"
+        },
+        "graph_sources": {
+          "component": "GraphSourceManager",
           "permission": "grag:manage_graphs",
-          "route": "/grag/graphs"
+          "route": "/grag/graph-sources"
+        },
+        "hybrid_retrieval": {
+          "component": "HybridRetrievalWorkbench",
+          "permission": "grag:query",
+          "route": "/grag/hybrid-retrieval"
+        },
+        "provenance": {
+          "component": "ProvenanceInspector",
+          "permission": "grag:view",
+          "route": "/grag/provenance"
         },
         "query": {
-          "component": "GraphRAGQuery",
+          "component": "GraphRAGQueryConsole",
           "permission": "grag:query",
           "route": "/grag/query"
         },
@@ -256,14 +1320,33 @@
           "component": "GRAGSettings",
           "permission": "grag:admin",
           "route": "/grag/settings"
+        },
+        "vector_sources": {
+          "component": "VectorSourceManager",
+          "permission": "grag:manage_sources",
+          "route": "/grag/vector-sources"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
           "curation_queue": {
             "threshold_style": "quality-band",
             "visual": "review-list"
+          },
+          "generation_panel": {
+            "status_style": "grounding-chip",
+            "visual": "answer-draft"
+          },
+          "graph_source_card": {
+            "status_style": "lineage-chip",
+            "visual": "graph-summary"
           },
           "hybrid_result": {
             "icon": "network",
@@ -274,15 +1357,23 @@
             "status_style": "confidence-pill",
             "visual": "source-graph"
           },
+          "query_console": {
+            "status_style": "retrieval-chip",
+            "visual": "ranked-context"
+          },
           "reasoning_path": {
             "highlight": "hop-chip",
             "visual": "multi-hop-path"
+          },
+          "vector_index_card": {
+            "status_style": "embedding-chip",
+            "visual": "index-summary"
           }
         },
         "name": "grag_reasoning_console",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#86BBD8",
+          "color.accent": "#F2A541",
           "color.danger": "#C53030",
           "color.primary": "#2F4858",
           "color.success": "#2F855A",
@@ -306,10 +1397,31 @@
             "permission": "grag:view"
           },
           {
-            "component": "GraphRAGQuery",
+            "component": "GraphRAGQueryConsole",
             "name": "query",
             "nav_group": "Ask",
             "path": "/grag/query",
+            "permission": "grag:query"
+          },
+          {
+            "component": "GraphSourceManager",
+            "name": "graph_sources",
+            "nav_group": "Sources",
+            "path": "/grag/graph-sources",
+            "permission": "grag:manage_graphs"
+          },
+          {
+            "component": "VectorSourceManager",
+            "name": "vector_sources",
+            "nav_group": "Sources",
+            "path": "/grag/vector-sources",
+            "permission": "grag:manage_sources"
+          },
+          {
+            "component": "HybridRetrievalWorkbench",
+            "name": "hybrid_retrieval",
+            "nav_group": "Ask",
+            "path": "/grag/hybrid-retrieval",
             "permission": "grag:query"
           },
           {
@@ -320,25 +1432,39 @@
             "permission": "grag:reason"
           },
           {
-            "component": "GraphContextManager",
-            "name": "graphs",
-            "nav_group": "Graphs",
-            "path": "/grag/graphs",
-            "permission": "grag:manage_graphs"
+            "component": "ProvenanceInspector",
+            "name": "provenance",
+            "nav_group": "Evidence",
+            "path": "/grag/provenance",
+            "permission": "grag:view"
           },
           {
-            "component": "GraphCuration",
+            "component": "GroundedGenerationWorkbench",
+            "name": "generation",
+            "nav_group": "Ask",
+            "path": "/grag/generation",
+            "permission": "grag:generate"
+          },
+          {
+            "component": "GraphAnswerCuration",
             "name": "curation",
-            "nav_group": "Curation",
+            "nav_group": "Governance",
             "path": "/grag/curation",
             "permission": "grag:curate"
           },
           {
-            "component": "ExplanationWorkbench",
-            "name": "explanations",
-            "nav_group": "Reasoning",
-            "path": "/grag/explanations",
-            "permission": "grag:reason"
+            "component": "GRAGGovernance",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/grag/governance",
+            "permission": "grag:govern"
+          },
+          {
+            "component": "GRAGAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/grag/audit",
+            "permission": "grag:audit"
           },
           {
             "component": "GRAGSettings",
@@ -367,25 +1493,97 @@
   "contracts": {
     "grag": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "grag_runtime.GragService",
+          "graph": "grph",
+          "helper_runtime": "grag_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "ontology": "onto",
+          "production_runtime": "service.GraphRAGService",
+          "rag": "ragn",
+          "search": "srch"
+        },
         "curation": {
-          "confidence_threshold": 0.75,
-          "expert_review_required": true,
-          "provenance_required": true
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "curator_required": true,
+          "evidence_required": true,
+          "publication_requires_approval": true,
+          "review_required_for_low_confidence": true
+        },
+        "generation": {
+          "citations_required": true,
+          "external_model_requires_policy": true,
+          "minimum_answer_confidence": 0.75,
+          "model_policy_required": true,
+          "provenance_required": true,
+          "reasoning_path_required": true,
+          "unsafe_generation_blocking": true
         },
         "governance": {
+          "audit_curation": true,
+          "audit_generation": true,
+          "audit_graph_sources": true,
+          "audit_queries": true,
           "audit_reasoning": true,
-          "graph_access_filter_required": true,
+          "audit_vector_sources": true,
           "require_tenant_context": true
         },
-        "reasoning": {
-          "evidence_required": true,
-          "explanation_required": true,
-          "max_hops": 4
+        "graph_sources": {
+          "default_classification": "internal",
+          "id_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "provenance_required": true,
+          "registered_graph_required": true,
+          "retire_requires_review": true
         },
-        "retrieval": {
+        "hybrid_retrieval": {
+          "enabled": true,
           "graph_index_required": true,
-          "hybrid_retrieval_enabled": true,
+          "large_result_window_review_threshold": 50,
+          "max_result_window": 50,
+          "minimum_retrieval_confidence": 0.7,
+          "restricted_source_filter_required": true,
           "vector_index_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "provenance": {
+          "citation_refs_required": true,
+          "lineage_export_enabled": true,
+          "path_refs_required": true,
+          "source_refs_required": true
+        },
+        "reasoning": {
+          "evidence_path_required": true,
+          "explanation_required": true,
+          "max_hops": 4,
+          "minimum_hops": 1,
+          "multi_hop_review_threshold": 4,
+          "start_node_required": true
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "restricted_source_filter_required": true,
+          "tenant_isolation_required": true,
+          "unsafe_generation_blocking": true
         },
         "tenant_id": "default",
         "theme": {
@@ -393,10 +1591,26 @@
           "default_theme": "grag_reasoning_console"
         },
         "ui": {
-          "enable_explanations": true,
-          "enable_graph_curation": true,
+          "enable_audit": true,
+          "enable_curation": true,
+          "enable_dashboard": true,
+          "enable_generation": true,
+          "enable_governance": true,
+          "enable_graph_sources": true,
+          "enable_hybrid_retrieval": true,
+          "enable_provenance": true,
           "enable_query_console": true,
-          "enable_reasoning_paths": true
+          "enable_reasoning_paths": true,
+          "enable_settings": true,
+          "enable_vector_sources": true
+        },
+        "vector_sources": {
+          "default_embedding_model": "text-embedding-3-large",
+          "embedding_model_required": true,
+          "id_required": true,
+          "index_required": true,
+          "minimum_documents": 1,
+          "source_documents_required": true
         }
       },
       "id": "grag",
@@ -449,12 +1663,259 @@
       },
       "name": "answer_requires_provenance"
     },
+    "batch_grag_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_grag_mutation"
+      },
+      "description": "Batch GraphRAG mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_grag_mutation_requires_bytewax"
+    },
+    "cross_tenant_graph_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "GraphRAG operations may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_graph_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_graph_access_denied"
+    },
+    "curation_requires_curator": {
+      "condition": {
+        "curator_present": false,
+        "operation": "curate_answer"
+      },
+      "description": "Curation requires a curator.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curator_required",
+        "required_action": "assign_curator"
+      },
+      "name": "curation_requires_curator"
+    },
+    "curation_requires_decision": {
+      "condition": {
+        "curation_decision_present": false,
+        "operation": "curate_answer"
+      },
+      "description": "Curation requires an allowed decision.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_decision_required",
+        "required_action": "choose_curation_decision"
+      },
+      "name": "curation_requires_decision"
+    },
+    "curation_requires_evidence": {
+      "condition": {
+        "evidence_present": false,
+        "operation": "curate_answer"
+      },
+      "description": "Curation requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_evidence_required",
+        "required_action": "attach_curation_evidence"
+      },
+      "name": "curation_requires_evidence"
+    },
+    "external_model_requires_policy": {
+      "condition": {
+        "model_location": "external",
+        "model_policy_attached": false,
+        "operation": "generate_answer"
+      },
+      "description": "External generation models require policy approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_policy_required",
+        "required_action": "attach_model_policy"
+      },
+      "name": "external_model_requires_policy"
+    },
+    "generation_requires_answer_text": {
+      "condition": {
+        "answer_text_present": false,
+        "operation": "generate_answer"
+      },
+      "description": "Graph-grounded generation requires answer text.",
+      "effect": {
+        "decision": "deny",
+        "reason": "answer_text_required",
+        "required_action": "attach_answer_text"
+      },
+      "name": "generation_requires_answer_text"
+    },
+    "generation_requires_citations": {
+      "condition": {
+        "citations_attached": false,
+        "operation": "generate_answer"
+      },
+      "description": "Graph-grounded answers require citations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "citations_required",
+        "required_action": "attach_citations"
+      },
+      "name": "generation_requires_citations"
+    },
+    "generation_requires_query": {
+      "condition": {
+        "operation": "generate_answer",
+        "query_present": false
+      },
+      "description": "Graph-grounded generation requires a user query.",
+      "effect": {
+        "decision": "deny",
+        "reason": "generation_query_required",
+        "required_action": "attach_query"
+      },
+      "name": "generation_requires_query"
+    },
+    "generation_requires_reasoning_path": {
+      "condition": {
+        "operation": "generate_answer",
+        "reasoning_path_present": false
+      },
+      "description": "Graph-grounded generation requires a reasoning path.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reasoning_path_required",
+        "required_action": "build_reasoning_path"
+      },
+      "name": "generation_requires_reasoning_path"
+    },
+    "generation_requires_retrieval_context": {
+      "condition": {
+        "operation": "generate_answer",
+        "retrieval_context_present": false
+      },
+      "description": "Graph-grounded generation requires hybrid retrieval context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retrieval_context_required",
+        "required_action": "run_hybrid_query"
+      },
+      "name": "generation_requires_retrieval_context"
+    },
+    "graph_source_requires_id": {
+      "condition": {
+        "graph_source_id_present": false,
+        "operation": "register_graph_source"
+      },
+      "description": "Graph sources require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "graph_source_id_required",
+        "required_action": "attach_graph_source_id"
+      },
+      "name": "graph_source_requires_id"
+    },
+    "graph_source_requires_name": {
+      "condition": {
+        "graph_source_name_present": false,
+        "operation": "register_graph_source"
+      },
+      "description": "Graph sources require names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "graph_source_name_required",
+        "required_action": "attach_graph_source_name"
+      },
+      "name": "graph_source_requires_name"
+    },
+    "graph_source_requires_owner": {
+      "condition": {
+        "operation": "register_graph_source",
+        "owner_assigned": false
+      },
+      "description": "Graph sources require accountable owners.",
+      "effect": {
+        "decision": "deny",
+        "reason": "graph_source_owner_required",
+        "required_action": "assign_owner"
+      },
+      "name": "graph_source_requires_owner"
+    },
+    "graph_source_requires_provenance": {
+      "condition": {
+        "operation": "register_graph_source",
+        "provenance_attached": false
+      },
+      "description": "Graph sources require provenance references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "graph_source_provenance_required",
+        "required_action": "attach_provenance"
+      },
+      "name": "graph_source_requires_provenance"
+    },
+    "graph_source_requires_registered_graph": {
+      "condition": {
+        "operation": "register_graph_source",
+        "registered_graph_present": false
+      },
+      "description": "Graph sources must reference a registered graph.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_graph_required",
+        "required_action": "attach_graph_id"
+      },
+      "name": "graph_source_requires_registered_graph"
+    },
+    "graph_source_retire_requires_review": {
+      "condition": {
+        "operation": "retire_graph_source",
+        "review_recorded": false
+      },
+      "description": "Retiring graph sources requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "graph_source_retire_review_required",
+        "required_action": "record_graph_source_review"
+      },
+      "name": "graph_source_retire_requires_review"
+    },
+    "graph_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "GraphRAG state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "graph_state_change_requires_audit"
+    },
+    "hybrid_query_requires_access_filter_for_restricted": {
+      "condition": {
+        "access_filter_applied": false,
+        "source_classification": "restricted"
+      },
+      "description": "Restricted graph/vector sources require access filters.",
+      "effect": {
+        "decision": "deny",
+        "reason": "access_filter_required",
+        "required_action": "apply_access_filter"
+      },
+      "name": "hybrid_query_requires_access_filter_for_restricted"
+    },
     "hybrid_query_requires_graph_index": {
       "condition": {
         "graph_index_ready": false,
-        "query_type": "hybrid"
+        "operation": "hybrid_query"
       },
-      "description": "Hybrid GraphRAG requires graph index readiness.",
+      "description": "Hybrid retrieval requires graph index readiness.",
       "effect": {
         "decision": "deny",
         "reason": "graph_index_required",
@@ -462,22 +1923,104 @@
       },
       "name": "hybrid_query_requires_graph_index"
     },
-    "hybrid_query_requires_vector_and_graph": {
+    "hybrid_query_requires_graph_source": {
       "condition": {
-        "query_type": "hybrid",
+        "graph_source_present": false,
+        "operation": "hybrid_query"
+      },
+      "description": "Hybrid retrieval requires a graph source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "graph_source_required",
+        "required_action": "select_graph_source"
+      },
+      "name": "hybrid_query_requires_graph_source"
+    },
+    "hybrid_query_requires_query": {
+      "condition": {
+        "operation": "hybrid_query",
+        "query_present": false
+      },
+      "description": "Hybrid retrieval requires a query.",
+      "effect": {
+        "decision": "deny",
+        "reason": "hybrid_query_required",
+        "required_action": "attach_query"
+      },
+      "name": "hybrid_query_requires_query"
+    },
+    "hybrid_query_requires_result_window_review": {
+      "condition": {
+        "operation": "hybrid_query",
+        "result_window_gt": 50,
+        "review_recorded": false
+      },
+      "description": "Large hybrid result windows require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_result_window_review_required",
+        "required_action": "record_retrieval_review"
+      },
+      "name": "hybrid_query_requires_result_window_review"
+    },
+    "hybrid_query_requires_vector_index": {
+      "condition": {
+        "operation": "hybrid_query",
         "vector_index_ready": false
       },
-      "description": "Hybrid GraphRAG requires vector and graph indexes.",
+      "description": "Hybrid retrieval requires vector index readiness.",
       "effect": {
         "decision": "deny",
         "reason": "vector_index_required",
         "required_action": "build_vector_index"
       },
-      "name": "hybrid_query_requires_vector_and_graph"
+      "name": "hybrid_query_requires_vector_index"
+    },
+    "hybrid_query_requires_vector_source": {
+      "condition": {
+        "operation": "hybrid_query",
+        "vector_source_present": false
+      },
+      "description": "Hybrid retrieval requires a vector source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vector_source_required",
+        "required_action": "select_vector_source"
+      },
+      "name": "hybrid_query_requires_vector_source"
+    },
+    "low_answer_confidence_requires_review": {
+      "condition": {
+        "answer_confidence_lt": 0.75,
+        "operation": "generate_answer",
+        "review_recorded": false
+      },
+      "description": "Low confidence graph-grounded answers require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_answer_confidence_review_required",
+        "required_action": "record_answer_review"
+      },
+      "name": "low_answer_confidence_requires_review"
+    },
+    "low_retrieval_confidence_requires_review": {
+      "condition": {
+        "operation": "hybrid_query",
+        "retrieval_confidence_lt": 0.7,
+        "review_recorded": false
+      },
+      "description": "Low confidence hybrid retrieval requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_retrieval_confidence_review_required",
+        "required_action": "record_retrieval_review"
+      },
+      "name": "low_retrieval_confidence_requires_review"
     },
     "multi_hop_requires_review": {
       "condition": {
         "hop_count_gt": 4,
+        "operation": "build_reasoning_path",
         "review_recorded": false
       },
       "description": "Deep multi-hop reasoning requires review.",
@@ -488,10 +2031,23 @@
       },
       "name": "multi_hop_requires_review"
     },
+    "publication_requires_curated_answer": {
+      "condition": {
+        "curated_answer_present": false,
+        "operation": "publish_answer"
+      },
+      "description": "Published graph-grounded answers require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curated_answer_required",
+        "required_action": "approve_answer"
+      },
+      "name": "publication_requires_curated_answer"
+    },
     "reasoning_requires_evidence_path": {
       "condition": {
         "evidence_path_present": false,
-        "operation": "reason"
+        "operation": "build_reasoning_path"
       },
       "description": "Graph reasoning requires evidence paths.",
       "effect": {
@@ -500,6 +2056,58 @@
         "required_action": "attach_evidence_path"
       },
       "name": "reasoning_requires_evidence_path"
+    },
+    "reasoning_requires_explanation": {
+      "condition": {
+        "explanation_present": false,
+        "operation": "build_reasoning_path"
+      },
+      "description": "Reasoning paths require a human-readable explanation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reasoning_explanation_required",
+        "required_action": "attach_explanation"
+      },
+      "name": "reasoning_requires_explanation"
+    },
+    "reasoning_requires_positive_hops": {
+      "condition": {
+        "hop_count_lte": 0,
+        "operation": "build_reasoning_path"
+      },
+      "description": "Reasoning paths require at least one hop.",
+      "effect": {
+        "decision": "deny",
+        "reason": "positive_hop_count_required",
+        "required_action": "increase_hop_count"
+      },
+      "name": "reasoning_requires_positive_hops"
+    },
+    "reasoning_requires_query": {
+      "condition": {
+        "operation": "build_reasoning_path",
+        "query_present": false
+      },
+      "description": "Reasoning paths require a recorded hybrid query.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reasoning_query_required",
+        "required_action": "select_hybrid_query"
+      },
+      "name": "reasoning_requires_query"
+    },
+    "reasoning_requires_start_node": {
+      "condition": {
+        "operation": "build_reasoning_path",
+        "start_node_present": false
+      },
+      "description": "Reasoning paths require a graph start node.",
+      "effect": {
+        "decision": "deny",
+        "reason": "start_node_required",
+        "required_action": "attach_start_node"
+      },
+      "name": "reasoning_requires_start_node"
     },
     "tenant_context_required": {
       "condition": {
@@ -512,11 +2120,79 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "unsafe_generation_requires_block": {
+      "condition": {
+        "operation": "generate_answer",
+        "unsafe_answer_detected": true
+      },
+      "description": "Unsafe answer classifications block generation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsafe_generation_blocked",
+        "required_action": "block_answer"
+      },
+      "name": "unsafe_generation_requires_block"
+    },
+    "vector_source_requires_embedding_model": {
+      "condition": {
+        "embedding_model_present": false,
+        "operation": "register_vector_source"
+      },
+      "description": "Vector sources require an embedding model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "embedding_model_required",
+        "required_action": "attach_embedding_model"
+      },
+      "name": "vector_source_requires_embedding_model"
+    },
+    "vector_source_requires_id": {
+      "condition": {
+        "operation": "register_vector_source",
+        "vector_source_id_present": false
+      },
+      "description": "Vector sources require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vector_source_id_required",
+        "required_action": "attach_vector_source_id"
+      },
+      "name": "vector_source_requires_id"
+    },
+    "vector_source_requires_index": {
+      "condition": {
+        "operation": "register_vector_source",
+        "vector_index_present": false
+      },
+      "description": "Vector sources require an index id.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vector_index_required",
+        "required_action": "attach_vector_index"
+      },
+      "name": "vector_source_requires_index"
+    },
+    "vector_source_requires_source_documents": {
+      "condition": {
+        "operation": "register_vector_source",
+        "source_documents_present": false
+      },
+      "description": "Vector sources require source document references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_documents_required",
+        "required_action": "attach_source_documents"
+      },
+      "name": "vector_source_requires_source_documents"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "grag_runtime.py",
+    "api.py",
+    "views.py"
   ],
   "symbols": {
     "capability.grag": {

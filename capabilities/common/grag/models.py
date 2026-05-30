@@ -1,7 +1,7 @@
 """
 APG GraphRAG Capability - SQLAlchemy Database Models
 
-Revolutionary graph-based retrieval-augmented generation with Apache AGE integration.
+Graph-based retrieval-augmented generation with Apache AGE integration.
 Complete database models for knowledge graphs, entities, relationships, and analytics.
 
 Author: Datacraft (nyimbi@gmail.com)

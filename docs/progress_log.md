@@ -14546,3 +14546,60 @@ Not run to preserve battery:
 - Legacy heavy GRPH service, API, and Flask-AppBuilder tests.
 - Load, latency, traversal-cost, graph-quality, authorization, and throughput
   benchmarks.
+
+### 2026-05-30 11:05 EAT
+
+GRAG lifecycle and guardrail packet:
+
+- Selected `capabilities/common/grag` as the next common capability after RAGN
+  and GRPH-related graph foundations.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md`/`todo.md` with concise packet docs and follow-up notes.
+- Expanded the GRAG contract to 41 deterministic guardrails, 12 UI routes,
+  graph-source/vector-source/hybrid-retrieval/reasoning/generation/
+  provenance/curation/security/governance/observability/adapter
+  configuration, Bytewax event-stream adapter evidence, and theme components
+  for generated graph-grounded answer surfaces.
+- Added `grag_runtime.py` with dependency-light lifecycle execution for graph
+  sources, vector sources, hybrid queries, reasoning paths, graph-grounded
+  answers, curation, publication, dashboard summaries, package snapshots, and
+  audit events.
+- Replaced the heavy API import path with dependency-light helper functions
+  that wrap `GragService` and are suitable for generated applications.
+- Added generated-app UI helper models to `views.py` while preserving legacy
+  model exports used by heavier production modules.
+- Updated capability registration with richer endpoints, adapter evidence,
+  source-management and publication capabilities, governance/audit
+  permissions, and optional APG adapter dependencies.
+- Replaced static package evidence with contract-derived `app.py` semantics and
+  refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Moved dependency-light package-contract tests out of the legacy heavy
+  `tests/` folder because that folder's `conftest.py` imports SQLAlchemy
+  models and still fails on the existing reserved `metadata` attribute.
+- Removed stale exaggerated language from the primary GRAG implementation
+  slice during direct review.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/grag/__init__.py capabilities/common/grag/capability_contract.py capabilities/common/grag/models.py capabilities/common/grag/grag_runtime.py capabilities/common/grag/service.py capabilities/common/grag/api.py capabilities/common/grag/views.py capabilities/common/grag/app.py capabilities/common/grag/test_capability_contract.py capabilities/common/grag/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/grag/test_capability_contract.py capabilities/common/grag/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and GRAG capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/grag --json` passed with `ok: true`; GRAG remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grag --json` passed with 12 UI routes, 41 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/grag/README.md capabilities/common/grag/SPECIFICATION.md capabilities/common/grag/PLAN.md capabilities/common/grag/cap_spec.md capabilities/common/grag/__init__.py capabilities/common/grag/capability_contract.py capabilities/common/grag/models.py capabilities/common/grag/grag_runtime.py capabilities/common/grag/service.py capabilities/common/grag/api.py capabilities/common/grag/views.py capabilities/common/grag/app.py capabilities/common/grag/test_capability_contract.py capabilities/common/grag/test_package_contract.py capabilities/common/grag/package_manifest.json capabilities/common/grag/release_report.json capabilities/common/grag/semantic_model.json` returned no primary-slice stale markers.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Legacy heavy GRAG tests under `capabilities/common/grag/tests/`.
+- Live Apache AGE/PostgreSQL graph backend.
+- Live vector database or embedding-index backend.
+- Live model provider, Ollama, or external AI adapter.
+- Live Bytewax stream execution.
+- External RAGN, KNGR, GRPH, SRCH, NLPC, AICR, ONTO, META, AUTH, AUDL, MONI,
+  and CACH adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Load, latency, retrieval-quality, reasoning-quality, authorization, and
+  throughput benchmarks.

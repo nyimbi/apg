@@ -1,7 +1,6 @@
 """
-APG GraphRAG Capability - Pydantic v2 Data Models
+APG GraphRAG Capability - Pydantic v2 Data Models and UI metadata helpers
 
-Revolutionary graph-based retrieval-augmented generation with Apache AGE integration.
 Comprehensive data models for knowledge graphs, entities, relationships, and reasoning.
 
 Author: Datacraft (nyimbi@gmail.com)
@@ -13,7 +12,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field, ConfigDict, validator, AfterValidator
@@ -628,6 +627,141 @@ GRAPHRAG_MODELS = {
 }
 
 
+# ============================================================================
+# GENERATED-APP UI HELPERS
+# ============================================================================
+
+from .capability_contract import get_capability_contract
+from .grag_runtime import GragService
+
+
+def capability_routes(tenant_id: str = "default") -> list[dict[str, str]]:
+	return list(get_capability_contract(tenant_id)["ui"]["routes"])
+
+
+def dashboard_model(service: GragService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or GragService()
+	contract = service.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"routes": capability_routes(tenant_id),
+		"summary": service.dashboard_summary(tenant_id),
+		"graph_sources": service.list_graph_sources(tenant_id),
+		"vector_sources": service.list_vector_sources(tenant_id),
+		"hybrid_queries": service.list_hybrid_queries(tenant_id),
+		"reasoning_paths": service.list_reasoning_paths(tenant_id),
+		"answers": service.list_answers(tenant_id),
+		"curations": service.list_curations(tenant_id),
+		"publications": service.list_publications(tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
+		"rules": contract["rule_engine"]["rules"],
+		"theme": contract["theme"],
+	}
+
+
+def query_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"graph_sources": service.list_graph_sources(tenant_id),
+		"vector_sources": service.list_vector_sources(tenant_id),
+		"hybrid_queries": service.list_hybrid_queries(tenant_id),
+		"answers": service.list_answers(tenant_id),
+	}
+
+
+def graph_source_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"graph_sources": service.list_graph_sources(tenant_id),
+		"restricted_sources": [
+			source for source in service.list_graph_sources(tenant_id)
+			if source["metadata"].get("classification") == "restricted"
+		],
+	}
+
+
+def vector_source_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"vector_sources": service.list_vector_sources(tenant_id),
+	}
+
+
+def hybrid_retrieval_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"graph_sources": service.list_graph_sources(tenant_id),
+		"vector_sources": service.list_vector_sources(tenant_id),
+		"hybrid_queries": service.list_hybrid_queries(tenant_id),
+	}
+
+
+def reasoning_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"hybrid_queries": service.list_hybrid_queries(tenant_id),
+		"reasoning_paths": service.list_reasoning_paths(tenant_id),
+	}
+
+
+def provenance_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	answers = service.list_answers(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"answers": answers,
+		"provenance_ref_count": sum(len(answer["metadata"].get("provenance_refs", [])) for answer in answers),
+		"citation_count": sum(int(answer["metadata"].get("citation_count", 0)) for answer in answers),
+	}
+
+
+def generation_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"answers": service.list_answers(tenant_id),
+		"hybrid_queries": service.list_hybrid_queries(tenant_id),
+		"reasoning_paths": service.list_reasoning_paths(tenant_id),
+	}
+
+
+def curation_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"answers": service.list_answers(tenant_id),
+		"curations": service.list_curations(tenant_id),
+		"publications": service.list_publications(tenant_id),
+	}
+
+
+def governance_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rules": contract["rule_engine"]["rules"],
+		"audit_events": service.list_audit_events(tenant_id),
+		"configuration": contract["configuration"],
+	}
+
+
+def audit_timeline_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+	}
+
+
+def settings_model(service: GragService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"theme": contract["theme"],
+		"adapters": contract["configuration"]["adapters"],
+	}
+
+
 __all__ = [
 	# Enums
 	'EntityType', 'RelationshipType', 'QueryType', 'ExplanationLevel',
@@ -662,4 +796,11 @@ __all__ = [
 	
 	# Registry
 	'GRAPHRAG_MODELS',
+
+	# Generated-app UI helpers
+	'capability_routes', 'dashboard_model', 'query_model',
+	'graph_source_model', 'vector_source_model', 'hybrid_retrieval_model',
+	'reasoning_model', 'provenance_model', 'generation_model',
+	'curation_model', 'governance_model', 'audit_timeline_model',
+	'settings_model',
 ]

@@ -5,13 +5,126 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Graph-based RAG package-backed APG capability", "entity_count": 0, "name": "grag", "version": "1.0.0"}, "capabilities": {"grag": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"curation": {"confidence_threshold": 0.75, "expert_review_required": true, "provenance_required": true}, "governance": {"audit_reasoning": true, "graph_access_filter_required": true, "require_tenant_context": true}, "reasoning": {"evidence_required": true, "explanation_required": true, "max_hops": 4}, "retrieval": {"graph_index_required": true, "hybrid_retrieval_enabled": true, "vector_index_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "grag_reasoning_console"}, "ui": {"enable_explanations": true, "enable_graph_curation": true, "enable_query_console": true, "enable_reasoning_paths": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Graph-based RAG", "provides": ["grag_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All GraphRAG operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"query_type": "hybrid", "vector_index_ready": false}, "description": "Hybrid GraphRAG requires vector and graph indexes.", "effect": {"decision": "deny", "reason": "vector_index_required", "required_action": "build_vector_index"}, "name": "hybrid_query_requires_vector_and_graph"}, {"condition": {"graph_index_ready": false, "query_type": "hybrid"}, "description": "Hybrid GraphRAG requires graph index readiness.", "effect": {"decision": "deny", "reason": "graph_index_required", "required_action": "build_graph_index"}, "name": "hybrid_query_requires_graph_index"}, {"condition": {"evidence_path_present": false, "operation": "reason"}, "description": "Graph reasoning requires evidence paths.", "effect": {"decision": "deny", "reason": "evidence_path_required", "required_action": "attach_evidence_path"}, "name": "reasoning_requires_evidence_path"}, {"condition": {"hop_count_gt": 4, "review_recorded": false}, "description": "Deep multi-hop reasoning requires review.", "effect": {"decision": "require_review", "reason": "multi_hop_review_required", "required_action": "record_reasoning_review"}, "name": "multi_hop_requires_review"}, {"condition": {"operation": "generate_answer", "provenance_attached": false}, "description": "Graph-grounded answers require provenance.", "effect": {"decision": "deny", "reason": "provenance_required", "required_action": "attach_provenance"}, "name": "answer_requires_provenance"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All GraphRAG operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"query_type": "hybrid", "vector_index_ready": false}, "description": "Hybrid GraphRAG requires vector and graph indexes.", "effect": {"decision": "deny", "reason": "vector_index_required", "required_action": "build_vector_index"}, "name": "hybrid_query_requires_vector_and_graph"}, {"condition": {"graph_index_ready": false, "query_type": "hybrid"}, "description": "Hybrid GraphRAG requires graph index readiness.", "effect": {"decision": "deny", "reason": "graph_index_required", "required_action": "build_graph_index"}, "name": "hybrid_query_requires_graph_index"}, {"condition": {"evidence_path_present": false, "operation": "reason"}, "description": "Graph reasoning requires evidence paths.", "effect": {"decision": "deny", "reason": "evidence_path_required", "required_action": "attach_evidence_path"}, "name": "reasoning_requires_evidence_path"}, {"condition": {"hop_count_gt": 4, "review_recorded": false}, "description": "Deep multi-hop reasoning requires review.", "effect": {"decision": "require_review", "reason": "multi_hop_review_required", "required_action": "record_reasoning_review"}, "name": "multi_hop_requires_review"}, {"condition": {"operation": "generate_answer", "provenance_attached": false}, "description": "Graph-grounded answers require provenance.", "effect": {"decision": "deny", "reason": "provenance_required", "required_action": "attach_provenance"}, "name": "answer_requires_provenance"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"curation": {"component": "GraphCuration", "permission": "grag:curate", "route": "/grag/curation"}, "dashboard": {"component": "GRAGDashboard", "permission": "grag:view", "route": "/grag/dashboard"}, "explanations": {"component": "ExplanationWorkbench", "permission": "grag:reason", "route": "/grag/explanations"}, "graphs": {"component": "GraphContextManager", "permission": "grag:manage_graphs", "route": "/grag/graphs"}, "query": {"component": "GraphRAGQuery", "permission": "grag:query", "route": "/grag/query"}, "reasoning": {"component": "ReasoningPathExplorer", "permission": "grag:reason", "route": "/grag/reasoning"}, "settings": {"component": "GRAGSettings", "permission": "grag:admin", "route": "/grag/settings"}}, "streaming": {}, "theme": {"components": {"curation_queue": {"threshold_style": "quality-band", "visual": "review-list"}, "hybrid_result": {"icon": "network", "risk_style": "evidence-band", "status_indicator": "fusion-pill"}, "provenance_panel": {"status_style": "confidence-pill", "visual": "source-graph"}, "reasoning_path": {"highlight": "hop-chip", "visual": "multi-hop-path"}}, "name": "grag_reasoning_console", "tokens": {"border.radius": "8px", "color.accent": "#86BBD8", "color.danger": "#C53030", "color.primary": "#2F4858", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/grag/api/v1", "requires_theme": true, "routes": [{"component": "GRAGDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/grag/dashboard", "permission": "grag:view"}, {"component": "GraphRAGQuery", "name": "query", "nav_group": "Ask", "path": "/grag/query", "permission": "grag:query"}, {"component": "ReasoningPathExplorer", "name": "reasoning", "nav_group": "Reasoning", "path": "/grag/reasoning", "permission": "grag:reason"}, {"component": "GraphContextManager", "name": "graphs", "nav_group": "Graphs", "path": "/grag/graphs", "permission": "grag:manage_graphs"}, {"component": "GraphCuration", "name": "curation", "nav_group": "Curation", "path": "/grag/curation", "permission": "grag:curate"}, {"component": "ExplanationWorkbench", "name": "explanations", "nav_group": "Reasoning", "path": "/grag/explanations", "permission": "grag:reason"}, {"component": "GRAGSettings", "name": "settings", "nav_group": "Administration", "path": "/grag/settings", "permission": "grag:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"grag": []}}, "contracts": {"grag": {"configuration": {"curation": {"confidence_threshold": 0.75, "expert_review_required": true, "provenance_required": true}, "governance": {"audit_reasoning": true, "graph_access_filter_required": true, "require_tenant_context": true}, "reasoning": {"evidence_required": true, "explanation_required": true, "max_hops": 4}, "retrieval": {"graph_index_required": true, "hybrid_retrieval_enabled": true, "vector_index_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "grag_reasoning_console"}, "ui": {"enable_explanations": true, "enable_graph_curation": true, "enable_query_console": true, "enable_reasoning_paths": true}}, "id": "grag", "provides": ["grag_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"grag": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"answer_requires_provenance": {"condition": {"operation": "generate_answer", "provenance_attached": false}, "description": "Graph-grounded answers require provenance.", "effect": {"decision": "deny", "reason": "provenance_required", "required_action": "attach_provenance"}, "name": "answer_requires_provenance"}, "hybrid_query_requires_graph_index": {"condition": {"graph_index_ready": false, "query_type": "hybrid"}, "description": "Hybrid GraphRAG requires graph index readiness.", "effect": {"decision": "deny", "reason": "graph_index_required", "required_action": "build_graph_index"}, "name": "hybrid_query_requires_graph_index"}, "hybrid_query_requires_vector_and_graph": {"condition": {"query_type": "hybrid", "vector_index_ready": false}, "description": "Hybrid GraphRAG requires vector and graph indexes.", "effect": {"decision": "deny", "reason": "vector_index_required", "required_action": "build_vector_index"}, "name": "hybrid_query_requires_vector_and_graph"}, "multi_hop_requires_review": {"condition": {"hop_count_gt": 4, "review_recorded": false}, "description": "Deep multi-hop reasoning requires review.", "effect": {"decision": "require_review", "reason": "multi_hop_review_required", "required_action": "record_reasoning_review"}, "name": "multi_hop_requires_review"}, "reasoning_requires_evidence_path": {"condition": {"evidence_path_present": false, "operation": "reason"}, "description": "Graph reasoning requires evidence paths.", "effect": {"decision": "deny", "reason": "evidence_path_required", "required_action": "attach_evidence_path"}, "name": "reasoning_requires_evidence_path"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All GraphRAG operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.grag": {"file": "capability_contract.py", "id": "capability.grag", "kind": "capability", "name": "Graph-based RAG", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("grag_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "grag",
+			"version": "1.0.0",
+			"description": "Graph-based RAG package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"grag": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"grag": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["grag_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"graph_source_retirement": "GragRecord",
+					"large_result_window": "GragRecord",
+					"low_retrieval_confidence": "GragRecord",
+					"deep_reasoning_path": "GragRecord",
+					"low_answer_confidence": "GragRecord",
+					"answer_publication": "GragRecord",
+				},
+				"graph_rag_lifecycle": {
+					"graph_source": "GragRecord",
+					"vector_source": "GragRecord",
+					"hybrid_query": "GragRecord",
+					"reasoning_path": "GragRecord",
+					"answer": "GragRecord",
+					"curation": "GragRecord",
+					"publication": "GragRecord",
+					"audit": "GragRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"grag": {
+				"id": "grag",
+				"configuration": contract["configuration"],
+				"provides": ["grag_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"grag": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "grag_runtime.py", "api.py", "views.py"],
+		"symbols": {
+			"capability.grag": {
+				"id": "capability.grag",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +149,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("grag", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "grag" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("GRAG semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("GRAG semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("GRAG adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "grag_runtime.GragService":
+		errors.append("GRAG generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

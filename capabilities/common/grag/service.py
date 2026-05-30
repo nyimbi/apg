@@ -1,7 +1,7 @@
 """
 APG GraphRAG Capability - Core Service Layer
 
-Revolutionary graph-based retrieval-augmented generation with Apache AGE integration.
+Graph-based retrieval-augmented generation with Apache AGE integration.
 Comprehensive GraphRAG operations including document processing, graph construction,
 hybrid retrieval, multi-hop reasoning, and intelligent generation.
 
