@@ -16,6 +16,90 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:28 EAT
+
+FIN APY accounts payable lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the
+  `apy_accounts_payable` capability, and replaced `cap_spec.md` with the
+  active package summary.
+- Replaced stale generated APY notes and deployment/user docs with current
+  package documentation for vendor, invoice, matching, approval, hold,
+  payment, expense, close, AP-agent, UI, theme, adapter, and Bytewax
+  lifecycle behavior.
+- Replaced the generic contract with explicit vendor, invoice, matching,
+  approval, hold, payment, expense, close, AP-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  vendor owner/tax/payment/bank review, invoice vendor/number/currency/amount
+  and document evidence, duplicate review, PO receipt evidence, matching
+  variance review, invoice approval and separation of duties, payment
+  eligibility, payment batch review, hold controls, expense employee/amount/
+  receipt and policy review, period close blockers, AP batch/event Bytewax
+  streams, AP-agent runtime/role, and privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light AP lifecycle helpers for vendors, invoices, matching,
+  approvals, holds, payments, payment batches, expense reports, period close,
+  AP-agent registration, batch validation, dashboard summaries, aging
+  summaries, audit events, API helpers, and screen models.
+- Preserved `APService` as a compatibility alias while keeping optional web
+  and database imports out of the top-level APG surface.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, vendor, invoice, matching, payment, expense,
+  close, and guardrail behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fin/apy/accounts_payable/__init__.py
+  capabilities/fin/apy/accounts_payable/capability_contract.py
+  capabilities/fin/apy/accounts_payable/service.py
+  capabilities/fin/apy/accounts_payable/api.py
+  capabilities/fin/apy/accounts_payable/views.py
+  capabilities/fin/apy/accounts_payable/app.py
+  capabilities/fin/apy/accounts_payable/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q
+  capabilities/fin/apy/accounts_payable/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fin/apy/accounts_payable/app.py` passed
+  package self-test.
+- `./.venv/bin/apg capabilities inspect apy_accounts_payable --json`
+  confirmed `ok: true`, 11 routes, 35 rules, and
+  `apy_accounts_payable_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fin/apy/accounts_payable --json` confirmed side-effect-free
+  publish planning with Bytewax stream metadata and no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fin/apy/accounts_payable --json` passed with
+  `domain_specific` implementation level and 0 baseline markers.
+- `jq '.capabilities.apy_accounts_payable.streaming.processor,
+  .capabilities.apy_accounts_payable.provides,
+  .capabilities.apy_accounts_payable.requires,
+  .capabilities.apy_accounts_payable.screens.agents.route,
+  (.capabilities.apy_accounts_payable.rules[] |
+  select(.name=="ap_agent_runtime_supported") | .effect.reason),
+  (.capabilities.apy_accounts_payable.rules[] |
+  select(.name=="ap_batch_requires_bytewax") | .effect.reason)'
+  capabilities/fin/apy/accounts_payable/semantic_model.json` confirmed
+  `bytewax`, AP-agent provides, required services,
+  `/apy-accounts-payable/agents`, `ap_agent_runtime_not_supported`, and
+  `bytewax_event_stream_required`.
+- `./.venv/bin/python -c "from capabilities.fin.apy.accounts_payable import
+  AccountsPayableService; service=AccountsPayableService();
+  vendor=service.register_vendor('vendor','tenant-proof','Vendor','owner',
+  'tax','ach'); service.register_ap_agent('tenant-proof','Proof agent',
+  'codex','payment_run_reviewer','review payments');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  AP-agent registration, audit event emission, and Bytewax stream metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- Not run: durable AP stores, live GL/cash/document/audit/notification/auth
+  adapters, durable Bytewax topology, rendered browser UI, AP
+  performance/failover checks, and full repository tests.
+
 ### 2026-05-30 23:16 EAT
 
 INTEL CRAWLER source collection lifecycle/guardrail packet:

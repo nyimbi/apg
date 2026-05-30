@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Core Financials - Accounts Payable",
+  "display_name": "Accounts Payable",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,41 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "2.0.0"
+  "route_count": 11,
+  "rule_count": 35,
+  "streaming": {
+    "events": [
+      "vendor_registered",
+      "invoice_recorded",
+      "invoice_matched",
+      "invoice_approved",
+      "invoice_hold_placed",
+      "payment_scheduled",
+      "payment_batch_released",
+      "expense_report_recorded",
+      "period_closed",
+      "ap_agent_registered"
+    ],
+    "guardrails": [
+      "ap_batch_requires_bytewax",
+      "ap_event_requires_bytewax",
+      "privileged_agent_ap_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "captured",
+      "matched",
+      "approved",
+      "held",
+      "scheduled",
+      "paid",
+      "closed",
+      "blocked"
+    ],
+    "stream": "apg.fin.apy.lifecycle"
+  },
+  "version": "2.1.0"
 }

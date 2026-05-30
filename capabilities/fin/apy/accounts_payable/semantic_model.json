@@ -1,60 +1,149 @@
 {
   "agents": {},
   "app": {
-    "description": "Core Financials - Accounts Payable package-backed APG capability",
-    "entity_count": 0,
+    "description": "Accounts payable package-backed APG capability",
+    "entity_count": 8,
     "name": "apy_accounts_payable",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "apy_accounts_payable": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Apy",
-          "enabled": true,
-          "id": "apy_accounts_payable",
-          "name": "Core Financials - Accounts Payable",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/apy/accounts_payable/cap_spec.md",
-          "version": "2.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "cash_management": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "ap_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "vendor_risk_reviewer",
+            "invoice_exception_reviewer",
+            "matching_reviewer",
+            "payment_run_reviewer",
+            "cash_flow_reviewer",
+            "close_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "approvals": {
+          "approval_required_for_high_value": true,
+          "high_value_threshold": 10000,
+          "separation_of_duties_required": true
+        },
+        "close": {
+          "aging_review_required": true,
+          "open_exception_block": true,
+          "unposted_invoice_block": true
+        },
+        "expenses": {
+          "employee_required": true,
+          "policy_review_required": true,
+          "receipt_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "holds": {
+          "reason_required": true,
+          "release_approval_required": true
+        },
+        "invoices": {
+          "currency_required": true,
+          "document_reference_required": true,
+          "duplicate_check_required": true,
+          "invoice_number_required": true,
+          "positive_amount_required": true,
+          "vendor_required": true
+        },
+        "matching": {
+          "receipt_required_for_po_invoice": true,
+          "three_way_match_enabled": true,
+          "variance_review_threshold": 0.03
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_close_events": true,
+          "emit_invoice_events": true,
+          "emit_matching_events": true,
+          "emit_payment_events": true,
+          "emit_vendor_events": true,
+          "event_stream": "apg.fin.apy.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "approved_invoice_required": true,
+          "cash_account_required": true,
+          "payment_batch_review_required": true,
+          "positive_amount_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "apy_accounts_payable_operations"
+          "default_theme": "apy_accounts_payable_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_aging": true,
+          "enable_approvals": true,
+          "enable_close": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_expenses": true,
+          "enable_invoices": true,
+          "enable_matching": true,
+          "enable_payments": true,
+          "enable_settings": true,
+          "enable_vendors": true
+        },
+        "vendors": {
+          "bank_review_required": true,
+          "owner_required": true,
+          "payment_method_required": true,
+          "tax_profile_required": true
         }
       },
-      "erp_modules": [
-        "fin"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Core Financials - Accounts Payable",
+      "name": "Accounts Payable",
       "provides": [
-        "apy_accounts_payable_operations"
+        "vendor_payables_lifecycle",
+        "invoice_capture_and_matching",
+        "approval_workflow",
+        "payment_run_lifecycle",
+        "expense_reimbursement_lifecycle",
+        "ap_aging_and_close",
+        "ap_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "cash_management",
+        "document_management"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Core Financials - Accounts Payable operations require tenant context.",
+            "description": "AP operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +156,449 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Core Financials - Accounts Payable write operations require policy enforcement.",
+            "description": "AP writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "ap_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "register_vendor",
+              "vendor_owner_assigned": false
             },
-            "description": "High-risk Core Financials - Accounts Payable operations require review.",
+            "description": "Vendors require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_owner_required",
+              "required_action": "assign_vendor_owner"
+            },
+            "name": "vendor_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_vendor",
+              "tax_profile_present": false
+            },
+            "description": "Vendors require tax profile evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_tax_profile_required",
+              "required_action": "attach_tax_profile"
+            },
+            "name": "vendor_requires_tax_profile"
+          },
+          {
+            "condition": {
+              "operation": "register_vendor",
+              "payment_method_present": false
+            },
+            "description": "Vendors require payment method setup.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_payment_method_required",
+              "required_action": "attach_payment_method"
+            },
+            "name": "vendor_requires_payment_method"
+          },
+          {
+            "condition": {
+              "bank_change": true,
+              "bank_review_recorded": false,
+              "operation": "register_vendor"
+            },
+            "description": "Vendor bank changes require independent review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "vendor_bank_review_required",
+              "required_action": "record_bank_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "vendor_bank_change_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "record_invoice",
+              "vendor_present": false
+            },
+            "description": "Invoices require a registered vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_vendor_required",
+              "required_action": "attach_vendor"
+            },
+            "name": "invoice_requires_vendor"
+          },
+          {
+            "condition": {
+              "invoice_number_present": false,
+              "operation": "record_invoice"
+            },
+            "description": "Invoices require invoice number.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_number_required",
+              "required_action": "record_invoice_number"
+            },
+            "name": "invoice_requires_number"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "record_invoice"
+            },
+            "description": "Invoices require currency.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_currency_required",
+              "required_action": "set_currency"
+            },
+            "name": "invoice_requires_currency"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "record_invoice"
+            },
+            "description": "Invoice amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_amount_must_be_positive",
+              "required_action": "set_positive_amount"
+            },
+            "name": "invoice_amount_positive"
+          },
+          {
+            "condition": {
+              "document_reference_present": false,
+              "operation": "record_invoice"
+            },
+            "description": "Invoices require document reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_document_required",
+              "required_action": "attach_invoice_document"
+            },
+            "name": "invoice_requires_document"
+          },
+          {
+            "condition": {
+              "duplicate_detected": true,
+              "duplicate_review_recorded": false,
+              "operation": "record_invoice"
+            },
+            "description": "Potential duplicate invoices require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "duplicate_invoice_review_required",
+              "required_action": "record_duplicate_review"
+            },
+            "name": "duplicate_invoice_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "match_invoice",
+              "po_backed": true,
+              "receipt_present": false
+            },
+            "description": "PO-backed invoices require receipt evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "receipt_required_for_po_invoice",
+              "required_action": "attach_receipt"
+            },
+            "name": "po_invoice_requires_receipt"
+          },
+          {
+            "condition": {
+              "operation": "match_invoice",
+              "variance_rate_gt": 0.03,
+              "variance_review_recorded": false
+            },
+            "description": "Invoice match variance above threshold requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "matching_variance_review_required",
+              "required_action": "record_variance_review"
+            },
+            "name": "matching_variance_requires_review"
+          },
+          {
+            "condition": {
+              "invoice_present": false,
+              "operation": "approve_invoice"
+            },
+            "description": "Approvals require an invoice.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_invoice_required",
+              "required_action": "attach_invoice"
+            },
+            "name": "approval_requires_invoice"
+          },
+          {
+            "condition": {
+              "amount_gt": 10000,
+              "approval_recorded": false,
+              "operation": "approve_invoice"
+            },
+            "description": "High value invoices require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "high_value_invoice_approval_required",
+              "required_action": "record_approval"
+            },
+            "name": "high_value_invoice_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "approve_invoice",
+              "separation_of_duties_passed": false
+            },
+            "description": "Invoice requester cannot self-approve.",
+            "effect": {
+              "decision": "deny",
+              "reason": "separation_of_duties_required",
+              "required_action": "select_independent_approver"
+            },
+            "name": "approval_requires_separation"
+          },
+          {
+            "condition": {
+              "invoice_approved": false,
+              "operation": "schedule_payment"
+            },
+            "description": "Payments require approved invoices.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approved_invoice_required",
+              "required_action": "approve_invoice"
+            },
+            "name": "payment_requires_approved_invoice"
+          },
+          {
+            "condition": {
+              "operation": "schedule_payment",
+              "payment_amount_lte": 0
+            },
+            "description": "Payment amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_amount_must_be_positive",
+              "required_action": "set_positive_payment_amount"
+            },
+            "name": "payment_amount_positive"
+          },
+          {
+            "condition": {
+              "cash_account_present": false,
+              "operation": "schedule_payment"
+            },
+            "description": "Payments require cash account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_account_required",
+              "required_action": "attach_cash_account"
+            },
+            "name": "payment_requires_cash_account"
+          },
+          {
+            "condition": {
+              "batch_review_recorded": false,
+              "operation": "release_payment_batch"
+            },
+            "description": "Payment batches require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_batch_review_required",
+              "required_action": "record_batch_review"
+            },
+            "name": "payment_batch_requires_review"
+          },
+          {
+            "condition": {
+              "hold_reason_present": false,
+              "operation": "place_invoice_hold"
+            },
+            "description": "Invoice holds require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hold_reason_required",
+              "required_action": "record_hold_reason"
+            },
+            "name": "hold_requires_reason"
+          },
+          {
+            "condition": {
+              "operation": "release_invoice_hold",
+              "release_approval_recorded": false
+            },
+            "description": "Hold release requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hold_release_approval_required",
+              "required_action": "record_release_approval"
+            },
+            "name": "hold_release_requires_approval"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "record_expense_report"
+            },
+            "description": "Expense reports require employee identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "expense_employee_required",
+              "required_action": "attach_employee"
+            },
+            "name": "expense_requires_employee"
+          },
+          {
+            "condition": {
+              "expense_amount_lte": 0,
+              "operation": "record_expense_report"
+            },
+            "description": "Expense report amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "expense_amount_must_be_positive",
+              "required_action": "set_positive_expense_amount"
+            },
+            "name": "expense_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "record_expense_report",
+              "receipt_present": false
+            },
+            "description": "Expense reports require receipts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "expense_receipt_required",
+              "required_action": "attach_receipt"
+            },
+            "name": "expense_requires_receipt"
+          },
+          {
+            "condition": {
+              "operation": "record_expense_report",
+              "policy_exception": true,
+              "policy_review_recorded": false
+            },
+            "description": "Expense policy exceptions require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "expense_policy_review_required",
+              "required_action": "record_policy_review"
+            },
+            "name": "expense_policy_exception_requires_review"
+          },
+          {
+            "condition": {
+              "open_exception_count_gt": 0,
+              "operation": "close_period"
+            },
+            "description": "AP period close blocks open exceptions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "open_ap_exceptions_block_close",
+              "required_action": "resolve_open_exceptions"
+            },
+            "name": "period_close_blocks_open_exceptions"
+          },
+          {
+            "condition": {
+              "operation": "close_period",
+              "unposted_invoice_count_gt": 0
+            },
+            "description": "AP period close blocks unposted invoices.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unposted_invoices_block_close",
+              "required_action": "post_or_hold_invoices"
+            },
+            "name": "period_close_blocks_unposted_invoices"
+          },
+          {
+            "condition": {
+              "aging_review_recorded": false,
+              "operation": "close_period"
+            },
+            "description": "AP period close requires aging review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aging_review_required",
+              "required_action": "record_aging_review"
+            },
+            "name": "period_close_requires_aging_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "ap_batch"
+            },
+            "description": "AP batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_ap_batch_to_bytewax"
+            },
+            "name": "ap_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "ap_event"
+            },
+            "description": "AP lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_ap_event_to_bytewax"
+            },
+            "name": "ap_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_ap_agent"
+            },
+            "description": "AP agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ap_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "ap_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_ap_agent"
+            },
+            "description": "AP agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ap_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "ap_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_ap_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged AP actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_ap_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +608,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Core Financials - Accounts Payable operations require tenant context.",
+          "description": "AP operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +621,449 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Core Financials - Accounts Payable write operations require policy enforcement.",
+          "description": "AP writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "ap_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "register_vendor",
+            "vendor_owner_assigned": false
           },
-          "description": "High-risk Core Financials - Accounts Payable operations require review.",
+          "description": "Vendors require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_owner_required",
+            "required_action": "assign_vendor_owner"
+          },
+          "name": "vendor_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_vendor",
+            "tax_profile_present": false
+          },
+          "description": "Vendors require tax profile evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_tax_profile_required",
+            "required_action": "attach_tax_profile"
+          },
+          "name": "vendor_requires_tax_profile"
+        },
+        {
+          "condition": {
+            "operation": "register_vendor",
+            "payment_method_present": false
+          },
+          "description": "Vendors require payment method setup.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_payment_method_required",
+            "required_action": "attach_payment_method"
+          },
+          "name": "vendor_requires_payment_method"
+        },
+        {
+          "condition": {
+            "bank_change": true,
+            "bank_review_recorded": false,
+            "operation": "register_vendor"
+          },
+          "description": "Vendor bank changes require independent review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "vendor_bank_review_required",
+            "required_action": "record_bank_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "vendor_bank_change_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "record_invoice",
+            "vendor_present": false
+          },
+          "description": "Invoices require a registered vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_vendor_required",
+            "required_action": "attach_vendor"
+          },
+          "name": "invoice_requires_vendor"
+        },
+        {
+          "condition": {
+            "invoice_number_present": false,
+            "operation": "record_invoice"
+          },
+          "description": "Invoices require invoice number.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_number_required",
+            "required_action": "record_invoice_number"
+          },
+          "name": "invoice_requires_number"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "record_invoice"
+          },
+          "description": "Invoices require currency.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_currency_required",
+            "required_action": "set_currency"
+          },
+          "name": "invoice_requires_currency"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "record_invoice"
+          },
+          "description": "Invoice amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_amount_must_be_positive",
+            "required_action": "set_positive_amount"
+          },
+          "name": "invoice_amount_positive"
+        },
+        {
+          "condition": {
+            "document_reference_present": false,
+            "operation": "record_invoice"
+          },
+          "description": "Invoices require document reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_document_required",
+            "required_action": "attach_invoice_document"
+          },
+          "name": "invoice_requires_document"
+        },
+        {
+          "condition": {
+            "duplicate_detected": true,
+            "duplicate_review_recorded": false,
+            "operation": "record_invoice"
+          },
+          "description": "Potential duplicate invoices require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "duplicate_invoice_review_required",
+            "required_action": "record_duplicate_review"
+          },
+          "name": "duplicate_invoice_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "match_invoice",
+            "po_backed": true,
+            "receipt_present": false
+          },
+          "description": "PO-backed invoices require receipt evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "receipt_required_for_po_invoice",
+            "required_action": "attach_receipt"
+          },
+          "name": "po_invoice_requires_receipt"
+        },
+        {
+          "condition": {
+            "operation": "match_invoice",
+            "variance_rate_gt": 0.03,
+            "variance_review_recorded": false
+          },
+          "description": "Invoice match variance above threshold requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "matching_variance_review_required",
+            "required_action": "record_variance_review"
+          },
+          "name": "matching_variance_requires_review"
+        },
+        {
+          "condition": {
+            "invoice_present": false,
+            "operation": "approve_invoice"
+          },
+          "description": "Approvals require an invoice.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_invoice_required",
+            "required_action": "attach_invoice"
+          },
+          "name": "approval_requires_invoice"
+        },
+        {
+          "condition": {
+            "amount_gt": 10000,
+            "approval_recorded": false,
+            "operation": "approve_invoice"
+          },
+          "description": "High value invoices require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "high_value_invoice_approval_required",
+            "required_action": "record_approval"
+          },
+          "name": "high_value_invoice_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "approve_invoice",
+            "separation_of_duties_passed": false
+          },
+          "description": "Invoice requester cannot self-approve.",
+          "effect": {
+            "decision": "deny",
+            "reason": "separation_of_duties_required",
+            "required_action": "select_independent_approver"
+          },
+          "name": "approval_requires_separation"
+        },
+        {
+          "condition": {
+            "invoice_approved": false,
+            "operation": "schedule_payment"
+          },
+          "description": "Payments require approved invoices.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approved_invoice_required",
+            "required_action": "approve_invoice"
+          },
+          "name": "payment_requires_approved_invoice"
+        },
+        {
+          "condition": {
+            "operation": "schedule_payment",
+            "payment_amount_lte": 0
+          },
+          "description": "Payment amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_amount_must_be_positive",
+            "required_action": "set_positive_payment_amount"
+          },
+          "name": "payment_amount_positive"
+        },
+        {
+          "condition": {
+            "cash_account_present": false,
+            "operation": "schedule_payment"
+          },
+          "description": "Payments require cash account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_account_required",
+            "required_action": "attach_cash_account"
+          },
+          "name": "payment_requires_cash_account"
+        },
+        {
+          "condition": {
+            "batch_review_recorded": false,
+            "operation": "release_payment_batch"
+          },
+          "description": "Payment batches require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_batch_review_required",
+            "required_action": "record_batch_review"
+          },
+          "name": "payment_batch_requires_review"
+        },
+        {
+          "condition": {
+            "hold_reason_present": false,
+            "operation": "place_invoice_hold"
+          },
+          "description": "Invoice holds require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hold_reason_required",
+            "required_action": "record_hold_reason"
+          },
+          "name": "hold_requires_reason"
+        },
+        {
+          "condition": {
+            "operation": "release_invoice_hold",
+            "release_approval_recorded": false
+          },
+          "description": "Hold release requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hold_release_approval_required",
+            "required_action": "record_release_approval"
+          },
+          "name": "hold_release_requires_approval"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "record_expense_report"
+          },
+          "description": "Expense reports require employee identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "expense_employee_required",
+            "required_action": "attach_employee"
+          },
+          "name": "expense_requires_employee"
+        },
+        {
+          "condition": {
+            "expense_amount_lte": 0,
+            "operation": "record_expense_report"
+          },
+          "description": "Expense report amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "expense_amount_must_be_positive",
+            "required_action": "set_positive_expense_amount"
+          },
+          "name": "expense_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "record_expense_report",
+            "receipt_present": false
+          },
+          "description": "Expense reports require receipts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "expense_receipt_required",
+            "required_action": "attach_receipt"
+          },
+          "name": "expense_requires_receipt"
+        },
+        {
+          "condition": {
+            "operation": "record_expense_report",
+            "policy_exception": true,
+            "policy_review_recorded": false
+          },
+          "description": "Expense policy exceptions require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "expense_policy_review_required",
+            "required_action": "record_policy_review"
+          },
+          "name": "expense_policy_exception_requires_review"
+        },
+        {
+          "condition": {
+            "open_exception_count_gt": 0,
+            "operation": "close_period"
+          },
+          "description": "AP period close blocks open exceptions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "open_ap_exceptions_block_close",
+            "required_action": "resolve_open_exceptions"
+          },
+          "name": "period_close_blocks_open_exceptions"
+        },
+        {
+          "condition": {
+            "operation": "close_period",
+            "unposted_invoice_count_gt": 0
+          },
+          "description": "AP period close blocks unposted invoices.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unposted_invoices_block_close",
+            "required_action": "post_or_hold_invoices"
+          },
+          "name": "period_close_blocks_unposted_invoices"
+        },
+        {
+          "condition": {
+            "aging_review_recorded": false,
+            "operation": "close_period"
+          },
+          "description": "AP period close requires aging review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aging_review_required",
+            "required_action": "record_aging_review"
+          },
+          "name": "period_close_requires_aging_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "ap_batch"
+          },
+          "description": "AP batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_ap_batch_to_bytewax"
+          },
+          "name": "ap_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "ap_event"
+          },
+          "description": "AP lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_ap_event_to_bytewax"
+          },
+          "name": "ap_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_ap_agent"
+          },
+          "description": "AP agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ap_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "ap_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_ap_agent"
+          },
+          "description": "AP agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ap_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "ap_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_ap_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged AP actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_ap_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +1073,137 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "APAgentWorkbench",
+          "permission": "apy_accounts_payable:admin",
+          "route": "/apy-accounts-payable/agents"
+        },
+        "aging": {
+          "component": "APAgingAnalysis",
+          "permission": "apy_accounts_payable:view",
+          "route": "/apy-accounts-payable/aging"
+        },
+        "approvals": {
+          "component": "APApprovalQueue",
+          "permission": "apy_accounts_payable:approve",
+          "route": "/apy-accounts-payable/approvals"
+        },
+        "close": {
+          "component": "APCloseWorkbench",
+          "permission": "apy_accounts_payable:close",
+          "route": "/apy-accounts-payable/close"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "APDashboard",
           "permission": "apy_accounts_payable:view",
           "route": "/apy-accounts-payable/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "apy_accounts_payable:operate",
-          "route": "/apy-accounts-payable/operations"
+        "expenses": {
+          "component": "ExpenseReportConsole",
+          "permission": "apy_accounts_payable:expenses",
+          "route": "/apy-accounts-payable/expenses"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "apy_accounts_payable:govern",
-          "route": "/apy-accounts-payable/rules"
+        "invoices": {
+          "component": "InvoiceWorkbench",
+          "permission": "apy_accounts_payable:manage_invoices",
+          "route": "/apy-accounts-payable/invoices"
+        },
+        "matching": {
+          "component": "InvoiceMatchingConsole",
+          "permission": "apy_accounts_payable:match",
+          "route": "/apy-accounts-payable/matching"
+        },
+        "payments": {
+          "component": "PaymentRunConsole",
+          "permission": "apy_accounts_payable:pay",
+          "route": "/apy-accounts-payable/payments"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "APSettings",
           "permission": "apy_accounts_payable:admin",
           "route": "/apy-accounts-payable/settings"
+        },
+        "vendors": {
+          "component": "VendorRegistry",
+          "permission": "apy_accounts_payable:manage_vendors",
+          "route": "/apy-accounts-payable/vendors"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "vendor_registered",
+          "invoice_recorded",
+          "invoice_matched",
+          "invoice_approved",
+          "invoice_hold_placed",
+          "payment_scheduled",
+          "payment_batch_released",
+          "expense_report_recorded",
+          "period_closed",
+          "ap_agent_registered"
+        ],
+        "guardrails": [
+          "ap_batch_requires_bytewax",
+          "ap_event_requires_bytewax",
+          "privileged_agent_ap_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "captured",
+          "matched",
+          "approved",
+          "held",
+          "scheduled",
+          "paid",
+          "closed",
+          "blocked"
+        ],
+        "stream": "apg.fin.apy.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "aging": {
+            "status_style": "aging-chip",
+            "visual": "aging-buckets"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "approvals": {
+            "status_style": "approval-chip",
+            "visual": "approval-queue"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "close": {
+            "status_style": "period-chip",
+            "visual": "close-checklist"
+          },
+          "expenses": {
+            "status_style": "policy-chip",
+            "visual": "receipt-list"
+          },
+          "invoices": {
+            "status_style": "invoice-chip",
+            "visual": "invoice-table"
+          },
+          "matching": {
+            "status_style": "variance-chip",
+            "visual": "match-grid"
+          },
+          "payments": {
+            "status_style": "cash-chip",
+            "visual": "payment-run"
+          },
+          "vendors": {
+            "icon": "building-2",
+            "risk_style": "risk-band",
+            "status_indicator": "vendor-pill"
           }
         },
-        "name": "apy_accounts_payable_operations",
+        "name": "apy_accounts_payable_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1223,77 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "APDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/apy-accounts-payable/dashboard",
             "permission": "apy_accounts_payable:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/apy-accounts-payable/operations",
-            "permission": "apy_accounts_payable:operate"
+            "component": "VendorRegistry",
+            "name": "vendors",
+            "nav_group": "Vendors",
+            "path": "/apy-accounts-payable/vendors",
+            "permission": "apy_accounts_payable:manage_vendors"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/apy-accounts-payable/rules",
-            "permission": "apy_accounts_payable:govern"
+            "component": "InvoiceWorkbench",
+            "name": "invoices",
+            "nav_group": "Invoices",
+            "path": "/apy-accounts-payable/invoices",
+            "permission": "apy_accounts_payable:manage_invoices"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "InvoiceMatchingConsole",
+            "name": "matching",
+            "nav_group": "Invoices",
+            "path": "/apy-accounts-payable/matching",
+            "permission": "apy_accounts_payable:match"
+          },
+          {
+            "component": "APApprovalQueue",
+            "name": "approvals",
+            "nav_group": "Approvals",
+            "path": "/apy-accounts-payable/approvals",
+            "permission": "apy_accounts_payable:approve"
+          },
+          {
+            "component": "PaymentRunConsole",
+            "name": "payments",
+            "nav_group": "Payments",
+            "path": "/apy-accounts-payable/payments",
+            "permission": "apy_accounts_payable:pay"
+          },
+          {
+            "component": "ExpenseReportConsole",
+            "name": "expenses",
+            "nav_group": "Expenses",
+            "path": "/apy-accounts-payable/expenses",
+            "permission": "apy_accounts_payable:expenses"
+          },
+          {
+            "component": "APAgingAnalysis",
+            "name": "aging",
+            "nav_group": "Close",
+            "path": "/apy-accounts-payable/aging",
+            "permission": "apy_accounts_payable:view"
+          },
+          {
+            "component": "APCloseWorkbench",
+            "name": "close",
+            "nav_group": "Close",
+            "path": "/apy-accounts-payable/close",
+            "permission": "apy_accounts_payable:close"
+          },
+          {
+            "component": "APAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/apy-accounts-payable/agents",
+            "permission": "apy_accounts_payable:admin"
+          },
+          {
+            "component": "APSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/apy-accounts-payable/settings",
@@ -238,46 +1310,168 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "accounts_payable": {
+        "supported_roles": [
+          "vendor_risk_reviewer",
+          "invoice_exception_reviewer",
+          "matching_reviewer",
+          "payment_run_reviewer",
+          "cash_flow_reviewer",
+          "close_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "apy_accounts_payable": []
+      "apy_accounts_payable": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "cash_management",
+        "document_management"
+      ]
     }
   },
   "contracts": {
     "apy_accounts_payable": {
       "configuration": {
-        "capability": {
-          "category": "Apy",
-          "enabled": true,
-          "id": "apy_accounts_payable",
-          "name": "Core Financials - Accounts Payable",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/apy/accounts_payable/cap_spec.md",
-          "version": "2.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "cash_management": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "ap_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "vendor_risk_reviewer",
+            "invoice_exception_reviewer",
+            "matching_reviewer",
+            "payment_run_reviewer",
+            "cash_flow_reviewer",
+            "close_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "approvals": {
+          "approval_required_for_high_value": true,
+          "high_value_threshold": 10000,
+          "separation_of_duties_required": true
+        },
+        "close": {
+          "aging_review_required": true,
+          "open_exception_block": true,
+          "unposted_invoice_block": true
+        },
+        "expenses": {
+          "employee_required": true,
+          "policy_review_required": true,
+          "receipt_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "holds": {
+          "reason_required": true,
+          "release_approval_required": true
+        },
+        "invoices": {
+          "currency_required": true,
+          "document_reference_required": true,
+          "duplicate_check_required": true,
+          "invoice_number_required": true,
+          "positive_amount_required": true,
+          "vendor_required": true
+        },
+        "matching": {
+          "receipt_required_for_po_invoice": true,
+          "three_way_match_enabled": true,
+          "variance_review_threshold": 0.03
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_close_events": true,
+          "emit_invoice_events": true,
+          "emit_matching_events": true,
+          "emit_payment_events": true,
+          "emit_vendor_events": true,
+          "event_stream": "apg.fin.apy.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "approved_invoice_required": true,
+          "cash_account_required": true,
+          "payment_batch_review_required": true,
+          "positive_amount_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "apy_accounts_payable_operations"
+          "default_theme": "apy_accounts_payable_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_aging": true,
+          "enable_approvals": true,
+          "enable_close": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_expenses": true,
+          "enable_invoices": true,
+          "enable_matching": true,
+          "enable_payments": true,
+          "enable_settings": true,
+          "enable_vendors": true
+        },
+        "vendors": {
+          "bank_review_required": true,
+          "owner_required": true,
+          "payment_method_required": true,
+          "tax_profile_required": true
         }
       },
       "id": "apy_accounts_payable",
       "provides": [
-        "apy_accounts_payable_operations"
+        "vendor_payables_lifecycle",
+        "invoice_capture_and_matching",
+        "approval_workflow",
+        "payment_run_lifecycle",
+        "expense_reimbursement_lifecycle",
+        "ap_aging_and_close",
+        "ap_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "cash_management",
+        "document_management"
+      ]
     }
   },
   "deployment": {
@@ -289,89 +1483,479 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 8,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "apy_accounts_payable": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "ap_agent_role_supported": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "agent_role_supported": false,
+        "operation": "register_ap_agent"
       },
-      "description": "High-risk Core Financials - Accounts Payable operations require review.",
+      "description": "AP agents must use an approved role.",
       "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "decision": "deny",
+        "reason": "ap_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
       },
-      "name": "high_risk_requires_review"
+      "name": "ap_agent_role_supported"
     },
-    "operation_policy_required": {
+    "ap_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_ap_agent"
+      },
+      "description": "AP agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ap_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "ap_agent_runtime_supported"
+    },
+    "ap_batch_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "ap_batch"
+      },
+      "description": "AP batches require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_ap_batch_to_bytewax"
+      },
+      "name": "ap_batch_requires_bytewax"
+    },
+    "ap_event_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "ap_event"
+      },
+      "description": "AP lifecycle events require Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_ap_event_to_bytewax"
+      },
+      "name": "ap_event_requires_bytewax"
+    },
+    "ap_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Core Financials - Accounts Payable write operations require policy enforcement.",
+      "description": "AP writes require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "ap_write_requires_policy"
+    },
+    "approval_requires_invoice": {
+      "condition": {
+        "invoice_present": false,
+        "operation": "approve_invoice"
+      },
+      "description": "Approvals require an invoice.",
+      "effect": {
+        "decision": "deny",
+        "reason": "approval_invoice_required",
+        "required_action": "attach_invoice"
+      },
+      "name": "approval_requires_invoice"
+    },
+    "approval_requires_separation": {
+      "condition": {
+        "operation": "approve_invoice",
+        "separation_of_duties_passed": false
+      },
+      "description": "Invoice requester cannot self-approve.",
+      "effect": {
+        "decision": "deny",
+        "reason": "separation_of_duties_required",
+        "required_action": "select_independent_approver"
+      },
+      "name": "approval_requires_separation"
+    },
+    "duplicate_invoice_requires_review": {
+      "condition": {
+        "duplicate_detected": true,
+        "duplicate_review_recorded": false,
+        "operation": "record_invoice"
+      },
+      "description": "Potential duplicate invoices require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "duplicate_invoice_review_required",
+        "required_action": "record_duplicate_review"
+      },
+      "name": "duplicate_invoice_requires_review"
+    },
+    "expense_amount_positive": {
+      "condition": {
+        "expense_amount_lte": 0,
+        "operation": "record_expense_report"
+      },
+      "description": "Expense report amount must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "expense_amount_must_be_positive",
+        "required_action": "set_positive_expense_amount"
+      },
+      "name": "expense_amount_positive"
+    },
+    "expense_policy_exception_requires_review": {
+      "condition": {
+        "operation": "record_expense_report",
+        "policy_exception": true,
+        "policy_review_recorded": false
+      },
+      "description": "Expense policy exceptions require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "expense_policy_review_required",
+        "required_action": "record_policy_review"
+      },
+      "name": "expense_policy_exception_requires_review"
+    },
+    "expense_requires_employee": {
+      "condition": {
+        "employee_present": false,
+        "operation": "record_expense_report"
+      },
+      "description": "Expense reports require employee identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "expense_employee_required",
+        "required_action": "attach_employee"
+      },
+      "name": "expense_requires_employee"
+    },
+    "expense_requires_receipt": {
+      "condition": {
+        "operation": "record_expense_report",
+        "receipt_present": false
+      },
+      "description": "Expense reports require receipts.",
+      "effect": {
+        "decision": "deny",
+        "reason": "expense_receipt_required",
+        "required_action": "attach_receipt"
+      },
+      "name": "expense_requires_receipt"
+    },
+    "high_value_invoice_requires_approval": {
+      "condition": {
+        "amount_gt": 10000,
+        "approval_recorded": false,
+        "operation": "approve_invoice"
+      },
+      "description": "High value invoices require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "high_value_invoice_approval_required",
+        "required_action": "record_approval"
+      },
+      "name": "high_value_invoice_requires_approval"
+    },
+    "hold_release_requires_approval": {
+      "condition": {
+        "operation": "release_invoice_hold",
+        "release_approval_recorded": false
+      },
+      "description": "Hold release requires approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "hold_release_approval_required",
+        "required_action": "record_release_approval"
+      },
+      "name": "hold_release_requires_approval"
+    },
+    "hold_requires_reason": {
+      "condition": {
+        "hold_reason_present": false,
+        "operation": "place_invoice_hold"
+      },
+      "description": "Invoice holds require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "hold_reason_required",
+        "required_action": "record_hold_reason"
+      },
+      "name": "hold_requires_reason"
+    },
+    "invoice_amount_positive": {
+      "condition": {
+        "amount_lte": 0,
+        "operation": "record_invoice"
+      },
+      "description": "Invoice amount must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invoice_amount_must_be_positive",
+        "required_action": "set_positive_amount"
+      },
+      "name": "invoice_amount_positive"
+    },
+    "invoice_requires_currency": {
+      "condition": {
+        "currency_present": false,
+        "operation": "record_invoice"
+      },
+      "description": "Invoices require currency.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invoice_currency_required",
+        "required_action": "set_currency"
+      },
+      "name": "invoice_requires_currency"
+    },
+    "invoice_requires_document": {
+      "condition": {
+        "document_reference_present": false,
+        "operation": "record_invoice"
+      },
+      "description": "Invoices require document reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invoice_document_required",
+        "required_action": "attach_invoice_document"
+      },
+      "name": "invoice_requires_document"
+    },
+    "invoice_requires_number": {
+      "condition": {
+        "invoice_number_present": false,
+        "operation": "record_invoice"
+      },
+      "description": "Invoices require invoice number.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invoice_number_required",
+        "required_action": "record_invoice_number"
+      },
+      "name": "invoice_requires_number"
+    },
+    "invoice_requires_vendor": {
+      "condition": {
+        "operation": "record_invoice",
+        "vendor_present": false
+      },
+      "description": "Invoices require a registered vendor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "invoice_vendor_required",
+        "required_action": "attach_vendor"
+      },
+      "name": "invoice_requires_vendor"
+    },
+    "matching_variance_requires_review": {
+      "condition": {
+        "operation": "match_invoice",
+        "variance_rate_gt": 0.03,
+        "variance_review_recorded": false
+      },
+      "description": "Invoice match variance above threshold requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "matching_variance_review_required",
+        "required_action": "record_variance_review"
+      },
+      "name": "matching_variance_requires_review"
+    },
+    "payment_amount_positive": {
+      "condition": {
+        "operation": "schedule_payment",
+        "payment_amount_lte": 0
+      },
+      "description": "Payment amount must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "payment_amount_must_be_positive",
+        "required_action": "set_positive_payment_amount"
+      },
+      "name": "payment_amount_positive"
+    },
+    "payment_batch_requires_review": {
+      "condition": {
+        "batch_review_recorded": false,
+        "operation": "release_payment_batch"
+      },
+      "description": "Payment batches require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "payment_batch_review_required",
+        "required_action": "record_batch_review"
+      },
+      "name": "payment_batch_requires_review"
+    },
+    "payment_requires_approved_invoice": {
+      "condition": {
+        "invoice_approved": false,
+        "operation": "schedule_payment"
+      },
+      "description": "Payments require approved invoices.",
+      "effect": {
+        "decision": "deny",
+        "reason": "approved_invoice_required",
+        "required_action": "approve_invoice"
+      },
+      "name": "payment_requires_approved_invoice"
+    },
+    "payment_requires_cash_account": {
+      "condition": {
+        "cash_account_present": false,
+        "operation": "schedule_payment"
+      },
+      "description": "Payments require cash account.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cash_account_required",
+        "required_action": "attach_cash_account"
+      },
+      "name": "payment_requires_cash_account"
+    },
+    "period_close_blocks_open_exceptions": {
+      "condition": {
+        "open_exception_count_gt": 0,
+        "operation": "close_period"
+      },
+      "description": "AP period close blocks open exceptions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "open_ap_exceptions_block_close",
+        "required_action": "resolve_open_exceptions"
+      },
+      "name": "period_close_blocks_open_exceptions"
+    },
+    "period_close_blocks_unposted_invoices": {
+      "condition": {
+        "operation": "close_period",
+        "unposted_invoice_count_gt": 0
+      },
+      "description": "AP period close blocks unposted invoices.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unposted_invoices_block_close",
+        "required_action": "post_or_hold_invoices"
+      },
+      "name": "period_close_blocks_unposted_invoices"
+    },
+    "period_close_requires_aging_review": {
+      "condition": {
+        "aging_review_recorded": false,
+        "operation": "close_period"
+      },
+      "description": "AP period close requires aging review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "aging_review_required",
+        "required_action": "record_aging_review"
+      },
+      "name": "period_close_requires_aging_review"
+    },
+    "po_invoice_requires_receipt": {
+      "condition": {
+        "operation": "match_invoice",
+        "po_backed": true,
+        "receipt_present": false
+      },
+      "description": "PO-backed invoices require receipt evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "receipt_required_for_po_invoice",
+        "required_action": "attach_receipt"
+      },
+      "name": "po_invoice_requires_receipt"
+    },
+    "privileged_agent_ap_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_ap_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged AP actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_ap_action_requires_human_approval"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Core Financials - Accounts Payable operations require tenant context.",
+      "description": "AP operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.apy_accounts_payable": {
-      "file": "capability_contract.py",
-      "id": "capability.apy_accounts_payable",
-      "kind": "capability",
-      "name": "Core Financials - Accounts Payable",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+    },
+    "vendor_bank_change_requires_review": {
+      "condition": {
+        "bank_change": true,
+        "bank_review_recorded": false,
+        "operation": "register_vendor"
       },
-      "references": []
+      "description": "Vendor bank changes require independent review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "vendor_bank_review_required",
+        "required_action": "record_bank_review"
+      },
+      "name": "vendor_bank_change_requires_review"
+    },
+    "vendor_requires_owner": {
+      "condition": {
+        "operation": "register_vendor",
+        "vendor_owner_assigned": false
+      },
+      "description": "Vendors require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vendor_owner_required",
+        "required_action": "assign_vendor_owner"
+      },
+      "name": "vendor_requires_owner"
+    },
+    "vendor_requires_payment_method": {
+      "condition": {
+        "operation": "register_vendor",
+        "payment_method_present": false
+      },
+      "description": "Vendors require payment method setup.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vendor_payment_method_required",
+        "required_action": "attach_payment_method"
+      },
+      "name": "vendor_requires_payment_method"
+    },
+    "vendor_requires_tax_profile": {
+      "condition": {
+        "operation": "register_vendor",
+        "tax_profile_present": false
+      },
+      "description": "Vendors require tax profile evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "vendor_tax_profile_required",
+        "required_action": "attach_tax_profile"
+      },
+      "name": "vendor_requires_tax_profile"
     }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

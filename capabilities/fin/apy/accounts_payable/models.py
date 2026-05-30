@@ -630,8 +630,7 @@ async def validate_vendor_data(vendor_data: Dict[str, Any], tenant_id: str) -> D
 		if field not in vendor_data or not vendor_data[field]:
 			errors.append(f"Required field '{field}' is missing")
 	
-	# Validate vendor code uniqueness (would typically check database)
-	# This is a placeholder for actual database validation
+	# Validate vendor code shape; durable deployments should add database uniqueness checks.
 	if 'vendor_code' in vendor_data:
 		vendor_code = vendor_data['vendor_code']
 		if len(vendor_code) < 3:

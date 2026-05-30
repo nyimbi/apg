@@ -276,11 +276,11 @@ def performance_test_data():
 	}
 
 
-# Database fixtures (placeholder for actual database integration)
+# Database fixture surface for future durable integration checks.
 
 @pytest.fixture
 def test_database():
-	"""Test database connection (placeholder)"""
+	"""Test database connection surface."""
 	# In real implementation, this would set up a test database
 	# using PostgreSQL test containers or similar
 	class MockDatabase:

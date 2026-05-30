@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
-        "display_name": "Core Financials - Accounts Payable",
+        "display_name": "Accounts Payable",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 11,
+        "rule_count": 35,
+        "streaming_processor": "bytewax",
+        "theme": "apy_accounts_payable_control"
       }
     },
     "self_test": {
       "capability": "apy_accounts_payable",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
