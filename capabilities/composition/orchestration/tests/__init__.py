@@ -1,64 +1,23 @@
-"""
-APG Workflow Orchestration Test Suite
+"""Workflow orchestration tests."""
 
-Comprehensive test suite for workflow orchestration system with >95% code coverage.
-Includes unit tests, integration tests, performance tests, and APG-specific tests.
+TEST_TENANT_ID = "test_tenant"
+TEST_USER_ID = "test_user"
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
-
-__version__ = "1.0.0"
-__author__ = "Nyimbi Odero <nyimbi@gmail.com>"
-__copyright__ = "© 2025 Datacraft. All rights reserved."
-
-# Test suite information
-TEST_SUITE_INFO = {
-	"name": "APG Workflow Orchestration Test Suite",
-	"version": __version__,
-	"coverage_target": 95.0,
-	"test_types": [
-		"unit",
-		"integration", 
-		"performance",
-		"security",
-		"api",
-		"database",
-		"engine",
-		"service",
-		"management",
-		"models"
-	],
-	"apg_integration": True,
-	"async_support": True
-}
-
-# Test markers for pytest
 PYTEST_MARKERS = {
 	"unit": "Unit tests for individual components",
 	"integration": "Integration tests across components",
-	"performance": "Performance and benchmark tests",
-	"security": "Security and vulnerability tests",
-	"api": "API endpoint tests",
-	"database": "Database operation tests", 
-	"engine": "Workflow engine tests",
-	"service": "Service layer tests",
-	"management": "Management layer tests",
-	"models": "Data model tests",
-	"apg": "APG platform integration tests",
-	"slow": "Slow running tests",
-	"redis": "Tests requiring Redis"
+	"package": "Dependency-light package contract tests",
 }
 
-# Export key test utilities
-from .conftest import (
-	TEST_TENANT_ID, TEST_USER_ID, TestHelpers
-)
 
-__all__ = [
-	"TEST_SUITE_INFO",
-	"PYTEST_MARKERS", 
-	"TEST_TENANT_ID",
-	"TEST_USER_ID",
-	"TestHelpers"
-]
+class TestHelpers:
+	"""Small helpers shared by dependency-light package tests."""
+
+	@staticmethod
+	def workflow_task(task_id: str, task_type: str = "automated", **kwargs):
+		payload = {"id": task_id, "type": task_type}
+		payload.update(kwargs)
+		return payload
+
+
+__all__ = ["PYTEST_MARKERS", "TEST_TENANT_ID", "TEST_USER_ID", "TestHelpers"]

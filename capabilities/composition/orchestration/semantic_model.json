@@ -1,60 +1,125 @@
 {
   "agents": {},
   "app": {
-    "description": "Workflow Orchestration package-backed APG capability",
-    "entity_count": 0,
+    "description": "Workflow orchestration package-backed APG capability",
+    "entity_count": 7,
     "name": "composition_orchestration",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "composition_orchestration": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Composition",
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "registry": "adapter",
+          "theme": "adapter"
+        },
+        "automation_agents": {
           "enabled": true,
-          "id": "composition_orchestration",
-          "name": "Workflow Orchestration",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/orchestration/cap_spec.md",
-          "version": "1.0.0"
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "workflow_architect",
+            "bpml_reviewer",
+            "release_reviewer",
+            "incident_reviewer",
+            "compliance_reviewer",
+            "optimization_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+          "bytewax_required": true,
+          "compensation_required_for_transactions": true,
+          "idempotency_required": true,
+          "max_parallel_branches": 64,
+          "retry_limit_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privileged_workflow_changes_reviewed": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_definition_events": true,
+          "emit_execution_events": true,
+          "emit_release_events": true,
+          "event_stream": "apg.composition.orchestration.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "releases": {
+          "approval_required_for_high_risk": true,
+          "dry_run_required": true,
+          "rollback_plan_required": true,
+          "validation_required": true
+        },
+        "tasks": {
+          "approval_policy_required": true,
+          "cross_capability_contract_required": true,
+          "handler_required": true,
+          "human_assignee_required": true,
+          "sla_escalation_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_orchestration_operations"
+          "default_theme": "composition_orchestration_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_definition_library": true,
+          "enable_designer": true,
+          "enable_execution_console": true,
+          "enable_release_console": true,
+          "enable_rule_center": true,
+          "enable_settings": true,
+          "enable_task_console": true
+        },
+        "workflow_definitions": {
+          "cycle_detection_enabled": true,
+          "owner_required": true,
+          "start_event_required": true,
+          "task_graph_required": true,
+          "terminal_state_required": true,
+          "version_required": true
         }
       },
-      "erp_modules": [
-        "composition"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Workflow Orchestration",
       "provides": [
-        "composition_orchestration_operations"
+        "workflow_definition_lifecycle",
+        "workflow_graph_validation",
+        "workflow_execution_lifecycle",
+        "human_task_coordination",
+        "workflow_release_governance",
+        "workflow_rule_enforcement",
+        "workflow_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_events",
+        "composition_config"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Workflow Orchestration operations require tenant context.",
+            "description": "Workflow orchestration operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +132,307 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Workflow Orchestration write operations require policy enforcement.",
+            "description": "Workflow definition and execution write operations require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "workflow_write_requires_policy"
           },
           {
             "condition": {
+              "operation": "define_workflow",
+              "workflow_owner_assigned": false
+            },
+            "description": "Workflow definitions require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_owner_required",
+              "required_action": "assign_workflow_owner"
+            },
+            "name": "workflow_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "define_workflow",
+              "workflow_version_present": false
+            },
+            "description": "Workflow definitions require a version.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_version_required",
+              "required_action": "set_workflow_version"
+            },
+            "name": "workflow_requires_version"
+          },
+          {
+            "condition": {
+              "operation": "define_workflow",
+              "start_event_present": false
+            },
+            "description": "Workflow definitions require at least one start event.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_start_event_required",
+              "required_action": "add_start_event"
+            },
+            "name": "workflow_requires_start_event"
+          },
+          {
+            "condition": {
+              "operation": "define_workflow",
+              "task_graph_present": false
+            },
+            "description": "Workflow definitions require at least one executable task.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_task_graph_required",
+              "required_action": "add_executable_task_graph"
+            },
+            "name": "workflow_requires_task_graph"
+          },
+          {
+            "condition": {
+              "operation": "define_workflow",
+              "terminal_state_present": false
+            },
+            "description": "Workflow definitions require a terminal state.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_terminal_state_required",
+              "required_action": "add_terminal_state"
+            },
+            "name": "workflow_requires_terminal_state"
+          },
+          {
+            "condition": {
+              "handler_present": false,
+              "operation": "define_task"
+            },
+            "description": "Automated and integration tasks require a handler.",
+            "effect": {
+              "decision": "deny",
+              "reason": "task_handler_required",
+              "required_action": "attach_task_handler"
+            },
+            "name": "task_requires_handler"
+          },
+          {
+            "condition": {
+              "assignee_present": false,
+              "human_task": true,
+              "operation": "define_task"
+            },
+            "description": "Human tasks require an assignee, group, or role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_task_assignee_required",
+              "required_action": "assign_human_task"
+            },
+            "name": "human_task_requires_assignee"
+          },
+          {
+            "condition": {
+              "approval_policy_present": false,
+              "approval_task": true,
+              "operation": "define_task"
+            },
+            "description": "Approval tasks require an approval policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_policy_required",
+              "required_action": "attach_approval_policy"
+            },
+            "name": "approval_task_requires_policy"
+          },
+          {
+            "condition": {
+              "capability_contract_present": false,
+              "cross_capability_task": true,
+              "operation": "define_task"
+            },
+            "description": "Cross-capability tasks require an APG capability contract reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capability_contract_required",
+              "required_action": "attach_capability_contract"
+            },
+            "name": "cross_capability_task_requires_contract"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "start_execution"
+            },
+            "description": "Workflow execution lifecycle events must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_execution_lifecycle_to_bytewax"
+            },
+            "name": "execution_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "idempotency_key_present": false,
+              "operation": "start_execution"
+            },
+            "description": "Workflow execution starts require idempotency keys.",
+            "effect": {
+              "decision": "deny",
+              "reason": "idempotency_key_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "execution_requires_idempotency_key"
+          },
+          {
+            "condition": {
+              "operation": "start_execution",
               "review_recorded": false,
               "risk_level": "high"
             },
-            "description": "High-risk Workflow Orchestration operations require review.",
+            "description": "High-risk workflow executions require review.",
             "effect": {
               "decision": "require_review",
               "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "required_action": "record_execution_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "high_risk_execution_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "release_workflow",
+              "validation_evidence_present": false
+            },
+            "description": "Workflow releases require validation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "release_validation_required",
+              "required_action": "attach_validation_evidence"
+            },
+            "name": "release_requires_validation"
+          },
+          {
+            "condition": {
+              "dry_run_passed": false,
+              "operation": "release_workflow"
+            },
+            "description": "Workflow releases require a dry-run result.",
+            "effect": {
+              "decision": "deny",
+              "reason": "release_dry_run_required",
+              "required_action": "run_release_dry_run"
+            },
+            "name": "release_requires_dry_run"
+          },
+          {
+            "condition": {
+              "operation": "release_workflow",
+              "rollback_plan_present": false
+            },
+            "description": "Workflow releases require a rollback plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "release_rollback_plan_required",
+              "required_action": "attach_rollback_plan"
+            },
+            "name": "release_requires_rollback_plan"
+          },
+          {
+            "condition": {
+              "operation": "define_task",
+              "retry_limit_present": false,
+              "retry_policy_present": true
+            },
+            "description": "Retry policies require bounded attempts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retry_limit_required",
+              "required_action": "set_retry_limit"
+            },
+            "name": "retry_policy_requires_limit"
+          },
+          {
+            "condition": {
+              "escalation_present": false,
+              "operation": "define_task",
+              "sla_present": true
+            },
+            "description": "SLA-bound tasks require escalation rules.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "sla_escalation_required",
+              "required_action": "attach_escalation_rule"
+            },
+            "name": "sla_task_requires_escalation"
+          },
+          {
+            "condition": {
+              "compensation_present": false,
+              "operation": "define_workflow",
+              "transactional_workflow": true
+            },
+            "description": "Transactional workflows require compensation steps.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compensation_required",
+              "required_action": "attach_compensation_steps"
+            },
+            "name": "compensation_required_for_transaction"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_schedule"
+            },
+            "description": "Batch execution scheduling requires Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_schedule_to_bytewax"
+            },
+            "name": "batch_schedule_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_workflow_agent"
+            },
+            "description": "Workflow agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "workflow_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_workflow_agent"
+            },
+            "description": "Workflow agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "workflow_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_workflow_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged workflow actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_workflow_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +442,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Workflow Orchestration operations require tenant context.",
+          "description": "Workflow orchestration operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +455,307 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Workflow Orchestration write operations require policy enforcement.",
+          "description": "Workflow definition and execution write operations require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "workflow_write_requires_policy"
         },
         {
           "condition": {
+            "operation": "define_workflow",
+            "workflow_owner_assigned": false
+          },
+          "description": "Workflow definitions require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_owner_required",
+            "required_action": "assign_workflow_owner"
+          },
+          "name": "workflow_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "define_workflow",
+            "workflow_version_present": false
+          },
+          "description": "Workflow definitions require a version.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_version_required",
+            "required_action": "set_workflow_version"
+          },
+          "name": "workflow_requires_version"
+        },
+        {
+          "condition": {
+            "operation": "define_workflow",
+            "start_event_present": false
+          },
+          "description": "Workflow definitions require at least one start event.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_start_event_required",
+            "required_action": "add_start_event"
+          },
+          "name": "workflow_requires_start_event"
+        },
+        {
+          "condition": {
+            "operation": "define_workflow",
+            "task_graph_present": false
+          },
+          "description": "Workflow definitions require at least one executable task.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_task_graph_required",
+            "required_action": "add_executable_task_graph"
+          },
+          "name": "workflow_requires_task_graph"
+        },
+        {
+          "condition": {
+            "operation": "define_workflow",
+            "terminal_state_present": false
+          },
+          "description": "Workflow definitions require a terminal state.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_terminal_state_required",
+            "required_action": "add_terminal_state"
+          },
+          "name": "workflow_requires_terminal_state"
+        },
+        {
+          "condition": {
+            "handler_present": false,
+            "operation": "define_task"
+          },
+          "description": "Automated and integration tasks require a handler.",
+          "effect": {
+            "decision": "deny",
+            "reason": "task_handler_required",
+            "required_action": "attach_task_handler"
+          },
+          "name": "task_requires_handler"
+        },
+        {
+          "condition": {
+            "assignee_present": false,
+            "human_task": true,
+            "operation": "define_task"
+          },
+          "description": "Human tasks require an assignee, group, or role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_task_assignee_required",
+            "required_action": "assign_human_task"
+          },
+          "name": "human_task_requires_assignee"
+        },
+        {
+          "condition": {
+            "approval_policy_present": false,
+            "approval_task": true,
+            "operation": "define_task"
+          },
+          "description": "Approval tasks require an approval policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_policy_required",
+            "required_action": "attach_approval_policy"
+          },
+          "name": "approval_task_requires_policy"
+        },
+        {
+          "condition": {
+            "capability_contract_present": false,
+            "cross_capability_task": true,
+            "operation": "define_task"
+          },
+          "description": "Cross-capability tasks require an APG capability contract reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capability_contract_required",
+            "required_action": "attach_capability_contract"
+          },
+          "name": "cross_capability_task_requires_contract"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "start_execution"
+          },
+          "description": "Workflow execution lifecycle events must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_execution_lifecycle_to_bytewax"
+          },
+          "name": "execution_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "idempotency_key_present": false,
+            "operation": "start_execution"
+          },
+          "description": "Workflow execution starts require idempotency keys.",
+          "effect": {
+            "decision": "deny",
+            "reason": "idempotency_key_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "execution_requires_idempotency_key"
+        },
+        {
+          "condition": {
+            "operation": "start_execution",
             "review_recorded": false,
             "risk_level": "high"
           },
-          "description": "High-risk Workflow Orchestration operations require review.",
+          "description": "High-risk workflow executions require review.",
           "effect": {
             "decision": "require_review",
             "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "required_action": "record_execution_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "high_risk_execution_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "release_workflow",
+            "validation_evidence_present": false
+          },
+          "description": "Workflow releases require validation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "release_validation_required",
+            "required_action": "attach_validation_evidence"
+          },
+          "name": "release_requires_validation"
+        },
+        {
+          "condition": {
+            "dry_run_passed": false,
+            "operation": "release_workflow"
+          },
+          "description": "Workflow releases require a dry-run result.",
+          "effect": {
+            "decision": "deny",
+            "reason": "release_dry_run_required",
+            "required_action": "run_release_dry_run"
+          },
+          "name": "release_requires_dry_run"
+        },
+        {
+          "condition": {
+            "operation": "release_workflow",
+            "rollback_plan_present": false
+          },
+          "description": "Workflow releases require a rollback plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "release_rollback_plan_required",
+            "required_action": "attach_rollback_plan"
+          },
+          "name": "release_requires_rollback_plan"
+        },
+        {
+          "condition": {
+            "operation": "define_task",
+            "retry_limit_present": false,
+            "retry_policy_present": true
+          },
+          "description": "Retry policies require bounded attempts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retry_limit_required",
+            "required_action": "set_retry_limit"
+          },
+          "name": "retry_policy_requires_limit"
+        },
+        {
+          "condition": {
+            "escalation_present": false,
+            "operation": "define_task",
+            "sla_present": true
+          },
+          "description": "SLA-bound tasks require escalation rules.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "sla_escalation_required",
+            "required_action": "attach_escalation_rule"
+          },
+          "name": "sla_task_requires_escalation"
+        },
+        {
+          "condition": {
+            "compensation_present": false,
+            "operation": "define_workflow",
+            "transactional_workflow": true
+          },
+          "description": "Transactional workflows require compensation steps.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compensation_required",
+            "required_action": "attach_compensation_steps"
+          },
+          "name": "compensation_required_for_transaction"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_schedule"
+          },
+          "description": "Batch execution scheduling requires Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_schedule_to_bytewax"
+          },
+          "name": "batch_schedule_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_workflow_agent"
+          },
+          "description": "Workflow agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "workflow_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_workflow_agent"
+          },
+          "description": "Workflow agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "workflow_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_workflow_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged workflow actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_workflow_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +765,115 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "WorkflowAgentWorkbench",
+          "permission": "composition_orchestration:admin",
+          "route": "/composition-orchestration/agents"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "OrchestrationDashboard",
           "permission": "composition_orchestration:view",
           "route": "/composition-orchestration/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
+        "definitions": {
+          "component": "WorkflowDefinitionLibrary",
+          "permission": "composition_orchestration:manage_definitions",
+          "route": "/composition-orchestration/definitions"
+        },
+        "designer": {
+          "component": "WorkflowDesigner",
+          "permission": "composition_orchestration:design",
+          "route": "/composition-orchestration/designer"
+        },
+        "executions": {
+          "component": "WorkflowExecutionConsole",
           "permission": "composition_orchestration:operate",
-          "route": "/composition-orchestration/operations"
+          "route": "/composition-orchestration/executions"
+        },
+        "releases": {
+          "component": "WorkflowReleaseConsole",
+          "permission": "composition_orchestration:release",
+          "route": "/composition-orchestration/releases"
         },
         "rules": {
-          "component": "CapabilityRules",
+          "component": "WorkflowRuleCenter",
           "permission": "composition_orchestration:govern",
           "route": "/composition-orchestration/rules"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "WorkflowSettings",
           "permission": "composition_orchestration:admin",
           "route": "/composition-orchestration/settings"
+        },
+        "tasks": {
+          "component": "WorkflowTaskConsole",
+          "permission": "composition_orchestration:manage_tasks",
+          "route": "/composition-orchestration/tasks"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "workflow_defined",
+          "workflow_validated",
+          "workflow_released",
+          "workflow_execution_started",
+          "workflow_execution_advanced",
+          "workflow_execution_completed",
+          "workflow_task_assigned",
+          "workflow_agent_registered"
+        ],
+        "guardrails": [
+          "execution_requires_bytewax_stream",
+          "batch_schedule_requires_bytewax",
+          "privileged_agent_workflow_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "validated",
+          "released",
+          "running",
+          "waiting",
+          "completed",
+          "failed",
+          "retired"
+        ],
+        "stream": "apg.composition.orchestration.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
           },
-          "operations": {
+          "definition_library": {
+            "icon": "workflow",
+            "risk_style": "validation-band",
+            "status_indicator": "definition-pill"
+          },
+          "designer": {
+            "status_style": "graph-chip",
+            "visual": "graph-canvas"
+          },
+          "execution_console": {
+            "status_style": "execution-chip",
+            "visual": "run-lanes"
+          },
+          "release_console": {
+            "status_style": "evidence-chip",
+            "visual": "release-checklist"
+          },
+          "rule_center": {
+            "status_style": "guardrail-chip",
+            "visual": "rule-grid"
+          },
+          "task_console": {
             "status_style": "sla-chip",
-            "visual": "work-queue"
-          },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
-          },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+            "visual": "task-queue"
           }
         },
-        "name": "composition_orchestration_operations",
+        "name": "composition_orchestration_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +893,63 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "OrchestrationDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/composition-orchestration/dashboard",
             "permission": "composition_orchestration:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
+            "component": "WorkflowDefinitionLibrary",
+            "name": "definitions",
+            "nav_group": "Definitions",
+            "path": "/composition-orchestration/definitions",
+            "permission": "composition_orchestration:manage_definitions"
+          },
+          {
+            "component": "WorkflowDesigner",
+            "name": "designer",
+            "nav_group": "Design",
+            "path": "/composition-orchestration/designer",
+            "permission": "composition_orchestration:design"
+          },
+          {
+            "component": "WorkflowExecutionConsole",
+            "name": "executions",
             "nav_group": "Operations",
-            "path": "/composition-orchestration/operations",
+            "path": "/composition-orchestration/executions",
             "permission": "composition_orchestration:operate"
           },
           {
-            "component": "CapabilityRules",
+            "component": "WorkflowTaskConsole",
+            "name": "tasks",
+            "nav_group": "Operations",
+            "path": "/composition-orchestration/tasks",
+            "permission": "composition_orchestration:manage_tasks"
+          },
+          {
+            "component": "WorkflowReleaseConsole",
+            "name": "releases",
+            "nav_group": "Release",
+            "path": "/composition-orchestration/releases",
+            "permission": "composition_orchestration:release"
+          },
+          {
+            "component": "WorkflowRuleCenter",
             "name": "rules",
             "nav_group": "Governance",
             "path": "/composition-orchestration/rules",
             "permission": "composition_orchestration:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "WorkflowAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/composition-orchestration/agents",
+            "permission": "composition_orchestration:admin"
+          },
+          {
+            "component": "WorkflowSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/composition-orchestration/settings",
@@ -238,46 +966,142 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "workflow_orchestration": {
+        "supported_roles": [
+          "workflow_architect",
+          "bpml_reviewer",
+          "release_reviewer",
+          "incident_reviewer",
+          "compliance_reviewer",
+          "optimization_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "composition_orchestration": []
+      "composition_orchestration": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_events",
+        "composition_config"
+      ]
     }
   },
   "contracts": {
     "composition_orchestration": {
       "configuration": {
-        "capability": {
-          "category": "Composition",
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "registry": "adapter",
+          "theme": "adapter"
+        },
+        "automation_agents": {
           "enabled": true,
-          "id": "composition_orchestration",
-          "name": "Workflow Orchestration",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/composition/orchestration/cap_spec.md",
-          "version": "1.0.0"
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "workflow_architect",
+            "bpml_reviewer",
+            "release_reviewer",
+            "incident_reviewer",
+            "compliance_reviewer",
+            "optimization_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
+          "bytewax_required": true,
+          "compensation_required_for_transactions": true,
+          "idempotency_required": true,
+          "max_parallel_branches": 64,
+          "retry_limit_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privileged_workflow_changes_reviewed": true,
           "require_tenant_context": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_definition_events": true,
+          "emit_execution_events": true,
+          "emit_release_events": true,
+          "event_stream": "apg.composition.orchestration.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "releases": {
+          "approval_required_for_high_risk": true,
+          "dry_run_required": true,
+          "rollback_plan_required": true,
+          "validation_required": true
+        },
+        "tasks": {
+          "approval_policy_required": true,
+          "cross_capability_contract_required": true,
+          "handler_required": true,
+          "human_assignee_required": true,
+          "sla_escalation_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "composition_orchestration_operations"
+          "default_theme": "composition_orchestration_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_definition_library": true,
+          "enable_designer": true,
+          "enable_execution_console": true,
+          "enable_release_console": true,
+          "enable_rule_center": true,
+          "enable_settings": true,
+          "enable_task_console": true
+        },
+        "workflow_definitions": {
+          "cycle_detection_enabled": true,
+          "owner_required": true,
+          "start_event_required": true,
+          "task_graph_required": true,
+          "terminal_state_required": true,
+          "version_required": true
         }
       },
       "id": "composition_orchestration",
       "provides": [
-        "composition_orchestration_operations"
+        "workflow_definition_lifecycle",
+        "workflow_graph_validation",
+        "workflow_execution_lifecycle",
+        "human_task_coordination",
+        "workflow_release_governance",
+        "workflow_rule_enforcement",
+        "workflow_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "registry",
+        "composition_events",
+        "composition_config"
+      ]
     }
   },
   "deployment": {
@@ -289,89 +1113,337 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "composition_orchestration": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "approval_task_requires_policy": {
       "condition": {
+        "approval_policy_present": false,
+        "approval_task": true,
+        "operation": "define_task"
+      },
+      "description": "Approval tasks require an approval policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "approval_policy_required",
+        "required_action": "attach_approval_policy"
+      },
+      "name": "approval_task_requires_policy"
+    },
+    "batch_schedule_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_schedule"
+      },
+      "description": "Batch execution scheduling requires Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_schedule_to_bytewax"
+      },
+      "name": "batch_schedule_requires_bytewax"
+    },
+    "compensation_required_for_transaction": {
+      "condition": {
+        "compensation_present": false,
+        "operation": "define_workflow",
+        "transactional_workflow": true
+      },
+      "description": "Transactional workflows require compensation steps.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compensation_required",
+        "required_action": "attach_compensation_steps"
+      },
+      "name": "compensation_required_for_transaction"
+    },
+    "cross_capability_task_requires_contract": {
+      "condition": {
+        "capability_contract_present": false,
+        "cross_capability_task": true,
+        "operation": "define_task"
+      },
+      "description": "Cross-capability tasks require an APG capability contract reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "capability_contract_required",
+        "required_action": "attach_capability_contract"
+      },
+      "name": "cross_capability_task_requires_contract"
+    },
+    "execution_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "start_execution"
+      },
+      "description": "Workflow execution lifecycle events must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_execution_lifecycle_to_bytewax"
+      },
+      "name": "execution_requires_bytewax_stream"
+    },
+    "execution_requires_idempotency_key": {
+      "condition": {
+        "idempotency_key_present": false,
+        "operation": "start_execution"
+      },
+      "description": "Workflow execution starts require idempotency keys.",
+      "effect": {
+        "decision": "deny",
+        "reason": "idempotency_key_required",
+        "required_action": "attach_idempotency_key"
+      },
+      "name": "execution_requires_idempotency_key"
+    },
+    "high_risk_execution_requires_review": {
+      "condition": {
+        "operation": "start_execution",
         "review_recorded": false,
         "risk_level": "high"
       },
-      "description": "High-risk Workflow Orchestration operations require review.",
+      "description": "High-risk workflow executions require review.",
       "effect": {
         "decision": "require_review",
         "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "required_action": "record_execution_review"
       },
-      "name": "high_risk_requires_review"
+      "name": "high_risk_execution_requires_review"
     },
-    "operation_policy_required": {
+    "human_task_requires_assignee": {
       "condition": {
-        "operation_type": "write",
-        "policy_attached": false
+        "assignee_present": false,
+        "human_task": true,
+        "operation": "define_task"
       },
-      "description": "Workflow Orchestration write operations require policy enforcement.",
+      "description": "Human tasks require an assignee, group, or role.",
       "effect": {
         "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
+        "reason": "human_task_assignee_required",
+        "required_action": "assign_human_task"
       },
-      "name": "operation_policy_required"
+      "name": "human_task_requires_assignee"
+    },
+    "privileged_agent_workflow_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_workflow_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged workflow actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_workflow_action_requires_human_approval"
+    },
+    "release_requires_dry_run": {
+      "condition": {
+        "dry_run_passed": false,
+        "operation": "release_workflow"
+      },
+      "description": "Workflow releases require a dry-run result.",
+      "effect": {
+        "decision": "deny",
+        "reason": "release_dry_run_required",
+        "required_action": "run_release_dry_run"
+      },
+      "name": "release_requires_dry_run"
+    },
+    "release_requires_rollback_plan": {
+      "condition": {
+        "operation": "release_workflow",
+        "rollback_plan_present": false
+      },
+      "description": "Workflow releases require a rollback plan.",
+      "effect": {
+        "decision": "deny",
+        "reason": "release_rollback_plan_required",
+        "required_action": "attach_rollback_plan"
+      },
+      "name": "release_requires_rollback_plan"
+    },
+    "release_requires_validation": {
+      "condition": {
+        "operation": "release_workflow",
+        "validation_evidence_present": false
+      },
+      "description": "Workflow releases require validation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "release_validation_required",
+        "required_action": "attach_validation_evidence"
+      },
+      "name": "release_requires_validation"
+    },
+    "retry_policy_requires_limit": {
+      "condition": {
+        "operation": "define_task",
+        "retry_limit_present": false,
+        "retry_policy_present": true
+      },
+      "description": "Retry policies require bounded attempts.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retry_limit_required",
+        "required_action": "set_retry_limit"
+      },
+      "name": "retry_policy_requires_limit"
+    },
+    "sla_task_requires_escalation": {
+      "condition": {
+        "escalation_present": false,
+        "operation": "define_task",
+        "sla_present": true
+      },
+      "description": "SLA-bound tasks require escalation rules.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "sla_escalation_required",
+        "required_action": "attach_escalation_rule"
+      },
+      "name": "sla_task_requires_escalation"
+    },
+    "task_requires_handler": {
+      "condition": {
+        "handler_present": false,
+        "operation": "define_task"
+      },
+      "description": "Automated and integration tasks require a handler.",
+      "effect": {
+        "decision": "deny",
+        "reason": "task_handler_required",
+        "required_action": "attach_task_handler"
+      },
+      "name": "task_requires_handler"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Workflow Orchestration operations require tenant context.",
+      "description": "Workflow orchestration operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.composition_orchestration": {
-      "file": "capability_contract.py",
-      "id": "capability.composition_orchestration",
-      "kind": "capability",
-      "name": "Workflow Orchestration",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+    },
+    "workflow_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_workflow_agent"
       },
-      "references": []
+      "description": "Workflow agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "workflow_agent_role_supported"
+    },
+    "workflow_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_workflow_agent"
+      },
+      "description": "Workflow agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "workflow_agent_runtime_supported"
+    },
+    "workflow_requires_owner": {
+      "condition": {
+        "operation": "define_workflow",
+        "workflow_owner_assigned": false
+      },
+      "description": "Workflow definitions require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_owner_required",
+        "required_action": "assign_workflow_owner"
+      },
+      "name": "workflow_requires_owner"
+    },
+    "workflow_requires_start_event": {
+      "condition": {
+        "operation": "define_workflow",
+        "start_event_present": false
+      },
+      "description": "Workflow definitions require at least one start event.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_start_event_required",
+        "required_action": "add_start_event"
+      },
+      "name": "workflow_requires_start_event"
+    },
+    "workflow_requires_task_graph": {
+      "condition": {
+        "operation": "define_workflow",
+        "task_graph_present": false
+      },
+      "description": "Workflow definitions require at least one executable task.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_task_graph_required",
+        "required_action": "add_executable_task_graph"
+      },
+      "name": "workflow_requires_task_graph"
+    },
+    "workflow_requires_terminal_state": {
+      "condition": {
+        "operation": "define_workflow",
+        "terminal_state_present": false
+      },
+      "description": "Workflow definitions require a terminal state.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_terminal_state_required",
+        "required_action": "add_terminal_state"
+      },
+      "name": "workflow_requires_terminal_state"
+    },
+    "workflow_requires_version": {
+      "condition": {
+        "operation": "define_workflow",
+        "workflow_version_present": false
+      },
+      "description": "Workflow definitions require a version.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_version_required",
+        "required_action": "set_workflow_version"
+      },
+      "name": "workflow_requires_version"
+    },
+    "workflow_write_requires_policy": {
+      "condition": {
+        "operation_type": "write",
+        "policy_attached": false
+      },
+      "description": "Workflow definition and execution write operations require policy attachment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "operation_policy_required",
+        "required_action": "attach_operation_policy"
+      },
+      "name": "workflow_write_requires_policy"
     }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

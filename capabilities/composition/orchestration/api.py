@@ -1,871 +1,109 @@
-"""
-APG Workflow Orchestration REST API
+"""Dependency-light API helpers for APG workflow orchestration."""
 
-Comprehensive async REST API endpoints with CRUD operations, APG authentication
-integration, rate limiting, input validation, and comprehensive error handling.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
+from typing import Any
 
-import asyncio
-import os
-from typing import Dict, List, Optional, Any, Union
-from datetime import datetime, timezone, timedelta
-import logging
-import json
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI, HTTPException, Depends, Query, Path, Body, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field, ConfigDict, validator
-from starlette.middleware.base import BaseHTTPMiddleware
-import redis.asyncio as redis
-from uuid_extensions import uuid7str
-
-from .models import (
-	Workflow, WorkflowInstance, TaskDefinition, TaskExecution,
-	WorkflowStatus, TaskStatus, Priority, TaskType
-)
-from .database import DatabaseManager, create_repositories
-from .management import (
-	WorkflowManager, WorkflowSearchFilter, WorkflowValidationLevel,
-	VersionManager, DeploymentManager
-)
-from .service import WorkflowOrchestrationService
-
-logger = logging.getLogger(__name__)
-
-# Security
-security = HTTPBearer()
-
-# API Models
-class APIResponse(BaseModel):
-	"""Standard API response format."""
-	model_config = ConfigDict(extra='forbid')
-	
-	success: bool = True
-	message: str = ""
-	data: Any = None
-	errors: List[str] = Field(default_factory=list)
-	metadata: Dict[str, Any] = Field(default_factory=dict)
-	timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-
-class WorkflowCreateRequest(BaseModel):
-	"""Request model for creating workflows."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	name: str = Field(..., min_length=1, max_length=200)
-	description: str = Field(default="", max_length=1000)
-	tasks: List[Dict[str, Any]] = Field(..., min_items=1)
-	configuration: Optional[Dict[str, Any]] = None
-	metadata: Optional[Dict[str, Any]] = None
-	tags: List[str] = Field(default_factory=list)
-	priority: Priority = Field(default=Priority.MEDIUM)
-	sla_hours: Optional[float] = Field(default=None, gt=0)
-	validation_level: WorkflowValidationLevel = Field(default=WorkflowValidationLevel.STANDARD)
-
-class WorkflowUpdateRequest(BaseModel):
-	"""Request model for updating workflows."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-	description: Optional[str] = Field(default=None, max_length=1000)
-	tasks: Optional[List[Dict[str, Any]]] = Field(default=None, min_items=1)
-	configuration: Optional[Dict[str, Any]] = None
-	metadata: Optional[Dict[str, Any]] = None
-	tags: Optional[List[str]] = None
-	priority: Optional[Priority] = None
-	sla_hours: Optional[float] = Field(default=None, gt=0)
-	validation_level: WorkflowValidationLevel = Field(default=WorkflowValidationLevel.STANDARD)
-
-class WorkflowExecuteRequest(BaseModel):
-	"""Request model for executing workflows."""
-	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
-	
-	input_data: Dict[str, Any] = Field(default_factory=dict)
-	configuration_overrides: Dict[str, Any] = Field(default_factory=dict)
-	priority: Optional[Priority] = None
-	tags: List[str] = Field(default_factory=list)
-	schedule_at: Optional[datetime] = None
-
-class PaginationParams(BaseModel):
-	"""Pagination parameters."""
-	model_config = ConfigDict(extra='forbid')
-	
-	offset: int = Field(default=0, ge=0, description="Number of items to skip")
-	limit: int = Field(default=100, ge=1, le=1000, description="Maximum number of items to return")
-
-# Rate Limiting Middleware
-class RateLimitMiddleware(BaseHTTPMiddleware):
-	"""Rate limiting middleware using Redis."""
-	
-	def __init__(self, app, redis_client: redis.Redis, default_rate_limit: int = 1000):
-		super().__init__(app)
-		self.redis_client = redis_client
-		self.default_rate_limit = default_rate_limit
-	
-	async def dispatch(self, request: Request, call_next):
-		# Extract user ID from request (would be set by auth middleware)
-		user_id = getattr(request.state, 'user_id', 'anonymous')
-		
-		# Create rate limit key
-		rate_limit_key = f"rate_limit:{user_id}:{datetime.now(timezone.utc).strftime('%Y-%m-%d-%H-%M')}"
-		
-		try:
-			# Check current request count
-			current_count = await self.redis_client.get(rate_limit_key)
-			current_count = int(current_count) if current_count else 0
-			
-			# Check if rate limit exceeded
-			if current_count >= self.default_rate_limit:
-				return JSONResponse(
-					status_code=429,
-					content={
-						"success": False,
-						"message": "Rate limit exceeded",
-						"errors": ["Too many requests. Please try again later."]
-					}
-				)
-			
-			# Increment counter
-			await self.redis_client.incr(rate_limit_key)
-			await self.redis_client.expire(rate_limit_key, 60)  # 1 minute window
-			
-			# Process request
-			response = await call_next(request)
-			
-			# Add rate limit headers
-			response.headers["X-RateLimit-Limit"] = str(self.default_rate_limit)
-			response.headers["X-RateLimit-Remaining"] = str(max(0, self.default_rate_limit - current_count - 1))
-			response.headers["X-RateLimit-Reset"] = str(int((datetime.now(timezone.utc) + timedelta(minutes=1)).timestamp()))
-			
-			return response
-			
-		except Exception as e:
-			logger.error(f"Rate limiting error: {e}")
-			# Continue processing if rate limiting fails
-			return await call_next(request)
-
-# Authentication Dependencies
-def _clean_text(value: Any) -> Optional[str]:
-	if value is None:
-		return None
-	text = str(value).strip()
-	return text or None
+try:
+	from .capability_contract import get_capability_contract
+	from .service import WorkflowOrchestrationService
+except ImportError:
+	from capability_contract import get_capability_contract
+	from service import WorkflowOrchestrationService
 
 
-def _first_text(candidates: List[Any], fallback: str) -> str:
-	for candidate in candidates:
-		text = _clean_text(candidate)
-		if text:
-			return text
-	return fallback
+_SERVICE = WorkflowOrchestrationService()
 
 
-def _object_value(source: Any, name: str) -> Any:
-	if source is None:
-		return None
-	if isinstance(source, dict):
-		return source.get(name)
-	return getattr(source, name, None)
-
-
-def _normalise_list(value: Any, fallback: List[str]) -> List[str]:
-	if value is None:
-		return fallback
-	if isinstance(value, str):
-		items = [item.strip() for item in value.replace(",", " ").split()]
-		return items or fallback
-	if isinstance(value, list):
-		return [str(item) for item in value if _clean_text(item)] or fallback
-	return fallback
-
-
-def _decode_bearer_claims(token: str) -> Dict[str, Any]:
-	parts = token.split(".")
-	if len(parts) < 2:
-		return {}
-	try:
-		import base64
-		import binascii
-
-		payload = parts[1]
-		padding = "=" * (-len(payload) % 4)
-		claims = json.loads(base64.urlsafe_b64decode(f"{payload}{padding}".encode("ascii")).decode("utf-8"))
-	except (binascii.Error, json.JSONDecodeError, UnicodeDecodeError, ValueError):
-		return {}
-	return claims if isinstance(claims, dict) else {}
-
-
-def _resolve_auth_context(request: Request, token_context: Dict[str, Any]) -> Dict[str, Any]:
-	state = getattr(request, "state", None)
-	state_user = _object_value(state, "current_user") or _object_value(state, "user")
-	headers = request.headers or {}
-	query_params = request.query_params or {}
-
-	user_id = _first_text([
-		token_context.get("user_id"),
-		token_context.get("sub"),
-		token_context.get("uid"),
-		_object_value(state_user, "user_id"),
-		_object_value(state_user, "id"),
-		_object_value(state_user, "username"),
-		_object_value(state, "user_id"),
-		headers.get("X-User-ID"),
-		headers.get("X-APG-User-ID"),
-		query_params.get("user_id"),
-		os.getenv("APG_USER_ID"),
-	], os.getenv("APG_DEFAULT_USER_ID", "system"))
-
-	tenant_id = _first_text([
-		token_context.get("tenant_id"),
-		token_context.get("tenant"),
-		token_context.get("organization_id"),
-		_object_value(state_user, "tenant_id"),
-		_object_value(state, "tenant_id"),
-		headers.get("X-Tenant-ID"),
-		headers.get("X-APG-Tenant-ID"),
-		headers.get("X-Organization-ID"),
-		query_params.get("tenant_id"),
-		query_params.get("tenant"),
-		os.getenv("APG_TENANT_ID"),
-	], os.getenv("APG_DEFAULT_TENANT_ID", "default"))
-
+def capability_status(tenant_id: str = "default") -> dict[str, Any]:
+	"""Return service status and contract metadata for generated applications."""
+	contract = get_capability_contract(tenant_id)
 	return {
-		"user_id": user_id,
-		"tenant_id": tenant_id,
-		"roles": _normalise_list(
-			token_context.get("roles") or headers.get("X-APG-Roles") or os.getenv("APG_ROLES"),
-			["workflow_user"]
-		),
-		"permissions": _normalise_list(
-			token_context.get("permissions") or token_context.get("scope") or headers.get("X-APG-Permissions") or os.getenv("APG_PERMISSIONS"),
-			["workflow.read"]
-		),
+		"ok": True,
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"provides": contract["provides"],
+		"requires": contract["requires"],
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		"streaming": contract["streaming"],
+		"summary": _SERVICE.dashboard_summary(tenant_id),
 	}
 
 
-async def get_current_user(
-	request: Request,
-	credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> Dict[str, Any]:
-	"""Extract and validate user from APG authentication token."""
-	
-	try:
-		token = credentials.credentials
-		
-		if not token or token == "invalid":
-			raise HTTPException(
-				status_code=401,
-				detail="Invalid authentication token"
-			)
-		
-		token_context: Dict[str, Any] = {}
+def create_record(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Create a workflow definition using the package service."""
+	return _SERVICE.create_record(payload)
 
-		# Try APG auth_rbac capability integration
-		try:
-			from apg.capabilities.auth_rbac import AuthRBACService
-			auth_service = AuthRBACService()
-			
-			# Validate token with APG auth service
-			user_info = await auth_service.validate_token(token)
-			if user_info:
-				token_context = user_info
-			
-		except ImportError:
-			token_context = _decode_bearer_claims(token)
 
-		return _resolve_auth_context(request, token_context)
-		
-	except HTTPException:
-		raise  # Re-raise HTTP exceptions
-	except Exception as e:
-		logger.error(f"Authentication failed: {e}")
-		raise HTTPException(
-			status_code=401,
-			detail="Authentication failed"
-		)
+def list_records(tenant_id: str = "default") -> list[dict[str, Any]]:
+	"""List workflow definitions for a tenant."""
+	return _SERVICE.list_records(tenant_id)
 
-async def get_tenant_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
-	"""Extract tenant ID from authenticated user."""
-	return current_user["tenant_id"]
 
-async def get_user_id(current_user: Dict[str, Any] = Depends(get_current_user)) -> str:
-	"""Extract user ID from authenticated user."""
-	return current_user["user_id"]
-
-# Permission Dependencies
-def require_permission(permission: str):
-	"""Require specific permission for endpoint access."""
-	
-	def permission_checker(current_user: Dict[str, Any] = Depends(get_current_user)):
-		if permission not in current_user.get("permissions", []):
-			raise HTTPException(
-				status_code=403,
-				detail=f"Insufficient permissions. Required: {permission}"
-			)
-		return current_user
-	
-	return permission_checker
-
-# API Application Factory
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-	"""Application lifespan events."""
-	# Startup
-	logger.info("Starting APG Workflow Orchestration API")
-	yield
-	# Shutdown
-	logger.info("Shutting down APG Workflow Orchestration API")
-
-def create_api_app(
-	database_manager: DatabaseManager,
-	redis_client: redis.Redis,
-	tenant_id: str = "default"
-) -> FastAPI:
-	"""Create FastAPI application with all endpoints."""
-	
-	app = FastAPI(
-		title="APG Workflow Orchestration API",
-		description="Comprehensive workflow orchestration and automation platform",
-		version="1.0.0",
-		lifespan=lifespan,
-		docs_url="/docs",
-		redoc_url="/redoc",
-		openapi_url="/openapi.json"
+def define_workflow(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Define and validate a workflow graph."""
+	return _SERVICE.define_workflow(
+		payload["workflow_id"],
+		payload.get("tenant_id", "default"),
+		payload["name"],
+		payload["owner"],
+		payload.get("version", "1.0.0"),
+		payload["tasks"],
+		payload.get("start_event", "manual"),
+		payload.get("terminal_state", "completed"),
+		transactional=payload.get("transactional", False),
+		compensation_steps=payload.get("compensation_steps"),
 	)
-	
-	# Add middleware
-	app.add_middleware(
-		CORSMiddleware,
-		allow_origins=["*"],  # Configure appropriately for production
-		allow_credentials=True,
-		allow_methods=["*"],
-		allow_headers=["*"],
-	)
-	
-	app.add_middleware(GZipMiddleware, minimum_size=1000)
-	app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
-	
-	# Initialize services
-	workflow_service = WorkflowOrchestrationService(database_manager, redis_client, tenant_id)
-	workflow_manager = WorkflowManager(database_manager, redis_client, tenant_id)
-	version_manager = VersionManager(database_manager, redis_client, tenant_id)
-	deployment_manager = DeploymentManager(database_manager, redis_client, version_manager, tenant_id)
-	
-	# Store services in app state
-	app.state.workflow_service = workflow_service
-	app.state.workflow_manager = workflow_manager
-	app.state.version_manager = version_manager
-	app.state.deployment_manager = deployment_manager
-	
-	# Exception Handlers
-	@app.exception_handler(HTTPException)
-	async def http_exception_handler(request: Request, exc: HTTPException):
-		return JSONResponse(
-			status_code=exc.status_code,
-			content=APIResponse(
-				success=False,
-				message=exc.detail,
-				errors=[exc.detail]
-			).model_dump()
-		)
-	
-	@app.exception_handler(Exception)
-	async def general_exception_handler(request: Request, exc: Exception):
-		logger.error(f"Unhandled exception: {exc}", exc_info=True)
-		return JSONResponse(
-			status_code=500,
-			content=APIResponse(
-				success=False,
-				message="Internal server error",
-				errors=["An unexpected error occurred"]
-			).model_dump()
-		)
-	
-	# Health Check Endpoints
-	@app.get("/health", response_model=APIResponse)
-	async def health_check():
-		"""Health check endpoint."""
-		return APIResponse(
-			message="API is healthy",
-			data={"status": "healthy", "timestamp": datetime.now(timezone.utc)}
-		)
-	
-	@app.get("/health/detailed", response_model=APIResponse)
-	async def detailed_health_check(current_user: Dict[str, Any] = Depends(get_current_user)):
-		"""Detailed health check with service status."""
-		
-		health_data = {
-			"api": "healthy",
-			"database": "unknown",
-			"redis": "unknown",
-			"services": {}
-		}
-		
-		try:
-			# Check database
-			async with database_manager.get_session() as session:
-				await session.execute("SELECT 1")
-			health_data["database"] = "healthy"
-		except Exception as e:
-			health_data["database"] = f"unhealthy: {str(e)}"
-		
-		try:
-			# Check Redis
-			await redis_client.ping()
-			health_data["redis"] = "healthy"
-		except Exception as e:
-			health_data["redis"] = f"unhealthy: {str(e)}"
-		
-		# Check services
-		try:
-			health_data["services"]["workflow_service"] = "healthy"
-			health_data["services"]["workflow_manager"] = "healthy"
-			health_data["services"]["version_manager"] = "healthy"
-			health_data["services"]["deployment_manager"] = "healthy"
-		except Exception as e:
-			health_data["services"]["error"] = str(e)
-		
-		return APIResponse(
-			message="Detailed health check completed",
-			data=health_data
-		)
-	
-	# Workflow CRUD Endpoints
-	@app.post("/workflows", response_model=APIResponse)
-	async def create_workflow(
-		request: WorkflowCreateRequest,
-		user_id: str = Depends(get_user_id),
-		tenant_id: str = Depends(get_tenant_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.write"))
-	):
-		"""Create a new workflow."""
-		
-		try:
-			workflow_data = request.model_dump()
-			workflow_data["tenant_id"] = tenant_id
-			
-			workflow = await workflow_manager.create_workflow(
-				workflow_data, user_id, request.validation_level
-			)
-			
-			return APIResponse(
-				message="Workflow created successfully",
-				data=workflow.model_dump(),
-				metadata={"workflow_id": workflow.id}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to create workflow: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.get("/workflows/{workflow_id}", response_model=APIResponse)
-	async def get_workflow(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		include_instances: bool = Query(False, description="Include workflow instances"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Get a workflow by ID."""
-		
-		try:
-			workflow = await workflow_manager.get_workflow(workflow_id, user_id, include_instances)
-			
-			if not workflow:
-				raise HTTPException(status_code=404, detail="Workflow not found")
-			
-			return APIResponse(
-				message="Workflow retrieved successfully",
-				data=workflow.model_dump()
-			)
-			
-		except HTTPException:
-			raise
-		except Exception as e:
-			logger.error(f"Failed to get workflow: {e}")
-			raise HTTPException(status_code=500, detail=str(e))
-	
-	@app.put("/workflows/{workflow_id}", response_model=APIResponse)
-	async def update_workflow(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		request: WorkflowUpdateRequest = Body(...),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.write"))
-	):
-		"""Update a workflow."""
-		
-		try:
-			updates = request.model_dump(exclude_none=True)
-			validation_level = updates.pop("validation_level", WorkflowValidationLevel.STANDARD)
-			
-			workflow = await workflow_manager.update_workflow(
-				workflow_id, updates, user_id, validation_level
-			)
-			
-			return APIResponse(
-				message="Workflow updated successfully",
-				data=workflow.model_dump()
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to update workflow: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.delete("/workflows/{workflow_id}", response_model=APIResponse)
-	async def delete_workflow(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		hard_delete: bool = Query(False, description="Perform hard delete"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.delete"))
-	):
-		"""Delete a workflow."""
-		
-		try:
-			success = await workflow_manager.delete_workflow(workflow_id, user_id, hard_delete)
-			
-			return APIResponse(
-				message="Workflow deleted successfully",
-				data={"deleted": success}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to delete workflow: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.get("/workflows", response_model=APIResponse)
-	async def search_workflows(
-		name_pattern: Optional[str] = Query(None, description="Name pattern (supports wildcards)"),
-		status: Optional[List[WorkflowStatus]] = Query(None, description="Workflow statuses"),
-		tags: Optional[List[str]] = Query(None, description="Tags to filter by"),
-		created_after: Optional[datetime] = Query(None, description="Created after timestamp"),
-		created_before: Optional[datetime] = Query(None, description="Created before timestamp"),
-		author: Optional[str] = Query(None, description="Author user ID"),
-		priority: Optional[List[Priority]] = Query(None, description="Priority levels"),
-		sort_by: str = Query("updated_at", pattern="^(name|created_at|updated_at|status|priority)$"),
-		sort_order: str = Query("desc", pattern="^(asc|desc)$"),
-		offset: int = Query(0, ge=0, description="Pagination offset"),
-		limit: int = Query(100, ge=1, le=1000, description="Pagination limit"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Search workflows with filters."""
-		
-		try:
-			filters = WorkflowSearchFilter(
-				name_pattern=name_pattern,
-				status=status,
-				tags=tags,
-				created_after=created_after,
-				created_before=created_before,
-				author=author,
-				priority=priority,
-				sort_by=sort_by,
-				sort_order=sort_order,
-				offset=offset,
-				limit=limit
-			)
-			
-			workflows = await workflow_manager.search_workflows(filters, user_id)
-			
-			return APIResponse(
-				message="Workflows retrieved successfully",
-				data=[workflow.model_dump() for workflow in workflows],
-				metadata={
-					"count": len(workflows),
-					"offset": offset,
-					"limit": limit,
-					"filters": filters.model_dump(exclude_none=True)
-				}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to search workflows: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.post("/workflows/{workflow_id}/clone", response_model=APIResponse)
-	async def clone_workflow(
-		workflow_id: str = Path(..., description="Source workflow ID"),
-		new_name: str = Body(..., embed=True, description="New workflow name"),
-		modifications: Optional[Dict[str, Any]] = Body(None, embed=True, description="Modifications to apply"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.write"))
-	):
-		"""Clone a workflow with optional modifications."""
-		
-		try:
-			cloned_workflow = await workflow_manager.clone_workflow(
-				workflow_id, new_name, user_id, modifications
-			)
-			
-			return APIResponse(
-				message="Workflow cloned successfully",
-				data=cloned_workflow.model_dump(),
-				metadata={"original_workflow_id": workflow_id}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to clone workflow: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.get("/workflows/{workflow_id}/statistics", response_model=APIResponse)
-	async def get_workflow_statistics(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		time_range_days: int = Query(30, ge=1, le=365, description="Time range in days"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Get workflow execution statistics."""
-		
-		try:
-			statistics = await workflow_manager.get_workflow_statistics(
-				workflow_id, user_id, time_range_days
-			)
-			
-			return APIResponse(
-				message="Workflow statistics retrieved successfully",
-				data=statistics.model_dump(),
-				metadata={"time_range_days": time_range_days}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to get workflow statistics: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	# Workflow Execution Endpoints
-	@app.post("/workflows/{workflow_id}/execute", response_model=APIResponse)
-	async def execute_workflow(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		request: WorkflowExecuteRequest = Body(...),
-		user_id: str = Depends(get_user_id),
-		tenant_id: str = Depends(get_tenant_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.execute"))
-	):
-		"""Execute a workflow."""
-		
-		try:
-			instance = await workflow_service.execute_workflow(
-				workflow_id=workflow_id,
-				input_data=request.input_data,
-				user_id=user_id,
-				configuration_overrides=request.configuration_overrides,
-				priority=request.priority,
-				tags=request.tags,
-				schedule_at=request.schedule_at
-			)
-			
-			return APIResponse(
-				message="Workflow execution started",
-				data=instance.model_dump(),
-				metadata={"instance_id": instance.id}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to execute workflow: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.get("/workflows/{workflow_id}/instances", response_model=APIResponse)
-	async def get_workflow_instances(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		status: Optional[List[str]] = Query(None, description="Instance statuses"),
-		limit: int = Query(100, ge=1, le=1000),
-		offset: int = Query(0, ge=0),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Get workflow instances."""
-		
-		try:
-			instances = await workflow_service.get_workflow_instances(
-				workflow_id, status, limit, offset
-			)
-			
-			return APIResponse(
-				message="Workflow instances retrieved successfully",
-				data=[instance.model_dump() for instance in instances],
-				metadata={"count": len(instances), "offset": offset, "limit": limit}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to get workflow instances: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.get("/workflows/{workflow_id}/instances/{instance_id}", response_model=APIResponse)
-	async def get_workflow_instance(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		instance_id: str = Path(..., description="Instance ID"),
-		include_tasks: bool = Query(True, description="Include task executions"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Get a specific workflow instance."""
-		
-		try:
-			instance = await workflow_service.get_workflow_instance(
-				instance_id, include_tasks
-			)
-			
-			if not instance:
-				raise HTTPException(status_code=404, detail="Workflow instance not found")
-			
-			return APIResponse(
-				message="Workflow instance retrieved successfully",
-				data=instance.model_dump()
-			)
-			
-		except HTTPException:
-			raise
-		except Exception as e:
-			logger.error(f"Failed to get workflow instance: {e}")
-			raise HTTPException(status_code=500, detail=str(e))
-	
-	@app.post("/workflows/{workflow_id}/instances/{instance_id}/pause", response_model=APIResponse)
-	async def pause_workflow_instance(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		instance_id: str = Path(..., description="Instance ID"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.execute"))
-	):
-		"""Pause a workflow instance."""
-		
-		try:
-			success = await workflow_service.pause_workflow_instance(instance_id, user_id)
-			
-			return APIResponse(
-				message="Workflow instance paused successfully",
-				data={"paused": success}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to pause workflow instance: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.post("/workflows/{workflow_id}/instances/{instance_id}/resume", response_model=APIResponse)
-	async def resume_workflow_instance(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		instance_id: str = Path(..., description="Instance ID"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.execute"))
-	):
-		"""Resume a paused workflow instance."""
-		
-		try:
-			success = await workflow_service.resume_workflow_instance(instance_id, user_id)
-			
-			return APIResponse(
-				message="Workflow instance resumed successfully",
-				data={"resumed": success}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to resume workflow instance: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.post("/workflows/{workflow_id}/instances/{instance_id}/stop", response_model=APIResponse)
-	async def stop_workflow_instance(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		instance_id: str = Path(..., description="Instance ID"),
-		reason: Optional[str] = Body(None, embed=True, description="Reason for stopping"),
-		user_id: str = Depends(get_user_id),
-		_: Dict[str, Any] = Depends(require_permission("workflows.execute"))
-	):
-		"""Stop a workflow instance."""
-		
-		try:
-			success = await workflow_service.stop_workflow_instance(instance_id, user_id, reason)
-			
-			return APIResponse(
-				message="Workflow instance stopped successfully",
-				data={"stopped": success}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to stop workflow instance: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	# Version Control Endpoints
-	@app.get("/workflows/{workflow_id}/versions", response_model=APIResponse)
-	async def list_workflow_versions(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		branch_name: Optional[str] = Query(None, description="Branch name filter"),
-		limit: int = Query(50, ge=1, le=100),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""List versions for a workflow."""
-		
-		try:
-			versions = await version_manager.list_versions(workflow_id, branch_name, None, limit)
-			
-			return APIResponse(
-				message="Workflow versions retrieved successfully",
-				data=[version.model_dump() for version in versions],
-				metadata={"count": len(versions)}
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to list workflow versions: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	@app.get("/workflows/{workflow_id}/versions/{version_id}", response_model=APIResponse)
-	async def get_workflow_version(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		version_id: str = Path(..., description="Version ID"),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Get a specific workflow version."""
-		
-		try:
-			version = await version_manager.get_version(version_id)
-			
-			if not version:
-				raise HTTPException(status_code=404, detail="Workflow version not found")
-			
-			return APIResponse(
-				message="Workflow version retrieved successfully",
-				data=version.model_dump()
-			)
-			
-		except HTTPException:
-			raise
-		except Exception as e:
-			logger.error(f"Failed to get workflow version: {e}")
-			raise HTTPException(status_code=500, detail=str(e))
-	
-	@app.post("/workflows/{workflow_id}/versions/{from_version}/compare/{to_version}", response_model=APIResponse)
-	async def compare_workflow_versions(
-		workflow_id: str = Path(..., description="Workflow ID"),
-		from_version: str = Path(..., description="From version ID"),
-		to_version: str = Path(..., description="To version ID"),
-		_: Dict[str, Any] = Depends(require_permission("workflows.read"))
-	):
-		"""Compare two workflow versions."""
-		
-		try:
-			comparison = await version_manager.compare_versions(from_version, to_version)
-			
-			return APIResponse(
-				message="Version comparison completed",
-				data=comparison.model_dump()
-			)
-			
-		except Exception as e:
-			logger.error(f"Failed to compare versions: {e}")
-			raise HTTPException(status_code=400, detail=str(e))
-	
-	return app
 
-# Export API components
-__all__ = [
-	"create_api_app",
-	"APIResponse",
-	"WorkflowCreateRequest",
-	"WorkflowUpdateRequest",
-	"WorkflowExecuteRequest",
-	"PaginationParams",
-	"get_current_user",
-	"require_permission"
-]
+
+def release_workflow(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Release a validated workflow definition."""
+	return _SERVICE.release_workflow(
+		payload["release_id"],
+		payload.get("tenant_id", "default"),
+		payload["workflow_definition_id"],
+		payload["validation_evidence"],
+		payload["rollback_plan"],
+		dry_run_passed=payload.get("dry_run_passed", False),
+		approved_by=payload.get("approved_by"),
+	)
+
+
+def start_execution(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Start a workflow execution with an idempotency key."""
+	return _SERVICE.start_execution(
+		payload["execution_id"],
+		payload.get("tenant_id", "default"),
+		payload["workflow_definition_id"],
+		payload["idempotency_key"],
+		payload.get("inputs"),
+		risk_level=payload.get("risk_level", "normal"),
+		reviewed_by=payload.get("reviewed_by"),
+	)
+
+
+def complete_task(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Complete an active task and advance the execution graph."""
+	return _SERVICE.complete_task(
+		payload.get("tenant_id", "default"),
+		payload["execution_record_id"],
+		payload["task_id"],
+		payload.get("result"),
+	)
+
+
+def register_workflow_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Register an AI agent runtime for orchestration review work."""
+	return _SERVICE.register_workflow_agent(
+		payload.get("tenant_id", "default"),
+		payload["name"],
+		payload["runtime"],
+		payload["role"],
+		payload.get("instructions", ""),
+	)
+
+
+def service() -> WorkflowOrchestrationService:
+	"""Return the in-process service used by generated application adapters."""
+	return _SERVICE

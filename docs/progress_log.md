@@ -16,6 +16,100 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 22:36 EAT
+
+Composition ORCHESTRATION workflow lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the
+  `composition_orchestration` capability, and replaced `cap_spec.md` with the
+  active packet summary.
+- Replaced the generic spec-backed contract with explicit workflow definition,
+  task, execution, release, workflow-agent, governance, observability, adapter,
+  UI, theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  workflow owner, workflow version, start event, task graph, terminal state,
+  task handlers, human-task assignees, approval policies, cross-capability
+  contracts, execution Bytewax streams, execution idempotency, high-risk
+  execution review, release validation, release dry-run, release rollback plan,
+  retry limits, SLA escalation, transactional compensation, batch scheduling
+  Bytewax streams, workflow-agent runtime/role, and privileged agent-action
+  approval.
+- Replaced the dependency-heavy publishable service/API/view/app surfaces with
+  dependency-light orchestration lifecycle helpers for definition, validation,
+  release, execution, task advancement, task assignment, batch validation,
+  workflow-agent registration, dashboard summaries, audit events, API helpers,
+  and screen models.
+- Kept compatibility exports for the existing composition facade while routing
+  new generated-application behavior through `WorkflowOrchestrationService`.
+- Review hardening added duplicate task-id rejection and human-assignment checks
+  so non-active or non-human tasks cannot be assigned through the human-task
+  helper.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Narrowed the orchestration test package bootstrap so focused package tests do
+  not require optional Redis/database/orchestration-engine dependencies.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, release, execution, human task, and guardrail
+  behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/composition/orchestration/__init__.py
+  capabilities/composition/orchestration/capability_contract.py
+  capabilities/composition/orchestration/service.py
+  capabilities/composition/orchestration/api.py
+  capabilities/composition/orchestration/views.py
+  capabilities/composition/orchestration/app.py
+  capabilities/composition/orchestration/tests/test_package_contract.py
+  capabilities/composition/orchestration/tests/__init__.py
+  capabilities/composition/orchestration/tests/conftest.py` passed.
+- `./.venv/bin/pytest -q
+  capabilities/composition/orchestration/tests/test_package_contract.py`
+  passed with 5 tests.
+- `./.venv/bin/apg capabilities inspect composition_orchestration --json | jq
+  '.ok, .summary.route_count, .summary.rule_count, .summary.theme'` confirmed
+  `true`, 9 routes, 24 rules, and `composition_orchestration_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/composition/orchestration --json | jq '.ok,
+  .side_effect_free, .warnings, .errors, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor), .runtime_evidence.loaded'`
+  confirmed `true`, `true`, no warnings, no errors,
+  `composition_orchestration`, `bytewax`, `bytewax`, and runtime evidence
+  loaded.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/composition/orchestration --json | jq '.ok, .summary,
+  .records[0].implementation_level, .records[0].baseline_marker_count'`
+  passed with `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python capabilities/composition/orchestration/app.py` passed
+  package self-test.
+- `./.venv/bin/python -c "from capabilities.composition.orchestration import
+  WorkflowOrchestrationService; service=WorkflowOrchestrationService();
+  service.register_workflow_agent('tenant-proof','Proof agent','codex',
+  'release_reviewer','review workflow releases');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  workflow-agent registration, audit event emission, and Bytewax stream
+  metadata.
+- `jq '.capabilities.composition_orchestration.streaming.processor,
+  .capabilities.composition_orchestration.provides,
+  .capabilities.composition_orchestration.requires,
+  .capabilities.composition_orchestration.screens.agents.route,
+  (.capabilities.composition_orchestration.rules[] |
+  select(.name=="workflow_agent_runtime_supported") | .effect.reason),
+  (.capabilities.composition_orchestration.rules[] |
+  select(.name=="execution_requires_bytewax_stream") | .effect.reason)'
+  capabilities/composition/orchestration/semantic_model.json` confirmed
+  `bytewax`, workflow-agent provides, required services,
+  `/composition-orchestration/agents`, `workflow_agent_runtime_not_supported`,
+  and `bytewax_event_stream_required`.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/composition/orchestration` passed.
+- Not run: live schedulers/workers, durable state stores, durable audit sinks,
+  live Bytewax topology, rendered browser UI, orchestration performance/failover
+  checks, and full repository tests.
+
 ### 2026-05-30 23:29 EAT
 
 Composition GATEWAY API service-mesh lifecycle/guardrail packet:

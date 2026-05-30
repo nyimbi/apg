@@ -4,23 +4,233 @@
       "capability_contract": {
         "display_name": "Workflow Orchestration",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 9,
+        "rule_count": 24
       }
     },
     "self_test": {
       "capability": "composition_orchestration",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
       "capability": "composition_orchestration",
-      "format": "apg.semantic-model.v1"
+      "format": "apg.semantic-model.v1",
+      "streaming": {
+        "events": [
+          "workflow_defined",
+          "workflow_validated",
+          "workflow_released",
+          "workflow_execution_started",
+          "workflow_execution_advanced",
+          "workflow_execution_completed",
+          "workflow_task_assigned",
+          "workflow_agent_registered"
+        ],
+        "guardrails": [
+          "execution_requires_bytewax_stream",
+          "batch_schedule_requires_bytewax",
+          "privileged_agent_workflow_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "validated",
+          "released",
+          "running",
+          "waiting",
+          "completed",
+          "failed",
+          "retired"
+        ],
+        "stream": "apg.composition.orchestration.lifecycle"
+      }
     }
   },
   "format": "apg.release-report.v1",
   "ok": true,
   "package": "composition_orchestration",
+  "registration": {
+    "capability": "composition_orchestration",
+    "display_name": "Workflow Orchestration",
+    "provides": [
+      "workflow_definition_lifecycle",
+      "workflow_graph_validation",
+      "workflow_execution_lifecycle",
+      "human_task_coordination",
+      "workflow_release_governance",
+      "workflow_rule_enforcement",
+      "workflow_agents"
+    ],
+    "requires": [
+      "auth",
+      "audl",
+      "ntfy",
+      "registry",
+      "composition_events",
+      "composition_config"
+    ],
+    "streaming": {
+      "events": [
+        "workflow_defined",
+        "workflow_validated",
+        "workflow_released",
+        "workflow_execution_started",
+        "workflow_execution_advanced",
+        "workflow_execution_completed",
+        "workflow_task_assigned",
+        "workflow_agent_registered"
+      ],
+      "guardrails": [
+        "execution_requires_bytewax_stream",
+        "batch_schedule_requires_bytewax",
+        "privileged_agent_workflow_action_requires_human_approval"
+      ],
+      "key": "tenant_id",
+      "processor": "bytewax",
+      "states": [
+        "draft",
+        "validated",
+        "released",
+        "running",
+        "waiting",
+        "completed",
+        "failed",
+        "retired"
+      ],
+      "stream": "apg.composition.orchestration.lifecycle"
+    },
+    "theme": {
+      "components": {
+        "agent_workbench": {
+          "status_style": "approval-chip",
+          "visual": "review-lane"
+        },
+        "definition_library": {
+          "icon": "workflow",
+          "risk_style": "validation-band",
+          "status_indicator": "definition-pill"
+        },
+        "designer": {
+          "status_style": "graph-chip",
+          "visual": "graph-canvas"
+        },
+        "execution_console": {
+          "status_style": "execution-chip",
+          "visual": "run-lanes"
+        },
+        "release_console": {
+          "status_style": "evidence-chip",
+          "visual": "release-checklist"
+        },
+        "rule_center": {
+          "status_style": "guardrail-chip",
+          "visual": "rule-grid"
+        },
+        "task_console": {
+          "status_style": "sla-chip",
+          "visual": "task-queue"
+        }
+      },
+      "name": "composition_orchestration_control",
+      "tokens": {
+        "border.radius": "8px",
+        "color.accent": "#C44536",
+        "color.danger": "#C53030",
+        "color.primary": "#28536B",
+        "color.success": "#2F855A",
+        "color.warning": "#B7791F",
+        "density": "compact",
+        "surface.canvas": "#F7F8FA",
+        "surface.panel": "#FFFFFF",
+        "text.primary": "#172033",
+        "text.secondary": "#52606D"
+      }
+    },
+    "ui": {
+      "api_prefix": "/composition-orchestration/api/v1",
+      "requires_theme": true,
+      "routes": [
+        {
+          "component": "OrchestrationDashboard",
+          "name": "dashboard",
+          "nav_group": "Overview",
+          "path": "/composition-orchestration/dashboard",
+          "permission": "composition_orchestration:view"
+        },
+        {
+          "component": "WorkflowDefinitionLibrary",
+          "name": "definitions",
+          "nav_group": "Definitions",
+          "path": "/composition-orchestration/definitions",
+          "permission": "composition_orchestration:manage_definitions"
+        },
+        {
+          "component": "WorkflowDesigner",
+          "name": "designer",
+          "nav_group": "Design",
+          "path": "/composition-orchestration/designer",
+          "permission": "composition_orchestration:design"
+        },
+        {
+          "component": "WorkflowExecutionConsole",
+          "name": "executions",
+          "nav_group": "Operations",
+          "path": "/composition-orchestration/executions",
+          "permission": "composition_orchestration:operate"
+        },
+        {
+          "component": "WorkflowTaskConsole",
+          "name": "tasks",
+          "nav_group": "Operations",
+          "path": "/composition-orchestration/tasks",
+          "permission": "composition_orchestration:manage_tasks"
+        },
+        {
+          "component": "WorkflowReleaseConsole",
+          "name": "releases",
+          "nav_group": "Release",
+          "path": "/composition-orchestration/releases",
+          "permission": "composition_orchestration:release"
+        },
+        {
+          "component": "WorkflowRuleCenter",
+          "name": "rules",
+          "nav_group": "Governance",
+          "path": "/composition-orchestration/rules",
+          "permission": "composition_orchestration:govern"
+        },
+        {
+          "component": "WorkflowAgentWorkbench",
+          "name": "agents",
+          "nav_group": "Automation",
+          "path": "/composition-orchestration/agents",
+          "permission": "composition_orchestration:admin"
+        },
+        {
+          "component": "WorkflowSettings",
+          "name": "settings",
+          "nav_group": "Administration",
+          "path": "/composition-orchestration/settings",
+          "permission": "composition_orchestration:admin"
+        }
+      ],
+      "shell": "apg_python",
+      "template_roots": [
+        "templates/",
+        "static/"
+      ],
+      "view_module": "views.py"
+    }
+  },
   "source": "capability_contract.py",
   "target": "python"
 }
