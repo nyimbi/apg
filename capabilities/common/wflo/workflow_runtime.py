@@ -13,6 +13,7 @@ EXECUTION_STATUSES = {"running", "waiting_approval", "completed", "failed", "can
 TASK_STATUSES = {"open", "claimed", "completed", "escalated"}
 APPROVAL_STATUSES = {"pending", "approved", "rejected", "delegated"}
 STEP_TYPES = {"human", "automation", "approval", "ai", "event"}
+AGENT_STATUSES = {"active", "suspended"}
 
 
 def utc_now() -> str:
@@ -53,6 +54,9 @@ class WorkflowStepRecord:
 	sla_minutes: int = 1440
 	requires_approval: bool = False
 	ai_policy_ref: str = ""
+	automation_policy_ref: str = ""
+	event_policy_ref: str = ""
+	compensation_ref: str = ""
 
 	def to_dict(self) -> dict[str, Any]:
 		return serialize(self)
@@ -92,6 +96,10 @@ class WorkflowExecutionRecord:
 	status: str = "running"
 	current_step: str | None = None
 	payload: dict[str, Any] = field(default_factory=dict)
+	event_stream: str = "bytewax"
+	cancel_reason: str = ""
+	failure_reason: str = ""
+	compensation_status: str = "not_required"
 	started_at: str = field(default_factory=utc_now)
 	completed_at: str | None = None
 
@@ -109,6 +117,10 @@ class WorkflowTaskRecord:
 	assignee_ref: str
 	status: str = "open"
 	due_at: str | None = None
+	claimed_by: str | None = None
+	claimed_at: str | None = None
+	escalated_at: str | None = None
+	escalation_reason: str = ""
 	created_at: str = field(default_factory=utc_now)
 	completed_at: str | None = None
 	completed_by: str | None = None
@@ -129,6 +141,8 @@ class WorkflowApprovalRecord:
 	requested_at: str = field(default_factory=utc_now)
 	decided_at: str | None = None
 	decision_by: str | None = None
+	decision_evidence_ref: str = ""
+	delegated_to: str = ""
 
 	def to_dict(self) -> dict[str, Any]:
 		return serialize(self)
@@ -162,7 +176,25 @@ class WorkflowAuditEventRecord:
 		return serialize(self)
 
 
+@dataclass(slots=True)
+class WorkflowAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope_ref: str
+	registered_by: str
+	contribution_disclosed: bool
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize(self)
+
+
 __all__ = [
+	"AGENT_STATUSES",
 	"APPROVAL_STATUSES",
 	"DEFINITION_STATUSES",
 	"EXECUTION_STATUSES",
@@ -170,6 +202,7 @@ __all__ = [
 	"TASK_STATUSES",
 	"WorkflowApprovalRecord",
 	"WorkflowAuditEventRecord",
+	"WorkflowAgentRecord",
 	"WorkflowDefinitionRecord",
 	"WorkflowEventRecord",
 	"WorkflowExecutionRecord",

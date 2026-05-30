@@ -25,7 +25,7 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_wflo", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_wflo", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
@@ -35,7 +35,7 @@ def test_contract_shape_is_valid():
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_wflo", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_wflo", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -69,9 +69,11 @@ def test_definition_publish_execution_task_approval_and_completion_lifecycle_exe
 	published = service.publish_workflow("tenant-a", definition["id"], "approval://publish/1", "workflow-admin")
 	execution = service.start_execution("tenant-a", published["id"], "purchase-123", "requester-1", {"amount": 500})
 	task = service.create_task("tenant-a", execution["id"], published["steps"][0]["id"], "Review purchase", "manager")
+	claimed_task = service.claim_task("tenant-a", task["id"], "manager")
 	completed_task = service.complete_task("tenant-a", task["id"], "manager")
 	approval = service.request_approval("tenant-a", execution["id"], "purchase-123", "approver-1", "High value purchase")
-	approved = service.record_approval("tenant-a", approval["id"], "approved", "approver-1")
+	approved = service.record_approval("tenant-a", approval["id"], "approved", "approver-1", "evidence://approval/1")
+	agent = service.register_workflow_agent("agent-1", "tenant-a", "Runtime observer", "codex", "runtime_observer", execution["id"], "workflow-admin", True)
 	completed = service.complete_execution("tenant-a", execution["id"], "workflow-admin")
 	summary = service.dashboard_summary("tenant-a")
 
@@ -79,14 +81,17 @@ def test_definition_publish_execution_task_approval_and_completion_lifecycle_exe
 	assert published["status"] == "published"
 	assert execution["status"] == "running"
 	assert task["status"] == "open"
+	assert claimed_task["status"] == "claimed"
 	assert completed_task["status"] == "completed"
 	assert approval["status"] == "pending"
 	assert approved["status"] == "approved"
+	assert agent["runtime"] == "codex"
 	assert completed["status"] == "completed"
 	assert summary["definition_count"] == 1
 	assert summary["published_definition_count"] == 1
 	assert summary["completed_execution_count"] == 1
 	assert summary["pending_approval_count"] == 0
+	assert summary["agent_count"] == 1
 	assert summary["event_count"] >= 5
 
 
@@ -134,6 +139,19 @@ def test_workflow_guardrails_require_tenant_owner_policies_approval_and_open_wor
 	else:
 		raise AssertionError("AI step without policy was accepted")
 
+	try:
+		service.create_workflow_definition(
+			"tenant-a",
+			"Automation No Policy",
+			"owner",
+			[{"name": "sync", "step_type": "automation"}],
+			retry_policy_ref="retry://x",
+		)
+	except PermissionError as exc:
+		assert str(exc) == "automation_policy_required"
+	else:
+		raise AssertionError("automation step without policy was accepted")
+
 	long_running = service.create_workflow_definition(
 		"tenant-a",
 		"Long Runtime",
@@ -169,6 +187,87 @@ def test_workflow_guardrails_require_tenant_owner_policies_approval_and_open_wor
 		assert str(exc) == "open_tasks_block_completion"
 	else:
 		raise AssertionError("execution completed with open tasks")
+
+
+def test_task_approval_compensation_agent_and_stream_guardrails():
+	service = WfloService()
+	definition = service.create_workflow_definition(
+		"tenant-c",
+		"Compensated Workflow",
+		"owner",
+		[{"name": "review", "step_type": "human", "assignee_ref": "owner"}],
+		retry_policy_ref="retry://x",
+		compensation_ref="compensation://x",
+	)
+	published = service.publish_workflow("tenant-c", definition["id"], "approval://publish", "publisher")
+	execution = service.start_execution("tenant-c", published["id"], "corr-c", "starter")
+	task = service.create_task("tenant-c", execution["id"], published["steps"][0]["id"], "Review", "owner")
+
+	try:
+		service.complete_task("tenant-c", task["id"], "owner")
+	except PermissionError as exc:
+		assert str(exc) == "task_claim_required"
+	else:
+		raise AssertionError("task completed without claim")
+
+	try:
+		service.escalate_task("tenant-c", task["id"], "owner", "")
+	except PermissionError as exc:
+		assert str(exc) == "task_escalation_reason_required"
+	else:
+		raise AssertionError("task escalated without reason")
+
+	try:
+		service.request_approval("tenant-c", execution["id"], "subject", "approver", "")
+	except PermissionError as exc:
+		assert str(exc) == "approval_reason_required"
+	else:
+		raise AssertionError("approval requested without reason")
+
+	approval = service.request_approval("tenant-c", execution["id"], "subject", "approver", "Needs review")
+	try:
+		service.record_approval("tenant-c", approval["id"], "approved", "approver")
+	except PermissionError as exc:
+		assert str(exc) == "approval_decision_evidence_required"
+	else:
+		raise AssertionError("approval decision accepted without evidence")
+
+	try:
+		service.record_approval("tenant-c", approval["id"], "delegated", "approver", "evidence://approval")
+	except PermissionError as exc:
+		assert str(exc) == "approval_delegate_required"
+	else:
+		raise AssertionError("delegation accepted without delegate")
+
+	delegated = service.record_approval("tenant-c", approval["id"], "delegated", "approver", "evidence://approval", "delegate-1")
+	assert delegated["delegated_to"] == "delegate-1"
+
+	try:
+		service.cancel_execution("tenant-c", execution["id"], "starter", "")
+	except PermissionError as exc:
+		assert str(exc) == "execution_state_change_reason_required"
+	else:
+		raise AssertionError("execution cancelled without reason")
+
+	failed = service.fail_execution("tenant-c", execution["id"], "starter", "Downstream service failed", compensation_requested=True)
+	compensated = service.run_compensation("tenant-c", execution["id"], "operator")
+	assert failed["status"] == "failed"
+	assert compensated["compensation_status"] == "completed"
+
+	try:
+		service.register_workflow_agent("agent-bad", "tenant-c", "Agent", "unknown", "runtime_observer", execution["id"], "owner", True)
+	except PermissionError as exc:
+		assert str(exc) == "workflow_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported workflow agent runtime accepted")
+
+	try:
+		service.validate_batch_mutation("legacy_queue")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("non-Bytewax batch mutation accepted")
+	assert service.validate_batch_mutation("bytewax")["decision"] == "allow"
 
 
 def test_api_and_view_models_expose_workflow_surfaces():
@@ -207,6 +306,11 @@ def test_api_and_view_models_expose_workflow_surfaces():
 		"title": "Collect documents",
 		"assignee_ref": "agent",
 	})
+	api.claim_task({
+		"tenant_id": "tenant-b",
+		"task_id": task["id"],
+		"claimed_by": "agent",
+	})
 	api.complete_task({
 		"tenant_id": "tenant-b",
 		"task_id": task["id"],
@@ -224,6 +328,17 @@ def test_api_and_view_models_expose_workflow_surfaces():
 		"approval_id": approval["id"],
 		"decision": "approved",
 		"decision_by": "supervisor",
+		"decision_evidence_ref": "evidence://approval/onboarding",
+	})
+	agent = api.register_workflow_agent({
+		"id": "agent-onboarding",
+		"tenant_id": "tenant-b",
+		"name": "Onboarding observer",
+		"runtime": "codex",
+		"role": "runtime_observer",
+		"scope_ref": execution["id"],
+		"registered_by": "workflow-admin",
+		"contribution_disclosed": True,
 	})
 	api.complete_execution({
 		"tenant_id": "tenant-b",
@@ -240,6 +355,8 @@ def test_api_and_view_models_expose_workflow_surfaces():
 	tasks = views.task_inbox_model(local_service, "tenant-b")
 	approvals = views.approval_center_model(local_service, "tenant-b")
 	analytics = views.analytics_model(local_service, "tenant-b")
+	agents = views.agent_panel_model(local_service, "tenant-b")
+	audit = views.audit_trail_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["definition_count"] == 1
@@ -250,5 +367,8 @@ def test_api_and_view_models_expose_workflow_surfaces():
 	assert monitor["executions"][0]["status"] == "completed"
 	assert tasks["tasks"][0]["status"] == "completed"
 	assert approvals["approvals"][0]["status"] == "approved"
+	assert agent["role"] == "runtime_observer"
+	assert agents["agents"][0]["runtime"] == "codex"
+	assert audit["audit_events"]
 	assert analytics["review_required_definitions"] == []
 	assert settings["configuration"]["tenant_id"] == "tenant-b"

@@ -59,6 +59,7 @@ def start_execution(payload: dict[str, Any]) -> dict[str, Any]:
 		correlation_id=str(payload.get("correlation_id") or ""),
 		started_by=str(payload.get("started_by") or "system"),
 		payload=dict(payload.get("payload") or {}),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -81,6 +82,23 @@ def complete_task(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def claim_task(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.claim_task(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		task_id=str(payload["task_id"]),
+		claimed_by=str(payload.get("claimed_by") or "system"),
+	)
+
+
+def escalate_task(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.escalate_task(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		task_id=str(payload["task_id"]),
+		escalated_by=str(payload.get("escalated_by") or "system"),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
 def request_approval(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.request_approval(
 		tenant_id=str(payload.get("tenant_id") or "default"),
@@ -97,6 +115,8 @@ def record_approval(payload: dict[str, Any]) -> dict[str, Any]:
 		approval_id=str(payload["approval_id"]),
 		decision=str(payload.get("decision") or ""),
 		decision_by=str(payload.get("decision_by") or "system"),
+		decision_evidence_ref=str(payload.get("decision_evidence_ref") or ""),
+		delegated_to=str(payload.get("delegated_to") or ""),
 	)
 
 
@@ -106,6 +126,59 @@ def complete_execution(payload: dict[str, Any]) -> dict[str, Any]:
 		execution_id=str(payload["execution_id"]),
 		actor=str(payload.get("actor") or "system"),
 	)
+
+
+def cancel_execution(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.cancel_execution(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		execution_id=str(payload["execution_id"]),
+		actor=str(payload.get("actor") or "system"),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def fail_execution(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.fail_execution(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		execution_id=str(payload["execution_id"]),
+		actor=str(payload.get("actor") or "system"),
+		reason=str(payload.get("reason") or ""),
+		compensation_requested=bool(payload.get("compensation_requested", False)),
+	)
+
+
+def run_compensation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.run_compensation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		execution_id=str(payload["execution_id"]),
+		actor=str(payload.get("actor") or "system"),
+	)
+
+
+def retire_workflow(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.retire_workflow(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		definition_id=str(payload["definition_id"]),
+		approval_ref=str(payload.get("approval_ref") or ""),
+		retired_by=str(payload.get("retired_by") or "system"),
+	)
+
+
+def register_workflow_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_workflow_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or ""),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope_ref=str(payload.get("scope_ref") or ""),
+		registered_by=str(payload.get("registered_by") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+	)
+
+
+def validate_batch_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_mutation(str(payload.get("event_stream") or ""))
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
@@ -127,6 +200,7 @@ def list_workflow_orchestration(tenant_id: str = "default") -> dict[str, Any]:
 		"executions": SERVICE.list_executions(tenant_id),
 		"tasks": SERVICE.list_tasks(tenant_id),
 		"approvals": SERVICE.list_approvals(tenant_id),
+		"agents": SERVICE.list_agents(tenant_id),
 		"events": SERVICE.list_events(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),

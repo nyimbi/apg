@@ -15424,3 +15424,59 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, ENCR, AUDL, COMP, WFLO, NTFY, IDFD, DLPD, NLPC, or THEM
   adapters.
+
+### 2026-05-30 14:36 EAT
+
+WFLO lifecycle and guardrail packet:
+
+- Selected `capabilities/common/wflo` as the next common capability after ESGN.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable WFLO contract to cover definitions, steps,
+  executions, tasks, approvals, AI workflow agents, governance, observability,
+  APG adapters, UI routes, visual theme tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, workflow owner,
+  workflow name, step count, large workflow review, duplicate step IDs, retry
+  policy, publication approval, retirement approval, external trigger policy,
+  AI step policy, automation policy, event policy, long-running runtime review,
+  published-definition execution, correlation IDs, Bytewax event streams, task
+  assignment, task claim-before-completion, task escalation reason, approval
+  approver/reason/decision evidence/delegation, completion blocking by open
+  tasks and pending approvals, execution cancellation/failure reason,
+  compensation plans, AI workflow agent registration/runtime/scope/disclosure,
+  audit evidence, tenant isolation, and Bytewax batch mutation.
+- Added runtime fields for step policies, execution event stream, cancellation
+  and failure reasons, compensation state, task claim/escalation state,
+  approval decision evidence/delegation, and workflow-agent records.
+- Hardened `WfloService` with retirement, task claiming/escalation,
+  evidence-backed approval decisions, cancellation, failure, compensation,
+  workflow-agent registration, and batch-mutation validation.
+- Added API helper coverage for task claims/escalation, cancellation, failure,
+  compensation, retirement, workflow agents, and batch mutation validation.
+- Added agent-panel and audit view models, plus richer dashboard, designer,
+  monitor, task, approval, analytics, and settings metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, guardrails, AI workflow
+  agents, compensation, Bytewax policy, view models, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/wflo/__init__.py capabilities/common/wflo/models.py capabilities/common/wflo/workflow_runtime.py capabilities/common/wflo/service.py capabilities/common/wflo/api.py capabilities/common/wflo/views.py capabilities/common/wflo/capability_contract.py capabilities/common/wflo/app.py capabilities/common/wflo/test_capability_contract.py capabilities/common/wflo/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/wflo/test_capability_contract.py capabilities/common/wflo/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and WFLO capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/wflo --json` passed with `ok: true`; WFLO remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wflo --json` passed with 10 UI routes, 35 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and placeholder markers returned no matches.
+- `git diff --check -- capabilities/common/wflo docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live event buses, distributed executors, schedulers, notification providers,
+  script runtimes, AI providers, external AI-agent CLIs, durable workflow
+  databases, browser-rendered workflow studio behavior, and performance/load
+  tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External MQEB, AUTH, AUDL, AICR, SCHD, NTFY, COMP, SCPT, or THEM adapters.

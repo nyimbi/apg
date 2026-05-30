@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
 from .workflow_runtime import (
 	WorkflowApprovalRecord,
 	WorkflowAuditEventRecord,
+	WorkflowAgentRecord,
 	WorkflowDefinitionRecord,
 	WorkflowEventRecord,
 	WorkflowExecutionRecord,
@@ -29,6 +30,7 @@ class WfloService:
 		self.tasks: dict[str, WorkflowTaskRecord] = {}
 		self.approvals: dict[str, WorkflowApprovalRecord] = {}
 		self.events: dict[str, WorkflowEventRecord] = {}
+		self.agents: dict[str, WorkflowAgentRecord] = {}
 		self.audit_events: dict[str, WorkflowAuditEventRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -53,28 +55,36 @@ class WfloService:
 		actor: str = "system",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		if not str(name or "").strip():
-			raise ValueError("workflow_name_required")
-		if not steps:
-			raise ValueError("workflow_steps_required")
 		normalized_steps = self._normalize_steps(tenant_id, name, steps)
+		step_ids = [step["id"] for step in normalized_steps]
 		ai_step_present = any(step["step_type"] == "ai" for step in normalized_steps)
+		automation_step_present = any(step["step_type"] == "automation" for step in normalized_steps)
+		event_step_present = any(step["step_type"] == "event" for step in normalized_steps)
 		context = {
 			"tenant_context_present": True,
 			"operation": "create_workflow",
 			"workflow_owner_assigned": bool(str(owner_ref or "").strip()),
+			"workflow_name_present": bool(str(name or "").strip()),
+			"step_count": len(normalized_steps),
+			"workflow_size_review_recorded": len(normalized_steps) <= DEFAULT_CONFIGURATION["definitions"]["max_steps_per_workflow"],
+			"duplicate_step_ids_present": len(step_ids) != len(set(step_ids)),
+			"retry_policy_attached": bool(str(retry_policy_ref or "").strip()),
 			"external_trigger": str(trigger_type or "").strip().lower() == "external",
 			"trigger_policy_attached": bool(str(trigger_policy_ref or "").strip()),
 			"ai_step_present": ai_step_present,
 			"ai_policy_attached": all(bool(str(step.get("ai_policy_ref") or "").strip()) for step in normalized_steps if step["step_type"] == "ai"),
+			"automation_step_present": automation_step_present,
+			"automation_policy_attached": all(bool(str(step.get("automation_policy_ref") or "").strip()) for step in normalized_steps if step["step_type"] == "automation"),
+			"event_step_present": event_step_present,
+			"event_policy_attached": all(bool(str(step.get("event_policy_ref") or "").strip()) for step in normalized_steps if step["step_type"] == "event"),
 			"expected_runtime_minutes": int(expected_runtime_minutes),
 			"runtime_review_recorded": bool(runtime_review_recorded),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if not str(retry_policy_ref or "").strip():
-			raise PermissionError("retry_policy_required")
 		status = "review_required" if result["decision"] == "require_review" else "draft"
 		record = WorkflowDefinitionRecord(
 			id=stable_id("wflo_definition", tenant_id, name, version),
@@ -109,6 +119,8 @@ class WfloService:
 			"tenant_context_present": True,
 			"operation": "publish_workflow",
 			"approval_recorded": bool(str(approval_ref or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -119,6 +131,28 @@ class WfloService:
 		self._record_audit(tenant_id, "workflow_published", definition.id, f"Workflow published: {definition.name}", published_by)
 		return definition.to_dict()
 
+	def retire_workflow(
+		self,
+		tenant_id: str,
+		definition_id: str,
+		approval_ref: str,
+		retired_by: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		definition = self._get_definition(tenant_id, definition_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "retire_workflow",
+			"approval_recorded": bool(str(approval_ref or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		definition.status = "retired"
+		self._record_audit(tenant_id, "workflow_retired", definition.id, f"Workflow retired: {definition.name}", retired_by)
+		return definition.to_dict()
+
 	def start_execution(
 		self,
 		tenant_id: str,
@@ -126,13 +160,20 @@ class WfloService:
 		correlation_id: str,
 		started_by: str,
 		payload: dict[str, Any] | None = None,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		definition = self._get_definition(tenant_id, definition_id)
-		if definition.status != "published":
-			raise PermissionError(f"workflow_not_published:{definition.status}")
-		if not str(correlation_id or "").strip():
-			raise ValueError("correlation_id_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "start_execution",
+			"definition_published": definition.status == "published",
+			"correlation_id_present": bool(str(correlation_id or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		record = WorkflowExecutionRecord(
 			id=stable_id("wflo_execution", tenant_id, definition.id, correlation_id),
 			tenant_id=tenant_id,
@@ -141,9 +182,11 @@ class WfloService:
 			started_by=started_by,
 			current_step=definition.steps[0]["id"] if definition.steps else None,
 			payload=dict(payload or {}),
+			event_stream=event_stream,
+			compensation_status="available" if definition.compensation_ref else "not_required",
 		)
 		self.executions[record.id] = record
-		self.emit_event(tenant_id, record.id, "workflow_started", {"definition_id": definition.id, "correlation_id": correlation_id})
+		self.emit_event(tenant_id, record.id, "workflow_started", {"definition_id": definition.id, "correlation_id": correlation_id}, event_stream=event_stream)
 		self._record_audit(tenant_id, "execution_started", record.id, f"Workflow execution started: {definition.name}", started_by)
 		return record.to_dict()
 
@@ -160,8 +203,15 @@ class WfloService:
 		execution = self._get_execution(tenant_id, execution_id)
 		if not str(title or "").strip():
 			raise ValueError("task_title_required")
-		if not str(assignee_ref or "").strip():
-			raise PermissionError("task_assignee_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "create_task",
+			"task_assignee_present": bool(str(assignee_ref or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		record = WorkflowTaskRecord(
 			id=stable_id("wflo_task", tenant_id, execution.id, step_id, len(self.tasks)),
 			tenant_id=tenant_id,
@@ -175,15 +225,55 @@ class WfloService:
 		self.emit_event(tenant_id, execution.id, "task_created", {"task_id": record.id, "step_id": step_id})
 		return record.to_dict()
 
+	def claim_task(self, tenant_id: str, task_id: str, claimed_by: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		task = self._get_task(tenant_id, task_id)
+		if task.status == "completed":
+			raise PermissionError("task_already_completed")
+		if not str(claimed_by or "").strip():
+			raise PermissionError("task_claim_actor_required")
+		task.status = "claimed"
+		task.claimed_by = claimed_by
+		task.claimed_at = utc_now()
+		self.emit_event(tenant_id, task.execution_id, "task_claimed", {"task_id": task.id, "claimed_by": claimed_by})
+		return task.to_dict()
+
 	def complete_task(self, tenant_id: str, task_id: str, completed_by: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		task = self._get_task(tenant_id, task_id)
 		if task.status == "completed":
 			return task.to_dict()
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "complete_task",
+			"task_claimed": bool(task.claimed_by),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		task.status = "completed"
 		task.completed_at = utc_now()
 		task.completed_by = completed_by
 		self.emit_event(tenant_id, task.execution_id, "task_completed", {"task_id": task.id, "completed_by": completed_by})
+		return task.to_dict()
+
+	def escalate_task(self, tenant_id: str, task_id: str, escalated_by: str, reason: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		task = self._get_task(tenant_id, task_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "escalate_task",
+			"escalation_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		task.status = "escalated"
+		task.escalated_at = utc_now()
+		task.escalation_reason = reason
+		self.emit_event(tenant_id, task.execution_id, "task_escalated", {"task_id": task.id, "escalated_by": escalated_by, "reason": reason})
 		return task.to_dict()
 
 	def request_approval(
@@ -196,8 +286,16 @@ class WfloService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		execution = self._get_execution(tenant_id, execution_id)
-		if not str(approver_ref or "").strip():
-			raise PermissionError("approval_approver_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "request_approval",
+			"approver_present": bool(str(approver_ref or "").strip()),
+			"approval_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		record = WorkflowApprovalRecord(
 			id=stable_id("wflo_approval", tenant_id, execution.id, subject_ref, len(self.approvals)),
 			tenant_id=tenant_id,
@@ -217,31 +315,117 @@ class WfloService:
 		approval_id: str,
 		decision: str,
 		decision_by: str,
+		decision_evidence_ref: str = "",
+		delegated_to: str = "",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		approval = self._get_approval(tenant_id, approval_id)
 		decision_value = str(decision or "").strip().lower()
 		if decision_value not in {"approved", "rejected", "delegated"}:
 			raise ValueError(f"unsupported_approval_decision:{decision}")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "record_approval",
+			"decision_evidence_present": bool(str(decision_evidence_ref or "").strip()),
+			"approval_delegated": decision_value == "delegated",
+			"delegate_present": bool(str(delegated_to or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		approval.status = decision_value
 		approval.decided_at = utc_now()
 		approval.decision_by = decision_by
+		approval.decision_evidence_ref = decision_evidence_ref
+		approval.delegated_to = delegated_to
 		execution = self._get_execution(tenant_id, approval.execution_id)
-		execution.status = "running" if decision_value == "approved" else "failed"
+		execution.status = "running" if decision_value in {"approved", "delegated"} else "failed"
 		self.emit_event(tenant_id, execution.id, f"approval_{decision_value}", {"approval_id": approval.id})
 		return approval.to_dict()
 
 	def complete_execution(self, tenant_id: str, execution_id: str, actor: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		execution = self._get_execution(tenant_id, execution_id)
-		if any(task.status != "completed" for task in self._tasks_for_execution(tenant_id, execution.id)):
-			raise PermissionError("open_tasks_block_completion")
-		if any(approval.status == "pending" for approval in self._approvals_for_execution(tenant_id, execution.id)):
-			raise PermissionError("pending_approvals_block_completion")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "complete_execution",
+			"open_tasks_present": any(task.status != "completed" for task in self._tasks_for_execution(tenant_id, execution.id)),
+			"pending_approvals_present": any(approval.status == "pending" for approval in self._approvals_for_execution(tenant_id, execution.id)),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		execution.status = "completed"
 		execution.completed_at = utc_now()
 		self.emit_event(tenant_id, execution.id, "workflow_completed", {"actor": actor})
 		self._record_audit(tenant_id, "execution_completed", execution.id, "Workflow execution completed", actor)
+		return execution.to_dict()
+
+	def cancel_execution(self, tenant_id: str, execution_id: str, actor: str, reason: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		execution = self._get_execution(tenant_id, execution_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "change_execution_state",
+			"state_change_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		execution.status = "cancelled"
+		execution.cancel_reason = reason
+		execution.completed_at = utc_now()
+		self.emit_event(tenant_id, execution.id, "workflow_cancelled", {"actor": actor, "reason": reason})
+		self._record_audit(tenant_id, "execution_cancelled", execution.id, "Workflow execution cancelled", actor, severity="medium")
+		return execution.to_dict()
+
+	def fail_execution(
+		self,
+		tenant_id: str,
+		execution_id: str,
+		actor: str,
+		reason: str,
+		compensation_requested: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		execution = self._get_execution(tenant_id, execution_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "change_execution_state",
+			"state_change_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		execution.status = "failed"
+		execution.failure_reason = reason
+		execution.completed_at = utc_now()
+		if compensation_requested:
+			execution.compensation_status = "requested"
+		self.emit_event(tenant_id, execution.id, "workflow_failed", {"actor": actor, "reason": reason, "compensation_requested": compensation_requested})
+		self._record_audit(tenant_id, "execution_failed", execution.id, "Workflow execution failed", actor, severity="high")
+		return execution.to_dict()
+
+	def run_compensation(self, tenant_id: str, execution_id: str, actor: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		execution = self._get_execution(tenant_id, execution_id)
+		definition = self._get_definition(tenant_id, execution.definition_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "run_compensation",
+			"compensation_plan_present": bool(str(definition.compensation_ref or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		execution.compensation_status = "completed"
+		self.emit_event(tenant_id, execution.id, "compensation_completed", {"actor": actor, "compensation_ref": definition.compensation_ref})
+		self._record_audit(tenant_id, "compensation_completed", execution.id, "Workflow compensation completed", actor, severity="medium")
 		return execution.to_dict()
 
 	def emit_event(
@@ -250,9 +434,17 @@ class WfloService:
 		execution_id: str,
 		event_type: str,
 		payload: dict[str, Any] | None = None,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		execution = self._get_execution(tenant_id, execution_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "emit_event",
+			"event_stream": event_stream,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		record = WorkflowEventRecord(
 			id=stable_id("wflo_event", tenant_id, execution.id, event_type, len(self.events)),
 			tenant_id=tenant_id,
@@ -262,6 +454,52 @@ class WfloService:
 		)
 		self.events[record.id] = record
 		return record.to_dict()
+
+	def register_workflow_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope_ref: str,
+		registered_by: str,
+		contribution_disclosed: bool,
+	) -> dict[str, Any]:
+		config = DEFAULT_CONFIGURATION["workflow_agents"]
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"workflow_agent_present": True,
+			"agent_registered": bool(name and registered_by),
+			"agent_runtime_supported": runtime in config["supported_runtimes"],
+			"agent_scope_present": bool(scope_ref),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		if role not in config["allowed_roles"]:
+			raise PermissionError("workflow_agent_role_not_supported")
+		record = WorkflowAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			scope_ref=scope_ref,
+			registered_by=registered_by,
+			contribution_disclosed=bool(contribution_disclosed),
+		)
+		self.agents[agent_id] = record
+		self._record_audit(tenant_id, "workflow_agent_registered", agent_id, f"Workflow agent registered: {name}", registered_by)
+		return record.to_dict()
+
+	def validate_batch_mutation(self, event_stream: str) -> dict[str, Any]:
+		result = self.evaluate({"tenant_context_present": True, "operation": "batch_workflow_mutation", "event_stream": event_stream})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		return result
 
 	def create_record(
 		self,
@@ -313,6 +551,9 @@ class WfloService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
+	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		definitions = self.list_definitions(tenant_id)
 		executions = self.list_executions(tenant_id)
@@ -328,7 +569,11 @@ class WfloService:
 			"completed_execution_count": sum(1 for item in executions if item["status"] == "completed"),
 			"open_task_count": sum(1 for item in tasks if item["status"] in {"open", "claimed"}),
 			"pending_approval_count": sum(1 for item in approvals if item["status"] == "pending"),
+			"agent_count": len(self.list_agents(tenant_id)),
+			"cancelled_execution_count": sum(1 for item in executions if item["status"] == "cancelled"),
+			"failed_execution_count": sum(1 for item in executions if item["status"] == "failed"),
 			"event_count": len(self.list_events(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"recent_events": self.list_events(tenant_id)[-5:],
 		}
 
@@ -344,6 +589,9 @@ class WfloService:
 				sla_minutes=int(step.get("sla_minutes", 1440)),
 				requires_approval=bool(step.get("requires_approval", step_type == "approval")),
 				ai_policy_ref=str(step.get("ai_policy_ref") or ""),
+				automation_policy_ref=str(step.get("automation_policy_ref") or ""),
+				event_policy_ref=str(step.get("event_policy_ref") or ""),
+				compensation_ref=str(step.get("compensation_ref") or ""),
 			)
 			normalized.append(record.to_dict())
 		return normalized

@@ -5,6 +5,7 @@ from __future__ import annotations
 from .workflow_runtime import (
 	WorkflowApprovalRecord,
 	WorkflowAuditEventRecord,
+	WorkflowAgentRecord,
 	WorkflowDefinitionRecord,
 	WorkflowEventRecord,
 	WorkflowExecutionRecord,
@@ -19,6 +20,7 @@ WfloRecord = WorkflowDefinitionRecord
 __all__ = [
 	"WorkflowApprovalRecord",
 	"WorkflowAuditEventRecord",
+	"WorkflowAgentRecord",
 	"WorkflowDefinitionRecord",
 	"WorkflowEventRecord",
 	"WorkflowExecutionRecord",
