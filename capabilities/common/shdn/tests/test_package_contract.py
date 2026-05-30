@@ -25,17 +25,19 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_shdn", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_shdn", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "shdn"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "shdn_agents" in contract["provides"]
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_shdn", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_shdn", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -101,6 +103,14 @@ def test_shutdown_lifecycle_executes_with_recovery_evidence():
 		evidence_ref="incident://change/123",
 		post_shutdown_health_check_ref="health://billing-api/post",
 	)
+	agent = service.register_shdn_agent(
+		tenant_id="tenant-a",
+		name="Shutdown reviewer",
+		runtime="codex",
+		role="shutdown_reviewer",
+		scope="review critical shutdown gates before execution",
+		owner="platform-owner",
+	)
 	summary = service.dashboard_summary("tenant-a")
 
 	assert target["criticality"] == "critical"
@@ -109,10 +119,13 @@ def test_shutdown_lifecycle_executes_with_recovery_evidence():
 	assert snapshot["verified"] is True
 	assert execution["status"] == "completed"
 	assert recovery["status"] == "recovered"
+	assert agent["runtime"] == "codex"
 	assert summary["target_count"] == 1
 	assert summary["snapshot_count"] == 1
 	assert summary["shutdown_count"] == 0
 	assert summary["recovery_count"] == 1
+	assert summary["shdn_agent_count"] == 1
+	assert summary["streaming"]["processor"] == "bytewax"
 
 
 def test_guardrails_require_tenant_owner_plan_evidence_drain_and_recovery_evidence():
@@ -189,6 +202,20 @@ def test_guardrails_require_tenant_owner_plan_evidence_drain_and_recovery_eviden
 	else:
 		raise AssertionError("shutdown without health gate was accepted")
 
+	try:
+		service.execute_shutdown("tenant-a", plan["id"], target["id"], "", "health://pre")
+	except PermissionError as exc:
+		assert str(exc) == "shutdown_actor_required"
+	else:
+		raise AssertionError("shutdown without actor was accepted")
+
+	try:
+		service.execute_shutdown("tenant-a", plan["id"], target["id"], "operator", "health://pre", event_stream="memory")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("shutdown without Bytewax stream was accepted")
+
 	execution = service.execute_shutdown("tenant-a", plan["id"], target["id"], "operator", "health://pre", force_shutdown=True)
 	assert execution["status"] == "blocked"
 	assert execution["required_actions"] == ["review_force_shutdown"]
@@ -199,6 +226,29 @@ def test_guardrails_require_tenant_owner_plan_evidence_drain_and_recovery_eviden
 		assert str(exc) == "incident_link_required"
 	else:
 		raise AssertionError("recovery without incident link was accepted")
+
+	try:
+		service.record_recovery("tenant-a", plan["id"], target["id"], "operator", "incident://change/123", "")
+	except PermissionError as exc:
+		assert str(exc) == "post_shutdown_health_check_required"
+	else:
+		raise AssertionError("recovery without post-shutdown health was accepted")
+
+	try:
+		service.register_shdn_agent("tenant-a", "Bad agent", "unsupported", "shutdown_reviewer", "review shutdown")
+	except PermissionError as exc:
+		assert str(exc) == "shdn_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported SHDN agent runtime was accepted")
+
+	agent = service.register_shdn_agent("tenant-a", "Critical reviewer", "opencode", "approval_reviewer", "review critical action")
+	decision = service.validate_agent_lifecycle_action("tenant-a", agent["id"], "critical", human_approval_recorded=False)
+	assert decision["decision"] == "deny"
+	assert decision["matched_rules"] == ["critical_agent_shutdown_requires_human_approval"]
+
+	batch = service.validate_batch_lifecycle_mutation("tenant-a", [target["id"]], event_stream="memory")
+	assert batch["decision"] == "deny"
+	assert batch["matched_rules"] == ["batch_lifecycle_mutation_requires_bytewax"]
 
 
 def test_api_and_view_models_expose_lifecycle_control_surfaces():
@@ -251,6 +301,14 @@ def test_api_and_view_models_expose_lifecycle_control_surfaces():
 		"evidence_ref": "incident://change/456",
 		"post_shutdown_health_check_ref": "health://etl/post",
 	})
+	agent = api.register_shdn_agent({
+		"tenant_id": "tenant-b",
+		"name": "Lifecycle planner",
+		"runtime": "claude_code",
+		"role": "lifecycle_planner",
+		"scope": "prepare lifecycle plans for staging maintenance",
+		"owner": "data-platform",
+	})
 
 	status = api.capability_status("tenant-b")
 	lifecycle = api.list_lifecycle_control("tenant-b")
@@ -260,16 +318,23 @@ def test_api_and_view_models_expose_lifecycle_control_surfaces():
 	executions = views.execution_monitor_model(local_service, "tenant-b")
 	approvals = views.approvals_model(local_service, "tenant-b")
 	recovery = views.recovery_center_model(local_service, "tenant-b")
+	agents = views.agent_workbench_model(local_service, "tenant-b")
+	policy = views.policy_center_model(local_service, "tenant-b")
 	audit = views.audit_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["target_count"] == 1
+	assert status["shdn_agent_count"] == 1
 	assert lifecycle["summary"]["recovery_count"] == 1
+	assert lifecycle["shdn_agents"][0]["id"] == agent["id"]
 	assert dashboard["summary"]["snapshot_count"] == 1
 	assert services["route"] == "/shdn/services"
 	assert plans["approval_required"] is True
 	assert executions["statuses"] == ["pending", "draining", "quiesced", "completed", "blocked"]
 	assert approvals["force_shutdown_review_required"] is True
 	assert recovery["required_evidence"] == ["backup_snapshot", "restore_test", "post_shutdown_health_check", "incident_link"]
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert policy["streaming"]["processor"] == "bytewax"
 	assert audit["events"]
 	assert settings["theme"]["name"] == "shdn_lifecycle_control"
+	assert settings["streaming"]["processor"] == "bytewax"

@@ -24,6 +24,7 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -100,6 +101,37 @@ def recovery_center_model(
 	}
 
 
+def agent_workbench_model(
+	service: ShdnService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ShdnService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/shdn/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_shdn_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["shdn_agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["shdn_agents"]["supported_roles"],
+		"approval_required": contract["configuration"]["shdn_agents"]["human_approval_required"],
+	}
+
+
+def policy_center_model(
+	service: ShdnService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ShdnService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/shdn/policy",
+		"tenant_id": tenant_id,
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"adapters": contract["configuration"]["adapters"],
+	}
+
+
 def audit_model(
 	service: ShdnService | None = None,
 	tenant_id: str = "default",
@@ -119,4 +151,5 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}

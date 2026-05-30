@@ -4,8 +4,8 @@
       "capability_contract": {
         "display_name": "Shutdown and Lifecycle Control",
         "errors": [],
-        "route_count": 8,
-        "rule_count": 6
+        "route_count": 10,
+        "rule_count": 15
       }
     },
     "self_test": {

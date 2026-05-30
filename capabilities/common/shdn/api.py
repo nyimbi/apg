@@ -23,6 +23,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"active_plan_count": summary["active_plan_count"],
 		"shutdown_count": summary["shutdown_count"],
 		"recovery_count": summary["recovery_count"],
+		"shdn_agent_count": summary["shdn_agent_count"],
 	}
 
 
@@ -85,6 +86,7 @@ def execute_shutdown(payload: dict[str, Any]) -> dict[str, Any]:
 		health_gate_ref=str(payload.get("health_gate_ref") or ""),
 		force_shutdown=bool(payload.get("force_shutdown", False)),
 		force_review_recorded=bool(payload.get("force_review_recorded", False)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -96,6 +98,35 @@ def record_recovery(payload: dict[str, Any]) -> dict[str, Any]:
 		actor=str(payload.get("actor") or ""),
 		evidence_ref=str(payload.get("evidence_ref") or ""),
 		post_shutdown_health_check_ref=str(payload.get("post_shutdown_health_check_ref") or ""),
+	)
+
+
+def register_shdn_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_shdn_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or "platform-ops"),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+	)
+
+
+def validate_agent_lifecycle_action(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_agent_lifecycle_action(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["agent_id"]),
+		target_criticality=str(payload.get("target_criticality") or "normal"),
+		human_approval_recorded=bool(payload.get("human_approval_recorded", False)),
+	)
+
+
+def validate_batch_lifecycle_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_lifecycle_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		target_ids=list(payload.get("target_ids") or []),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -120,6 +151,7 @@ def list_lifecycle_control(tenant_id: str = "default") -> dict[str, Any]:
 		"snapshots": SERVICE.list_snapshots(tenant_id),
 		"executions": SERVICE.list_executions(tenant_id),
 		"recoveries": SERVICE.list_recoveries(tenant_id),
+		"shdn_agents": SERVICE.list_shdn_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

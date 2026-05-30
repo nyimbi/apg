@@ -12,17 +12,34 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit": "adapter",
+          "backup": "adapter",
+          "deployment": "adapter",
+          "event_stream": "bytewax",
+          "health": "adapter",
+          "scheduler": "adapter"
+        },
         "governance": {
           "audit_lifecycle_events": true,
           "force_shutdown_review_required": true,
           "maintenance_window_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
         },
         "lifecycle": {
+          "batch_mutation_review_required": true,
           "plan_required": true,
           "production_approval_required": true,
           "restart_sequence_required": true,
           "rollback_plan_required": true
+        },
+        "observability": {
+          "emit_execution_events": true,
+          "emit_plan_events": true,
+          "emit_recovery_events": true,
+          "event_stream": "apg.shdn.lifecycle",
+          "stream_processor": "bytewax"
         },
         "recovery": {
           "backup_snapshot_required": true,
@@ -34,7 +51,35 @@
           "dependency_map_required": true,
           "drain_timeout_seconds": 300,
           "health_gate_required": true,
-          "service_owner_required": true
+          "service_owner_required": true,
+          "supported_target_types": [
+            "service",
+            "worker",
+            "database",
+            "queue",
+            "tenant_app",
+            "integration"
+          ]
+        },
+        "shdn_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_criticality": "normal",
+          "supported_roles": [
+            "lifecycle_planner",
+            "shutdown_reviewer",
+            "dependency_reviewer",
+            "recovery_reviewer",
+            "approval_reviewer",
+            "audit_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -42,8 +87,10 @@
           "default_theme": "shdn_lifecycle_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_execution_monitor": true,
           "enable_plan_builder": true,
+          "enable_policy_center": true,
           "enable_recovery_center": true,
           "enable_service_console": true
         }
@@ -55,9 +102,20 @@
       "master_data": {},
       "name": "Shutdown and Lifecycle Control",
       "provides": [
-        "shdn_operations"
+        "service_lifecycle",
+        "shutdown_orchestration",
+        "restart_plans",
+        "backup_gates",
+        "operational_safety",
+        "shdn_agents"
       ],
-      "requires": [],
+      "requires": [
+        "moni",
+        "hlth",
+        "bkup",
+        "audl",
+        "envm"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +145,19 @@
           },
           {
             "condition": {
+              "dependency_map_present": false,
+              "operation": "create_shutdown_plan"
+            },
+            "description": "Lifecycle targets require dependency context before planned shutdown.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dependency_map_required",
+              "required_action": "attach_dependency_map"
+            },
+            "name": "service_requires_dependency_map"
+          },
+          {
+            "condition": {
               "health_gate_passed": false,
               "operation": "execute_shutdown"
             },
@@ -113,6 +184,32 @@
           },
           {
             "condition": {
+              "operation": "execute_shutdown",
+              "shutdown_actor_present": false
+            },
+            "description": "Shutdown execution requires an accountable actor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "shutdown_actor_required",
+              "required_action": "attach_shutdown_actor"
+            },
+            "name": "shutdown_requires_actor"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "execute_shutdown"
+            },
+            "description": "Shutdown lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_shutdown_lifecycle_to_bytewax"
+            },
+            "name": "shutdown_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "approval_recorded": false,
               "production_service": true
             },
@@ -136,6 +233,85 @@
               "required_action": "review_force_shutdown"
             },
             "name": "force_shutdown_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "record_recovery",
+              "post_shutdown_health_check_present": false
+            },
+            "description": "Recovery records require post-shutdown health evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "post_shutdown_health_check_required",
+              "required_action": "attach_post_shutdown_health_check"
+            },
+            "name": "recovery_requires_post_health_check"
+          },
+          {
+            "condition": {
+              "incident_link_present": false,
+              "operation": "record_recovery"
+            },
+            "description": "Recovery records require an incident, change, or work-order reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_link_required",
+              "required_action": "attach_incident_link"
+            },
+            "name": "recovery_requires_incident_link"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_shdn_agent"
+            },
+            "description": "Lifecycle agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "shdn_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "shdn_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_shdn_agent"
+            },
+            "description": "Lifecycle agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "shdn_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "shdn_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_lifecycle_action",
+              "target_criticality": "critical"
+            },
+            "description": "Critical shutdown actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "critical_agent_shutdown_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_lifecycle_mutation"
+            },
+            "description": "Batch lifecycle mutations require Bytewax stream coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_lifecycle_mutation_to_bytewax"
+            },
+            "name": "batch_lifecycle_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +344,19 @@
         },
         {
           "condition": {
+            "dependency_map_present": false,
+            "operation": "create_shutdown_plan"
+          },
+          "description": "Lifecycle targets require dependency context before planned shutdown.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dependency_map_required",
+            "required_action": "attach_dependency_map"
+          },
+          "name": "service_requires_dependency_map"
+        },
+        {
+          "condition": {
             "health_gate_passed": false,
             "operation": "execute_shutdown"
           },
@@ -194,6 +383,32 @@
         },
         {
           "condition": {
+            "operation": "execute_shutdown",
+            "shutdown_actor_present": false
+          },
+          "description": "Shutdown execution requires an accountable actor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "shutdown_actor_required",
+            "required_action": "attach_shutdown_actor"
+          },
+          "name": "shutdown_requires_actor"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "execute_shutdown"
+          },
+          "description": "Shutdown lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_shutdown_lifecycle_to_bytewax"
+          },
+          "name": "shutdown_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "approval_recorded": false,
             "production_service": true
           },
@@ -217,6 +432,85 @@
             "required_action": "review_force_shutdown"
           },
           "name": "force_shutdown_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "record_recovery",
+            "post_shutdown_health_check_present": false
+          },
+          "description": "Recovery records require post-shutdown health evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "post_shutdown_health_check_required",
+            "required_action": "attach_post_shutdown_health_check"
+          },
+          "name": "recovery_requires_post_health_check"
+        },
+        {
+          "condition": {
+            "incident_link_present": false,
+            "operation": "record_recovery"
+          },
+          "description": "Recovery records require an incident, change, or work-order reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_link_required",
+            "required_action": "attach_incident_link"
+          },
+          "name": "recovery_requires_incident_link"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_shdn_agent"
+          },
+          "description": "Lifecycle agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "shdn_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "shdn_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_shdn_agent"
+          },
+          "description": "Lifecycle agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "shdn_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "shdn_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_lifecycle_action",
+            "target_criticality": "critical"
+          },
+          "description": "Critical shutdown actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "critical_agent_shutdown_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_lifecycle_mutation"
+          },
+          "description": "Batch lifecycle mutations require Bytewax stream coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_lifecycle_mutation_to_bytewax"
+          },
+          "name": "batch_lifecycle_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,6 +520,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "SHDNAgentWorkbench",
+          "permission": "shdn:admin",
+          "route": "/shdn/agents"
+        },
         "approvals": {
           "component": "LifecycleApprovals",
           "permission": "shdn:approve",
@@ -251,6 +550,11 @@
           "permission": "shdn:plan",
           "route": "/shdn/plans"
         },
+        "policy": {
+          "component": "LifecyclePolicyCenter",
+          "permission": "shdn:admin",
+          "route": "/shdn/policy"
+        },
         "recovery": {
           "component": "RecoveryCenter",
           "permission": "shdn:execute",
@@ -267,9 +571,40 @@
           "route": "/shdn/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "target_registered",
+          "plan_created",
+          "drain_started",
+          "snapshot_recorded",
+          "shutdown_executed",
+          "recovery_recorded",
+          "shdn_agent_registered"
+        ],
+        "guardrails": [
+          "shutdown_requires_bytewax_stream",
+          "batch_lifecycle_mutation_requires_bytewax",
+          "critical_agent_shutdown_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "running",
+          "draining",
+          "quiesced",
+          "snapshot_ready",
+          "stopped",
+          "recovered",
+          "blocked"
+        ],
+        "stream": "apg.shdn.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_workbench": {
+            "status_style": "review-chip",
+            "visual": "approval-lane"
+          },
           "execution_monitor": {
             "status_style": "health-chip",
             "visual": "operation-timeline"
@@ -277,6 +612,10 @@
           "plan_builder": {
             "highlight": "gate-chip",
             "visual": "sequence-list"
+          },
+          "policy_center": {
+            "status_style": "rule-chip",
+            "visual": "guardrail-grid"
           },
           "recovery_center": {
             "status_style": "restore-chip",
@@ -350,6 +689,20 @@
             "permission": "shdn:execute"
           },
           {
+            "component": "SHDNAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/shdn/agents",
+            "permission": "shdn:admin"
+          },
+          {
+            "component": "LifecyclePolicyCenter",
+            "name": "policy",
+            "nav_group": "Governance",
+            "path": "/shdn/policy",
+            "permission": "shdn:admin"
+          },
+          {
             "component": "LifecycleAudit",
             "name": "audit",
             "nav_group": "Governance",
@@ -377,23 +730,46 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "shdn": []
+      "shdn": [
+        "moni",
+        "hlth",
+        "bkup",
+        "audl",
+        "envm"
+      ]
     }
   },
   "contracts": {
     "shdn": {
       "configuration": {
+        "adapters": {
+          "audit": "adapter",
+          "backup": "adapter",
+          "deployment": "adapter",
+          "event_stream": "bytewax",
+          "health": "adapter",
+          "scheduler": "adapter"
+        },
         "governance": {
           "audit_lifecycle_events": true,
           "force_shutdown_review_required": true,
           "maintenance_window_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
         },
         "lifecycle": {
+          "batch_mutation_review_required": true,
           "plan_required": true,
           "production_approval_required": true,
           "restart_sequence_required": true,
           "rollback_plan_required": true
+        },
+        "observability": {
+          "emit_execution_events": true,
+          "emit_plan_events": true,
+          "emit_recovery_events": true,
+          "event_stream": "apg.shdn.lifecycle",
+          "stream_processor": "bytewax"
         },
         "recovery": {
           "backup_snapshot_required": true,
@@ -405,7 +781,35 @@
           "dependency_map_required": true,
           "drain_timeout_seconds": 300,
           "health_gate_required": true,
-          "service_owner_required": true
+          "service_owner_required": true,
+          "supported_target_types": [
+            "service",
+            "worker",
+            "database",
+            "queue",
+            "tenant_app",
+            "integration"
+          ]
+        },
+        "shdn_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_criticality": "normal",
+          "supported_roles": [
+            "lifecycle_planner",
+            "shutdown_reviewer",
+            "dependency_reviewer",
+            "recovery_reviewer",
+            "approval_reviewer",
+            "audit_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -413,17 +817,30 @@
           "default_theme": "shdn_lifecycle_control"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_execution_monitor": true,
           "enable_plan_builder": true,
+          "enable_policy_center": true,
           "enable_recovery_center": true,
           "enable_service_console": true
         }
       },
       "id": "shdn",
       "provides": [
-        "shdn_operations"
+        "service_lifecycle",
+        "shutdown_orchestration",
+        "restart_plans",
+        "backup_gates",
+        "operational_safety",
+        "shdn_agents"
       ],
-      "requires": []
+      "requires": [
+        "moni",
+        "hlth",
+        "bkup",
+        "audl",
+        "envm"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +852,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +873,33 @@
   },
   "roles": {},
   "rules": {
+    "batch_lifecycle_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_lifecycle_mutation"
+      },
+      "description": "Batch lifecycle mutations require Bytewax stream coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_lifecycle_mutation_to_bytewax"
+      },
+      "name": "batch_lifecycle_mutation_requires_bytewax"
+    },
+    "critical_agent_shutdown_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_lifecycle_action",
+        "target_criticality": "critical"
+      },
+      "description": "Critical shutdown actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "critical_agent_shutdown_requires_human_approval"
+    },
     "force_shutdown_requires_review": {
       "condition": {
         "force_review_recorded": false,
@@ -482,6 +926,45 @@
       },
       "name": "production_shutdown_requires_approval"
     },
+    "recovery_requires_incident_link": {
+      "condition": {
+        "incident_link_present": false,
+        "operation": "record_recovery"
+      },
+      "description": "Recovery records require an incident, change, or work-order reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_link_required",
+        "required_action": "attach_incident_link"
+      },
+      "name": "recovery_requires_incident_link"
+    },
+    "recovery_requires_post_health_check": {
+      "condition": {
+        "operation": "record_recovery",
+        "post_shutdown_health_check_present": false
+      },
+      "description": "Recovery records require post-shutdown health evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "post_shutdown_health_check_required",
+        "required_action": "attach_post_shutdown_health_check"
+      },
+      "name": "recovery_requires_post_health_check"
+    },
+    "service_requires_dependency_map": {
+      "condition": {
+        "dependency_map_present": false,
+        "operation": "create_shutdown_plan"
+      },
+      "description": "Lifecycle targets require dependency context before planned shutdown.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dependency_map_required",
+        "required_action": "attach_dependency_map"
+      },
+      "name": "service_requires_dependency_map"
+    },
     "service_requires_owner": {
       "condition": {
         "operation": "register_service",
@@ -495,6 +978,45 @@
       },
       "name": "service_requires_owner"
     },
+    "shdn_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_shdn_agent"
+      },
+      "description": "Lifecycle agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "shdn_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "shdn_agent_role_supported"
+    },
+    "shdn_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_shdn_agent"
+      },
+      "description": "Lifecycle agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "shdn_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "shdn_agent_runtime_supported"
+    },
+    "shutdown_requires_actor": {
+      "condition": {
+        "operation": "execute_shutdown",
+        "shutdown_actor_present": false
+      },
+      "description": "Shutdown execution requires an accountable actor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "shutdown_actor_required",
+        "required_action": "attach_shutdown_actor"
+      },
+      "name": "shutdown_requires_actor"
+    },
     "shutdown_requires_backup_snapshot": {
       "condition": {
         "backup_snapshot_present": false,
@@ -507,6 +1029,19 @@
         "required_action": "capture_backup_snapshot"
       },
       "name": "shutdown_requires_backup_snapshot"
+    },
+    "shutdown_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "execute_shutdown"
+      },
+      "description": "Shutdown lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_shutdown_lifecycle_to_bytewax"
+      },
+      "name": "shutdown_requires_bytewax_stream"
     },
     "shutdown_requires_health_gate": {
       "condition": {

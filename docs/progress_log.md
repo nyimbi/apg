@@ -16,6 +16,79 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 20:57 EAT
+
+Common SHDN shutdown/lifecycle-control packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the SHDN
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with SHDN-agent, service lifecycle,
+  shutdown, recovery, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, service owner, dependency
+  maps, health gates, backup snapshots, shutdown actor, shutdown Bytewax
+  streams, production approval, force-shutdown review, recovery health checks,
+  recovery incident/change references, SHDN-agent runtime/role, critical
+  agent-lifecycle approval, and Bytewax batch lifecycle mutation.
+- Added `ShdnAgentRecord` and metadata-rich audit event support, then extended
+  `ShdnService` with agent registration, critical agent-action validation,
+  batch lifecycle mutation validation, audit counts, Bytewax stream metadata,
+  and stronger execution/recovery guardrails.
+- Extended API helpers and view models with SHDN-agent, policy center,
+  dashboard, settings, and Bytewax metadata surfaces.
+- Updated package registration to expose SHDN agents, policy endpoints,
+  required dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, batch, shutdown actor, and recovery guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/shdn/__init__.py
+  capabilities/common/shdn/capability_contract.py
+  capabilities/common/shdn/models.py
+  capabilities/common/shdn/lifecycle_runtime.py
+  capabilities/common/shdn/service.py capabilities/common/shdn/api.py
+  capabilities/common/shdn/views.py capabilities/common/shdn/app.py
+  capabilities/common/shdn/test_capability_contract.py
+  capabilities/common/shdn/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/shdn/test_capability_contract.py
+  capabilities/common/shdn/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.shdn import ShdnService;
+  service=ShdnService(); service.register_shdn_agent('tenant-proof',
+  'Proof agent', 'codex', 'shutdown_reviewer', 'review shutdown gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  SHDN-agent registration, audit event emission, and Bytewax stream metadata.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.shdn.streaming.processor,
+  .capabilities.shdn.provides, .capabilities.shdn.requires,
+  .capabilities.shdn.screens.agents.route,
+  (.capabilities.shdn.rules[] |
+  select(.name=="shdn_agent_runtime_supported") | .effect.reason),
+  (.capabilities.shdn.rules[] |
+  select(.name=="shutdown_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/shdn/semantic_model.json` confirmed `bytewax`, SHDN-agent
+  provides, required services, `/shdn/agents`,
+  `shdn_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/shdn --json` passed with `shdn` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/shdn --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `shdn`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/shdn docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: live deployment systems, live health probes, backup engines,
+  schedulers, service mesh adapters, live Bytewax topology, rendered browser UI,
+  performance checks, and full repository tests.
+
 ### 2026-05-30 20:49 EAT
 
 Common SEOP security-operations lifecycle/guardrail packet:

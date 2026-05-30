@@ -1,92 +1,82 @@
 # Shutdown and Lifecycle Control Capability Specification
 
-- **Capability Name**: Shutdown and Lifecycle Control
-- **Capability ID**: `shdn`
-- **Category**: common
-- **Version**: 1.0.0
+- Capability Name: Shutdown and Lifecycle Control
+- Capability ID: `shdn`
+- Category: common
+- Version: 1.0.0
 
 ## Purpose
 
-This package provides the executable APG runtime for `shdn`.
-It gives composed applications a deterministic shutdown and lifecycle-control
-surface for service registration, shutdown planning, drain orchestration,
-backup and restore-test evidence, guarded shutdown execution, recovery evidence,
-audit events, UI route metadata, semantic-model publication, and publish-plan
-evidence.
+SHDN provides executable APG lifecycle control for generated applications. It coordinates service lifecycle targets, shutdown planning, drain and quiescence, backup and restore gates, shutdown execution, recovery evidence, governed AI agents, audit trails, and Bytewax lifecycle events.
 
 ## Provided Services
 
-- `service_lifecycle_registry`
-- `shutdown_plan_builder`
-- `drain_orchestrator`
-- `backup_snapshot_gate`
-- `shutdown_execution_gate`
-- `recovery_evidence_center`
-- `lifecycle_audit_events`
+- `service_lifecycle`
+- `shutdown_orchestration`
+- `restart_plans`
+- `backup_gates`
+- `operational_safety`
+- `shdn_agents`
 
 ## Required Services
 
-- `tenant_context`
-- `monitoring_health_gate`
-- `backup_snapshot_store`
-- `operator_identity`
-- `audit_sink`
+- `moni`
+- `hlth`
+- `bkup`
+- `audl`
+- `envm`
 
-## Configuration
+## Current Runtime
 
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations.
+The package exposes `ShdnService`, API helpers, UI view models, deterministic rules, visual theme metadata, and package publication evidence.
+
+The service can:
+
+- register lifecycle targets;
+- create shutdown plans with rollback, restart sequence, maintenance window, and approval gates;
+- drain targets and track quiescence;
+- record backup snapshot and restore-test evidence;
+- execute shutdowns with health, snapshot, actor, approval, force-review, and Bytewax stream guardrails;
+- record recovery evidence;
+- register governed SHDN agents;
+- validate critical agent-driven lifecycle actions;
+- validate batch lifecycle mutation stream routing;
+- expose audit events and dashboard summaries.
 
 ## Rules
 
 - `tenant_context_required`
 - `service_requires_owner`
+- `service_requires_dependency_map`
 - `shutdown_requires_health_gate`
 - `shutdown_requires_backup_snapshot`
+- `shutdown_requires_actor`
+- `shutdown_requires_bytewax_stream`
 - `production_shutdown_requires_approval`
 - `force_shutdown_requires_review`
+- `recovery_requires_post_health_check`
+- `recovery_requires_incident_link`
+- `shdn_agent_runtime_supported`
+- `shdn_agent_role_supported`
+- `critical_agent_shutdown_requires_human_approval`
+- `batch_lifecycle_mutation_requires_bytewax`
 
 ## UI
 
-The package exposes 8 APG Python UI route contract(s) through
-`views.py` and the package semantic model.
-
-The view helpers provide dashboard, service console, plan builder, execution
-monitor, approval queue, recovery center, audit, and settings models.
+SHDN exposes route-backed APG Python view models for dashboard, service console, plan builder, execution monitor, approvals, recovery center, agent workbench, policy center, audit, and settings.
 
 ## Theme
 
-The package uses the `shdn_lifecycle_control` APG theme contract.
+SHDN uses the `shdn_lifecycle_control` theme with compact density, lifecycle bands, gate chips, health chips, restore chips, review chips, and rule chips.
 
-## Runtime Behavior
+## Event Stream
 
-`ShdnService` is intentionally dependency-light so it can run inside generated
-applications, tests, and publish-plan probes without external infrastructure.
-It supports:
+SHDN lifecycle events are described by the Bytewax stream manifest:
 
-- `register_service()` for tenant-scoped lifecycle targets with owner,
-  environment, dependency, criticality, drain timeout, and health-gate metadata.
-- `create_shutdown_plan()` for approved plans with rollback plan, restart
-  sequence, maintenance window, and production approval controls.
-- `start_drain()` for active-session and queue-depth drain tracking.
-- `record_backup_snapshot()` for backup and restore-test evidence.
-- `execute_shutdown()` for rule-driven health, snapshot, approval, and
-  force-shutdown review gates.
-- `record_recovery()` for incident/change evidence and post-shutdown health
-  proof.
-- `dashboard_summary()` and list helpers for API and UI composition.
+- processor: `bytewax`
+- stream: `apg.shdn.lifecycle`
+- key: `tenant_id`
 
-## Adapter Boundaries
+## Detailed Packet
 
-The in-package runtime stores records in memory by design. Production adapters
-are expected to bind tenant context, identity, health monitoring, backup
-evidence, change windows, incident/change references, and audit sinks at the APG
-composition layer without changing the deterministic package contract.
-
-## Focused Verification
-
-- `./.venv/bin/python -m py_compile capabilities/common/shdn/__init__.py capabilities/common/shdn/models.py capabilities/common/shdn/lifecycle_runtime.py capabilities/common/shdn/service.py capabilities/common/shdn/api.py capabilities/common/shdn/views.py capabilities/common/shdn/capability_contract.py capabilities/common/shdn/app.py capabilities/common/shdn/test_capability_contract.py capabilities/common/shdn/tests/test_package_contract.py`
-- `./.venv/bin/pytest -q capabilities/common/shdn/test_capability_contract.py capabilities/common/shdn/tests/test_package_contract.py`
-- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/shdn --json`
-- `./.venv/bin/apg capabilities publish-plan capabilities/common/shdn --json`
+See `SPECIFICATION.md`, `PLAN.md`, and `README.md` for the full lifecycle packet, implementation plan, usage examples, and focused verification commands.

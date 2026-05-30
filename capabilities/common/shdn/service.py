@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_SHDN_AGENT_ROLES,
+	SUPPORTED_SHDN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .lifecycle_runtime import (
 	BackupSnapshotRecord,
 	DrainOperationRecord,
 	LifecycleAuditEventRecord,
 	RecoveryRecord,
+	ShdnAgentRecord,
 	ShutdownExecutionRecord,
 	ShutdownPlanRecord,
 	ShutdownTargetRecord,
@@ -32,6 +40,7 @@ class ShdnService:
 		self.executions: dict[str, ShutdownExecutionRecord] = {}
 		self.recoveries: dict[str, RecoveryRecord] = {}
 		self.audit_events: dict[str, LifecycleAuditEventRecord] = {}
+		self.shdn_agents: dict[str, ShdnAgentRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -77,7 +86,15 @@ class ShdnService:
 			health_gate_ref=health_gate_ref,
 		)
 		self.targets[record.id] = record
-		self._record_event(tenant_id, "target_registered", record.id, f"Lifecycle target registered: {target_id}", owner)
+		self._record_event(
+			tenant_id,
+			"target_registered",
+			record.id,
+			f"Lifecycle target registered: {target_id}",
+			owner,
+			"low",
+			{"event_stream": event_stream_name(), "target_type": record.target_type},
+		)
 		return record.to_dict()
 
 	def create_shutdown_plan(
@@ -115,6 +132,7 @@ class ShdnService:
 			"operation": "create_shutdown_plan",
 			"production_service": production_service,
 			"approval_recorded": bool(str(approved_by or "").strip()),
+			"dependency_map_present": all(target.dependencies or len(targets) == 1 for target in targets),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -134,7 +152,15 @@ class ShdnService:
 			maintenance_window_ref=maintenance_window_ref,
 		)
 		self.plans[record.id] = record
-		self._record_event(tenant_id, "plan_created", record.id, f"Shutdown plan created: {name}", owner)
+		self._record_event(
+			tenant_id,
+			"plan_created",
+			record.id,
+			f"Shutdown plan created: {name}",
+			owner,
+			"medium" if production_service else "low",
+			{"event_stream": event_stream_name(), "target_count": len(record.target_ids)},
+		)
 		return record.to_dict()
 
 	def start_drain(
@@ -166,7 +192,15 @@ class ShdnService:
 		target.state = status
 		target.updated_at = utc_now()
 		plan.status = "executing"
-		self._record_event(tenant_id, "drain_started", record.id, f"Drain status for {target.target_id}: {status}", plan.owner)
+		self._record_event(
+			tenant_id,
+			"drain_started",
+			record.id,
+			f"Drain status for {target.target_id}: {status}",
+			plan.owner,
+			"medium",
+			{"event_stream": event_stream_name(), "active_sessions": active_sessions, "queue_depth": queue_depth},
+		)
 		return record.to_dict()
 
 	def record_backup_snapshot(
@@ -198,7 +232,15 @@ class ShdnService:
 		self.snapshots[record.id] = record
 		target.state = "snapshot_ready" if verified else target.state
 		target.updated_at = utc_now()
-		self._record_event(tenant_id, "snapshot_recorded", record.id, f"Backup snapshot recorded for {target.target_id}", plan.owner)
+		self._record_event(
+			tenant_id,
+			"snapshot_recorded",
+			record.id,
+			f"Backup snapshot recorded for {target.target_id}",
+			plan.owner,
+			"medium",
+			{"event_stream": event_stream_name(), "restore_test_ref": restore_test_ref},
+		)
 		return record.to_dict()
 
 	def execute_shutdown(
@@ -210,6 +252,7 @@ class ShdnService:
 		health_gate_ref: str,
 		force_shutdown: bool = False,
 		force_review_recorded: bool = False,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		plan = self._get_plan(tenant_id, plan_id)
@@ -226,6 +269,8 @@ class ShdnService:
 			"approval_recorded": bool(str(plan.approved_by or "").strip()),
 			"force_shutdown": bool(force_shutdown),
 			"force_review_recorded": bool(force_review_recorded),
+			"shutdown_actor_present": bool(str(actor or "").strip()),
+			"event_stream": str(event_stream or "").strip().lower(),
 		}
 		if drain.status != "quiesced":
 			raise PermissionError("drain_not_quiesced")
@@ -252,7 +297,15 @@ class ShdnService:
 			plan.status = "blocked"
 		target.health_gate_ref = health_gate_ref
 		target.updated_at = utc_now()
-		self._record_event(tenant_id, "shutdown_executed", record.id, f"Shutdown execution {status}: {target.target_id}", actor, "high")
+		self._record_event(
+			tenant_id,
+			"shutdown_executed",
+			record.id,
+			f"Shutdown execution {status}: {target.target_id}",
+			actor,
+			"high",
+			{"event_stream": event_stream_name(), "force_shutdown": force_shutdown},
+		)
 		return record.to_dict()
 
 	def record_recovery(
@@ -269,9 +322,21 @@ class ShdnService:
 		target = self._get_target(tenant_id, target_id)
 		self._require_plan_target(plan, target)
 		if not str(evidence_ref or "").strip():
-			raise PermissionError("incident_link_required")
+			context = {
+				"tenant_context_present": True,
+				"operation": "record_recovery",
+				"incident_link_present": False,
+				"post_shutdown_health_check_present": bool(str(post_shutdown_health_check_ref or "").strip()),
+			}
+			self._raise_policy(self.evaluate(context))
 		if not str(post_shutdown_health_check_ref or "").strip():
-			raise PermissionError("post_shutdown_health_check_required")
+			context = {
+				"tenant_context_present": True,
+				"operation": "record_recovery",
+				"incident_link_present": bool(str(evidence_ref or "").strip()),
+				"post_shutdown_health_check_present": False,
+			}
+			self._raise_policy(self.evaluate(context))
 		record = RecoveryRecord(
 			id=stable_id("shdn_recovery", tenant_id, plan.id, target.id),
 			tenant_id=tenant_id,
@@ -285,7 +350,15 @@ class ShdnService:
 		self.recoveries[record.id] = record
 		target.state = "recovered"
 		target.updated_at = utc_now()
-		self._record_event(tenant_id, "recovery_recorded", record.id, f"Recovery evidence recorded for {target.target_id}", actor)
+		self._record_event(
+			tenant_id,
+			"recovery_recorded",
+			record.id,
+			f"Recovery evidence recorded for {target.target_id}",
+			actor,
+			"medium",
+			{"event_stream": event_stream_name(), "post_shutdown_health_check_ref": post_shutdown_health_check_ref},
+		)
 		return record.to_dict()
 
 	def create_record(
@@ -332,6 +405,92 @@ class ShdnService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
+	def register_shdn_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str = "platform-ops",
+		human_approval_required: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_shdn_agent",
+			"agent_runtime_supported": runtime_value in SUPPORTED_SHDN_AGENT_RUNTIMES,
+			"agent_role_supported": role_value in SUPPORTED_SHDN_AGENT_ROLES,
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		if not str(name or "").strip():
+			raise ValueError("shdn_agent_name_required")
+		if not str(scope or "").strip():
+			raise ValueError("shdn_agent_scope_required")
+		record = ShdnAgentRecord(
+			id=stable_id("shdn_agent", tenant_id, name, runtime_value, role_value),
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=scope,
+			owner=owner,
+			human_approval_required=bool(human_approval_required),
+		)
+		self.shdn_agents[record.id] = record
+		self._record_event(
+			tenant_id,
+			"shdn_agent_registered",
+			record.id,
+			f"SHDN agent registered: {name}",
+			owner,
+			"low",
+			{"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
+		)
+		return record.to_dict()
+
+	def validate_agent_lifecycle_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		target_criticality: str,
+		human_approval_recorded: bool,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent = self.shdn_agents.get(agent_id)
+		if agent is None or agent.tenant_id != tenant_id:
+			raise KeyError(f"shdn_agent_not_found:{agent_id}")
+		context = {
+			"tenant_context_present": True,
+			"operation": "agent_lifecycle_action",
+			"target_criticality": normalize_criticality(target_criticality),
+			"human_approval_recorded": bool(human_approval_recorded),
+		}
+		return self.evaluate(context)
+
+	def validate_batch_lifecycle_mutation(
+		self,
+		tenant_id: str,
+		target_ids: list[str],
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not target_ids:
+			raise ValueError("batch_lifecycle_targets_required")
+		context = {
+			"tenant_context_present": True,
+			"operation": "batch_lifecycle_mutation",
+			"event_stream": str(event_stream or "").strip().lower(),
+		}
+		return self.evaluate(context)
+
+	def list_shdn_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.shdn_agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		targets = self.list_targets(tenant_id)
 		plans = self.list_plans(tenant_id)
@@ -346,7 +505,10 @@ class ShdnService:
 			"snapshot_count": len(self.list_snapshots(tenant_id)),
 			"shutdown_count": len([item for item in targets if item["state"] == "stopped"]),
 			"recovery_count": len(self.list_recoveries(tenant_id)),
+			"shdn_agent_count": len(self.list_shdn_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
+			"streaming": streaming_manifest(),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -398,6 +560,7 @@ class ShdnService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		record = LifecycleAuditEventRecord(
 			id=stable_id("shdn_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -407,6 +570,7 @@ class ShdnService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			metadata=dict(metadata or {}),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -416,3 +580,6 @@ class ShdnService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
