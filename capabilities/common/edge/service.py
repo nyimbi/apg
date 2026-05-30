@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	SUPPORTED_EDGE_AGENT_ROLES,
+	SUPPORTED_EDGE_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .edge_engine import artifact_digest, capacity_fits, resource_pressure, stable_digest, sync_status
-from .models import EdgeAuditEvent, EdgeDeployment, EdgeFleet, EdgeNode, EdgeSyncSession, EdgeWorkload, utc_now
+from .models import EdgeAgent, EdgeAuditEvent, EdgeDeployment, EdgeFleet, EdgeNode, EdgeSyncSession, EdgeWorkload, utc_now
 
 
 class EdgeService:
@@ -18,6 +24,7 @@ class EdgeService:
 		self._workloads: dict[str, EdgeWorkload] = {}
 		self._deployments: dict[str, EdgeDeployment] = {}
 		self._sync_sessions: dict[str, EdgeSyncSession] = {}
+		self._agents: dict[str, EdgeAgent] = {}
 		self._audit_events: list[EdgeAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -45,7 +52,9 @@ class EdgeService:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "register_node",
+			"node_owner_present": bool(owner),
 			"node_attested": attested,
+			"location_policy_present": bool(location_policy),
 			"edge_connection": True,
 			"secure_transport": secure_transport,
 		})
@@ -85,7 +94,21 @@ class EdgeService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		if not owner:
-			raise PermissionError("fleet_owner_required")
+			result = self.evaluate({
+				"tenant_context_present": bool(tenant_id),
+				"operation": "create_fleet",
+				"fleet_owner_present": False,
+				"policy_version_present": bool(policy_version),
+			})
+			self._raise_if_denied(result)
+		if not policy_version:
+			result = self.evaluate({
+				"tenant_context_present": bool(tenant_id),
+				"operation": "create_fleet",
+				"fleet_owner_present": bool(owner),
+				"policy_version_present": False,
+			})
+			self._raise_if_denied(result)
 		fleet = EdgeFleet(
 			id=fleet_id,
 			tenant_id=tenant_id,
@@ -127,15 +150,13 @@ class EdgeService:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "deploy_workload",
+			"workload_owner_present": bool(owner),
 			"artifact_signed": artifact_signed,
+			"resource_quota_present": bool(resource_quota),
 		})
 		self._raise_if_denied(result)
-		if not owner:
-			raise PermissionError("workload_owner_required")
 		if DEFAULT_CONFIGURATION["workloads"]["deployment_policy_required"] and not deployment_policy:
 			raise PermissionError("deployment_policy_required")
-		if DEFAULT_CONFIGURATION["workloads"]["resource_quota_required"] and not resource_quota:
-			raise PermissionError("resource_quota_required")
 		workload = EdgeWorkload(
 			id=workload_id,
 			tenant_id=tenant_id,
@@ -213,14 +234,13 @@ class EdgeService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "sync_state",
 			"conflict_policy_attached": bool(conflict_policy),
+			"cache_policy_attached": bool(cache_policy),
 			"edge_connection": True,
 			"secure_transport": secure_transport,
 			"offline_hours": offline_hours,
 			"offline_review_recorded": bool(reviewed_by),
 		})
 		self._raise_if_denied(result)
-		if DEFAULT_CONFIGURATION["sync"]["cache_policy_required"] and not cache_policy:
-			raise PermissionError("cache_policy_required")
 		if not workload.offline_mode_enabled and offline_hours > 0:
 			raise PermissionError("workload_offline_mode_disabled")
 		review_required = result["decision"] == "require_review"
@@ -265,6 +285,9 @@ class EdgeService:
 			"healthy_node_count": sum(1 for node in nodes if node["health_status"] == "healthy"),
 			"review_required_sync_count": sum(1 for item in sync_sessions if item["review_required"]),
 			"conflict_pending_sync_count": sum(1 for item in sync_sessions if item["status"] == "conflict_pending"),
+			"edge_agent_count": len(self.list_edge_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def node_pressure(self, node_id: str, tenant_id: str) -> dict[str, Any]:
@@ -285,6 +308,52 @@ class EdgeService:
 
 	def list_sync_sessions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list_for_tenant(self._sync_sessions, tenant_id)
+
+	def register_edge_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"edge_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_EDGE_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_EDGE_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		edge_agent = EdgeAgent(
+			id=agent_id or f"edge-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+		)
+		self._agents[edge_agent.id] = edge_agent
+		self._record_audit(tenant_id, "edge_agent_registered", edge_agent.id, name, edge_agent.to_dict())
+		return edge_agent.to_dict()
+
+	def list_edge_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list_for_tenant(self._agents, tenant_id)
+
+	def validate_batch_edge_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_edge_mutation",
+			"event_stream": event_stream,
+		})
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
@@ -368,3 +437,7 @@ class EdgeService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")

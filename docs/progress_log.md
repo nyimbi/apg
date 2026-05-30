@@ -16,6 +16,74 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 18:59 EAT
+
+Common EDGE edge-computing lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the EDGE
+  capability, and replaced `cap_spec.md` with a pointer to the active packet
+  specification.
+- Expanded `capability_contract.py` with edge-agent, node, fleet, workload,
+  deployment, sync, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, node owner, node
+  attestation, node location policy, fleet owner, fleet policy version,
+  workload owner, signed artifact, resource quota, sync conflict policy, sync
+  cache policy, secure transport, offline-window review, edge-agent
+  registration/runtime/role/scope/disclosure, audit-backed state changes, and
+  Bytewax batch edge mutation.
+- Added `EdgeAgent` model support and extended `EdgeService` with edge-agent
+  registration, listing, dashboard counts, normalized runtime/role tokens, and
+  batch mutation validation.
+- Extended API helpers and view models with edge-agent and batch mutation
+  surfaces.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract, service, agent model, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded `test_capability_contract.py` for focused contract, rule, service,
+  API/view, agent, Bytewax, app, semantic evidence, and documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/edge/__init__.py
+  capabilities/common/edge/capability_contract.py
+  capabilities/common/edge/models.py capabilities/common/edge/service.py
+  capabilities/common/edge/api.py capabilities/common/edge/views.py
+  capabilities/common/edge/app.py
+  capabilities/common/edge/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/edge/test_capability_contract.py`
+  passed with 7 tests and only pre-existing adjacent SQLAlchemy/Pydantic
+  deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.edge import EdgeService;
+  service = EdgeService(); service.register_edge_agent('tenant-proof',
+  'Proof agent', 'codex', 'security_reviewer', 'review edge security');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  edge-agent registration plus Bytewax stream metadata in the lifecycle summary.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.edge.streaming.processor,
+  .capabilities.edge.configuration.edge_agents.supported_runtimes,
+  .capabilities.edge.screens.agents.route,
+  (.capabilities.edge.rules[] |
+  select(.name=="edge_agent_runtime_supported") | .effect.reason),
+  (.capabilities.edge.rules[] |
+  select(.name=="batch_edge_mutation_requires_bytewax") | .effect.reason)'
+  capabilities/common/edge/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/edge/agents`,
+  `edge_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/edge --json` passed with `edge` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/edge --json`
+  passed with `side_effect_free: true` and no warnings.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/edge docs/progress_log.md` passed.
+- Not run: physical device enrollment, live attestation providers, container or
+  model runtimes, durable telemetry stores, remote update systems, live Bytewax
+  topology, rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 18:49 EAT
 
 CKM WFA workflow automation lifecycle/guardrail packet:

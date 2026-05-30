@@ -59,3 +59,16 @@ def sync_monitor_model(service: EdgeService, tenant_id: str = "default") -> dict
 		"route": "/edge/sync",
 		"permissions": ["edge:view", "edge:sync"],
 	}
+
+
+def edge_agent_model(service: EdgeService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return edge-agent state and governance route metadata."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"edge_agents": service.list_edge_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["edge_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["edge_agents"]["allowed_roles"],
+		"route": "/edge/agents",
+		"permissions": ["edge:view", "edge:govern"],
+	}

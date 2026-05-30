@@ -23,6 +23,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"workload_count": summary["workload_count"],
 		"deployment_count": summary["deployment_count"],
 		"sync_session_count": len(SERVICE.list_sync_sessions(tenant_id)),
+		"edge_agent_count": summary["edge_agent_count"],
 	}
 
 
@@ -100,6 +101,22 @@ def review_offline_window(sync_id: str, tenant_id: str, reviewer: str) -> dict[s
 	return SERVICE.review_offline_window(sync_id, tenant_id, reviewer)
 
 
+def register_edge_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_edge_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=payload.get("id"),
+	)
+
+
+def validate_batch_edge_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_edge_mutation(event_stream)
+
+
 def edge_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"dashboard": SERVICE.dashboard_summary(tenant_id),
@@ -108,6 +125,7 @@ def edge_state(tenant_id: str = "default") -> dict[str, Any]:
 		"workloads": SERVICE.list_workloads(tenant_id),
 		"deployments": SERVICE.list_deployments(tenant_id),
 		"sync_sessions": SERVICE.list_sync_sessions(tenant_id),
+		"edge_agents": SERVICE.list_edge_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}
 
