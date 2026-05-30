@@ -8,29 +8,134 @@
   },
   "capabilities": {
     "ragn": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "rag_runtime.RagnService",
+        "graph": "grph",
+        "helper_runtime": "rag_runtime.py",
+        "http_api": "api.py",
+        "knowledge_graph": "kngr",
+        "metadata": "meta",
+        "metrics_sink": "moni",
+        "model_lifecycle": "mlcm",
+        "nlp": "nlpc",
+        "production_runtime": "service.RAGService",
+        "search": "srch"
+      },
+      "approvals": {
+        "answer_curation": "RagnRecord",
+        "large_ingest": "RagnRecord",
+        "large_retrieval_window": "RagnRecord",
+        "long_conversation": "RagnRecord",
+        "low_context_confidence": "RagnRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "rag_runtime.RagnService",
+          "graph": "grph",
+          "helper_runtime": "rag_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "nlp": "nlpc",
+          "production_runtime": "service.RAGService",
+          "search": "srch"
+        },
+        "chunking": {
+          "chunk_overlap": 200,
+          "chunk_size": 1000,
+          "maximum_chunk_size": 8000,
+          "minimum_chunk_size": 100
+        },
+        "citations": {
+          "chunk_id_required": true,
+          "document_id_required": true,
+          "minimum_citation_count": 1,
+          "source_id_required": true
+        },
+        "conversations": {
+          "conversation_id_required": true,
+          "max_turns": 100,
+          "memory_enabled": true,
+          "retention_days": 30,
+          "user_id_required": true
+        },
+        "curation": {
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "curator_required": true,
+          "evidence_required": true,
+          "review_required_for_low_confidence": true
+        },
+        "documents": {
+          "allowed_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "content_hash_required": true,
+          "knowledge_base_required": true,
+          "large_ingest_review_threshold": 1000,
+          "max_documents_per_ingest": 5000,
+          "title_required": true
+        },
         "generation": {
           "citations_required": true,
+          "external_model_requires_policy": true,
+          "max_answer_tokens": 4000,
           "model_policy_required": true,
           "streaming_enabled": true
         },
         "governance": {
+          "audit_curation": true,
+          "audit_generation": true,
+          "audit_ingestion": true,
           "audit_queries": true,
-          "require_tenant_context": true,
-          "restricted_source_filter_required": true
+          "require_tenant_context": true
         },
         "knowledge_bases": {
-          "max_documents_per_ingest": 5000,
+          "default_classification": "internal",
+          "id_required": true,
+          "name_required": true,
           "owner_required": true,
+          "retire_requires_review": true,
           "source_attribution_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
         },
         "retrieval": {
           "keyword_fallback_enabled": true,
+          "max_results": 50,
           "minimum_context_confidence": 0.7,
+          "rbac_filter_required": true,
           "semantic_retrieval_enabled": true
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "prompt_injection_scan_required": true,
+          "restricted_source_filter_required": true,
+          "unsafe_generation_blocking": true
         },
         "tenant_id": "default",
         "theme": {
@@ -38,10 +143,18 @@
           "default_theme": "ragn_answer_studio"
         },
         "ui": {
+          "enable_audit": true,
+          "enable_citations": true,
           "enable_conversations": true,
           "enable_curation": true,
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_generation": true,
+          "enable_governance": true,
           "enable_knowledge_bases": true,
-          "enable_rag_studio": true
+          "enable_retrieval": true,
+          "enable_settings": true,
+          "enable_studio": true
         }
       },
       "erp_modules": [
@@ -53,6 +166,15 @@
       "provides": [
         "ragn_operations"
       ],
+      "rag_lifecycle": {
+        "answer": "RagnRecord",
+        "audit": "RagnRecord",
+        "conversation_turn": "RagnRecord",
+        "curation": "RagnRecord",
+        "document": "RagnRecord",
+        "knowledge_base": "RagnRecord",
+        "retrieval": "RagnRecord"
+      },
       "requires": [],
       "rule_engine": {
         "rules": [
@@ -70,6 +192,32 @@
           },
           {
             "condition": {
+              "knowledge_base_id_present": false,
+              "operation": "create_knowledge_base"
+            },
+            "description": "Knowledge bases require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_base_id_required",
+              "required_action": "attach_knowledge_base_id"
+            },
+            "name": "knowledge_base_requires_id"
+          },
+          {
+            "condition": {
+              "knowledge_base_name_present": false,
+              "operation": "create_knowledge_base"
+            },
+            "description": "Knowledge bases require names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_base_name_required",
+              "required_action": "attach_knowledge_base_name"
+            },
+            "name": "knowledge_base_requires_name"
+          },
+          {
+            "condition": {
               "operation": "create_knowledge_base",
               "owner_assigned": false
             },
@@ -80,6 +228,164 @@
               "required_action": "assign_owner"
             },
             "name": "knowledge_base_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_knowledge_base",
+              "source_attribution_present": false
+            },
+            "description": "Knowledge bases require source attribution policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_attribution_required",
+              "required_action": "attach_source_attribution_policy"
+            },
+            "name": "knowledge_base_requires_source_attribution"
+          },
+          {
+            "condition": {
+              "knowledge_base_present": false,
+              "operation": "ingest_document"
+            },
+            "description": "Document ingestion requires a knowledge base.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_base_required",
+              "required_action": "select_knowledge_base"
+            },
+            "name": "document_requires_knowledge_base"
+          },
+          {
+            "condition": {
+              "document_title_present": false,
+              "operation": "ingest_document"
+            },
+            "description": "Document ingestion requires a title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_title_required",
+              "required_action": "attach_document_title"
+            },
+            "name": "document_requires_title"
+          },
+          {
+            "condition": {
+              "content_hash_present": false,
+              "operation": "ingest_document"
+            },
+            "description": "Document ingestion requires a content hash.",
+            "effect": {
+              "decision": "deny",
+              "reason": "content_hash_required",
+              "required_action": "attach_content_hash"
+            },
+            "name": "document_requires_content_hash"
+          },
+          {
+            "condition": {
+              "operation": "ingest_document",
+              "source_uri_present": false
+            },
+            "description": "Document ingestion requires a source URI.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_uri_required",
+              "required_action": "attach_source_uri"
+            },
+            "name": "document_requires_source_uri"
+          },
+          {
+            "condition": {
+              "classification_allowed": false,
+              "operation": "ingest_document"
+            },
+            "description": "Document classifications must be configured values.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_classification_invalid",
+              "required_action": "choose_allowed_classification"
+            },
+            "name": "document_classification_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "document_count_gt": 1000,
+              "operation": "ingest_document",
+              "review_recorded": false
+            },
+            "description": "Large document ingestion batches require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_ingest_review_required",
+              "required_action": "record_ingest_review"
+            },
+            "name": "large_ingest_requires_review"
+          },
+          {
+            "condition": {
+              "chunk_size_lt": 100,
+              "operation": "configure_chunking"
+            },
+            "description": "Chunk size must be within configured bounds.",
+            "effect": {
+              "decision": "deny",
+              "reason": "chunk_size_too_small",
+              "required_action": "increase_chunk_size"
+            },
+            "name": "chunk_size_requires_minimum"
+          },
+          {
+            "condition": {
+              "chunk_size_gt": 8000,
+              "operation": "configure_chunking"
+            },
+            "description": "Chunk size must be within configured bounds.",
+            "effect": {
+              "decision": "deny",
+              "reason": "chunk_size_too_large",
+              "required_action": "reduce_chunk_size"
+            },
+            "name": "chunk_size_requires_maximum"
+          },
+          {
+            "condition": {
+              "operation": "retrieve_context",
+              "query_present": false
+            },
+            "description": "Retrieval requires a query.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retrieval_query_required",
+              "required_action": "attach_query"
+            },
+            "name": "retrieval_requires_query"
+          },
+          {
+            "condition": {
+              "knowledge_base_present": false,
+              "operation": "retrieve_context"
+            },
+            "description": "Retrieval requires a knowledge base.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_base_required",
+              "required_action": "select_knowledge_base"
+            },
+            "name": "retrieval_requires_knowledge_base"
+          },
+          {
+            "condition": {
+              "operation": "retrieve_context",
+              "result_window_gt": 50,
+              "review_recorded": false
+            },
+            "description": "Large retrieval windows require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_retrieval_window_review_required",
+              "required_action": "record_retrieval_review"
+            },
+            "name": "retrieval_result_window_requires_review"
           },
           {
             "condition": {
@@ -96,19 +402,6 @@
           },
           {
             "condition": {
-              "citations_attached": false,
-              "operation": "generate_answer"
-            },
-            "description": "Generated answers require citations.",
-            "effect": {
-              "decision": "deny",
-              "reason": "citations_required",
-              "required_action": "attach_citations"
-            },
-            "name": "generation_requires_citations"
-          },
-          {
-            "condition": {
               "context_confidence_lt": 0.7,
               "review_recorded": false
             },
@@ -122,8 +415,61 @@
           },
           {
             "condition": {
+              "operation": "generate_answer",
+              "query_present": false
+            },
+            "description": "Answer generation requires a user query.",
+            "effect": {
+              "decision": "deny",
+              "reason": "generation_query_required",
+              "required_action": "attach_query"
+            },
+            "name": "generation_requires_query"
+          },
+          {
+            "condition": {
+              "context_present": false,
+              "operation": "generate_answer"
+            },
+            "description": "Answer generation requires retrieved context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retrieval_context_required",
+              "required_action": "retrieve_context"
+            },
+            "name": "generation_requires_context"
+          },
+          {
+            "condition": {
+              "answer_text_present": false,
+              "operation": "generate_answer"
+            },
+            "description": "Answer generation requires non-empty answer text.",
+            "effect": {
+              "decision": "deny",
+              "reason": "answer_text_required",
+              "required_action": "attach_answer_text"
+            },
+            "name": "generation_requires_answer_text"
+          },
+          {
+            "condition": {
+              "citations_attached": false,
+              "operation": "generate_answer"
+            },
+            "description": "Generated answers require citations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "citations_required",
+              "required_action": "attach_citations"
+            },
+            "name": "generation_requires_citations"
+          },
+          {
+            "condition": {
               "model_location": "external",
-              "model_policy_attached": false
+              "model_policy_attached": false,
+              "operation": "generate_answer"
             },
             "description": "External generation models require policy approval.",
             "effect": {
@@ -132,6 +478,188 @@
               "required_action": "attach_model_policy"
             },
             "name": "external_model_requires_policy"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "prompt_injection_detected": true
+            },
+            "description": "Detected prompt injection blocks generation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "prompt_injection_blocked",
+              "required_action": "sanitize_or_reject_prompt"
+            },
+            "name": "prompt_injection_requires_block"
+          },
+          {
+            "condition": {
+              "operation": "generate_answer",
+              "unsafe_answer_detected": true
+            },
+            "description": "Unsafe answer classifications block generation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsafe_generation_blocked",
+              "required_action": "block_answer"
+            },
+            "name": "unsafe_generation_requires_block"
+          },
+          {
+            "condition": {
+              "conversation_id_present": false,
+              "operation": "record_turn"
+            },
+            "description": "Conversation turns require a conversation id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "conversation_id_required",
+              "required_action": "attach_conversation_id"
+            },
+            "name": "conversation_requires_id"
+          },
+          {
+            "condition": {
+              "operation": "record_turn",
+              "user_id_present": false
+            },
+            "description": "Conversation turns require a user id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "user_id_required",
+              "required_action": "attach_user_id"
+            },
+            "name": "conversation_requires_user"
+          },
+          {
+            "condition": {
+              "operation": "record_turn",
+              "review_recorded": false,
+              "turn_count_gt": 100
+            },
+            "description": "Long conversations require review or summarization.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "conversation_turn_review_required",
+              "required_action": "summarize_or_review_conversation"
+            },
+            "name": "conversation_turn_limit_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "attach_citation",
+              "source_id_present": false
+            },
+            "description": "Citations require source ids.",
+            "effect": {
+              "decision": "deny",
+              "reason": "citation_source_required",
+              "required_action": "attach_source_id"
+            },
+            "name": "citation_requires_source"
+          },
+          {
+            "condition": {
+              "document_id_present": false,
+              "operation": "attach_citation"
+            },
+            "description": "Citations require document ids.",
+            "effect": {
+              "decision": "deny",
+              "reason": "citation_document_required",
+              "required_action": "attach_document_id"
+            },
+            "name": "citation_requires_document"
+          },
+          {
+            "condition": {
+              "chunk_id_present": false,
+              "operation": "attach_citation"
+            },
+            "description": "Citations require chunk ids.",
+            "effect": {
+              "decision": "deny",
+              "reason": "citation_chunk_required",
+              "required_action": "attach_chunk_id"
+            },
+            "name": "citation_requires_chunk"
+          },
+          {
+            "condition": {
+              "curator_present": false,
+              "operation": "curate_answer"
+            },
+            "description": "Curation requires a curator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curator_required",
+              "required_action": "assign_curator"
+            },
+            "name": "curation_requires_curator"
+          },
+          {
+            "condition": {
+              "curation_decision_present": false,
+              "operation": "curate_answer"
+            },
+            "description": "Curation requires a decision.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_decision_required",
+              "required_action": "choose_curation_decision"
+            },
+            "name": "curation_requires_decision"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "curate_answer"
+            },
+            "description": "Curation requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_evidence_required",
+              "required_action": "attach_curation_evidence"
+            },
+            "name": "curation_requires_evidence"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_rag_mutation"
+            },
+            "description": "Batch RAG mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_rag_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "RAG operations may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_rag_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_rag_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "RAG state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "rag_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -151,6 +679,32 @@
         },
         {
           "condition": {
+            "knowledge_base_id_present": false,
+            "operation": "create_knowledge_base"
+          },
+          "description": "Knowledge bases require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_base_id_required",
+            "required_action": "attach_knowledge_base_id"
+          },
+          "name": "knowledge_base_requires_id"
+        },
+        {
+          "condition": {
+            "knowledge_base_name_present": false,
+            "operation": "create_knowledge_base"
+          },
+          "description": "Knowledge bases require names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_base_name_required",
+            "required_action": "attach_knowledge_base_name"
+          },
+          "name": "knowledge_base_requires_name"
+        },
+        {
+          "condition": {
             "operation": "create_knowledge_base",
             "owner_assigned": false
           },
@@ -161,6 +715,164 @@
             "required_action": "assign_owner"
           },
           "name": "knowledge_base_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_knowledge_base",
+            "source_attribution_present": false
+          },
+          "description": "Knowledge bases require source attribution policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_attribution_required",
+            "required_action": "attach_source_attribution_policy"
+          },
+          "name": "knowledge_base_requires_source_attribution"
+        },
+        {
+          "condition": {
+            "knowledge_base_present": false,
+            "operation": "ingest_document"
+          },
+          "description": "Document ingestion requires a knowledge base.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_base_required",
+            "required_action": "select_knowledge_base"
+          },
+          "name": "document_requires_knowledge_base"
+        },
+        {
+          "condition": {
+            "document_title_present": false,
+            "operation": "ingest_document"
+          },
+          "description": "Document ingestion requires a title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_title_required",
+            "required_action": "attach_document_title"
+          },
+          "name": "document_requires_title"
+        },
+        {
+          "condition": {
+            "content_hash_present": false,
+            "operation": "ingest_document"
+          },
+          "description": "Document ingestion requires a content hash.",
+          "effect": {
+            "decision": "deny",
+            "reason": "content_hash_required",
+            "required_action": "attach_content_hash"
+          },
+          "name": "document_requires_content_hash"
+        },
+        {
+          "condition": {
+            "operation": "ingest_document",
+            "source_uri_present": false
+          },
+          "description": "Document ingestion requires a source URI.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_uri_required",
+            "required_action": "attach_source_uri"
+          },
+          "name": "document_requires_source_uri"
+        },
+        {
+          "condition": {
+            "classification_allowed": false,
+            "operation": "ingest_document"
+          },
+          "description": "Document classifications must be configured values.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_classification_invalid",
+            "required_action": "choose_allowed_classification"
+          },
+          "name": "document_classification_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "document_count_gt": 1000,
+            "operation": "ingest_document",
+            "review_recorded": false
+          },
+          "description": "Large document ingestion batches require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_ingest_review_required",
+            "required_action": "record_ingest_review"
+          },
+          "name": "large_ingest_requires_review"
+        },
+        {
+          "condition": {
+            "chunk_size_lt": 100,
+            "operation": "configure_chunking"
+          },
+          "description": "Chunk size must be within configured bounds.",
+          "effect": {
+            "decision": "deny",
+            "reason": "chunk_size_too_small",
+            "required_action": "increase_chunk_size"
+          },
+          "name": "chunk_size_requires_minimum"
+        },
+        {
+          "condition": {
+            "chunk_size_gt": 8000,
+            "operation": "configure_chunking"
+          },
+          "description": "Chunk size must be within configured bounds.",
+          "effect": {
+            "decision": "deny",
+            "reason": "chunk_size_too_large",
+            "required_action": "reduce_chunk_size"
+          },
+          "name": "chunk_size_requires_maximum"
+        },
+        {
+          "condition": {
+            "operation": "retrieve_context",
+            "query_present": false
+          },
+          "description": "Retrieval requires a query.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retrieval_query_required",
+            "required_action": "attach_query"
+          },
+          "name": "retrieval_requires_query"
+        },
+        {
+          "condition": {
+            "knowledge_base_present": false,
+            "operation": "retrieve_context"
+          },
+          "description": "Retrieval requires a knowledge base.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_base_required",
+            "required_action": "select_knowledge_base"
+          },
+          "name": "retrieval_requires_knowledge_base"
+        },
+        {
+          "condition": {
+            "operation": "retrieve_context",
+            "result_window_gt": 50,
+            "review_recorded": false
+          },
+          "description": "Large retrieval windows require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_retrieval_window_review_required",
+            "required_action": "record_retrieval_review"
+          },
+          "name": "retrieval_result_window_requires_review"
         },
         {
           "condition": {
@@ -177,19 +889,6 @@
         },
         {
           "condition": {
-            "citations_attached": false,
-            "operation": "generate_answer"
-          },
-          "description": "Generated answers require citations.",
-          "effect": {
-            "decision": "deny",
-            "reason": "citations_required",
-            "required_action": "attach_citations"
-          },
-          "name": "generation_requires_citations"
-        },
-        {
-          "condition": {
             "context_confidence_lt": 0.7,
             "review_recorded": false
           },
@@ -203,8 +902,61 @@
         },
         {
           "condition": {
+            "operation": "generate_answer",
+            "query_present": false
+          },
+          "description": "Answer generation requires a user query.",
+          "effect": {
+            "decision": "deny",
+            "reason": "generation_query_required",
+            "required_action": "attach_query"
+          },
+          "name": "generation_requires_query"
+        },
+        {
+          "condition": {
+            "context_present": false,
+            "operation": "generate_answer"
+          },
+          "description": "Answer generation requires retrieved context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retrieval_context_required",
+            "required_action": "retrieve_context"
+          },
+          "name": "generation_requires_context"
+        },
+        {
+          "condition": {
+            "answer_text_present": false,
+            "operation": "generate_answer"
+          },
+          "description": "Answer generation requires non-empty answer text.",
+          "effect": {
+            "decision": "deny",
+            "reason": "answer_text_required",
+            "required_action": "attach_answer_text"
+          },
+          "name": "generation_requires_answer_text"
+        },
+        {
+          "condition": {
+            "citations_attached": false,
+            "operation": "generate_answer"
+          },
+          "description": "Generated answers require citations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "citations_required",
+            "required_action": "attach_citations"
+          },
+          "name": "generation_requires_citations"
+        },
+        {
+          "condition": {
             "model_location": "external",
-            "model_policy_attached": false
+            "model_policy_attached": false,
+            "operation": "generate_answer"
           },
           "description": "External generation models require policy approval.",
           "effect": {
@@ -213,15 +965,209 @@
             "required_action": "attach_model_policy"
           },
           "name": "external_model_requires_policy"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "prompt_injection_detected": true
+          },
+          "description": "Detected prompt injection blocks generation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "prompt_injection_blocked",
+            "required_action": "sanitize_or_reject_prompt"
+          },
+          "name": "prompt_injection_requires_block"
+        },
+        {
+          "condition": {
+            "operation": "generate_answer",
+            "unsafe_answer_detected": true
+          },
+          "description": "Unsafe answer classifications block generation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsafe_generation_blocked",
+            "required_action": "block_answer"
+          },
+          "name": "unsafe_generation_requires_block"
+        },
+        {
+          "condition": {
+            "conversation_id_present": false,
+            "operation": "record_turn"
+          },
+          "description": "Conversation turns require a conversation id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "conversation_id_required",
+            "required_action": "attach_conversation_id"
+          },
+          "name": "conversation_requires_id"
+        },
+        {
+          "condition": {
+            "operation": "record_turn",
+            "user_id_present": false
+          },
+          "description": "Conversation turns require a user id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "user_id_required",
+            "required_action": "attach_user_id"
+          },
+          "name": "conversation_requires_user"
+        },
+        {
+          "condition": {
+            "operation": "record_turn",
+            "review_recorded": false,
+            "turn_count_gt": 100
+          },
+          "description": "Long conversations require review or summarization.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "conversation_turn_review_required",
+            "required_action": "summarize_or_review_conversation"
+          },
+          "name": "conversation_turn_limit_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "attach_citation",
+            "source_id_present": false
+          },
+          "description": "Citations require source ids.",
+          "effect": {
+            "decision": "deny",
+            "reason": "citation_source_required",
+            "required_action": "attach_source_id"
+          },
+          "name": "citation_requires_source"
+        },
+        {
+          "condition": {
+            "document_id_present": false,
+            "operation": "attach_citation"
+          },
+          "description": "Citations require document ids.",
+          "effect": {
+            "decision": "deny",
+            "reason": "citation_document_required",
+            "required_action": "attach_document_id"
+          },
+          "name": "citation_requires_document"
+        },
+        {
+          "condition": {
+            "chunk_id_present": false,
+            "operation": "attach_citation"
+          },
+          "description": "Citations require chunk ids.",
+          "effect": {
+            "decision": "deny",
+            "reason": "citation_chunk_required",
+            "required_action": "attach_chunk_id"
+          },
+          "name": "citation_requires_chunk"
+        },
+        {
+          "condition": {
+            "curator_present": false,
+            "operation": "curate_answer"
+          },
+          "description": "Curation requires a curator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curator_required",
+            "required_action": "assign_curator"
+          },
+          "name": "curation_requires_curator"
+        },
+        {
+          "condition": {
+            "curation_decision_present": false,
+            "operation": "curate_answer"
+          },
+          "description": "Curation requires a decision.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_decision_required",
+            "required_action": "choose_curation_decision"
+          },
+          "name": "curation_requires_decision"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "curate_answer"
+          },
+          "description": "Curation requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_evidence_required",
+            "required_action": "attach_curation_evidence"
+          },
+          "name": "curation_requires_evidence"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_rag_mutation"
+          },
+          "description": "Batch RAG mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_rag_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "RAG operations may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_rag_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_rag_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "RAG state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "rag_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "rag_runtime.py",
+        "production_service": "service.RAGService",
+        "service": "rag_runtime.RagnService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "RAGNAuditTimeline",
+          "permission": "ragn:audit",
+          "route": "/ragn/audit"
+        },
+        "citations": {
+          "component": "CitationInspector",
+          "permission": "ragn:view",
+          "route": "/ragn/citations"
+        },
         "conversations": {
           "component": "ConversationMemory",
           "permission": "ragn:query",
@@ -242,10 +1188,25 @@
           "permission": "ragn:manage_kb",
           "route": "/ragn/documents"
         },
+        "generation": {
+          "component": "GenerationWorkbench",
+          "permission": "ragn:query",
+          "route": "/ragn/generation"
+        },
+        "governance": {
+          "component": "RAGNGovernance",
+          "permission": "ragn:govern",
+          "route": "/ragn/governance"
+        },
         "knowledge_bases": {
           "component": "KnowledgeBaseManager",
           "permission": "ragn:manage_kb",
           "route": "/ragn/knowledge-bases"
+        },
+        "retrieval": {
+          "component": "RetrievalWorkbench",
+          "permission": "ragn:query",
+          "route": "/ragn/retrieval"
         },
         "settings": {
           "component": "RAGNSettings",
@@ -258,7 +1219,9 @@
           "route": "/ragn/studio"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
           "answer_panel": {
@@ -266,9 +1229,33 @@
             "risk_style": "grounding-band",
             "status_indicator": "citation-pill"
           },
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
+          "citation_stack": {
+            "status_style": "source-chip",
+            "visual": "citation-list"
+          },
           "conversation_trace": {
             "status_style": "memory-chip",
             "visual": "turn-timeline"
+          },
+          "curation_queue": {
+            "threshold_style": "quality-band",
+            "visual": "review-list"
+          },
+          "document_panel": {
+            "status_style": "ingest-chip",
+            "visual": "document-list"
+          },
+          "generation_panel": {
+            "status_style": "policy-chip",
+            "visual": "answer-draft"
+          },
+          "knowledge_base_card": {
+            "status_style": "classification-chip",
+            "visual": "collection-summary"
           },
           "retrieval_debug": {
             "threshold_style": "confidence-band",
@@ -327,6 +1314,20 @@
             "permission": "ragn:manage_kb"
           },
           {
+            "component": "RetrievalWorkbench",
+            "name": "retrieval",
+            "nav_group": "Ask",
+            "path": "/ragn/retrieval",
+            "permission": "ragn:query"
+          },
+          {
+            "component": "GenerationWorkbench",
+            "name": "generation",
+            "nav_group": "Ask",
+            "path": "/ragn/generation",
+            "permission": "ragn:query"
+          },
+          {
             "component": "ConversationMemory",
             "name": "conversations",
             "nav_group": "Ask",
@@ -334,11 +1335,32 @@
             "permission": "ragn:query"
           },
           {
+            "component": "CitationInspector",
+            "name": "citations",
+            "nav_group": "Evidence",
+            "path": "/ragn/citations",
+            "permission": "ragn:view"
+          },
+          {
             "component": "KnowledgeCuration",
             "name": "curation",
             "nav_group": "Governance",
             "path": "/ragn/curation",
             "permission": "ragn:curate"
+          },
+          {
+            "component": "RAGNGovernance",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/ragn/governance",
+            "permission": "ragn:govern"
+          },
+          {
+            "component": "RAGNAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/ragn/audit",
+            "permission": "ragn:audit"
           },
           {
             "component": "RAGNSettings",
@@ -367,25 +1389,106 @@
   "contracts": {
     "ragn": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "rag_runtime.RagnService",
+          "graph": "grph",
+          "helper_runtime": "rag_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "nlp": "nlpc",
+          "production_runtime": "service.RAGService",
+          "search": "srch"
+        },
+        "chunking": {
+          "chunk_overlap": 200,
+          "chunk_size": 1000,
+          "maximum_chunk_size": 8000,
+          "minimum_chunk_size": 100
+        },
+        "citations": {
+          "chunk_id_required": true,
+          "document_id_required": true,
+          "minimum_citation_count": 1,
+          "source_id_required": true
+        },
+        "conversations": {
+          "conversation_id_required": true,
+          "max_turns": 100,
+          "memory_enabled": true,
+          "retention_days": 30,
+          "user_id_required": true
+        },
+        "curation": {
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "curator_required": true,
+          "evidence_required": true,
+          "review_required_for_low_confidence": true
+        },
+        "documents": {
+          "allowed_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "content_hash_required": true,
+          "knowledge_base_required": true,
+          "large_ingest_review_threshold": 1000,
+          "max_documents_per_ingest": 5000,
+          "title_required": true
+        },
         "generation": {
           "citations_required": true,
+          "external_model_requires_policy": true,
+          "max_answer_tokens": 4000,
           "model_policy_required": true,
           "streaming_enabled": true
         },
         "governance": {
+          "audit_curation": true,
+          "audit_generation": true,
+          "audit_ingestion": true,
           "audit_queries": true,
-          "require_tenant_context": true,
-          "restricted_source_filter_required": true
+          "require_tenant_context": true
         },
         "knowledge_bases": {
-          "max_documents_per_ingest": 5000,
+          "default_classification": "internal",
+          "id_required": true,
+          "name_required": true,
           "owner_required": true,
+          "retire_requires_review": true,
           "source_attribution_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
         },
         "retrieval": {
           "keyword_fallback_enabled": true,
+          "max_results": 50,
           "minimum_context_confidence": 0.7,
+          "rbac_filter_required": true,
           "semantic_retrieval_enabled": true
+        },
+        "security": {
+          "cross_tenant_access_allowed": false,
+          "prompt_injection_scan_required": true,
+          "restricted_source_filter_required": true,
+          "unsafe_generation_blocking": true
         },
         "tenant_id": "default",
         "theme": {
@@ -393,10 +1496,18 @@
           "default_theme": "ragn_answer_studio"
         },
         "ui": {
+          "enable_audit": true,
+          "enable_citations": true,
           "enable_conversations": true,
           "enable_curation": true,
+          "enable_dashboard": true,
+          "enable_documents": true,
+          "enable_generation": true,
+          "enable_governance": true,
           "enable_knowledge_bases": true,
-          "enable_rag_studio": true
+          "enable_retrieval": true,
+          "enable_settings": true,
+          "enable_studio": true
         }
       },
       "id": "ragn",
@@ -436,10 +1547,245 @@
   },
   "roles": {},
   "rules": {
+    "batch_rag_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_rag_mutation"
+      },
+      "description": "Batch RAG mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_rag_mutation_requires_bytewax"
+    },
+    "chunk_size_requires_maximum": {
+      "condition": {
+        "chunk_size_gt": 8000,
+        "operation": "configure_chunking"
+      },
+      "description": "Chunk size must be within configured bounds.",
+      "effect": {
+        "decision": "deny",
+        "reason": "chunk_size_too_large",
+        "required_action": "reduce_chunk_size"
+      },
+      "name": "chunk_size_requires_maximum"
+    },
+    "chunk_size_requires_minimum": {
+      "condition": {
+        "chunk_size_lt": 100,
+        "operation": "configure_chunking"
+      },
+      "description": "Chunk size must be within configured bounds.",
+      "effect": {
+        "decision": "deny",
+        "reason": "chunk_size_too_small",
+        "required_action": "increase_chunk_size"
+      },
+      "name": "chunk_size_requires_minimum"
+    },
+    "citation_requires_chunk": {
+      "condition": {
+        "chunk_id_present": false,
+        "operation": "attach_citation"
+      },
+      "description": "Citations require chunk ids.",
+      "effect": {
+        "decision": "deny",
+        "reason": "citation_chunk_required",
+        "required_action": "attach_chunk_id"
+      },
+      "name": "citation_requires_chunk"
+    },
+    "citation_requires_document": {
+      "condition": {
+        "document_id_present": false,
+        "operation": "attach_citation"
+      },
+      "description": "Citations require document ids.",
+      "effect": {
+        "decision": "deny",
+        "reason": "citation_document_required",
+        "required_action": "attach_document_id"
+      },
+      "name": "citation_requires_document"
+    },
+    "citation_requires_source": {
+      "condition": {
+        "operation": "attach_citation",
+        "source_id_present": false
+      },
+      "description": "Citations require source ids.",
+      "effect": {
+        "decision": "deny",
+        "reason": "citation_source_required",
+        "required_action": "attach_source_id"
+      },
+      "name": "citation_requires_source"
+    },
+    "conversation_requires_id": {
+      "condition": {
+        "conversation_id_present": false,
+        "operation": "record_turn"
+      },
+      "description": "Conversation turns require a conversation id.",
+      "effect": {
+        "decision": "deny",
+        "reason": "conversation_id_required",
+        "required_action": "attach_conversation_id"
+      },
+      "name": "conversation_requires_id"
+    },
+    "conversation_requires_user": {
+      "condition": {
+        "operation": "record_turn",
+        "user_id_present": false
+      },
+      "description": "Conversation turns require a user id.",
+      "effect": {
+        "decision": "deny",
+        "reason": "user_id_required",
+        "required_action": "attach_user_id"
+      },
+      "name": "conversation_requires_user"
+    },
+    "conversation_turn_limit_requires_review": {
+      "condition": {
+        "operation": "record_turn",
+        "review_recorded": false,
+        "turn_count_gt": 100
+      },
+      "description": "Long conversations require review or summarization.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "conversation_turn_review_required",
+        "required_action": "summarize_or_review_conversation"
+      },
+      "name": "conversation_turn_limit_requires_review"
+    },
+    "cross_tenant_rag_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "RAG operations may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_rag_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_rag_access_denied"
+    },
+    "curation_requires_curator": {
+      "condition": {
+        "curator_present": false,
+        "operation": "curate_answer"
+      },
+      "description": "Curation requires a curator.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curator_required",
+        "required_action": "assign_curator"
+      },
+      "name": "curation_requires_curator"
+    },
+    "curation_requires_decision": {
+      "condition": {
+        "curation_decision_present": false,
+        "operation": "curate_answer"
+      },
+      "description": "Curation requires a decision.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_decision_required",
+        "required_action": "choose_curation_decision"
+      },
+      "name": "curation_requires_decision"
+    },
+    "curation_requires_evidence": {
+      "condition": {
+        "evidence_present": false,
+        "operation": "curate_answer"
+      },
+      "description": "Curation requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_evidence_required",
+        "required_action": "attach_curation_evidence"
+      },
+      "name": "curation_requires_evidence"
+    },
+    "document_classification_requires_allowed_value": {
+      "condition": {
+        "classification_allowed": false,
+        "operation": "ingest_document"
+      },
+      "description": "Document classifications must be configured values.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_classification_invalid",
+        "required_action": "choose_allowed_classification"
+      },
+      "name": "document_classification_requires_allowed_value"
+    },
+    "document_requires_content_hash": {
+      "condition": {
+        "content_hash_present": false,
+        "operation": "ingest_document"
+      },
+      "description": "Document ingestion requires a content hash.",
+      "effect": {
+        "decision": "deny",
+        "reason": "content_hash_required",
+        "required_action": "attach_content_hash"
+      },
+      "name": "document_requires_content_hash"
+    },
+    "document_requires_knowledge_base": {
+      "condition": {
+        "knowledge_base_present": false,
+        "operation": "ingest_document"
+      },
+      "description": "Document ingestion requires a knowledge base.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_base_required",
+        "required_action": "select_knowledge_base"
+      },
+      "name": "document_requires_knowledge_base"
+    },
+    "document_requires_source_uri": {
+      "condition": {
+        "operation": "ingest_document",
+        "source_uri_present": false
+      },
+      "description": "Document ingestion requires a source URI.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_uri_required",
+        "required_action": "attach_source_uri"
+      },
+      "name": "document_requires_source_uri"
+    },
+    "document_requires_title": {
+      "condition": {
+        "document_title_present": false,
+        "operation": "ingest_document"
+      },
+      "description": "Document ingestion requires a title.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_title_required",
+        "required_action": "attach_document_title"
+      },
+      "name": "document_requires_title"
+    },
     "external_model_requires_policy": {
       "condition": {
         "model_location": "external",
-        "model_policy_attached": false
+        "model_policy_attached": false,
+        "operation": "generate_answer"
       },
       "description": "External generation models require policy approval.",
       "effect": {
@@ -448,6 +1794,19 @@
         "required_action": "attach_model_policy"
       },
       "name": "external_model_requires_policy"
+    },
+    "generation_requires_answer_text": {
+      "condition": {
+        "answer_text_present": false,
+        "operation": "generate_answer"
+      },
+      "description": "Answer generation requires non-empty answer text.",
+      "effect": {
+        "decision": "deny",
+        "reason": "answer_text_required",
+        "required_action": "attach_answer_text"
+      },
+      "name": "generation_requires_answer_text"
     },
     "generation_requires_citations": {
       "condition": {
@@ -462,6 +1821,58 @@
       },
       "name": "generation_requires_citations"
     },
+    "generation_requires_context": {
+      "condition": {
+        "context_present": false,
+        "operation": "generate_answer"
+      },
+      "description": "Answer generation requires retrieved context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retrieval_context_required",
+        "required_action": "retrieve_context"
+      },
+      "name": "generation_requires_context"
+    },
+    "generation_requires_query": {
+      "condition": {
+        "operation": "generate_answer",
+        "query_present": false
+      },
+      "description": "Answer generation requires a user query.",
+      "effect": {
+        "decision": "deny",
+        "reason": "generation_query_required",
+        "required_action": "attach_query"
+      },
+      "name": "generation_requires_query"
+    },
+    "knowledge_base_requires_id": {
+      "condition": {
+        "knowledge_base_id_present": false,
+        "operation": "create_knowledge_base"
+      },
+      "description": "Knowledge bases require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_base_id_required",
+        "required_action": "attach_knowledge_base_id"
+      },
+      "name": "knowledge_base_requires_id"
+    },
+    "knowledge_base_requires_name": {
+      "condition": {
+        "knowledge_base_name_present": false,
+        "operation": "create_knowledge_base"
+      },
+      "description": "Knowledge bases require names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_base_name_required",
+        "required_action": "attach_knowledge_base_name"
+      },
+      "name": "knowledge_base_requires_name"
+    },
     "knowledge_base_requires_owner": {
       "condition": {
         "operation": "create_knowledge_base",
@@ -474,6 +1885,33 @@
         "required_action": "assign_owner"
       },
       "name": "knowledge_base_requires_owner"
+    },
+    "knowledge_base_requires_source_attribution": {
+      "condition": {
+        "operation": "create_knowledge_base",
+        "source_attribution_present": false
+      },
+      "description": "Knowledge bases require source attribution policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_attribution_required",
+        "required_action": "attach_source_attribution_policy"
+      },
+      "name": "knowledge_base_requires_source_attribution"
+    },
+    "large_ingest_requires_review": {
+      "condition": {
+        "document_count_gt": 1000,
+        "operation": "ingest_document",
+        "review_recorded": false
+      },
+      "description": "Large document ingestion batches require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_ingest_review_required",
+        "required_action": "record_ingest_review"
+      },
+      "name": "large_ingest_requires_review"
     },
     "low_context_confidence_requires_review": {
       "condition": {
@@ -488,6 +1926,32 @@
       },
       "name": "low_context_confidence_requires_review"
     },
+    "prompt_injection_requires_block": {
+      "condition": {
+        "operation": "generate_answer",
+        "prompt_injection_detected": true
+      },
+      "description": "Detected prompt injection blocks generation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "prompt_injection_blocked",
+        "required_action": "sanitize_or_reject_prompt"
+      },
+      "name": "prompt_injection_requires_block"
+    },
+    "rag_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "RAG state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "rag_state_change_requires_audit"
+    },
     "restricted_sources_require_filter": {
       "condition": {
         "access_filter_applied": false,
@@ -501,6 +1965,46 @@
       },
       "name": "restricted_sources_require_filter"
     },
+    "retrieval_requires_knowledge_base": {
+      "condition": {
+        "knowledge_base_present": false,
+        "operation": "retrieve_context"
+      },
+      "description": "Retrieval requires a knowledge base.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_base_required",
+        "required_action": "select_knowledge_base"
+      },
+      "name": "retrieval_requires_knowledge_base"
+    },
+    "retrieval_requires_query": {
+      "condition": {
+        "operation": "retrieve_context",
+        "query_present": false
+      },
+      "description": "Retrieval requires a query.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retrieval_query_required",
+        "required_action": "attach_query"
+      },
+      "name": "retrieval_requires_query"
+    },
+    "retrieval_result_window_requires_review": {
+      "condition": {
+        "operation": "retrieve_context",
+        "result_window_gt": 50,
+        "review_recorded": false
+      },
+      "description": "Large retrieval windows require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "large_retrieval_window_review_required",
+        "required_action": "record_retrieval_review"
+      },
+      "name": "retrieval_result_window_requires_review"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -512,11 +2016,27 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "unsafe_generation_requires_block": {
+      "condition": {
+        "operation": "generate_answer",
+        "unsafe_answer_detected": true
+      },
+      "description": "Unsafe answer classifications block generation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsafe_generation_blocked",
+        "required_action": "block_answer"
+      },
+      "name": "unsafe_generation_requires_block"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "rag_runtime.py",
+    "api.py",
+    "views.py"
   ],
   "symbols": {
     "capability.ragn": {

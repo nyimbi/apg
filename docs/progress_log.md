@@ -16,6 +16,76 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 10:48 EAT
+
+RAGN retrieval-augmented-generation lifecycle/guardrail packet:
+
+- Replaced root `README.md`, added `SPECIFICATION.md` and `PLAN.md`, and
+  replaced `cap_spec.md` with current executable scope, lifecycle workflows,
+  adapter boundaries, UI surfaces, guardrails, and focused proof commands.
+- Replaced stale RAGN registration metadata with a current first-class APG
+  registration surface for knowledge bases, document ingestion, context
+  retrieval, grounded generation, conversations, citations, curation,
+  governance, audit, adapters, and permissions.
+- Expanded `capability_contract.py` with knowledge-base, document, chunking,
+  retrieval, generation, conversation, citation, curation, security,
+  governance, observability, adapter, UI, and theme configuration.
+- Expanded deterministic guardrails to cover tenant context, knowledge-base
+  identity/name/owner/source attribution, document knowledge base/title/content
+  hash/source URI/classification, large ingestion review, chunk-size bounds,
+  retrieval query/knowledge base/window/restricted-source filters, context
+  confidence review, generation query/context/answer text/citations/external
+  model policy/prompt-injection/unsafe answer blocking, conversation id/user
+  id/turn-count review, citation source/document/chunk identifiers, curation
+  curator/decision/evidence, Bytewax batch mutation, cross-tenant access, and
+  audit requirements.
+- Added dependency-light `rag_runtime.RagnService` for generated applications
+  while leaving the heavier async `service.RAGService` as the production adapter
+  surface.
+- Replaced `api.py` and `views.py` with import-light generated-app helpers and
+  view models, avoiding the missing `asyncpg` production dependency during
+  generated-app package imports.
+- Replaced static `app.py` semantic JSON with contract-derived package evidence
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed the old materialized package test to `tests/test_package_contract.py`
+  and expanded RAGN tests for contract shape, Bytewax adapter evidence,
+  import-light API behavior, package evidence matching, lifecycle flows,
+  guardrail failures, and existing conversation retrieval behavior.
+- Focused review cleanup: added a missing answer-text guardrail and replaced old
+  RAGN `ROADMAP.md`, `PRODUCTION_SUMMARY.md`, `CHANGELOG.md`, and `todo.md`
+  content that contained unsupported market/performance claims.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ragn/__init__.py
+  capabilities/common/ragn/capability_contract.py capabilities/common/ragn/rag_runtime.py
+  capabilities/common/ragn/api.py capabilities/common/ragn/views.py
+  capabilities/common/ragn/app.py capabilities/common/ragn/test_capability_contract.py
+  capabilities/common/ragn/tests/test_package_contract.py
+  capabilities/common/ragn/tests/test_conversation_retrieval_runtime.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/ragn/test_capability_contract.py
+  capabilities/common/ragn/tests/test_package_contract.py
+  capabilities/common/ragn/tests/test_conversation_retrieval_runtime.py` passed
+  with 13 tests and only pre-existing adjacent SQLAlchemy/Pydantic deprecation
+  warnings.
+- `./.venv/bin/python -c "from capabilities.common.ragn import app; result=app.self_test(); print(result); assert result['passed']"`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/ragn --json` passed with RAGN classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ragn --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- Full RAGN stale-marker and overclaim search returned no matches for old
+  package markers or unsupported market/performance claims.
+- `git diff --check -- capabilities/common/ragn docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live vector index, live model
+  inference, async database production service, live SRCH/NLPC/AICR/MLCM/KG/
+  AUTH/AUDL/MONI/CACH adapters, live Bytewax topology, rendered browser UI, and
+  performance/resilience benchmarks.
+
 ### 2026-05-30 10:34 EAT
 
 KNGR knowledge-graph lifecycle/guardrail packet:

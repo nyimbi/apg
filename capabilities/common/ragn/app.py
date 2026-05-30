@@ -5,13 +5,124 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Retrieval-Augmented Generation package-backed APG capability", "entity_count": 0, "name": "ragn", "version": "1.0.0"}, "capabilities": {"ragn": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"generation": {"citations_required": true, "model_policy_required": true, "streaming_enabled": true}, "governance": {"audit_queries": true, "require_tenant_context": true, "restricted_source_filter_required": true}, "knowledge_bases": {"max_documents_per_ingest": 5000, "owner_required": true, "source_attribution_required": true}, "retrieval": {"keyword_fallback_enabled": true, "minimum_context_confidence": 0.7, "semantic_retrieval_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ragn_answer_studio"}, "ui": {"enable_conversations": true, "enable_curation": true, "enable_knowledge_bases": true, "enable_rag_studio": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Retrieval-Augmented Generation", "provides": ["ragn_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All RAG operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_knowledge_base", "owner_assigned": false}, "description": "Knowledge bases require an owner.", "effect": {"decision": "deny", "reason": "knowledge_base_owner_required", "required_action": "assign_owner"}, "name": "knowledge_base_requires_owner"}, {"condition": {"access_filter_applied": false, "source_classification": "restricted"}, "description": "Restricted sources require access filters.", "effect": {"decision": "deny", "reason": "access_filter_required", "required_action": "apply_access_filter"}, "name": "restricted_sources_require_filter"}, {"condition": {"citations_attached": false, "operation": "generate_answer"}, "description": "Generated answers require citations.", "effect": {"decision": "deny", "reason": "citations_required", "required_action": "attach_citations"}, "name": "generation_requires_citations"}, {"condition": {"context_confidence_lt": 0.7, "review_recorded": false}, "description": "Low confidence context requires review.", "effect": {"decision": "require_review", "reason": "low_context_confidence_review_required", "required_action": "record_context_review"}, "name": "low_context_confidence_requires_review"}, {"condition": {"model_location": "external", "model_policy_attached": false}, "description": "External generation models require policy approval.", "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}, "name": "external_model_requires_policy"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All RAG operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_knowledge_base", "owner_assigned": false}, "description": "Knowledge bases require an owner.", "effect": {"decision": "deny", "reason": "knowledge_base_owner_required", "required_action": "assign_owner"}, "name": "knowledge_base_requires_owner"}, {"condition": {"access_filter_applied": false, "source_classification": "restricted"}, "description": "Restricted sources require access filters.", "effect": {"decision": "deny", "reason": "access_filter_required", "required_action": "apply_access_filter"}, "name": "restricted_sources_require_filter"}, {"condition": {"citations_attached": false, "operation": "generate_answer"}, "description": "Generated answers require citations.", "effect": {"decision": "deny", "reason": "citations_required", "required_action": "attach_citations"}, "name": "generation_requires_citations"}, {"condition": {"context_confidence_lt": 0.7, "review_recorded": false}, "description": "Low confidence context requires review.", "effect": {"decision": "require_review", "reason": "low_context_confidence_review_required", "required_action": "record_context_review"}, "name": "low_context_confidence_requires_review"}, {"condition": {"model_location": "external", "model_policy_attached": false}, "description": "External generation models require policy approval.", "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}, "name": "external_model_requires_policy"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"conversations": {"component": "ConversationMemory", "permission": "ragn:query", "route": "/ragn/conversations"}, "curation": {"component": "KnowledgeCuration", "permission": "ragn:curate", "route": "/ragn/curation"}, "dashboard": {"component": "RAGNDashboard", "permission": "ragn:view", "route": "/ragn/dashboard"}, "documents": {"component": "DocumentIngestion", "permission": "ragn:manage_kb", "route": "/ragn/documents"}, "knowledge_bases": {"component": "KnowledgeBaseManager", "permission": "ragn:manage_kb", "route": "/ragn/knowledge-bases"}, "settings": {"component": "RAGNSettings", "permission": "ragn:admin", "route": "/ragn/settings"}, "studio": {"component": "RAGStudio", "permission": "ragn:query", "route": "/ragn/studio"}}, "streaming": {}, "theme": {"components": {"answer_panel": {"icon": "message-square-text", "risk_style": "grounding-band", "status_indicator": "citation-pill"}, "conversation_trace": {"status_style": "memory-chip", "visual": "turn-timeline"}, "retrieval_debug": {"threshold_style": "confidence-band", "visual": "ranked-results"}, "source_stack": {"highlight": "source-chip", "visual": "evidence-list"}}, "name": "ragn_answer_studio", "tokens": {"border.radius": "8px", "color.accent": "#F2A541", "color.danger": "#C53030", "color.primary": "#324A5F", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/ragn/api/v1", "requires_theme": true, "routes": [{"component": "RAGNDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/ragn/dashboard", "permission": "ragn:view"}, {"component": "RAGStudio", "name": "studio", "nav_group": "Ask", "path": "/ragn/studio", "permission": "ragn:query"}, {"component": "KnowledgeBaseManager", "name": "knowledge_bases", "nav_group": "Knowledge", "path": "/ragn/knowledge-bases", "permission": "ragn:manage_kb"}, {"component": "DocumentIngestion", "name": "documents", "nav_group": "Knowledge", "path": "/ragn/documents", "permission": "ragn:manage_kb"}, {"component": "ConversationMemory", "name": "conversations", "nav_group": "Ask", "path": "/ragn/conversations", "permission": "ragn:query"}, {"component": "KnowledgeCuration", "name": "curation", "nav_group": "Governance", "path": "/ragn/curation", "permission": "ragn:curate"}, {"component": "RAGNSettings", "name": "settings", "nav_group": "Administration", "path": "/ragn/settings", "permission": "ragn:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"ragn": []}}, "contracts": {"ragn": {"configuration": {"generation": {"citations_required": true, "model_policy_required": true, "streaming_enabled": true}, "governance": {"audit_queries": true, "require_tenant_context": true, "restricted_source_filter_required": true}, "knowledge_bases": {"max_documents_per_ingest": 5000, "owner_required": true, "source_attribution_required": true}, "retrieval": {"keyword_fallback_enabled": true, "minimum_context_confidence": 0.7, "semantic_retrieval_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ragn_answer_studio"}, "ui": {"enable_conversations": true, "enable_curation": true, "enable_knowledge_bases": true, "enable_rag_studio": true}}, "id": "ragn", "provides": ["ragn_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"ragn": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"external_model_requires_policy": {"condition": {"model_location": "external", "model_policy_attached": false}, "description": "External generation models require policy approval.", "effect": {"decision": "deny", "reason": "model_policy_required", "required_action": "attach_model_policy"}, "name": "external_model_requires_policy"}, "generation_requires_citations": {"condition": {"citations_attached": false, "operation": "generate_answer"}, "description": "Generated answers require citations.", "effect": {"decision": "deny", "reason": "citations_required", "required_action": "attach_citations"}, "name": "generation_requires_citations"}, "knowledge_base_requires_owner": {"condition": {"operation": "create_knowledge_base", "owner_assigned": false}, "description": "Knowledge bases require an owner.", "effect": {"decision": "deny", "reason": "knowledge_base_owner_required", "required_action": "assign_owner"}, "name": "knowledge_base_requires_owner"}, "low_context_confidence_requires_review": {"condition": {"context_confidence_lt": 0.7, "review_recorded": false}, "description": "Low confidence context requires review.", "effect": {"decision": "require_review", "reason": "low_context_confidence_review_required", "required_action": "record_context_review"}, "name": "low_context_confidence_requires_review"}, "restricted_sources_require_filter": {"condition": {"access_filter_applied": false, "source_classification": "restricted"}, "description": "Restricted sources require access filters.", "effect": {"decision": "deny", "reason": "access_filter_required", "required_action": "apply_access_filter"}, "name": "restricted_sources_require_filter"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All RAG operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.ragn": {"file": "capability_contract.py", "id": "capability.ragn", "kind": "capability", "name": "Retrieval-Augmented Generation", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("ragn_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "ragn",
+			"version": "1.0.0",
+			"description": "Retrieval-Augmented Generation package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"ragn": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"ragn": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["ragn_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"large_ingest": "RagnRecord",
+					"low_context_confidence": "RagnRecord",
+					"large_retrieval_window": "RagnRecord",
+					"long_conversation": "RagnRecord",
+					"answer_curation": "RagnRecord",
+				},
+				"rag_lifecycle": {
+					"knowledge_base": "RagnRecord",
+					"document": "RagnRecord",
+					"retrieval": "RagnRecord",
+					"answer": "RagnRecord",
+					"conversation_turn": "RagnRecord",
+					"curation": "RagnRecord",
+					"audit": "RagnRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"ragn": {
+				"id": "ragn",
+				"configuration": contract["configuration"],
+				"provides": ["ragn_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"ragn": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "rag_runtime.py", "api.py", "views.py"],
+		"symbols": {
+			"capability.ragn": {
+				"id": "capability.ragn",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +147,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("ragn", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "ragn" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("RAGN semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("RAGN semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("RAGN adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "rag_runtime.RagnService":
+		errors.append("RAGN generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
