@@ -2,14 +2,9 @@
 """
 APG Intelligent Gateway (APIG) - Edge Engine
 
-Revolutionary edge computing engine with WebAssembly runtime integration.
-Provides intelligent request processing, AI-powered analysis, and edge caching
-with microsecond-level performance optimization.
-
-This module implements one of the 10 revolutionary differentiators:
-- Edge-Native Performance Architecture with WASM runtime
-- AI-powered request analysis and routing decisions
-- Intelligent caching with predictive invalidation
+Adapter-backed edge computing engine with WebAssembly runtime integration.
+Generated applications should evaluate APIG guardrails before binding this
+runtime to live edge execution.
 
 Author: APG Platform Team
 Copyright: © 2025 Datacraft
@@ -542,15 +537,11 @@ class APGEdgeEngine:
 	"""
 	APG Intelligent Edge Engine with WebAssembly runtime.
 
-	Revolutionary edge computing engine that provides:
-	- Sub-millisecond request processing with WASM runtime
-	- AI-powered traffic analysis and routing decisions
-	- Intelligent caching with predictive invalidation
-	- Edge-native security and threat detection
-	- Real-time performance optimization
+	Adapter-backed edge computing engine for runtime deployments.
 
-	This is one of the 10 revolutionary differentiators that makes APIG
-	10x better than market leaders like Kong and AWS API Gateway.
+	The dependency-light APIG package validates governance and composition; live
+	performance, security, cache, and WASM behavior must be proven with the
+	selected production adapters.
 	"""
 
 	def __init__(self, tenant_id: str, edge_location: Optional[EdgeLocation] = None):
@@ -1355,7 +1346,7 @@ class APGEdgeEngine:
 	async def get_performance_summary(self) -> Dict[str, Any]:
 		"""Get performance summary statistics."""
 		return {
-			'max_throughput': 1000000,  # 1M RPS theoretical
+			'max_throughput': self.config.max_concurrent_requests,
 			'current_rps': min(1000, self.processed_requests),
 			'response_time_p50': '0.5',
 			'response_time_p95': '2.1',

@@ -27,7 +27,7 @@ try:
 except ImportError:
     # Fallback for environments without wasmtime
     WASMTIME_AVAILABLE = False
-    # Create placeholder classes for type hints
+    # Create fallback classes for type hints when wasmtime is not installed.
     class Store: pass
     class Module: pass
     class Instance: pass

@@ -2,14 +2,10 @@
 """
 APG Intelligent Gateway (APIG) - Unified Control Plane
 
-Revolutionary control plane for API Gateway management with AI-powered policy generation,
-GitOps integration, and zero-configuration service discovery. This module implements
-multiple revolutionary differentiators that make APIG 10x better than market leaders.
-
-Key Revolutionary Features:
-- Intent-Based Natural Language Policy Generation
-- GitOps-Native Configuration Management
-- Zero-Configuration Service Discovery
+Adapter-backed control-plane surfaces for policy generation, configuration
+integration, and service discovery. Generated applications should use
+gateway_runtime.ApigService for deterministic guardrail decisions before runtime
+side effects.
 - AI-Powered Policy Conflict Resolution
 - Real-Time Policy Distribution
 
@@ -93,11 +89,11 @@ class PolicyGenerationRequest:
 
 class NaturalLanguagePolicyGenerator:
 	"""
-	Revolutionary AI-powered policy generator that converts natural language
+	AI-assisted policy generator that converts natural language
 	descriptions into technical gateway policies.
 
-	This is one of the 10 revolutionary differentiators - allowing users to create
-	complex policies using simple natural language instead of complex configuration.
+	This runtime adapter is optional; package guardrails must still be enforced
+	before generated policies are activated.
 
 	Examples:
 	- "Block all requests from China except authenticated admin users"
@@ -726,15 +722,12 @@ class APGControlPlane:
 	"""
 	APG Intelligent Gateway Unified Control Plane.
 
-	Revolutionary control plane that provides:
+	Adapter-backed control plane that provides:
 	- Natural language policy generation using AI
 	- GitOps-native configuration management
-	- Zero-configuration service discovery
+	- Service discovery integration
 	- Real-time policy distribution and synchronization
 	- AI-powered conflict resolution and optimization
-
-	This implements multiple revolutionary differentiators that make APIG
-	10x better than market leaders.
 	"""
 
 	def __init__(self, tenant_id: str, user_id: str, config: Optional[Dict[str, Any]] = None):
@@ -868,8 +861,8 @@ class APGControlPlane:
 		"""
 		Create gateway policy from natural language description.
 
-		This is one of the revolutionary features that makes APIG 10x better.
-		Users can create complex policies using simple natural language.
+		Users can create complex policies using simple natural language after
+		APIG guardrails determine whether review is required.
 
 		Args:
 			description: Natural language policy description

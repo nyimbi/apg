@@ -7,8 +7,12 @@ from typing import Any
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
 	GatewayAuditEvent,
+	GatewayConsumerRecord,
+	GatewayDeploymentRecord,
+	GatewayPolicyRecord,
 	GatewayQuotaReview,
 	GatewayRouteRecord,
+	GatewayTrafficShiftRecord,
 	GatewayUpstreamRecord,
 )
 
@@ -21,8 +25,12 @@ class ApigService:
 
 	def __init__(self) -> None:
 		self._upstreams: dict[tuple[str, str], GatewayUpstreamRecord] = {}
+		self._consumers: dict[tuple[str, str], GatewayConsumerRecord] = {}
 		self._routes: dict[tuple[str, str], GatewayRouteRecord] = {}
 		self._quota_reviews: dict[tuple[str, str], GatewayQuotaReview] = {}
+		self._policies: dict[tuple[str, str], GatewayPolicyRecord] = {}
+		self._traffic_shifts: dict[tuple[str, str], GatewayTrafficShiftRecord] = {}
+		self._deployments: dict[tuple[str, str], GatewayDeploymentRecord] = {}
 		self._events: list[GatewayAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -39,15 +47,23 @@ class ApigService:
 		base_url: str,
 		owner: str,
 		health: str = "healthy",
+		health_check_configured: bool = True,
 		labels: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._enforce_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_upstream",
+			"upstream_owner_assigned": bool(owner),
+			"https_enabled": base_url.startswith("https://"),
+			"health_check_configured": health_check_configured and bool(health),
+		})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
 		if self._tenant_key(tenant_id, upstream_id) in self._upstreams:
 			raise ValueError(f"upstream already exists for tenant: {upstream_id}")
 		if not name:
 			raise ValueError("upstream name is required")
-		if not owner:
-			raise ValueError("upstream owner is required")
 		if not (base_url.startswith("http://") or base_url.startswith("https://")):
 			raise ValueError("upstream base_url must be http or https")
 		record = GatewayUpstreamRecord(
@@ -65,7 +81,54 @@ class ApigService:
 			event_type="upstream_registered",
 			subject_id=upstream_id,
 			message=f"Registered upstream {name}.",
-			evidence={"base_url": record.base_url, "owner": owner, "health": health},
+			evidence={"base_url": record.base_url, "owner": owner, "health": health, "matched_rules": result["matched_rules"]},
+		)
+		return record.model_dump(mode="json")
+
+	def register_consumer(
+		self,
+		consumer_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		access_tier: str = "standard",
+		identity_provider: str = "auth",
+		credential_rotation_recorded: bool = True,
+		rbac_approval_recorded: bool = False,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_consumer",
+			"consumer_owner_assigned": bool(owner),
+			"access_tier": access_tier,
+			"credential_rotation_recorded": credential_rotation_recorded,
+			"rbac_approval_recorded": rbac_approval_recorded,
+		})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		if self._tenant_key(tenant_id, consumer_id) in self._consumers:
+			raise ValueError(f"consumer already exists for tenant: {consumer_id}")
+		if not name:
+			raise ValueError("consumer name is required")
+		record = GatewayConsumerRecord(
+			id=consumer_id,
+			tenant_id=tenant_id,
+			name=name,
+			owner=owner,
+			access_tier=access_tier,
+			identity_provider=identity_provider,
+			credential_rotation_recorded=credential_rotation_recorded,
+			rbac_approval_recorded=rbac_approval_recorded,
+			status="registered",
+		)
+		self._consumers[self._tenant_key(tenant_id, consumer_id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="consumer_registered",
+			subject_id=consumer_id,
+			message=f"Registered consumer {name}.",
+			evidence={"access_tier": access_tier, "matched_rules": result["matched_rules"]},
 		)
 		return record.model_dump(mode="json")
 
@@ -78,8 +141,11 @@ class ApigService:
 		upstream_id: str,
 		owner: str,
 		route_exposure: str = "internal",
+		consumer_id: str | None = None,
 		auth_policy_attached: bool = True,
 		threat_policy_attached: bool = True,
+		mtls_enabled: bool = True,
+		rate_limit_configured: bool = True,
 		requested_rps_limit: int = 1000,
 		wasm_filter_attached: bool = False,
 		filter_signature_verified: bool = True,
@@ -94,10 +160,15 @@ class ApigService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_route",
 			"service_registered": upstream_registered,
+			"route_owner_assigned": bool(owner),
+			"absolute_path": path.startswith("/"),
+			"methods_present": bool(normalized_methods),
 			"route_exposure": route_exposure,
 			"auth_policy_attached": auth_policy_attached,
+			"mtls_enabled": mtls_enabled,
 			"unsafe_http_method_enabled": any(method in UNSAFE_METHODS for method in normalized_methods),
 			"threat_policy_attached": threat_policy_attached,
+			"rate_limit_configured": rate_limit_configured,
 			"wasm_filter_attached": wasm_filter_attached,
 			"filter_signature_verified": filter_signature_verified,
 			"requested_rps_limit": requested_rps_limit,
@@ -106,10 +177,8 @@ class ApigService:
 		if result["decision"] == "deny":
 			_raise_if_blocked(result)
 		self._get_upstream(tenant_id, upstream_id)
-		if not path.startswith("/"):
-			raise ValueError("route path must start with /")
-		if not owner:
-			raise ValueError("route owner is required")
+		if consumer_id is not None:
+			self._get_consumer(tenant_id, consumer_id)
 		status = "pending_quota_review" if result["decision"] == "require_review" else "active"
 		route = GatewayRouteRecord(
 			id=route_id,
@@ -119,8 +188,11 @@ class ApigService:
 			upstream_id=upstream_id,
 			owner=owner,
 			route_exposure=route_exposure,
+			consumer_id=consumer_id,
 			auth_policy_attached=auth_policy_attached,
 			threat_policy_attached=threat_policy_attached,
+			mtls_enabled=mtls_enabled,
+			rate_limit_configured=rate_limit_configured,
 			requested_rps_limit=requested_rps_limit,
 			wasm_filter_attached=wasm_filter_attached,
 			filter_signature_verified=filter_signature_verified,
@@ -132,7 +204,7 @@ class ApigService:
 			event_type="route_requested",
 			subject_id=route_id,
 			message=f"Requested route {path}.",
-			evidence={"status": status, "upstream_id": upstream_id, "requested_rps_limit": requested_rps_limit},
+			evidence={"status": status, "upstream_id": upstream_id, "requested_rps_limit": requested_rps_limit, "matched_rules": result["matched_rules"]},
 		)
 		if result["decision"] == "require_review":
 			review = GatewayQuotaReview(
@@ -208,7 +280,10 @@ class ApigService:
 			route_exposure=route.route_exposure,
 			auth_policy_attached=route.auth_policy_attached,
 			threat_policy_attached=route.threat_policy_attached,
+			mtls_enabled=route.mtls_enabled,
+			rate_limit_configured=route.rate_limit_configured,
 			requested_rps_limit=route.requested_rps_limit,
+			consumer_id=route.consumer_id,
 			wasm_filter_attached=route.wasm_filter_attached,
 			filter_signature_verified=route.filter_signature_verified,
 			status="active",
@@ -223,14 +298,187 @@ class ApigService:
 		)
 		return activated.model_dump(mode="json")
 
+	def change_policy(
+		self,
+		policy_id: str,
+		tenant_id: str,
+		name: str,
+		policy_type: str,
+		actor: str,
+		policy_review_recorded: bool,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "change_policy",
+			"policy_review_recorded": policy_review_recorded,
+		})
+		record = GatewayPolicyRecord(
+			id=policy_id,
+			tenant_id=tenant_id,
+			name=name,
+			policy_type=policy_type,
+			actor=actor,
+			status="active" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
+			decision=result["decision"],
+			matched_rules=result["matched_rules"],
+			metadata=dict(metadata or {}),
+		)
+		self._policies[self._tenant_key(tenant_id, policy_id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="policy_change_evaluated",
+			subject_id=policy_id,
+			message=f"Evaluated policy change {name}.",
+			evidence={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+		)
+		return record.model_dump(mode="json")
+
+	def shift_traffic(
+		self,
+		shift_id: str,
+		tenant_id: str,
+		route_id: str,
+		canary_percent: int,
+		actor: str,
+		rollback_plan_recorded: bool,
+		canary_review_recorded: bool,
+		rollback_plan: str | None = None,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		self._get_route(tenant_id, route_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "shift_traffic",
+			"canary_percent": canary_percent,
+			"rollback_plan_recorded": rollback_plan_recorded,
+			"canary_review_recorded": canary_review_recorded,
+		})
+		record = GatewayTrafficShiftRecord(
+			id=shift_id,
+			tenant_id=tenant_id,
+			route_id=route_id,
+			canary_percent=canary_percent,
+			actor=actor,
+			status="active" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
+			decision=result["decision"],
+			matched_rules=result["matched_rules"],
+			rollback_plan=rollback_plan,
+		)
+		self._traffic_shifts[self._tenant_key(tenant_id, shift_id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="traffic_shift_evaluated",
+			subject_id=shift_id,
+			message=f"Evaluated canary shift for {route_id}.",
+			evidence={"decision": result["decision"], "canary_percent": canary_percent, "matched_rules": result["matched_rules"]},
+		)
+		return record.model_dump(mode="json")
+
+	def deploy_gateway(
+		self,
+		deployment_id: str,
+		tenant_id: str,
+		environment: str,
+		region: str,
+		actor: str,
+		observability_configured: bool,
+		deployment_approval_recorded: bool,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		allowed_regions = set(self.describe(tenant_id)["configuration"]["edge"]["allowed_regions"])
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "deploy_gateway",
+			"environment": environment,
+			"allowed_region": region in allowed_regions,
+			"observability_configured": observability_configured,
+			"deployment_approval_recorded": deployment_approval_recorded,
+		})
+		record = GatewayDeploymentRecord(
+			id=deployment_id,
+			tenant_id=tenant_id,
+			environment=environment,
+			region=region,
+			actor=actor,
+			status="deployed" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
+			decision=result["decision"],
+			matched_rules=result["matched_rules"],
+		)
+		self._deployments[self._tenant_key(tenant_id, deployment_id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="deployment_evaluated",
+			subject_id=deployment_id,
+			message=f"Evaluated {environment} deployment in {region}.",
+			evidence={"decision": result["decision"], "matched_rules": result["matched_rules"]},
+		)
+		return record.model_dump(mode="json")
+
+	def retire_route(
+		self,
+		route_id: str,
+		tenant_id: str,
+		actor: str,
+		impact_review_recorded: bool,
+	) -> dict[str, Any]:
+		route = self._get_route(tenant_id, route_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_route",
+			"impact_review_recorded": impact_review_recorded,
+		})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		retired = GatewayRouteRecord(
+			id=route.id,
+			tenant_id=route.tenant_id,
+			path=route.path,
+			methods=list(route.methods),
+			upstream_id=route.upstream_id,
+			owner=route.owner,
+			route_exposure=route.route_exposure,
+			consumer_id=route.consumer_id,
+			auth_policy_attached=route.auth_policy_attached,
+			threat_policy_attached=route.threat_policy_attached,
+			mtls_enabled=route.mtls_enabled,
+			rate_limit_configured=route.rate_limit_configured,
+			requested_rps_limit=route.requested_rps_limit,
+			wasm_filter_attached=route.wasm_filter_attached,
+			filter_signature_verified=route.filter_signature_verified,
+			status="retired",
+		)
+		self._routes[self._tenant_key(tenant_id, route_id)] = retired
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="route_retired",
+			subject_id=route_id,
+			message=f"Retired route {route.path}.",
+			evidence={"actor": actor, "matched_rules": result["matched_rules"]},
+		)
+		return retired.model_dump(mode="json")
+
 	def list_upstreams(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._upstreams, tenant_id)
+
+	def list_consumers(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._consumers, tenant_id)
 
 	def list_routes(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._routes, tenant_id)
 
 	def list_quota_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._quota_reviews, tenant_id)
+
+	def list_policies(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._policies, tenant_id)
+
+	def list_traffic_shifts(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._traffic_shifts, tenant_id)
+
+	def list_deployments(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._deployments, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = list(self._events)
@@ -244,16 +492,38 @@ class ApigService:
 		return {
 			"tenant_id": tenant_id,
 			"upstream_count": len(self.list_upstreams(tenant_id)),
+			"consumer_count": len(self.list_consumers(tenant_id)),
 			"route_count": len(routes),
 			"active_route_count": len([route for route in routes if route["status"] == "active"]),
+			"retired_route_count": len([route for route in routes if route["status"] == "retired"]),
 			"pending_quota_review_count": len([review for review in reviews if review["decision"] == "pending"]),
 			"public_route_count": len([route for route in routes if route["route_exposure"] == "public"]),
 			"edge_filter_count": len([route for route in routes if route["wasm_filter_attached"]]),
+			"policy_count": len(self.list_policies(tenant_id)),
+			"traffic_shift_count": len(self.list_traffic_shifts(tenant_id)),
+			"deployment_count": len(self.list_deployments(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
-	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
-		return self.list_routes(tenant_id)
+	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		collections = {
+			"upstreams": self.list_upstreams,
+			"consumers": self.list_consumers,
+			"routes": self.list_routes,
+			"quota_reviews": self.list_quota_reviews,
+			"policies": self.list_policies,
+			"traffic_shifts": self.list_traffic_shifts,
+			"deployments": self.list_deployments,
+			"audit_events": self.list_audit_events,
+		}
+		if record_type:
+			if record_type not in collections:
+				raise ValueError(f"unsupported record_type: {record_type}")
+			return collections[record_type](tenant_id)
+		rows: list[dict[str, Any]] = []
+		for loader in collections.values():
+			rows.extend(loader(tenant_id))
+		return rows
 
 	def create_record(
 		self,
@@ -270,8 +540,9 @@ class ApigService:
 				tenant_id=tenant_id,
 				name=str(metadata.get("upstream_name") or upstream_id),
 				base_url=str(metadata.get("base_url") or "https://example.internal"),
-				owner=str(metadata.get("owner") or "operations"),
-			)
+			owner=str(metadata.get("owner") or "operations"),
+			health_check_configured=bool(metadata.get("health_check_configured", True)),
+		)
 		route = self.request_route(
 			route_id=record_id,
 			tenant_id=tenant_id,
@@ -280,8 +551,11 @@ class ApigService:
 			upstream_id=upstream_id,
 			owner=str(metadata.get("owner") or "operations"),
 			route_exposure=str(metadata.get("route_exposure") or "internal"),
+			consumer_id=metadata.get("consumer_id"),
 			auth_policy_attached=bool(metadata.get("auth_policy_attached", True)),
 			threat_policy_attached=bool(metadata.get("threat_policy_attached", True)),
+			mtls_enabled=bool(metadata.get("mtls_enabled", True)),
+			rate_limit_configured=bool(metadata.get("rate_limit_configured", True)),
 			requested_rps_limit=int(metadata.get("requested_rps_limit") or 1000),
 			wasm_filter_attached=bool(metadata.get("wasm_filter_attached", False)),
 			filter_signature_verified=bool(metadata.get("filter_signature_verified", True)),
@@ -303,6 +577,12 @@ class ApigService:
 		if upstream is None:
 			raise KeyError(f"unknown upstream for tenant: {upstream_id}")
 		return upstream
+
+	def _get_consumer(self, tenant_id: str, consumer_id: str) -> GatewayConsumerRecord:
+		consumer = self._consumers.get(self._tenant_key(tenant_id, consumer_id))
+		if consumer is None:
+			raise KeyError(f"unknown consumer for tenant: {consumer_id}")
+		return consumer
 
 	def _get_route(self, tenant_id: str, route_id: str) -> GatewayRouteRecord:
 		route = self._routes.get(self._tenant_key(tenant_id, route_id))
@@ -340,6 +620,14 @@ def _raise_if_blocked(result: dict[str, Any]) -> None:
 		return
 	reasons = ", ".join(action.get("reason", "gateway_policy_blocked") for action in result["actions"])
 	raise PermissionError(reasons or "gateway_policy_blocked")
+
+
+def _status_for_decision(decision: str) -> str:
+	if decision == "require_review":
+		return "pending_review"
+	if decision == "deny":
+		return "denied"
+	return "active"
 
 
 __all__ = ["ApigService"]

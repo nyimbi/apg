@@ -2,14 +2,9 @@
 """
 APG Intelligent Gateway (APIG) - Advanced Traffic Manager
 
-Revolutionary traffic management with intelligent load balancing, circuit breakers,
-and adaptive rate limiting. This module implements advanced traffic control
-algorithms that make APIG 10x better than market leaders.
-
-Key Revolutionary Features:
-- AI-Powered Load Balancing with predictive scaling
-- Intelligent Circuit Breakers with ML failure prediction
-- Adaptive Rate Limiting based on real-time conditions
+Adapter-backed traffic management with load balancing, circuit breakers, and
+adaptive rate limiting. Generated applications should evaluate APIG route and
+traffic guardrails before binding live traffic adapters.
 - Multi-Dimensional Health Monitoring
 - Dynamic Traffic Shaping with QoS
 

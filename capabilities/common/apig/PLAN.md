@@ -1,54 +1,70 @@
-# APIG Capability Development Plan
+# APIG Capability Build Plan
 
 ## Current State
 
-APIG has a large production gateway implementation plus an executable contract,
-API helper shell, view shell, packaging evidence, and contract tests. The
-package-level API/view facade currently needs a dependency-light service that
-can execute route lifecycle governance without booting the production gateway
-runtime.
+APIG already has a large production-oriented gateway runtime, a dependency-light
+`ApigService`, API helpers, view helpers, packaging evidence, and focused
+contract tests. The package still needs the richer lifecycle packet shape used
+for the current APG capability build-out.
 
-## Packet 1: Governed Route Publication
+Known gaps:
 
-Deliver a focused lifecycle packet:
+- No root `README.md`.
+- Primary specification and `cap_spec.md` still contain old market and
+  production-readiness claims.
+- Contract has only a narrow 6-rule, 8-route surface.
+- `app.py` embeds static semantic JSON.
+- UI helpers live in `views.py` rather than the generated-app `view_models.py`
+  convention used by recent packets.
+- Package evidence and tests do not yet cover consumers, deployments, canary
+  traffic shifts, route retirement, policy review, or adapter metadata.
 
-- add package-level upstream, route, quota review, and audit event records;
-- add a dependency-light `ApigService` control-plane facade;
-- register tenant-owned upstream services;
-- request routes and enforce registered upstream, auth policy, threat policy,
-  signed edge-filter, and tenant guardrails;
-- create and decide high-quota reviews;
-- activate only approved high-quota routes;
-- expose API helper and view-model surfaces for routes, upstreams, reviews,
-  traffic, security, edge filters, analytics, and audit evidence;
-- replace stale generated-package test naming with package contract tests;
-- update package documentation and progress evidence.
+## Build Sequence
 
-## Implementation Steps
+1. Documentation baseline
+   - Add root `README.md`.
+   - Replace `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` with current
+     executable scope, adapter boundaries, and focused proof commands.
+   - Clean primary package overclaims.
 
-1. Extend `models.py` with `GatewayUpstreamRecord`, `GatewayRouteRecord`,
-   `GatewayQuotaReview`, and `GatewayAuditEvent`.
-2. Add `gateway_runtime.py` with the dependency-light `ApigService` facade.
-3. Update `api.py` and `views.py` to use the dependency-light facade.
-4. Update registration metadata with quota review and audit endpoint surfaces.
-5. Extend package contract tests with positive high-quota review activation and
-   negative public-auth, unsafe-method, unsigned-filter, tenant-mismatch, and
-   duplicate-ID isolation coverage.
-6. Rename generated-package tests to package contract naming.
-7. Update `cap_spec.md` with current executable lifecycle and proof commands.
-8. Run focused package proof, implementation audit, publish-plan, and diff
-   checks.
+2. Contract expansion
+   - Add upstream, consumer, route, policy, quota, canary, deployment, adapter,
+     UI, and theme configuration.
+   - Expand deterministic guardrails to at least 20 route and gateway lifecycle
+     rules.
 
-## Review Checklist
+3. Dependency-light lifecycle service
+   - Extend `ApigService` with consumer, policy, canary, deployment, and
+     retirement records/workflows.
+   - Keep production gateway/service-mesh/edge runtime code behind adapter
+     boundaries.
 
-- Upstream, route, quota review, and audit state is tenant-qualified.
-- Public routes require auth policy.
-- Unsafe methods require threat policy.
-- WebAssembly filters require verified signatures.
-- High quota routes require approved reviews before activation.
-- Tenant mismatches are blocked.
-- API helpers expose the same behavior as service methods.
-- View models expose route, upstream, review, traffic, security, edge, rule,
-  theme, and audit-event state.
-- Production gateway, service mesh, edge runtime, monitoring, and AI systems
-  remain adapter boundaries.
+4. API and UI
+   - Add generated-app helpers for consumer, policy, deployment, traffic shift,
+     and retirement workflows.
+   - Add `view_models.py` and keep `views.py` as a compatibility re-export.
+
+5. Package evidence and tests
+   - Replace static app semantic JSON with contract-derived evidence.
+   - Refresh `semantic_model.json`, `release_report.json`, and
+     `package_manifest.json`.
+   - Expand focused tests for guardrails, lifecycle behavior, UI models, package
+     contract shape, and app evidence.
+
+6. Verification and commit
+   - Run focused compile, APIG package tests, implementation audit, publish
+     plan, stale marker scan, and diff checks.
+   - Commit and push the coherent APIG packet.
+
+## Battery-Conscious Verification
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/apig/__init__.py capabilities/common/apig/capability_contract.py capabilities/common/apig/models.py capabilities/common/apig/gateway_runtime.py capabilities/common/apig/api.py capabilities/common/apig/view_models.py capabilities/common/apig/views.py capabilities/common/apig/app.py capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/apig --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json
+```
+
+Full repository tests, live proxy execution, Kubernetes deployment, service
+mesh behavior, WebAssembly runtime execution, rendered UI, Bytewax flow
+execution, and performance benchmarks are deferred.

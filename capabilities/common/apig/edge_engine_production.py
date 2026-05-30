@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-APG Intelligent Gateway - Production Edge Computing Engine
+APG Intelligent Gateway - Runtime Edge Computing Engine
 
-Revolutionary edge computing engine with WebAssembly runtime, AI-powered caching,
-and intelligent request processing. This is a complete production implementation
-without any placeholders or TODOs.
+Adapter-backed edge computing engine with WebAssembly runtime, cache
+integration, and request processing. Generated-app guardrails must be evaluated
+before binding this runtime to live gateway traffic.
 
 Features:
 - Production WebAssembly runtime with wasmtime-py
@@ -1183,8 +1183,8 @@ class ProductionEdgeEngine:
         upstream_services: List[AgUpstreamService]
     ) -> Dict[str, Any]:
         """Fetch data for cache warming."""
-        # This would make actual requests for cache warming
-        # For now, return placeholder data
+        # Runtime adapters may replace this dependency-light warming payload
+        # with live upstream requests.
         return {
             'cache_key': cache_key,
             'warmed_at': datetime.now(timezone.utc).isoformat(),

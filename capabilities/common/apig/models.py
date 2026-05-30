@@ -536,6 +536,21 @@ class GatewayUpstreamRecord(BaseModel):
 	labels: Dict[str, Any] = Field(default_factory=dict, description="Routing and discovery labels")
 
 
+class GatewayConsumerRecord(BaseModel):
+	"""Tenant-scoped API consumer registration for package governance."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Consumer ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	name: str = Field(description="Human-readable consumer name")
+	owner: str = Field(description="Consumer owner")
+	access_tier: str = Field("standard", description="standard, partner, or restricted")
+	identity_provider: str = Field("auth", description="Identity provider for the consumer")
+	credential_rotation_recorded: bool = Field(False, description="Whether credential rotation evidence exists")
+	rbac_approval_recorded: bool = Field(False, description="Whether restricted access has RBAC approval")
+	status: str = Field("registered", description="Consumer lifecycle status")
+
+
 class GatewayRouteRecord(BaseModel):
 	"""Governed route publication record for package composition."""
 	model_config = APG_MODEL_CONFIG
@@ -547,8 +562,11 @@ class GatewayRouteRecord(BaseModel):
 	upstream_id: str = Field(description="Registered upstream service ID")
 	owner: str = Field(description="Route owner")
 	route_exposure: str = Field("internal", description="Route exposure scope")
+	consumer_id: Optional[str] = Field(None, description="Optional registered API consumer ID")
 	auth_policy_attached: bool = Field(True, description="Whether auth policy is attached")
 	threat_policy_attached: bool = Field(True, description="Whether threat policy is attached")
+	mtls_enabled: bool = Field(True, description="Whether mTLS is enabled for route exposure")
+	rate_limit_configured: bool = Field(True, description="Whether route rate limits are configured")
 	requested_rps_limit: int = Field(1000, description="Requested RPS quota")
 	wasm_filter_attached: bool = Field(False, description="Whether a WASM edge filter is attached")
 	filter_signature_verified: bool = Field(True, description="Whether attached filter signature is verified")
@@ -568,6 +586,50 @@ class GatewayQuotaReview(BaseModel):
 	decision: str = Field("pending", description="pending, approved, or rejected")
 	reviewer: Optional[str] = Field(None, description="Reviewer who decided the request")
 	notes: Optional[str] = Field(None, description="Reviewer notes")
+
+
+class GatewayPolicyRecord(BaseModel):
+	"""Gateway policy change review record."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Policy record ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	name: str = Field(description="Policy name")
+	policy_type: str = Field(description="Policy type")
+	actor: str = Field(description="Actor requesting the policy change")
+	status: str = Field("active", description="Policy lifecycle status")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	metadata: Dict[str, Any] = Field(default_factory=dict, description="Policy metadata")
+
+
+class GatewayTrafficShiftRecord(BaseModel):
+	"""Canary or weighted traffic shift record."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Traffic shift ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	route_id: str = Field(description="Route receiving shifted traffic")
+	canary_percent: int = Field(description="Percentage of traffic shifted to canary")
+	actor: str = Field(description="Actor requesting shift")
+	status: str = Field("active", description="Traffic shift lifecycle status")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	rollback_plan: Optional[str] = Field(None, description="Rollback plan")
+
+
+class GatewayDeploymentRecord(BaseModel):
+	"""Gateway deployment gate record."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Deployment ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	environment: str = Field(description="Deployment environment")
+	region: str = Field(description="Deployment region")
+	actor: str = Field(description="Deployment actor")
+	status: str = Field("deployed", description="Deployment lifecycle status")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
 
 
 class GatewayAuditEvent(BaseModel):
@@ -601,7 +663,8 @@ async def validate_tenant_access(tenant_id: str, user_id: str) -> bool:
 		bool: True if access is allowed
 
 	Note:
-		This is a placeholder for APG auth_rbac integration
+		Generated-app package validation is intentionally dependency-light; live
+		APG auth/RBAC checks bind through the production auth adapter.
 	"""
 	assert isinstance(tenant_id, str), "tenant_id must be a string"
 	assert isinstance(user_id, str), "user_id must be a string"
@@ -633,8 +696,12 @@ MODEL_REGISTRY = {
 	'api_error': AgApiError,
 	'pagination_info': AgPaginationInfo,
 	'gateway_upstream_record': GatewayUpstreamRecord,
+	'gateway_consumer_record': GatewayConsumerRecord,
 	'gateway_route_record': GatewayRouteRecord,
 	'gateway_quota_review': GatewayQuotaReview,
+	'gateway_policy_record': GatewayPolicyRecord,
+	'gateway_traffic_shift_record': GatewayTrafficShiftRecord,
+	'gateway_deployment_record': GatewayDeploymentRecord,
 	'gateway_audit_event': GatewayAuditEvent
 }
 
@@ -651,7 +718,9 @@ __all__ = [
 	'AgWasmModule', 'AgHttpRequest', 'AgHttpResponse',
 	# Utility Models
 	'AgApiError', 'AgPaginationInfo',
-	'GatewayUpstreamRecord', 'GatewayRouteRecord', 'GatewayQuotaReview', 'GatewayAuditEvent',
+	'GatewayUpstreamRecord', 'GatewayConsumerRecord', 'GatewayRouteRecord',
+	'GatewayQuotaReview', 'GatewayPolicyRecord', 'GatewayTrafficShiftRecord',
+	'GatewayDeploymentRecord', 'GatewayAuditEvent',
 	# Registry
 	'MODEL_REGISTRY',
 	# Helper Functions

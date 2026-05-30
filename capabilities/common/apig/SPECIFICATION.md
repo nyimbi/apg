@@ -1,116 +1,111 @@
 # APIG Capability Specification
 
-## Identity
-
-- Capability ID: `apig`
-- Display name: APG Intelligent Gateway
-- Category: `common`
-- Owner: APG Platform Team
-- Runtime shell: `apg_python`
-- Theme: `apig_gateway_console`
-
 ## Purpose
 
-APIG is the tenant-scoped API gateway control plane for APG applications. It
-registers upstream services, governs route publication, enforces auth and threat
-policies, controls signed edge filters, records high-quota reviews, and exposes
-gateway state through API helpers and view models.
+APIG is APG's API gateway and management capability. It gives generated APG
+applications a governed control plane for upstream services, consumers, routes,
+traffic policies, security policies, edge filters, quota reviews, canary traffic
+shifts, deployments, retirement, and audit evidence.
 
-The package must remain usable without a running reverse proxy, service mesh,
-Kubernetes cluster, Redis, WebAssembly runtime, or AI provider. Those systems
-remain adapter boundaries. Local package proof focuses on deterministic
-governance, route lifecycle, tenant isolation, and composition behavior.
+APIG must be useful without booting a reverse proxy, Kubernetes cluster,
+service mesh, WebAssembly runtime, Redis cache, AI provider, or external API
+manager. Those systems remain adapter boundaries. The package-backed lifecycle
+service must still make route publication decisions executable and auditable.
 
-## Users And Outcomes
+## Scope
 
-- Platform teams can register upstream services with owners and health state.
-- API owners can request routes and see why guardrails block publication.
-- Security reviewers can require auth, threat policies, and signed edge
-  filters before traffic is exposed.
-- Operations reviewers can approve high-RPS quotas before activation.
-- Generated APG applications can compose APIG with AUTH, MONI, MQEB, CONF,
-  AUDL, WFLO, NTFY, and AICR without binding to one gateway implementation.
+APIG owns:
 
-## Domain Model
+- tenant-scoped upstream service registration;
+- API consumer registration and credential governance;
+- route request, review, activation, and retirement;
+- auth, threat, mTLS, quota, rate-limit, canary, edge-filter, and observability
+  guardrails;
+- high-quota and canary review decisions;
+- deployment gate records for gateway rollout;
+- generated application API helpers, UI view models, theme tokens, and package
+  evidence.
 
-APIG owns these package-level records:
+APIG integrates with:
 
-- `GatewayUpstreamRecord`: tenant-scoped upstream service registration.
-- `GatewayRouteRecord`: governed route request and activation state.
-- `GatewayQuotaReview`: high-quota approval request for route activation.
-- `GatewayAuditEvent`: tenant-scoped evidence event for gateway lifecycle
-  decisions.
+- `auth`/`auth_rbac` for authentication and authorization;
+- `conf`/registry for service discovery and gateway configuration;
+- `moni` for metrics, traces, access logs, health, and SLOs;
+- `audl`/audit compliance for decision trails;
+- `mqeb` or Bytewax-backed streams for gateway events;
+- `keym` for API keys, certificates, and signing material;
+- `cach` for gateway/cache policy adapters;
+- edge runtime adapters for WebAssembly filters and regional deployments.
 
-All mutable package-level state must be tenant-qualified so duplicate IDs in
-different tenants cannot collide.
+## Functional Requirements
 
-## Lifecycle
+### Upstream Lifecycle
 
-The focused lifecycle is:
+APIG must register upstream services with tenant context, owner, HTTPS base URL
+by default, health status, discovery labels, and audit evidence.
 
-1. Register a tenant-owned upstream service.
-2. Request a route against the registered upstream.
-3. Deny public routes without auth policy.
-4. Deny unsafe methods without threat policy.
-5. Deny unsigned WebAssembly edge filters.
-6. Create a pending quota review for high-RPS routes.
-7. Approve or reject the quota review with reviewer evidence.
-8. Activate only routes that pass guardrails and have required quota approval.
-9. Emit audit evidence for registration, route request, review decision, and
-   activation.
+### Consumer Lifecycle
 
-## Rules And Guardrails
+APIG must register API consumers with owner, identity provider, credential
+rotation evidence, RBAC approval for restricted routes, and audit evidence.
 
-The contract rules are executable guardrails:
+### Route Lifecycle
 
-- `tenant_context_required`: operations require tenant context.
-- `route_requires_registered_service`: routes require registered upstreams.
-- `public_route_requires_auth_policy`: public routes require auth policy.
-- `unsafe_method_requires_threat_policy`: unsafe methods require threat policy.
-- `wasm_filter_requires_signature`: edge filters require signature
-  verification.
-- `high_quota_requires_review`: high-RPS routes require review.
+APIG must request, review, activate, list, and retire routes. Route requests
+must include path, methods, upstream reference, owner, exposure, auth policy,
+threat policy, mTLS evidence, rate-limit evidence, requested quota, optional
+consumer reference, optional WebAssembly filter evidence, lineage/trace
+settings, and rollback plan.
 
-Service methods must enforce these rules and expose the same decisions through
-API helpers and view models.
+### Traffic and Release Lifecycle
 
-## UI And Theme
+APIG must govern high-quota requests, canary traffic shifts, regional edge
+deployments, rollback plans, and route retirement impact reviews.
 
-APIG exposes route and view-model surfaces for:
+### Policy Lifecycle
 
-- dashboard summary;
-- route designer;
-- traffic console;
-- security policy console;
-- upstream services;
-- edge filters;
-- analytics;
-- settings.
+APIG must record policy changes and require review/audit evidence before
+activation for security-sensitive route or traffic policy changes.
 
-The `apig_gateway_console` theme must provide semantic tokens and component
-metadata for route status, traffic policy, topology maps, and edge-filter
-signature traces.
+### UI and Theme
+
+APIG must expose generated UI models for dashboard, routes, upstreams,
+consumers, traffic, security, edge filters, quota reviews, canary releases,
+deployments, analytics, audit, and settings. Theme metadata must include
+components for route status, upstream health, traffic policies, security
+posture, edge filters, quota reviews, canary releases, deployment gates, and
+audit timelines.
+
+## Guardrails
+
+APIG decisions must return `allow`, `deny`, or `require_review`, with matched
+rules and required actions. Guardrails must cover tenant context, upstream
+ownership, HTTPS requirements, upstream health, consumer ownership, credential
+rotation, RBAC approval, route ownership, absolute route paths, registered
+upstreams, HTTP method evidence, public auth, unsafe method threat policy,
+mTLS, rate limits, high quota review, signed edge filters, canary review,
+canary percentage limits, rollback plans, deployment observability, policy
+review, and retirement impact review.
 
 ## Adapter Boundaries
 
-These integrations remain replaceable:
+The dependency-light control plane must not execute live proxy operations.
+Reverse proxies, ingress controllers, service meshes, WAFs, certificate
+managers, external API managers, WebAssembly engines, metrics backends, audit
+sinks, cache stores, Bytewax flows, and AI optimization providers are adapters
+that must honor APIG decisions.
 
-- reverse proxy, service mesh, and ingress controllers;
-- Kubernetes and edge deployment systems;
-- WebAssembly runtimes and filter registries;
-- traffic analytics and metrics backends;
-- audit/SIEM exporters;
-- AI route-optimization providers.
+## Acceptance Criteria
 
-Local package tests must not require those systems.
-
-## Acceptance Gates
-
-Focused APIG proof:
-
-```bash
-./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py
-./.venv/bin/apg capabilities implementation-audit --root capabilities/common/apig --json
-./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json
-git diff --check -- capabilities/common/apig
-```
+- Root `README.md`, `SPECIFICATION.md`, and `PLAN.md` describe current APIG
+  behavior and adapter boundaries.
+- Contract exposes configuration, rules, adapters, UI, theme, and package
+  evidence for upstream, consumer, route, traffic, policy, deployment, and audit
+  workflows.
+- Generated apps can use a dependency-light service for gateway lifecycle
+  workflows without optional production dependencies.
+- Focused tests cover positive and negative guardrail paths.
+- `app.py`, `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` derive from the current contract.
+- Focused compile, tests, implementation audit, publish-plan, stale marker
+  scan, and diff checks pass.

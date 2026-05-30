@@ -1,21 +1,84 @@
 {
   "agents": {},
   "app": {
-    "description": "APG Intelligent Gateway package-backed APG capability",
+    "description": "API Gateway & Management package-backed APG capability",
     "entity_count": 0,
     "name": "apig",
     "version": "1.0.0"
   },
   "capabilities": {
     "apig": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache_store": "cach",
+        "credential_vault": "keym",
+        "edge_runtime": "wasm_runtime",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "gateway_runtime.ApigService",
+        "metrics_sink": "moni",
+        "production_runtime": "service.ProductionAPGIntelligentGatewayService",
+        "reverse_proxy": "adapter",
+        "service_discovery": "conf"
+      },
+      "approvals": {
+        "canary_review": "GatewayTrafficShiftRecord",
+        "deployment_approval": "GatewayDeploymentRecord",
+        "policy_review": "GatewayPolicyRecord",
+        "quota_review": "GatewayQuotaReview",
+        "route_retirement": "GatewayRouteRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache_store": "cach",
+          "credential_vault": "keym",
+          "edge_runtime": "wasm_runtime",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "gateway_runtime.ApigService",
+          "metrics_sink": "moni",
+          "production_runtime": "service.ProductionAPGIntelligentGatewayService",
+          "reverse_proxy": "adapter",
+          "service_discovery": "conf"
+        },
+        "canary": {
+          "canary_release_enabled": true,
+          "max_percent": 50,
+          "max_percent_without_review": 25,
+          "review_threshold_percent": 10
+        },
+        "consumers": {
+          "consumer_registration_required": true,
+          "credential_rotation_required": true,
+          "owner_required": true,
+          "restricted_consumer_review_required": true
+        },
+        "deployments": {
+          "access_logs_required": true,
+          "approval_required_for_production": true,
+          "observability_required": true,
+          "trace_propagation_required": true
+        },
         "edge": {
+          "allowed_regions": [
+            "local",
+            "edge-east",
+            "edge-west",
+            "edge-africa",
+            "edge-eu"
+          ],
           "edge_deployment_enabled": true,
           "filter_signing_required": true,
           "wasm_filters_enabled": true
+        },
+        "governance": {
+          "audit_policy_changes": true,
+          "lineage_capture_required": true,
+          "policy_review_required": true,
+          "retirement_impact_review_required": true
         },
         "observability": {
           "audit_policy_changes": true,
@@ -23,17 +86,29 @@
           "emit_metrics": true,
           "trace_propagation_enabled": true
         },
-        "routing": {
-          "canary_release_enabled": true,
+        "routes": {
+          "absolute_path_required": true,
           "default_strategy": "weighted",
+          "mtls_required_for_external": true,
+          "public_auth_required": true,
           "route_owner_required": true,
-          "service_discovery_required": true
+          "supported_methods": [
+            "GET",
+            "HEAD",
+            "OPTIONS",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "unsafe_method_threat_policy_required": true
         },
         "security": {
           "auth_required_by_default": true,
           "blocked_without_threat_policy": true,
           "m_tls_enabled": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "waf_policy_required_for_public": true
         },
         "tenant_id": "default",
         "theme": {
@@ -43,22 +118,46 @@
         "traffic": {
           "circuit_breaking_enabled": true,
           "default_rps_limit": 1000,
-          "quota_review_threshold": 100000,
-          "rate_limits_enabled": true
+          "max_rps_without_review": 100000,
+          "rate_limits_enabled": true,
+          "rollback_plan_required": true
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_canary_releases": true,
+          "enable_consumer_manager": true,
+          "enable_deployment_gates": true,
           "enable_edge_filters": true,
+          "enable_quota_reviews": true,
           "enable_route_designer": true,
           "enable_security_policies": true,
-          "enable_traffic_console": true
+          "enable_traffic_console": true,
+          "enable_upstream_manager": true
+        },
+        "upstreams": {
+          "health_required": true,
+          "https_required": true,
+          "max_upstreams_per_tenant": 500,
+          "owner_required": true,
+          "service_discovery_required": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "gateway_lifecycle": {
+        "audit": "GatewayAuditEvent",
+        "consumer": "GatewayConsumerRecord",
+        "deployment": "GatewayDeploymentRecord",
+        "policy": "GatewayPolicyRecord",
+        "quota_review": "GatewayQuotaReview",
+        "route": "GatewayRouteRecord",
+        "traffic_shift": "GatewayTrafficShiftRecord",
+        "upstream": "GatewayUpstreamRecord"
+      },
       "i18n": {},
       "master_data": {},
-      "name": "APG Intelligent Gateway",
+      "name": "API Gateway & Management",
       "provides": [
         "apig_operations"
       ],
@@ -79,6 +178,111 @@
           },
           {
             "condition": {
+              "operation": "register_upstream",
+              "upstream_owner_assigned": false
+            },
+            "description": "Upstream services require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "upstream_owner_required",
+              "required_action": "assign_upstream_owner"
+            },
+            "name": "upstream_requires_owner"
+          },
+          {
+            "condition": {
+              "https_enabled": false,
+              "operation": "register_upstream"
+            },
+            "description": "Upstream services require HTTPS by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "https_upstream_required",
+              "required_action": "use_https_upstream"
+            },
+            "name": "upstream_requires_https"
+          },
+          {
+            "condition": {
+              "health_check_configured": false,
+              "operation": "register_upstream"
+            },
+            "description": "Upstreams require health status evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "upstream_health_required",
+              "required_action": "configure_upstream_health"
+            },
+            "name": "upstream_requires_health_check"
+          },
+          {
+            "condition": {
+              "consumer_owner_assigned": false,
+              "operation": "register_consumer"
+            },
+            "description": "API consumers require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_owner_required",
+              "required_action": "assign_consumer_owner"
+            },
+            "name": "consumer_requires_owner"
+          },
+          {
+            "condition": {
+              "credential_rotation_recorded": false,
+              "operation": "register_consumer"
+            },
+            "description": "API consumers require credential rotation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "credential_rotation_required",
+              "required_action": "record_credential_rotation"
+            },
+            "name": "consumer_requires_credential_rotation"
+          },
+          {
+            "condition": {
+              "access_tier": "restricted",
+              "operation": "register_consumer",
+              "rbac_approval_recorded": false
+            },
+            "description": "Restricted consumers require RBAC approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consumer_rbac_approval_required",
+              "required_action": "record_consumer_rbac_approval"
+            },
+            "name": "restricted_consumer_requires_rbac"
+          },
+          {
+            "condition": {
+              "operation": "create_route",
+              "route_owner_assigned": false
+            },
+            "description": "Routes require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "route_owner_required",
+              "required_action": "assign_route_owner"
+            },
+            "name": "route_requires_owner"
+          },
+          {
+            "condition": {
+              "absolute_path": false,
+              "operation": "create_route"
+            },
+            "description": "Route paths must start with a slash.",
+            "effect": {
+              "decision": "deny",
+              "reason": "absolute_route_path_required",
+              "required_action": "use_absolute_route_path"
+            },
+            "name": "route_path_must_be_absolute"
+          },
+          {
+            "condition": {
               "operation": "create_route",
               "service_registered": false
             },
@@ -92,7 +296,21 @@
           },
           {
             "condition": {
+              "methods_present": false,
+              "operation": "create_route"
+            },
+            "description": "Routes require at least one HTTP method.",
+            "effect": {
+              "decision": "deny",
+              "reason": "route_methods_required",
+              "required_action": "declare_route_methods"
+            },
+            "name": "route_requires_methods"
+          },
+          {
+            "condition": {
               "auth_policy_attached": false,
+              "operation": "create_route",
               "route_exposure": "public"
             },
             "description": "Public routes require an explicit auth policy.",
@@ -105,6 +323,21 @@
           },
           {
             "condition": {
+              "mtls_enabled": false,
+              "operation": "create_route",
+              "route_exposure": "external"
+            },
+            "description": "External routes require mTLS evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mtls_required",
+              "required_action": "enable_mtls"
+            },
+            "name": "external_route_requires_mtls"
+          },
+          {
+            "condition": {
+              "operation": "create_route",
               "threat_policy_attached": false,
               "unsafe_http_method_enabled": true
             },
@@ -118,7 +351,21 @@
           },
           {
             "condition": {
+              "operation": "create_route",
+              "rate_limit_configured": false
+            },
+            "description": "Routes require rate-limit policy evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rate_limit_required",
+              "required_action": "configure_rate_limit"
+            },
+            "name": "route_requires_rate_limit"
+          },
+          {
+            "condition": {
               "filter_signature_verified": false,
+              "operation": "create_route",
               "wasm_filter_attached": true
             },
             "description": "WASM edge filters require signature verification.",
@@ -131,6 +378,7 @@
           },
           {
             "condition": {
+              "operation": "create_route",
               "quota_review_recorded": false,
               "requested_rps_limit_gt": 100000
             },
@@ -141,6 +389,112 @@
               "required_action": "record_quota_review"
             },
             "name": "high_quota_requires_review"
+          },
+          {
+            "condition": {
+              "canary_percent_gt": 10,
+              "canary_review_recorded": false,
+              "operation": "shift_traffic"
+            },
+            "description": "Canary traffic shifts above threshold require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "canary_review_required",
+              "required_action": "record_canary_review"
+            },
+            "name": "canary_requires_review"
+          },
+          {
+            "condition": {
+              "canary_percent_gt": 50,
+              "operation": "shift_traffic"
+            },
+            "description": "Canary traffic shifts cannot exceed the configured limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "canary_percent_limit_exceeded",
+              "required_action": "reduce_canary_percent"
+            },
+            "name": "canary_percent_limit_enforced"
+          },
+          {
+            "condition": {
+              "operation": "shift_traffic",
+              "rollback_plan_recorded": false
+            },
+            "description": "Traffic shifts require a rollback plan.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_plan_required",
+              "required_action": "record_rollback_plan"
+            },
+            "name": "traffic_shift_requires_rollback_plan"
+          },
+          {
+            "condition": {
+              "allowed_region": false,
+              "operation": "deploy_gateway"
+            },
+            "description": "Edge deployments require an allowed target region.",
+            "effect": {
+              "decision": "deny",
+              "reason": "allowed_region_required",
+              "required_action": "choose_allowed_region"
+            },
+            "name": "deployment_requires_region"
+          },
+          {
+            "condition": {
+              "observability_configured": false,
+              "operation": "deploy_gateway"
+            },
+            "description": "Gateway deployments require metrics, logs, and tracing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "observability_required",
+              "required_action": "configure_gateway_observability"
+            },
+            "name": "deployment_requires_observability"
+          },
+          {
+            "condition": {
+              "deployment_approval_recorded": false,
+              "environment": "production",
+              "operation": "deploy_gateway"
+            },
+            "description": "Production deployments require approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "deployment_approval_required",
+              "required_action": "record_deployment_approval"
+            },
+            "name": "production_deployment_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "change_policy",
+              "policy_review_recorded": false
+            },
+            "description": "Gateway policy changes require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "policy_review_required",
+              "required_action": "record_policy_review"
+            },
+            "name": "policy_change_requires_review"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_route"
+            },
+            "description": "Retiring a route requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_review_required",
+              "required_action": "record_route_impact_review"
+            },
+            "name": "route_retirement_requires_impact_review"
           }
         ],
         "type": "deterministic"
@@ -160,6 +514,111 @@
         },
         {
           "condition": {
+            "operation": "register_upstream",
+            "upstream_owner_assigned": false
+          },
+          "description": "Upstream services require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "upstream_owner_required",
+            "required_action": "assign_upstream_owner"
+          },
+          "name": "upstream_requires_owner"
+        },
+        {
+          "condition": {
+            "https_enabled": false,
+            "operation": "register_upstream"
+          },
+          "description": "Upstream services require HTTPS by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "https_upstream_required",
+            "required_action": "use_https_upstream"
+          },
+          "name": "upstream_requires_https"
+        },
+        {
+          "condition": {
+            "health_check_configured": false,
+            "operation": "register_upstream"
+          },
+          "description": "Upstreams require health status evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "upstream_health_required",
+            "required_action": "configure_upstream_health"
+          },
+          "name": "upstream_requires_health_check"
+        },
+        {
+          "condition": {
+            "consumer_owner_assigned": false,
+            "operation": "register_consumer"
+          },
+          "description": "API consumers require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_owner_required",
+            "required_action": "assign_consumer_owner"
+          },
+          "name": "consumer_requires_owner"
+        },
+        {
+          "condition": {
+            "credential_rotation_recorded": false,
+            "operation": "register_consumer"
+          },
+          "description": "API consumers require credential rotation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "credential_rotation_required",
+            "required_action": "record_credential_rotation"
+          },
+          "name": "consumer_requires_credential_rotation"
+        },
+        {
+          "condition": {
+            "access_tier": "restricted",
+            "operation": "register_consumer",
+            "rbac_approval_recorded": false
+          },
+          "description": "Restricted consumers require RBAC approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consumer_rbac_approval_required",
+            "required_action": "record_consumer_rbac_approval"
+          },
+          "name": "restricted_consumer_requires_rbac"
+        },
+        {
+          "condition": {
+            "operation": "create_route",
+            "route_owner_assigned": false
+          },
+          "description": "Routes require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "route_owner_required",
+            "required_action": "assign_route_owner"
+          },
+          "name": "route_requires_owner"
+        },
+        {
+          "condition": {
+            "absolute_path": false,
+            "operation": "create_route"
+          },
+          "description": "Route paths must start with a slash.",
+          "effect": {
+            "decision": "deny",
+            "reason": "absolute_route_path_required",
+            "required_action": "use_absolute_route_path"
+          },
+          "name": "route_path_must_be_absolute"
+        },
+        {
+          "condition": {
             "operation": "create_route",
             "service_registered": false
           },
@@ -173,7 +632,21 @@
         },
         {
           "condition": {
+            "methods_present": false,
+            "operation": "create_route"
+          },
+          "description": "Routes require at least one HTTP method.",
+          "effect": {
+            "decision": "deny",
+            "reason": "route_methods_required",
+            "required_action": "declare_route_methods"
+          },
+          "name": "route_requires_methods"
+        },
+        {
+          "condition": {
             "auth_policy_attached": false,
+            "operation": "create_route",
             "route_exposure": "public"
           },
           "description": "Public routes require an explicit auth policy.",
@@ -186,6 +659,21 @@
         },
         {
           "condition": {
+            "mtls_enabled": false,
+            "operation": "create_route",
+            "route_exposure": "external"
+          },
+          "description": "External routes require mTLS evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mtls_required",
+            "required_action": "enable_mtls"
+          },
+          "name": "external_route_requires_mtls"
+        },
+        {
+          "condition": {
+            "operation": "create_route",
             "threat_policy_attached": false,
             "unsafe_http_method_enabled": true
           },
@@ -199,7 +687,21 @@
         },
         {
           "condition": {
+            "operation": "create_route",
+            "rate_limit_configured": false
+          },
+          "description": "Routes require rate-limit policy evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rate_limit_required",
+            "required_action": "configure_rate_limit"
+          },
+          "name": "route_requires_rate_limit"
+        },
+        {
+          "condition": {
             "filter_signature_verified": false,
+            "operation": "create_route",
             "wasm_filter_attached": true
           },
           "description": "WASM edge filters require signature verification.",
@@ -212,6 +714,7 @@
         },
         {
           "condition": {
+            "operation": "create_route",
             "quota_review_recorded": false,
             "requested_rps_limit_gt": 100000
           },
@@ -222,13 +725,119 @@
             "required_action": "record_quota_review"
           },
           "name": "high_quota_requires_review"
+        },
+        {
+          "condition": {
+            "canary_percent_gt": 10,
+            "canary_review_recorded": false,
+            "operation": "shift_traffic"
+          },
+          "description": "Canary traffic shifts above threshold require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "canary_review_required",
+            "required_action": "record_canary_review"
+          },
+          "name": "canary_requires_review"
+        },
+        {
+          "condition": {
+            "canary_percent_gt": 50,
+            "operation": "shift_traffic"
+          },
+          "description": "Canary traffic shifts cannot exceed the configured limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "canary_percent_limit_exceeded",
+            "required_action": "reduce_canary_percent"
+          },
+          "name": "canary_percent_limit_enforced"
+        },
+        {
+          "condition": {
+            "operation": "shift_traffic",
+            "rollback_plan_recorded": false
+          },
+          "description": "Traffic shifts require a rollback plan.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_plan_required",
+            "required_action": "record_rollback_plan"
+          },
+          "name": "traffic_shift_requires_rollback_plan"
+        },
+        {
+          "condition": {
+            "allowed_region": false,
+            "operation": "deploy_gateway"
+          },
+          "description": "Edge deployments require an allowed target region.",
+          "effect": {
+            "decision": "deny",
+            "reason": "allowed_region_required",
+            "required_action": "choose_allowed_region"
+          },
+          "name": "deployment_requires_region"
+        },
+        {
+          "condition": {
+            "observability_configured": false,
+            "operation": "deploy_gateway"
+          },
+          "description": "Gateway deployments require metrics, logs, and tracing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "observability_required",
+            "required_action": "configure_gateway_observability"
+          },
+          "name": "deployment_requires_observability"
+        },
+        {
+          "condition": {
+            "deployment_approval_recorded": false,
+            "environment": "production",
+            "operation": "deploy_gateway"
+          },
+          "description": "Production deployments require approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "deployment_approval_required",
+            "required_action": "record_deployment_approval"
+          },
+          "name": "production_deployment_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "change_policy",
+            "policy_review_recorded": false
+          },
+          "description": "Gateway policy changes require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "policy_review_required",
+            "required_action": "record_policy_review"
+          },
+          "name": "policy_change_requires_review"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_route"
+          },
+          "description": "Retiring a route requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_review_required",
+            "required_action": "record_route_impact_review"
+          },
+          "name": "route_retirement_requires_impact_review"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
-        "views": "views.py"
+        "service": "gateway_runtime.py",
+        "views": "view_models.py"
       },
       "screens": {
         "analytics": {
@@ -236,15 +845,40 @@
           "permission": "apig:view_metrics",
           "route": "/apig/analytics"
         },
+        "audit": {
+          "component": "GatewayAuditTimeline",
+          "permission": "apig:view_metrics",
+          "route": "/apig/audit"
+        },
+        "canary": {
+          "component": "CanaryReleaseConsole",
+          "permission": "apig:manage_traffic",
+          "route": "/apig/canary"
+        },
+        "consumers": {
+          "component": "APIConsumers",
+          "permission": "apig:manage_security",
+          "route": "/apig/consumers"
+        },
         "dashboard": {
           "component": "APIGDashboard",
           "permission": "apig:view",
           "route": "/apig/dashboard"
         },
+        "deployments": {
+          "component": "GatewayDeployments",
+          "permission": "apig:admin",
+          "route": "/apig/deployments"
+        },
         "edge": {
           "component": "EdgeFilterManager",
           "permission": "apig:manage_edge",
           "route": "/apig/edge"
+        },
+        "quota_reviews": {
+          "component": "QuotaReviewQueue",
+          "permission": "apig:manage_traffic",
+          "route": "/apig/quota-reviews"
         },
         "routes": {
           "component": "RouteDesigner",
@@ -272,21 +906,51 @@
           "route": "/apig/upstreams"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "decision-pill",
+            "visual": "event-timeline"
+          },
+          "canary_release_panel": {
+            "status_indicator": "canary-pill",
+            "visual": "traffic-split"
+          },
+          "consumer_access_panel": {
+            "status_style": "rotation-chip",
+            "visual": "credential-table"
+          },
+          "deployment_gate_panel": {
+            "status_indicator": "gate-pill",
+            "visual": "environment-lane"
+          },
           "gateway_topology_map": {
             "edge_style": "weighted-route-line",
             "visual": "edge-route-graph"
+          },
+          "quota_review_queue": {
+            "highlight": "quota-chip",
+            "visual": "review-list"
           },
           "route_status_card": {
             "icon": "route",
             "risk_style": "latency-band",
             "status_indicator": "traffic-pill"
           },
+          "security_policy_matrix": {
+            "status_indicator": "control-chip",
+            "visual": "policy-grid"
+          },
           "traffic_policy_panel": {
             "highlight": "limit-chip",
             "visual": "rule-stack"
+          },
+          "upstream_health_panel": {
+            "status_indicator": "health-pill",
+            "visual": "service-list"
           },
           "wasm_filter_trace": {
             "status_style": "signature-pill",
@@ -327,6 +991,20 @@
             "permission": "apig:manage_routes"
           },
           {
+            "component": "UpstreamServices",
+            "name": "upstreams",
+            "nav_group": "Gateway",
+            "path": "/apig/upstreams",
+            "permission": "apig:manage_routes"
+          },
+          {
+            "component": "APIConsumers",
+            "name": "consumers",
+            "nav_group": "Security",
+            "path": "/apig/consumers",
+            "permission": "apig:manage_security"
+          },
+          {
             "component": "TrafficConsole",
             "name": "traffic",
             "nav_group": "Gateway",
@@ -341,13 +1019,6 @@
             "permission": "apig:manage_security"
           },
           {
-            "component": "UpstreamServices",
-            "name": "upstreams",
-            "nav_group": "Gateway",
-            "path": "/apig/upstreams",
-            "permission": "apig:manage_routes"
-          },
-          {
             "component": "EdgeFilterManager",
             "name": "edge",
             "nav_group": "Edge",
@@ -355,10 +1026,38 @@
             "permission": "apig:manage_edge"
           },
           {
+            "component": "QuotaReviewQueue",
+            "name": "quota_reviews",
+            "nav_group": "Governance",
+            "path": "/apig/quota-reviews",
+            "permission": "apig:manage_traffic"
+          },
+          {
+            "component": "CanaryReleaseConsole",
+            "name": "canary",
+            "nav_group": "Gateway",
+            "path": "/apig/canary",
+            "permission": "apig:manage_traffic"
+          },
+          {
+            "component": "GatewayDeployments",
+            "name": "deployments",
+            "nav_group": "Operations",
+            "path": "/apig/deployments",
+            "permission": "apig:admin"
+          },
+          {
             "component": "GatewayAnalytics",
             "name": "analytics",
             "nav_group": "Operations",
             "path": "/apig/analytics",
+            "permission": "apig:view_metrics"
+          },
+          {
+            "component": "GatewayAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/apig/audit",
             "permission": "apig:view_metrics"
           },
           {
@@ -374,7 +1073,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "control_plane.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -388,10 +1087,54 @@
   "contracts": {
     "apig": {
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache_store": "cach",
+          "credential_vault": "keym",
+          "edge_runtime": "wasm_runtime",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "gateway_runtime.ApigService",
+          "metrics_sink": "moni",
+          "production_runtime": "service.ProductionAPGIntelligentGatewayService",
+          "reverse_proxy": "adapter",
+          "service_discovery": "conf"
+        },
+        "canary": {
+          "canary_release_enabled": true,
+          "max_percent": 50,
+          "max_percent_without_review": 25,
+          "review_threshold_percent": 10
+        },
+        "consumers": {
+          "consumer_registration_required": true,
+          "credential_rotation_required": true,
+          "owner_required": true,
+          "restricted_consumer_review_required": true
+        },
+        "deployments": {
+          "access_logs_required": true,
+          "approval_required_for_production": true,
+          "observability_required": true,
+          "trace_propagation_required": true
+        },
         "edge": {
+          "allowed_regions": [
+            "local",
+            "edge-east",
+            "edge-west",
+            "edge-africa",
+            "edge-eu"
+          ],
           "edge_deployment_enabled": true,
           "filter_signing_required": true,
           "wasm_filters_enabled": true
+        },
+        "governance": {
+          "audit_policy_changes": true,
+          "lineage_capture_required": true,
+          "policy_review_required": true,
+          "retirement_impact_review_required": true
         },
         "observability": {
           "audit_policy_changes": true,
@@ -399,17 +1142,29 @@
           "emit_metrics": true,
           "trace_propagation_enabled": true
         },
-        "routing": {
-          "canary_release_enabled": true,
+        "routes": {
+          "absolute_path_required": true,
           "default_strategy": "weighted",
+          "mtls_required_for_external": true,
+          "public_auth_required": true,
           "route_owner_required": true,
-          "service_discovery_required": true
+          "supported_methods": [
+            "GET",
+            "HEAD",
+            "OPTIONS",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "unsafe_method_threat_policy_required": true
         },
         "security": {
           "auth_required_by_default": true,
           "blocked_without_threat_policy": true,
           "m_tls_enabled": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "waf_policy_required_for_public": true
         },
         "tenant_id": "default",
         "theme": {
@@ -419,14 +1174,28 @@
         "traffic": {
           "circuit_breaking_enabled": true,
           "default_rps_limit": 1000,
-          "quota_review_threshold": 100000,
-          "rate_limits_enabled": true
+          "max_rps_without_review": 100000,
+          "rate_limits_enabled": true,
+          "rollback_plan_required": true
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_canary_releases": true,
+          "enable_consumer_manager": true,
+          "enable_deployment_gates": true,
           "enable_edge_filters": true,
+          "enable_quota_reviews": true,
           "enable_route_designer": true,
           "enable_security_policies": true,
-          "enable_traffic_console": true
+          "enable_traffic_console": true,
+          "enable_upstream_manager": true
+        },
+        "upstreams": {
+          "health_required": true,
+          "https_required": true,
+          "max_upstreams_per_tenant": 500,
+          "owner_required": true,
+          "service_discovery_required": true
         }
       },
       "id": "apig",
@@ -466,8 +1235,102 @@
   },
   "roles": {},
   "rules": {
+    "canary_percent_limit_enforced": {
+      "condition": {
+        "canary_percent_gt": 50,
+        "operation": "shift_traffic"
+      },
+      "description": "Canary traffic shifts cannot exceed the configured limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "canary_percent_limit_exceeded",
+        "required_action": "reduce_canary_percent"
+      },
+      "name": "canary_percent_limit_enforced"
+    },
+    "canary_requires_review": {
+      "condition": {
+        "canary_percent_gt": 10,
+        "canary_review_recorded": false,
+        "operation": "shift_traffic"
+      },
+      "description": "Canary traffic shifts above threshold require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "canary_review_required",
+        "required_action": "record_canary_review"
+      },
+      "name": "canary_requires_review"
+    },
+    "consumer_requires_credential_rotation": {
+      "condition": {
+        "credential_rotation_recorded": false,
+        "operation": "register_consumer"
+      },
+      "description": "API consumers require credential rotation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "credential_rotation_required",
+        "required_action": "record_credential_rotation"
+      },
+      "name": "consumer_requires_credential_rotation"
+    },
+    "consumer_requires_owner": {
+      "condition": {
+        "consumer_owner_assigned": false,
+        "operation": "register_consumer"
+      },
+      "description": "API consumers require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "consumer_owner_required",
+        "required_action": "assign_consumer_owner"
+      },
+      "name": "consumer_requires_owner"
+    },
+    "deployment_requires_observability": {
+      "condition": {
+        "observability_configured": false,
+        "operation": "deploy_gateway"
+      },
+      "description": "Gateway deployments require metrics, logs, and tracing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "observability_required",
+        "required_action": "configure_gateway_observability"
+      },
+      "name": "deployment_requires_observability"
+    },
+    "deployment_requires_region": {
+      "condition": {
+        "allowed_region": false,
+        "operation": "deploy_gateway"
+      },
+      "description": "Edge deployments require an allowed target region.",
+      "effect": {
+        "decision": "deny",
+        "reason": "allowed_region_required",
+        "required_action": "choose_allowed_region"
+      },
+      "name": "deployment_requires_region"
+    },
+    "external_route_requires_mtls": {
+      "condition": {
+        "mtls_enabled": false,
+        "operation": "create_route",
+        "route_exposure": "external"
+      },
+      "description": "External routes require mTLS evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mtls_required",
+        "required_action": "enable_mtls"
+      },
+      "name": "external_route_requires_mtls"
+    },
     "high_quota_requires_review": {
       "condition": {
+        "operation": "create_route",
         "quota_review_recorded": false,
         "requested_rps_limit_gt": 100000
       },
@@ -479,9 +1342,37 @@
       },
       "name": "high_quota_requires_review"
     },
+    "policy_change_requires_review": {
+      "condition": {
+        "operation": "change_policy",
+        "policy_review_recorded": false
+      },
+      "description": "Gateway policy changes require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "policy_review_required",
+        "required_action": "record_policy_review"
+      },
+      "name": "policy_change_requires_review"
+    },
+    "production_deployment_requires_approval": {
+      "condition": {
+        "deployment_approval_recorded": false,
+        "environment": "production",
+        "operation": "deploy_gateway"
+      },
+      "description": "Production deployments require approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "deployment_approval_required",
+        "required_action": "record_deployment_approval"
+      },
+      "name": "production_deployment_requires_approval"
+    },
     "public_route_requires_auth_policy": {
       "condition": {
         "auth_policy_attached": false,
+        "operation": "create_route",
         "route_exposure": "public"
       },
       "description": "Public routes require an explicit auth policy.",
@@ -491,6 +1382,72 @@
         "required_action": "attach_auth_policy"
       },
       "name": "public_route_requires_auth_policy"
+    },
+    "restricted_consumer_requires_rbac": {
+      "condition": {
+        "access_tier": "restricted",
+        "operation": "register_consumer",
+        "rbac_approval_recorded": false
+      },
+      "description": "Restricted consumers require RBAC approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "consumer_rbac_approval_required",
+        "required_action": "record_consumer_rbac_approval"
+      },
+      "name": "restricted_consumer_requires_rbac"
+    },
+    "route_path_must_be_absolute": {
+      "condition": {
+        "absolute_path": false,
+        "operation": "create_route"
+      },
+      "description": "Route paths must start with a slash.",
+      "effect": {
+        "decision": "deny",
+        "reason": "absolute_route_path_required",
+        "required_action": "use_absolute_route_path"
+      },
+      "name": "route_path_must_be_absolute"
+    },
+    "route_requires_methods": {
+      "condition": {
+        "methods_present": false,
+        "operation": "create_route"
+      },
+      "description": "Routes require at least one HTTP method.",
+      "effect": {
+        "decision": "deny",
+        "reason": "route_methods_required",
+        "required_action": "declare_route_methods"
+      },
+      "name": "route_requires_methods"
+    },
+    "route_requires_owner": {
+      "condition": {
+        "operation": "create_route",
+        "route_owner_assigned": false
+      },
+      "description": "Routes require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "route_owner_required",
+        "required_action": "assign_route_owner"
+      },
+      "name": "route_requires_owner"
+    },
+    "route_requires_rate_limit": {
+      "condition": {
+        "operation": "create_route",
+        "rate_limit_configured": false
+      },
+      "description": "Routes require rate-limit policy evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rate_limit_required",
+        "required_action": "configure_rate_limit"
+      },
+      "name": "route_requires_rate_limit"
     },
     "route_requires_registered_service": {
       "condition": {
@@ -505,6 +1462,19 @@
       },
       "name": "route_requires_registered_service"
     },
+    "route_retirement_requires_impact_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_route"
+      },
+      "description": "Retiring a route requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "impact_review_required",
+        "required_action": "record_route_impact_review"
+      },
+      "name": "route_retirement_requires_impact_review"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -517,8 +1487,22 @@
       },
       "name": "tenant_context_required"
     },
+    "traffic_shift_requires_rollback_plan": {
+      "condition": {
+        "operation": "shift_traffic",
+        "rollback_plan_recorded": false
+      },
+      "description": "Traffic shifts require a rollback plan.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_plan_required",
+        "required_action": "record_rollback_plan"
+      },
+      "name": "traffic_shift_requires_rollback_plan"
+    },
     "unsafe_method_requires_threat_policy": {
       "condition": {
+        "operation": "create_route",
         "threat_policy_attached": false,
         "unsafe_http_method_enabled": true
       },
@@ -530,9 +1514,49 @@
       },
       "name": "unsafe_method_requires_threat_policy"
     },
+    "upstream_requires_health_check": {
+      "condition": {
+        "health_check_configured": false,
+        "operation": "register_upstream"
+      },
+      "description": "Upstreams require health status evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "upstream_health_required",
+        "required_action": "configure_upstream_health"
+      },
+      "name": "upstream_requires_health_check"
+    },
+    "upstream_requires_https": {
+      "condition": {
+        "https_enabled": false,
+        "operation": "register_upstream"
+      },
+      "description": "Upstream services require HTTPS by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "https_upstream_required",
+        "required_action": "use_https_upstream"
+      },
+      "name": "upstream_requires_https"
+    },
+    "upstream_requires_owner": {
+      "condition": {
+        "operation": "register_upstream",
+        "upstream_owner_assigned": false
+      },
+      "description": "Upstream services require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "upstream_owner_required",
+        "required_action": "assign_upstream_owner"
+      },
+      "name": "upstream_requires_owner"
+    },
     "wasm_filter_requires_signature": {
       "condition": {
         "filter_signature_verified": false,
+        "operation": "create_route",
         "wasm_filter_attached": true
       },
       "description": "WASM edge filters require signature verification.",
@@ -553,7 +1577,7 @@
       "file": "capability_contract.py",
       "id": "capability.apig",
       "kind": "capability",
-      "name": "APG Intelligent Gateway",
+      "name": "API Gateway & Management",
       "range": {
         "end": {
           "character": 1,

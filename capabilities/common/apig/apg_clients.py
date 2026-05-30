@@ -2,9 +2,9 @@
 """
 APG Platform Service Clients
 
-Production-grade client implementations for all APG platform services.
-This module provides fully functional, non-placeholder clients that integrate
-with the APG platform capabilities.
+Adapter-backed client implementations for APG platform services.
+Generated applications should use dependency-light APIG package contracts until
+these clients are bound and verified in a runtime deployment.
 
 Author: APG Platform Team
 Copyright: © 2025 Datacraft

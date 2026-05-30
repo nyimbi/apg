@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-APG Intelligent Gateway - Production Service Layer
+APG Intelligent Gateway - Runtime Service Layer
 
-Complete production-grade service implementation with full APG platform integration.
-This replaces all placeholder implementations with real, functional code using the
-production APG clients, WASM runtime, and AI capabilities.
+Adapter-backed service implementation for APG platform integration. Generated
+applications should use gateway_runtime.ApigService for dependency-light
+guardrail decisions before binding runtime adapters.
 
 Author: APG Platform Team
 Copyright: © 2025 Datacraft
@@ -74,11 +74,10 @@ class ServiceMetrics:
 
 class ProductionAPGIntelligentGatewayService:
     """
-    Production-grade APG Intelligent Gateway Service.
-    
-    Complete implementation with real APG platform integrations, WebAssembly runtime,
-    AI-powered features, and comprehensive observability. No placeholders or mock
-    implementations - fully production-ready code.
+    Adapter-backed APG Intelligent Gateway Service.
+
+    This class coordinates APG service clients, WebAssembly runtime surfaces,
+    optional AI features, and observability adapters for runtime deployments.
     
     Features:
     - Real APG platform service integrations

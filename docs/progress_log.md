@@ -16,6 +16,73 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 06:48 EAT
+
+APIG API gateway and management lifecycle/guardrail packet:
+
+- Added root `README.md` and replaced `SPECIFICATION.md`, `PLAN.md`, and
+  `cap_spec.md` with current executable scope, adapter boundaries, lifecycle
+  workflows, UI surfaces, and focused proof commands.
+- Expanded `capability_contract.py` with upstream, consumer, route, traffic,
+  security, edge, canary, deployment, governance, observability, adapter, UI,
+  and theme configuration.
+- Expanded deterministic guardrails to cover tenant context, upstream owner,
+  HTTPS, health evidence, consumer owner, credential rotation, restricted
+  consumer RBAC, route owner, absolute paths, registered upstreams, HTTP
+  methods, public auth, external mTLS, unsafe method threat policy, route rate
+  limits, signed edge filters, high quota review, canary review, canary limits,
+  rollback plans, deployment region, observability, production approval, policy
+  review, and route retirement impact review.
+- Extended dependency-light `ApigService` workflows for consumers, policy
+  changes, canary/traffic shifts, gateway deployments, route retirement, and
+  richer record listing while preserving the existing production runtime as an
+  adapter-backed surface.
+- Added generated-application `view_models.py` and kept `views.py` as a
+  compatibility re-export for dashboard, route, upstream, consumer, traffic,
+  security, edge, quota, canary, deployment, analytics, audit, and settings
+  surfaces.
+- Replaced static `app.py` semantic JSON with contract-derived package evidence
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded APIG tests for route, consumer, policy, canary, deployment,
+  retirement, API helper, UI model, package contract, and app evidence paths.
+- Focused review cleanup: removed old APIG market/production overclaims from
+  primary package docs and runtime-adjacent module docstrings, replacing them
+  with adapter-boundary language.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/apig/__init__.py
+  capabilities/common/apig/capability_contract.py capabilities/common/apig/models.py
+  capabilities/common/apig/gateway_runtime.py capabilities/common/apig/api.py
+  capabilities/common/apig/view_models.py capabilities/common/apig/views.py
+  capabilities/common/apig/app.py capabilities/common/apig/apg_clients.py
+  capabilities/common/apig/control_plane.py capabilities/common/apig/edge_engine.py
+  capabilities/common/apig/edge_engine_production.py capabilities/common/apig/service.py
+  capabilities/common/apig/service_production.py capabilities/common/apig/traffic_manager.py
+  capabilities/common/apig/wasm_runtime.py capabilities/common/apig/test_capability_contract.py
+  capabilities/common/apig/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py
+  capabilities/common/apig/tests/test_package_contract.py` passed with 11 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/apig --json` passed with APIG classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- `./.venv/bin/python -c "from capabilities.common.apig.gateway_runtime import
+  ApigService; print(ApigService().gateway_summary('default')['route_count'])"`
+  passed and printed `0`; optional OpenTelemetry warning is expected when the
+  production observability adapter is not installed.
+- Primary APIG stale-marker search outside archived `works/`, legacy tests, and
+  deployment packaging returned no matches for old market/production overclaims.
+- `git diff --check -- capabilities/common/apig docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live reverse proxy/service mesh,
+  Kubernetes deployment, WebAssembly runtime execution, live APG auth/config/
+  key/metrics/audit/cache/event adapters, rendered dashboard/browser behavior,
+  Bytewax runtime flows, and performance/resilience benchmarks.
+
 ### 2026-05-30 06:22 EAT
 
 DVRL data virtualization lifecycle/guardrail packet:

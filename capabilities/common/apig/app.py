@@ -1,17 +1,147 @@
-"""Publishable APG capability package entrypoint for APG Intelligent Gateway."""
+"""Publishable APG capability package entrypoint for API Gateway & Management."""
 
 from __future__ import annotations
 
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "APG Intelligent Gateway package-backed APG capability", "entity_count": 0, "name": "apig", "version": "1.0.0"}, "capabilities": {"apig": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"edge": {"edge_deployment_enabled": true, "filter_signing_required": true, "wasm_filters_enabled": true}, "observability": {"audit_policy_changes": true, "emit_access_logs": true, "emit_metrics": true, "trace_propagation_enabled": true}, "routing": {"canary_release_enabled": true, "default_strategy": "weighted", "route_owner_required": true, "service_discovery_required": true}, "security": {"auth_required_by_default": true, "blocked_without_threat_policy": true, "m_tls_enabled": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "apig_gateway_console"}, "traffic": {"circuit_breaking_enabled": true, "default_rps_limit": 1000, "quota_review_threshold": 100000, "rate_limits_enabled": true}, "ui": {"enable_edge_filters": true, "enable_route_designer": true, "enable_security_policies": true, "enable_traffic_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "APG Intelligent Gateway", "provides": ["apig_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All gateway operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_route", "service_registered": false}, "description": "Routes require a registered upstream service.", "effect": {"decision": "deny", "reason": "registered_service_required", "required_action": "register_upstream_service"}, "name": "route_requires_registered_service"}, {"condition": {"auth_policy_attached": false, "route_exposure": "public"}, "description": "Public routes require an explicit auth policy.", "effect": {"decision": "deny", "reason": "auth_policy_required", "required_action": "attach_auth_policy"}, "name": "public_route_requires_auth_policy"}, {"condition": {"threat_policy_attached": false, "unsafe_http_method_enabled": true}, "description": "Unsafe methods require a threat policy.", "effect": {"decision": "deny", "reason": "threat_policy_required", "required_action": "attach_threat_policy"}, "name": "unsafe_method_requires_threat_policy"}, {"condition": {"filter_signature_verified": false, "wasm_filter_attached": true}, "description": "WASM edge filters require signature verification.", "effect": {"decision": "deny", "reason": "filter_signature_required", "required_action": "verify_filter_signature"}, "name": "wasm_filter_requires_signature"}, {"condition": {"quota_review_recorded": false, "requested_rps_limit_gt": 100000}, "description": "High gateway quotas require review.", "effect": {"decision": "require_review", "reason": "quota_review_required", "required_action": "record_quota_review"}, "name": "high_quota_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All gateway operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_route", "service_registered": false}, "description": "Routes require a registered upstream service.", "effect": {"decision": "deny", "reason": "registered_service_required", "required_action": "register_upstream_service"}, "name": "route_requires_registered_service"}, {"condition": {"auth_policy_attached": false, "route_exposure": "public"}, "description": "Public routes require an explicit auth policy.", "effect": {"decision": "deny", "reason": "auth_policy_required", "required_action": "attach_auth_policy"}, "name": "public_route_requires_auth_policy"}, {"condition": {"threat_policy_attached": false, "unsafe_http_method_enabled": true}, "description": "Unsafe methods require a threat policy.", "effect": {"decision": "deny", "reason": "threat_policy_required", "required_action": "attach_threat_policy"}, "name": "unsafe_method_requires_threat_policy"}, {"condition": {"filter_signature_verified": false, "wasm_filter_attached": true}, "description": "WASM edge filters require signature verification.", "effect": {"decision": "deny", "reason": "filter_signature_required", "required_action": "verify_filter_signature"}, "name": "wasm_filter_requires_signature"}, {"condition": {"quota_review_recorded": false, "requested_rps_limit_gt": 100000}, "description": "High gateway quotas require review.", "effect": {"decision": "require_review", "reason": "quota_review_required", "required_action": "record_quota_review"}, "name": "high_quota_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "GatewayAnalytics", "permission": "apig:view_metrics", "route": "/apig/analytics"}, "dashboard": {"component": "APIGDashboard", "permission": "apig:view", "route": "/apig/dashboard"}, "edge": {"component": "EdgeFilterManager", "permission": "apig:manage_edge", "route": "/apig/edge"}, "routes": {"component": "RouteDesigner", "permission": "apig:manage_routes", "route": "/apig/routes"}, "security": {"component": "GatewaySecurityPolicies", "permission": "apig:manage_security", "route": "/apig/security"}, "settings": {"component": "APIGSettings", "permission": "apig:admin", "route": "/apig/settings"}, "traffic": {"component": "TrafficConsole", "permission": "apig:manage_traffic", "route": "/apig/traffic"}, "upstreams": {"component": "UpstreamServices", "permission": "apig:manage_routes", "route": "/apig/upstreams"}}, "streaming": {}, "theme": {"components": {"gateway_topology_map": {"edge_style": "weighted-route-line", "visual": "edge-route-graph"}, "route_status_card": {"icon": "route", "risk_style": "latency-band", "status_indicator": "traffic-pill"}, "traffic_policy_panel": {"highlight": "limit-chip", "visual": "rule-stack"}, "wasm_filter_trace": {"status_style": "signature-pill", "visual": "filter-chain"}}, "name": "apig_gateway_console", "tokens": {"border.radius": "8px", "color.accent": "#F18F01", "color.danger": "#C53030", "color.primary": "#1F4E79", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F5F7FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/apig/api/v1", "requires_theme": true, "routes": [{"component": "APIGDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/apig/dashboard", "permission": "apig:view"}, {"component": "RouteDesigner", "name": "routes", "nav_group": "Gateway", "path": "/apig/routes", "permission": "apig:manage_routes"}, {"component": "TrafficConsole", "name": "traffic", "nav_group": "Gateway", "path": "/apig/traffic", "permission": "apig:manage_traffic"}, {"component": "GatewaySecurityPolicies", "name": "security", "nav_group": "Security", "path": "/apig/security", "permission": "apig:manage_security"}, {"component": "UpstreamServices", "name": "upstreams", "nav_group": "Gateway", "path": "/apig/upstreams", "permission": "apig:manage_routes"}, {"component": "EdgeFilterManager", "name": "edge", "nav_group": "Edge", "path": "/apig/edge", "permission": "apig:manage_edge"}, {"component": "GatewayAnalytics", "name": "analytics", "nav_group": "Operations", "path": "/apig/analytics", "permission": "apig:view_metrics"}, {"component": "APIGSettings", "name": "settings", "nav_group": "Administration", "path": "/apig/settings", "permission": "apig:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "control_plane.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"apig": []}}, "contracts": {"apig": {"configuration": {"edge": {"edge_deployment_enabled": true, "filter_signing_required": true, "wasm_filters_enabled": true}, "observability": {"audit_policy_changes": true, "emit_access_logs": true, "emit_metrics": true, "trace_propagation_enabled": true}, "routing": {"canary_release_enabled": true, "default_strategy": "weighted", "route_owner_required": true, "service_discovery_required": true}, "security": {"auth_required_by_default": true, "blocked_without_threat_policy": true, "m_tls_enabled": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "apig_gateway_console"}, "traffic": {"circuit_breaking_enabled": true, "default_rps_limit": 1000, "quota_review_threshold": 100000, "rate_limits_enabled": true}, "ui": {"enable_edge_filters": true, "enable_route_designer": true, "enable_security_policies": true, "enable_traffic_console": true}}, "id": "apig", "provides": ["apig_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"apig": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"high_quota_requires_review": {"condition": {"quota_review_recorded": false, "requested_rps_limit_gt": 100000}, "description": "High gateway quotas require review.", "effect": {"decision": "require_review", "reason": "quota_review_required", "required_action": "record_quota_review"}, "name": "high_quota_requires_review"}, "public_route_requires_auth_policy": {"condition": {"auth_policy_attached": false, "route_exposure": "public"}, "description": "Public routes require an explicit auth policy.", "effect": {"decision": "deny", "reason": "auth_policy_required", "required_action": "attach_auth_policy"}, "name": "public_route_requires_auth_policy"}, "route_requires_registered_service": {"condition": {"operation": "create_route", "service_registered": false}, "description": "Routes require a registered upstream service.", "effect": {"decision": "deny", "reason": "registered_service_required", "required_action": "register_upstream_service"}, "name": "route_requires_registered_service"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All gateway operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "unsafe_method_requires_threat_policy": {"condition": {"threat_policy_attached": false, "unsafe_http_method_enabled": true}, "description": "Unsafe methods require a threat policy.", "effect": {"decision": "deny", "reason": "threat_policy_required", "required_action": "attach_threat_policy"}, "name": "unsafe_method_requires_threat_policy"}, "wasm_filter_requires_signature": {"condition": {"filter_signature_verified": false, "wasm_filter_attached": true}, "description": "WASM edge filters require signature verification.", "effect": {"decision": "deny", "reason": "filter_signature_required", "required_action": "verify_filter_signature"}, "name": "wasm_filter_requires_signature"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.apig": {"file": "capability_contract.py", "id": "capability.apig", "kind": "capability", "name": "APG Intelligent Gateway", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("apig_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "apig",
+			"version": "1.0.0",
+			"description": "API Gateway & Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"apig": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"apig": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["apig_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "gateway_runtime.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"quota_review": "GatewayQuotaReview",
+					"canary_review": "GatewayTrafficShiftRecord",
+					"deployment_approval": "GatewayDeploymentRecord",
+					"policy_review": "GatewayPolicyRecord",
+					"route_retirement": "GatewayRouteRecord",
+				},
+				"gateway_lifecycle": {
+					"upstream": "GatewayUpstreamRecord",
+					"consumer": "GatewayConsumerRecord",
+					"route": "GatewayRouteRecord",
+					"quota_review": "GatewayQuotaReview",
+					"policy": "GatewayPolicyRecord",
+					"traffic_shift": "GatewayTrafficShiftRecord",
+					"deployment": "GatewayDeploymentRecord",
+					"audit": "GatewayAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {
+					"engine": contract["configuration"]["adapters"]["event_stream"],
+				},
+			}
+		},
+		"contracts": {
+			"apig": {
+				"id": "apig",
+				"configuration": contract["configuration"],
+				"provides": ["apig_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"apig": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.apig": {
+				"id": "capability.apig",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -20,7 +150,7 @@ def component_manifest() -> dict[str, Any]:
 		"format": "apg.component-manifest.v1",
 		"kind": "apg.generated_application",
 		"name": "apig",
-		"display_name": "APG Intelligent Gateway",
+		"display_name": "API Gateway & Management",
 		"target": "python",
 		"interfaces": {
 			"health": "/health",
@@ -36,12 +166,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("apig", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "apig" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 13:
+		errors.append("APIG semantic model route manifest is stale")
+	if len(rules) < 20:
+		errors.append("APIG semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("APIG adapter manifest must use Bytewax for event streaming")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
