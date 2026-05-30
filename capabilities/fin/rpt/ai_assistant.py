@@ -1,5 +1,5 @@
 """
-APG Financial Reporting - Revolutionary AI Assistant
+APG Financial Reporting - Advanced AI Assistant
 
 Advanced AI-powered financial assistant providing intelligent guidance, automated insights,
 and predictive analytics for financial reporting operations.
@@ -81,7 +81,7 @@ class PredictiveModel:
 
 
 class AIFinancialAssistant:
-	"""Revolutionary AI Assistant for Financial Reporting Intelligence using APG AI capabilities."""
+	"""Advanced AI Assistant for Financial Reporting Intelligence using APG AI capabilities."""
 	
 	def __init__(self, tenant_id: str, ai_config: Optional[Dict[str, Any]] = None):
 		self.tenant_id = tenant_id

@@ -1,5 +1,5 @@
 """
-APG Financial Reporting - Revolutionary Conversational Interface
+APG Financial Reporting - Advanced Conversational Interface
 
 Voice and text-based conversational interface for natural language financial reporting
 with multi-language support and context-aware interaction.
@@ -95,7 +95,7 @@ class ConversationTurn:
 
 
 class ConversationalFinancialInterface:
-	"""Revolutionary conversational interface for financial reporting."""
+	"""Advanced conversational interface for financial reporting."""
 	
 	def __init__(self, tenant_id: str, openai_api_key: str):
 		self.tenant_id = tenant_id

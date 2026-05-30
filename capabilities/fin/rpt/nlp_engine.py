@@ -1,5 +1,5 @@
 """
-APG Financial Reporting - Revolutionary Natural Language Processing Engine
+APG Financial Reporting - Advanced Natural Language Processing Engine
 
 AI-powered conversational interface for financial reporting with advanced natural language
 understanding, intent classification, and intelligent query processing.
@@ -96,7 +96,7 @@ class NLPResponse(BaseModel):
 
 
 class FinancialNLPEngine:
-	"""Revolutionary Natural Language Processing Engine for Financial Reporting using APG AI facilities."""
+	"""Advanced Natural Language Processing Engine for Financial Reporting using APG AI facilities."""
 	
 	def __init__(self, tenant_id: str, ai_config: Optional[Dict[str, Any]] = None):
 		self.tenant_id = tenant_id

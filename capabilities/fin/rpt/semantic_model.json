@@ -1,60 +1,172 @@
 {
   "agents": {},
   "app": {
-    "description": "Financial Reporting package-backed APG capability",
-    "entity_count": 0,
+    "description": "Financial reporting package-backed APG capability",
+    "entity_count": 8,
     "name": "fin_rpt",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "fin_rpt": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Fin",
-          "enabled": true,
-          "id": "fin_rpt",
-          "name": "Financial Reporting",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/rpt/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "accounts_payable": "adapter",
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "consolidation": {
+          "elimination_review_required": true,
+          "entity_required": true,
+          "method_required": true,
+          "ownership_bounds": [
+            0,
+            100
+          ]
+        },
+        "disclosures": {
+          "owner_required": true,
+          "review_required": true,
+          "statement_required": true
+        },
+        "distribution": {
+          "approved_statement_required": true,
+          "format_required": true,
+          "recipient_required": true,
+          "statement_required": true
+        },
+        "generation": {
+          "data_quality_review_threshold": 0.97,
+          "output_format_required": true,
+          "period_required": true,
+          "supported_output_formats": [
+            "pdf",
+            "xlsx",
+            "html",
+            "json"
+          ],
+          "template_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_consolidation_events": true,
+          "emit_distribution_events": true,
+          "emit_generation_events": true,
+          "emit_statement_events": true,
+          "emit_template_events": true,
+          "event_stream": "apg.fin.rpt.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "periods": {
+          "close_status_required": true,
+          "period_dates_required": true,
+          "period_required": true
+        },
+        "report_lines": {
+          "account_mapping_required": true,
+          "line_type_required": true,
+          "sort_order_required": true
+        },
+        "rpt_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "statement_reviewer",
+            "consolidation_reviewer",
+            "disclosure_reviewer",
+            "distribution_reviewer",
+            "variance_narrative_reviewer",
+            "close_reporting_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "statements": {
+          "approval_required_for_publish": true,
+          "balance_check_required": true,
+          "narrative_review_required": true
+        },
+        "templates": {
+          "line_required_for_generation": true,
+          "name_required": true,
+          "statement_type_required": true,
+          "supported_statement_types": [
+            "balance_sheet",
+            "income_statement",
+            "cash_flow",
+            "equity_statement",
+            "management_report"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "fin_rpt_operations"
+          "default_theme": "fin_rpt_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_consolidation": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_disclosures": true,
+          "enable_distribution": true,
+          "enable_generation": true,
+          "enable_lines": true,
+          "enable_periods": true,
+          "enable_settings": true,
+          "enable_statements": true,
+          "enable_templates": true
         }
       },
-      "erp_modules": [
-        "fin"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Financial Reporting",
       "provides": [
-        "fin_rpt_operations"
+        "financial_report_template_lifecycle",
+        "report_line_mapping",
+        "reporting_period_lifecycle",
+        "financial_statement_generation",
+        "statement_publication_workflow",
+        "financial_consolidation",
+        "disclosure_management",
+        "report_distribution",
+        "rpt_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "cash_management",
+        "document_management",
+        "business_intelligence"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Financial Reporting operations require tenant context.",
+            "description": "Financial reporting operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +179,444 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Financial Reporting write operations require policy enforcement.",
+            "description": "Financial reporting writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "rpt_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "create_template",
+              "template_name_present": false
             },
-            "description": "High-risk Financial Reporting operations require review.",
+            "description": "Report templates require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_name_required",
+              "required_action": "name_template"
+            },
+            "name": "template_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "create_template",
+              "statement_type_supported": false
+            },
+            "description": "Report template statement type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "statement_type_not_supported",
+              "required_action": "select_supported_statement_type"
+            },
+            "name": "template_statement_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "add_report_line",
+              "template_present": false
+            },
+            "description": "Report lines require a template.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_line_template_required",
+              "required_action": "attach_template"
+            },
+            "name": "report_line_requires_template"
+          },
+          {
+            "condition": {
+              "account_mapping_present": false,
+              "operation": "add_report_line"
+            },
+            "description": "Report lines require account mapping.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_line_account_mapping_required",
+              "required_action": "attach_account_mapping"
+            },
+            "name": "report_line_requires_account_mapping"
+          },
+          {
+            "condition": {
+              "operation": "add_report_line",
+              "sort_order_present": false
+            },
+            "description": "Report lines require sort order.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_line_sort_order_required",
+              "required_action": "set_sort_order"
+            },
+            "name": "report_line_requires_sort_order"
+          },
+          {
+            "condition": {
+              "operation": "open_period",
+              "period_name_present": false
+            },
+            "description": "Reporting periods require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_name_required",
+              "required_action": "name_period"
+            },
+            "name": "period_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "open_period",
+              "period_dates_present": false
+            },
+            "description": "Reporting periods require start and end dates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_dates_required",
+              "required_action": "set_period_dates"
+            },
+            "name": "period_requires_dates"
+          },
+          {
+            "condition": {
+              "operation": "open_period",
+              "period_range_valid": false
+            },
+            "description": "Reporting period end must be after start.",
+            "effect": {
+              "decision": "deny",
+              "reason": "period_range_invalid",
+              "required_action": "set_valid_period_range"
+            },
+            "name": "period_end_after_start"
+          },
+          {
+            "condition": {
+              "operation": "generate_report",
+              "template_present": false
+            },
+            "description": "Report generation requires a template.",
+            "effect": {
+              "decision": "deny",
+              "reason": "generation_template_required",
+              "required_action": "attach_template"
+            },
+            "name": "generation_requires_template"
+          },
+          {
+            "condition": {
+              "operation": "generate_report",
+              "period_present": false
+            },
+            "description": "Report generation requires reporting period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "generation_period_required",
+              "required_action": "attach_period"
+            },
+            "name": "generation_requires_period"
+          },
+          {
+            "condition": {
+              "operation": "generate_report",
+              "template_line_count_lte": 0
+            },
+            "description": "Report generation requires template lines.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_lines_required",
+              "required_action": "add_template_lines"
+            },
+            "name": "generation_requires_template_lines"
+          },
+          {
+            "condition": {
+              "operation": "generate_report",
+              "output_format_supported": false
+            },
+            "description": "Report generation output format must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "output_format_not_supported",
+              "required_action": "select_supported_output_format"
+            },
+            "name": "generation_output_format_supported"
+          },
+          {
+            "condition": {
+              "data_quality_score_lt": 0.97,
+              "operation": "generate_report",
+              "quality_review_recorded": false
+            },
+            "description": "Low data quality score requires review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "data_quality_review_required",
+              "required_action": "record_quality_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "generation_quality_requires_review"
+          },
+          {
+            "condition": {
+              "generation_present": false,
+              "operation": "publish_statement"
+            },
+            "description": "Statements require a generated report.",
+            "effect": {
+              "decision": "deny",
+              "reason": "statement_generation_required",
+              "required_action": "generate_report"
+            },
+            "name": "statement_requires_generation"
+          },
+          {
+            "condition": {
+              "balance_check_passed": false,
+              "operation": "publish_statement"
+            },
+            "description": "Statements require balance check.",
+            "effect": {
+              "decision": "deny",
+              "reason": "statement_balance_check_required",
+              "required_action": "resolve_balance_check"
+            },
+            "name": "statement_requires_balance_check"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "publish_statement"
+            },
+            "description": "Statements require approval before publish.",
+            "effect": {
+              "decision": "deny",
+              "reason": "statement_approval_required",
+              "required_action": "record_statement_approval"
+            },
+            "name": "statement_requires_approval"
+          },
+          {
+            "condition": {
+              "narrative_review_recorded": false,
+              "operation": "publish_statement"
+            },
+            "description": "Statement narratives require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "narrative_review_required",
+              "required_action": "record_narrative_review"
+            },
+            "name": "statement_requires_narrative_review"
+          },
+          {
+            "condition": {
+              "operation": "create_consolidation",
+              "parent_entity_present": false
+            },
+            "description": "Consolidations require parent entity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "parent_entity_required",
+              "required_action": "attach_parent_entity"
+            },
+            "name": "consolidation_requires_parent_entity"
+          },
+          {
+            "condition": {
+              "operation": "create_consolidation",
+              "subsidiary_entity_present": false
+            },
+            "description": "Consolidations require subsidiary entity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "subsidiary_entity_required",
+              "required_action": "attach_subsidiary_entity"
+            },
+            "name": "consolidation_requires_subsidiary_entity"
+          },
+          {
+            "condition": {
+              "operation": "create_consolidation",
+              "ownership_out_of_bounds": true
+            },
+            "description": "Ownership percentage must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ownership_out_of_bounds",
+              "required_action": "set_valid_ownership"
+            },
+            "name": "consolidation_ownership_within_bounds"
+          },
+          {
+            "condition": {
+              "elimination_review_recorded": false,
+              "operation": "create_consolidation"
+            },
+            "description": "Consolidations require elimination review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "elimination_review_required",
+              "required_action": "record_elimination_review"
+            },
+            "name": "consolidation_requires_elimination_review"
+          },
+          {
+            "condition": {
+              "operation": "record_disclosure",
+              "statement_present": false
+            },
+            "description": "Disclosures require statement linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "disclosure_statement_required",
+              "required_action": "attach_statement"
+            },
+            "name": "disclosure_requires_statement"
+          },
+          {
+            "condition": {
+              "operation": "record_disclosure",
+              "owner_present": false
+            },
+            "description": "Disclosures require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "disclosure_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "disclosure_requires_owner"
+          },
+          {
+            "condition": {
+              "disclosure_review_recorded": false,
+              "operation": "record_disclosure"
+            },
+            "description": "Disclosures require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "disclosure_review_required",
+              "required_action": "record_disclosure_review"
+            },
+            "name": "disclosure_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "distribute_statement",
+              "statement_present": false
+            },
+            "description": "Distribution requires statement.",
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_statement_required",
+              "required_action": "attach_statement"
+            },
+            "name": "distribution_requires_statement"
+          },
+          {
+            "condition": {
+              "operation": "distribute_statement",
+              "statement_approved": false
+            },
+            "description": "Distribution requires approved statement.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approved_statement_required",
+              "required_action": "approve_statement"
+            },
+            "name": "distribution_requires_approved_statement"
+          },
+          {
+            "condition": {
+              "operation": "distribute_statement",
+              "recipient_present": false
+            },
+            "description": "Distribution requires recipient.",
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_recipient_required",
+              "required_action": "add_recipient"
+            },
+            "name": "distribution_requires_recipient"
+          },
+          {
+            "condition": {
+              "distribution_format_supported": false,
+              "operation": "distribute_statement"
+            },
+            "description": "Distribution format must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "distribution_format_not_supported",
+              "required_action": "select_supported_format"
+            },
+            "name": "distribution_format_supported"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "rpt_batch"
+            },
+            "description": "Financial reporting batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_rpt_batch_to_bytewax"
+            },
+            "name": "rpt_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "rpt_event"
+            },
+            "description": "Financial reporting lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_rpt_event_to_bytewax"
+            },
+            "name": "rpt_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_rpt_agent"
+            },
+            "description": "RPT agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rpt_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "rpt_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_rpt_agent"
+            },
+            "description": "RPT agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rpt_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "rpt_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_rpt_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged RPT actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_rpt_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +626,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Financial Reporting operations require tenant context.",
+          "description": "Financial reporting operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +639,444 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Financial Reporting write operations require policy enforcement.",
+          "description": "Financial reporting writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "rpt_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "create_template",
+            "template_name_present": false
           },
-          "description": "High-risk Financial Reporting operations require review.",
+          "description": "Report templates require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_name_required",
+            "required_action": "name_template"
+          },
+          "name": "template_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "create_template",
+            "statement_type_supported": false
+          },
+          "description": "Report template statement type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "statement_type_not_supported",
+            "required_action": "select_supported_statement_type"
+          },
+          "name": "template_statement_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "add_report_line",
+            "template_present": false
+          },
+          "description": "Report lines require a template.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_line_template_required",
+            "required_action": "attach_template"
+          },
+          "name": "report_line_requires_template"
+        },
+        {
+          "condition": {
+            "account_mapping_present": false,
+            "operation": "add_report_line"
+          },
+          "description": "Report lines require account mapping.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_line_account_mapping_required",
+            "required_action": "attach_account_mapping"
+          },
+          "name": "report_line_requires_account_mapping"
+        },
+        {
+          "condition": {
+            "operation": "add_report_line",
+            "sort_order_present": false
+          },
+          "description": "Report lines require sort order.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_line_sort_order_required",
+            "required_action": "set_sort_order"
+          },
+          "name": "report_line_requires_sort_order"
+        },
+        {
+          "condition": {
+            "operation": "open_period",
+            "period_name_present": false
+          },
+          "description": "Reporting periods require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_name_required",
+            "required_action": "name_period"
+          },
+          "name": "period_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "open_period",
+            "period_dates_present": false
+          },
+          "description": "Reporting periods require start and end dates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_dates_required",
+            "required_action": "set_period_dates"
+          },
+          "name": "period_requires_dates"
+        },
+        {
+          "condition": {
+            "operation": "open_period",
+            "period_range_valid": false
+          },
+          "description": "Reporting period end must be after start.",
+          "effect": {
+            "decision": "deny",
+            "reason": "period_range_invalid",
+            "required_action": "set_valid_period_range"
+          },
+          "name": "period_end_after_start"
+        },
+        {
+          "condition": {
+            "operation": "generate_report",
+            "template_present": false
+          },
+          "description": "Report generation requires a template.",
+          "effect": {
+            "decision": "deny",
+            "reason": "generation_template_required",
+            "required_action": "attach_template"
+          },
+          "name": "generation_requires_template"
+        },
+        {
+          "condition": {
+            "operation": "generate_report",
+            "period_present": false
+          },
+          "description": "Report generation requires reporting period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "generation_period_required",
+            "required_action": "attach_period"
+          },
+          "name": "generation_requires_period"
+        },
+        {
+          "condition": {
+            "operation": "generate_report",
+            "template_line_count_lte": 0
+          },
+          "description": "Report generation requires template lines.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_lines_required",
+            "required_action": "add_template_lines"
+          },
+          "name": "generation_requires_template_lines"
+        },
+        {
+          "condition": {
+            "operation": "generate_report",
+            "output_format_supported": false
+          },
+          "description": "Report generation output format must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "output_format_not_supported",
+            "required_action": "select_supported_output_format"
+          },
+          "name": "generation_output_format_supported"
+        },
+        {
+          "condition": {
+            "data_quality_score_lt": 0.97,
+            "operation": "generate_report",
+            "quality_review_recorded": false
+          },
+          "description": "Low data quality score requires review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "data_quality_review_required",
+            "required_action": "record_quality_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "generation_quality_requires_review"
+        },
+        {
+          "condition": {
+            "generation_present": false,
+            "operation": "publish_statement"
+          },
+          "description": "Statements require a generated report.",
+          "effect": {
+            "decision": "deny",
+            "reason": "statement_generation_required",
+            "required_action": "generate_report"
+          },
+          "name": "statement_requires_generation"
+        },
+        {
+          "condition": {
+            "balance_check_passed": false,
+            "operation": "publish_statement"
+          },
+          "description": "Statements require balance check.",
+          "effect": {
+            "decision": "deny",
+            "reason": "statement_balance_check_required",
+            "required_action": "resolve_balance_check"
+          },
+          "name": "statement_requires_balance_check"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "publish_statement"
+          },
+          "description": "Statements require approval before publish.",
+          "effect": {
+            "decision": "deny",
+            "reason": "statement_approval_required",
+            "required_action": "record_statement_approval"
+          },
+          "name": "statement_requires_approval"
+        },
+        {
+          "condition": {
+            "narrative_review_recorded": false,
+            "operation": "publish_statement"
+          },
+          "description": "Statement narratives require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "narrative_review_required",
+            "required_action": "record_narrative_review"
+          },
+          "name": "statement_requires_narrative_review"
+        },
+        {
+          "condition": {
+            "operation": "create_consolidation",
+            "parent_entity_present": false
+          },
+          "description": "Consolidations require parent entity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "parent_entity_required",
+            "required_action": "attach_parent_entity"
+          },
+          "name": "consolidation_requires_parent_entity"
+        },
+        {
+          "condition": {
+            "operation": "create_consolidation",
+            "subsidiary_entity_present": false
+          },
+          "description": "Consolidations require subsidiary entity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "subsidiary_entity_required",
+            "required_action": "attach_subsidiary_entity"
+          },
+          "name": "consolidation_requires_subsidiary_entity"
+        },
+        {
+          "condition": {
+            "operation": "create_consolidation",
+            "ownership_out_of_bounds": true
+          },
+          "description": "Ownership percentage must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ownership_out_of_bounds",
+            "required_action": "set_valid_ownership"
+          },
+          "name": "consolidation_ownership_within_bounds"
+        },
+        {
+          "condition": {
+            "elimination_review_recorded": false,
+            "operation": "create_consolidation"
+          },
+          "description": "Consolidations require elimination review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "elimination_review_required",
+            "required_action": "record_elimination_review"
+          },
+          "name": "consolidation_requires_elimination_review"
+        },
+        {
+          "condition": {
+            "operation": "record_disclosure",
+            "statement_present": false
+          },
+          "description": "Disclosures require statement linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "disclosure_statement_required",
+            "required_action": "attach_statement"
+          },
+          "name": "disclosure_requires_statement"
+        },
+        {
+          "condition": {
+            "operation": "record_disclosure",
+            "owner_present": false
+          },
+          "description": "Disclosures require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "disclosure_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "disclosure_requires_owner"
+        },
+        {
+          "condition": {
+            "disclosure_review_recorded": false,
+            "operation": "record_disclosure"
+          },
+          "description": "Disclosures require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "disclosure_review_required",
+            "required_action": "record_disclosure_review"
+          },
+          "name": "disclosure_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "distribute_statement",
+            "statement_present": false
+          },
+          "description": "Distribution requires statement.",
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_statement_required",
+            "required_action": "attach_statement"
+          },
+          "name": "distribution_requires_statement"
+        },
+        {
+          "condition": {
+            "operation": "distribute_statement",
+            "statement_approved": false
+          },
+          "description": "Distribution requires approved statement.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approved_statement_required",
+            "required_action": "approve_statement"
+          },
+          "name": "distribution_requires_approved_statement"
+        },
+        {
+          "condition": {
+            "operation": "distribute_statement",
+            "recipient_present": false
+          },
+          "description": "Distribution requires recipient.",
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_recipient_required",
+            "required_action": "add_recipient"
+          },
+          "name": "distribution_requires_recipient"
+        },
+        {
+          "condition": {
+            "distribution_format_supported": false,
+            "operation": "distribute_statement"
+          },
+          "description": "Distribution format must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "distribution_format_not_supported",
+            "required_action": "select_supported_format"
+          },
+          "name": "distribution_format_supported"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "rpt_batch"
+          },
+          "description": "Financial reporting batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_rpt_batch_to_bytewax"
+          },
+          "name": "rpt_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "rpt_event"
+          },
+          "description": "Financial reporting lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_rpt_event_to_bytewax"
+          },
+          "name": "rpt_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_rpt_agent"
+          },
+          "description": "RPT agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rpt_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "rpt_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_rpt_agent"
+          },
+          "description": "RPT agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rpt_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "rpt_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_rpt_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged RPT actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_rpt_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +1086,135 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "RPTAgentWorkbench",
+          "permission": "fin_rpt:admin",
+          "route": "/fin-rpt/agents"
+        },
+        "consolidation": {
+          "component": "ConsolidationWorkbench",
+          "permission": "fin_rpt:consolidate",
+          "route": "/fin-rpt/consolidation"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "FinancialReportingDashboard",
           "permission": "fin_rpt:view",
           "route": "/fin-rpt/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "fin_rpt:operate",
-          "route": "/fin-rpt/operations"
+        "disclosures": {
+          "component": "DisclosureRegister",
+          "permission": "fin_rpt:disclose",
+          "route": "/fin-rpt/disclosures"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "fin_rpt:govern",
-          "route": "/fin-rpt/rules"
+        "distribution": {
+          "component": "ReportDistribution",
+          "permission": "fin_rpt:distribute",
+          "route": "/fin-rpt/distribution"
+        },
+        "generation": {
+          "component": "ReportGenerationConsole",
+          "permission": "fin_rpt:generate",
+          "route": "/fin-rpt/generation"
+        },
+        "lines": {
+          "component": "ReportLineGrid",
+          "permission": "fin_rpt:manage_templates",
+          "route": "/fin-rpt/lines"
+        },
+        "periods": {
+          "component": "ReportingPeriodConsole",
+          "permission": "fin_rpt:manage_periods",
+          "route": "/fin-rpt/periods"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "FinancialReportingSettings",
           "permission": "fin_rpt:admin",
           "route": "/fin-rpt/settings"
+        },
+        "statements": {
+          "component": "FinancialStatementLibrary",
+          "permission": "fin_rpt:publish",
+          "route": "/fin-rpt/statements"
+        },
+        "templates": {
+          "component": "ReportTemplateWorkbench",
+          "permission": "fin_rpt:manage_templates",
+          "route": "/fin-rpt/templates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "template_created",
+          "report_line_added",
+          "period_opened",
+          "report_generated",
+          "statement_published",
+          "consolidation_created",
+          "disclosure_recorded",
+          "statement_distributed",
+          "rpt_agent_registered"
+        ],
+        "guardrails": [
+          "rpt_batch_requires_bytewax",
+          "rpt_event_requires_bytewax",
+          "privileged_agent_rpt_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "mapped",
+          "open",
+          "generated",
+          "reviewed",
+          "published",
+          "distributed",
+          "closed",
+          "blocked"
+        ],
+        "stream": "apg.fin.rpt.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "consolidation": {
+            "status_style": "entity-chip",
+            "visual": "entity-tree"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "disclosures": {
+            "status_style": "review-chip",
+            "visual": "disclosure-register"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "distribution": {
+            "status_style": "delivery-chip",
+            "visual": "recipient-list"
+          },
+          "generation": {
+            "status_style": "quality-chip",
+            "visual": "generation-queue"
+          },
+          "lines": {
+            "status_style": "line-chip",
+            "visual": "report-grid"
+          },
+          "periods": {
+            "status_style": "period-chip",
+            "visual": "period-calendar"
+          },
+          "statements": {
+            "status_style": "publish-chip",
+            "visual": "statement-library"
+          },
+          "templates": {
+            "icon": "file-spreadsheet",
+            "risk_style": "report-band",
+            "status_indicator": "template-pill"
           }
         },
-        "name": "fin_rpt_operations",
+        "name": "fin_rpt_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1234,77 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "FinancialReportingDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/fin-rpt/dashboard",
             "permission": "fin_rpt:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/fin-rpt/operations",
-            "permission": "fin_rpt:operate"
+            "component": "ReportTemplateWorkbench",
+            "name": "templates",
+            "nav_group": "Templates",
+            "path": "/fin-rpt/templates",
+            "permission": "fin_rpt:manage_templates"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/fin-rpt/rules",
-            "permission": "fin_rpt:govern"
+            "component": "ReportLineGrid",
+            "name": "lines",
+            "nav_group": "Templates",
+            "path": "/fin-rpt/lines",
+            "permission": "fin_rpt:manage_templates"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ReportingPeriodConsole",
+            "name": "periods",
+            "nav_group": "Close",
+            "path": "/fin-rpt/periods",
+            "permission": "fin_rpt:manage_periods"
+          },
+          {
+            "component": "ReportGenerationConsole",
+            "name": "generation",
+            "nav_group": "Reports",
+            "path": "/fin-rpt/generation",
+            "permission": "fin_rpt:generate"
+          },
+          {
+            "component": "FinancialStatementLibrary",
+            "name": "statements",
+            "nav_group": "Reports",
+            "path": "/fin-rpt/statements",
+            "permission": "fin_rpt:publish"
+          },
+          {
+            "component": "ConsolidationWorkbench",
+            "name": "consolidation",
+            "nav_group": "Consolidation",
+            "path": "/fin-rpt/consolidation",
+            "permission": "fin_rpt:consolidate"
+          },
+          {
+            "component": "DisclosureRegister",
+            "name": "disclosures",
+            "nav_group": "Compliance",
+            "path": "/fin-rpt/disclosures",
+            "permission": "fin_rpt:disclose"
+          },
+          {
+            "component": "ReportDistribution",
+            "name": "distribution",
+            "nav_group": "Reports",
+            "path": "/fin-rpt/distribution",
+            "permission": "fin_rpt:distribute"
+          },
+          {
+            "component": "RPTAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fin-rpt/agents",
+            "permission": "fin_rpt:admin"
+          },
+          {
+            "component": "FinancialReportingSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/fin-rpt/settings",
@@ -238,46 +1321,194 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "financial_reporting": {
+        "supported_roles": [
+          "statement_reviewer",
+          "consolidation_reviewer",
+          "disclosure_reviewer",
+          "distribution_reviewer",
+          "variance_narrative_reviewer",
+          "close_reporting_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "fin_rpt": []
+      "fin_rpt": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "cash_management",
+        "document_management",
+        "business_intelligence"
+      ]
     }
   },
   "contracts": {
     "fin_rpt": {
       "configuration": {
-        "capability": {
-          "category": "Fin",
-          "enabled": true,
-          "id": "fin_rpt",
-          "name": "Financial Reporting",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/rpt/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "accounts_payable": "adapter",
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "consolidation": {
+          "elimination_review_required": true,
+          "entity_required": true,
+          "method_required": true,
+          "ownership_bounds": [
+            0,
+            100
+          ]
+        },
+        "disclosures": {
+          "owner_required": true,
+          "review_required": true,
+          "statement_required": true
+        },
+        "distribution": {
+          "approved_statement_required": true,
+          "format_required": true,
+          "recipient_required": true,
+          "statement_required": true
+        },
+        "generation": {
+          "data_quality_review_threshold": 0.97,
+          "output_format_required": true,
+          "period_required": true,
+          "supported_output_formats": [
+            "pdf",
+            "xlsx",
+            "html",
+            "json"
+          ],
+          "template_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_consolidation_events": true,
+          "emit_distribution_events": true,
+          "emit_generation_events": true,
+          "emit_statement_events": true,
+          "emit_template_events": true,
+          "event_stream": "apg.fin.rpt.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "periods": {
+          "close_status_required": true,
+          "period_dates_required": true,
+          "period_required": true
+        },
+        "report_lines": {
+          "account_mapping_required": true,
+          "line_type_required": true,
+          "sort_order_required": true
+        },
+        "rpt_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "statement_reviewer",
+            "consolidation_reviewer",
+            "disclosure_reviewer",
+            "distribution_reviewer",
+            "variance_narrative_reviewer",
+            "close_reporting_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "statements": {
+          "approval_required_for_publish": true,
+          "balance_check_required": true,
+          "narrative_review_required": true
+        },
+        "templates": {
+          "line_required_for_generation": true,
+          "name_required": true,
+          "statement_type_required": true,
+          "supported_statement_types": [
+            "balance_sheet",
+            "income_statement",
+            "cash_flow",
+            "equity_statement",
+            "management_report"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "fin_rpt_operations"
+          "default_theme": "fin_rpt_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_consolidation": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_disclosures": true,
+          "enable_distribution": true,
+          "enable_generation": true,
+          "enable_lines": true,
+          "enable_periods": true,
+          "enable_settings": true,
+          "enable_statements": true,
+          "enable_templates": true
         }
       },
       "id": "fin_rpt",
       "provides": [
-        "fin_rpt_operations"
+        "financial_report_template_lifecycle",
+        "report_line_mapping",
+        "reporting_period_lifecycle",
+        "financial_statement_generation",
+        "statement_publication_workflow",
+        "financial_consolidation",
+        "disclosure_management",
+        "report_distribution",
+        "rpt_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "cash_management",
+        "document_management",
+        "business_intelligence"
+      ]
     }
   },
   "deployment": {
@@ -289,58 +1520,468 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 11,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "fin_rpt": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "consolidation_ownership_within_bounds": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "operation": "create_consolidation",
+        "ownership_out_of_bounds": true
       },
-      "description": "High-risk Financial Reporting operations require review.",
+      "description": "Ownership percentage must be between 0 and 100.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ownership_out_of_bounds",
+        "required_action": "set_valid_ownership"
+      },
+      "name": "consolidation_ownership_within_bounds"
+    },
+    "consolidation_requires_elimination_review": {
+      "condition": {
+        "elimination_review_recorded": false,
+        "operation": "create_consolidation"
+      },
+      "description": "Consolidations require elimination review.",
       "effect": {
         "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "reason": "elimination_review_required",
+        "required_action": "record_elimination_review"
       },
-      "name": "high_risk_requires_review"
+      "name": "consolidation_requires_elimination_review"
     },
-    "operation_policy_required": {
+    "consolidation_requires_parent_entity": {
+      "condition": {
+        "operation": "create_consolidation",
+        "parent_entity_present": false
+      },
+      "description": "Consolidations require parent entity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "parent_entity_required",
+        "required_action": "attach_parent_entity"
+      },
+      "name": "consolidation_requires_parent_entity"
+    },
+    "consolidation_requires_subsidiary_entity": {
+      "condition": {
+        "operation": "create_consolidation",
+        "subsidiary_entity_present": false
+      },
+      "description": "Consolidations require subsidiary entity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "subsidiary_entity_required",
+        "required_action": "attach_subsidiary_entity"
+      },
+      "name": "consolidation_requires_subsidiary_entity"
+    },
+    "disclosure_requires_owner": {
+      "condition": {
+        "operation": "record_disclosure",
+        "owner_present": false
+      },
+      "description": "Disclosures require owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "disclosure_owner_required",
+        "required_action": "assign_owner"
+      },
+      "name": "disclosure_requires_owner"
+    },
+    "disclosure_requires_review": {
+      "condition": {
+        "disclosure_review_recorded": false,
+        "operation": "record_disclosure"
+      },
+      "description": "Disclosures require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "disclosure_review_required",
+        "required_action": "record_disclosure_review"
+      },
+      "name": "disclosure_requires_review"
+    },
+    "disclosure_requires_statement": {
+      "condition": {
+        "operation": "record_disclosure",
+        "statement_present": false
+      },
+      "description": "Disclosures require statement linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "disclosure_statement_required",
+        "required_action": "attach_statement"
+      },
+      "name": "disclosure_requires_statement"
+    },
+    "distribution_format_supported": {
+      "condition": {
+        "distribution_format_supported": false,
+        "operation": "distribute_statement"
+      },
+      "description": "Distribution format must be supported.",
+      "effect": {
+        "decision": "deny",
+        "reason": "distribution_format_not_supported",
+        "required_action": "select_supported_format"
+      },
+      "name": "distribution_format_supported"
+    },
+    "distribution_requires_approved_statement": {
+      "condition": {
+        "operation": "distribute_statement",
+        "statement_approved": false
+      },
+      "description": "Distribution requires approved statement.",
+      "effect": {
+        "decision": "deny",
+        "reason": "approved_statement_required",
+        "required_action": "approve_statement"
+      },
+      "name": "distribution_requires_approved_statement"
+    },
+    "distribution_requires_recipient": {
+      "condition": {
+        "operation": "distribute_statement",
+        "recipient_present": false
+      },
+      "description": "Distribution requires recipient.",
+      "effect": {
+        "decision": "deny",
+        "reason": "distribution_recipient_required",
+        "required_action": "add_recipient"
+      },
+      "name": "distribution_requires_recipient"
+    },
+    "distribution_requires_statement": {
+      "condition": {
+        "operation": "distribute_statement",
+        "statement_present": false
+      },
+      "description": "Distribution requires statement.",
+      "effect": {
+        "decision": "deny",
+        "reason": "distribution_statement_required",
+        "required_action": "attach_statement"
+      },
+      "name": "distribution_requires_statement"
+    },
+    "generation_output_format_supported": {
+      "condition": {
+        "operation": "generate_report",
+        "output_format_supported": false
+      },
+      "description": "Report generation output format must be supported.",
+      "effect": {
+        "decision": "deny",
+        "reason": "output_format_not_supported",
+        "required_action": "select_supported_output_format"
+      },
+      "name": "generation_output_format_supported"
+    },
+    "generation_quality_requires_review": {
+      "condition": {
+        "data_quality_score_lt": 0.97,
+        "operation": "generate_report",
+        "quality_review_recorded": false
+      },
+      "description": "Low data quality score requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "data_quality_review_required",
+        "required_action": "record_quality_review"
+      },
+      "name": "generation_quality_requires_review"
+    },
+    "generation_requires_period": {
+      "condition": {
+        "operation": "generate_report",
+        "period_present": false
+      },
+      "description": "Report generation requires reporting period.",
+      "effect": {
+        "decision": "deny",
+        "reason": "generation_period_required",
+        "required_action": "attach_period"
+      },
+      "name": "generation_requires_period"
+    },
+    "generation_requires_template": {
+      "condition": {
+        "operation": "generate_report",
+        "template_present": false
+      },
+      "description": "Report generation requires a template.",
+      "effect": {
+        "decision": "deny",
+        "reason": "generation_template_required",
+        "required_action": "attach_template"
+      },
+      "name": "generation_requires_template"
+    },
+    "generation_requires_template_lines": {
+      "condition": {
+        "operation": "generate_report",
+        "template_line_count_lte": 0
+      },
+      "description": "Report generation requires template lines.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_lines_required",
+        "required_action": "add_template_lines"
+      },
+      "name": "generation_requires_template_lines"
+    },
+    "period_end_after_start": {
+      "condition": {
+        "operation": "open_period",
+        "period_range_valid": false
+      },
+      "description": "Reporting period end must be after start.",
+      "effect": {
+        "decision": "deny",
+        "reason": "period_range_invalid",
+        "required_action": "set_valid_period_range"
+      },
+      "name": "period_end_after_start"
+    },
+    "period_requires_dates": {
+      "condition": {
+        "operation": "open_period",
+        "period_dates_present": false
+      },
+      "description": "Reporting periods require start and end dates.",
+      "effect": {
+        "decision": "deny",
+        "reason": "period_dates_required",
+        "required_action": "set_period_dates"
+      },
+      "name": "period_requires_dates"
+    },
+    "period_requires_name": {
+      "condition": {
+        "operation": "open_period",
+        "period_name_present": false
+      },
+      "description": "Reporting periods require a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "period_name_required",
+        "required_action": "name_period"
+      },
+      "name": "period_requires_name"
+    },
+    "privileged_agent_rpt_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_rpt_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged RPT actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_rpt_action_requires_human_approval"
+    },
+    "report_line_requires_account_mapping": {
+      "condition": {
+        "account_mapping_present": false,
+        "operation": "add_report_line"
+      },
+      "description": "Report lines require account mapping.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_line_account_mapping_required",
+        "required_action": "attach_account_mapping"
+      },
+      "name": "report_line_requires_account_mapping"
+    },
+    "report_line_requires_sort_order": {
+      "condition": {
+        "operation": "add_report_line",
+        "sort_order_present": false
+      },
+      "description": "Report lines require sort order.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_line_sort_order_required",
+        "required_action": "set_sort_order"
+      },
+      "name": "report_line_requires_sort_order"
+    },
+    "report_line_requires_template": {
+      "condition": {
+        "operation": "add_report_line",
+        "template_present": false
+      },
+      "description": "Report lines require a template.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_line_template_required",
+        "required_action": "attach_template"
+      },
+      "name": "report_line_requires_template"
+    },
+    "rpt_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_rpt_agent"
+      },
+      "description": "RPT agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rpt_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "rpt_agent_role_supported"
+    },
+    "rpt_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_rpt_agent"
+      },
+      "description": "RPT agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rpt_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "rpt_agent_runtime_supported"
+    },
+    "rpt_batch_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "rpt_batch"
+      },
+      "description": "Financial reporting batches require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_rpt_batch_to_bytewax"
+      },
+      "name": "rpt_batch_requires_bytewax"
+    },
+    "rpt_event_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "rpt_event"
+      },
+      "description": "Financial reporting lifecycle events require Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_rpt_event_to_bytewax"
+      },
+      "name": "rpt_event_requires_bytewax"
+    },
+    "rpt_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Financial Reporting write operations require policy enforcement.",
+      "description": "Financial reporting writes require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "rpt_write_requires_policy"
+    },
+    "statement_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "publish_statement"
+      },
+      "description": "Statements require approval before publish.",
+      "effect": {
+        "decision": "deny",
+        "reason": "statement_approval_required",
+        "required_action": "record_statement_approval"
+      },
+      "name": "statement_requires_approval"
+    },
+    "statement_requires_balance_check": {
+      "condition": {
+        "balance_check_passed": false,
+        "operation": "publish_statement"
+      },
+      "description": "Statements require balance check.",
+      "effect": {
+        "decision": "deny",
+        "reason": "statement_balance_check_required",
+        "required_action": "resolve_balance_check"
+      },
+      "name": "statement_requires_balance_check"
+    },
+    "statement_requires_generation": {
+      "condition": {
+        "generation_present": false,
+        "operation": "publish_statement"
+      },
+      "description": "Statements require a generated report.",
+      "effect": {
+        "decision": "deny",
+        "reason": "statement_generation_required",
+        "required_action": "generate_report"
+      },
+      "name": "statement_requires_generation"
+    },
+    "statement_requires_narrative_review": {
+      "condition": {
+        "narrative_review_recorded": false,
+        "operation": "publish_statement"
+      },
+      "description": "Statement narratives require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "narrative_review_required",
+        "required_action": "record_narrative_review"
+      },
+      "name": "statement_requires_narrative_review"
+    },
+    "template_requires_name": {
+      "condition": {
+        "operation": "create_template",
+        "template_name_present": false
+      },
+      "description": "Report templates require a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_name_required",
+        "required_action": "name_template"
+      },
+      "name": "template_requires_name"
+    },
+    "template_statement_type_supported": {
+      "condition": {
+        "operation": "create_template",
+        "statement_type_supported": false
+      },
+      "description": "Report template statement type must be supported.",
+      "effect": {
+        "decision": "deny",
+        "reason": "statement_type_not_supported",
+        "required_action": "select_supported_statement_type"
+      },
+      "name": "template_statement_type_supported"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Financial Reporting operations require tenant context.",
+      "description": "Financial reporting operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
@@ -348,30 +1989,5 @@
       },
       "name": "tenant_context_required"
     }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.fin_rpt": {
-      "file": "capability_contract.py",
-      "id": "capability.fin_rpt",
-      "kind": "capability",
-      "name": "Financial Reporting",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

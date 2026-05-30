@@ -16,6 +16,94 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:53 EAT
+
+FIN RPT financial reporting lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for `fin_rpt`, and
+  refreshed `cap_spec.md` with the active package summary.
+- Deleted stale generated completion/task notes that contradicted the active
+  executable package surface.
+- Replaced the spec-factory contract with explicit report-template,
+  report-line, reporting-period, report-generation, statement-publication,
+  consolidation, disclosure, distribution, RPT-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  template name/type, report-line template/account/sort order, period dates
+  and range, generation template/period/line/output/data-quality review,
+  statement generation/balance/approval/narrative review, consolidation
+  parent/subsidiary/ownership/elimination review, disclosure linkage/owner/
+  review, distribution statement/recipient/format, RPT batch/event Bytewax
+  streams, RPT-agent runtime/role, and privileged agent-action approval.
+- Replaced provider-heavy top-level service/API/view/app surfaces with
+  dependency-light RPT lifecycle helpers for templates, lines, periods,
+  generation, publication, consolidation, disclosures, distribution,
+  RPT-agent registration, batch validation, dashboard summaries, audit events,
+  API helpers, and screen models.
+- Preserved `RPTService` as a compatibility alias while keeping optional web,
+  database, rendering, and AI-provider imports out of the top-level APG
+  surface.
+- Renamed the old report-engine helper to `advanced_report_engine.py` and
+  cleaned stale generated wording across the RPT package.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, guardrail,
+  API/view, app, semantic, RPT-agent, and Bytewax behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fin/rpt/__init__.py capabilities/fin/rpt/capability_contract.py
+  capabilities/fin/rpt/service.py capabilities/fin/rpt/api.py
+  capabilities/fin/rpt/views.py capabilities/fin/rpt/app.py
+  capabilities/fin/rpt/tests/test_package_contract.py` passed.
+- Syntax-only compile for edited legacy helper modules
+  (`advanced_report_engine.py`, `ai_assistant.py`, `api_integration.py`,
+  `blueprint_integration.py`, `capability_registry.py`,
+  `conversational_interface.py`, `immersive_analytics.py`,
+  `integration_validator.py`, `models.py`, `nlp_engine.py`,
+  `predictive_engine.py`, and `production_deployment.py`) passed.
+- `./.venv/bin/pytest -q capabilities/fin/rpt/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fin/rpt/app.py` passed package self-test.
+- `./.venv/bin/apg capabilities inspect fin_rpt --json` confirmed `ok: true`,
+  11 routes, 35 rules, and `fin_rpt_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/fin/rpt --json`
+  confirmed side-effect-free publish planning with Bytewax stream metadata and
+  no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fin/rpt --json` passed with `domain_specific` implementation
+  level and 0 baseline markers.
+- `jq '.capabilities.fin_rpt.streaming.processor,
+  .capabilities.fin_rpt.provides, .capabilities.fin_rpt.requires,
+  .capabilities.fin_rpt.screens.agents.route,
+  (.capabilities.fin_rpt.rules[] |
+  select(.name=="rpt_agent_runtime_supported") | .effect.reason),
+  (.capabilities.fin_rpt.rules[] |
+  select(.name=="rpt_batch_requires_bytewax") | .effect.reason),
+  (.capabilities.fin_rpt.rules[] |
+  select(.name=="generation_quality_requires_review") | .effect.reason)'
+  capabilities/fin/rpt/semantic_model.json` confirmed `bytewax`, RPT-agent
+  provides, required services, `/fin-rpt/agents`,
+  `rpt_agent_runtime_not_supported`, `bytewax_event_stream_required`, and
+  `data_quality_review_required`.
+- `./.venv/bin/python -c "from capabilities.fin.rpt import
+  FinancialReportingService; service=FinancialReportingService();
+  template=service.create_template('template','tenant-proof','Income',
+  'income_statement','owner'); service.add_report_line('line','tenant-proof',
+  template['id'],'Revenue','4*',10); service.register_rpt_agent(
+  'tenant-proof','Proof agent','codex','statement_reviewer',
+  'review statements'); print(service.dashboard_summary('tenant-proof'))"`
+  passed and confirmed RPT-agent registration, audit event emission, and
+  Bytewax stream metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- `git diff --check -- capabilities/fin/rpt docs/progress_log.md` passed.
+- Not run: durable reporting stores, live GL/AP/AR/cash/document/BI/audit/
+  notification/auth adapters, report rendering providers, durable Bytewax
+  topology, rendered browser UI, RPT performance/failover checks, and full
+  repository tests.
+
 ### 2026-05-30 23:40 EAT
 
 FIN BFC budgeting and forecasting lifecycle/guardrail packet:

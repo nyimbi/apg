@@ -1,5 +1,5 @@
 """
-APG Financial Reporting - Revolutionary Report Generation Engine
+APG Financial Reporting - Advanced Report Generation Engine
 
 AI-powered report generation engine with adaptive templates, real-time consolidation,
 intelligent data validation, and automated financial statement generation.
@@ -48,7 +48,7 @@ class AdaptiveFormattingLevel(str, Enum):
 	BASIC = "basic"
 	INTELLIGENT = "intelligent"
 	ADAPTIVE = "adaptive"
-	REVOLUTIONARY = "revolutionary"
+	REVOLUTIONARY = "advanced"
 
 
 class ValidationSeverity(str, Enum):
@@ -111,8 +111,8 @@ class ValidationResult:
 	correction_applied: bool = False
 
 
-class RevolutionaryReportEngine:
-	"""Revolutionary AI-Powered Report Generation Engine using APG AI capabilities."""
+class AdvancedReportEngine:
+	"""Advanced AI-Powered Report Generation Engine using APG AI capabilities."""
 	
 	def __init__(self, tenant_id: str, ai_config: Dict[str, Any]):
 		self.tenant_id = tenant_id
@@ -132,8 +132,8 @@ class RevolutionaryReportEngine:
 		self.learning_models = {}
 		self.user_preferences = {}
 		
-	async def generate_revolutionary_report(self, context: ReportGenerationContext) -> Dict[str, Any]:
-		"""Generate revolutionary financial report with full AI enhancement."""
+	async def generate_advanced_report(self, context: ReportGenerationContext) -> Dict[str, Any]:
+		"""Generate advanced financial report with full AI enhancement."""
 		
 		performance = GenerationPerformanceMetrics(start_time=datetime.now())
 		
@@ -152,9 +152,9 @@ class RevolutionaryReportEngine:
 			await self._handle_validation_results(validation_results, context)
 			performance.validation_time_ms = int((datetime.now() - validation_start).total_seconds() * 1000)
 			
-			# Phase 3: Revolutionary Calculation Engine
+			# Phase 3: Advanced Calculation Engine
 			calculation_start = datetime.now()
-			calculated_data = await self._perform_revolutionary_calculations(financial_data, context)
+			calculated_data = await self._perform_advanced_calculations(financial_data, context)
 			performance.calculation_time_ms = int((datetime.now() - calculation_start).total_seconds() * 1000)
 			
 			# Phase 4: AI-Powered Consolidation (if required)
@@ -241,7 +241,7 @@ class RevolutionaryReportEngine:
 		)
 		
 		# Generate the report
-		generation_result = await self.generate_revolutionary_report(context)
+		generation_result = await self.generate_advanced_report(context)
 		
 		# Add conversational context
 		generation_result.update({
@@ -451,9 +451,9 @@ class RevolutionaryReportEngine:
 		
 		return filtered_results
 	
-	async def _perform_revolutionary_calculations(self, financial_data: Dict[str, Any], 
+	async def _perform_advanced_calculations(self, financial_data: Dict[str, Any],
 												 context: ReportGenerationContext) -> Dict[str, Any]:
-		"""Perform revolutionary calculations with AI optimization."""
+		"""Perform advanced calculations with AI optimization."""
 		
 		template = financial_data['template']
 		definition = financial_data['definition']
@@ -467,7 +467,7 @@ class RevolutionaryReportEngine:
 			'lines': [],
 			'summary_metrics': {},
 			'calculation_metadata': {
-				'calculation_engine': 'revolutionary',
+				'calculation_engine': 'advanced',
 				'ai_enhanced': context.ai_enhancement_level.value,
 				'parallel_processing': True
 			}
@@ -512,8 +512,8 @@ class RevolutionaryReportEngine:
 			formatting_analysis, context.adaptive_formatting
 		)
 		
-		# Apply revolutionary formatting
-		formatted_data = await self._apply_revolutionary_formatting(
+		# Apply advanced formatting
+		formatted_data = await self._apply_advanced_formatting(
 			calculated_data, adaptive_rules, context
 		)
 		
@@ -564,7 +564,7 @@ class RevolutionaryReportEngine:
 			tenant_id=context.tenant_id,
 			template_id=context.template_id,
 			period_id=context.period_id,
-			generation_name=f"Revolutionary Report Generation {context.generation_id[:8]}",
+			generation_name=f"Advanced Report Generation {context.generation_id[:8]}",
 			generation_type=context.generation_mode.value,
 			as_of_date=date.today(),
 			include_adjustments=True,
@@ -710,8 +710,8 @@ class RevolutionaryReportEngine:
 		"""Generate adaptive formatting rules."""
 		return {}
 	
-	async def _apply_revolutionary_formatting(self, calculated_data, rules, context) -> Dict[str, Any]:
-		"""Apply revolutionary formatting with AI."""
+	async def _apply_advanced_formatting(self, calculated_data, rules, context) -> Dict[str, Any]:
+		"""Apply advanced formatting with AI."""
 		return calculated_data
 	
 	async def _learn_formatting_preferences(self, user_id, rules):
@@ -770,7 +770,7 @@ class RevolutionaryReportEngine:
 		"""Generate AI insights for report line."""
 		return {}
 	
-	# Additional placeholder methods for comprehensive functionality
+	# Additional template token methods for comprehensive functionality
 	
 	async def _gather_entity_data_parallel(self, entity_ids, as_of_date) -> Dict[str, Any]:
 		"""Gather entity data in parallel."""

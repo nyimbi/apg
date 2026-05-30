@@ -1,4 +1,4 @@
--- APG Financial Reporting - Revolutionary Database Schema
+-- APG Financial Reporting - Advanced Database Schema
 -- Enhanced multi-tenant database schema with AI-powered capabilities and performance optimization
 -- © 2025 Datacraft. All rights reserved.
 -- Author: Nyimbi Odero | APG Platform Architect
@@ -34,7 +34,7 @@ CREATE TABLE cf_fr_report_template (
     category VARCHAR(50),
     format_type VARCHAR(50) NOT NULL,
     
-    -- Revolutionary AI Enhancement Features
+    -- Advanced AI Enhancement Features
     ai_intelligence_level VARCHAR(20) DEFAULT 'enhanced',
     auto_narrative_generation BOOLEAN DEFAULT TRUE,
     predictive_insights_enabled BOOLEAN DEFAULT TRUE,
@@ -745,7 +745,7 @@ $$ LANGUAGE plpgsql;
 -- DATABASE COMMENTS FOR DOCUMENTATION
 -- ==================================================================================
 
-COMMENT ON TABLE cf_fr_report_template IS 'Revolutionary AI-powered financial report templates with adaptive intelligence and natural language capabilities';
+COMMENT ON TABLE cf_fr_report_template IS 'Advanced AI-powered financial report templates with adaptive intelligence and natural language capabilities';
 COMMENT ON TABLE cf_fr_conversational_interface IS 'Natural language processing interface for conversational financial reporting';
 COMMENT ON TABLE cf_fr_ai_insight_engine IS 'AI-powered financial insight generation with machine learning analysis';
 COMMENT ON TABLE cf_fr_predictive_analytics IS 'Advanced predictive analytics for financial forecasting and trend analysis';

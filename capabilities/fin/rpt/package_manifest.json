@@ -4,7 +4,7 @@
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,39 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 11,
+  "rule_count": 35,
+  "streaming": {
+    "events": [
+      "template_created",
+      "report_line_added",
+      "period_opened",
+      "report_generated",
+      "statement_published",
+      "consolidation_created",
+      "disclosure_recorded",
+      "statement_distributed",
+      "rpt_agent_registered"
+    ],
+    "guardrails": [
+      "rpt_batch_requires_bytewax",
+      "rpt_event_requires_bytewax",
+      "privileged_agent_rpt_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "mapped",
+      "open",
+      "generated",
+      "reviewed",
+      "published",
+      "distributed",
+      "closed",
+      "blocked"
+    ],
+    "stream": "apg.fin.rpt.lifecycle"
+  },
+  "version": "2.1.0"
 }

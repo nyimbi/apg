@@ -1,1004 +1,420 @@
-"""
-APG Financial Reporting Service - Revolutionary AI-Enhanced Financial Reporting
+"""Domain service for APG financial reporting."""
 
-Enhanced business logic for Financial Reporting operations with revolutionary AI capabilities,
-including intelligent statement generation, automated consolidation, AI-powered notes management,
-and advanced analytical reporting functionality.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero | APG Platform Architect
-"""
+from copy import deepcopy
+from datetime import datetime, timezone
+from typing import Any
 
-import asyncio
-from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, date, timedelta
-from decimal import Decimal
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, asc, func, text
-import json
-import pandas as pd
-from pathlib import Path
-from uuid_extensions import uuid7str
-
-from .models import (
-	CFRFReportTemplate, CFRFReportDefinition, CFRFReportLine, CFRFReportPeriod,
-	CFRFReportGeneration, CFRFFinancialStatement, CFRFConsolidation, CFRFNotes,
-	CFRFDisclosure, CFRFAnalyticalReport, CFRFReportDistribution,
-	ReportIntelligenceLevel, ConsolidationMethodType
-)
-from .revolutionary_report_engine import (
-	RevolutionaryReportEngine, ReportGenerationContext, ReportGenerationMode,
-	AdaptiveFormattingLevel, ValidationSeverity
-)
-from .nlp_engine import FinancialNLPEngine
-from .ai_assistant import AIFinancialAssistant
-from .predictive_engine import PredictiveFinancialEngine
-from ..general_ledger.models import CFGLAccount, CFGLJournalEntry, CFGLPosting
-from ...auth_rbac.models import db
+try:
+	from .capability_contract import (
+		SUPPORTED_OUTPUT_FORMATS,
+		SUPPORTED_RPT_AGENT_ROLES,
+		SUPPORTED_RPT_AGENT_RUNTIMES,
+		SUPPORTED_STATEMENT_TYPES,
+		evaluate_capability_rules,
+		streaming_manifest,
+	)
+except ImportError:
+	from capability_contract import (
+		SUPPORTED_OUTPUT_FORMATS,
+		SUPPORTED_RPT_AGENT_ROLES,
+		SUPPORTED_RPT_AGENT_RUNTIMES,
+		SUPPORTED_STATEMENT_TYPES,
+		evaluate_capability_rules,
+		streaming_manifest,
+	)
 
 
 class FinancialReportingService:
-	"""Revolutionary AI-Enhanced Financial Reporting Service"""
-	
-	def __init__(self, tenant_id: str, openai_api_key: Optional[str] = None):
-		self.tenant_id = tenant_id
-		
-		# Initialize AI-powered components using APG AI services
-		ai_config = {
-			'primary_provider': 'openai' if openai_api_key else 'ollama',
-			'fallback_provider': 'ollama',
-			'model_preferences': {
-				'openai': 'gpt-4',
-				'ollama': 'llama2:13b'
-			},
-			'financial_domain_optimization': True,
-			'openai_api_key': openai_api_key
+	"""Tenant-scoped report template, generation, publication, consolidation, and distribution coordinator."""
+
+	def __init__(self) -> None:
+		self._templates: dict[str, dict[str, Any]] = {}
+		self._report_lines: dict[str, dict[str, Any]] = {}
+		self._periods: dict[str, dict[str, Any]] = {}
+		self._generations: dict[str, dict[str, Any]] = {}
+		self._statements: dict[str, dict[str, Any]] = {}
+		self._consolidations: dict[str, dict[str, Any]] = {}
+		self._disclosures: dict[str, dict[str, Any]] = {}
+		self._distributions: dict[str, dict[str, Any]] = {}
+		self._agents: dict[str, dict[str, Any]] = {}
+		self._audit_events: list[dict[str, Any]] = []
+
+	def create_template(self, template_id: str, tenant_id: str, name: str, statement_type: str, owner: str) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "create_template",
+			"template_name_present": bool(name),
+			"statement_type_supported": statement_type in SUPPORTED_STATEMENT_TYPES,
 		}
-		
-		self.revolutionary_engine = RevolutionaryReportEngine(tenant_id, ai_config)
-		self.nlp_engine = FinancialNLPEngine(tenant_id, ai_config)
-		self.ai_assistant = AIFinancialAssistant(tenant_id, ai_config)
-		self.predictive_engine = PredictiveFinancialEngine(tenant_id)
-		self.ai_enabled = True  # Always enabled with APG AI services
-		
-		# Performance optimization
-		self.report_cache = {}
-		self.template_cache = {}
-		self.calculation_cache = {}
-	
-	# Revolutionary AI-Enhanced Report Generation
-	
-	async def generate_ai_powered_report(self, user_query: str, user_id: str, 
-										session_id: Optional[str] = None) -> Dict[str, Any]:
-		"""Generate report using natural language AI interface."""
-		if not self.ai_enabled:
-			raise ValueError("AI features require OpenAI API key")
-		
-		session_id = session_id or uuid7str()
-		
-		return await self.revolutionary_engine.generate_conversational_report(
-			user_query, user_id, session_id
-		)
-	
-	async def generate_revolutionary_report(self, template_id: str, period_id: str, 
-										   user_id: str, 
-										   ai_enhancement_level: ReportIntelligenceLevel = ReportIntelligenceLevel.ENHANCED,
-										   generation_mode: ReportGenerationMode = ReportGenerationMode.AI_ENHANCED) -> Dict[str, Any]:
-		"""Generate revolutionary financial report with full AI capabilities."""
-		if not self.ai_enabled:
-			return await self._generate_standard_report(template_id, period_id, user_id)
-		
-		context = ReportGenerationContext(
-			generation_id=uuid7str(),
-			template_id=template_id,
-			period_id=period_id,
-			user_id=user_id,
-			tenant_id=self.tenant_id,
-			generation_mode=generation_mode,
-			ai_enhancement_level=ai_enhancement_level,
-			adaptive_formatting=AdaptiveFormattingLevel.REVOLUTIONARY,
-			real_time_updates=True,
-			include_predictions=True,
-			include_narratives=True,
-			include_insights=True
-		)
-		
-		return await self.revolutionary_engine.generate_revolutionary_report(context)
-	
-	async def perform_intelligent_consolidation(self, entity_ids: List[str], 
-											   consolidation_rules: Dict[str, Any],
-											   as_of_date: date) -> Dict[str, Any]:
-		"""Perform AI-powered real-time consolidation."""
-		if not self.ai_enabled:
-			return await self._perform_standard_consolidation(entity_ids, consolidation_rules, as_of_date)
-		
-		return await self.revolutionary_engine.perform_real_time_consolidation(
-			entity_ids, consolidation_rules, as_of_date
-		)
-	
-	async def generate_predictive_insights(self, statement_id: str, 
-										  analysis_depth: str = 'comprehensive') -> List[Dict[str, Any]]:
-		"""Generate AI-powered predictive insights for financial statements."""
-		if not self.ai_enabled:
-			raise ValueError("Predictive insights require AI features")
-		
-		return await self.ai_assistant.generate_intelligent_insights(statement_id, analysis_depth)
-	
-	async def validate_data_quality(self, data_source: str, 
-								   validation_rules: Optional[Dict] = None) -> List[Dict[str, Any]]:
-		"""Perform comprehensive AI-powered data quality validation."""
-		if not self.ai_enabled:
-			return await self._perform_basic_validation(data_source, validation_rules)
-		
-		validation_results = await self.revolutionary_engine.validate_financial_data_quality(
-			data_source, validation_rules
-		)
-		
-		# Convert validation results to dictionary format
-		return [
-			{
-				'validation_id': result.validation_id,
-				'severity': result.severity.value,
-				'rule_violated': result.rule_violated,
-				'description': result.description,
-				'affected_accounts': result.affected_accounts,
-				'recommended_actions': result.recommended_actions,
-				'auto_correctable': result.auto_correctable,
-				'correction_applied': result.correction_applied
-			}
-			for result in validation_results
-		]
-	
-	async def create_adaptive_template(self, base_template_id: str, 
-									  usage_patterns: Dict[str, Any],
-									  user_preferences: Dict[str, Any]) -> Dict[str, Any]:
-		"""Create adaptive template that learns from usage patterns."""
-		if not self.ai_enabled:
-			raise ValueError("Adaptive templates require AI features")
-		
-		return await self.revolutionary_engine.generate_adaptive_template(
-			base_template_id, usage_patterns, user_preferences
-		)
-	
-	# Enhanced Template Management with AI
-	
-	def create_report_template(self, template_data: Dict[str, Any]) -> CFRFReportTemplate:
-		"""Create a new financial report template with optional AI enhancements"""
-		assert 'template_code' in template_data, "Template code is required"
-		assert 'template_name' in template_data, "Template name is required"
-		assert 'statement_type' in template_data, "Statement type is required"
-		
-		# Set AI enhancement defaults
-		ai_intelligence_level = template_data.get('ai_intelligence_level', 'standard')
-		if self.ai_enabled and ai_intelligence_level == 'auto':
-			ai_intelligence_level = 'enhanced'
-		
-		template = CFRFReportTemplate(
-			tenant_id=self.tenant_id,
-			template_code=template_data['template_code'],
-			template_name=template_data['template_name'],
-			description=template_data.get('description'),
-			statement_type=template_data['statement_type'],
-			category=template_data.get('category', 'standard'),
-			format_type=template_data.get('format_type', 'comparative'),
-			is_system=template_data.get('is_system', False),
-			is_active=template_data.get('is_active', True),
-			version=template_data.get('version', '1.0'),
-			currency_type=template_data.get('currency_type', 'single'),
-			show_percentages=template_data.get('show_percentages', False),
-			show_variances=template_data.get('show_variances', False),
-			decimal_places=template_data.get('decimal_places', 2),
-			
-			# Revolutionary AI Enhancement Features
-			ai_intelligence_level=ai_intelligence_level,
-			auto_narrative_generation=template_data.get('auto_narrative_generation', self.ai_enabled),
-			predictive_insights_enabled=template_data.get('predictive_insights_enabled', self.ai_enabled),
-			adaptive_formatting=template_data.get('adaptive_formatting', self.ai_enabled),
-			natural_language_interface=template_data.get('natural_language_interface', self.ai_enabled),
-			voice_activation_enabled=template_data.get('voice_activation_enabled', False),
-			
-			# Real-Time Collaboration Features
-			real_time_collaboration=template_data.get('real_time_collaboration', True),
-			conflict_resolution_mode=template_data.get('conflict_resolution_mode', 'intelligent'),
-			version_control_enabled=template_data.get('version_control_enabled', True),
-			
-			# Advanced AI Configuration
-			ai_model_preferences=template_data.get('ai_model_preferences'),
-			natural_language_prompts=template_data.get('natural_language_prompts'),
-			predictive_model_config=template_data.get('predictive_model_config'),
-			personalization_data=template_data.get('personalization_data'),
-			
-			configuration=template_data.get('configuration')
-		)
-		
-		db.session.add(template)
-		db.session.commit()
-		
-		# Cache template for performance
-		self.template_cache[template.template_id] = template
-		
-		self._log_template_creation(template)
-		return template
-	
-	def get_report_template(self, template_id: str) -> Optional[CFRFReportTemplate]:
-		"""Get a report template by ID"""
-		return db.session.query(CFRFReportTemplate).filter(
-			and_(
-				CFRFReportTemplate.template_id == template_id,
-				CFRFReportTemplate.tenant_id == self.tenant_id
-			)
-		).first()
-	
-	def get_templates_by_type(self, statement_type: str) -> List[CFRFReportTemplate]:
-		"""Get all templates for a specific statement type"""
-		return db.session.query(CFRFReportTemplate).filter(
-			and_(
-				CFRFReportTemplate.tenant_id == self.tenant_id,
-				CFRFReportTemplate.statement_type == statement_type,
-				CFRFReportTemplate.is_active == True
-			)
-		).order_by(CFRFReportTemplate.template_name).all()
-	
-	# Report Definition Management
-	
-	def create_report_definition(self, definition_data: Dict[str, Any]) -> CFRFReportDefinition:
-		"""Create a report definition for a template"""
-		assert 'template_id' in definition_data, "Template ID is required"
-		assert 'definition_name' in definition_data, "Definition name is required"
-		
-		definition = CFRFReportDefinition(
-			tenant_id=self.tenant_id,
-			template_id=definition_data['template_id'],
-			definition_name=definition_data['definition_name'],
-			description=definition_data.get('description'),
-			version=definition_data.get('version', '1.0'),
-			calculation_method=definition_data.get('calculation_method', 'standard'),
-			balance_check=definition_data.get('balance_check', True),
-			zero_suppression=definition_data.get('zero_suppression', False),
-			period_type=definition_data.get('period_type', 'monthly'),
-			periods_to_show=definition_data.get('periods_to_show', 1),
-			comparative_periods=definition_data.get('comparative_periods', 0),
-			consolidation_required=definition_data.get('consolidation_required', False),
-			requires_approval=definition_data.get('requires_approval', True),
-			calculation_rules=definition_data.get('calculation_rules'),
-			formatting_rules=definition_data.get('formatting_rules')
-		)
-		
-		db.session.add(definition)
-		db.session.commit()
-		
-		return definition
-	
-	def add_report_lines(self, definition_id: str, lines_data: List[Dict[str, Any]]) -> List[CFRFReportLine]:
-		"""Add report lines to a definition"""
-		lines = []
-		
-		for line_data in lines_data:
-			line = CFRFReportLine(
-				tenant_id=self.tenant_id,
-				definition_id=definition_id,
-				line_code=line_data['line_code'],
-				line_name=line_data['line_name'],
-				description=line_data.get('description'),
-				parent_line_id=line_data.get('parent_line_id'),
-				level=line_data.get('level', 0),
-				sort_order=line_data.get('sort_order', 0),
-				section_name=line_data.get('section_name'),
-				line_type=line_data.get('line_type', 'detail'),
-				data_source=line_data.get('data_source', 'accounts'),
-				calculation_method=line_data.get('calculation_method'),
-				account_filter=line_data.get('account_filter'),
-				account_type_filter=line_data.get('account_type_filter'),
-				include_children=line_data.get('include_children', True),
-				formula=line_data.get('formula'),
-				sign_reversal=line_data.get('sign_reversal', False),
-				absolute_value=line_data.get('absolute_value', False),
-				indent_level=line_data.get('indent_level', 0),
-				bold=line_data.get('bold', False),
-				show_line=line_data.get('show_line', True),
-				note_reference=line_data.get('note_reference'),
-				line_attributes=line_data.get('line_attributes')
-			)
-			lines.append(line)
-			db.session.add(line)
-		
-		db.session.commit()
-		
-		# Update line count in definition
-		definition = self.get_report_definition(definition_id)
-		if definition:
-			definition.line_count = len(lines)
-			db.session.commit()
-		
-		return lines
-	
-	def get_report_definition(self, definition_id: str) -> Optional[CFRFReportDefinition]:
-		"""Get a report definition by ID"""
-		return db.session.query(CFRFReportDefinition).filter(
-			and_(
-				CFRFReportDefinition.definition_id == definition_id,
-				CFRFReportDefinition.tenant_id == self.tenant_id
-			)
-		).first()
-	
-	# Report Period Management
-	
-	def create_report_period(self, period_data: Dict[str, Any]) -> CFRFReportPeriod:
-		"""Create a new reporting period"""
-		assert 'period_code' in period_data, "Period code is required"
-		assert 'period_name' in period_data, "Period name is required"
-		assert 'start_date' in period_data, "Start date is required"
-		assert 'end_date' in period_data, "End date is required"
-		
-		start_date = period_data['start_date']
-		end_date = period_data['end_date']
-		days_in_period = (end_date - start_date).days + 1
-		
-		period = CFRFReportPeriod(
-			tenant_id=self.tenant_id,
-			period_code=period_data['period_code'],
-			period_name=period_data['period_name'],
-			description=period_data.get('description'),
-			period_type=period_data.get('period_type', 'month'),
-			fiscal_year=period_data.get('fiscal_year', start_date.year),
-			period_number=period_data.get('period_number'),
-			start_date=start_date,
-			end_date=end_date,
-			days_in_period=days_in_period,
-			is_current=period_data.get('is_current', False),
-			is_closed=period_data.get('is_closed', False),
-			parent_period_id=period_data.get('parent_period_id'),
-			period_attributes=period_data.get('period_attributes')
-		)
-		
-		db.session.add(period)
-		db.session.commit()
-		
-		return period
-	
-	def get_current_period(self, period_type: str = 'month') -> Optional[CFRFReportPeriod]:
-		"""Get the current reporting period"""
-		return db.session.query(CFRFReportPeriod).filter(
-			and_(
-				CFRFReportPeriod.tenant_id == self.tenant_id,
-				CFRFReportPeriod.period_type == period_type,
-				CFRFReportPeriod.is_current == True
-			)
-		).first()
-	
-	def get_periods_in_range(self, start_date: date, end_date: date) -> List[CFRFReportPeriod]:
-		"""Get all periods within a date range"""
-		return db.session.query(CFRFReportPeriod).filter(
-			and_(
-				CFRFReportPeriod.tenant_id == self.tenant_id,
-				CFRFReportPeriod.start_date >= start_date,
-				CFRFReportPeriod.end_date <= end_date
-			)
-		).order_by(CFRFReportPeriod.start_date).all()
-	
-	# Financial Statement Generation
-	
-	def generate_financial_statement(self, generation_data: Dict[str, Any]) -> CFRFReportGeneration:
-		"""Generate a financial statement from a template"""
-		assert 'template_id' in generation_data, "Template ID is required"
-		assert 'period_id' in generation_data, "Period ID is required"
-		assert 'as_of_date' in generation_data, "As of date is required"
-		
-		# Create generation record
-		generation = CFRFReportGeneration(
-			tenant_id=self.tenant_id,
-			template_id=generation_data['template_id'],
-			period_id=generation_data['period_id'],
-			generation_name=generation_data.get('generation_name', 'Financial Statement Generation'),
-			description=generation_data.get('description'),
-			generation_type=generation_data.get('generation_type', 'standard'),
-			as_of_date=generation_data['as_of_date'],
-			include_adjustments=generation_data.get('include_adjustments', True),
-			consolidation_level=generation_data.get('consolidation_level'),
-			currency_code=generation_data.get('currency_code', 'USD'),
-			output_format=generation_data.get('output_format', 'pdf'),
-			parameters=generation_data.get('parameters')
-		)
-		
-		db.session.add(generation)
-		db.session.flush()  # Get the ID
-		
-		try:
-			# Update status to running
-			generation.status = 'running'
-			generation.start_time = datetime.now()
-			generation.progress_percentage = 0
-			db.session.commit()
-			
-			# Get template and definition
-			template = self.get_report_template(generation_data['template_id'])
-			if not template:
-				raise ValueError("Template not found")
-			
-			definition = template.report_definitions[0] if template.report_definitions else None
-			if not definition:
-				raise ValueError("No report definition found for template")
-			
-			# Generate statement data
-			statement_data = self._generate_statement_data(generation, template, definition)
-			
-			# Create financial statement record
-			statement = CFRFFinancialStatement(
-				tenant_id=self.tenant_id,
-				generation_id=generation.generation_id,
-				period_id=generation_data['period_id'],
-				statement_name=f"{template.template_name} - {generation_data['as_of_date']}",
-				statement_type=template.statement_type,
-				as_of_date=generation_data['as_of_date'],
-				currency_code=generation.currency_code,
-				reporting_entity=generation_data.get('reporting_entity'),
-				consolidation_level=generation.consolidation_level,
-				statement_data=statement_data,
-				calculation_details=self._get_calculation_details(statement_data)
-			)
-			
-			# Extract key financial metrics
-			self._extract_financial_metrics(statement, statement_data, template.statement_type)
-			
-			db.session.add(statement)
-			db.session.flush()
-			
-			# Verify balance if balance sheet
-			if template.statement_type == 'balance_sheet':
-				balance_diff = self._verify_balance_sheet(statement_data)
-				statement.balance_difference = balance_diff
-				generation.balance_verified = abs(balance_diff or 0) < 0.01
-			
-			# Update generation status
-			generation.status = 'completed'
-			generation.end_time = datetime.now()
-			generation.duration_seconds = int((generation.end_time - generation.start_time).total_seconds())
-			generation.progress_percentage = 100
-			
-			db.session.commit()
-			
-			self._log_statement_generation(generation, statement)
-			
-		except Exception as e:
-			generation.status = 'failed'
-			generation.end_time = datetime.now()
-			generation.error_count = 1
-			generation.generation_log = {'error': str(e)}
-			db.session.commit()
-			raise
-		
-		return generation
-	
-	def _generate_statement_data(self, generation: CFRFReportGeneration, 
-								template: CFRFReportTemplate, 
-								definition: CFRFReportDefinition) -> Dict[str, Any]:
-		"""Generate the actual statement data from GL accounts"""
-		statement_data = {
-			'lines': [],
-			'metadata': {
-				'generation_date': datetime.now().isoformat(),
-				'template_code': template.template_code,
-				'definition_version': definition.version,
-				'currency': generation.currency_code
-			}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_template", template_id),
+			"template_id": template_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"statement_type": statement_type,
+			"owner": owner,
+			"line_count": 0,
+			"status": "draft",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
 		}
-		
-		# Get report lines ordered by sort order
-		report_lines = db.session.query(CFRFReportLine).filter(
-			CFRFReportLine.definition_id == definition.definition_id
-		).order_by(CFRFReportLine.sort_order).all()
-		
-		for line in report_lines:
-			line_data = self._calculate_line_value(line, generation)
-			statement_data['lines'].append(line_data)
-			
-			# Update progress
-			progress = min(95, int((len(statement_data['lines']) / len(report_lines)) * 90))
-			generation.progress_percentage = progress
-			db.session.commit()
-		
-		return statement_data
-	
-	def _calculate_line_value(self, line: CFRFReportLine, generation: CFRFReportGeneration) -> Dict[str, Any]:
-		"""Calculate the value for a specific report line"""
-		line_data = {
-			'line_code': line.line_code,
-			'line_name': line.line_name,
-			'line_type': line.line_type,
-			'level': line.level,
-			'indent_level': line.indent_level,
-			'formatting': {
-				'bold': line.bold,
-				'italic': line.italic,
-				'underline': line.underline
-			},
-			'show_line': line.show_line,
-			'current_value': Decimal('0.00'),
-			'prior_value': None,
-			'variance': None,
-			'percentage': None
+		self._templates[record["id"]] = record
+		self._emit("template_created", tenant_id, record["id"], {"statement_type": statement_type})
+		return deepcopy(record)
+
+	def add_report_line(self, line_id: str, tenant_id: str, template_record_id: str, label: str, account_mapping: str, sort_order: int | None, line_type: str = "detail") -> dict[str, Any]:
+		template = self._require_template(template_record_id, tenant_id) if template_record_id else None
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "add_report_line",
+			"template_present": template is not None,
+			"account_mapping_present": bool(account_mapping),
+			"sort_order_present": sort_order is not None,
 		}
-		
-		if line.data_source == 'accounts' and line.account_filter:
-			# Calculate from GL accounts
-			value = self._calculate_account_balance(
-				line.account_filter,
-				generation.as_of_date,
-				line.account_type_filter,
-				line.include_children
-			)
-			
-			if line.sign_reversal:
-				value = -value
-			if line.absolute_value:
-				value = abs(value)
-				
-			line_data['current_value'] = value
-			
-		elif line.data_source == 'calculation' and line.formula:
-			# Calculate from formula
-			line_data['current_value'] = self._evaluate_formula(line.formula, generation)
-			
-		elif line.data_source == 'manual':
-			# Manual entry - would come from user input or configuration
-			line_data['current_value'] = Decimal('0.00')
-		
-		return line_data
-	
-	def _calculate_account_balance(self, account_filter: str, as_of_date: date, 
-								  account_type_filter: Optional[str] = None,
-								  include_children: bool = True) -> Decimal:
-		"""Calculate balance from GL accounts based on filter criteria"""
-		# Build account query
-		query = db.session.query(func.sum(CFGLPosting.amount)).join(CFGLAccount)
-		
-		# Apply tenant filter
-		query = query.filter(CFGLAccount.tenant_id == self.tenant_id)
-		
-		# Apply date filter
-		query = query.filter(CFGLPosting.posting_date <= as_of_date)
-		
-		# Apply account filter (supports wildcards)
-		if '*' in account_filter:
-			pattern = account_filter.replace('*', '%')
-			query = query.filter(CFGLAccount.account_code.like(pattern))
-		else:
-			# Exact match or range
-			if '-' in account_filter:
-				start, end = account_filter.split('-')
-				query = query.filter(
-					and_(
-						CFGLAccount.account_code >= start.strip(),
-						CFGLAccount.account_code <= end.strip()
-					)
-				)
-			else:
-				query = query.filter(CFGLAccount.account_code == account_filter)
-		
-		# Apply account type filter if specified
-		if account_type_filter:
-			query = query.join(CFGLAccount.account_type).filter(
-				CFGLAccount.account_type.has(type_code=account_type_filter)
-			)
-		
-		result = query.scalar()
-		return result or Decimal('0.00')
-	
-	def _evaluate_formula(self, formula: str, generation: CFRFReportGeneration) -> Decimal:
-		"""Evaluate a calculation formula"""
-		# This is a simplified formula evaluator
-		# In production, you'd want a more robust formula parser
-		
-		# Replace line references with actual values
-		# Formula might be like: "LINE001 + LINE002 - LINE003"
-		
-		# For now, return zero - this would need proper implementation
-		return Decimal('0.00')
-	
-	def _extract_financial_metrics(self, statement: CFRFFinancialStatement, 
-								   statement_data: Dict[str, Any], 
-								   statement_type: str):
-		"""Extract key financial metrics from statement data"""
-		lines = statement_data.get('lines', [])
-		
-		if statement_type == 'balance_sheet':
-			# Extract balance sheet metrics
-			for line in lines:
-				line_code = line.get('line_code', '').upper()
-				value = line.get('current_value', 0)
-				
-				if 'TOTAL_ASSETS' in line_code:
-					statement.total_assets = value
-				elif 'TOTAL_LIABILITIES' in line_code:
-					statement.total_liabilities = value
-				elif 'TOTAL_EQUITY' in line_code:
-					statement.total_equity = value
-					
-		elif statement_type == 'income_statement':
-			# Extract income statement metrics
-			for line in lines:
-				line_code = line.get('line_code', '').upper()
-				value = line.get('current_value', 0)
-				
-				if 'TOTAL_REV' in line_code or 'TOTAL_SALES' in line_code:
-					statement.total_revenue = value
-				elif 'NET_INCOME' in line_code:
-					statement.net_income = value
-	
-	def _verify_balance_sheet(self, statement_data: Dict[str, Any]) -> Decimal:
-		"""Verify that balance sheet balances (Assets = Liabilities + Equity)"""
-		lines = statement_data.get('lines', [])
-		
-		total_assets = Decimal('0.00')
-		total_liabilities = Decimal('0.00')
-		total_equity = Decimal('0.00')
-		
-		for line in lines:
-			line_code = line.get('line_code', '').upper()
-			value = line.get('current_value', 0)
-			
-			if 'TOTAL_ASSETS' in line_code:
-				total_assets = Decimal(str(value))
-			elif 'TOTAL_LIABILITIES' in line_code:
-				total_liabilities = Decimal(str(value))
-			elif 'TOTAL_EQUITY' in line_code:
-				total_equity = Decimal(str(value))
-		
-		return total_assets - (total_liabilities + total_equity)
-	
-	def _get_calculation_details(self, statement_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Get detailed calculation breakdown"""
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_line", line_id),
+			"line_id": line_id,
+			"tenant_id": tenant_id,
+			"template_record_id": template["id"],
+			"label": label,
+			"account_mapping": account_mapping,
+			"sort_order": sort_order,
+			"line_type": line_type,
+			"status": "active",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._report_lines[record["id"]] = record
+		template["line_count"] = len(self.list_report_lines(tenant_id, template["id"]))
+		template["status"] = "mapped"
+		template["updated_at"] = self._now()
+		self._emit("report_line_added", tenant_id, record["id"], {"template_id": template["template_id"], "account_mapping": account_mapping})
+		return deepcopy(record)
+
+	def open_period(self, period_id: str, tenant_id: str, name: str, period_start: str, period_end: str, close_status: str = "open") -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "open_period",
+			"period_name_present": bool(name),
+			"period_dates_present": bool(period_start) and bool(period_end),
+			"period_range_valid": self._period_range_valid(period_start, period_end),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_period", period_id),
+			"period_id": period_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"period_start": period_start,
+			"period_end": period_end,
+			"close_status": close_status,
+			"status": "open",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._periods[record["id"]] = record
+		self._emit("period_opened", tenant_id, record["id"], {"period_id": period_id})
+		return deepcopy(record)
+
+	def generate_report(self, generation_id: str, tenant_id: str, template_record_id: str, period_record_id: str, output_format: str, data_quality_score: float = 1.0, quality_reviewed_by: str | None = None) -> dict[str, Any]:
+		template = self._require_template(template_record_id, tenant_id) if template_record_id else None
+		period = self._require_period(period_record_id, tenant_id) if period_record_id else None
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "generate_report",
+			"template_present": template is not None,
+			"period_present": period is not None,
+			"template_line_count": template["line_count"] if template else 0,
+			"output_format_supported": output_format in SUPPORTED_OUTPUT_FORMATS,
+			"data_quality_score": data_quality_score,
+			"quality_review_recorded": bool(quality_reviewed_by),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_generation", generation_id),
+			"generation_id": generation_id,
+			"tenant_id": tenant_id,
+			"template_record_id": template["id"],
+			"period_record_id": period["id"],
+			"output_format": output_format,
+			"data_quality_score": float(data_quality_score),
+			"quality_reviewed_by": quality_reviewed_by,
+			"status": "generated",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._generations[record["id"]] = record
+		self._emit("report_generated", tenant_id, record["id"], {"output_format": output_format, "data_quality_score": data_quality_score})
+		return deepcopy(record)
+
+	def publish_statement(self, statement_id: str, tenant_id: str, generation_record_id: str, title: str, balance_check_passed: bool, approved_by: str, narrative_reviewed_by: str) -> dict[str, Any]:
+		generation = self._require_generation(generation_record_id, tenant_id) if generation_record_id else None
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "publish_statement",
+			"generation_present": generation is not None,
+			"balance_check_passed": balance_check_passed,
+			"approval_recorded": bool(approved_by),
+			"narrative_review_recorded": bool(narrative_reviewed_by),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_statement", statement_id),
+			"statement_id": statement_id,
+			"tenant_id": tenant_id,
+			"generation_record_id": generation["id"],
+			"title": title,
+			"balance_check_passed": balance_check_passed,
+			"approved_by": approved_by,
+			"narrative_reviewed_by": narrative_reviewed_by,
+			"status": "published",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._statements[record["id"]] = record
+		self._emit("statement_published", tenant_id, record["id"], {"title": title, "approved_by": approved_by})
+		return deepcopy(record)
+
+	def create_consolidation(self, consolidation_id: str, tenant_id: str, parent_entity: str, subsidiary_entity: str, method: str, ownership_percent: float, elimination_reviewed_by: str | None = None) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "create_consolidation",
+			"parent_entity_present": bool(parent_entity),
+			"subsidiary_entity_present": bool(subsidiary_entity),
+			"ownership_out_of_bounds": ownership_percent < 0 or ownership_percent > 100,
+			"elimination_review_recorded": bool(elimination_reviewed_by),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_consolidation", consolidation_id),
+			"consolidation_id": consolidation_id,
+			"tenant_id": tenant_id,
+			"parent_entity": parent_entity,
+			"subsidiary_entity": subsidiary_entity,
+			"method": method,
+			"ownership_percent": float(ownership_percent),
+			"elimination_reviewed_by": elimination_reviewed_by,
+			"status": "reviewed",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._consolidations[record["id"]] = record
+		self._emit("consolidation_created", tenant_id, record["id"], {"parent_entity": parent_entity, "subsidiary_entity": subsidiary_entity})
+		return deepcopy(record)
+
+	def record_disclosure(self, disclosure_id: str, tenant_id: str, statement_record_id: str, title: str, owner: str, reviewed_by: str) -> dict[str, Any]:
+		statement = self._require_statement(statement_record_id, tenant_id) if statement_record_id else None
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "record_disclosure",
+			"statement_present": statement is not None,
+			"owner_present": bool(owner),
+			"disclosure_review_recorded": bool(reviewed_by),
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_disclosure", disclosure_id),
+			"disclosure_id": disclosure_id,
+			"tenant_id": tenant_id,
+			"statement_record_id": statement["id"],
+			"title": title,
+			"owner": owner,
+			"reviewed_by": reviewed_by,
+			"status": "reviewed",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._disclosures[record["id"]] = record
+		self._emit("disclosure_recorded", tenant_id, record["id"], {"title": title})
+		return deepcopy(record)
+
+	def distribute_statement(self, distribution_id: str, tenant_id: str, statement_record_id: str, recipients: list[str], output_format: str) -> dict[str, Any]:
+		statement = self._require_statement(statement_record_id, tenant_id) if statement_record_id else None
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "distribute_statement",
+			"statement_present": statement is not None,
+			"statement_approved": statement is not None and bool(statement.get("approved_by")),
+			"recipient_present": bool(recipients),
+			"distribution_format_supported": output_format in SUPPORTED_OUTPUT_FORMATS,
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_distribution", distribution_id),
+			"distribution_id": distribution_id,
+			"tenant_id": tenant_id,
+			"statement_record_id": statement["id"],
+			"recipients": list(recipients),
+			"output_format": output_format,
+			"status": "distributed",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._distributions[record["id"]] = record
+		self._emit("statement_distributed", tenant_id, record["id"], {"recipient_count": len(recipients), "output_format": output_format})
+		return deepcopy(record)
+
+	def register_rpt_agent(self, tenant_id: str, name: str, runtime: str, role: str, instructions: str) -> dict[str, Any]:
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation_type": "write",
+			"policy_attached": True,
+			"operation": "register_rpt_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_RPT_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_RPT_AGENT_ROLES,
+		}
+		self._enforce(context)
+		record = {
+			"id": self._record_id("rpt_agent", name),
+			"tenant_id": tenant_id,
+			"name": name,
+			"runtime": runtime,
+			"role": role,
+			"instructions": instructions,
+			"status": "active",
+			"event_stream": "bytewax",
+			"updated_at": self._now(),
+		}
+		self._agents[record["id"]] = record
+		self._emit("rpt_agent_registered", tenant_id, record["id"], {"runtime": runtime, "role": role})
+		return deepcopy(record)
+
+	def validate_agent_rpt_action(self, tenant_id: str, agent_id: str, action: str, privileged_scope: bool, human_approval_recorded: bool) -> dict[str, Any]:
+		if agent_id not in self._agents:
+			raise KeyError(f"Unknown RPT agent: {agent_id}")
+		context = {"tenant_context_present": bool(tenant_id), "operation": "agent_rpt_action", "action": action, "privileged_scope": privileged_scope, "human_approval_recorded": human_approval_recorded}
+		return evaluate_capability_rules(context)
+
+	def validate_batch(self, tenant_id: str, record_count: int, event_stream: str = "bytewax") -> dict[str, Any]:
+		context = {"tenant_context_present": bool(tenant_id), "operation": "rpt_batch", "event_stream": event_stream}
+		result = evaluate_capability_rules(context)
+		return {"processor": "bytewax", "record_count": record_count, "decision": result["decision"], "matched_rules": result["matched_rules"]}
+
+	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
 		return {
-			'calculation_method': 'standard',
-			'total_lines': len(statement_data.get('lines', [])),
-			'calculation_date': datetime.now().isoformat()
+			"tenant_id": tenant_id,
+			"template_count": len(self.list_templates(tenant_id)),
+			"report_line_count": len(self.list_report_lines(tenant_id)),
+			"period_count": len(self.list_periods(tenant_id)),
+			"generation_count": len(self.list_generations(tenant_id)),
+			"published_statement_count": len([item for item in self.list_statements(tenant_id) if item["status"] == "published"]),
+			"consolidation_count": len(self.list_consolidations(tenant_id)),
+			"disclosure_count": len(self.list_disclosures(tenant_id)),
+			"distribution_count": len(self.list_distributions(tenant_id)),
+			"rpt_agent_count": len(self.list_rpt_agents(tenant_id)),
+			"audit_event_count": len(self.audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
 		}
-	
-	# Consolidation Management
-	
-	def create_consolidation(self, consolidation_data: Dict[str, Any]) -> CFRFConsolidation:
-		"""Create a new consolidation rule"""
-		assert 'consolidation_code' in consolidation_data, "Consolidation code is required"
-		assert 'parent_entity' in consolidation_data, "Parent entity is required"
-		assert 'subsidiary_entity' in consolidation_data, "Subsidiary entity is required"
-		
-		consolidation = CFRFConsolidation(
-			tenant_id=self.tenant_id,
-			consolidation_code=consolidation_data['consolidation_code'],
-			consolidation_name=consolidation_data.get('consolidation_name', 
-													 f"{consolidation_data['parent_entity']} - {consolidation_data['subsidiary_entity']}"),
-			description=consolidation_data.get('description'),
-			parent_entity=consolidation_data['parent_entity'],
-			subsidiary_entity=consolidation_data['subsidiary_entity'],
-			consolidation_method=consolidation_data.get('consolidation_method', 'full'),
-			ownership_percentage=Decimal(str(consolidation_data.get('ownership_percentage', 100.0))),
-			voting_percentage=consolidation_data.get('voting_percentage'),
-			acquisition_date=consolidation_data.get('acquisition_date'),
-			eliminate_intercompany=consolidation_data.get('eliminate_intercompany', True),
-			currency_translation_method=consolidation_data.get('currency_translation_method'),
-			functional_currency=consolidation_data.get('functional_currency'),
-			reporting_currency=consolidation_data.get('reporting_currency', 'USD'),
-			effective_from=consolidation_data.get('effective_from', date.today()),
-			effective_to=consolidation_data.get('effective_to'),
-			consolidation_rules=consolidation_data.get('consolidation_rules')
-		)
-		
-		db.session.add(consolidation)
-		db.session.commit()
-		
-		return consolidation
-	
-	def perform_consolidation(self, consolidation_id: str, period_id: str) -> Dict[str, Any]:
-		"""Perform consolidation for a specific period"""
-		consolidation = db.session.query(CFRFConsolidation).filter(
-			and_(
-				CFRFConsolidation.consolidation_id == consolidation_id,
-				CFRFConsolidation.tenant_id == self.tenant_id
-			)
-		).first()
-		
-		if not consolidation:
-			raise ValueError("Consolidation not found")
-		
-		# This is a simplified consolidation process
-		# In production, this would involve complex consolidation logic
-		
-		consolidation_result = {
-			'consolidation_id': consolidation_id,
-			'period_id': period_id,
-			'method': consolidation.consolidation_method,
-			'ownership_percentage': float(consolidation.ownership_percentage),
-			'entities_consolidated': [consolidation.parent_entity, consolidation.subsidiary_entity],
-			'elimination_entries': [],
-			'consolidated_balances': {},
-			'consolidation_date': datetime.now().isoformat()
-		}
-		
-		return consolidation_result
-	
-	# Notes and Disclosures Management
-	
-	def create_statement_note(self, note_data: Dict[str, Any]) -> CFRFNotes:
-		"""Create a financial statement note"""
-		assert 'statement_id' in note_data, "Statement ID is required"
-		assert 'note_number' in note_data, "Note number is required"
-		assert 'note_title' in note_data, "Note title is required"
-		
-		note = CFRFNotes(
-			tenant_id=self.tenant_id,
-			statement_id=note_data['statement_id'],
-			note_number=note_data['note_number'],
-			note_title=note_data['note_title'],
-			note_category=note_data.get('note_category', 'disclosure'),
-			note_text=note_data.get('note_text', ''),
-			note_format=note_data.get('note_format', 'text'),
-			is_required=note_data.get('is_required', False),
-			is_standard=note_data.get('is_standard', False),
-			sort_order=note_data.get('sort_order', 0),
-			referenced_accounts=note_data.get('referenced_accounts'),
-			referenced_lines=note_data.get('referenced_lines'),
-			note_attributes=note_data.get('note_attributes')
-		)
-		
-		db.session.add(note)
-		db.session.commit()
-		
-		return note
-	
-	def create_disclosure(self, disclosure_data: Dict[str, Any]) -> CFRFDisclosure:
-		"""Create a regulatory disclosure"""
-		assert 'statement_id' in disclosure_data, "Statement ID is required"
-		assert 'disclosure_code' in disclosure_data, "Disclosure code is required"
-		assert 'disclosure_title' in disclosure_data, "Disclosure title is required"
-		
-		disclosure = CFRFDisclosure(
-			tenant_id=self.tenant_id,
-			statement_id=disclosure_data['statement_id'],
-			disclosure_code=disclosure_data['disclosure_code'],
-			disclosure_title=disclosure_data['disclosure_title'],
-			disclosure_type=disclosure_data.get('disclosure_type', 'regulatory'),
-			regulation_framework=disclosure_data.get('regulation_framework'),
-			regulation_section=disclosure_data.get('regulation_section'),
-			compliance_level=disclosure_data.get('compliance_level'),
-			disclosure_text=disclosure_data.get('disclosure_text', ''),
-			disclosure_format=disclosure_data.get('disclosure_format', 'text'),
-			supporting_data=disclosure_data.get('supporting_data'),
-			risk_category=disclosure_data.get('risk_category'),
-			risk_level=disclosure_data.get('risk_level'),
-			mitigation_measures=disclosure_data.get('mitigation_measures'),
-			effective_from=disclosure_data.get('effective_from', date.today()),
-			effective_to=disclosure_data.get('effective_to'),
-			review_frequency=disclosure_data.get('review_frequency'),
-			disclosure_attributes=disclosure_data.get('disclosure_attributes')
-		)
-		
-		db.session.add(disclosure)
-		db.session.commit()
-		
-		return disclosure
-	
-	# Analytical Reporting
-	
-	def create_analytical_report(self, report_data: Dict[str, Any]) -> CFRFAnalyticalReport:
-		"""Create a custom analytical report"""
-		assert 'report_code' in report_data, "Report code is required"
-		assert 'report_name' in report_data, "Report name is required"
-		assert 'report_type' in report_data, "Report type is required"
-		
-		report = CFRFAnalyticalReport(
-			tenant_id=self.tenant_id,
-			consolidation_id=report_data.get('consolidation_id'),
-			report_code=report_data['report_code'],
-			report_name=report_data['report_name'],
-			description=report_data.get('description'),
-			report_type=report_data['report_type'],
-			report_category=report_data.get('report_category', 'management'),
-			analysis_type=report_data.get('analysis_type', 'period_comparison'),
-			analysis_periods=report_data.get('analysis_periods', 12),
-			comparison_basis=report_data.get('comparison_basis'),
-			account_selection=report_data.get('account_selection'),
-			entity_selection=report_data.get('entity_selection'),
-			dimension_filters=report_data.get('dimension_filters'),
-			chart_types=report_data.get('chart_types'),
-			key_metrics=report_data.get('key_metrics'),
-			threshold_values=report_data.get('threshold_values'),
-			is_scheduled=report_data.get('is_scheduled', False),
-			schedule_frequency=report_data.get('schedule_frequency'),
-			output_formats=report_data.get('output_formats'),
-			default_format=report_data.get('default_format', 'pdf'),
-			is_public=report_data.get('is_public', False),
-			restricted_access=report_data.get('restricted_access', False),
-			access_groups=report_data.get('access_groups'),
-			report_configuration=report_data.get('report_configuration'),
-			calculation_logic=report_data.get('calculation_logic')
-		)
-		
-		db.session.add(report)
-		db.session.commit()
-		
-		return report
-	
-	def generate_analytical_report(self, report_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-		"""Generate an analytical report"""
-		report = db.session.query(CFRFAnalyticalReport).filter(
-			and_(
-				CFRFAnalyticalReport.report_id == report_id,
-				CFRFAnalyticalReport.tenant_id == self.tenant_id
-			)
-		).first()
-		
-		if not report:
-			raise ValueError("Analytical report not found")
-		
-		# Generate report based on type and configuration
-		report_data = {
-			'report_id': report_id,
-			'report_name': report.report_name,
-			'report_type': report.report_type,
-			'analysis_type': report.analysis_type,
-			'generation_date': datetime.now().isoformat(),
-			'parameters': parameters,
-			'data': self._generate_analytical_data(report, parameters),
-			'charts': self._generate_charts(report, parameters),
-			'key_metrics': self._calculate_key_metrics(report, parameters)
-		}
-		
-		# Update last generated timestamp
-		report.last_generated = datetime.now()
-		db.session.commit()
-		
-		return report_data
-	
-	def _generate_analytical_data(self, report: CFRFAnalyticalReport, parameters: Dict[str, Any]) -> Dict[str, Any]:
-		"""Generate the analytical data for a report"""
-		# This would contain the actual analytical calculations
-		# based on the report configuration and parameters
-		
-		return {
-			'summary': {},
-			'details': [],
-			'trends': [],
-			'variances': []
-		}
-	
-	def _generate_charts(self, report: CFRFAnalyticalReport, parameters: Dict[str, Any]) -> List[Dict[str, Any]]:
-		"""Generate chart data for analytical report"""
-		charts = []
-		
-		if report.chart_types:
-			for chart_type in report.chart_types:
-				chart_data = {
-					'type': chart_type,
-					'title': f"{report.report_name} - {chart_type}",
-					'data': [],
-					'options': {}
-				}
-				charts.append(chart_data)
-		
-		return charts
-	
-	def _calculate_key_metrics(self, report: CFRFAnalyticalReport, parameters: Dict[str, Any]) -> Dict[str, Any]:
-		"""Calculate key performance indicators"""
-		metrics = {}
-		
-		if report.key_metrics:
-			for metric in report.key_metrics:
-				metrics[metric] = {
-					'value': 0,
-					'trend': 'stable',
-					'variance': 0,
-					'threshold_status': 'normal'
-				}
-		
-		return metrics
-	
-	# Report Distribution
-	
-	def create_distribution_list(self, distribution_data: Dict[str, Any]) -> CFRFReportDistribution:
-		"""Create a report distribution list"""
-		assert 'distribution_name' in distribution_data, "Distribution name is required"
-		assert 'distribution_type' in distribution_data, "Distribution type is required"
-		
-		distribution = CFRFReportDistribution(
-			tenant_id=self.tenant_id,
-			analytical_report_id=distribution_data.get('analytical_report_id'),
-			distribution_name=distribution_data['distribution_name'],
-			description=distribution_data.get('description'),
-			distribution_type=distribution_data['distribution_type'],
-			email_recipients=distribution_data.get('email_recipients'),
-			distribution_groups=distribution_data.get('distribution_groups'),
-			external_recipients=distribution_data.get('external_recipients'),
-			delivery_method=distribution_data.get('delivery_method', 'email'),
-			delivery_format=distribution_data.get('delivery_format', 'pdf'),
-			delivery_schedule=distribution_data.get('delivery_schedule'),
-			email_subject_template=distribution_data.get('email_subject_template'),
-			email_body_template=distribution_data.get('email_body_template'),
-			include_attachments=distribution_data.get('include_attachments', True),
-			file_path=distribution_data.get('file_path'),
-			file_naming_pattern=distribution_data.get('file_naming_pattern'),
-			encryption_required=distribution_data.get('encryption_required', False),
-			password_protection=distribution_data.get('password_protection', False),
-			requires_approval=distribution_data.get('requires_approval', False),
-			configuration=distribution_data.get('configuration')
-		)
-		
-		db.session.add(distribution)
-		db.session.commit()
-		
-		return distribution
-	
-	def distribute_report(self, distribution_id: str, report_data: Dict[str, Any]) -> Dict[str, Any]:
-		"""Distribute a report using a distribution list"""
-		distribution = db.session.query(CFRFReportDistribution).filter(
-			and_(
-				CFRFReportDistribution.distribution_id == distribution_id,
-				CFRFReportDistribution.tenant_id == self.tenant_id
-			)
-		).first()
-		
-		if not distribution:
-			raise ValueError("Distribution list not found")
-		
-		distribution_result = {
-			'distribution_id': distribution_id,
-			'distribution_name': distribution.distribution_name,
-			'delivery_method': distribution.delivery_method,
-			'delivery_format': distribution.delivery_format,
-			'distribution_date': datetime.now().isoformat(),
-			'recipients': [],
-			'success_count': 0,
-			'failure_count': 0,
-			'status': 'completed'
-		}
-		
-		# Update distribution statistics
-		distribution.last_distribution = datetime.now()
-		distribution.distribution_count += 1
-		
-		# In a real implementation, this would handle actual distribution
-		# via email, file upload, API calls, etc.
-		
-		db.session.commit()
-		
-		return distribution_result
-	
-	# Utility and Logging Methods
-	
-	def _log_template_creation(self, template: CFRFReportTemplate):
-		"""Log template creation"""
-		print(f"Created report template: {template.template_name} ({template.template_code})")
-	
-	def _log_statement_generation(self, generation: CFRFReportGeneration, statement: CFRFFinancialStatement):
-		"""Log statement generation"""
-		print(f"Generated financial statement: {statement.statement_name} in {generation.duration_seconds}s")
-	
-	def get_financial_summary(self, period_id: str) -> Dict[str, Any]:
-		"""Get financial summary for a period"""
-		statements = db.session.query(CFRFFinancialStatement).filter(
-			and_(
-				CFRFFinancialStatement.tenant_id == self.tenant_id,
-				CFRFFinancialStatement.period_id == period_id,
-				CFRFFinancialStatement.is_final == True
-			)
-		).all()
-		
-		summary = {
-			'period_id': period_id,
-			'statement_count': len(statements),
-			'total_assets': sum(s.total_assets or 0 for s in statements if s.total_assets),
-			'total_liabilities': sum(s.total_liabilities or 0 for s in statements if s.total_liabilities),
-			'total_equity': sum(s.total_equity or 0 for s in statements if s.total_equity),
-			'total_revenue': sum(s.total_revenue or 0 for s in statements if s.total_revenue),
-			'net_income': sum(s.net_income or 0 for s in statements if s.net_income),
-			'statements': [
-				{
-					'statement_id': s.statement_id,
-					'statement_name': s.statement_name,
-					'statement_type': s.statement_type,
-					'as_of_date': s.as_of_date.isoformat() if s.as_of_date else None
-				}
-				for s in statements
-			]
-		}
-		
-		return summary
+
+	def statement_summary(self, tenant_id: str) -> dict[str, Any]:
+		statements = self.list_statements(tenant_id)
+		return {"tenant_id": tenant_id, "statement_count": len(statements), "published_count": len([item for item in statements if item["status"] == "published"])}
+
+	def distribution_summary(self, tenant_id: str) -> dict[str, Any]:
+		distributions = self.list_distributions(tenant_id)
+		return {"tenant_id": tenant_id, "distribution_count": len(distributions), "recipient_count": sum(len(item["recipients"]) for item in distributions)}
+
+	def list_templates(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._templates, tenant_id)
+
+	def list_report_lines(self, tenant_id: str, template_record_id: str | None = None) -> list[dict[str, Any]]:
+		records = self._tenant_records(self._report_lines, tenant_id)
+		if template_record_id:
+			records = [record for record in records if record["template_record_id"] == template_record_id]
+		return records
+
+	def list_periods(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._periods, tenant_id)
+
+	def list_generations(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._generations, tenant_id)
+
+	def list_statements(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._statements, tenant_id)
+
+	def list_consolidations(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._consolidations, tenant_id)
+
+	def list_disclosures(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._disclosures, tenant_id)
+
+	def list_distributions(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._distributions, tenant_id)
+
+	def list_rpt_agents(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._agents, tenant_id)
+
+	def audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
+		return [deepcopy(event) for event in self._audit_events if event["tenant_id"] == tenant_id]
+
+	def create_record(self, data: dict[str, Any]) -> dict[str, Any]:
+		return self.create_template(data.get("template_id", data.get("id", "template")), data.get("tenant_id", "default"), data.get("name", "Statement Template"), data.get("statement_type", "income_statement"), data.get("owner", "finance"))
+
+	def list_records(self, tenant_id: str = "default") -> list[dict[str, Any]]:
+		return self.list_templates(tenant_id)
+
+	def _require_template(self, template_id: str, tenant_id: str) -> dict[str, Any]:
+		return self._require_record(self._templates, template_id, tenant_id, "template", "template_id")
+
+	def _require_period(self, period_id: str, tenant_id: str) -> dict[str, Any]:
+		return self._require_record(self._periods, period_id, tenant_id, "period", "period_id")
+
+	def _require_generation(self, generation_id: str, tenant_id: str) -> dict[str, Any]:
+		return self._require_record(self._generations, generation_id, tenant_id, "generation", "generation_id")
+
+	def _require_statement(self, statement_id: str, tenant_id: str) -> dict[str, Any]:
+		return self._require_record(self._statements, statement_id, tenant_id, "statement", "statement_id")
+
+	def _require_record(self, records: dict[str, dict[str, Any]], record_id: str, tenant_id: str, label: str, public_key: str) -> dict[str, Any]:
+		for record in records.values():
+			if record["tenant_id"] == tenant_id and (record["id"] == record_id or record[public_key] == record_id):
+				return record
+		raise KeyError(f"Unknown {label}: {record_id}")
+
+	def _enforce(self, context: dict[str, Any]) -> None:
+		result = evaluate_capability_rules(context)
+		if result["decision"] == "deny":
+			raise PermissionError(",".join(result["matched_rules"]))
+		if result["decision"] == "require_review":
+			raise PermissionError(",".join(result["matched_rules"]))
+
+	def _tenant_records(self, records: dict[str, dict[str, Any]], tenant_id: str) -> list[dict[str, Any]]:
+		return [deepcopy(record) for record in records.values() if record["tenant_id"] == tenant_id]
+
+	def _emit(self, event_name: str, tenant_id: str, record_id: str, payload: dict[str, Any]) -> None:
+		self._audit_events.append({"event": event_name, "tenant_id": tenant_id, "record_id": record_id, "payload": deepcopy(payload), "processor": "bytewax", "stream": streaming_manifest()["stream"], "created_at": self._now()})
+
+	def _record_id(self, prefix: str, value: str) -> str:
+		slug = "".join(character.lower() if character.isalnum() else "_" for character in str(value)).strip("_")
+		return f"{prefix}_{slug or 'record'}"
+
+	def _period_range_valid(self, start: str, end: str) -> bool:
+		if not start or not end:
+			return False
+		return str(end) > str(start)
+
+	def _now(self) -> str:
+		return datetime.now(timezone.utc).isoformat()
+
+
+RPTService = FinancialReportingService

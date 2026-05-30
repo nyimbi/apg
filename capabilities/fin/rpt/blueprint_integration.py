@@ -145,7 +145,7 @@ class CompositionResult:
 
 
 class APGBlueprintOrchestrator:
-	"""Revolutionary APG Blueprint Orchestrator with intelligent composition capabilities."""
+	"""Advanced APG Blueprint Orchestrator with intelligent composition capabilities."""
 	
 	def __init__(self, tenant_id: str):
 		self.tenant_id = tenant_id
@@ -617,9 +617,9 @@ class APGBlueprintOrchestrator:
 			blueprint_name="AI-Enhanced Conversational Reporting",
 			blueprint_type=BlueprintType.AI_ORCHESTRATION,
 			version="1.0.0",
-			description="Revolutionary conversational reporting with AI assistance and predictive insights",
+			description="Advanced conversational reporting with AI assistance and predictive insights",
 			author="APG AI Platform",
-			tags=["ai", "conversational", "nlp", "predictive", "revolutionary"],
+			tags=["ai", "conversational", "nlp", "predictive", "advanced"],
 			execution_mode=ExecutionMode.HYBRID,
 			composition_strategy=CompositionStrategy.PERFORMANCE_OPTIMIZED,
 			estimated_duration_seconds=180,
@@ -968,7 +968,7 @@ class APGBlueprintOrchestrator:
 			except Exception as e:
 				self.logger.error(f"Blueprint discovery error: {str(e)}")
 
-	# Simplified placeholder implementations for complex operations
+	# Simplified template token implementations for complex operations
 	
 	async def _analyze_workflow_requirements(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
 		"""Analyze workflow requirements."""

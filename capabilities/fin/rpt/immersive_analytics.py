@@ -1,7 +1,7 @@
 """
 APG Financial Reporting - Immersive Analytics Dashboard
 
-Revolutionary 3D visualization and AR/VR-enabled financial analytics platform
+Advanced 3D visualization and AR/VR-enabled financial analytics platform
 with spatial data exploration, immersive KPI monitoring, and collaborative virtual reporting.
 
 © 2025 Datacraft. All rights reserved.
@@ -25,7 +25,7 @@ from .models import (
 	CFRFFinancialStatement, CFRFReportTemplate, CFRFReportPeriod,
 	ReportIntelligenceLevel
 )
-from .revolutionary_report_engine import RevolutionaryReportEngine
+from .advanced_report_engine import AdvancedReportEngine
 from ...auth_rbac.models import db
 
 
@@ -114,12 +114,12 @@ class VirtualEnvironment:
 
 
 class ImmersiveAnalyticsDashboard:
-	"""Revolutionary Immersive Analytics Dashboard with 3D/AR/VR capabilities."""
+	"""Advanced Immersive Analytics Dashboard with 3D/AR/VR capabilities."""
 	
 	def __init__(self, tenant_id: str, user_id: str):
 		self.tenant_id = tenant_id
 		self.user_id = user_id
-		self.report_engine = RevolutionaryReportEngine(tenant_id, {})
+		self.report_engine = AdvancedReportEngine(tenant_id, {})
 		
 		# 3D rendering configuration
 		self.render_config = {

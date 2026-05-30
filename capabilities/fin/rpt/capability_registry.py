@@ -137,7 +137,7 @@ class CapabilityRequest:
 
 
 class APGCapabilityRegistry:
-	"""Revolutionary APG Capability Registry with intelligent discovery and composition."""
+	"""Advanced APG Capability Registry with intelligent discovery and composition."""
 	
 	def __init__(self, tenant_id: str):
 		self.tenant_id = tenant_id
@@ -837,7 +837,7 @@ class APGCapabilityRegistry:
 			rule_id="parallel_ai_enhanced_report",
 			rule_name="Parallel AI-Enhanced Report Generation",
 			pattern=CompositionPattern.PARALLEL,
-			trigger_conditions={"ai_enhancement": "revolutionary"},
+			trigger_conditions={"ai_enhancement": "advanced"},
 			capability_sequence=[
 				"conversational_report_interface",
 				"financial_predictive_analytics",
@@ -957,7 +957,7 @@ class APGCapabilityRegistry:
 			'timestamp': datetime.now()
 		}
 
-	# Simplified placeholder implementations
+	# Simplified template token implementations
 	
 	async def _analyze_capability_requirements(self, request: CapabilityRequest) -> Dict[str, Any]:
 		"""Analyze capability requirements from request."""

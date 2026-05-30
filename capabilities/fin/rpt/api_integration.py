@@ -124,7 +124,7 @@ class APIResponse:
 
 
 class APGServiceOrchestrator:
-	"""Revolutionary APG Service Orchestration Engine with intelligent load balancing."""
+	"""Advanced APG Service Orchestration Engine with intelligent load balancing."""
 	
 	def __init__(self, tenant_id: str):
 		self.tenant_id = tenant_id
@@ -711,7 +711,7 @@ class APGServiceOrchestrator:
 	async def _orchestrate_core_generation(self, context: Dict[str, Any], orchestration_id: str) -> Dict[str, Any]:
 		"""Orchestrate core report generation phase."""
 		
-		# This would coordinate with the revolutionary report engine
+		# This would coordinate with the advanced report engine
 		return {
 			'report_generated': True,
 			'report_id': uuid7str(),

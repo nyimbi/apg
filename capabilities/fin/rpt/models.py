@@ -1,7 +1,7 @@
 """
-APG Financial Reporting Models - Revolutionary AI-Powered Financial Reporting Platform
+APG Financial Reporting Models - Advanced AI-Powered Financial Reporting Platform
 
-Enhanced database models for the Financial Reporting capability with revolutionary AI features,
+Enhanced database models for the Financial Reporting capability with advanced AI features,
 natural language processing, real-time collaboration, and predictive analytics.
 
 © 2025 Datacraft. All rights reserved.
@@ -51,7 +51,7 @@ class ReportIntelligenceLevel(str, Enum):
 	BASIC = "basic"
 	ENHANCED = "enhanced"
 	ADVANCED = "advanced"
-	REVOLUTIONARY = "revolutionary"
+	REVOLUTIONARY = "advanced"
 
 class ConversationalIntentType(str, Enum):
 	"""Natural language intent classification."""
@@ -151,7 +151,7 @@ class SmartReportConfiguration(BaseModel):
 
 class CFRFReportTemplate(Model, AuditMixin, BaseMixin):
 	"""
-	Revolutionary AI-Powered Financial Report Template.
+	Advanced AI-Powered Financial Report Template.
 	
 	Enhanced template system with adaptive intelligence, natural language generation,
 	and collaborative features that learn and optimize based on usage patterns.
@@ -172,8 +172,8 @@ class CFRFReportTemplate(Model, AuditMixin, BaseMixin):
 	category = Column(String(50), nullable=True)  # standard, regulatory, management, analytical
 	format_type = Column(String(50), nullable=False)  # comparative, single_period, trend, variance
 	
-	# Revolutionary AI Enhancement Features
-	ai_intelligence_level = Column(String(20), default='enhanced', index=True)  # basic, enhanced, advanced, revolutionary
+	# Advanced AI Enhancement Features
+	ai_intelligence_level = Column(String(20), default='enhanced', index=True)  # basic, enhanced, advanced, advanced
 	auto_narrative_generation = Column(Boolean, default=True)  # AI-generated explanations
 	predictive_insights_enabled = Column(Boolean, default=True)  # ML-powered predictions
 	adaptive_formatting = Column(Boolean, default=True)  # Self-optimizing layout
