@@ -42,8 +42,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "biop"
 	assert contract["configuration"]["tenant_id"] == "tenant-bio"
 	assert contract["configuration"]["modalities"]["minimum_match_confidence"] == 0.9
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "modalities", "templates", "liveness", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 10
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "consent", "modalities", "enrollment", "templates", "verification", "liveness", "reviews", "privacy", "retention", "security", "governance", "observability", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 30
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"users",
@@ -59,6 +59,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/biop/api/v1"
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "template_vault" in contract["theme"]["components"]
 	assert "privacy_review_queue" in contract["theme"]["components"]
@@ -80,6 +81,9 @@ def test_rule_engine_enforces_biometric_guardrails():
 	auth_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "authenticate", "liveness_passed": False})
 	match_review_result = evaluate_capability_rules({"operation": "approve_match_review", "match_reviewer_same_as_requester": True})
 	privacy_review_result = evaluate_capability_rules({"operation": "approve_privacy_review", "privacy_reviewer_same_as_requester": True})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_biometric_mutation", "event_stream": "kafka"})
+	audit_result = evaluate_capability_rules({"tenant_context_present": True, "state_change_requested": True, "audit_event_recorded": False})
+	quality_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "enroll_template", "quality_score": 0.5})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -94,6 +98,9 @@ def test_rule_engine_enforces_biometric_guardrails():
 	assert auth_result["matched_rules"] == ["authentication_requires_liveness"]
 	assert match_review_result["matched_rules"] == ["match_review_requires_independent_reviewer"]
 	assert privacy_review_result["matched_rules"] == ["privacy_review_requires_independent_reviewer"]
+	assert batch_result["matched_rules"] == ["batch_biometric_mutation_requires_bytewax"]
+	assert audit_result["matched_rules"] == ["biometric_state_change_requires_audit"]
+	assert quality_result["matched_rules"] == ["template_quality_requires_threshold"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -107,6 +114,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["verification"] == "/biop/verification"
 	assert registration["ui_components"]["privacy_reviews"] == "/biop/reviews/privacy"
 	assert "mfau" in registration["dependencies"]
+	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["endpoints"]["audit"] == "/biop/api/v1/audit"
 	assert "biop:verify" in registration["permissions"]
 	assert "biop:manage_consent" in registration["permissions"]
 	assert "biop:review_privacy" in registration["permissions"]

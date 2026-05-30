@@ -53,7 +53,7 @@ def semantic_model() -> dict[str, Any]:
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
 				"provides": ["biop_operations"],
-				"requires": [],
+				"requires": ["mfau", "cvsn", "aicr"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
@@ -63,7 +63,9 @@ def semantic_model() -> dict[str, Any]:
 				"runtime": {
 					"api_helpers": "api_helpers.py",
 					"entrypoint": "app.py",
-					"service": "biometric_runtime.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"production_service": contract["configuration"]["adapters"]["production_runtime"],
 					"views": "view_models.py",
 				},
 				"business_rules": [],
@@ -74,7 +76,8 @@ def semantic_model() -> dict[str, Any]:
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
+				"adapters": contract["configuration"]["adapters"],
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
 			}
 		},
 		"contracts": {
@@ -82,7 +85,7 @@ def semantic_model() -> dict[str, Any]:
 				"id": "biop",
 				"configuration": contract["configuration"],
 				"provides": ["biop_operations"],
-				"requires": [],
+				"requires": ["mfau", "cvsn", "aicr"],
 			}
 		},
 		"rules": {
@@ -90,7 +93,7 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"biop": []},
+			"capability_dependencies": {"biop": ["mfau", "cvsn", "aicr"]},
 			"applications": {},
 			"agent_teams": {},
 		},
@@ -102,7 +105,7 @@ def semantic_model() -> dict[str, Any]:
 			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
-		"source_files": ["capability_contract.py"],
+		"source_files": ["capability_contract.py", "models.py", "biometric_runtime.py", "service.py", "api_helpers.py", "view_models.py", "api.py", "views.py"],
 		"symbols": {
 			"capability.biop": {
 				"id": "capability.biop",
@@ -151,6 +154,8 @@ def self_test() -> dict[str, Any]:
 	manifest = component_manifest()
 	errors: list[str] = []
 	routes = model.get("capabilities", {}).get("biop", {}).get("ui", {}).get("routes", [])
+	rules = model.get("capabilities", {}).get("biop", {}).get("rule_engine", {}).get("rules", [])
+	adapters = model.get("capabilities", {}).get("biop", {}).get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "biop" not in model.get("capabilities", {}):
@@ -159,6 +164,12 @@ def self_test() -> dict[str, Any]:
 		errors.append("component manifest semantic model interface mismatch")
 	if len(routes) < 12:
 		errors.append("BIOP semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("BIOP semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("BIOP adapter manifest must use Bytewax for event streaming")
+	if model.get("capabilities", {}).get("biop", {}).get("runtime", {}).get("service") != "biometric_runtime.BiopService":
+		errors.append("BIOP generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

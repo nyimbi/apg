@@ -14724,3 +14724,64 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Load, latency, risk-quality, biometric-quality, authorization, recovery-abuse,
   and throughput benchmarks.
+
+### 2026-05-30 11:50 EAT
+
+BIOP lifecycle and guardrail packet:
+
+- Selected `capabilities/common/biop` as the next common capability after MFAU
+  in the development order.
+- Added root `README.md` for generated-app usage, composition boundaries,
+  consent/template/verification/review examples, and adapter notes.
+- Replaced `cap_spec.md` with a pointer to the active `SPECIFICATION.md`.
+- Expanded the BIOP contract to cover consent, modalities, enrollment,
+  templates, verification, liveness, reviews, privacy, retention, security,
+  governance, observability, adapters, UI, and theme configuration.
+- Expanded deterministic guardrails to 39 rules covering tenant context,
+  consent evidence, enrollment scope, template encryption, template quality,
+  retention policy, raw-sample retention denial, liveness, presentation-attack
+  signals, cross-border privacy review, jurisdiction scope, match confidence,
+  active consent, active templates, subject/modality template matching,
+  high-risk multimodal evidence, review justification, duplicate reviews,
+  independent reviewers, review notes, stale review decisions, rejected reviews,
+  consent revocation, template retirement, Bytewax batch mutation, tenant
+  isolation, and biometric state-change audit.
+- Added adapter evidence for generated-app runtime, helper runtime, API helpers,
+  view models, production runtime/API/views, Bytewax event streaming, MFAU,
+  CVSN, AICR, ENCR, AUDL, IDFD, FREC, CACH, and MONI.
+- Updated capability registration with richer provided capabilities, status,
+  analytics, audit endpoints, adapter evidence, and optional monitoring/cache
+  adapters.
+- Updated `app.py` semantic output to include BIOP dependencies, runtime
+  metadata, adapters, Bytewax streaming evidence, and stronger self-test
+  checks for rule count, route count, event stream, and runtime metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused tests for the wider contract, Bytewax guardrail,
+  audit-state guardrail, template-quality guardrail, adapter evidence, and
+  package runtime metadata.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/biop/__init__.py capabilities/common/biop/capability_contract.py capabilities/common/biop/biometric_runtime.py capabilities/common/biop/api_helpers.py capabilities/common/biop/view_models.py capabilities/common/biop/app.py capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and BIOP capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/biop --json` passed with `ok: true`; BIOP remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/biop --json` passed with 12 UI routes, 39 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/biop/README.md capabilities/common/biop/SPECIFICATION.md capabilities/common/biop/PLAN.md capabilities/common/biop/cap_spec.md capabilities/common/biop/__init__.py capabilities/common/biop/capability_contract.py capabilities/common/biop/biometric_runtime.py capabilities/common/biop/api_helpers.py capabilities/common/biop/view_models.py capabilities/common/biop/app.py capabilities/common/biop/test_capability_contract.py capabilities/common/biop/tests/test_package_contract.py capabilities/common/biop/package_manifest.json capabilities/common/biop/release_report.json capabilities/common/biop/semantic_model.json` returned no primary-slice stale markers.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Legacy deep BIOP service, Flask, Flask-AppBuilder, production API/views,
+  biometric engine, and older generated docs/tests outside the primary packet.
+- Live biometric capture hardware, raw face/voice/fingerprint/iris processing,
+  liveness providers, HSM-backed template vaults, model inference, or external
+  privacy engines.
+- Live Bytewax stream execution.
+- External MFAU, CVSN, AICR, AUTH, AUDL, ENCR, IDFD, FREC, CACH, and MONI
+  adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Load, latency, biometric-quality, liveness-quality, privacy, authorization,
+  and throughput benchmarks.

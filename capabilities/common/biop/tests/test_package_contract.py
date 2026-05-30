@@ -30,6 +30,8 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "biop"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -44,3 +46,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "biop" in model["capabilities"]
+	assert model["capabilities"]["biop"]["runtime"]["service"] == "biometric_runtime.BiopService"
+	assert model["capabilities"]["biop"]["streaming"]["engine"] == "bytewax"

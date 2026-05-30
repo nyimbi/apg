@@ -24,7 +24,17 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["biometric_enrollment", "template_governance", "liveness_detection", "biometric_verification", "consent_management"],
+	"provides": [
+		"biometric_consent",
+		"biometric_enrollment",
+		"template_governance",
+		"liveness_detection",
+		"biometric_verification",
+		"match_review",
+		"privacy_review",
+		"biometric_audit",
+		"visual_theming",
+	],
 	"permissions": ["biop:view", "biop:enroll", "biop:verify", "biop:manage_consent", "biop:manage_templates", "biop:review", "biop:review_privacy", "biop:admin"]
 }
 
@@ -44,12 +54,13 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "encr", "frec"],
+		"optional_dependencies": ["auth", "audl", "encr", "frec", "moni", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
-			"biometric_enrollment": "Enroll tenant-scoped biometric samples with explicit consent",
+			"biometric_consent": "Record, scope, revoke, and audit biometric consent evidence",
+			"biometric_enrollment": "Enroll tenant-scoped biometric templates with explicit consent",
 			"consent_management": "Record, scope, and revoke biometric consent evidence",
 			"template_governance": "Protect, rotate, retire, and audit biometric templates",
 			"liveness_detection": "Require presentation-attack checks for authentication flows",
@@ -60,6 +71,7 @@ def register_capability() -> dict[str, Any]:
 			"visual_theming": "Apply biometric-control theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/biop/api/v1/status",
 			"consents": "/biop/api/v1/consents",
 			"enrollments": "/biop/api/v1/enrollments",
 			"verification": "/biop/api/v1/verification",
@@ -67,8 +79,11 @@ def register_capability() -> dict[str, Any]:
 			"match_reviews": "/biop/api/v1/reviews/matches",
 			"privacy_reviews": "/biop/api/v1/reviews/privacy",
 			"liveness": "/biop/api/v1/liveness",
-			"compliance": "/biop/api/v1/compliance"
+			"compliance": "/biop/api/v1/compliance",
+			"analytics": "/biop/api/v1/analytics",
+			"audit": "/biop/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

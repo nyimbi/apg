@@ -8,6 +8,25 @@
   },
   "capabilities": {
     "biop": {
+      "adapters": {
+        "ai_core": "aicr",
+        "api_helpers": "api_helpers.py",
+        "audit_sink": "audl",
+        "cache": "cach",
+        "computer_vision": "cvsn",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "facial_recognition": "frec",
+        "generated_app_runtime": "biometric_runtime.BiopService",
+        "helper_runtime": "biometric_runtime.py",
+        "identity_federation": "idfd",
+        "metrics_sink": "moni",
+        "mfa_provider": "mfau",
+        "production_api": "api.py",
+        "production_runtime": "service.BiometricAuthenticationService",
+        "production_views": "views.py",
+        "view_models": "view_models.py"
+      },
       "approvals": {
         "match_review": "BiometricReviewApproval",
         "privacy_review": "BiometricReviewApproval"
@@ -15,6 +34,37 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "computer_vision": "cvsn",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "facial_recognition": "frec",
+          "generated_app_runtime": "biometric_runtime.BiopService",
+          "helper_runtime": "biometric_runtime.py",
+          "identity_federation": "idfd",
+          "metrics_sink": "moni",
+          "mfa_provider": "mfau",
+          "production_api": "api.py",
+          "production_runtime": "service.BiometricAuthenticationService",
+          "production_views": "views.py",
+          "view_models": "view_models.py"
+        },
+        "consent": {
+          "explicit_consent_required": true,
+          "jurisdiction_scope_required": true,
+          "purpose_required": true,
+          "revocation_supported": true
+        },
+        "enrollment": {
+          "active_consent_required": true,
+          "quality_gate_required": true,
+          "retention_policy_required": true,
+          "template_hash_required": true
+        },
         "governance": {
           "audit_template_access": true,
           "cross_border_processing_review": true,
@@ -39,6 +89,34 @@
           "multi_modal_required_for_high_risk": true,
           "quality_threshold": 0.72
         },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "privacy": {
+          "cross_border_processing_review": true,
+          "jurisdiction_mismatch_blocks_processing": true,
+          "privacy_review_notes_required": true
+        },
+        "retention": {
+          "raw_sample_retention": "disabled",
+          "retire_templates_on_consent_revocation": true,
+          "retirement_reason_required": true
+        },
+        "reviews": {
+          "duplicate_pending_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true,
+          "stale_review_mutation_blocked": true
+        },
+        "security": {
+          "audit_state_changes": true,
+          "raw_sample_storage_allowed": false,
+          "template_hash_required": true,
+          "tenant_isolation_required": true
+        },
         "templates": {
           "encrypted_storage_required": true,
           "raw_sample_retention": "disabled",
@@ -58,6 +136,12 @@
           "enable_review_queues": true,
           "enable_template_vault": true,
           "enable_verification_workbench": true
+        },
+        "verification": {
+          "active_template_required": true,
+          "modality_template_match_required": true,
+          "review_low_confidence": true,
+          "subject_template_match_required": true
         }
       },
       "erp_modules": [
@@ -69,7 +153,11 @@
       "provides": [
         "biop_operations"
       ],
-      "requires": [],
+      "requires": [
+        "mfau",
+        "cvsn",
+        "aicr"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -86,6 +174,71 @@
           },
           {
             "condition": {
+              "operation": "record_consent",
+              "subject_present": false
+            },
+            "description": "Biometric consent requires a subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_subject_required",
+              "required_action": "select_subject"
+            },
+            "name": "consent_requires_subject"
+          },
+          {
+            "condition": {
+              "operation": "record_consent",
+              "purpose_present": false
+            },
+            "description": "Biometric consent requires a processing purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_purpose_required",
+              "required_action": "record_consent_purpose"
+            },
+            "name": "consent_requires_purpose"
+          },
+          {
+            "condition": {
+              "modalities_present": false,
+              "operation": "record_consent"
+            },
+            "description": "Biometric consent requires scoped modalities.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_modalities_required",
+              "required_action": "record_modality_scope"
+            },
+            "name": "consent_requires_modalities"
+          },
+          {
+            "condition": {
+              "jurisdictions_present": false,
+              "operation": "record_consent"
+            },
+            "description": "Biometric consent requires jurisdiction scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_jurisdictions_required",
+              "required_action": "record_jurisdiction_scope"
+            },
+            "name": "consent_requires_jurisdictions"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_consent"
+            },
+            "description": "Biometric consent requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_evidence_required",
+              "required_action": "attach_consent_evidence"
+            },
+            "name": "consent_requires_evidence"
+          },
+          {
+            "condition": {
               "consent_recorded": false,
               "operation": "process_biometric"
             },
@@ -96,6 +249,45 @@
               "required_action": "record_consent"
             },
             "name": "biometric_processing_requires_consent"
+          },
+          {
+            "condition": {
+              "active_consent_present": false,
+              "operation": "enroll_template"
+            },
+            "description": "Biometric enrollment requires active consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_biometric_consent_required",
+              "required_action": "record_or_restore_consent"
+            },
+            "name": "enrollment_requires_active_consent"
+          },
+          {
+            "condition": {
+              "modality_in_consent_scope": false,
+              "operation": "enroll_template"
+            },
+            "description": "Enrollment modality must be within consent scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_modality_mismatch",
+              "required_action": "update_consent_scope"
+            },
+            "name": "enrollment_modality_requires_consent_scope"
+          },
+          {
+            "condition": {
+              "operation": "enroll_template",
+              "template_hash_present": false
+            },
+            "description": "Biometric template enrollment requires a template hash.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_hash_required",
+              "required_action": "attach_template_hash"
+            },
+            "name": "template_requires_hash"
           },
           {
             "condition": {
@@ -112,6 +304,44 @@
           },
           {
             "condition": {
+              "operation": "enroll_template",
+              "quality_score_lt": 0.72
+            },
+            "description": "Template quality must meet tenant threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_quality_too_low",
+              "required_action": "capture_higher_quality_sample"
+            },
+            "name": "template_quality_requires_threshold"
+          },
+          {
+            "condition": {
+              "operation": "enroll_template",
+              "retention_policy_present": false
+            },
+            "description": "Template enrollment requires a retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_retention_policy_required",
+              "required_action": "select_retention_policy"
+            },
+            "name": "template_requires_retention_policy"
+          },
+          {
+            "condition": {
+              "raw_sample_retention_requested": true
+            },
+            "description": "Raw biometric samples may not be retained in the package runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "raw_biometric_sample_retention_denied",
+              "required_action": "store_encrypted_template_metadata_only"
+            },
+            "name": "raw_sample_retention_denied"
+          },
+          {
+            "condition": {
               "liveness_passed": false,
               "operation": "authenticate"
             },
@@ -125,6 +355,32 @@
           },
           {
             "condition": {
+              "liveness_score_lt": 0.82,
+              "operation": "authenticate"
+            },
+            "description": "Liveness score must meet tenant threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "liveness_required",
+              "required_action": "complete_liveness_check"
+            },
+            "name": "liveness_score_requires_threshold"
+          },
+          {
+            "condition": {
+              "operation": "authenticate",
+              "presentation_attack_detected": true
+            },
+            "description": "Presentation-attack signals block biometric authentication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "presentation_attack_detected",
+              "required_action": "escalate_security_review"
+            },
+            "name": "presentation_attack_blocks_authentication"
+          },
+          {
+            "condition": {
               "cross_border_processing": true,
               "privacy_review_recorded": false
             },
@@ -135,6 +391,19 @@
               "required_action": "record_privacy_review"
             },
             "name": "cross_border_use_requires_review"
+          },
+          {
+            "condition": {
+              "jurisdiction_in_consent_scope": false,
+              "operation": "process_biometric"
+            },
+            "description": "Processing outside consent jurisdiction scope is denied.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_consent_jurisdiction_mismatch",
+              "required_action": "update_consent_or_change_processing_jurisdiction"
+            },
+            "name": "jurisdiction_scope_blocks_processing"
           },
           {
             "condition": {
@@ -175,6 +444,85 @@
           },
           {
             "condition": {
+              "operation": "verify_template",
+              "subject_matches_template": false
+            },
+            "description": "Verification subject must match template subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_subject_mismatch",
+              "required_action": "select_subject_template"
+            },
+            "name": "verification_subject_requires_template_subject"
+          },
+          {
+            "condition": {
+              "modality_matches_template": false,
+              "operation": "verify_template"
+            },
+            "description": "Verification modality must match template modality.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_modality_mismatch",
+              "required_action": "select_matching_template"
+            },
+            "name": "verification_modality_requires_template_modality"
+          },
+          {
+            "condition": {
+              "multi_modal_evidence_present": false,
+              "operation": "verify_template",
+              "risk_level": "high"
+            },
+            "description": "High-risk biometric verification requires multiple modalities.",
+            "effect": {
+              "decision": "deny",
+              "reason": "multi_modal_biometric_evidence_required",
+              "required_action": "collect_additional_modality"
+            },
+            "name": "high_risk_verification_requires_multi_modal"
+          },
+          {
+            "condition": {
+              "justification_present": false,
+              "operation": "request_privacy_review"
+            },
+            "description": "Privacy review requests require justification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_review_justification_required",
+              "required_action": "record_privacy_justification"
+            },
+            "name": "privacy_review_requires_justification"
+          },
+          {
+            "condition": {
+              "justification_present": false,
+              "operation": "request_match_review"
+            },
+            "description": "Match review requests require justification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "match_review_justification_required",
+              "required_action": "record_match_justification"
+            },
+            "name": "match_review_requires_justification"
+          },
+          {
+            "condition": {
+              "operation": "request_review",
+              "pending_review_exists": true
+            },
+            "description": "Duplicate pending biometric reviews are blocked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_review_already_pending",
+              "required_action": "complete_existing_review"
+            },
+            "name": "duplicate_pending_review_blocked"
+          },
+          {
+            "condition": {
               "match_reviewer_same_as_requester": true,
               "operation": "approve_match_review"
             },
@@ -198,6 +546,122 @@
               "required_action": "route_to_independent_privacy_reviewer"
             },
             "name": "privacy_review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "notes_present": false,
+              "operation": "decide_review"
+            },
+            "description": "Biometric review decisions require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_review_notes_required",
+              "required_action": "record_review_notes"
+            },
+            "name": "review_decision_requires_notes"
+          },
+          {
+            "condition": {
+              "operation": "decide_review",
+              "review_already_decided": true
+            },
+            "description": "Already-decided biometric reviews cannot be changed.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_review_already_decided",
+              "required_action": "open_new_review_if_needed"
+            },
+            "name": "stale_review_decision_blocked"
+          },
+          {
+            "condition": {
+              "operation": "apply_privacy_review",
+              "privacy_review_decision": "rejected"
+            },
+            "description": "Rejected privacy reviews deny cross-border verification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_review_rejected",
+              "required_action": "stop_cross_border_processing"
+            },
+            "name": "rejected_privacy_review_blocks_verification"
+          },
+          {
+            "condition": {
+              "match_review_decision": "rejected",
+              "operation": "apply_match_review"
+            },
+            "description": "Rejected match reviews deny biometric verification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "match_review_rejected",
+              "required_action": "reject_verification"
+            },
+            "name": "rejected_match_review_blocks_verification"
+          },
+          {
+            "condition": {
+              "active_templates_retired": false,
+              "operation": "revoke_consent"
+            },
+            "description": "Consent revocation requires active templates to be retired.",
+            "effect": {
+              "decision": "deny",
+              "reason": "consent_revocation_requires_template_retirement",
+              "required_action": "retire_templates_for_consent"
+            },
+            "name": "consent_revocation_retires_templates"
+          },
+          {
+            "condition": {
+              "operation": "retire_template",
+              "retirement_reason_present": false
+            },
+            "description": "Template retirement requires a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_template_retirement_reason_required",
+              "required_action": "record_retirement_reason"
+            },
+            "name": "template_retirement_requires_reason"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_biometric_mutation"
+            },
+            "description": "Batch biometric lifecycle mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_biometric_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Biometric records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_biometric_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_biometric_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Biometric state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "biometric_audit_event_required",
+              "required_action": "record_biometric_audit_event"
+            },
+            "name": "biometric_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -217,6 +681,71 @@
         },
         {
           "condition": {
+            "operation": "record_consent",
+            "subject_present": false
+          },
+          "description": "Biometric consent requires a subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_subject_required",
+            "required_action": "select_subject"
+          },
+          "name": "consent_requires_subject"
+        },
+        {
+          "condition": {
+            "operation": "record_consent",
+            "purpose_present": false
+          },
+          "description": "Biometric consent requires a processing purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_purpose_required",
+            "required_action": "record_consent_purpose"
+          },
+          "name": "consent_requires_purpose"
+        },
+        {
+          "condition": {
+            "modalities_present": false,
+            "operation": "record_consent"
+          },
+          "description": "Biometric consent requires scoped modalities.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_modalities_required",
+            "required_action": "record_modality_scope"
+          },
+          "name": "consent_requires_modalities"
+        },
+        {
+          "condition": {
+            "jurisdictions_present": false,
+            "operation": "record_consent"
+          },
+          "description": "Biometric consent requires jurisdiction scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_jurisdictions_required",
+            "required_action": "record_jurisdiction_scope"
+          },
+          "name": "consent_requires_jurisdictions"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_consent"
+          },
+          "description": "Biometric consent requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_evidence_required",
+            "required_action": "attach_consent_evidence"
+          },
+          "name": "consent_requires_evidence"
+        },
+        {
+          "condition": {
             "consent_recorded": false,
             "operation": "process_biometric"
           },
@@ -227,6 +756,45 @@
             "required_action": "record_consent"
           },
           "name": "biometric_processing_requires_consent"
+        },
+        {
+          "condition": {
+            "active_consent_present": false,
+            "operation": "enroll_template"
+          },
+          "description": "Biometric enrollment requires active consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_biometric_consent_required",
+            "required_action": "record_or_restore_consent"
+          },
+          "name": "enrollment_requires_active_consent"
+        },
+        {
+          "condition": {
+            "modality_in_consent_scope": false,
+            "operation": "enroll_template"
+          },
+          "description": "Enrollment modality must be within consent scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_modality_mismatch",
+            "required_action": "update_consent_scope"
+          },
+          "name": "enrollment_modality_requires_consent_scope"
+        },
+        {
+          "condition": {
+            "operation": "enroll_template",
+            "template_hash_present": false
+          },
+          "description": "Biometric template enrollment requires a template hash.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_hash_required",
+            "required_action": "attach_template_hash"
+          },
+          "name": "template_requires_hash"
         },
         {
           "condition": {
@@ -243,6 +811,44 @@
         },
         {
           "condition": {
+            "operation": "enroll_template",
+            "quality_score_lt": 0.72
+          },
+          "description": "Template quality must meet tenant threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_quality_too_low",
+            "required_action": "capture_higher_quality_sample"
+          },
+          "name": "template_quality_requires_threshold"
+        },
+        {
+          "condition": {
+            "operation": "enroll_template",
+            "retention_policy_present": false
+          },
+          "description": "Template enrollment requires a retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_retention_policy_required",
+            "required_action": "select_retention_policy"
+          },
+          "name": "template_requires_retention_policy"
+        },
+        {
+          "condition": {
+            "raw_sample_retention_requested": true
+          },
+          "description": "Raw biometric samples may not be retained in the package runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "raw_biometric_sample_retention_denied",
+            "required_action": "store_encrypted_template_metadata_only"
+          },
+          "name": "raw_sample_retention_denied"
+        },
+        {
+          "condition": {
             "liveness_passed": false,
             "operation": "authenticate"
           },
@@ -256,6 +862,32 @@
         },
         {
           "condition": {
+            "liveness_score_lt": 0.82,
+            "operation": "authenticate"
+          },
+          "description": "Liveness score must meet tenant threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "liveness_required",
+            "required_action": "complete_liveness_check"
+          },
+          "name": "liveness_score_requires_threshold"
+        },
+        {
+          "condition": {
+            "operation": "authenticate",
+            "presentation_attack_detected": true
+          },
+          "description": "Presentation-attack signals block biometric authentication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "presentation_attack_detected",
+            "required_action": "escalate_security_review"
+          },
+          "name": "presentation_attack_blocks_authentication"
+        },
+        {
+          "condition": {
             "cross_border_processing": true,
             "privacy_review_recorded": false
           },
@@ -266,6 +898,19 @@
             "required_action": "record_privacy_review"
           },
           "name": "cross_border_use_requires_review"
+        },
+        {
+          "condition": {
+            "jurisdiction_in_consent_scope": false,
+            "operation": "process_biometric"
+          },
+          "description": "Processing outside consent jurisdiction scope is denied.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_consent_jurisdiction_mismatch",
+            "required_action": "update_consent_or_change_processing_jurisdiction"
+          },
+          "name": "jurisdiction_scope_blocks_processing"
         },
         {
           "condition": {
@@ -306,6 +951,85 @@
         },
         {
           "condition": {
+            "operation": "verify_template",
+            "subject_matches_template": false
+          },
+          "description": "Verification subject must match template subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_subject_mismatch",
+            "required_action": "select_subject_template"
+          },
+          "name": "verification_subject_requires_template_subject"
+        },
+        {
+          "condition": {
+            "modality_matches_template": false,
+            "operation": "verify_template"
+          },
+          "description": "Verification modality must match template modality.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_modality_mismatch",
+            "required_action": "select_matching_template"
+          },
+          "name": "verification_modality_requires_template_modality"
+        },
+        {
+          "condition": {
+            "multi_modal_evidence_present": false,
+            "operation": "verify_template",
+            "risk_level": "high"
+          },
+          "description": "High-risk biometric verification requires multiple modalities.",
+          "effect": {
+            "decision": "deny",
+            "reason": "multi_modal_biometric_evidence_required",
+            "required_action": "collect_additional_modality"
+          },
+          "name": "high_risk_verification_requires_multi_modal"
+        },
+        {
+          "condition": {
+            "justification_present": false,
+            "operation": "request_privacy_review"
+          },
+          "description": "Privacy review requests require justification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_review_justification_required",
+            "required_action": "record_privacy_justification"
+          },
+          "name": "privacy_review_requires_justification"
+        },
+        {
+          "condition": {
+            "justification_present": false,
+            "operation": "request_match_review"
+          },
+          "description": "Match review requests require justification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "match_review_justification_required",
+            "required_action": "record_match_justification"
+          },
+          "name": "match_review_requires_justification"
+        },
+        {
+          "condition": {
+            "operation": "request_review",
+            "pending_review_exists": true
+          },
+          "description": "Duplicate pending biometric reviews are blocked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_review_already_pending",
+            "required_action": "complete_existing_review"
+          },
+          "name": "duplicate_pending_review_blocked"
+        },
+        {
+          "condition": {
             "match_reviewer_same_as_requester": true,
             "operation": "approve_match_review"
           },
@@ -329,12 +1053,130 @@
             "required_action": "route_to_independent_privacy_reviewer"
           },
           "name": "privacy_review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "notes_present": false,
+            "operation": "decide_review"
+          },
+          "description": "Biometric review decisions require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_review_notes_required",
+            "required_action": "record_review_notes"
+          },
+          "name": "review_decision_requires_notes"
+        },
+        {
+          "condition": {
+            "operation": "decide_review",
+            "review_already_decided": true
+          },
+          "description": "Already-decided biometric reviews cannot be changed.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_review_already_decided",
+            "required_action": "open_new_review_if_needed"
+          },
+          "name": "stale_review_decision_blocked"
+        },
+        {
+          "condition": {
+            "operation": "apply_privacy_review",
+            "privacy_review_decision": "rejected"
+          },
+          "description": "Rejected privacy reviews deny cross-border verification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_review_rejected",
+            "required_action": "stop_cross_border_processing"
+          },
+          "name": "rejected_privacy_review_blocks_verification"
+        },
+        {
+          "condition": {
+            "match_review_decision": "rejected",
+            "operation": "apply_match_review"
+          },
+          "description": "Rejected match reviews deny biometric verification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "match_review_rejected",
+            "required_action": "reject_verification"
+          },
+          "name": "rejected_match_review_blocks_verification"
+        },
+        {
+          "condition": {
+            "active_templates_retired": false,
+            "operation": "revoke_consent"
+          },
+          "description": "Consent revocation requires active templates to be retired.",
+          "effect": {
+            "decision": "deny",
+            "reason": "consent_revocation_requires_template_retirement",
+            "required_action": "retire_templates_for_consent"
+          },
+          "name": "consent_revocation_retires_templates"
+        },
+        {
+          "condition": {
+            "operation": "retire_template",
+            "retirement_reason_present": false
+          },
+          "description": "Template retirement requires a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_template_retirement_reason_required",
+            "required_action": "record_retirement_reason"
+          },
+          "name": "template_retirement_requires_reason"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_biometric_mutation"
+          },
+          "description": "Batch biometric lifecycle mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_biometric_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Biometric records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_biometric_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_biometric_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Biometric state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "biometric_audit_event_required",
+            "required_action": "record_biometric_audit_event"
+          },
+          "name": "biometric_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
-        "service": "biometric_runtime.py",
+        "helper_runtime": "biometric_runtime.py",
+        "production_service": "service.BiometricAuthenticationService",
+        "service": "biometric_runtime.BiopService",
         "views": "view_models.py"
       },
       "screens": {
@@ -399,7 +1241,9 @@
           "route": "/biop/verification"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
           "consent_center": {
@@ -553,12 +1397,47 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "biop": []
+      "biop": [
+        "mfau",
+        "cvsn",
+        "aicr"
+      ]
     }
   },
   "contracts": {
     "biop": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "computer_vision": "cvsn",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "facial_recognition": "frec",
+          "generated_app_runtime": "biometric_runtime.BiopService",
+          "helper_runtime": "biometric_runtime.py",
+          "identity_federation": "idfd",
+          "metrics_sink": "moni",
+          "mfa_provider": "mfau",
+          "production_api": "api.py",
+          "production_runtime": "service.BiometricAuthenticationService",
+          "production_views": "views.py",
+          "view_models": "view_models.py"
+        },
+        "consent": {
+          "explicit_consent_required": true,
+          "jurisdiction_scope_required": true,
+          "purpose_required": true,
+          "revocation_supported": true
+        },
+        "enrollment": {
+          "active_consent_required": true,
+          "quality_gate_required": true,
+          "retention_policy_required": true,
+          "template_hash_required": true
+        },
         "governance": {
           "audit_template_access": true,
           "cross_border_processing_review": true,
@@ -583,6 +1462,34 @@
           "multi_modal_required_for_high_risk": true,
           "quality_threshold": 0.72
         },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "privacy": {
+          "cross_border_processing_review": true,
+          "jurisdiction_mismatch_blocks_processing": true,
+          "privacy_review_notes_required": true
+        },
+        "retention": {
+          "raw_sample_retention": "disabled",
+          "retire_templates_on_consent_revocation": true,
+          "retirement_reason_required": true
+        },
+        "reviews": {
+          "duplicate_pending_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true,
+          "stale_review_mutation_blocked": true
+        },
+        "security": {
+          "audit_state_changes": true,
+          "raw_sample_storage_allowed": false,
+          "template_hash_required": true,
+          "tenant_isolation_required": true
+        },
         "templates": {
           "encrypted_storage_required": true,
           "raw_sample_retention": "disabled",
@@ -602,13 +1509,23 @@
           "enable_review_queues": true,
           "enable_template_vault": true,
           "enable_verification_workbench": true
+        },
+        "verification": {
+          "active_template_required": true,
+          "modality_template_match_required": true,
+          "review_low_confidence": true,
+          "subject_template_match_required": true
         }
       },
       "id": "biop",
       "provides": [
         "biop_operations"
       ],
-      "requires": []
+      "requires": [
+        "mfau",
+        "cvsn",
+        "aicr"
+      ]
     }
   },
   "deployment": {
@@ -654,6 +1571,19 @@
       },
       "name": "authentication_requires_liveness"
     },
+    "batch_biometric_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_biometric_mutation"
+      },
+      "description": "Batch biometric lifecycle mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_biometric_mutation_requires_bytewax"
+    },
     "biometric_operation_requires_active_consent": {
       "condition": {
         "active_consent_present": false
@@ -679,6 +1609,97 @@
       },
       "name": "biometric_processing_requires_consent"
     },
+    "biometric_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Biometric state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_audit_event_required",
+        "required_action": "record_biometric_audit_event"
+      },
+      "name": "biometric_state_change_requires_audit"
+    },
+    "consent_requires_evidence": {
+      "condition": {
+        "evidence_present": false,
+        "operation": "record_consent"
+      },
+      "description": "Biometric consent requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_evidence_required",
+        "required_action": "attach_consent_evidence"
+      },
+      "name": "consent_requires_evidence"
+    },
+    "consent_requires_jurisdictions": {
+      "condition": {
+        "jurisdictions_present": false,
+        "operation": "record_consent"
+      },
+      "description": "Biometric consent requires jurisdiction scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_jurisdictions_required",
+        "required_action": "record_jurisdiction_scope"
+      },
+      "name": "consent_requires_jurisdictions"
+    },
+    "consent_requires_modalities": {
+      "condition": {
+        "modalities_present": false,
+        "operation": "record_consent"
+      },
+      "description": "Biometric consent requires scoped modalities.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_modalities_required",
+        "required_action": "record_modality_scope"
+      },
+      "name": "consent_requires_modalities"
+    },
+    "consent_requires_purpose": {
+      "condition": {
+        "operation": "record_consent",
+        "purpose_present": false
+      },
+      "description": "Biometric consent requires a processing purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_purpose_required",
+        "required_action": "record_consent_purpose"
+      },
+      "name": "consent_requires_purpose"
+    },
+    "consent_requires_subject": {
+      "condition": {
+        "operation": "record_consent",
+        "subject_present": false
+      },
+      "description": "Biometric consent requires a subject.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_subject_required",
+        "required_action": "select_subject"
+      },
+      "name": "consent_requires_subject"
+    },
+    "consent_revocation_retires_templates": {
+      "condition": {
+        "active_templates_retired": false,
+        "operation": "revoke_consent"
+      },
+      "description": "Consent revocation requires active templates to be retired.",
+      "effect": {
+        "decision": "deny",
+        "reason": "consent_revocation_requires_template_retirement",
+        "required_action": "retire_templates_for_consent"
+      },
+      "name": "consent_revocation_retires_templates"
+    },
     "cross_border_use_requires_review": {
       "condition": {
         "cross_border_processing": true,
@@ -691,6 +1712,97 @@
         "required_action": "record_privacy_review"
       },
       "name": "cross_border_use_requires_review"
+    },
+    "cross_tenant_biometric_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Biometric records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_biometric_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_biometric_access_denied"
+    },
+    "duplicate_pending_review_blocked": {
+      "condition": {
+        "operation": "request_review",
+        "pending_review_exists": true
+      },
+      "description": "Duplicate pending biometric reviews are blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_review_already_pending",
+        "required_action": "complete_existing_review"
+      },
+      "name": "duplicate_pending_review_blocked"
+    },
+    "enrollment_modality_requires_consent_scope": {
+      "condition": {
+        "modality_in_consent_scope": false,
+        "operation": "enroll_template"
+      },
+      "description": "Enrollment modality must be within consent scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_modality_mismatch",
+        "required_action": "update_consent_scope"
+      },
+      "name": "enrollment_modality_requires_consent_scope"
+    },
+    "enrollment_requires_active_consent": {
+      "condition": {
+        "active_consent_present": false,
+        "operation": "enroll_template"
+      },
+      "description": "Biometric enrollment requires active consent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_biometric_consent_required",
+        "required_action": "record_or_restore_consent"
+      },
+      "name": "enrollment_requires_active_consent"
+    },
+    "high_risk_verification_requires_multi_modal": {
+      "condition": {
+        "multi_modal_evidence_present": false,
+        "operation": "verify_template",
+        "risk_level": "high"
+      },
+      "description": "High-risk biometric verification requires multiple modalities.",
+      "effect": {
+        "decision": "deny",
+        "reason": "multi_modal_biometric_evidence_required",
+        "required_action": "collect_additional_modality"
+      },
+      "name": "high_risk_verification_requires_multi_modal"
+    },
+    "jurisdiction_scope_blocks_processing": {
+      "condition": {
+        "jurisdiction_in_consent_scope": false,
+        "operation": "process_biometric"
+      },
+      "description": "Processing outside consent jurisdiction scope is denied.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_consent_jurisdiction_mismatch",
+        "required_action": "update_consent_or_change_processing_jurisdiction"
+      },
+      "name": "jurisdiction_scope_blocks_processing"
+    },
+    "liveness_score_requires_threshold": {
+      "condition": {
+        "liveness_score_lt": 0.82,
+        "operation": "authenticate"
+      },
+      "description": "Liveness score must meet tenant threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "liveness_required",
+        "required_action": "complete_liveness_check"
+      },
+      "name": "liveness_score_requires_threshold"
     },
     "low_match_confidence_requires_review": {
       "condition": {
@@ -718,6 +1830,32 @@
       },
       "name": "match_review_requires_independent_reviewer"
     },
+    "match_review_requires_justification": {
+      "condition": {
+        "justification_present": false,
+        "operation": "request_match_review"
+      },
+      "description": "Match review requests require justification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "match_review_justification_required",
+        "required_action": "record_match_justification"
+      },
+      "name": "match_review_requires_justification"
+    },
+    "presentation_attack_blocks_authentication": {
+      "condition": {
+        "operation": "authenticate",
+        "presentation_attack_detected": true
+      },
+      "description": "Presentation-attack signals block biometric authentication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "presentation_attack_detected",
+        "required_action": "escalate_security_review"
+      },
+      "name": "presentation_attack_blocks_authentication"
+    },
     "privacy_review_requires_independent_reviewer": {
       "condition": {
         "operation": "approve_privacy_review",
@@ -730,6 +1868,135 @@
         "required_action": "route_to_independent_privacy_reviewer"
       },
       "name": "privacy_review_requires_independent_reviewer"
+    },
+    "privacy_review_requires_justification": {
+      "condition": {
+        "justification_present": false,
+        "operation": "request_privacy_review"
+      },
+      "description": "Privacy review requests require justification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privacy_review_justification_required",
+        "required_action": "record_privacy_justification"
+      },
+      "name": "privacy_review_requires_justification"
+    },
+    "raw_sample_retention_denied": {
+      "condition": {
+        "raw_sample_retention_requested": true
+      },
+      "description": "Raw biometric samples may not be retained in the package runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "raw_biometric_sample_retention_denied",
+        "required_action": "store_encrypted_template_metadata_only"
+      },
+      "name": "raw_sample_retention_denied"
+    },
+    "rejected_match_review_blocks_verification": {
+      "condition": {
+        "match_review_decision": "rejected",
+        "operation": "apply_match_review"
+      },
+      "description": "Rejected match reviews deny biometric verification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "match_review_rejected",
+        "required_action": "reject_verification"
+      },
+      "name": "rejected_match_review_blocks_verification"
+    },
+    "rejected_privacy_review_blocks_verification": {
+      "condition": {
+        "operation": "apply_privacy_review",
+        "privacy_review_decision": "rejected"
+      },
+      "description": "Rejected privacy reviews deny cross-border verification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "privacy_review_rejected",
+        "required_action": "stop_cross_border_processing"
+      },
+      "name": "rejected_privacy_review_blocks_verification"
+    },
+    "review_decision_requires_notes": {
+      "condition": {
+        "notes_present": false,
+        "operation": "decide_review"
+      },
+      "description": "Biometric review decisions require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_review_notes_required",
+        "required_action": "record_review_notes"
+      },
+      "name": "review_decision_requires_notes"
+    },
+    "stale_review_decision_blocked": {
+      "condition": {
+        "operation": "decide_review",
+        "review_already_decided": true
+      },
+      "description": "Already-decided biometric reviews cannot be changed.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_review_already_decided",
+        "required_action": "open_new_review_if_needed"
+      },
+      "name": "stale_review_decision_blocked"
+    },
+    "template_quality_requires_threshold": {
+      "condition": {
+        "operation": "enroll_template",
+        "quality_score_lt": 0.72
+      },
+      "description": "Template quality must meet tenant threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_quality_too_low",
+        "required_action": "capture_higher_quality_sample"
+      },
+      "name": "template_quality_requires_threshold"
+    },
+    "template_requires_hash": {
+      "condition": {
+        "operation": "enroll_template",
+        "template_hash_present": false
+      },
+      "description": "Biometric template enrollment requires a template hash.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_hash_required",
+        "required_action": "attach_template_hash"
+      },
+      "name": "template_requires_hash"
+    },
+    "template_requires_retention_policy": {
+      "condition": {
+        "operation": "enroll_template",
+        "retention_policy_present": false
+      },
+      "description": "Template enrollment requires a retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_retention_policy_required",
+        "required_action": "select_retention_policy"
+      },
+      "name": "template_requires_retention_policy"
+    },
+    "template_retirement_requires_reason": {
+      "condition": {
+        "operation": "retire_template",
+        "retirement_reason_present": false
+      },
+      "description": "Template retirement requires a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_retirement_reason_required",
+        "required_action": "record_retirement_reason"
+      },
+      "name": "template_retirement_requires_reason"
     },
     "template_storage_requires_encryption": {
       "condition": {
@@ -756,6 +2023,19 @@
       },
       "name": "tenant_context_required"
     },
+    "verification_modality_requires_template_modality": {
+      "condition": {
+        "modality_matches_template": false,
+        "operation": "verify_template"
+      },
+      "description": "Verification modality must match template modality.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_modality_mismatch",
+        "required_action": "select_matching_template"
+      },
+      "name": "verification_modality_requires_template_modality"
+    },
     "verification_requires_active_template": {
       "condition": {
         "active_template_present": false
@@ -767,11 +2047,31 @@
         "required_action": "enroll_active_template"
       },
       "name": "verification_requires_active_template"
+    },
+    "verification_subject_requires_template_subject": {
+      "condition": {
+        "operation": "verify_template",
+        "subject_matches_template": false
+      },
+      "description": "Verification subject must match template subject.",
+      "effect": {
+        "decision": "deny",
+        "reason": "biometric_template_subject_mismatch",
+        "required_action": "select_subject_template"
+      },
+      "name": "verification_subject_requires_template_subject"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "biometric_runtime.py",
+    "service.py",
+    "api_helpers.py",
+    "view_models.py",
+    "api.py",
+    "views.py"
   ],
   "symbols": {
     "capability.biop": {
