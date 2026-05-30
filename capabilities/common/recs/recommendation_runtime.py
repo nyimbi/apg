@@ -8,6 +8,10 @@ from typing import Any
 
 ALGORITHMS = ("collaborative_filtering", "content_based", "hybrid", "contextual_bandit")
 IMPACT_LEVELS = ("low", "medium", "high")
+AGENT_RUNTIMES = ("codex", "claude_code", "opencode", "pi")
+AGENT_ROLES = ("ranking_designer", "feature_engineer", "experiment_designer", "drift_observer", "policy_reviewer")
+DEPLOYMENT_TARGETS = ("python", "apg_runtime", "batch_ranker", "edge_ranker")
+FEEDBACK_EVENTS = ("impression", "click", "dismiss", "conversion", "rating")
 
 
 def stable_id(prefix: str, *parts: object) -> str:
@@ -30,6 +34,34 @@ def normalize_impact_level(impact_level: str | None) -> str:
 	return value
 
 
+def normalize_agent_runtime(runtime: str | None) -> str:
+	value = (runtime or "").strip().lower()
+	if value not in AGENT_RUNTIMES:
+		raise ValueError(f"unsupported_recommender_agent_runtime:{value}")
+	return value
+
+
+def normalize_agent_role(role: str | None) -> str:
+	value = (role or "").strip().lower()
+	if value not in AGENT_ROLES:
+		raise ValueError(f"unsupported_recommender_agent_role:{value}")
+	return value
+
+
+def normalize_deployment_target(target: str | None) -> str:
+	value = (target or "").strip().lower()
+	if value not in DEPLOYMENT_TARGETS:
+		raise ValueError(f"unsupported_recommendation_deployment_target:{value}")
+	return value
+
+
+def normalize_feedback_event(event_type: str | None) -> str:
+	value = (event_type or "").strip().lower()
+	if value not in FEEDBACK_EVENTS:
+		raise ValueError(f"unsupported_feedback_event:{value}")
+	return value
+
+
 def normalize_features(features: dict[str, Any] | None) -> dict[str, float]:
 	normalized: dict[str, float] = {}
 	for key, value in (features or {}).items():
@@ -42,6 +74,10 @@ def normalize_features(features: dict[str, Any] | None) -> dict[str, float]:
 
 def normalize_labels(labels: list[str] | tuple[str, ...] | None) -> tuple[str, ...]:
 	return tuple(sorted({str(label).strip().lower() for label in labels or () if str(label).strip()}))
+
+
+def schema_fields_valid(fields: list[str] | tuple[str, ...] | None) -> bool:
+	return bool(normalize_labels(fields))
 
 
 def score_item(

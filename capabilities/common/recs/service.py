@@ -7,12 +7,17 @@ from typing import Any
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
 	RankingPolicy,
+	InteractionEvent,
+	ModelDeployment,
 	Recommendation,
 	RecommendationCatalogItem,
+	RecommendationDataset,
 	RecommendationExperiment,
+	RecommendationFeedback,
 	RecommendationModel,
 	RecommendationProfile,
 	RecommendationSet,
+	RecommenderAgent,
 	RecsAuditEvent,
 	TrainingRun,
 	utc_now,
@@ -20,11 +25,16 @@ from .models import (
 from .recommendation_runtime import (
 	confidence_for_score,
 	drift_status,
+	normalize_agent_role,
+	normalize_agent_runtime,
 	normalize_algorithm,
+	normalize_deployment_target,
 	normalize_features,
+	normalize_feedback_event,
 	normalize_impact_level,
 	normalize_labels,
 	recommendation_reason,
+	schema_fields_valid,
 	score_item,
 	stable_id,
 )
@@ -34,13 +44,18 @@ class RecsService:
 	"""In-process catalog, profile, ranking, model, experiment, and recommendation service."""
 
 	def __init__(self) -> None:
+		self._datasets: dict[str, RecommendationDataset] = {}
+		self._interaction_events: dict[str, InteractionEvent] = {}
 		self._catalog_items: dict[str, RecommendationCatalogItem] = {}
 		self._profiles: dict[str, RecommendationProfile] = {}
 		self._policies: dict[str, RankingPolicy] = {}
 		self._models: dict[str, RecommendationModel] = {}
 		self._training_runs: dict[str, TrainingRun] = {}
+		self._deployments: dict[str, ModelDeployment] = {}
 		self._recommendation_sets: dict[str, RecommendationSet] = {}
+		self._feedback: dict[str, RecommendationFeedback] = {}
 		self._experiments: dict[str, RecommendationExperiment] = {}
+		self._agents: dict[str, RecommenderAgent] = {}
 		self._audit_events: dict[str, RecsAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -80,6 +95,83 @@ class RecsService:
 		self._record_audit(tenant_id, item.id, "catalog_item_registered", actor, "allow")
 		return item.to_dict()
 
+	def register_dataset(
+		self,
+		dataset_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		source_ref: str,
+		schema_fields: list[str] | tuple[str, ...],
+		policy_ref: str,
+		event_count: int = 0,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		fields_valid = schema_fields_valid(schema_fields)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_dataset",
+			"dataset_owner_present": bool(owner.strip()),
+			"dataset_source_present": bool(source_ref.strip()),
+			"dataset_schema_present": fields_valid,
+			"dataset_policy_present": bool(policy_ref.strip()),
+		})
+		self._raise_if_blocked(result)
+		dataset = RecommendationDataset(
+			id=dataset_id,
+			tenant_id=tenant_id,
+			name=name or dataset_id,
+			owner=owner,
+			source_ref=source_ref,
+			schema_fields=normalize_labels(schema_fields),
+			policy_ref=policy_ref,
+			event_count=max(0, int(event_count)),
+		)
+		self._datasets[dataset.id] = dataset
+		self._record_audit(tenant_id, dataset.id, "dataset_registered", actor, "allow")
+		return dataset.to_dict()
+
+	def record_interaction(
+		self,
+		event_id: str,
+		tenant_id: str,
+		dataset_id: str,
+		profile_id: str,
+		item_id: str,
+		event_type: str,
+		occurred_at: str,
+		weight: float = 1.0,
+		metadata: dict[str, Any] | None = None,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		dataset = self._require_dataset(dataset_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_interaction",
+			"interaction_actor_present": bool(profile_id.strip()),
+			"interaction_item_present": bool(item_id.strip()),
+			"interaction_timestamp_present": bool(occurred_at.strip()),
+		})
+		self._raise_if_blocked(result)
+		event = InteractionEvent(
+			id=event_id,
+			tenant_id=tenant_id,
+			dataset_id=dataset.id,
+			profile_id=profile_id,
+			item_id=item_id,
+			event_type=normalize_feedback_event(event_type),
+			occurred_at=occurred_at,
+			weight=round(float(weight), 4),
+			metadata=dict(metadata or {}),
+		)
+		self._interaction_events[event.id] = event
+		dataset.event_count += 1
+		dataset.updated_at = utc_now()
+		self._record_audit(tenant_id, event.id, "interaction_recorded", actor, "allow")
+		return event.to_dict()
+
 	def record_profile(
 		self,
 		profile_id: str,
@@ -107,6 +199,7 @@ class RecsService:
 		tenant_id: str,
 		name: str,
 		objective: str,
+		owner: str = "recs",
 		minimum_confidence: float = 0.65,
 		diversity_constraints_enabled: bool = True,
 		sensitive_attribute_filtering: bool = True,
@@ -114,6 +207,12 @@ class RecsService:
 		actor: str = "recs",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "attach_ranking_policy",
+			"ranking_policy_owner_present": bool(owner.strip()),
+		})
+		self._raise_if_blocked(result)
 		if not objective:
 			raise PermissionError("ranking_objective_required")
 		if not 0 <= float(minimum_confidence) <= 1:
@@ -125,6 +224,7 @@ class RecsService:
 			tenant_id=tenant_id,
 			name=name or policy_id,
 			objective=objective,
+			owner=owner,
 			minimum_confidence=round(float(minimum_confidence), 4),
 			diversity_constraints_enabled=bool(diversity_constraints_enabled),
 			sensitive_attribute_filtering=bool(sensitive_attribute_filtering),
@@ -153,12 +253,10 @@ class RecsService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "train_model",
 			"training_event_count": int(training_event_count),
+			"model_owner_present": bool(owner.strip()),
+			"drift_monitoring_enabled": bool(drift_monitoring_enabled),
 		})
 		self._raise_if_blocked(result)
-		if not owner:
-			raise PermissionError("model_owner_required")
-		if not drift_monitoring_enabled:
-			raise PermissionError("drift_monitoring_required")
 		model = RecommendationModel(
 			id=model_id,
 			tenant_id=tenant_id,
@@ -181,6 +279,65 @@ class RecsService:
 		self._training_runs[training_run.id] = training_run
 		self._record_audit(tenant_id, model.id, "model_trained", actor, "allow")
 		return model.to_dict() | {"training_run": training_run.to_dict()}
+
+	def approve_model(
+		self,
+		model_id: str,
+		tenant_id: str,
+		approval_ref: str,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		model = self._require_model(model_id, tenant_id)
+		if not approval_ref.strip():
+			raise PermissionError("model_approval_ref_required")
+		model.approved = True
+		model.approval_ref = approval_ref
+		model.status = "approved"
+		model.updated_at = utc_now()
+		self._record_audit(tenant_id, model.id, "model_approved", actor, "allow")
+		return model.to_dict()
+
+	def deploy_model(
+		self,
+		deployment_id: str,
+		tenant_id: str,
+		model_id: str,
+		target_runtime: str,
+		target_ref: str,
+		approval_recorded: bool,
+		rollback_plan_ref: str,
+		approval_ref: str = "",
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		model = self._require_model(model_id, tenant_id)
+		try:
+			normalized_target = normalize_deployment_target(target_runtime)
+		except ValueError as exc:
+			raise PermissionError("deployment_target_required") from exc
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "deploy_model",
+			"model_approved": bool(model.approved),
+			"deployment_target_supported": bool(normalized_target and target_ref.strip()),
+			"deployment_approval_recorded": bool(approval_recorded),
+			"rollback_plan_present": bool(rollback_plan_ref.strip()),
+		})
+		self._raise_if_blocked(result)
+		deployment = ModelDeployment(
+			id=deployment_id,
+			tenant_id=tenant_id,
+			model_id=model.id,
+			target_runtime=normalized_target,
+			target_ref=target_ref,
+			approval_recorded=approval_recorded,
+			approval_ref=approval_ref,
+			rollback_plan_ref=rollback_plan_ref,
+		)
+		self._deployments[deployment.id] = deployment
+		model.status = "deployed"
+		model.updated_at = utc_now()
+		self._record_audit(tenant_id, deployment.id, "model_deployed", actor, "allow")
+		return deployment.to_dict()
 
 	def generate_recommendations(
 		self,
@@ -211,7 +368,20 @@ class RecsService:
 		if int(limit) < 1:
 			raise PermissionError("recommendation_limit_required")
 		items = [self._require_catalog_item(item_id, tenant_id) for item_id in candidate_item_ids]
+		candidate_result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "recommend",
+			"candidate_count": len(items),
+		})
+		self._raise_if_blocked(candidate_result)
 		ranked = self._rank(model, profile, policy, items, int(limit))
+		output_result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "recommend",
+			"recommendation_count": len(ranked),
+		})
+		if output_result["decision"] != "allow":
+			self._raise_if_blocked(output_result)
 		rec_set = RecommendationSet(
 			id=recommendation_id,
 			tenant_id=tenant_id,
@@ -225,6 +395,40 @@ class RecsService:
 		self._recommendation_sets[rec_set.id] = rec_set
 		self._record_audit(tenant_id, rec_set.id, "recommendations_generated", actor, "allow")
 		return rec_set.to_dict()
+
+	def record_feedback(
+		self,
+		feedback_id: str,
+		tenant_id: str,
+		recommendation_set_id: str,
+		profile_id: str,
+		item_id: str,
+		event_type: str,
+		value: float = 1.0,
+		metadata: dict[str, Any] | None = None,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		self._require_recommendation_set(recommendation_set_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_feedback",
+			"feedback_actor_present": bool(profile_id.strip()),
+			"feedback_event_present": bool(event_type.strip()),
+		})
+		self._raise_if_blocked(result)
+		feedback = RecommendationFeedback(
+			id=feedback_id,
+			tenant_id=tenant_id,
+			recommendation_set_id=recommendation_set_id,
+			profile_id=profile_id,
+			item_id=item_id,
+			event_type=normalize_feedback_event(event_type),
+			value=round(float(value), 4),
+			metadata=dict(metadata or {}),
+		)
+		self._feedback[feedback.id] = feedback
+		self._record_audit(tenant_id, feedback.id, "feedback_recorded", actor, "allow")
+		return feedback.to_dict()
 
 	def create_experiment(
 		self,
@@ -285,6 +489,71 @@ class RecsService:
 		self._record_audit(tenant_id, model.id, "model_drift_recorded", actor, "allow", (model.drift_status,))
 		return model.to_dict()
 
+	def register_recommender_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		try:
+			normalized_runtime = normalize_agent_runtime(runtime)
+		except ValueError as exc:
+			raise PermissionError("recommender_agent_runtime_not_supported") from exc
+		normalized_role = normalize_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"recommender_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_blocked(result)
+		agent = RecommenderAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+		)
+		self._agents[agent.id] = agent
+		self._record_audit(tenant_id, agent.id, "recommender_agent_registered", actor, "allow")
+		return agent.to_dict()
+
+	def change_model_state(
+		self,
+		tenant_id: str,
+		model_id: str,
+		status: str,
+		reason: str,
+		audit_recorded: bool = True,
+		actor: str = "recs",
+	) -> dict[str, Any]:
+		model = self._require_model(model_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		self._raise_if_blocked(result)
+		model.status = status or model.status
+		model.updated_at = utc_now()
+		self._record_audit(tenant_id, model.id, "model_state_changed", actor, "allow", (reason,))
+		return model.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -310,6 +579,12 @@ class RecsService:
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self.list_models(tenant_id)
 
+	def list_datasets(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._datasets, tenant_id)
+
+	def list_interaction_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._interaction_events, tenant_id)
+
 	def list_catalog_items(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._catalog_items, tenant_id)
 
@@ -325,11 +600,20 @@ class RecsService:
 	def list_training_runs(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._training_runs, tenant_id)
 
+	def list_deployments(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._deployments, tenant_id)
+
 	def list_recommendation_sets(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._recommendation_sets, tenant_id)
 
+	def list_feedback(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._feedback, tenant_id)
+
 	def list_experiments(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._experiments, tenant_id)
+
+	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
@@ -337,13 +621,18 @@ class RecsService:
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		return {
 			"tenant_id": tenant_id,
+			"dataset_count": len(self.list_datasets(tenant_id)),
+			"interaction_event_count": len(self.list_interaction_events(tenant_id)),
 			"catalog_item_count": len(self.list_catalog_items(tenant_id)),
 			"profile_count": len(self.list_profiles(tenant_id)),
 			"ranking_policy_count": len(self.list_policies(tenant_id)),
 			"model_count": len(self.list_models(tenant_id)),
 			"training_run_count": len(self.list_training_runs(tenant_id)),
+			"deployment_count": len(self.list_deployments(tenant_id)),
 			"recommendation_set_count": len(self.list_recommendation_sets(tenant_id)),
+			"feedback_count": len(self.list_feedback(tenant_id)),
 			"experiment_count": len(self.list_experiments(tenant_id)),
+			"agent_count": len(self.list_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -394,6 +683,12 @@ class RecsService:
 			raise KeyError("recommendation_catalog_item_not_found")
 		return item
 
+	def _require_dataset(self, dataset_id: str, tenant_id: str) -> RecommendationDataset:
+		dataset = self._datasets.get(dataset_id)
+		if dataset is None or dataset.tenant_id != tenant_id:
+			raise KeyError("recommendation_dataset_not_found")
+		return dataset
+
 	def _require_profile(self, profile_id: str, tenant_id: str) -> RecommendationProfile:
 		profile = self._profiles.get(profile_id)
 		if profile is None or profile.tenant_id != tenant_id:
@@ -411,6 +706,12 @@ class RecsService:
 		if model is None or model.tenant_id != tenant_id:
 			raise KeyError("recommendation_model_not_found")
 		return model
+
+	def _require_recommendation_set(self, recommendation_set_id: str, tenant_id: str) -> RecommendationSet:
+		rec_set = self._recommendation_sets.get(recommendation_set_id)
+		if rec_set is None or rec_set.tenant_id != tenant_id:
+			raise KeyError("recommendation_set_not_found")
+		return rec_set
 
 	def _raise_if_blocked(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "allow":

@@ -23,17 +23,18 @@ def _load_module(name: str, path: Path):
 
 
 def test_recs_contract_shape_is_valid():
-	module = _load_module("recs_contract_shape", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("recs_package_contract", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "recs"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
 
 
 def test_recs_app_entrypoint_is_publishable():
-	module = _load_module("recs_app_entrypoint", PACKAGE_DIR / "app.py")
+	module = _load_module("recs_package_app", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()

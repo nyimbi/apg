@@ -12,19 +12,61 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "etl": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.RecsService",
+          "master_data": "mdm",
+          "monitoring": "moni",
+          "nlp": "nlpc",
+          "prediction": "pred",
+          "runtime_helpers": "recommendation_runtime.py",
+          "view_models": "views.py"
+        },
+        "datasets": {
+          "dataset_owner_required": true,
+          "event_timestamp_required": true,
+          "minimum_training_events": 1000,
+          "schema_required": true,
+          "source_policy_required": true
+        },
+        "deployments": {
+          "deployment_approval_required": true,
+          "deployment_target_required": true,
+          "rollback_plan_required": true,
+          "supported_targets": [
+            "python",
+            "apg_runtime",
+            "batch_ranker",
+            "edge_ranker"
+          ]
+        },
         "experiments": {
           "business_metric_required": true,
           "experiment_approval_required": true,
           "holdout_required": true,
           "max_experiment_percent": 25
         },
+        "feedback": {
+          "feedback_actor_required": true,
+          "feedback_audit_required": true,
+          "feedback_capture_required": true,
+          "feedback_event_required": true
+        },
         "governance": {
           "audit_recommendations": true,
+          "batch_event_stream": "bytewax",
           "explainability_required_for_high_impact": true,
           "profile_consent_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
         },
         "models": {
+          "deployment_approval_required": true,
           "drift_monitoring_required": true,
           "enabled_algorithms": [
             "collaborative_filtering",
@@ -33,13 +75,43 @@
             "contextual_bandit"
           ],
           "minimum_training_events": 1000,
+          "model_approval_required": true,
           "model_owner_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "drift_metrics_required": true,
+          "event_stream": "bytewax",
+          "feedback_metrics_required": true,
+          "ranking_metrics_required": true
         },
         "ranking": {
           "diversity_constraints_enabled": true,
+          "empty_result_review_required": true,
           "minimum_recommendation_confidence": 0.65,
+          "ranking_policy_owner_required": true,
           "ranking_policy_required": true,
           "sensitive_attribute_filtering": true
+        },
+        "recommender_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "ranking_designer",
+            "feature_engineer",
+            "experiment_designer",
+            "drift_observer",
+            "policy_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -47,7 +119,13 @@
           "default_theme": "recs_recommendation_console"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
+          "enable_dataset_manager": true,
+          "enable_deployment_center": true,
           "enable_experiment_studio": true,
+          "enable_feedback_console": true,
           "enable_model_registry": true,
           "enable_ranking_policy": true,
           "enable_recommendation_console": true
@@ -60,9 +138,21 @@
       "master_data": {},
       "name": "Recommender Systems",
       "provides": [
-        "recs_operations"
+        "personalized_recommendations",
+        "ranking_policies",
+        "catalog_matching",
+        "interaction_datasets",
+        "model_training",
+        "model_deployments",
+        "feedback_loops",
+        "experiment_optimization",
+        "recommender_agents"
       ],
-      "requires": [],
+      "requires": [
+        "pred",
+        "aicr",
+        "nlpc"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -76,6 +166,97 @@
               "required_action": "attach_tenant_context"
             },
             "name": "tenant_context_required"
+          },
+          {
+            "condition": {
+              "dataset_owner_present": false,
+              "operation": "register_dataset"
+            },
+            "description": "Recommendation datasets require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_owner_required",
+              "required_action": "assign_dataset_owner"
+            },
+            "name": "dataset_requires_owner"
+          },
+          {
+            "condition": {
+              "dataset_source_present": false,
+              "operation": "register_dataset"
+            },
+            "description": "Recommendation datasets require a source reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_source_required",
+              "required_action": "attach_dataset_source"
+            },
+            "name": "dataset_requires_source"
+          },
+          {
+            "condition": {
+              "dataset_schema_present": false,
+              "operation": "register_dataset"
+            },
+            "description": "Recommendation datasets require schema fields.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_schema_required",
+              "required_action": "define_dataset_schema"
+            },
+            "name": "dataset_requires_schema"
+          },
+          {
+            "condition": {
+              "dataset_policy_present": false,
+              "operation": "register_dataset"
+            },
+            "description": "Recommendation datasets require a source governance policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_policy_required",
+              "required_action": "attach_dataset_policy"
+            },
+            "name": "dataset_requires_policy"
+          },
+          {
+            "condition": {
+              "interaction_actor_present": false,
+              "operation": "record_interaction"
+            },
+            "description": "Interaction events require a user or profile id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "interaction_actor_required",
+              "required_action": "set_interaction_actor"
+            },
+            "name": "interaction_event_requires_actor"
+          },
+          {
+            "condition": {
+              "interaction_item_present": false,
+              "operation": "record_interaction"
+            },
+            "description": "Interaction events require an item id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "interaction_item_required",
+              "required_action": "set_interaction_item"
+            },
+            "name": "interaction_event_requires_item"
+          },
+          {
+            "condition": {
+              "interaction_timestamp_present": false,
+              "operation": "record_interaction"
+            },
+            "description": "Interaction events require timestamp evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "interaction_timestamp_required",
+              "required_action": "set_interaction_timestamp"
+            },
+            "name": "interaction_event_requires_timestamp"
           },
           {
             "condition": {
@@ -105,6 +286,45 @@
           },
           {
             "condition": {
+              "candidate_count_lte": 0,
+              "operation": "recommend"
+            },
+            "description": "Recommendation requests require candidate items.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_candidates_required",
+              "required_action": "provide_candidate_items"
+            },
+            "name": "recommendation_candidates_required"
+          },
+          {
+            "condition": {
+              "operation": "recommend",
+              "recommendation_count_lte": 0
+            },
+            "description": "Recommendation output should contain ranked results.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "empty_recommendation_review_required",
+              "required_action": "review_empty_recommendations"
+            },
+            "name": "recommendation_output_requires_results"
+          },
+          {
+            "condition": {
+              "operation": "attach_ranking_policy",
+              "ranking_policy_owner_present": false
+            },
+            "description": "Ranking policies require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ranking_policy_owner_required",
+              "required_action": "assign_ranking_policy_owner"
+            },
+            "name": "ranking_policy_requires_owner"
+          },
+          {
+            "condition": {
               "operation": "train_model",
               "training_event_count_lt": 1000
             },
@@ -115,6 +335,84 @@
               "required_action": "collect_training_events"
             },
             "name": "model_training_requires_events"
+          },
+          {
+            "condition": {
+              "model_owner_present": false,
+              "operation": "train_model"
+            },
+            "description": "Models require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_owner_required",
+              "required_action": "assign_model_owner"
+            },
+            "name": "model_requires_owner"
+          },
+          {
+            "condition": {
+              "drift_monitoring_enabled": false,
+              "operation": "train_model"
+            },
+            "description": "Models require drift monitoring before activation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_monitoring_required",
+              "required_action": "enable_drift_monitoring"
+            },
+            "name": "model_requires_drift_monitoring"
+          },
+          {
+            "condition": {
+              "model_approved": false,
+              "operation": "deploy_model"
+            },
+            "description": "Models require approval before deployment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_approval_required",
+              "required_action": "approve_model"
+            },
+            "name": "model_approval_required"
+          },
+          {
+            "condition": {
+              "deployment_target_supported": false,
+              "operation": "deploy_model"
+            },
+            "description": "Model deployments require a supported target.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_target_required",
+              "required_action": "choose_supported_deployment_target"
+            },
+            "name": "model_deployment_requires_target"
+          },
+          {
+            "condition": {
+              "deployment_approval_recorded": false,
+              "operation": "deploy_model"
+            },
+            "description": "Model deployments require approval evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_approval_required",
+              "required_action": "record_deployment_approval"
+            },
+            "name": "model_deployment_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "deploy_model",
+              "rollback_plan_present": false
+            },
+            "description": "Model deployments require rollback evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rollback_plan_required",
+              "required_action": "attach_rollback_plan"
+            },
+            "name": "model_deployment_requires_rollback"
           },
           {
             "condition": {
@@ -141,6 +439,135 @@
               "required_action": "review_experiment"
             },
             "name": "large_experiment_requires_review"
+          },
+          {
+            "condition": {
+              "feedback_actor_present": false,
+              "operation": "record_feedback"
+            },
+            "description": "Feedback requires the acting user or profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feedback_actor_required",
+              "required_action": "record_feedback_actor"
+            },
+            "name": "feedback_requires_actor"
+          },
+          {
+            "condition": {
+              "feedback_event_present": false,
+              "operation": "record_feedback"
+            },
+            "description": "Feedback requires an event type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feedback_event_required",
+              "required_action": "record_feedback_event"
+            },
+            "name": "feedback_requires_event"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "recommender_agent_present": true
+            },
+            "description": "AI recommender agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recommender_agent_registration_required",
+              "required_action": "register_recommender_agent"
+            },
+            "name": "recommender_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "recommender_agent_present": true
+            },
+            "description": "AI recommender agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recommender_agent_runtime_not_supported",
+              "required_action": "choose_supported_recommender_agent_runtime"
+            },
+            "name": "recommender_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "recommender_agent_present": true
+            },
+            "description": "AI recommender agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recommender_agent_scope_required",
+              "required_action": "set_recommender_agent_scope"
+            },
+            "name": "recommender_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "recommender_agent_present": true
+            },
+            "description": "AI recommender-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recommender_agent_disclosure_required",
+              "required_action": "disclose_recommender_agent"
+            },
+            "name": "recommender_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Model and policy state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Model and policy state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recommendation_audit_event_required",
+              "required_action": "record_recommendation_audit"
+            },
+            "name": "state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Recommendation records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_recommendation_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_recommendation_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_recommendation_mutation"
+            },
+            "description": "Batch recommendation mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_recommendation_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -157,6 +584,97 @@
             "required_action": "attach_tenant_context"
           },
           "name": "tenant_context_required"
+        },
+        {
+          "condition": {
+            "dataset_owner_present": false,
+            "operation": "register_dataset"
+          },
+          "description": "Recommendation datasets require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_owner_required",
+            "required_action": "assign_dataset_owner"
+          },
+          "name": "dataset_requires_owner"
+        },
+        {
+          "condition": {
+            "dataset_source_present": false,
+            "operation": "register_dataset"
+          },
+          "description": "Recommendation datasets require a source reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_source_required",
+            "required_action": "attach_dataset_source"
+          },
+          "name": "dataset_requires_source"
+        },
+        {
+          "condition": {
+            "dataset_schema_present": false,
+            "operation": "register_dataset"
+          },
+          "description": "Recommendation datasets require schema fields.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_schema_required",
+            "required_action": "define_dataset_schema"
+          },
+          "name": "dataset_requires_schema"
+        },
+        {
+          "condition": {
+            "dataset_policy_present": false,
+            "operation": "register_dataset"
+          },
+          "description": "Recommendation datasets require a source governance policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_policy_required",
+            "required_action": "attach_dataset_policy"
+          },
+          "name": "dataset_requires_policy"
+        },
+        {
+          "condition": {
+            "interaction_actor_present": false,
+            "operation": "record_interaction"
+          },
+          "description": "Interaction events require a user or profile id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "interaction_actor_required",
+            "required_action": "set_interaction_actor"
+          },
+          "name": "interaction_event_requires_actor"
+        },
+        {
+          "condition": {
+            "interaction_item_present": false,
+            "operation": "record_interaction"
+          },
+          "description": "Interaction events require an item id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "interaction_item_required",
+            "required_action": "set_interaction_item"
+          },
+          "name": "interaction_event_requires_item"
+        },
+        {
+          "condition": {
+            "interaction_timestamp_present": false,
+            "operation": "record_interaction"
+          },
+          "description": "Interaction events require timestamp evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "interaction_timestamp_required",
+            "required_action": "set_interaction_timestamp"
+          },
+          "name": "interaction_event_requires_timestamp"
         },
         {
           "condition": {
@@ -186,6 +704,45 @@
         },
         {
           "condition": {
+            "candidate_count_lte": 0,
+            "operation": "recommend"
+          },
+          "description": "Recommendation requests require candidate items.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_candidates_required",
+            "required_action": "provide_candidate_items"
+          },
+          "name": "recommendation_candidates_required"
+        },
+        {
+          "condition": {
+            "operation": "recommend",
+            "recommendation_count_lte": 0
+          },
+          "description": "Recommendation output should contain ranked results.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "empty_recommendation_review_required",
+            "required_action": "review_empty_recommendations"
+          },
+          "name": "recommendation_output_requires_results"
+        },
+        {
+          "condition": {
+            "operation": "attach_ranking_policy",
+            "ranking_policy_owner_present": false
+          },
+          "description": "Ranking policies require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ranking_policy_owner_required",
+            "required_action": "assign_ranking_policy_owner"
+          },
+          "name": "ranking_policy_requires_owner"
+        },
+        {
+          "condition": {
             "operation": "train_model",
             "training_event_count_lt": 1000
           },
@@ -196,6 +753,84 @@
             "required_action": "collect_training_events"
           },
           "name": "model_training_requires_events"
+        },
+        {
+          "condition": {
+            "model_owner_present": false,
+            "operation": "train_model"
+          },
+          "description": "Models require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_owner_required",
+            "required_action": "assign_model_owner"
+          },
+          "name": "model_requires_owner"
+        },
+        {
+          "condition": {
+            "drift_monitoring_enabled": false,
+            "operation": "train_model"
+          },
+          "description": "Models require drift monitoring before activation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_monitoring_required",
+            "required_action": "enable_drift_monitoring"
+          },
+          "name": "model_requires_drift_monitoring"
+        },
+        {
+          "condition": {
+            "model_approved": false,
+            "operation": "deploy_model"
+          },
+          "description": "Models require approval before deployment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_approval_required",
+            "required_action": "approve_model"
+          },
+          "name": "model_approval_required"
+        },
+        {
+          "condition": {
+            "deployment_target_supported": false,
+            "operation": "deploy_model"
+          },
+          "description": "Model deployments require a supported target.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_target_required",
+            "required_action": "choose_supported_deployment_target"
+          },
+          "name": "model_deployment_requires_target"
+        },
+        {
+          "condition": {
+            "deployment_approval_recorded": false,
+            "operation": "deploy_model"
+          },
+          "description": "Model deployments require approval evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_approval_required",
+            "required_action": "record_deployment_approval"
+          },
+          "name": "model_deployment_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "deploy_model",
+            "rollback_plan_present": false
+          },
+          "description": "Model deployments require rollback evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rollback_plan_required",
+            "required_action": "attach_rollback_plan"
+          },
+          "name": "model_deployment_requires_rollback"
         },
         {
           "condition": {
@@ -222,6 +857,135 @@
             "required_action": "review_experiment"
           },
           "name": "large_experiment_requires_review"
+        },
+        {
+          "condition": {
+            "feedback_actor_present": false,
+            "operation": "record_feedback"
+          },
+          "description": "Feedback requires the acting user or profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feedback_actor_required",
+            "required_action": "record_feedback_actor"
+          },
+          "name": "feedback_requires_actor"
+        },
+        {
+          "condition": {
+            "feedback_event_present": false,
+            "operation": "record_feedback"
+          },
+          "description": "Feedback requires an event type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feedback_event_required",
+            "required_action": "record_feedback_event"
+          },
+          "name": "feedback_requires_event"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "recommender_agent_present": true
+          },
+          "description": "AI recommender agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recommender_agent_registration_required",
+            "required_action": "register_recommender_agent"
+          },
+          "name": "recommender_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "recommender_agent_present": true
+          },
+          "description": "AI recommender agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recommender_agent_runtime_not_supported",
+            "required_action": "choose_supported_recommender_agent_runtime"
+          },
+          "name": "recommender_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "recommender_agent_present": true
+          },
+          "description": "AI recommender agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recommender_agent_scope_required",
+            "required_action": "set_recommender_agent_scope"
+          },
+          "name": "recommender_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "recommender_agent_present": true
+          },
+          "description": "AI recommender-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recommender_agent_disclosure_required",
+            "required_action": "disclose_recommender_agent"
+          },
+          "name": "recommender_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Model and policy state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Model and policy state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recommendation_audit_event_required",
+            "required_action": "record_recommendation_audit"
+          },
+          "name": "state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Recommendation records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_recommendation_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_recommendation_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_recommendation_mutation"
+          },
+          "description": "Batch recommendation mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_recommendation_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -231,6 +995,21 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "RecommenderAgentPanel",
+          "permission": "recs:manage_models",
+          "route": "/recs/agents"
+        },
+        "analytics": {
+          "component": "RECSAnalytics",
+          "permission": "recs:view",
+          "route": "/recs/analytics"
+        },
+        "audit": {
+          "component": "RECSAuditTrail",
+          "permission": "recs:audit",
+          "route": "/recs/audit"
+        },
         "catalogs": {
           "component": "CatalogManager",
           "permission": "recs:view",
@@ -241,10 +1020,25 @@
           "permission": "recs:view",
           "route": "/recs/dashboard"
         },
+        "datasets": {
+          "component": "RecommendationDatasets",
+          "permission": "recs:manage_data",
+          "route": "/recs/datasets"
+        },
+        "deployments": {
+          "component": "ModelDeployments",
+          "permission": "recs:deploy",
+          "route": "/recs/deployments"
+        },
         "experiments": {
           "component": "ExperimentStudio",
           "permission": "recs:run_experiments",
           "route": "/recs/experiments"
+        },
+        "feedback": {
+          "component": "FeedbackConsole",
+          "permission": "recs:recommend",
+          "route": "/recs/feedback"
         },
         "models": {
           "component": "RecommendationModels",
@@ -272,12 +1066,61 @@
           "route": "/recs/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_recommendation_mutation_requires_bytewax",
+        "events": [
+          "dataset_registered",
+          "interaction_recorded",
+          "catalog_item_registered",
+          "profile_recorded",
+          "ranking_policy_attached",
+          "model_trained",
+          "model_approved",
+          "model_deployed",
+          "recommendations_generated",
+          "feedback_recorded",
+          "experiment_created",
+          "model_drift_recorded",
+          "recommender_agent_registered",
+          "model_state_changed"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "datasets",
+          "interaction_events",
+          "catalog_items",
+          "profiles",
+          "policies",
+          "models",
+          "deployments",
+          "recommendations",
+          "experiments",
+          "feedback",
+          "recommender_agents"
+        ],
+        "topic": "apg.recs.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "dataset_card": {
+            "status_style": "source-chip",
+            "visual": "event-stream-card"
+          },
+          "deployment_center": {
+            "status_style": "target-chip",
+            "visual": "deployment-lane"
+          },
           "experiment_board": {
             "status_style": "metric-chip",
             "visual": "variant-lanes"
+          },
+          "feedback_console": {
+            "status_style": "signal-chip",
+            "visual": "feedback-timeline"
           },
           "model_card": {
             "highlight": "drift-chip",
@@ -327,11 +1170,25 @@
             "permission": "recs:recommend"
           },
           {
+            "component": "RecommendationDatasets",
+            "name": "datasets",
+            "nav_group": "Data",
+            "path": "/recs/datasets",
+            "permission": "recs:manage_data"
+          },
+          {
             "component": "RecommendationModels",
             "name": "models",
             "nav_group": "Models",
             "path": "/recs/models",
             "permission": "recs:manage_models"
+          },
+          {
+            "component": "ModelDeployments",
+            "name": "deployments",
+            "nav_group": "Models",
+            "path": "/recs/deployments",
+            "permission": "recs:deploy"
           },
           {
             "component": "CatalogManager",
@@ -348,6 +1205,13 @@
             "permission": "recs:view"
           },
           {
+            "component": "FeedbackConsole",
+            "name": "feedback",
+            "nav_group": "Runtime",
+            "path": "/recs/feedback",
+            "permission": "recs:recommend"
+          },
+          {
             "component": "ExperimentStudio",
             "name": "experiments",
             "nav_group": "Optimization",
@@ -360,6 +1224,27 @@
             "nav_group": "Governance",
             "path": "/recs/policies",
             "permission": "recs:admin"
+          },
+          {
+            "component": "RecommenderAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/recs/agents",
+            "permission": "recs:manage_models"
+          },
+          {
+            "component": "RECSAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/recs/audit",
+            "permission": "recs:audit"
+          },
+          {
+            "component": "RECSAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/recs/analytics",
+            "permission": "recs:view"
           },
           {
             "component": "RECSSettings",
@@ -382,25 +1267,71 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "recs": []
+      "recs": [
+        "pred",
+        "aicr",
+        "nlpc"
+      ]
     }
   },
   "contracts": {
     "recs": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "etl": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.RecsService",
+          "master_data": "mdm",
+          "monitoring": "moni",
+          "nlp": "nlpc",
+          "prediction": "pred",
+          "runtime_helpers": "recommendation_runtime.py",
+          "view_models": "views.py"
+        },
+        "datasets": {
+          "dataset_owner_required": true,
+          "event_timestamp_required": true,
+          "minimum_training_events": 1000,
+          "schema_required": true,
+          "source_policy_required": true
+        },
+        "deployments": {
+          "deployment_approval_required": true,
+          "deployment_target_required": true,
+          "rollback_plan_required": true,
+          "supported_targets": [
+            "python",
+            "apg_runtime",
+            "batch_ranker",
+            "edge_ranker"
+          ]
+        },
         "experiments": {
           "business_metric_required": true,
           "experiment_approval_required": true,
           "holdout_required": true,
           "max_experiment_percent": 25
         },
+        "feedback": {
+          "feedback_actor_required": true,
+          "feedback_audit_required": true,
+          "feedback_capture_required": true,
+          "feedback_event_required": true
+        },
         "governance": {
           "audit_recommendations": true,
+          "batch_event_stream": "bytewax",
           "explainability_required_for_high_impact": true,
           "profile_consent_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
         },
         "models": {
+          "deployment_approval_required": true,
           "drift_monitoring_required": true,
           "enabled_algorithms": [
             "collaborative_filtering",
@@ -409,13 +1340,43 @@
             "contextual_bandit"
           ],
           "minimum_training_events": 1000,
+          "model_approval_required": true,
           "model_owner_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "drift_metrics_required": true,
+          "event_stream": "bytewax",
+          "feedback_metrics_required": true,
+          "ranking_metrics_required": true
         },
         "ranking": {
           "diversity_constraints_enabled": true,
+          "empty_result_review_required": true,
           "minimum_recommendation_confidence": 0.65,
+          "ranking_policy_owner_required": true,
           "ranking_policy_required": true,
           "sensitive_attribute_filtering": true
+        },
+        "recommender_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "ranking_designer",
+            "feature_engineer",
+            "experiment_designer",
+            "drift_observer",
+            "policy_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -423,7 +1384,13 @@
           "default_theme": "recs_recommendation_console"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
+          "enable_dataset_manager": true,
+          "enable_deployment_center": true,
           "enable_experiment_studio": true,
+          "enable_feedback_console": true,
           "enable_model_registry": true,
           "enable_ranking_policy": true,
           "enable_recommendation_console": true
@@ -431,9 +1398,21 @@
       },
       "id": "recs",
       "provides": [
-        "recs_operations"
+        "personalized_recommendations",
+        "ranking_policies",
+        "catalog_matching",
+        "interaction_datasets",
+        "model_training",
+        "model_deployments",
+        "feedback_loops",
+        "experiment_optimization",
+        "recommender_agents"
       ],
-      "requires": []
+      "requires": [
+        "pred",
+        "aicr",
+        "nlpc"
+      ]
     }
   },
   "deployment": {
@@ -445,7 +1424,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -466,6 +1445,109 @@
   },
   "roles": {},
   "rules": {
+    "batch_recommendation_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_recommendation_mutation"
+      },
+      "description": "Batch recommendation mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_recommendation_mutation_requires_bytewax"
+    },
+    "cross_tenant_recommendation_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Recommendation records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_recommendation_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_recommendation_access_denied"
+    },
+    "dataset_requires_owner": {
+      "condition": {
+        "dataset_owner_present": false,
+        "operation": "register_dataset"
+      },
+      "description": "Recommendation datasets require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_owner_required",
+        "required_action": "assign_dataset_owner"
+      },
+      "name": "dataset_requires_owner"
+    },
+    "dataset_requires_policy": {
+      "condition": {
+        "dataset_policy_present": false,
+        "operation": "register_dataset"
+      },
+      "description": "Recommendation datasets require a source governance policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_policy_required",
+        "required_action": "attach_dataset_policy"
+      },
+      "name": "dataset_requires_policy"
+    },
+    "dataset_requires_schema": {
+      "condition": {
+        "dataset_schema_present": false,
+        "operation": "register_dataset"
+      },
+      "description": "Recommendation datasets require schema fields.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_schema_required",
+        "required_action": "define_dataset_schema"
+      },
+      "name": "dataset_requires_schema"
+    },
+    "dataset_requires_source": {
+      "condition": {
+        "dataset_source_present": false,
+        "operation": "register_dataset"
+      },
+      "description": "Recommendation datasets require a source reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_source_required",
+        "required_action": "attach_dataset_source"
+      },
+      "name": "dataset_requires_source"
+    },
+    "feedback_requires_actor": {
+      "condition": {
+        "feedback_actor_present": false,
+        "operation": "record_feedback"
+      },
+      "description": "Feedback requires the acting user or profile.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feedback_actor_required",
+        "required_action": "record_feedback_actor"
+      },
+      "name": "feedback_requires_actor"
+    },
+    "feedback_requires_event": {
+      "condition": {
+        "feedback_event_present": false,
+        "operation": "record_feedback"
+      },
+      "description": "Feedback requires an event type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feedback_event_required",
+        "required_action": "record_feedback_event"
+      },
+      "name": "feedback_requires_event"
+    },
     "high_impact_requires_explainability": {
       "condition": {
         "explanation_attached": false,
@@ -479,6 +1561,45 @@
       },
       "name": "high_impact_requires_explainability"
     },
+    "interaction_event_requires_actor": {
+      "condition": {
+        "interaction_actor_present": false,
+        "operation": "record_interaction"
+      },
+      "description": "Interaction events require a user or profile id.",
+      "effect": {
+        "decision": "deny",
+        "reason": "interaction_actor_required",
+        "required_action": "set_interaction_actor"
+      },
+      "name": "interaction_event_requires_actor"
+    },
+    "interaction_event_requires_item": {
+      "condition": {
+        "interaction_item_present": false,
+        "operation": "record_interaction"
+      },
+      "description": "Interaction events require an item id.",
+      "effect": {
+        "decision": "deny",
+        "reason": "interaction_item_required",
+        "required_action": "set_interaction_item"
+      },
+      "name": "interaction_event_requires_item"
+    },
+    "interaction_event_requires_timestamp": {
+      "condition": {
+        "interaction_timestamp_present": false,
+        "operation": "record_interaction"
+      },
+      "description": "Interaction events require timestamp evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "interaction_timestamp_required",
+        "required_action": "set_interaction_timestamp"
+      },
+      "name": "interaction_event_requires_timestamp"
+    },
     "large_experiment_requires_review": {
       "condition": {
         "experiment_percent_gt": 25,
@@ -491,6 +1612,84 @@
         "required_action": "review_experiment"
       },
       "name": "large_experiment_requires_review"
+    },
+    "model_approval_required": {
+      "condition": {
+        "model_approved": false,
+        "operation": "deploy_model"
+      },
+      "description": "Models require approval before deployment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_approval_required",
+        "required_action": "approve_model"
+      },
+      "name": "model_approval_required"
+    },
+    "model_deployment_requires_approval": {
+      "condition": {
+        "deployment_approval_recorded": false,
+        "operation": "deploy_model"
+      },
+      "description": "Model deployments require approval evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_approval_required",
+        "required_action": "record_deployment_approval"
+      },
+      "name": "model_deployment_requires_approval"
+    },
+    "model_deployment_requires_rollback": {
+      "condition": {
+        "operation": "deploy_model",
+        "rollback_plan_present": false
+      },
+      "description": "Model deployments require rollback evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rollback_plan_required",
+        "required_action": "attach_rollback_plan"
+      },
+      "name": "model_deployment_requires_rollback"
+    },
+    "model_deployment_requires_target": {
+      "condition": {
+        "deployment_target_supported": false,
+        "operation": "deploy_model"
+      },
+      "description": "Model deployments require a supported target.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_target_required",
+        "required_action": "choose_supported_deployment_target"
+      },
+      "name": "model_deployment_requires_target"
+    },
+    "model_requires_drift_monitoring": {
+      "condition": {
+        "drift_monitoring_enabled": false,
+        "operation": "train_model"
+      },
+      "description": "Models require drift monitoring before activation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "drift_monitoring_required",
+        "required_action": "enable_drift_monitoring"
+      },
+      "name": "model_requires_drift_monitoring"
+    },
+    "model_requires_owner": {
+      "condition": {
+        "model_owner_present": false,
+        "operation": "train_model"
+      },
+      "description": "Models require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_owner_required",
+        "required_action": "assign_model_owner"
+      },
+      "name": "model_requires_owner"
     },
     "model_training_requires_events": {
       "condition": {
@@ -530,6 +1729,123 @@
         "required_action": "attach_ranking_policy"
       },
       "name": "ranking_policy_required"
+    },
+    "ranking_policy_requires_owner": {
+      "condition": {
+        "operation": "attach_ranking_policy",
+        "ranking_policy_owner_present": false
+      },
+      "description": "Ranking policies require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ranking_policy_owner_required",
+        "required_action": "assign_ranking_policy_owner"
+      },
+      "name": "ranking_policy_requires_owner"
+    },
+    "recommendation_candidates_required": {
+      "condition": {
+        "candidate_count_lte": 0,
+        "operation": "recommend"
+      },
+      "description": "Recommendation requests require candidate items.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recommendation_candidates_required",
+        "required_action": "provide_candidate_items"
+      },
+      "name": "recommendation_candidates_required"
+    },
+    "recommendation_output_requires_results": {
+      "condition": {
+        "operation": "recommend",
+        "recommendation_count_lte": 0
+      },
+      "description": "Recommendation output should contain ranked results.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "empty_recommendation_review_required",
+        "required_action": "review_empty_recommendations"
+      },
+      "name": "recommendation_output_requires_results"
+    },
+    "recommender_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "recommender_agent_present": true
+      },
+      "description": "AI recommender-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recommender_agent_disclosure_required",
+        "required_action": "disclose_recommender_agent"
+      },
+      "name": "recommender_agent_requires_disclosure"
+    },
+    "recommender_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "recommender_agent_present": true
+      },
+      "description": "AI recommender agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recommender_agent_registration_required",
+        "required_action": "register_recommender_agent"
+      },
+      "name": "recommender_agent_requires_registration"
+    },
+    "recommender_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "recommender_agent_present": true
+      },
+      "description": "AI recommender agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recommender_agent_scope_required",
+        "required_action": "set_recommender_agent_scope"
+      },
+      "name": "recommender_agent_requires_scope"
+    },
+    "recommender_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "recommender_agent_present": true
+      },
+      "description": "AI recommender agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recommender_agent_runtime_not_supported",
+        "required_action": "choose_supported_recommender_agent_runtime"
+      },
+      "name": "recommender_agent_runtime_supported"
+    },
+    "state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Model and policy state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recommendation_audit_event_required",
+        "required_action": "record_recommendation_audit"
+      },
+      "name": "state_change_requires_audit"
+    },
+    "state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Model and policy state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "state_change_requires_reason"
     },
     "tenant_context_required": {
       "condition": {

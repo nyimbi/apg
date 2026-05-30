@@ -22,7 +22,40 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"model_count": summary["model_count"],
 		"catalog_item_count": summary["catalog_item_count"],
 		"recommendation_set_count": summary["recommendation_set_count"],
+		"dataset_count": summary["dataset_count"],
+		"deployment_count": summary["deployment_count"],
+		"feedback_count": summary["feedback_count"],
+		"agent_count": summary["agent_count"],
 	}
+
+
+def register_dataset(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_dataset(
+		dataset_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload.get("owner") or ""),
+		source_ref=str(payload.get("source_ref") or ""),
+		schema_fields=list(payload.get("schema_fields") or ()),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		event_count=int(payload.get("event_count") or 0),
+		actor=str(payload.get("actor") or "recs"),
+	)
+
+
+def record_interaction(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.record_interaction(
+		event_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		dataset_id=str(payload["dataset_id"]),
+		profile_id=str(payload.get("profile_id") or ""),
+		item_id=str(payload.get("item_id") or ""),
+		event_type=str(payload.get("event_type") or "impression"),
+		occurred_at=str(payload.get("occurred_at") or ""),
+		weight=float(payload.get("weight", 1.0)),
+		metadata=dict(payload.get("metadata") or {}),
+		actor=str(payload.get("actor") or "recs"),
+	)
 
 
 def register_catalog_item(payload: dict[str, Any]) -> dict[str, Any]:
@@ -56,6 +89,7 @@ def attach_ranking_policy(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		name=str(payload.get("name") or payload["id"]),
 		objective=str(payload["objective"]),
+		owner=str(payload.get("owner") or "recs"),
 		minimum_confidence=float(payload.get("minimum_confidence", 0.65)),
 		diversity_constraints_enabled=bool(payload.get("diversity_constraints_enabled", True)),
 		sensitive_attribute_filtering=bool(payload.get("sensitive_attribute_filtering", True)),
@@ -80,6 +114,29 @@ def train_model(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def approve_model(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.approve_model(
+		model_id=str(payload["model_id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		approval_ref=str(payload.get("approval_ref") or ""),
+		actor=str(payload.get("actor") or "recs"),
+	)
+
+
+def deploy_model(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.deploy_model(
+		deployment_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		model_id=str(payload["model_id"]),
+		target_runtime=str(payload.get("target_runtime") or "python"),
+		target_ref=str(payload.get("target_ref") or ""),
+		approval_recorded=bool(payload.get("approval_recorded")),
+		rollback_plan_ref=str(payload.get("rollback_plan_ref") or ""),
+		approval_ref=str(payload.get("approval_ref") or ""),
+		actor=str(payload.get("actor") or "recs"),
+	)
+
+
 def generate_recommendations(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.generate_recommendations(
 		recommendation_id=str(payload["id"]),
@@ -91,6 +148,20 @@ def generate_recommendations(payload: dict[str, Any]) -> dict[str, Any]:
 		limit=int(payload.get("limit") or 5),
 		impact_level=str(payload.get("impact_level") or "low"),
 		explanation_attached=bool(payload.get("explanation_attached", False)),
+		actor=str(payload.get("actor") or "recs"),
+	)
+
+
+def record_feedback(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.record_feedback(
+		feedback_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		recommendation_set_id=str(payload["recommendation_set_id"]),
+		profile_id=str(payload.get("profile_id") or ""),
+		item_id=str(payload.get("item_id") or ""),
+		event_type=str(payload.get("event_type") or "impression"),
+		value=float(payload.get("value", 1.0)),
+		metadata=dict(payload.get("metadata") or {}),
 		actor=str(payload.get("actor") or "recs"),
 	)
 
@@ -117,6 +188,32 @@ def record_drift(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		baseline_metric=float(payload["baseline_metric"]),
 		current_metric=float(payload["current_metric"]),
+		actor=str(payload.get("actor") or "recs"),
+	)
+
+
+def register_recommender_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_recommender_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed")),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+		actor=str(payload.get("actor") or "recs"),
+	)
+
+
+def change_model_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_model_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		model_id=str(payload["model_id"]),
+		status=str(payload["status"]),
+		reason=str(payload.get("reason") or ""),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
 		actor=str(payload.get("actor") or "recs"),
 	)
 

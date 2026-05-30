@@ -16,6 +16,64 @@ def isoformat(value: datetime) -> str:
 
 
 @dataclass
+class RecommendationDataset:
+	id: str
+	tenant_id: str
+	name: str
+	owner: str
+	source_ref: str
+	schema_fields: tuple[str, ...]
+	policy_ref: str
+	event_count: int = 0
+	status: str = "registered"
+	created_at: datetime = field(default_factory=utc_now)
+	updated_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"owner": self.owner,
+			"source_ref": self.source_ref,
+			"schema_fields": list(self.schema_fields),
+			"policy_ref": self.policy_ref,
+			"event_count": self.event_count,
+			"status": self.status,
+			"created_at": isoformat(self.created_at),
+			"updated_at": isoformat(self.updated_at),
+		}
+
+
+@dataclass
+class InteractionEvent:
+	id: str
+	tenant_id: str
+	dataset_id: str
+	profile_id: str
+	item_id: str
+	event_type: str
+	occurred_at: str
+	weight: float = 1.0
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"dataset_id": self.dataset_id,
+			"profile_id": self.profile_id,
+			"item_id": self.item_id,
+			"event_type": self.event_type,
+			"occurred_at": self.occurred_at,
+			"weight": self.weight,
+			"metadata": dict(self.metadata),
+			"created_at": isoformat(self.created_at),
+		}
+
+
+@dataclass
 class RecommendationCatalogItem:
 	id: str
 	tenant_id: str
@@ -75,6 +133,7 @@ class RankingPolicy:
 	tenant_id: str
 	name: str
 	objective: str
+	owner: str = "recs"
 	minimum_confidence: float = 0.65
 	diversity_constraints_enabled: bool = True
 	sensitive_attribute_filtering: bool = True
@@ -88,6 +147,7 @@ class RankingPolicy:
 			"tenant_id": self.tenant_id,
 			"name": self.name,
 			"objective": self.objective,
+			"owner": self.owner,
 			"minimum_confidence": self.minimum_confidence,
 			"diversity_constraints_enabled": self.diversity_constraints_enabled,
 			"sensitive_attribute_filtering": self.sensitive_attribute_filtering,
@@ -107,6 +167,8 @@ class RecommendationModel:
 	training_event_count: int
 	feature_names: tuple[str, ...] = ()
 	drift_monitoring_enabled: bool = True
+	approved: bool = False
+	approval_ref: str = ""
 	status: str = "trained"
 	drift_status: str = "stable"
 	created_at: datetime = field(default_factory=utc_now)
@@ -122,6 +184,8 @@ class RecommendationModel:
 			"training_event_count": self.training_event_count,
 			"feature_names": list(self.feature_names),
 			"drift_monitoring_enabled": self.drift_monitoring_enabled,
+			"approved": self.approved,
+			"approval_ref": self.approval_ref,
 			"status": self.status,
 			"drift_status": self.drift_status,
 			"created_at": isoformat(self.created_at),
@@ -226,6 +290,90 @@ class RecommendationExperiment:
 			"business_metric": self.business_metric,
 			"approved": self.approved,
 			"review_recorded": self.review_recorded,
+			"status": self.status,
+			"created_at": isoformat(self.created_at),
+		}
+
+
+@dataclass
+class ModelDeployment:
+	id: str
+	tenant_id: str
+	model_id: str
+	target_runtime: str
+	target_ref: str
+	approval_recorded: bool
+	rollback_plan_ref: str
+	approval_ref: str = ""
+	status: str = "deployed"
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"model_id": self.model_id,
+			"target_runtime": self.target_runtime,
+			"target_ref": self.target_ref,
+			"approval_recorded": self.approval_recorded,
+			"approval_ref": self.approval_ref,
+			"rollback_plan_ref": self.rollback_plan_ref,
+			"status": self.status,
+			"created_at": isoformat(self.created_at),
+		}
+
+
+@dataclass
+class RecommendationFeedback:
+	id: str
+	tenant_id: str
+	recommendation_set_id: str
+	profile_id: str
+	item_id: str
+	event_type: str
+	value: float = 1.0
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"recommendation_set_id": self.recommendation_set_id,
+			"profile_id": self.profile_id,
+			"item_id": self.item_id,
+			"event_type": self.event_type,
+			"value": self.value,
+			"metadata": dict(self.metadata),
+			"created_at": isoformat(self.created_at),
+		}
+
+
+@dataclass
+class RecommenderAgent:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = False
+	policy_ref: str = ""
+	status: str = "active"
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"policy_ref": self.policy_ref,
 			"status": self.status,
 			"created_at": isoformat(self.created_at),
 		}

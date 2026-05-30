@@ -23,9 +23,12 @@ def dashboard_model(
 		"routes": capability_routes(tenant_id),
 		"summary": service.dashboard_summary(tenant_id),
 		"models": service.list_models(tenant_id),
+		"datasets": service.list_datasets(tenant_id),
+		"deployments": service.list_deployments(tenant_id),
 		"recommendation_sets": service.list_recommendation_sets(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -40,6 +43,7 @@ def recommendation_console_model(
 		"recommendation_sets": service.list_recommendation_sets(tenant_id),
 		"profiles": service.list_profiles(tenant_id),
 		"policies": service.list_policies(tenant_id),
+		"feedback": service.list_feedback(tenant_id),
 		"theme": service.describe(tenant_id)["theme"]["components"]["recommendation_list"],
 	}
 
@@ -54,7 +58,36 @@ def model_registry_model(
 		"route": _route("models", tenant_id),
 		"models": service.list_models(tenant_id),
 		"training_runs": service.list_training_runs(tenant_id),
+		"deployments": service.list_deployments(tenant_id),
 		"theme": service.describe(tenant_id)["theme"]["components"]["model_card"],
+	}
+
+
+def dataset_manager_model(
+	service: RecsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or RecsService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("datasets", tenant_id),
+		"datasets": service.list_datasets(tenant_id),
+		"interaction_events": service.list_interaction_events(tenant_id),
+		"theme": service.describe(tenant_id)["theme"]["components"]["dataset_card"],
+	}
+
+
+def deployment_center_model(
+	service: RecsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or RecsService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("deployments", tenant_id),
+		"models": service.list_models(tenant_id),
+		"deployments": service.list_deployments(tenant_id),
+		"theme": service.describe(tenant_id)["theme"]["components"]["deployment_center"],
 	}
 
 
@@ -67,6 +100,20 @@ def catalog_manager_model(
 		"tenant_id": tenant_id,
 		"route": _route("catalogs", tenant_id),
 		"catalog_items": service.list_catalog_items(tenant_id),
+	}
+
+
+def feedback_console_model(
+	service: RecsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or RecsService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("feedback", tenant_id),
+		"feedback": service.list_feedback(tenant_id),
+		"recommendation_sets": service.list_recommendation_sets(tenant_id),
+		"theme": service.describe(tenant_id)["theme"]["components"]["feedback_console"],
 	}
 
 
@@ -120,8 +167,46 @@ def governance_model(
 		"tenant_id": tenant_id,
 		"route": _route("settings", tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"audit_events": service.list_audit_events(tenant_id),
 		"permissions": sorted({route["permission"] for route in contract["ui"]["routes"]}),
+	}
+
+
+def recommender_agents_model(
+	service: RecsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or RecsService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("agents", tenant_id),
+		"agents": service.list_agents(tenant_id),
+		"theme": service.describe(tenant_id)["theme"]["components"]["agent_panel"],
+	}
+
+
+def audit_trail_model(
+	service: RecsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or RecsService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("audit", tenant_id),
+		"audit_events": service.list_audit_events(tenant_id),
+	}
+
+
+def analytics_model(
+	service: RecsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or RecsService()
+	return {
+		"tenant_id": tenant_id,
+		"route": _route("analytics", tenant_id),
+		"summary": service.dashboard_summary(tenant_id),
 	}
 
 
