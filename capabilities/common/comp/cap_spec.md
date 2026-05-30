@@ -1,64 +1,31 @@
-# Compliance Management Capability Specification
+# Compliance Management Capability Spec Pointer
 
-- **Capability Name**: Compliance Management
-- **Capability ID**: `comp`
-- **Category**: common
-- **Version**: 1.0.0
+The active specification is `SPECIFICATION.md`.
 
-## Purpose
+Use this file as the stable compatibility pointer for older capability tooling
+that still expects `cap_spec.md`.
 
-This package provides the executable APG compliance-management runtime for
-`comp`. It owns tenant compliance frameworks, control libraries, encrypted
-evidence records, control assessments, findings, report approvals,
-attestations, and immutable audit-event metadata behind the APG capability
-contract.
+## Current Packet
 
-The implementation is dependency-light and deterministic so generated APG
-applications can compose it without requiring a live GRC platform, regulator
-feed, document repository, scanner, DLP engine, or audit-log sink. Those
-integrations remain explicit APG capability boundaries.
+`comp` now owns a coherent compliance lifecycle packet:
 
-## Provided Services
+- tenant-scoped frameworks, obligations, and policy versions;
+- tenant-scoped controls with DLP linkage and testing cadence;
+- encrypted immutable evidence records;
+- control assessments and evidence freshness checks;
+- findings, escalation, remediation, and resolution evidence;
+- report preparation, independent approval, attestation, publication, and
+  critical-finding blocking;
+- hashed audit-event metadata;
+- UI route, view-model, theme, and adapter metadata;
+- Bytewax as the required event-stream adapter for batch compliance mutation.
 
-- `framework_management`
-- `control_assurance`
-- `evidence_collection`
-- `finding_remediation`
-- `regulatory_reporting`
-- `attestation_management`
-- `compliance_audit_events`
+## Proof Commands
 
-## Required Services
-
-- `audl`
-- `dlpd`
-- `encr`
-- `auth`
-
-Optional composition targets include `secu`, `mten`, `idfd`, and `ztna`.
-
-## Configuration
-
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations.
-
-## Rules
-
-- `tenant_context_required`
-- `control_requires_owner`
-- `stale_evidence_requires_refresh`
-- `regulated_data_requires_dlp`
-- `report_requires_approval`
-- `overdue_finding_requires_escalation`
-
-## UI
-
-The package exposes APG Python route contracts through `views.py` and provides
-dashboard, framework matrix, control library, evidence vault, assessment
-history, remediation board, report builder, attestation center, and audit
-timeline view models.
-
-## Theme
-
-The package uses the `comp_compliance_command_center` APG theme contract.
+```bash
+./.venv/bin/python -m py_compile capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/models.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/app.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py
+./.venv/bin/python -c "from capabilities.common.comp import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/comp --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/comp --json
+```

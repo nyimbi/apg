@@ -25,8 +25,19 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["framework_management", "control_assurance", "evidence_collection", "finding_remediation", "regulatory_reporting"],
-	"permissions": ["comp:view", "comp:manage_controls", "comp:collect_evidence", "comp:remediate", "comp:approve_reports", "comp:admin"]
+	"provides": [
+		"framework_management",
+		"obligation_mapping",
+		"control_assurance",
+		"evidence_collection",
+		"assessment_management",
+		"finding_remediation",
+		"exception_management",
+		"regulatory_reporting",
+		"attestation_management",
+		"compliance_audit_events",
+	],
+	"permissions": ["comp:view", "comp:manage_controls", "comp:collect_evidence", "comp:remediate", "comp:approve_reports", "comp:audit", "comp:admin"]
 }
 
 
@@ -40,25 +51,38 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["secu", "mten", "idfd", "ztna"],
+		"optional_dependencies": ["secu", "mten", "idfd", "ztna", "docm", "wflo", "ntfy", "mqeb", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"framework_management": "Map tenant obligations to frameworks, controls, owners, and evidence",
+			"obligation_mapping": "Track framework obligations, policy versions, and control coverage",
 			"control_assurance": "Assess control design and operating effectiveness",
 			"evidence_collection": "Collect, verify, retain, and audit compliance evidence",
+			"assessment_management": "Route stale, failed, or owner-tested controls into review workflows",
 			"finding_remediation": "Track findings, exceptions, and corrective-action plans",
+			"exception_management": "Govern compliance exceptions with ownership and expiry evidence",
+			"regulatory_reporting": "Prepare, approve, attest, publish, and export compliance reports",
+			"attestation_management": "Record accountable attestation statements before report publication",
+			"compliance_audit_events": "Hash and expose immutable audit-event metadata for compliance state changes",
 			"capability_rules": "Evaluate deterministic compliance-management rules",
 			"visual_theming": "Apply compliance-command-center theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/comp/api/v1/status",
 			"frameworks": "/comp/api/v1/frameworks",
 			"controls": "/comp/api/v1/controls",
 			"evidence": "/comp/api/v1/evidence",
+			"assessments": "/comp/api/v1/assessments",
 			"findings": "/comp/api/v1/findings",
-			"reports": "/comp/api/v1/reports"
+			"exceptions": "/comp/api/v1/exceptions",
+			"reports": "/comp/api/v1/reports",
+			"attestations": "/comp/api/v1/attestations",
+			"exports": "/comp/api/v1/exports",
+			"audit": "/comp/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

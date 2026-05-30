@@ -49,10 +49,17 @@ class CompService:
 		policy_version: str,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		if not owner:
-			raise PermissionError("framework_owner_required")
-		if DEFAULT_CONFIGURATION["frameworks"]["obligation_mapping_required"] and not obligations:
-			raise ValueError("obligation_mapping_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_framework",
+			"framework_owner_assigned": bool(owner),
+			"obligations_mapped": bool(obligations),
+			"policy_version_present": bool(policy_version),
+			"duplicate_framework": self._key(tenant_id, framework_id) in self._frameworks,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		framework = ComplianceFramework(
 			id=framework_id,
 			tenant_id=tenant_id,
@@ -61,7 +68,7 @@ class CompService:
 			obligations=list(obligations),
 			policy_version=policy_version,
 		)
-		self._frameworks[framework_id] = framework
+		self._frameworks[self._key(tenant_id, framework_id)] = framework
 		self._record_audit(tenant_id, "framework_registered", framework_id, owner, framework.to_dict())
 		return framework.to_dict()
 
@@ -78,13 +85,19 @@ class CompService:
 		testing_frequency_days: int | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		self._require_framework(framework_id, tenant_id)
+		framework = self._require_framework(framework_id, tenant_id)
+		frequency = testing_frequency_days or DEFAULT_CONFIGURATION["controls"]["testing_frequency_days"]
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_control",
+			"framework_present": bool(framework),
+			"control_name_present": bool(name),
 			"control_owner_assigned": bool(owner),
+			"testing_frequency_days": frequency,
 			"regulated_data_scope": regulated_data_scope,
 			"dlp_policy_linked": dlp_policy_linked,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
 		})
 		self._raise_if_denied(result)
 		control = ComplianceControl(
@@ -96,9 +109,9 @@ class CompService:
 			control_type=control_type,
 			regulated_data_scope=regulated_data_scope,
 			dlp_policy_linked=dlp_policy_linked,
-			testing_frequency_days=testing_frequency_days or DEFAULT_CONFIGURATION["controls"]["testing_frequency_days"],
+			testing_frequency_days=frequency,
 		)
-		self._controls[control_id] = control
+		self._controls[self._key(tenant_id, control_id)] = control
 		self._record_audit(tenant_id, "control_created", control_id, owner, control.to_dict())
 		return control.to_dict()
 
@@ -115,11 +128,19 @@ class CompService:
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		self._require_control(control_id, tenant_id)
-		if DEFAULT_CONFIGURATION["evidence"]["encrypted_evidence_required"] and not encrypted:
-			raise PermissionError("encrypted_evidence_required")
-		if DEFAULT_CONFIGURATION["evidence"]["immutable_audit_required"] and not immutable_reference:
-			raise PermissionError("immutable_evidence_reference_required")
+		control = self._require_control(control_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_evidence",
+			"control_present": bool(control),
+			"evidence_source_present": bool(source),
+			"evidence_collector_present": bool(collected_by),
+			"evidence_encrypted": bool(encrypted),
+			"immutable_reference_present": bool(immutable_reference),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		evidence = EvidenceRecord(
 			id=evidence_id,
 			tenant_id=tenant_id,
@@ -131,7 +152,7 @@ class CompService:
 			collected_at=collected_at or utc_now(),
 			metadata=dict(metadata or {}),
 		)
-		self._evidence[evidence_id] = evidence
+		self._evidence[self._key(tenant_id, evidence_id)] = evidence
 		self._record_audit(tenant_id, "evidence_recorded", evidence_id, collected_by, evidence.to_dict())
 		return evidence.to_dict()
 
@@ -145,31 +166,40 @@ class CompService:
 		now: datetime | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		self._require_control(control_id, tenant_id)
+		control = self._require_control(control_id, tenant_id)
 		evidence = self._require_evidence(evidence_id, tenant_id, control_id)
 		age = evidence_age_days(evidence.collected_at, now)
-		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
-			"evidence_age_days": age,
-			"evidence_refresh_completed": False,
-		})
-		self._raise_if_denied(result)
 		open_finding_ids = [
 			finding.id
 			for finding in self._findings.values()
 			if finding.tenant_id == tenant_id and finding.control_id == control_id and finding.status == "open"
 		]
+		preliminary_result = assessment_result(age, DEFAULT_CONFIGURATION["evidence"]["evidence_freshness_days"], bool(open_finding_ids))
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "assess_control",
+			"tester_present": bool(tested_by),
+			"tester_is_control_owner": tested_by == control.owner,
+			"evidence_age_days": age,
+			"evidence_refresh_completed": False,
+			"assessment_failed": preliminary_result != "effective",
+			"finding_linked": bool(open_finding_ids),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
+		required_actions = [action.get("required_action") for action in result["actions"] if action.get("decision") == "require_review"]
 		assessment = ControlAssessment(
 			id=assessment_id,
 			tenant_id=tenant_id,
 			control_id=control_id,
 			evidence_id=evidence_id,
-			result=assessment_result(age, DEFAULT_CONFIGURATION["evidence"]["evidence_freshness_days"], bool(open_finding_ids)),
+			result="review_required" if required_actions else preliminary_result,
 			tested_by=tested_by,
 			evidence_age_days=age,
 			findings=open_finding_ids,
 		)
-		self._assessments[assessment_id] = assessment
+		self._assessments[self._key(tenant_id, assessment_id)] = assessment
 		self._record_audit(tenant_id, "control_assessed", assessment_id, tested_by, assessment.to_dict())
 		return assessment.to_dict()
 
@@ -186,6 +216,17 @@ class CompService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		self._require_control(control_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "open_finding",
+			"finding_owner_assigned": bool(owner),
+			"finding_description_present": bool(description),
+			"high_severity_finding": severity in {"high", "critical"},
+			"remediation_plan_present": bool(remediation_plan),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		due_at = (created_at or utc_now()) + timedelta(days=DEFAULT_CONFIGURATION["reporting"]["finding_remediation_sla_days"])
 		finding = ComplianceFinding(
 			id=finding_id,
@@ -198,8 +239,31 @@ class CompService:
 			created_at=created_at or utc_now(),
 			remediation_plan=remediation_plan,
 		)
-		self._findings[finding_id] = finding
+		self._findings[self._key(tenant_id, finding_id)] = finding
 		self._record_audit(tenant_id, "finding_opened", finding_id, owner, finding.to_dict())
+		return finding.to_dict()
+
+	def resolve_finding(
+		self,
+		finding_id: str,
+		tenant_id: str,
+		resolved_by: str,
+		resolution: str,
+		evidence_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		finding = self._require_finding(finding_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "resolve_finding",
+			"resolution_evidence_present": bool(evidence_id),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
+		finding.status = "resolved"
+		finding.remediation_plan = resolution or finding.remediation_plan
+		self._record_audit(tenant_id, "finding_resolved", finding_id, resolved_by, {"resolution": resolution, "evidence_id": evidence_id})
 		return finding.to_dict()
 
 	def escalate_overdue_findings(self, tenant_id: str, now: datetime | None = None) -> list[dict[str, Any]]:
@@ -229,7 +293,17 @@ class CompService:
 		prepared_by: str,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		self._require_framework(framework_id, tenant_id)
+		framework = self._require_framework(framework_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "prepare_report",
+			"framework_present": bool(framework),
+			"report_period_present": bool(period),
+			"report_preparer_present": bool(prepared_by),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		control_count = len([control for control in self._controls.values() if control.tenant_id == tenant_id and control.framework_id == framework_id])
 		finding_count = len([finding for finding in self._findings.values() if finding.tenant_id == tenant_id and finding.status == "open"])
 		report = ComplianceReport(
@@ -241,12 +315,20 @@ class CompService:
 			control_count=control_count,
 			finding_count=finding_count,
 		)
-		self._reports[report_id] = report
+		self._reports[self._key(tenant_id, report_id)] = report
 		self._record_audit(tenant_id, "report_prepared", report_id, prepared_by, report.to_dict())
 		return report.to_dict()
 
 	def approve_report(self, report_id: str, tenant_id: str, approved_by: str) -> dict[str, Any]:
 		report = self._require_report(report_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "approve_report",
+			"approver_is_preparer": approved_by == report.prepared_by,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		report.status = "approved"
 		report.approved_by = approved_by
 		report.approved_at = utc_now()
@@ -255,8 +337,15 @@ class CompService:
 
 	def attest_report(self, attestation_id: str, report_id: str, tenant_id: str, attested_by: str, statement: str) -> dict[str, Any]:
 		report = self._require_report(report_id, tenant_id)
-		if report.status != "approved":
-			raise PermissionError("report_approval_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "attest_report",
+			"report_approved": report.status == "approved",
+			"attestation_statement_present": bool(statement),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		attestation = AttestationRecord(
 			id=attestation_id,
 			tenant_id=tenant_id,
@@ -264,17 +353,22 @@ class CompService:
 			attested_by=attested_by,
 			statement=statement,
 		)
-		self._attestations[attestation_id] = attestation
+		self._attestations[self._key(tenant_id, attestation_id)] = attestation
 		self._record_audit(tenant_id, "report_attested", attestation_id, attested_by, attestation.to_dict())
 		return attestation.to_dict()
 
 	def publish_report(self, report_id: str, tenant_id: str) -> dict[str, Any]:
 		report = self._require_report(report_id, tenant_id)
 		has_attestation = any(attestation.tenant_id == tenant_id and attestation.report_id == report_id for attestation in self._attestations.values())
+		open_critical_findings = any(finding.tenant_id == tenant_id and finding.status == "open" and finding.severity == "critical" for finding in self._findings.values())
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "publish_report",
-			"approval_recorded": report.status == "approved" and has_attestation,
+			"approval_recorded": report.status == "approved",
+			"attestation_recorded": has_attestation,
+			"open_critical_findings": open_critical_findings,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
 		})
 		self._raise_if_denied(result)
 		report.status = "published"
@@ -345,25 +439,31 @@ class CompService:
 		self._raise_if_denied(result)
 
 	def _require_framework(self, framework_id: str, tenant_id: str) -> ComplianceFramework:
-		framework = self._frameworks.get(framework_id)
+		framework = self._frameworks.get(self._key(tenant_id, framework_id))
 		if framework is None or framework.tenant_id != tenant_id:
 			raise KeyError("framework_not_found")
 		return framework
 
 	def _require_control(self, control_id: str, tenant_id: str) -> ComplianceControl:
-		control = self._controls.get(control_id)
+		control = self._controls.get(self._key(tenant_id, control_id))
 		if control is None or control.tenant_id != tenant_id:
 			raise KeyError("control_not_found")
 		return control
 
 	def _require_evidence(self, evidence_id: str, tenant_id: str, control_id: str) -> EvidenceRecord:
-		evidence = self._evidence.get(evidence_id)
+		evidence = self._evidence.get(self._key(tenant_id, evidence_id))
 		if evidence is None or evidence.tenant_id != tenant_id or evidence.control_id != control_id:
 			raise KeyError("evidence_not_found")
 		return evidence
 
+	def _require_finding(self, finding_id: str, tenant_id: str) -> ComplianceFinding:
+		finding = self._findings.get(self._key(tenant_id, finding_id))
+		if finding is None or finding.tenant_id != tenant_id:
+			raise KeyError("finding_not_found")
+		return finding
+
 	def _require_report(self, report_id: str, tenant_id: str) -> ComplianceReport:
-		report = self._reports.get(report_id)
+		report = self._reports.get(self._key(tenant_id, report_id))
 		if report is None or report.tenant_id != tenant_id:
 			raise KeyError("report_not_found")
 		return report
@@ -378,3 +478,7 @@ class CompService:
 		if result["decision"] == "deny":
 			reasons = ", ".join(action.get("reason", "compliance_policy_blocked") for action in result["actions"])
 			raise PermissionError(reasons or "compliance_policy_blocked")
+
+	@staticmethod
+	def _key(tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"

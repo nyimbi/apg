@@ -15022,3 +15022,65 @@ Not run to preserve battery:
 - External AUTH, SECU, MFAU, MONI, AUDL, IDFD, ANOM, MQEB, or CACH adapters.
 - Security certification, zero-trust interoperability, load, latency,
   authorization, policy, evasion, and throughput benchmarks.
+
+### 2026-05-30 13:04 EAT
+
+COMP lifecycle and guardrail packet:
+
+- Selected `capabilities/common/comp` as the next common capability after ZTNA.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the COMP contract to cover frameworks, controls, evidence,
+  assessments, findings, reporting, exceptions, security, governance,
+  observability, adapters, UI routes, and visual theme components.
+- Expanded deterministic guardrails to 36 rules covering tenant context,
+  framework ownership, obligations, policy versions, duplicate framework keys,
+  control framework/name/owner/cadence, regulated-data DLP linkage, evidence
+  control/source/collector/encryption/immutable reference/freshness, assessment
+  tester independence and finding linkage, finding owner/description/remediation
+  plan/escalation/resolution evidence, report framework/period/preparer,
+  independent report approval, attestation statement, approval and attestation
+  before publication, critical finding publication blocks, tenant isolation,
+  audit evidence, and Bytewax batch mutation.
+- Hardened `CompService` to use tenant-qualified internal storage keys while
+  preserving public business IDs, allowing repeated framework/control/report
+  IDs across tenants without collision.
+- Routed framework, control, evidence, assessment, finding, report approval,
+  attestation, publication, and finding resolution decisions through the
+  deterministic rule engine.
+- Added finding resolution with required resolution evidence.
+- Added API helper coverage for finding resolution.
+- Added framework, control, evidence, assessment, finding, report, attestation,
+  audit, and settings view models.
+- Replaced embedded semantic evidence with a contract-derived semantic model
+  and self-test that checks route count, rule count, Bytewax event streaming,
+  and generated runtime metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale package-test terminology and
+  expanded coverage for API helpers, view models, tenant-local IDs, report
+  publication blocks, and guardrail failures.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/models.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/app.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py` passed with 11 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and COMP capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/comp --json` passed with `ok: true`; COMP remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/comp --json` passed with 12 UI routes, 36 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/comp/README.md capabilities/common/comp/SPECIFICATION.md capabilities/common/comp/PLAN.md capabilities/common/comp/cap_spec.md capabilities/common/comp/__init__.py capabilities/common/comp/capability_contract.py capabilities/common/comp/compliance_engine.py capabilities/common/comp/models.py capabilities/common/comp/service.py capabilities/common/comp/api.py capabilities/common/comp/views.py capabilities/common/comp/app.py capabilities/common/comp/test_capability_contract.py capabilities/common/comp/tests/test_package_contract.py capabilities/common/comp/package_manifest.json capabilities/common/comp/release_report.json capabilities/common/comp/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/comp docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live GRC platform synchronization, regulator submission, document repository
+  storage, DLP inspection, identity provider, audit sink, workflow, notification,
+  or evidence-retention integrations.
+- Browser-rendered UI behavior.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUDL, DLPD, ENCR, AUTH, SECU, MTEN, IDFD, ZTNA, DOCM, WFLO, NTFY,
+  MQEB, or CACH adapters.
+- Security certification, compliance certification, regulator interoperability,
+  load, latency, authorization, evidence integrity, and throughput benchmarks.

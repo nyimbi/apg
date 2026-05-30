@@ -86,6 +86,16 @@ def open_finding(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def resolve_finding(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.resolve_finding(
+		finding_id=str(payload["finding_id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		resolved_by=str(payload["resolved_by"]),
+		resolution=str(payload.get("resolution") or ""),
+		evidence_id=payload.get("evidence_id"),
+	)
+
+
 def prepare_report(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.prepare_report(
 		report_id=str(payload["id"]),

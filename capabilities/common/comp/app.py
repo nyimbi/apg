@@ -5,13 +5,123 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Compliance Management package-backed APG capability", "entity_count": 0, "name": "comp", "version": "1.0.0"}, "capabilities": {"comp": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"controls": {"automated_control_testing": true, "control_owner_required": true, "exception_approval_required": true, "testing_frequency_days": 90}, "evidence": {"encrypted_evidence_required": true, "evidence_freshness_days": 30, "immutable_audit_required": true, "retention_years": 7}, "frameworks": {"enabled": ["soc2", "iso27001", "gdpr", "hipaa", "pci_dss", "sox"], "framework_owner_required": true, "obligation_mapping_required": true, "policy_versioning_enabled": true}, "governance": {"audit_control_changes": true, "dlp_for_regulated_data_required": true, "require_tenant_context": true, "role_separation_required": true}, "reporting": {"approval_required": true, "attestation_required": true, "finding_remediation_sla_days": 30, "regulatory_export_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "comp_compliance_command_center"}, "ui": {"enable_compliance_dashboard": true, "enable_control_library": true, "enable_evidence_vault": true, "enable_report_builder": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Compliance Management", "provides": ["comp_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All compliance operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"control_owner_assigned": false, "operation": "create_control"}, "description": "Controls require accountable owners.", "effect": {"decision": "deny", "reason": "control_owner_required", "required_action": "assign_control_owner"}, "name": "control_requires_owner"}, {"condition": {"evidence_age_days_gt": 30, "evidence_refresh_completed": false}, "description": "Stale evidence requires refresh before attestation.", "effect": {"decision": "deny", "reason": "evidence_refresh_required", "required_action": "refresh_evidence"}, "name": "stale_evidence_requires_refresh"}, {"condition": {"dlp_policy_linked": false, "regulated_data_scope": true}, "description": "Regulated data controls require linked DLP policy evidence.", "effect": {"decision": "deny", "reason": "dlp_policy_required", "required_action": "link_dlp_policy"}, "name": "regulated_data_requires_dlp"}, {"condition": {"approval_recorded": false, "operation": "publish_report"}, "description": "Compliance reports require approval before release.", "effect": {"decision": "deny", "reason": "report_approval_required", "required_action": "record_report_approval"}, "name": "report_requires_approval"}, {"condition": {"escalation_recorded": false, "finding_age_days_gt": 30}, "description": "Overdue findings require escalation.", "effect": {"decision": "require_review", "reason": "finding_escalation_required", "required_action": "escalate_finding"}, "name": "overdue_finding_requires_escalation"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All compliance operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"control_owner_assigned": false, "operation": "create_control"}, "description": "Controls require accountable owners.", "effect": {"decision": "deny", "reason": "control_owner_required", "required_action": "assign_control_owner"}, "name": "control_requires_owner"}, {"condition": {"evidence_age_days_gt": 30, "evidence_refresh_completed": false}, "description": "Stale evidence requires refresh before attestation.", "effect": {"decision": "deny", "reason": "evidence_refresh_required", "required_action": "refresh_evidence"}, "name": "stale_evidence_requires_refresh"}, {"condition": {"dlp_policy_linked": false, "regulated_data_scope": true}, "description": "Regulated data controls require linked DLP policy evidence.", "effect": {"decision": "deny", "reason": "dlp_policy_required", "required_action": "link_dlp_policy"}, "name": "regulated_data_requires_dlp"}, {"condition": {"approval_recorded": false, "operation": "publish_report"}, "description": "Compliance reports require approval before release.", "effect": {"decision": "deny", "reason": "report_approval_required", "required_action": "record_report_approval"}, "name": "report_requires_approval"}, {"condition": {"escalation_recorded": false, "finding_age_days_gt": 30}, "description": "Overdue findings require escalation.", "effect": {"decision": "require_review", "reason": "finding_escalation_required", "required_action": "escalate_finding"}, "name": "overdue_finding_requires_escalation"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"attestations": {"component": "AttestationCenter", "permission": "comp:approve_reports", "route": "/comp/attestations"}, "controls": {"component": "ControlLibrary", "permission": "comp:manage_controls", "route": "/comp/controls"}, "dashboard": {"component": "COMPDashboard", "permission": "comp:view", "route": "/comp/dashboard"}, "evidence": {"component": "EvidenceVault", "permission": "comp:collect_evidence", "route": "/comp/evidence"}, "findings": {"component": "FindingTracker", "permission": "comp:remediate", "route": "/comp/findings"}, "frameworks": {"component": "FrameworkManager", "permission": "comp:manage_controls", "route": "/comp/frameworks"}, "reports": {"component": "ReportBuilder", "permission": "comp:approve_reports", "route": "/comp/reports"}, "settings": {"component": "COMPSettings", "permission": "comp:admin", "route": "/comp/settings"}}, "streaming": {}, "theme": {"components": {"control_card": {"highlight": "owner-chip", "visual": "control-status-stack"}, "evidence_vault": {"status_style": "freshness-chip", "visual": "evidence-list"}, "finding_board": {"status_style": "sla-chip", "visual": "remediation-lanes"}, "framework_matrix": {"icon": "clipboard-check", "risk_style": "coverage-band", "status_indicator": "framework-pill"}}, "name": "comp_compliance_command_center", "tokens": {"border.radius": "8px", "color.accent": "#805AD5", "color.danger": "#C53030", "color.primary": "#2C5282", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/comp/api/v1", "requires_theme": true, "routes": [{"component": "COMPDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/comp/dashboard", "permission": "comp:view"}, {"component": "FrameworkManager", "name": "frameworks", "nav_group": "Frameworks", "path": "/comp/frameworks", "permission": "comp:manage_controls"}, {"component": "ControlLibrary", "name": "controls", "nav_group": "Controls", "path": "/comp/controls", "permission": "comp:manage_controls"}, {"component": "EvidenceVault", "name": "evidence", "nav_group": "Evidence", "path": "/comp/evidence", "permission": "comp:collect_evidence"}, {"component": "FindingTracker", "name": "findings", "nav_group": "Remediation", "path": "/comp/findings", "permission": "comp:remediate"}, {"component": "ReportBuilder", "name": "reports", "nav_group": "Reporting", "path": "/comp/reports", "permission": "comp:approve_reports"}, {"component": "AttestationCenter", "name": "attestations", "nav_group": "Reporting", "path": "/comp/attestations", "permission": "comp:approve_reports"}, {"component": "COMPSettings", "name": "settings", "nav_group": "Administration", "path": "/comp/settings", "permission": "comp:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"comp": []}}, "contracts": {"comp": {"configuration": {"controls": {"automated_control_testing": true, "control_owner_required": true, "exception_approval_required": true, "testing_frequency_days": 90}, "evidence": {"encrypted_evidence_required": true, "evidence_freshness_days": 30, "immutable_audit_required": true, "retention_years": 7}, "frameworks": {"enabled": ["soc2", "iso27001", "gdpr", "hipaa", "pci_dss", "sox"], "framework_owner_required": true, "obligation_mapping_required": true, "policy_versioning_enabled": true}, "governance": {"audit_control_changes": true, "dlp_for_regulated_data_required": true, "require_tenant_context": true, "role_separation_required": true}, "reporting": {"approval_required": true, "attestation_required": true, "finding_remediation_sla_days": 30, "regulatory_export_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "comp_compliance_command_center"}, "ui": {"enable_compliance_dashboard": true, "enable_control_library": true, "enable_evidence_vault": true, "enable_report_builder": true}}, "id": "comp", "provides": ["comp_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"comp": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"control_requires_owner": {"condition": {"control_owner_assigned": false, "operation": "create_control"}, "description": "Controls require accountable owners.", "effect": {"decision": "deny", "reason": "control_owner_required", "required_action": "assign_control_owner"}, "name": "control_requires_owner"}, "overdue_finding_requires_escalation": {"condition": {"escalation_recorded": false, "finding_age_days_gt": 30}, "description": "Overdue findings require escalation.", "effect": {"decision": "require_review", "reason": "finding_escalation_required", "required_action": "escalate_finding"}, "name": "overdue_finding_requires_escalation"}, "regulated_data_requires_dlp": {"condition": {"dlp_policy_linked": false, "regulated_data_scope": true}, "description": "Regulated data controls require linked DLP policy evidence.", "effect": {"decision": "deny", "reason": "dlp_policy_required", "required_action": "link_dlp_policy"}, "name": "regulated_data_requires_dlp"}, "report_requires_approval": {"condition": {"approval_recorded": false, "operation": "publish_report"}, "description": "Compliance reports require approval before release.", "effect": {"decision": "deny", "reason": "report_approval_required", "required_action": "record_report_approval"}, "name": "report_requires_approval"}, "stale_evidence_requires_refresh": {"condition": {"evidence_age_days_gt": 30, "evidence_refresh_completed": false}, "description": "Stale evidence requires refresh before attestation.", "effect": {"decision": "deny", "reason": "evidence_refresh_required", "required_action": "refresh_evidence"}, "name": "stale_evidence_requires_refresh"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All compliance operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.comp": {"file": "capability_contract.py", "id": "capability.comp", "kind": "capability", "name": "Compliance Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("comp_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "comp",
+			"version": "1.0.0",
+			"description": "Compliance Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"comp": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"comp": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["comp_operations"],
+				"requires": ["audl", "dlpd", "encr", "auth"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"api_helpers": contract["configuration"]["adapters"]["api_helpers"],
+					"views": contract["configuration"]["adapters"]["view_models"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"report_approval": "ComplianceReportApproval",
+					"report_attestation": "ComplianceAttestation",
+					"finding_escalation": "ComplianceFindingReview",
+					"independent_control_test": "ControlAssessmentReview",
+				},
+				"compliance_lifecycle": {
+					"framework": "ComplianceFramework",
+					"control": "ComplianceControl",
+					"evidence": "EvidenceRecord",
+					"assessment": "ControlAssessment",
+					"finding": "ComplianceFinding",
+					"report": "ComplianceReport",
+					"attestation": "AttestationRecord",
+					"audit": "ComplianceAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"comp": {
+				"id": "comp",
+				"configuration": contract["configuration"],
+				"provides": ["comp_operations"],
+				"requires": ["audl", "dlpd", "encr", "auth"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"comp": ["audl", "dlpd", "encr", "auth"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 4},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "compliance_engine.py", "service.py", "api.py", "views.py", "app.py"],
+		"symbols": {
+			"capability.comp": {
+				"id": "capability.comp",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +146,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("comp", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "comp" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("COMP semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("COMP semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("COMP adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.CompService":
+		errors.append("COMP generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

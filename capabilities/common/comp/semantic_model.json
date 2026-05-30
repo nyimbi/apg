@@ -8,23 +8,107 @@
   },
   "capabilities": {
     "comp": {
-      "approvals": {},
+      "adapters": {
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "authentication": "auth",
+        "cache": "cach",
+        "data_loss_prevention": "dlpd",
+        "document_management": "docm",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.CompService",
+        "helper_runtime": "compliance_engine.py",
+        "identity_federation": "idfd",
+        "message_bus": "mqeb",
+        "multi_tenancy": "mten",
+        "notification": "ntfy",
+        "production_api": "api.py",
+        "production_runtime": "service.py",
+        "production_views": "views.py",
+        "security_framework": "secu",
+        "view_models": "views.py",
+        "workflow": "wflo",
+        "zero_trust_access": "ztna"
+      },
+      "approvals": {
+        "finding_escalation": "ComplianceFindingReview",
+        "independent_control_test": "ControlAssessmentReview",
+        "report_approval": "ComplianceReportApproval",
+        "report_attestation": "ComplianceAttestation"
+      },
       "business_rules": [],
+      "compliance_lifecycle": {
+        "assessment": "ControlAssessment",
+        "attestation": "AttestationRecord",
+        "audit": "ComplianceAuditEvent",
+        "control": "ComplianceControl",
+        "evidence": "EvidenceRecord",
+        "finding": "ComplianceFinding",
+        "framework": "ComplianceFramework",
+        "report": "ComplianceReport"
+      },
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "data_loss_prevention": "dlpd",
+          "document_management": "docm",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.CompService",
+          "helper_runtime": "compliance_engine.py",
+          "identity_federation": "idfd",
+          "message_bus": "mqeb",
+          "multi_tenancy": "mten",
+          "notification": "ntfy",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "security_framework": "secu",
+          "view_models": "views.py",
+          "workflow": "wflo",
+          "zero_trust_access": "ztna"
+        },
+        "assessments": {
+          "assessment_audit_required": true,
+          "failed_control_opens_finding": true,
+          "fresh_evidence_required": true,
+          "tester_required": true
+        },
         "controls": {
           "automated_control_testing": true,
           "control_owner_required": true,
           "exception_approval_required": true,
+          "independent_testing_required": true,
+          "owner_separation_required": true,
           "testing_frequency_days": 90
         },
         "evidence": {
+          "collector_required": true,
           "encrypted_evidence_required": true,
           "evidence_freshness_days": 30,
           "immutable_audit_required": true,
-          "retention_years": 7
+          "retention_years": 7,
+          "source_required": true
+        },
+        "exceptions": {
+          "exception_expiry_required": true,
+          "exception_owner_required": true,
+          "expired_exception_blocks_report": true
+        },
+        "findings": {
+          "escalation_required": true,
+          "owner_required": true,
+          "remediation_plan_required_for_high": true,
+          "resolution_evidence_required": true,
+          "sla_days": 30
         },
         "frameworks": {
+          "duplicate_framework_blocked": true,
           "enabled": [
             "soc2",
             "iso27001",
@@ -40,14 +124,30 @@
         "governance": {
           "audit_control_changes": true,
           "dlp_for_regulated_data_required": true,
+          "policy_mutation_audit_required": true,
           "require_tenant_context": true,
           "role_separation_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
         },
         "reporting": {
           "approval_required": true,
           "attestation_required": true,
           "finding_remediation_sla_days": 30,
+          "independent_approval_required": true,
+          "open_critical_findings_block_publish": true,
           "regulatory_export_enabled": true
+        },
+        "security": {
+          "audit_required": true,
+          "dlp_for_regulated_data_required": true,
+          "encrypted_evidence_required": true,
+          "role_separation_required": true,
+          "tenant_isolation_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -55,10 +155,18 @@
           "default_theme": "comp_compliance_command_center"
         },
         "ui": {
+          "enable_assessment_workbench": true,
+          "enable_attestation_center": true,
+          "enable_audit": true,
           "enable_compliance_dashboard": true,
           "enable_control_library": true,
           "enable_evidence_vault": true,
-          "enable_report_builder": true
+          "enable_exception_register": true,
+          "enable_finding_tracker": true,
+          "enable_framework_manager": true,
+          "enable_regulatory_exports": true,
+          "enable_report_builder": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -70,7 +178,12 @@
       "provides": [
         "comp_operations"
       ],
-      "requires": [],
+      "requires": [
+        "audl",
+        "dlpd",
+        "encr",
+        "auth"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +200,84 @@
           },
           {
             "condition": {
+              "framework_owner_assigned": false,
+              "operation": "register_framework"
+            },
+            "description": "Framework registration requires an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "framework_owner_required",
+              "required_action": "assign_framework_owner"
+            },
+            "name": "framework_requires_owner"
+          },
+          {
+            "condition": {
+              "obligations_mapped": false,
+              "operation": "register_framework"
+            },
+            "description": "Frameworks require mapped obligations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "obligation_mapping_required",
+              "required_action": "map_framework_obligations"
+            },
+            "name": "framework_requires_obligations"
+          },
+          {
+            "condition": {
+              "operation": "register_framework",
+              "policy_version_present": false
+            },
+            "description": "Frameworks require policy version evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "policy_version_required",
+              "required_action": "attach_policy_version"
+            },
+            "name": "framework_requires_policy_version"
+          },
+          {
+            "condition": {
+              "duplicate_framework": true,
+              "operation": "register_framework"
+            },
+            "description": "Duplicate tenant framework keys are blocked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "duplicate_framework",
+              "required_action": "use_existing_framework"
+            },
+            "name": "duplicate_framework_blocked"
+          },
+          {
+            "condition": {
+              "framework_present": false,
+              "operation": "create_control"
+            },
+            "description": "Controls require a tenant-local framework.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_framework_required",
+              "required_action": "select_framework"
+            },
+            "name": "control_requires_framework"
+          },
+          {
+            "condition": {
+              "control_name_present": false,
+              "operation": "create_control"
+            },
+            "description": "Controls require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_name_required",
+              "required_action": "name_control"
+            },
+            "name": "control_requires_name"
+          },
+          {
+            "condition": {
               "control_owner_assigned": false,
               "operation": "create_control"
             },
@@ -100,16 +291,16 @@
           },
           {
             "condition": {
-              "evidence_age_days_gt": 30,
-              "evidence_refresh_completed": false
+              "operation": "create_control",
+              "testing_frequency_days_lte": 0
             },
-            "description": "Stale evidence requires refresh before attestation.",
+            "description": "Control testing frequency must be positive.",
             "effect": {
               "decision": "deny",
-              "reason": "evidence_refresh_required",
-              "required_action": "refresh_evidence"
+              "reason": "control_testing_frequency_required",
+              "required_action": "set_testing_frequency"
             },
-            "name": "stale_evidence_requires_refresh"
+            "name": "control_frequency_requires_positive_days"
           },
           {
             "condition": {
@@ -126,16 +317,161 @@
           },
           {
             "condition": {
-              "approval_recorded": false,
-              "operation": "publish_report"
+              "control_present": false,
+              "operation": "record_evidence"
             },
-            "description": "Compliance reports require approval before release.",
+            "description": "Evidence requires a tenant-local control.",
             "effect": {
               "decision": "deny",
-              "reason": "report_approval_required",
-              "required_action": "record_report_approval"
+              "reason": "evidence_control_required",
+              "required_action": "select_control"
             },
-            "name": "report_requires_approval"
+            "name": "evidence_requires_control"
+          },
+          {
+            "condition": {
+              "evidence_source_present": false,
+              "operation": "record_evidence"
+            },
+            "description": "Evidence records require a source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_source_required",
+              "required_action": "record_evidence_source"
+            },
+            "name": "evidence_requires_source"
+          },
+          {
+            "condition": {
+              "evidence_collector_present": false,
+              "operation": "record_evidence"
+            },
+            "description": "Evidence records require a collector.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_collector_required",
+              "required_action": "record_collector"
+            },
+            "name": "evidence_requires_collector"
+          },
+          {
+            "condition": {
+              "evidence_encrypted": false,
+              "operation": "record_evidence"
+            },
+            "description": "Compliance evidence must be encrypted.",
+            "effect": {
+              "decision": "deny",
+              "reason": "encrypted_evidence_required",
+              "required_action": "encrypt_evidence"
+            },
+            "name": "evidence_requires_encryption"
+          },
+          {
+            "condition": {
+              "immutable_reference_present": false,
+              "operation": "record_evidence"
+            },
+            "description": "Compliance evidence requires immutable reference metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "immutable_evidence_reference_required",
+              "required_action": "record_immutable_reference"
+            },
+            "name": "evidence_requires_immutable_reference"
+          },
+          {
+            "condition": {
+              "evidence_age_days_gt": 30,
+              "evidence_refresh_completed": false
+            },
+            "description": "Stale evidence requires refresh before attestation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "evidence_refresh_required",
+              "required_action": "refresh_evidence"
+            },
+            "name": "stale_evidence_requires_refresh"
+          },
+          {
+            "condition": {
+              "operation": "assess_control",
+              "tester_present": false
+            },
+            "description": "Control assessment requires a tester.",
+            "effect": {
+              "decision": "deny",
+              "reason": "control_tester_required",
+              "required_action": "assign_control_tester"
+            },
+            "name": "assessment_requires_tester"
+          },
+          {
+            "condition": {
+              "operation": "assess_control",
+              "tester_is_control_owner": true
+            },
+            "description": "Control owner cannot self-test the control.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "independent_control_test_required",
+              "required_action": "route_to_independent_tester"
+            },
+            "name": "assessment_requires_independent_tester"
+          },
+          {
+            "condition": {
+              "assessment_failed": true,
+              "finding_linked": false,
+              "operation": "assess_control"
+            },
+            "description": "Failed assessments require finding linkage.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "assessment_finding_required",
+              "required_action": "open_control_finding"
+            },
+            "name": "failed_assessment_requires_finding"
+          },
+          {
+            "condition": {
+              "finding_owner_assigned": false,
+              "operation": "open_finding"
+            },
+            "description": "Findings require accountable owners.",
+            "effect": {
+              "decision": "deny",
+              "reason": "finding_owner_required",
+              "required_action": "assign_finding_owner"
+            },
+            "name": "finding_requires_owner"
+          },
+          {
+            "condition": {
+              "finding_description_present": false,
+              "operation": "open_finding"
+            },
+            "description": "Findings require a description.",
+            "effect": {
+              "decision": "deny",
+              "reason": "finding_description_required",
+              "required_action": "describe_finding"
+            },
+            "name": "finding_requires_description"
+          },
+          {
+            "condition": {
+              "high_severity_finding": true,
+              "operation": "open_finding",
+              "remediation_plan_present": false
+            },
+            "description": "High and critical findings require remediation plans.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "remediation_plan_required",
+              "required_action": "record_remediation_plan"
+            },
+            "name": "high_severity_finding_requires_plan"
           },
           {
             "condition": {
@@ -149,6 +485,174 @@
               "required_action": "escalate_finding"
             },
             "name": "overdue_finding_requires_escalation"
+          },
+          {
+            "condition": {
+              "operation": "resolve_finding",
+              "resolution_evidence_present": false
+            },
+            "description": "Resolved findings require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "finding_resolution_evidence_required",
+              "required_action": "attach_resolution_evidence"
+            },
+            "name": "finding_resolution_requires_evidence"
+          },
+          {
+            "condition": {
+              "framework_present": false,
+              "operation": "prepare_report"
+            },
+            "description": "Reports require tenant-local frameworks.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_framework_required",
+              "required_action": "select_framework"
+            },
+            "name": "report_requires_framework"
+          },
+          {
+            "condition": {
+              "operation": "prepare_report",
+              "report_period_present": false
+            },
+            "description": "Reports require a reporting period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_period_required",
+              "required_action": "set_report_period"
+            },
+            "name": "report_requires_period"
+          },
+          {
+            "condition": {
+              "operation": "prepare_report",
+              "report_preparer_present": false
+            },
+            "description": "Reports require a preparer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_preparer_required",
+              "required_action": "assign_report_preparer"
+            },
+            "name": "report_requires_preparer"
+          },
+          {
+            "condition": {
+              "approver_is_preparer": true,
+              "operation": "approve_report"
+            },
+            "description": "Report approver must differ from preparer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_report_approval_required",
+              "required_action": "route_report_to_independent_approver"
+            },
+            "name": "report_approval_requires_independent_approver"
+          },
+          {
+            "condition": {
+              "attestation_statement_present": false,
+              "operation": "attest_report"
+            },
+            "description": "Attestations require a statement.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attestation_statement_required",
+              "required_action": "record_attestation_statement"
+            },
+            "name": "attestation_requires_statement"
+          },
+          {
+            "condition": {
+              "operation": "attest_report",
+              "report_approved": false
+            },
+            "description": "Attestations require approved reports.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_approval_required",
+              "required_action": "approve_report"
+            },
+            "name": "attestation_requires_approved_report"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "publish_report"
+            },
+            "description": "Compliance reports require approval before release.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_approval_required",
+              "required_action": "record_report_approval"
+            },
+            "name": "report_requires_approval"
+          },
+          {
+            "condition": {
+              "attestation_recorded": false,
+              "operation": "publish_report"
+            },
+            "description": "Compliance reports require attestation before release.",
+            "effect": {
+              "decision": "deny",
+              "reason": "report_attestation_required",
+              "required_action": "record_report_attestation"
+            },
+            "name": "report_requires_attestation"
+          },
+          {
+            "condition": {
+              "open_critical_findings": true,
+              "operation": "publish_report"
+            },
+            "description": "Open critical findings block report publishing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "critical_findings_open",
+              "required_action": "resolve_critical_findings"
+            },
+            "name": "critical_findings_block_publish"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Compliance records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_compliance_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_compliance_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Compliance state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_audit_event_required",
+              "required_action": "record_compliance_audit"
+            },
+            "name": "compliance_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_compliance_mutation"
+            },
+            "description": "Batch compliance mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_compliance_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +672,84 @@
         },
         {
           "condition": {
+            "framework_owner_assigned": false,
+            "operation": "register_framework"
+          },
+          "description": "Framework registration requires an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "framework_owner_required",
+            "required_action": "assign_framework_owner"
+          },
+          "name": "framework_requires_owner"
+        },
+        {
+          "condition": {
+            "obligations_mapped": false,
+            "operation": "register_framework"
+          },
+          "description": "Frameworks require mapped obligations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "obligation_mapping_required",
+            "required_action": "map_framework_obligations"
+          },
+          "name": "framework_requires_obligations"
+        },
+        {
+          "condition": {
+            "operation": "register_framework",
+            "policy_version_present": false
+          },
+          "description": "Frameworks require policy version evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "policy_version_required",
+            "required_action": "attach_policy_version"
+          },
+          "name": "framework_requires_policy_version"
+        },
+        {
+          "condition": {
+            "duplicate_framework": true,
+            "operation": "register_framework"
+          },
+          "description": "Duplicate tenant framework keys are blocked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "duplicate_framework",
+            "required_action": "use_existing_framework"
+          },
+          "name": "duplicate_framework_blocked"
+        },
+        {
+          "condition": {
+            "framework_present": false,
+            "operation": "create_control"
+          },
+          "description": "Controls require a tenant-local framework.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_framework_required",
+            "required_action": "select_framework"
+          },
+          "name": "control_requires_framework"
+        },
+        {
+          "condition": {
+            "control_name_present": false,
+            "operation": "create_control"
+          },
+          "description": "Controls require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_name_required",
+            "required_action": "name_control"
+          },
+          "name": "control_requires_name"
+        },
+        {
+          "condition": {
             "control_owner_assigned": false,
             "operation": "create_control"
           },
@@ -181,16 +763,16 @@
         },
         {
           "condition": {
-            "evidence_age_days_gt": 30,
-            "evidence_refresh_completed": false
+            "operation": "create_control",
+            "testing_frequency_days_lte": 0
           },
-          "description": "Stale evidence requires refresh before attestation.",
+          "description": "Control testing frequency must be positive.",
           "effect": {
             "decision": "deny",
-            "reason": "evidence_refresh_required",
-            "required_action": "refresh_evidence"
+            "reason": "control_testing_frequency_required",
+            "required_action": "set_testing_frequency"
           },
-          "name": "stale_evidence_requires_refresh"
+          "name": "control_frequency_requires_positive_days"
         },
         {
           "condition": {
@@ -207,16 +789,161 @@
         },
         {
           "condition": {
-            "approval_recorded": false,
-            "operation": "publish_report"
+            "control_present": false,
+            "operation": "record_evidence"
           },
-          "description": "Compliance reports require approval before release.",
+          "description": "Evidence requires a tenant-local control.",
           "effect": {
             "decision": "deny",
-            "reason": "report_approval_required",
-            "required_action": "record_report_approval"
+            "reason": "evidence_control_required",
+            "required_action": "select_control"
           },
-          "name": "report_requires_approval"
+          "name": "evidence_requires_control"
+        },
+        {
+          "condition": {
+            "evidence_source_present": false,
+            "operation": "record_evidence"
+          },
+          "description": "Evidence records require a source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_source_required",
+            "required_action": "record_evidence_source"
+          },
+          "name": "evidence_requires_source"
+        },
+        {
+          "condition": {
+            "evidence_collector_present": false,
+            "operation": "record_evidence"
+          },
+          "description": "Evidence records require a collector.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_collector_required",
+            "required_action": "record_collector"
+          },
+          "name": "evidence_requires_collector"
+        },
+        {
+          "condition": {
+            "evidence_encrypted": false,
+            "operation": "record_evidence"
+          },
+          "description": "Compliance evidence must be encrypted.",
+          "effect": {
+            "decision": "deny",
+            "reason": "encrypted_evidence_required",
+            "required_action": "encrypt_evidence"
+          },
+          "name": "evidence_requires_encryption"
+        },
+        {
+          "condition": {
+            "immutable_reference_present": false,
+            "operation": "record_evidence"
+          },
+          "description": "Compliance evidence requires immutable reference metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "immutable_evidence_reference_required",
+            "required_action": "record_immutable_reference"
+          },
+          "name": "evidence_requires_immutable_reference"
+        },
+        {
+          "condition": {
+            "evidence_age_days_gt": 30,
+            "evidence_refresh_completed": false
+          },
+          "description": "Stale evidence requires refresh before attestation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "evidence_refresh_required",
+            "required_action": "refresh_evidence"
+          },
+          "name": "stale_evidence_requires_refresh"
+        },
+        {
+          "condition": {
+            "operation": "assess_control",
+            "tester_present": false
+          },
+          "description": "Control assessment requires a tester.",
+          "effect": {
+            "decision": "deny",
+            "reason": "control_tester_required",
+            "required_action": "assign_control_tester"
+          },
+          "name": "assessment_requires_tester"
+        },
+        {
+          "condition": {
+            "operation": "assess_control",
+            "tester_is_control_owner": true
+          },
+          "description": "Control owner cannot self-test the control.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "independent_control_test_required",
+            "required_action": "route_to_independent_tester"
+          },
+          "name": "assessment_requires_independent_tester"
+        },
+        {
+          "condition": {
+            "assessment_failed": true,
+            "finding_linked": false,
+            "operation": "assess_control"
+          },
+          "description": "Failed assessments require finding linkage.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "assessment_finding_required",
+            "required_action": "open_control_finding"
+          },
+          "name": "failed_assessment_requires_finding"
+        },
+        {
+          "condition": {
+            "finding_owner_assigned": false,
+            "operation": "open_finding"
+          },
+          "description": "Findings require accountable owners.",
+          "effect": {
+            "decision": "deny",
+            "reason": "finding_owner_required",
+            "required_action": "assign_finding_owner"
+          },
+          "name": "finding_requires_owner"
+        },
+        {
+          "condition": {
+            "finding_description_present": false,
+            "operation": "open_finding"
+          },
+          "description": "Findings require a description.",
+          "effect": {
+            "decision": "deny",
+            "reason": "finding_description_required",
+            "required_action": "describe_finding"
+          },
+          "name": "finding_requires_description"
+        },
+        {
+          "condition": {
+            "high_severity_finding": true,
+            "operation": "open_finding",
+            "remediation_plan_present": false
+          },
+          "description": "High and critical findings require remediation plans.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "remediation_plan_required",
+            "required_action": "record_remediation_plan"
+          },
+          "name": "high_severity_finding_requires_plan"
         },
         {
           "condition": {
@@ -230,19 +957,198 @@
             "required_action": "escalate_finding"
           },
           "name": "overdue_finding_requires_escalation"
+        },
+        {
+          "condition": {
+            "operation": "resolve_finding",
+            "resolution_evidence_present": false
+          },
+          "description": "Resolved findings require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "finding_resolution_evidence_required",
+            "required_action": "attach_resolution_evidence"
+          },
+          "name": "finding_resolution_requires_evidence"
+        },
+        {
+          "condition": {
+            "framework_present": false,
+            "operation": "prepare_report"
+          },
+          "description": "Reports require tenant-local frameworks.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_framework_required",
+            "required_action": "select_framework"
+          },
+          "name": "report_requires_framework"
+        },
+        {
+          "condition": {
+            "operation": "prepare_report",
+            "report_period_present": false
+          },
+          "description": "Reports require a reporting period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_period_required",
+            "required_action": "set_report_period"
+          },
+          "name": "report_requires_period"
+        },
+        {
+          "condition": {
+            "operation": "prepare_report",
+            "report_preparer_present": false
+          },
+          "description": "Reports require a preparer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_preparer_required",
+            "required_action": "assign_report_preparer"
+          },
+          "name": "report_requires_preparer"
+        },
+        {
+          "condition": {
+            "approver_is_preparer": true,
+            "operation": "approve_report"
+          },
+          "description": "Report approver must differ from preparer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_report_approval_required",
+            "required_action": "route_report_to_independent_approver"
+          },
+          "name": "report_approval_requires_independent_approver"
+        },
+        {
+          "condition": {
+            "attestation_statement_present": false,
+            "operation": "attest_report"
+          },
+          "description": "Attestations require a statement.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attestation_statement_required",
+            "required_action": "record_attestation_statement"
+          },
+          "name": "attestation_requires_statement"
+        },
+        {
+          "condition": {
+            "operation": "attest_report",
+            "report_approved": false
+          },
+          "description": "Attestations require approved reports.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_approval_required",
+            "required_action": "approve_report"
+          },
+          "name": "attestation_requires_approved_report"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "publish_report"
+          },
+          "description": "Compliance reports require approval before release.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_approval_required",
+            "required_action": "record_report_approval"
+          },
+          "name": "report_requires_approval"
+        },
+        {
+          "condition": {
+            "attestation_recorded": false,
+            "operation": "publish_report"
+          },
+          "description": "Compliance reports require attestation before release.",
+          "effect": {
+            "decision": "deny",
+            "reason": "report_attestation_required",
+            "required_action": "record_report_attestation"
+          },
+          "name": "report_requires_attestation"
+        },
+        {
+          "condition": {
+            "open_critical_findings": true,
+            "operation": "publish_report"
+          },
+          "description": "Open critical findings block report publishing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "critical_findings_open",
+            "required_action": "resolve_critical_findings"
+          },
+          "name": "critical_findings_block_publish"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Compliance records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_compliance_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_compliance_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Compliance state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_audit_event_required",
+            "required_action": "record_compliance_audit"
+          },
+          "name": "compliance_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_compliance_mutation"
+          },
+          "description": "Batch compliance mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_compliance_mutation_requires_bytewax"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "compliance_engine.py",
+        "service": "service.CompService",
         "views": "views.py"
       },
       "screens": {
+        "assessments": {
+          "component": "AssessmentWorkbench",
+          "permission": "comp:manage_controls",
+          "route": "/comp/assessments"
+        },
         "attestations": {
           "component": "AttestationCenter",
           "permission": "comp:approve_reports",
           "route": "/comp/attestations"
+        },
+        "audit": {
+          "component": "ComplianceAuditTrail",
+          "permission": "comp:audit",
+          "route": "/comp/audit"
         },
         "controls": {
           "component": "ControlLibrary",
@@ -258,6 +1164,16 @@
           "component": "EvidenceVault",
           "permission": "comp:collect_evidence",
           "route": "/comp/evidence"
+        },
+        "exceptions": {
+          "component": "ExceptionRegister",
+          "permission": "comp:remediate",
+          "route": "/comp/exceptions"
+        },
+        "exports": {
+          "component": "RegulatoryExportCenter",
+          "permission": "comp:approve_reports",
+          "route": "/comp/exports"
         },
         "findings": {
           "component": "FindingTracker",
@@ -280,9 +1196,23 @@
           "route": "/comp/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "assessment_workbench": {
+            "status_style": "assurance-chip",
+            "visual": "testing-queue"
+          },
+          "attestation_center": {
+            "status_style": "signature-chip",
+            "visual": "attestation-list"
+          },
+          "audit_timeline": {
+            "status_style": "hash-chip",
+            "visual": "event-timeline"
+          },
           "control_card": {
             "highlight": "owner-chip",
             "visual": "control-status-stack"
@@ -290,6 +1220,10 @@
           "evidence_vault": {
             "status_style": "freshness-chip",
             "visual": "evidence-list"
+          },
+          "exception_register": {
+            "status_style": "expiry-chip",
+            "visual": "exception-table"
           },
           "finding_board": {
             "status_style": "sla-chip",
@@ -299,6 +1233,14 @@
             "icon": "clipboard-check",
             "risk_style": "coverage-band",
             "status_indicator": "framework-pill"
+          },
+          "regulatory_export": {
+            "status_style": "delivery-chip",
+            "visual": "export-table"
+          },
+          "report_builder": {
+            "status_style": "approval-chip",
+            "visual": "report-stage-list"
           }
         },
         "name": "comp_compliance_command_center",
@@ -349,10 +1291,24 @@
             "permission": "comp:collect_evidence"
           },
           {
+            "component": "AssessmentWorkbench",
+            "name": "assessments",
+            "nav_group": "Assurance",
+            "path": "/comp/assessments",
+            "permission": "comp:manage_controls"
+          },
+          {
             "component": "FindingTracker",
             "name": "findings",
             "nav_group": "Remediation",
             "path": "/comp/findings",
+            "permission": "comp:remediate"
+          },
+          {
+            "component": "ExceptionRegister",
+            "name": "exceptions",
+            "nav_group": "Remediation",
+            "path": "/comp/exceptions",
             "permission": "comp:remediate"
           },
           {
@@ -368,6 +1324,20 @@
             "nav_group": "Reporting",
             "path": "/comp/attestations",
             "permission": "comp:approve_reports"
+          },
+          {
+            "component": "RegulatoryExportCenter",
+            "name": "exports",
+            "nav_group": "Reporting",
+            "path": "/comp/exports",
+            "permission": "comp:approve_reports"
+          },
+          {
+            "component": "ComplianceAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/comp/audit",
+            "permission": "comp:audit"
           },
           {
             "component": "COMPSettings",
@@ -390,25 +1360,76 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "comp": []
+      "comp": [
+        "audl",
+        "dlpd",
+        "encr",
+        "auth"
+      ]
     }
   },
   "contracts": {
     "comp": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "data_loss_prevention": "dlpd",
+          "document_management": "docm",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.CompService",
+          "helper_runtime": "compliance_engine.py",
+          "identity_federation": "idfd",
+          "message_bus": "mqeb",
+          "multi_tenancy": "mten",
+          "notification": "ntfy",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "security_framework": "secu",
+          "view_models": "views.py",
+          "workflow": "wflo",
+          "zero_trust_access": "ztna"
+        },
+        "assessments": {
+          "assessment_audit_required": true,
+          "failed_control_opens_finding": true,
+          "fresh_evidence_required": true,
+          "tester_required": true
+        },
         "controls": {
           "automated_control_testing": true,
           "control_owner_required": true,
           "exception_approval_required": true,
+          "independent_testing_required": true,
+          "owner_separation_required": true,
           "testing_frequency_days": 90
         },
         "evidence": {
+          "collector_required": true,
           "encrypted_evidence_required": true,
           "evidence_freshness_days": 30,
           "immutable_audit_required": true,
-          "retention_years": 7
+          "retention_years": 7,
+          "source_required": true
+        },
+        "exceptions": {
+          "exception_expiry_required": true,
+          "exception_owner_required": true,
+          "expired_exception_blocks_report": true
+        },
+        "findings": {
+          "escalation_required": true,
+          "owner_required": true,
+          "remediation_plan_required_for_high": true,
+          "resolution_evidence_required": true,
+          "sla_days": 30
         },
         "frameworks": {
+          "duplicate_framework_blocked": true,
           "enabled": [
             "soc2",
             "iso27001",
@@ -424,14 +1445,30 @@
         "governance": {
           "audit_control_changes": true,
           "dlp_for_regulated_data_required": true,
+          "policy_mutation_audit_required": true,
           "require_tenant_context": true,
           "role_separation_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
         },
         "reporting": {
           "approval_required": true,
           "attestation_required": true,
           "finding_remediation_sla_days": 30,
+          "independent_approval_required": true,
+          "open_critical_findings_block_publish": true,
           "regulatory_export_enabled": true
+        },
+        "security": {
+          "audit_required": true,
+          "dlp_for_regulated_data_required": true,
+          "encrypted_evidence_required": true,
+          "role_separation_required": true,
+          "tenant_isolation_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -439,17 +1476,30 @@
           "default_theme": "comp_compliance_command_center"
         },
         "ui": {
+          "enable_assessment_workbench": true,
+          "enable_attestation_center": true,
+          "enable_audit": true,
           "enable_compliance_dashboard": true,
           "enable_control_library": true,
           "enable_evidence_vault": true,
-          "enable_report_builder": true
+          "enable_exception_register": true,
+          "enable_finding_tracker": true,
+          "enable_framework_manager": true,
+          "enable_regulatory_exports": true,
+          "enable_report_builder": true,
+          "enable_settings": true
         }
       },
       "id": "comp",
       "provides": [
         "comp_operations"
       ],
-      "requires": []
+      "requires": [
+        "audl",
+        "dlpd",
+        "encr",
+        "auth"
+      ]
     }
   },
   "deployment": {
@@ -461,7 +1511,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -482,6 +1532,123 @@
   },
   "roles": {},
   "rules": {
+    "assessment_requires_independent_tester": {
+      "condition": {
+        "operation": "assess_control",
+        "tester_is_control_owner": true
+      },
+      "description": "Control owner cannot self-test the control.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "independent_control_test_required",
+        "required_action": "route_to_independent_tester"
+      },
+      "name": "assessment_requires_independent_tester"
+    },
+    "assessment_requires_tester": {
+      "condition": {
+        "operation": "assess_control",
+        "tester_present": false
+      },
+      "description": "Control assessment requires a tester.",
+      "effect": {
+        "decision": "deny",
+        "reason": "control_tester_required",
+        "required_action": "assign_control_tester"
+      },
+      "name": "assessment_requires_tester"
+    },
+    "attestation_requires_approved_report": {
+      "condition": {
+        "operation": "attest_report",
+        "report_approved": false
+      },
+      "description": "Attestations require approved reports.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_approval_required",
+        "required_action": "approve_report"
+      },
+      "name": "attestation_requires_approved_report"
+    },
+    "attestation_requires_statement": {
+      "condition": {
+        "attestation_statement_present": false,
+        "operation": "attest_report"
+      },
+      "description": "Attestations require a statement.",
+      "effect": {
+        "decision": "deny",
+        "reason": "attestation_statement_required",
+        "required_action": "record_attestation_statement"
+      },
+      "name": "attestation_requires_statement"
+    },
+    "batch_compliance_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_compliance_mutation"
+      },
+      "description": "Batch compliance mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_compliance_mutation_requires_bytewax"
+    },
+    "compliance_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Compliance state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compliance_audit_event_required",
+        "required_action": "record_compliance_audit"
+      },
+      "name": "compliance_state_change_requires_audit"
+    },
+    "control_frequency_requires_positive_days": {
+      "condition": {
+        "operation": "create_control",
+        "testing_frequency_days_lte": 0
+      },
+      "description": "Control testing frequency must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "control_testing_frequency_required",
+        "required_action": "set_testing_frequency"
+      },
+      "name": "control_frequency_requires_positive_days"
+    },
+    "control_requires_framework": {
+      "condition": {
+        "framework_present": false,
+        "operation": "create_control"
+      },
+      "description": "Controls require a tenant-local framework.",
+      "effect": {
+        "decision": "deny",
+        "reason": "control_framework_required",
+        "required_action": "select_framework"
+      },
+      "name": "control_requires_framework"
+    },
+    "control_requires_name": {
+      "condition": {
+        "control_name_present": false,
+        "operation": "create_control"
+      },
+      "description": "Controls require a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "control_name_required",
+        "required_action": "name_control"
+      },
+      "name": "control_requires_name"
+    },
     "control_requires_owner": {
       "condition": {
         "control_owner_assigned": false,
@@ -494,6 +1661,215 @@
         "required_action": "assign_control_owner"
       },
       "name": "control_requires_owner"
+    },
+    "critical_findings_block_publish": {
+      "condition": {
+        "open_critical_findings": true,
+        "operation": "publish_report"
+      },
+      "description": "Open critical findings block report publishing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "critical_findings_open",
+        "required_action": "resolve_critical_findings"
+      },
+      "name": "critical_findings_block_publish"
+    },
+    "cross_tenant_compliance_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Compliance records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_compliance_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_compliance_access_denied"
+    },
+    "duplicate_framework_blocked": {
+      "condition": {
+        "duplicate_framework": true,
+        "operation": "register_framework"
+      },
+      "description": "Duplicate tenant framework keys are blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "duplicate_framework",
+        "required_action": "use_existing_framework"
+      },
+      "name": "duplicate_framework_blocked"
+    },
+    "evidence_requires_collector": {
+      "condition": {
+        "evidence_collector_present": false,
+        "operation": "record_evidence"
+      },
+      "description": "Evidence records require a collector.",
+      "effect": {
+        "decision": "deny",
+        "reason": "evidence_collector_required",
+        "required_action": "record_collector"
+      },
+      "name": "evidence_requires_collector"
+    },
+    "evidence_requires_control": {
+      "condition": {
+        "control_present": false,
+        "operation": "record_evidence"
+      },
+      "description": "Evidence requires a tenant-local control.",
+      "effect": {
+        "decision": "deny",
+        "reason": "evidence_control_required",
+        "required_action": "select_control"
+      },
+      "name": "evidence_requires_control"
+    },
+    "evidence_requires_encryption": {
+      "condition": {
+        "evidence_encrypted": false,
+        "operation": "record_evidence"
+      },
+      "description": "Compliance evidence must be encrypted.",
+      "effect": {
+        "decision": "deny",
+        "reason": "encrypted_evidence_required",
+        "required_action": "encrypt_evidence"
+      },
+      "name": "evidence_requires_encryption"
+    },
+    "evidence_requires_immutable_reference": {
+      "condition": {
+        "immutable_reference_present": false,
+        "operation": "record_evidence"
+      },
+      "description": "Compliance evidence requires immutable reference metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "immutable_evidence_reference_required",
+        "required_action": "record_immutable_reference"
+      },
+      "name": "evidence_requires_immutable_reference"
+    },
+    "evidence_requires_source": {
+      "condition": {
+        "evidence_source_present": false,
+        "operation": "record_evidence"
+      },
+      "description": "Evidence records require a source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "evidence_source_required",
+        "required_action": "record_evidence_source"
+      },
+      "name": "evidence_requires_source"
+    },
+    "failed_assessment_requires_finding": {
+      "condition": {
+        "assessment_failed": true,
+        "finding_linked": false,
+        "operation": "assess_control"
+      },
+      "description": "Failed assessments require finding linkage.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "assessment_finding_required",
+        "required_action": "open_control_finding"
+      },
+      "name": "failed_assessment_requires_finding"
+    },
+    "finding_requires_description": {
+      "condition": {
+        "finding_description_present": false,
+        "operation": "open_finding"
+      },
+      "description": "Findings require a description.",
+      "effect": {
+        "decision": "deny",
+        "reason": "finding_description_required",
+        "required_action": "describe_finding"
+      },
+      "name": "finding_requires_description"
+    },
+    "finding_requires_owner": {
+      "condition": {
+        "finding_owner_assigned": false,
+        "operation": "open_finding"
+      },
+      "description": "Findings require accountable owners.",
+      "effect": {
+        "decision": "deny",
+        "reason": "finding_owner_required",
+        "required_action": "assign_finding_owner"
+      },
+      "name": "finding_requires_owner"
+    },
+    "finding_resolution_requires_evidence": {
+      "condition": {
+        "operation": "resolve_finding",
+        "resolution_evidence_present": false
+      },
+      "description": "Resolved findings require evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "finding_resolution_evidence_required",
+        "required_action": "attach_resolution_evidence"
+      },
+      "name": "finding_resolution_requires_evidence"
+    },
+    "framework_requires_obligations": {
+      "condition": {
+        "obligations_mapped": false,
+        "operation": "register_framework"
+      },
+      "description": "Frameworks require mapped obligations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "obligation_mapping_required",
+        "required_action": "map_framework_obligations"
+      },
+      "name": "framework_requires_obligations"
+    },
+    "framework_requires_owner": {
+      "condition": {
+        "framework_owner_assigned": false,
+        "operation": "register_framework"
+      },
+      "description": "Framework registration requires an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "framework_owner_required",
+        "required_action": "assign_framework_owner"
+      },
+      "name": "framework_requires_owner"
+    },
+    "framework_requires_policy_version": {
+      "condition": {
+        "operation": "register_framework",
+        "policy_version_present": false
+      },
+      "description": "Frameworks require policy version evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "policy_version_required",
+        "required_action": "attach_policy_version"
+      },
+      "name": "framework_requires_policy_version"
+    },
+    "high_severity_finding_requires_plan": {
+      "condition": {
+        "high_severity_finding": true,
+        "operation": "open_finding",
+        "remediation_plan_present": false
+      },
+      "description": "High and critical findings require remediation plans.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "remediation_plan_required",
+        "required_action": "record_remediation_plan"
+      },
+      "name": "high_severity_finding_requires_plan"
     },
     "overdue_finding_requires_escalation": {
       "condition": {
@@ -521,6 +1897,19 @@
       },
       "name": "regulated_data_requires_dlp"
     },
+    "report_approval_requires_independent_approver": {
+      "condition": {
+        "approver_is_preparer": true,
+        "operation": "approve_report"
+      },
+      "description": "Report approver must differ from preparer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_report_approval_required",
+        "required_action": "route_report_to_independent_approver"
+      },
+      "name": "report_approval_requires_independent_approver"
+    },
     "report_requires_approval": {
       "condition": {
         "approval_recorded": false,
@@ -533,6 +1922,58 @@
         "required_action": "record_report_approval"
       },
       "name": "report_requires_approval"
+    },
+    "report_requires_attestation": {
+      "condition": {
+        "attestation_recorded": false,
+        "operation": "publish_report"
+      },
+      "description": "Compliance reports require attestation before release.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_attestation_required",
+        "required_action": "record_report_attestation"
+      },
+      "name": "report_requires_attestation"
+    },
+    "report_requires_framework": {
+      "condition": {
+        "framework_present": false,
+        "operation": "prepare_report"
+      },
+      "description": "Reports require tenant-local frameworks.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_framework_required",
+        "required_action": "select_framework"
+      },
+      "name": "report_requires_framework"
+    },
+    "report_requires_period": {
+      "condition": {
+        "operation": "prepare_report",
+        "report_period_present": false
+      },
+      "description": "Reports require a reporting period.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_period_required",
+        "required_action": "set_report_period"
+      },
+      "name": "report_requires_period"
+    },
+    "report_requires_preparer": {
+      "condition": {
+        "operation": "prepare_report",
+        "report_preparer_present": false
+      },
+      "description": "Reports require a preparer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "report_preparer_required",
+        "required_action": "assign_report_preparer"
+      },
+      "name": "report_requires_preparer"
     },
     "stale_evidence_requires_refresh": {
       "condition": {
@@ -562,7 +2003,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "compliance_engine.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.comp": {
