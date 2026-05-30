@@ -16,6 +16,86 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 01:01 EAT
+
+GRC document management lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md`, `PLAN.md`, and `README.md` for
+  `capabilities/grc/doc`, and refreshed `cap_spec.md` with the active
+  Document Management runtime summary.
+- Replaced the generated contract wrapper with explicit document, template,
+  revision, approval, publication, retention, access, processing, document
+  agent, governance, observability, adapter, UI, theme, provides/requires, and
+  Bytewax lifecycle-stream metadata.
+- Added 38 deterministic guardrails for tenant context, policy attachment,
+  document title/owner/type/classification/content-or-template/restricted
+  review, template name/body/owner/classification, revision document/editor/
+  change summary/published-document review, approval document/approver/note/
+  segregation of duties, publication document/approval/publisher, retention
+  document/minimum days, legal-hold archive blocking, access document/principal/
+  permission/restricted expiry, processing document/job type/Bytewax processor,
+  document batch/event Bytewax routing, document-agent runtime/role, and
+  privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light lifecycle helpers for templates, documents, revisions,
+  approvals, publication, retention policies, access grants, processing jobs,
+  processing completion, document-agent registration, batch validation,
+  dashboard summaries, API helpers, screen models, semantic model, component
+  manifest, and package self-test.
+- Preserved `APGDocumentService`, `DocumentService`, and `DocService` as
+  compatibility aliases while keeping Flask, database, storage, search, and live
+  external-system imports out of the top-level APG surface.
+- Added first-class document-agent composition metadata for Codex, Claude Code,
+  OpenCode, and Pi runtimes across document, classification, retention,
+  evidence, policy, and publication review roles.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the executable app surface.
+- Replaced the old generated package test with focused contract, rule, service,
+  guardrail, API/view, app, semantic, Bytewax, and agent tests.
+- Removed stale generated planning material and cleaned stale marker wording in
+  DOC helper modules and evidence files.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/grc/doc/__init__.py
+  capabilities/grc/doc/capability_contract.py
+  capabilities/grc/doc/service.py
+  capabilities/grc/doc/api.py
+  capabilities/grc/doc/views.py
+  capabilities/grc/doc/app.py
+  capabilities/grc/doc/tests/test_package_contract.py` passed.
+- Syntax-only compile for touched/adjacent helper modules (`apg_context.py`,
+  `composition.py`, `config.py`, `database.py`, `security.py`, and
+  `vision_processor.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/grc/doc/tests/test_package_contract.py` passed with 6 tests and
+  one pre-existing SQLAlchemy deprecation warning from `models.py`.
+- `./.venv/bin/python capabilities/grc/doc/app.py` passed package self-test.
+- `./.venv/bin/apg capabilities inspect grc_doc --json` confirmed `ok: true`,
+  9 routes, 38 rules, and `grc_doc_control`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/grc/doc --json`
+  confirmed side-effect-free publish planning with Bytewax stream metadata and
+  no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/grc/doc --json` passed with `domain_specific` implementation
+  level and 0 baseline markers.
+- Semantic metadata probe confirmed `bytewax`, `doc_agents`, the agents route,
+  supported-agent runtime guardrail, Bytewax batch guardrail, and restricted
+  document review guardrail.
+- Service smoke executed template -> document -> revision -> approval ->
+  publication -> retention -> access -> processing job -> processing completion
+  -> document agent and produced 10 audit events.
+- DOC stale-marker scan returned no matches.
+- `git diff --check -- capabilities/grc/doc docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, durable
+  storage/search/workflow/policy/audit/notification adapters, durable Bytewax
+  topology, external document vault integrations, performance checks, or
+  failover checks during this battery-conscious slice.
+
 ### 2026-05-31 00:51 EAT
 
 GRC risk and compliance management lifecycle/guardrail packet:

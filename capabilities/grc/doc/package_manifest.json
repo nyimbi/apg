@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Document Service",
+  "display_name": "Document Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,40 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 9,
+  "rule_count": 38,
+  "streaming": {
+    "events": [
+      "document_created",
+      "template_registered",
+      "document_revised",
+      "document_approved",
+      "document_published",
+      "retention_policy_assigned",
+      "document_access_granted",
+      "processing_job_registered",
+      "processing_job_completed",
+      "doc_agent_registered"
+    ],
+    "guardrails": [
+      "doc_batch_requires_bytewax",
+      "doc_event_requires_bytewax",
+      "privileged_doc_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "in_review",
+      "approved",
+      "published",
+      "archived",
+      "locked",
+      "queued",
+      "completed",
+      "expired"
+    ],
+    "stream": "apg.grc.doc.lifecycle"
+  },
+  "version": "2.1.0"
 }

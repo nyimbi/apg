@@ -423,7 +423,7 @@ class DatabaseMigration:
 		logger.info(f"Creating migration script: {message}")
 		
 		# This would typically use Alembic's autogenerate feature
-		# For now, return a placeholder
+		# For now, return an extension point
 		timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
 		script_name = f"{timestamp}_{message.lower().replace(' ', '_')}"
 		

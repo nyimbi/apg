@@ -1,60 +1,181 @@
 {
-  "agents": {},
   "app": {
-    "description": "Document Service package-backed APG capability",
-    "entity_count": 0,
+    "description": "Document Management package-backed APG capability",
+    "entity_count": 7,
     "name": "grc_doc",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "grc_doc": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Grc",
-          "enabled": true,
-          "id": "grc_doc",
-          "name": "Document Service",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/grc/doc/cap_spec.md",
-          "version": "1.0.0"
+        "access": {
+          "principal_required": true,
+          "restricted_documents_require_expiry": true,
+          "supported_permissions": [
+            "view",
+            "comment",
+            "edit",
+            "approve",
+            "admin"
+          ]
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "policy_management": "adapter",
+          "search": "adapter",
+          "storage": "adapter",
+          "theme": "adapter",
+          "workflow_orchestration": "adapter"
+        },
+        "approvals": {
+          "approval_note_required": true,
+          "approver_required": true,
+          "segregation_of_duties": true
+        },
+        "doc_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "review_prepare_and_recommend",
+          "supported_roles": [
+            "document_reviewer",
+            "classification_reviewer",
+            "retention_reviewer",
+            "evidence_reviewer",
+            "policy_reviewer",
+            "publication_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "documents": {
+          "content_or_template_required": true,
+          "owner_required": true,
+          "restricted_review_required": true,
+          "supported_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "supported_document_types": [
+            "policy",
+            "procedure",
+            "evidence",
+            "contract",
+            "report",
+            "record",
+            "template"
+          ],
+          "title_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_access_events": true,
+          "emit_agent_events": true,
+          "emit_approval_events": true,
+          "emit_document_events": true,
+          "emit_processing_events": true,
+          "emit_revision_events": true,
+          "emit_template_events": true,
+          "event_stream": "apg.grc.doc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "processing": {
+          "document_required": true,
+          "processor": "bytewax",
+          "supported_jobs": [
+            "classification",
+            "extraction",
+            "retention_review",
+            "policy_mapping",
+            "quality_review"
+          ]
+        },
+        "publication": {
+          "approval_required": true,
+          "published_documents_locked": true,
+          "publisher_required": true
+        },
+        "retention": {
+          "legal_hold_blocks_archive": true,
+          "minimum_retention_days": 365,
+          "policy_required": true
+        },
+        "revisions": {
+          "change_summary_required": true,
+          "document_required": true,
+          "editor_required": true
+        },
+        "templates": {
+          "body_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "grc_doc_operations"
+          "default_theme": "grc_doc_control"
         },
         "ui": {
+          "enable_access": true,
+          "enable_agents": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_documents": true,
+          "enable_processing": true,
+          "enable_retention": true,
+          "enable_reviews": true,
+          "enable_settings": true,
+          "enable_templates": true
         }
       },
-      "erp_modules": [
-        "grc"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Document Service",
+      "name": "Document Management",
       "provides": [
-        "grc_doc_operations"
+        "document_repository_lifecycle",
+        "document_template_lifecycle",
+        "document_revision_workflow",
+        "document_approval_workflow",
+        "document_publication_workflow",
+        "document_retention_workflow",
+        "document_access_workflow",
+        "document_processing_workflow",
+        "document_dashboard_service",
+        "doc_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "policy_management",
+        "workflow_orchestration",
+        "search"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Document Service operations require tenant context.",
+            "description": "Document operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +188,486 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Document Service write operations require policy enforcement.",
+            "description": "Document writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "doc_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "operation": "create_document",
+              "title_present": false
             },
-            "description": "High-risk Document Service operations require review.",
+            "description": "Documents require title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_title_required",
+              "required_action": "set_document_title"
+            },
+            "name": "document_requires_title"
+          },
+          {
+            "condition": {
+              "operation": "create_document",
+              "owner_present": false
+            },
+            "description": "Documents require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_owner_required",
+              "required_action": "assign_document_owner"
+            },
+            "name": "document_requires_owner"
+          },
+          {
+            "condition": {
+              "document_type_supported": false,
+              "operation": "create_document"
+            },
+            "description": "Document type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_type_not_supported",
+              "required_action": "select_supported_document_type"
+            },
+            "name": "document_type_supported"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "create_document"
+            },
+            "description": "Document classification must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "classification_supported"
+          },
+          {
+            "condition": {
+              "content_or_template_present": false,
+              "operation": "create_document"
+            },
+            "description": "Documents require content or template.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_content_or_template_required",
+              "required_action": "attach_content_or_template"
+            },
+            "name": "document_requires_content_or_template"
+          },
+          {
+            "condition": {
+              "operation": "create_document",
+              "restricted_classification": true,
+              "review_recorded": false
+            },
+            "description": "Restricted documents require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "restricted_document_review_required",
+              "required_action": "record_document_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "restricted_document_requires_review"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "register_template"
+            },
+            "description": "Templates require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_name_required",
+              "required_action": "set_template_name"
+            },
+            "name": "template_requires_name"
+          },
+          {
+            "condition": {
+              "body_present": false,
+              "operation": "register_template"
+            },
+            "description": "Templates require body.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_body_required",
+              "required_action": "set_template_body"
+            },
+            "name": "template_requires_body"
+          },
+          {
+            "condition": {
+              "operation": "register_template",
+              "owner_present": false
+            },
+            "description": "Templates require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_owner_required",
+              "required_action": "assign_template_owner"
+            },
+            "name": "template_requires_owner"
+          },
+          {
+            "condition": {
+              "classification_supported": false,
+              "operation": "register_template"
+            },
+            "description": "Template classification must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_not_supported",
+              "required_action": "select_supported_classification"
+            },
+            "name": "template_classification_supported"
+          },
+          {
+            "condition": {
+              "document_present": false,
+              "operation": "create_revision"
+            },
+            "description": "Revisions require document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_required",
+              "required_action": "select_document"
+            },
+            "name": "revision_requires_document"
+          },
+          {
+            "condition": {
+              "editor_present": false,
+              "operation": "create_revision"
+            },
+            "description": "Revisions require editor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "editor_required",
+              "required_action": "assign_editor"
+            },
+            "name": "revision_requires_editor"
+          },
+          {
+            "condition": {
+              "change_summary_present": false,
+              "operation": "create_revision"
+            },
+            "description": "Revisions require change summary.",
+            "effect": {
+              "decision": "deny",
+              "reason": "change_summary_required",
+              "required_action": "record_change_summary"
+            },
+            "name": "revision_requires_change_summary"
+          },
+          {
+            "condition": {
+              "operation": "create_revision",
+              "published_document": true,
+              "review_recorded": false
+            },
+            "description": "Published documents must be revised through controlled workflow.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "published_document_revision_review_required",
+              "required_action": "record_revision_review"
+            },
+            "name": "published_documents_are_locked"
+          },
+          {
+            "condition": {
+              "document_present": false,
+              "operation": "approve_document"
+            },
+            "description": "Approvals require document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_required",
+              "required_action": "select_document"
+            },
+            "name": "approval_requires_document"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "approve_document"
+            },
+            "description": "Approvals require approver.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approver_required",
+              "required_action": "assign_approver"
+            },
+            "name": "approval_requires_approver"
+          },
+          {
+            "condition": {
+              "approval_note_present": false,
+              "operation": "approve_document"
+            },
+            "description": "Approvals require note.",
+            "effect": {
+              "decision": "deny",
+              "reason": "approval_note_required",
+              "required_action": "record_approval_note"
+            },
+            "name": "approval_requires_note"
+          },
+          {
+            "condition": {
+              "operation": "approve_document",
+              "owner_is_approver": true,
+              "restricted_classification": true
+            },
+            "description": "Document owner cannot approve own restricted document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "segregation_of_duties_required",
+              "required_action": "select_independent_approver"
+            },
+            "name": "approval_segregation_required"
+          },
+          {
+            "condition": {
+              "document_present": false,
+              "operation": "publish_document"
+            },
+            "description": "Publishing requires document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_required",
+              "required_action": "select_document"
+            },
+            "name": "publish_requires_document"
+          },
+          {
+            "condition": {
+              "approved": false,
+              "operation": "publish_document"
+            },
+            "description": "Publishing requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_approval_required",
+              "required_action": "approve_document"
+            },
+            "name": "publish_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "publish_document",
+              "publisher_present": false
+            },
+            "description": "Publishing requires publisher.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publisher_required",
+              "required_action": "assign_publisher"
+            },
+            "name": "publish_requires_publisher"
+          },
+          {
+            "condition": {
+              "document_present": false,
+              "operation": "assign_retention_policy"
+            },
+            "description": "Retention policies require document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_required",
+              "required_action": "select_document"
+            },
+            "name": "retention_requires_document"
+          },
+          {
+            "condition": {
+              "operation": "assign_retention_policy",
+              "retention_days_lt": 365
+            },
+            "description": "Retention days must meet minimum.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_too_short",
+              "required_action": "increase_retention"
+            },
+            "name": "retention_days_minimum"
+          },
+          {
+            "condition": {
+              "legal_hold": true,
+              "operation": "archive_document"
+            },
+            "description": "Legal hold blocks archive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legal_hold_blocks_archive",
+              "required_action": "release_legal_hold"
+            },
+            "name": "archive_blocks_legal_hold"
+          },
+          {
+            "condition": {
+              "document_present": false,
+              "operation": "grant_access"
+            },
+            "description": "Access grants require document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_required",
+              "required_action": "select_document"
+            },
+            "name": "access_requires_document"
+          },
+          {
+            "condition": {
+              "operation": "grant_access",
+              "principal_present": false
+            },
+            "description": "Access grants require principal.",
+            "effect": {
+              "decision": "deny",
+              "reason": "principal_required",
+              "required_action": "select_principal"
+            },
+            "name": "access_requires_principal"
+          },
+          {
+            "condition": {
+              "operation": "grant_access",
+              "permission_supported": false
+            },
+            "description": "Access permission must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "permission_not_supported",
+              "required_action": "select_supported_permission"
+            },
+            "name": "access_permission_supported"
+          },
+          {
+            "condition": {
+              "expiry_present": false,
+              "operation": "grant_access",
+              "restricted_classification": true
+            },
+            "description": "Restricted document grants require expiry.",
+            "effect": {
+              "decision": "deny",
+              "reason": "restricted_access_expiry_required",
+              "required_action": "set_access_expiry"
+            },
+            "name": "restricted_access_requires_expiry"
+          },
+          {
+            "condition": {
+              "document_present": false,
+              "operation": "register_processing_job"
+            },
+            "description": "Processing jobs require document.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_required",
+              "required_action": "select_document"
+            },
+            "name": "processing_requires_document"
+          },
+          {
+            "condition": {
+              "job_type_supported": false,
+              "operation": "register_processing_job"
+            },
+            "description": "Processing job type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "processing_job_not_supported",
+              "required_action": "select_supported_processing_job"
+            },
+            "name": "processing_job_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_processing_job",
+              "processor_ne": "bytewax"
+            },
+            "description": "Document processing requires Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_processor_required",
+              "required_action": "route_processing_to_bytewax"
+            },
+            "name": "processing_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "doc_batch"
+            },
+            "description": "Document batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_doc_batch_to_bytewax"
+            },
+            "name": "doc_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "doc_event"
+            },
+            "description": "Document events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_doc_event_to_bytewax"
+            },
+            "name": "doc_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_doc_agent"
+            },
+            "description": "Document agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "doc_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "doc_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_doc_agent"
+            },
+            "description": "Document agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "doc_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "doc_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "doc_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged document actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_doc_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +677,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Document Service operations require tenant context.",
+          "description": "Document operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +690,486 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Document Service write operations require policy enforcement.",
+          "description": "Document writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "doc_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "operation": "create_document",
+            "title_present": false
           },
-          "description": "High-risk Document Service operations require review.",
+          "description": "Documents require title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_title_required",
+            "required_action": "set_document_title"
+          },
+          "name": "document_requires_title"
+        },
+        {
+          "condition": {
+            "operation": "create_document",
+            "owner_present": false
+          },
+          "description": "Documents require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_owner_required",
+            "required_action": "assign_document_owner"
+          },
+          "name": "document_requires_owner"
+        },
+        {
+          "condition": {
+            "document_type_supported": false,
+            "operation": "create_document"
+          },
+          "description": "Document type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_type_not_supported",
+            "required_action": "select_supported_document_type"
+          },
+          "name": "document_type_supported"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "create_document"
+          },
+          "description": "Document classification must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "classification_supported"
+        },
+        {
+          "condition": {
+            "content_or_template_present": false,
+            "operation": "create_document"
+          },
+          "description": "Documents require content or template.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_content_or_template_required",
+            "required_action": "attach_content_or_template"
+          },
+          "name": "document_requires_content_or_template"
+        },
+        {
+          "condition": {
+            "operation": "create_document",
+            "restricted_classification": true,
+            "review_recorded": false
+          },
+          "description": "Restricted documents require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "restricted_document_review_required",
+            "required_action": "record_document_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "restricted_document_requires_review"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "register_template"
+          },
+          "description": "Templates require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_name_required",
+            "required_action": "set_template_name"
+          },
+          "name": "template_requires_name"
+        },
+        {
+          "condition": {
+            "body_present": false,
+            "operation": "register_template"
+          },
+          "description": "Templates require body.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_body_required",
+            "required_action": "set_template_body"
+          },
+          "name": "template_requires_body"
+        },
+        {
+          "condition": {
+            "operation": "register_template",
+            "owner_present": false
+          },
+          "description": "Templates require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_owner_required",
+            "required_action": "assign_template_owner"
+          },
+          "name": "template_requires_owner"
+        },
+        {
+          "condition": {
+            "classification_supported": false,
+            "operation": "register_template"
+          },
+          "description": "Template classification must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_not_supported",
+            "required_action": "select_supported_classification"
+          },
+          "name": "template_classification_supported"
+        },
+        {
+          "condition": {
+            "document_present": false,
+            "operation": "create_revision"
+          },
+          "description": "Revisions require document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_required",
+            "required_action": "select_document"
+          },
+          "name": "revision_requires_document"
+        },
+        {
+          "condition": {
+            "editor_present": false,
+            "operation": "create_revision"
+          },
+          "description": "Revisions require editor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "editor_required",
+            "required_action": "assign_editor"
+          },
+          "name": "revision_requires_editor"
+        },
+        {
+          "condition": {
+            "change_summary_present": false,
+            "operation": "create_revision"
+          },
+          "description": "Revisions require change summary.",
+          "effect": {
+            "decision": "deny",
+            "reason": "change_summary_required",
+            "required_action": "record_change_summary"
+          },
+          "name": "revision_requires_change_summary"
+        },
+        {
+          "condition": {
+            "operation": "create_revision",
+            "published_document": true,
+            "review_recorded": false
+          },
+          "description": "Published documents must be revised through controlled workflow.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "published_document_revision_review_required",
+            "required_action": "record_revision_review"
+          },
+          "name": "published_documents_are_locked"
+        },
+        {
+          "condition": {
+            "document_present": false,
+            "operation": "approve_document"
+          },
+          "description": "Approvals require document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_required",
+            "required_action": "select_document"
+          },
+          "name": "approval_requires_document"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "approve_document"
+          },
+          "description": "Approvals require approver.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approver_required",
+            "required_action": "assign_approver"
+          },
+          "name": "approval_requires_approver"
+        },
+        {
+          "condition": {
+            "approval_note_present": false,
+            "operation": "approve_document"
+          },
+          "description": "Approvals require note.",
+          "effect": {
+            "decision": "deny",
+            "reason": "approval_note_required",
+            "required_action": "record_approval_note"
+          },
+          "name": "approval_requires_note"
+        },
+        {
+          "condition": {
+            "operation": "approve_document",
+            "owner_is_approver": true,
+            "restricted_classification": true
+          },
+          "description": "Document owner cannot approve own restricted document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "segregation_of_duties_required",
+            "required_action": "select_independent_approver"
+          },
+          "name": "approval_segregation_required"
+        },
+        {
+          "condition": {
+            "document_present": false,
+            "operation": "publish_document"
+          },
+          "description": "Publishing requires document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_required",
+            "required_action": "select_document"
+          },
+          "name": "publish_requires_document"
+        },
+        {
+          "condition": {
+            "approved": false,
+            "operation": "publish_document"
+          },
+          "description": "Publishing requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_approval_required",
+            "required_action": "approve_document"
+          },
+          "name": "publish_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "publish_document",
+            "publisher_present": false
+          },
+          "description": "Publishing requires publisher.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publisher_required",
+            "required_action": "assign_publisher"
+          },
+          "name": "publish_requires_publisher"
+        },
+        {
+          "condition": {
+            "document_present": false,
+            "operation": "assign_retention_policy"
+          },
+          "description": "Retention policies require document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_required",
+            "required_action": "select_document"
+          },
+          "name": "retention_requires_document"
+        },
+        {
+          "condition": {
+            "operation": "assign_retention_policy",
+            "retention_days_lt": 365
+          },
+          "description": "Retention days must meet minimum.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_too_short",
+            "required_action": "increase_retention"
+          },
+          "name": "retention_days_minimum"
+        },
+        {
+          "condition": {
+            "legal_hold": true,
+            "operation": "archive_document"
+          },
+          "description": "Legal hold blocks archive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legal_hold_blocks_archive",
+            "required_action": "release_legal_hold"
+          },
+          "name": "archive_blocks_legal_hold"
+        },
+        {
+          "condition": {
+            "document_present": false,
+            "operation": "grant_access"
+          },
+          "description": "Access grants require document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_required",
+            "required_action": "select_document"
+          },
+          "name": "access_requires_document"
+        },
+        {
+          "condition": {
+            "operation": "grant_access",
+            "principal_present": false
+          },
+          "description": "Access grants require principal.",
+          "effect": {
+            "decision": "deny",
+            "reason": "principal_required",
+            "required_action": "select_principal"
+          },
+          "name": "access_requires_principal"
+        },
+        {
+          "condition": {
+            "operation": "grant_access",
+            "permission_supported": false
+          },
+          "description": "Access permission must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "permission_not_supported",
+            "required_action": "select_supported_permission"
+          },
+          "name": "access_permission_supported"
+        },
+        {
+          "condition": {
+            "expiry_present": false,
+            "operation": "grant_access",
+            "restricted_classification": true
+          },
+          "description": "Restricted document grants require expiry.",
+          "effect": {
+            "decision": "deny",
+            "reason": "restricted_access_expiry_required",
+            "required_action": "set_access_expiry"
+          },
+          "name": "restricted_access_requires_expiry"
+        },
+        {
+          "condition": {
+            "document_present": false,
+            "operation": "register_processing_job"
+          },
+          "description": "Processing jobs require document.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_required",
+            "required_action": "select_document"
+          },
+          "name": "processing_requires_document"
+        },
+        {
+          "condition": {
+            "job_type_supported": false,
+            "operation": "register_processing_job"
+          },
+          "description": "Processing job type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "processing_job_not_supported",
+            "required_action": "select_supported_processing_job"
+          },
+          "name": "processing_job_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_processing_job",
+            "processor_ne": "bytewax"
+          },
+          "description": "Document processing requires Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_processor_required",
+            "required_action": "route_processing_to_bytewax"
+          },
+          "name": "processing_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "doc_batch"
+          },
+          "description": "Document batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_doc_batch_to_bytewax"
+          },
+          "name": "doc_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "doc_event"
+          },
+          "description": "Document events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_doc_event_to_bytewax"
+          },
+          "name": "doc_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_doc_agent"
+          },
+          "description": "Document agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "doc_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "doc_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_doc_agent"
+          },
+          "description": "Document agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "doc_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "doc_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "doc_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged document actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_doc_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,55 +1179,124 @@
         "views": "views.py"
       },
       "screens": {
+        "access": {
+          "component": "DocumentAccessBoard",
+          "permission": "grc_doc:manage_access",
+          "route": "/grc-doc/access"
+        },
+        "agents": {
+          "component": "DocumentAgentWorkbench",
+          "permission": "grc_doc:admin",
+          "route": "/grc-doc/agents"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "DocumentDashboard",
           "permission": "grc_doc:view",
           "route": "/grc-doc/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "grc_doc:operate",
-          "route": "/grc-doc/operations"
+        "documents": {
+          "component": "DocumentRepository",
+          "permission": "grc_doc:manage_documents",
+          "route": "/grc-doc/documents"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "grc_doc:govern",
-          "route": "/grc-doc/rules"
+        "processing": {
+          "component": "DocumentProcessingQueue",
+          "permission": "grc_doc:process",
+          "route": "/grc-doc/processing"
+        },
+        "retention": {
+          "component": "RetentionWorkbench",
+          "permission": "grc_doc:manage_retention",
+          "route": "/grc-doc/retention"
+        },
+        "reviews": {
+          "component": "DocumentReviewQueue",
+          "permission": "grc_doc:review",
+          "route": "/grc-doc/reviews"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "DocumentSettings",
           "permission": "grc_doc:admin",
           "route": "/grc-doc/settings"
+        },
+        "templates": {
+          "component": "DocumentTemplateLibrary",
+          "permission": "grc_doc:manage_templates",
+          "route": "/grc-doc/templates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "document_created",
+          "template_registered",
+          "document_revised",
+          "document_approved",
+          "document_published",
+          "retention_policy_assigned",
+          "document_access_granted",
+          "processing_job_registered",
+          "processing_job_completed",
+          "doc_agent_registered"
+        ],
+        "guardrails": [
+          "doc_batch_requires_bytewax",
+          "doc_event_requires_bytewax",
+          "privileged_doc_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "in_review",
+          "approved",
+          "published",
+          "archived",
+          "locked",
+          "queued",
+          "completed",
+          "expired"
+        ],
+        "stream": "apg.grc.doc.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "access": {
+            "status_style": "permission-chip",
+            "visual": "access-board"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "document-agent-lane"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "documents": {
+            "icon": "file-text",
+            "status_indicator": "document-pill",
+            "visual": "repository-list"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "processing": {
+            "status_style": "job-chip",
+            "visual": "processing-lane"
+          },
+          "retention": {
+            "status_style": "retention-chip",
+            "visual": "retention-ledger"
+          },
+          "reviews": {
+            "status_style": "review-chip",
+            "visual": "review-queue"
+          },
+          "templates": {
+            "status_style": "template-chip",
+            "visual": "template-grid"
           }
         },
-        "name": "grc_doc_operations",
+        "name": "grc_doc_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
-          "color.danger": "#C53030",
+          "color.accent": "#4C6F52",
+          "color.danger": "#B42318",
           "color.primary": "#28536B",
-          "color.success": "#2F855A",
+          "color.success": "#237A57",
           "color.warning": "#B7791F",
           "density": "compact",
           "surface.canvas": "#F7F8FA",
@@ -200,28 +1310,63 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "DocumentDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/grc-doc/dashboard",
             "permission": "grc_doc:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/grc-doc/operations",
-            "permission": "grc_doc:operate"
+            "component": "DocumentRepository",
+            "name": "documents",
+            "nav_group": "Documents",
+            "path": "/grc-doc/documents",
+            "permission": "grc_doc:manage_documents"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "DocumentTemplateLibrary",
+            "name": "templates",
+            "nav_group": "Documents",
+            "path": "/grc-doc/templates",
+            "permission": "grc_doc:manage_templates"
+          },
+          {
+            "component": "DocumentReviewQueue",
+            "name": "reviews",
             "nav_group": "Governance",
-            "path": "/grc-doc/rules",
-            "permission": "grc_doc:govern"
+            "path": "/grc-doc/reviews",
+            "permission": "grc_doc:review"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "RetentionWorkbench",
+            "name": "retention",
+            "nav_group": "Governance",
+            "path": "/grc-doc/retention",
+            "permission": "grc_doc:manage_retention"
+          },
+          {
+            "component": "DocumentAccessBoard",
+            "name": "access",
+            "nav_group": "Security",
+            "path": "/grc-doc/access",
+            "permission": "grc_doc:manage_access"
+          },
+          {
+            "component": "DocumentProcessingQueue",
+            "name": "processing",
+            "nav_group": "Automation",
+            "path": "/grc-doc/processing",
+            "permission": "grc_doc:process"
+          },
+          {
+            "component": "DocumentAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/grc-doc/agents",
+            "permission": "grc_doc:admin"
+          },
+          {
+            "component": "DocumentSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/grc-doc/settings",
@@ -234,50 +1379,207 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "document_governance_review": {
+        "roles": [
+          "document_reviewer",
+          "classification_reviewer",
+          "retention_reviewer",
+          "evidence_reviewer",
+          "policy_reviewer",
+          "publication_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "grc_doc": []
+      "grc_doc": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "policy_management",
+        "workflow_orchestration",
+        "search"
+      ]
     }
   },
   "contracts": {
     "grc_doc": {
       "configuration": {
-        "capability": {
-          "category": "Grc",
-          "enabled": true,
-          "id": "grc_doc",
-          "name": "Document Service",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/grc/doc/cap_spec.md",
-          "version": "1.0.0"
+        "access": {
+          "principal_required": true,
+          "restricted_documents_require_expiry": true,
+          "supported_permissions": [
+            "view",
+            "comment",
+            "edit",
+            "approve",
+            "admin"
+          ]
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "policy_management": "adapter",
+          "search": "adapter",
+          "storage": "adapter",
+          "theme": "adapter",
+          "workflow_orchestration": "adapter"
+        },
+        "approvals": {
+          "approval_note_required": true,
+          "approver_required": true,
+          "segregation_of_duties": true
+        },
+        "doc_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "review_prepare_and_recommend",
+          "supported_roles": [
+            "document_reviewer",
+            "classification_reviewer",
+            "retention_reviewer",
+            "evidence_reviewer",
+            "policy_reviewer",
+            "publication_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "documents": {
+          "content_or_template_required": true,
+          "owner_required": true,
+          "restricted_review_required": true,
+          "supported_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "supported_document_types": [
+            "policy",
+            "procedure",
+            "evidence",
+            "contract",
+            "report",
+            "record",
+            "template"
+          ],
+          "title_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_access_events": true,
+          "emit_agent_events": true,
+          "emit_approval_events": true,
+          "emit_document_events": true,
+          "emit_processing_events": true,
+          "emit_revision_events": true,
+          "emit_template_events": true,
+          "event_stream": "apg.grc.doc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "processing": {
+          "document_required": true,
+          "processor": "bytewax",
+          "supported_jobs": [
+            "classification",
+            "extraction",
+            "retention_review",
+            "policy_mapping",
+            "quality_review"
+          ]
+        },
+        "publication": {
+          "approval_required": true,
+          "published_documents_locked": true,
+          "publisher_required": true
+        },
+        "retention": {
+          "legal_hold_blocks_archive": true,
+          "minimum_retention_days": 365,
+          "policy_required": true
+        },
+        "revisions": {
+          "change_summary_required": true,
+          "document_required": true,
+          "editor_required": true
+        },
+        "templates": {
+          "body_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "grc_doc_operations"
+          "default_theme": "grc_doc_control"
         },
         "ui": {
+          "enable_access": true,
+          "enable_agents": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_documents": true,
+          "enable_processing": true,
+          "enable_retention": true,
+          "enable_reviews": true,
+          "enable_settings": true,
+          "enable_templates": true
         }
       },
       "id": "grc_doc",
       "provides": [
-        "grc_doc_operations"
+        "document_repository_lifecycle",
+        "document_template_lifecycle",
+        "document_revision_workflow",
+        "document_approval_workflow",
+        "document_publication_workflow",
+        "document_retention_workflow",
+        "document_access_workflow",
+        "document_processing_workflow",
+        "document_dashboard_service",
+        "doc_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "policy_management",
+        "workflow_orchestration",
+        "search"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1587,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 8,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "grc_doc": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Document Service operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Document Service write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Document Service operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.grc_doc": {
-      "file": "capability_contract.py",
-      "id": "capability.grc_doc",
-      "kind": "capability",
-      "name": "Document Service",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }
