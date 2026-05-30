@@ -43,6 +43,12 @@ class CapabilityConfiguration:
 			"escalate_on_active_threat": True,
 			"rotate_keys_on_compromise_signal": True
 		},
+		"operation_governance": {
+			"require_key_domain": True,
+			"require_independent_exception_review": True,
+			"require_rotation_evidence": True,
+			"record_crypto_audit_events": True
+		},
 		"compliance": {
 			"frameworks": ["GDPR", "HIPAA", "PCI_DSS", "FIPS_140_2"],
 			"audit_all_crypto_operations": True,
@@ -52,7 +58,11 @@ class CapabilityConfiguration:
 			"enable_dashboard": True,
 			"enable_policy_designer": True,
 			"enable_entropy_console": True,
-			"enable_homomorphic_workspace": True
+			"enable_homomorphic_workspace": True,
+			"enable_operation_queue": True,
+			"enable_exception_queue": True,
+			"enable_rotation_console": True,
+			"enable_audit_timeline": True
 		},
 		"theme": {
 			"default_theme": "encr_quantum_guard",
@@ -67,6 +77,7 @@ class CapabilityConfiguration:
 			"key_lifecycle",
 			"policy",
 			"threat_adaptive",
+			"operation_governance",
 			"compliance",
 			"ui",
 			"theme"
@@ -77,6 +88,7 @@ class CapabilityConfiguration:
 			"key_lifecycle": {"type": "object"},
 			"policy": {"type": "object"},
 			"threat_adaptive": {"type": "object"},
+			"operation_governance": {"type": "object"},
 			"compliance": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -179,6 +191,31 @@ class CapabilityTheme:
 		"homomorphic_workspace": {
 			"visual": "locked-data-flow",
 			"result_style": "sealed-output"
+		},
+		"key_domain_card": {
+			"icon": "key-round",
+			"status_indicator": "rotation-chip",
+			"variant": "domain"
+		},
+		"crypto_operation_queue": {
+			"icon": "list-checks",
+			"status_indicator": "decision-badge",
+			"variant": "governance"
+		},
+		"crypto_exception_queue": {
+			"icon": "clipboard-check",
+			"status_indicator": "review-bar",
+			"variant": "review"
+		},
+		"key_rotation_timeline": {
+			"icon": "rotate-cw",
+			"status_indicator": "evidence-lock",
+			"variant": "rotation"
+		},
+		"crypto_audit_timeline": {
+			"icon": "scroll-text",
+			"line_style": "segmented",
+			"variant": "evidence"
 		}
 	})
 
@@ -245,6 +282,36 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "threat_adaptive_rotation_required",
 				"required_action": "rotate_affected_keys"
 			}
+		),
+		CapabilityRule(
+			name="crypto_exception_requires_independent_reviewer",
+			description="Crypto exception review requires an independent reviewer.",
+			condition={"operation": "decide_crypto_exception", "crypto_exception_reviewer_same_as_requester": True},
+			effect={
+				"decision": "deny",
+				"reason": "independent_crypto_reviewer_required",
+				"required_action": "assign_independent_crypto_reviewer"
+			}
+		),
+		CapabilityRule(
+			name="crypto_exception_requires_notes",
+			description="Crypto exception review requires reviewer notes.",
+			condition={"operation": "decide_crypto_exception", "crypto_exception_notes_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "crypto_exception_notes_required",
+				"required_action": "attach_crypto_review_notes"
+			}
+		),
+		CapabilityRule(
+			name="key_rotation_completion_requires_evidence",
+			description="Key rotation completion requires evidence.",
+			condition={"operation": "complete_key_rotation", "key_rotation_evidence_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_rotation_evidence_required",
+				"required_action": "attach_key_rotation_evidence"
+			}
 		)
 	]
 
@@ -257,8 +324,11 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("keys", "/encr/keys", "EncryptionKeyDomains", "encr:view_keys", "Operations"),
 		CapabilityUIRoute("policies", "/encr/policies", "CryptoPolicyDesigner", "encr:manage_policies", "Governance"),
 		CapabilityUIRoute("entropy", "/encr/entropy", "EntropyQualityConsole", "encr:view_entropy", "Governance"),
+		CapabilityUIRoute("exceptions", "/encr/exceptions", "CryptoExceptionQueue", "encr:review", "Governance"),
+		CapabilityUIRoute("rotations", "/encr/rotations", "KeyRotationConsole", "encr:rotate", "Operations"),
 		CapabilityUIRoute("homomorphic", "/encr/homomorphic", "HomomorphicWorkspace", "encr:compute", "Advanced"),
 		CapabilityUIRoute("analytics", "/encr/analytics", "CryptoAnalytics", "encr:view_analytics", "Intelligence"),
+		CapabilityUIRoute("audit", "/encr/audit", "CryptoAuditTimeline", "encr:view", "Governance"),
 		CapabilityUIRoute("settings", "/encr/settings", "EncryptionSettings", "encr:admin", "Administration")
 	]
 	return {

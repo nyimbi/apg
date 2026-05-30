@@ -5,13 +5,127 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Encryption Services package-backed APG capability", "entity_count": 0, "name": "encr", "version": "1.0.0"}, "capabilities": {"encr": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"compliance": {"audit_all_crypto_operations": true, "evidence_retention_days": 2555, "frameworks": ["GDPR", "HIPAA", "PCI_DSS", "FIPS_140_2"]}, "cryptography": {"default_symmetric_algorithm": "AES-256-GCM", "homomorphic_computation_enabled": true, "minimum_entropy_quality": 0.95, "post_quantum_enabled": true, "zero_knowledge_enabled": true}, "key_lifecycle": {"autonomous_rotation_enabled": true, "default_rotation_days": 90, "external_key_manager": "keym", "tenant_key_domains_required": true}, "policy": {"deny_plaintext_exports": true, "require_quantum_safe_for_restricted_data": true, "require_review_for_legacy_algorithms": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "encr_quantum_guard"}, "threat_adaptive": {"enabled": true, "escalate_on_active_threat": true, "rotate_keys_on_compromise_signal": true}, "ui": {"enable_dashboard": true, "enable_entropy_console": true, "enable_homomorphic_workspace": true, "enable_policy_designer": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Encryption Services", "provides": ["encr_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All encryption operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"algorithm_quantum_safe": false, "data_classification": "restricted"}, "description": "Restricted data must use quantum-safe encryption.", "effect": {"decision": "deny", "reason": "quantum_safe_algorithm_required", "required_action": "select_quantum_safe_algorithm"}, "name": "restricted_data_requires_quantum_safe_algorithm"}, {"condition": {"plaintext_export_requested": true}, "description": "Plaintext export requests are blocked by default.", "effect": {"decision": "deny", "reason": "plaintext_export_blocked", "required_action": "use_wrapped_or_encrypted_export"}, "name": "plaintext_export_blocked"}, {"condition": {"entropy_quality_lt": 0.95, "operation": "generate_key"}, "description": "Key generation requires high-quality entropy.", "effect": {"decision": "deny", "reason": "entropy_quality_too_low", "required_action": "refresh_entropy_source"}, "name": "low_entropy_blocks_key_generation"}, {"condition": {"algorithm_family": "legacy", "security_review_recorded": false}, "description": "Legacy cryptographic algorithms require explicit review.", "effect": {"decision": "require_review", "reason": "legacy_algorithm_review_required", "required_action": "record_crypto_exception"}, "name": "legacy_algorithm_requires_review"}, {"condition": {"active_threat_signal": true, "key_rotation_completed": false}, "description": "Active threat signals require key rotation before sensitive operations.", "effect": {"decision": "deny", "reason": "threat_adaptive_rotation_required", "required_action": "rotate_affected_keys"}, "name": "active_threat_requires_key_rotation"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All encryption operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"algorithm_quantum_safe": false, "data_classification": "restricted"}, "description": "Restricted data must use quantum-safe encryption.", "effect": {"decision": "deny", "reason": "quantum_safe_algorithm_required", "required_action": "select_quantum_safe_algorithm"}, "name": "restricted_data_requires_quantum_safe_algorithm"}, {"condition": {"plaintext_export_requested": true}, "description": "Plaintext export requests are blocked by default.", "effect": {"decision": "deny", "reason": "plaintext_export_blocked", "required_action": "use_wrapped_or_encrypted_export"}, "name": "plaintext_export_blocked"}, {"condition": {"entropy_quality_lt": 0.95, "operation": "generate_key"}, "description": "Key generation requires high-quality entropy.", "effect": {"decision": "deny", "reason": "entropy_quality_too_low", "required_action": "refresh_entropy_source"}, "name": "low_entropy_blocks_key_generation"}, {"condition": {"algorithm_family": "legacy", "security_review_recorded": false}, "description": "Legacy cryptographic algorithms require explicit review.", "effect": {"decision": "require_review", "reason": "legacy_algorithm_review_required", "required_action": "record_crypto_exception"}, "name": "legacy_algorithm_requires_review"}, {"condition": {"active_threat_signal": true, "key_rotation_completed": false}, "description": "Active threat signals require key rotation before sensitive operations.", "effect": {"decision": "deny", "reason": "threat_adaptive_rotation_required", "required_action": "rotate_affected_keys"}, "name": "active_threat_requires_key_rotation"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "CryptoAnalytics", "permission": "encr:view_analytics", "route": "/encr/analytics"}, "dashboard": {"component": "EncryptionDashboard", "permission": "encr:view", "route": "/encr/dashboard"}, "entropy": {"component": "EntropyQualityConsole", "permission": "encr:view_entropy", "route": "/encr/entropy"}, "homomorphic": {"component": "HomomorphicWorkspace", "permission": "encr:compute", "route": "/encr/homomorphic"}, "keys": {"component": "EncryptionKeyDomains", "permission": "encr:view_keys", "route": "/encr/keys"}, "operations": {"component": "CryptoOperationsConsole", "permission": "encr:operate", "route": "/encr/operations"}, "policies": {"component": "CryptoPolicyDesigner", "permission": "encr:manage_policies", "route": "/encr/policies"}, "settings": {"component": "EncryptionSettings", "permission": "encr:admin", "route": "/encr/settings"}}, "streaming": {}, "theme": {"components": {"crypto_posture_card": {"icon": "shield-check", "risk_style": "left-rail", "status_indicator": "algorithm-badge"}, "entropy_quality_meter": {"threshold_style": "quality-bands", "visual": "segmented-meter"}, "homomorphic_workspace": {"result_style": "sealed-output", "visual": "locked-data-flow"}, "policy_decision_trace": {"highlight": "decision-chip", "visual": "stacked-rule-list"}}, "name": "encr_quantum_guard", "tokens": {"border.radius": "8px", "color.accent": "#23A6A6", "color.danger": "#C53030", "color.primary": "#143C5C", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F4F7FB", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#53627A"}}, "ui": {"api_prefix": "/encr/api/v1", "requires_theme": true, "routes": [{"component": "EncryptionDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/encr/dashboard", "permission": "encr:view"}, {"component": "CryptoOperationsConsole", "name": "operations", "nav_group": "Operations", "path": "/encr/operations", "permission": "encr:operate"}, {"component": "EncryptionKeyDomains", "name": "keys", "nav_group": "Operations", "path": "/encr/keys", "permission": "encr:view_keys"}, {"component": "CryptoPolicyDesigner", "name": "policies", "nav_group": "Governance", "path": "/encr/policies", "permission": "encr:manage_policies"}, {"component": "EntropyQualityConsole", "name": "entropy", "nav_group": "Governance", "path": "/encr/entropy", "permission": "encr:view_entropy"}, {"component": "HomomorphicWorkspace", "name": "homomorphic", "nav_group": "Advanced", "path": "/encr/homomorphic", "permission": "encr:compute"}, {"component": "CryptoAnalytics", "name": "analytics", "nav_group": "Intelligence", "path": "/encr/analytics", "permission": "encr:view_analytics"}, {"component": "EncryptionSettings", "name": "settings", "nav_group": "Administration", "path": "/encr/settings", "permission": "encr:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "web_ui.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"encr": []}}, "contracts": {"encr": {"configuration": {"compliance": {"audit_all_crypto_operations": true, "evidence_retention_days": 2555, "frameworks": ["GDPR", "HIPAA", "PCI_DSS", "FIPS_140_2"]}, "cryptography": {"default_symmetric_algorithm": "AES-256-GCM", "homomorphic_computation_enabled": true, "minimum_entropy_quality": 0.95, "post_quantum_enabled": true, "zero_knowledge_enabled": true}, "key_lifecycle": {"autonomous_rotation_enabled": true, "default_rotation_days": 90, "external_key_manager": "keym", "tenant_key_domains_required": true}, "policy": {"deny_plaintext_exports": true, "require_quantum_safe_for_restricted_data": true, "require_review_for_legacy_algorithms": true, "require_tenant_context": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "encr_quantum_guard"}, "threat_adaptive": {"enabled": true, "escalate_on_active_threat": true, "rotate_keys_on_compromise_signal": true}, "ui": {"enable_dashboard": true, "enable_entropy_console": true, "enable_homomorphic_workspace": true, "enable_policy_designer": true}}, "id": "encr", "provides": ["encr_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"encr": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"active_threat_requires_key_rotation": {"condition": {"active_threat_signal": true, "key_rotation_completed": false}, "description": "Active threat signals require key rotation before sensitive operations.", "effect": {"decision": "deny", "reason": "threat_adaptive_rotation_required", "required_action": "rotate_affected_keys"}, "name": "active_threat_requires_key_rotation"}, "legacy_algorithm_requires_review": {"condition": {"algorithm_family": "legacy", "security_review_recorded": false}, "description": "Legacy cryptographic algorithms require explicit review.", "effect": {"decision": "require_review", "reason": "legacy_algorithm_review_required", "required_action": "record_crypto_exception"}, "name": "legacy_algorithm_requires_review"}, "low_entropy_blocks_key_generation": {"condition": {"entropy_quality_lt": 0.95, "operation": "generate_key"}, "description": "Key generation requires high-quality entropy.", "effect": {"decision": "deny", "reason": "entropy_quality_too_low", "required_action": "refresh_entropy_source"}, "name": "low_entropy_blocks_key_generation"}, "plaintext_export_blocked": {"condition": {"plaintext_export_requested": true}, "description": "Plaintext export requests are blocked by default.", "effect": {"decision": "deny", "reason": "plaintext_export_blocked", "required_action": "use_wrapped_or_encrypted_export"}, "name": "plaintext_export_blocked"}, "restricted_data_requires_quantum_safe_algorithm": {"condition": {"algorithm_quantum_safe": false, "data_classification": "restricted"}, "description": "Restricted data must use quantum-safe encryption.", "effect": {"decision": "deny", "reason": "quantum_safe_algorithm_required", "required_action": "select_quantum_safe_algorithm"}, "name": "restricted_data_requires_quantum_safe_algorithm"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All encryption operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.encr": {"file": "capability_contract.py", "id": "capability.encr", "kind": "capability", "name": "Encryption Services", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("encr_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "encr",
+			"version": "1.0.0",
+			"description": "Encryption Services package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"encr": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"encr": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["encr_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "views.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"crypto_exception": "CryptoExceptionReviewRecord",
+					"key_rotation": "KeyRotationRecord",
+				},
+				"i18n": {},
+				"master_data": {},
+				"streaming": {},
+			}
+		},
+		"contracts": {
+			"encr": {
+				"id": "encr",
+				"configuration": contract["configuration"],
+				"provides": ["encr_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"encr": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.encr": {
+				"id": "capability.encr",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +150,18 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	routes = model.get("capabilities", {}).get("encr", {}).get("ui", {}).get("routes", [])
+	approvals = model.get("capabilities", {}).get("encr", {}).get("approvals", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "encr" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 11:
+		errors.append("ENCR semantic model route manifest is stale")
+	if "crypto_exception" not in approvals or "key_rotation" not in approvals:
+		errors.append("ENCR semantic model approval manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

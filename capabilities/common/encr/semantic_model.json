@@ -8,7 +8,10 @@
   },
   "capabilities": {
     "encr": {
-      "approvals": {},
+      "approvals": {
+        "crypto_exception": "CryptoExceptionReviewRecord",
+        "key_rotation": "KeyRotationRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -35,6 +38,12 @@
           "external_key_manager": "keym",
           "tenant_key_domains_required": true
         },
+        "operation_governance": {
+          "record_crypto_audit_events": true,
+          "require_independent_exception_review": true,
+          "require_key_domain": true,
+          "require_rotation_evidence": true
+        },
         "policy": {
           "deny_plaintext_exports": true,
           "require_quantum_safe_for_restricted_data": true,
@@ -52,10 +61,14 @@
           "rotate_keys_on_compromise_signal": true
         },
         "ui": {
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
           "enable_entropy_console": true,
+          "enable_exception_queue": true,
           "enable_homomorphic_workspace": true,
-          "enable_policy_designer": true
+          "enable_operation_queue": true,
+          "enable_policy_designer": true,
+          "enable_rotation_console": true
         }
       },
       "erp_modules": [
@@ -145,6 +158,45 @@
               "required_action": "rotate_affected_keys"
             },
             "name": "active_threat_requires_key_rotation"
+          },
+          {
+            "condition": {
+              "crypto_exception_reviewer_same_as_requester": true,
+              "operation": "decide_crypto_exception"
+            },
+            "description": "Crypto exception review requires an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_crypto_reviewer_required",
+              "required_action": "assign_independent_crypto_reviewer"
+            },
+            "name": "crypto_exception_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "crypto_exception_notes_attached": false,
+              "operation": "decide_crypto_exception"
+            },
+            "description": "Crypto exception review requires reviewer notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "crypto_exception_notes_required",
+              "required_action": "attach_crypto_review_notes"
+            },
+            "name": "crypto_exception_requires_notes"
+          },
+          {
+            "condition": {
+              "key_rotation_evidence_attached": false,
+              "operation": "complete_key_rotation"
+            },
+            "description": "Key rotation completion requires evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_rotation_evidence_required",
+              "required_action": "attach_key_rotation_evidence"
+            },
+            "name": "key_rotation_completion_requires_evidence"
           }
         ],
         "type": "deterministic"
@@ -225,6 +277,45 @@
             "required_action": "rotate_affected_keys"
           },
           "name": "active_threat_requires_key_rotation"
+        },
+        {
+          "condition": {
+            "crypto_exception_reviewer_same_as_requester": true,
+            "operation": "decide_crypto_exception"
+          },
+          "description": "Crypto exception review requires an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_crypto_reviewer_required",
+            "required_action": "assign_independent_crypto_reviewer"
+          },
+          "name": "crypto_exception_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "crypto_exception_notes_attached": false,
+            "operation": "decide_crypto_exception"
+          },
+          "description": "Crypto exception review requires reviewer notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "crypto_exception_notes_required",
+            "required_action": "attach_crypto_review_notes"
+          },
+          "name": "crypto_exception_requires_notes"
+        },
+        {
+          "condition": {
+            "key_rotation_evidence_attached": false,
+            "operation": "complete_key_rotation"
+          },
+          "description": "Key rotation completion requires evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_rotation_evidence_required",
+            "required_action": "attach_key_rotation_evidence"
+          },
+          "name": "key_rotation_completion_requires_evidence"
         }
       ],
       "runtime": {
@@ -239,6 +330,11 @@
           "permission": "encr:view_analytics",
           "route": "/encr/analytics"
         },
+        "audit": {
+          "component": "CryptoAuditTimeline",
+          "permission": "encr:view",
+          "route": "/encr/audit"
+        },
         "dashboard": {
           "component": "EncryptionDashboard",
           "permission": "encr:view",
@@ -248,6 +344,11 @@
           "component": "EntropyQualityConsole",
           "permission": "encr:view_entropy",
           "route": "/encr/entropy"
+        },
+        "exceptions": {
+          "component": "CryptoExceptionQueue",
+          "permission": "encr:review",
+          "route": "/encr/exceptions"
         },
         "homomorphic": {
           "component": "HomomorphicWorkspace",
@@ -269,6 +370,11 @@
           "permission": "encr:manage_policies",
           "route": "/encr/policies"
         },
+        "rotations": {
+          "component": "KeyRotationConsole",
+          "permission": "encr:rotate",
+          "route": "/encr/rotations"
+        },
         "settings": {
           "component": "EncryptionSettings",
           "permission": "encr:admin",
@@ -278,6 +384,21 @@
       "streaming": {},
       "theme": {
         "components": {
+          "crypto_audit_timeline": {
+            "icon": "scroll-text",
+            "line_style": "segmented",
+            "variant": "evidence"
+          },
+          "crypto_exception_queue": {
+            "icon": "clipboard-check",
+            "status_indicator": "review-bar",
+            "variant": "review"
+          },
+          "crypto_operation_queue": {
+            "icon": "list-checks",
+            "status_indicator": "decision-badge",
+            "variant": "governance"
+          },
           "crypto_posture_card": {
             "icon": "shield-check",
             "risk_style": "left-rail",
@@ -290,6 +411,16 @@
           "homomorphic_workspace": {
             "result_style": "sealed-output",
             "visual": "locked-data-flow"
+          },
+          "key_domain_card": {
+            "icon": "key-round",
+            "status_indicator": "rotation-chip",
+            "variant": "domain"
+          },
+          "key_rotation_timeline": {
+            "icon": "rotate-cw",
+            "status_indicator": "evidence-lock",
+            "variant": "rotation"
           },
           "policy_decision_trace": {
             "highlight": "decision-chip",
@@ -351,6 +482,20 @@
             "permission": "encr:view_entropy"
           },
           {
+            "component": "CryptoExceptionQueue",
+            "name": "exceptions",
+            "nav_group": "Governance",
+            "path": "/encr/exceptions",
+            "permission": "encr:review"
+          },
+          {
+            "component": "KeyRotationConsole",
+            "name": "rotations",
+            "nav_group": "Operations",
+            "path": "/encr/rotations",
+            "permission": "encr:rotate"
+          },
+          {
             "component": "HomomorphicWorkspace",
             "name": "homomorphic",
             "nav_group": "Advanced",
@@ -363,6 +508,13 @@
             "nav_group": "Intelligence",
             "path": "/encr/analytics",
             "permission": "encr:view_analytics"
+          },
+          {
+            "component": "CryptoAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/encr/audit",
+            "permission": "encr:view"
           },
           {
             "component": "EncryptionSettings",
@@ -414,6 +566,12 @@
           "external_key_manager": "keym",
           "tenant_key_domains_required": true
         },
+        "operation_governance": {
+          "record_crypto_audit_events": true,
+          "require_independent_exception_review": true,
+          "require_key_domain": true,
+          "require_rotation_evidence": true
+        },
         "policy": {
           "deny_plaintext_exports": true,
           "require_quantum_safe_for_restricted_data": true,
@@ -431,10 +589,14 @@
           "rotate_keys_on_compromise_signal": true
         },
         "ui": {
+          "enable_audit_timeline": true,
           "enable_dashboard": true,
           "enable_entropy_console": true,
+          "enable_exception_queue": true,
           "enable_homomorphic_workspace": true,
-          "enable_policy_designer": true
+          "enable_operation_queue": true,
+          "enable_policy_designer": true,
+          "enable_rotation_console": true
         }
       },
       "id": "encr",
@@ -486,6 +648,45 @@
         "required_action": "rotate_affected_keys"
       },
       "name": "active_threat_requires_key_rotation"
+    },
+    "crypto_exception_requires_independent_reviewer": {
+      "condition": {
+        "crypto_exception_reviewer_same_as_requester": true,
+        "operation": "decide_crypto_exception"
+      },
+      "description": "Crypto exception review requires an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_crypto_reviewer_required",
+        "required_action": "assign_independent_crypto_reviewer"
+      },
+      "name": "crypto_exception_requires_independent_reviewer"
+    },
+    "crypto_exception_requires_notes": {
+      "condition": {
+        "crypto_exception_notes_attached": false,
+        "operation": "decide_crypto_exception"
+      },
+      "description": "Crypto exception review requires reviewer notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "crypto_exception_notes_required",
+        "required_action": "attach_crypto_review_notes"
+      },
+      "name": "crypto_exception_requires_notes"
+    },
+    "key_rotation_completion_requires_evidence": {
+      "condition": {
+        "key_rotation_evidence_attached": false,
+        "operation": "complete_key_rotation"
+      },
+      "description": "Key rotation completion requires evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_rotation_evidence_required",
+        "required_action": "attach_key_rotation_evidence"
+      },
+      "name": "key_rotation_completion_requires_evidence"
     },
     "legacy_algorithm_requires_review": {
       "condition": {

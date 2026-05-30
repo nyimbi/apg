@@ -150,6 +150,9 @@ def register_capability() -> Dict[str, Any]:
 			"zero_knowledge_encryption": "Protect sensitive workloads with zero-knowledge defaults",
 			"autonomous_key_lifecycle": "Coordinate key lifecycle policy with KEYM",
 			"homomorphic_computation": "Expose controlled computation on encrypted data",
+			"crypto_operation_governance": "Evaluate crypto operation decisions with package-backed audit state",
+			"crypto_exception_review": "Govern legacy algorithm exceptions with independent review",
+			"threat_adaptive_key_rotation": "Schedule and complete key rotations with evidence",
 			"capability_rules": "Evaluate deterministic cryptographic governance rules",
 			"visual_theming": "Apply encryption-control theme tokens and components"
 		},
@@ -158,8 +161,11 @@ def register_capability() -> Dict[str, Any]:
 			"keys": "/encr/api/v1/keys",
 			"policies": "/encr/api/v1/policies",
 			"entropy": "/encr/api/v1/entropy",
+			"exceptions": "/encr/api/v1/exceptions",
+			"rotations": "/encr/api/v1/rotations",
 			"homomorphic": "/encr/api/v1/homomorphic",
-			"analytics": "/encr/api/v1/analytics"
+			"analytics": "/encr/api/v1/analytics",
+			"audit": "/encr/api/v1/audit"
 		},
 		"ui_components": {
 			route["name"]: route["path"]
@@ -173,6 +179,8 @@ def register_capability() -> Dict[str, Any]:
 			"encr:view_keys",
 			"encr:manage_policies",
 			"encr:view_entropy",
+			"encr:review",
+			"encr:rotate",
 			"encr:compute",
 			"encr:view_analytics",
 			"encr:admin"

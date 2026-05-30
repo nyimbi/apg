@@ -1,16 +1,20 @@
 """Regression coverage for the ENCR executable capability contract."""
 
+from __future__ import annotations
+
+import pytest
+
 from capabilities.common.encr import register_capability
 from capabilities.common.encr.capability_contract import (
 	evaluate_capability_rules,
-	get_capability_contract
+	get_capability_contract,
 )
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
 	contract = get_capability_contract(
 		"tenant-crypto",
-		{"cryptography": {"minimum_entropy_quality": 0.98}}
+		{"cryptography": {"minimum_entropy_quality": 0.98}},
 	)
 
 	assert contract["capability"] == "encr"
@@ -22,24 +26,34 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"key_lifecycle",
 		"policy",
 		"threat_adaptive",
+		"operation_governance",
 		"compliance",
 		"ui",
-		"theme"
+		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
+	assert len(contract["rule_engine"]["rules"]) >= 9
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"operations",
 		"keys",
 		"policies",
 		"entropy",
+		"exceptions",
+		"rotations",
 		"homomorphic",
 		"analytics",
-		"settings"
+		"audit",
+		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/encr/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert "entropy_quality_meter" in contract["theme"]["components"]
+	assert {
+		"entropy_quality_meter",
+		"crypto_operation_queue",
+		"crypto_exception_queue",
+		"key_rotation_timeline",
+		"crypto_audit_timeline",
+	} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_crypto_guardrails():
@@ -53,7 +67,7 @@ def test_rule_engine_enforces_crypto_guardrails():
 		"algorithm_family": "legacy",
 		"security_review_recorded": False,
 		"active_threat_signal": True,
-		"key_rotation_completed": False
+		"key_rotation_completed": False,
 	})
 
 	assert result["decision"] == "deny"
@@ -63,8 +77,43 @@ def test_rule_engine_enforces_crypto_guardrails():
 		"plaintext_export_blocked",
 		"low_entropy_blocks_key_generation",
 		"legacy_algorithm_requires_review",
-		"active_threat_requires_key_rotation"
+		"active_threat_requires_key_rotation",
 	}
+
+
+@pytest.mark.parametrize(
+	"context, reason",
+	[
+		(
+			{
+				"operation": "decide_crypto_exception",
+				"crypto_exception_reviewer_same_as_requester": True,
+				"crypto_exception_notes_attached": True,
+			},
+			"independent_crypto_reviewer_required",
+		),
+		(
+			{
+				"operation": "decide_crypto_exception",
+				"crypto_exception_reviewer_same_as_requester": False,
+				"crypto_exception_notes_attached": False,
+			},
+			"crypto_exception_notes_required",
+		),
+		(
+			{
+				"operation": "complete_key_rotation",
+				"key_rotation_evidence_attached": False,
+			},
+			"key_rotation_evidence_required",
+		),
+	],
+)
+def test_rule_engine_enforces_exception_and_rotation_guardrails(context, reason):
+	result = evaluate_capability_rules(context)
+
+	assert result["decision"] == "deny"
+	assert result["actions"][0]["reason"] == reason
 
 
 def test_registration_includes_full_capability_contract():
@@ -75,4 +124,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "encr_quantum_guard"
 	assert registration["ui_components"]["homomorphic"] == "/encr/homomorphic"
+	assert registration["ui_components"]["exceptions"] == "/encr/exceptions"
+	assert registration["ui_components"]["rotations"] == "/encr/rotations"
 	assert "secu" in registration["dependencies"]
+	assert "encr:review" in registration["permissions"]
+	assert "encr:rotate" in registration["permissions"]

@@ -13104,3 +13104,33 @@ Battery-conscious verification:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/secu --json` passed with exception/incident/quarantine/audit routes, 9 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized" capabilities/common/secu` returned no stale SECU materialized markers.
 - `git diff --check -- capabilities/common/secu docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 02:58 EAT
+
+ENCR governed key-domain, crypto operation, exception review, and rotation lifecycle slice:
+
+- Added `capabilities/common/encr/SPECIFICATION.md`, `capabilities/common/encr/PLAN.md`, and `capabilities/common/encr/README.md` for the package-specific specification-plan-implementation-review cycle.
+- Added dependency-light key domain, crypto operation, crypto exception review, key rotation, and crypto audit event records to the ENCR package runtime.
+- Added tenant-qualified ENCR service state for key domains, operations, exception reviews, rotations, and audit events without disturbing the existing async encryption engines.
+- Added key-domain registration guardrails for tenant context, domain ID, owner, algorithm, data classification, entropy range, and restricted/critical quantum-safety requirements.
+- Added crypto operation evaluation for encrypt/decrypt/export/compute/generate-key actions with deterministic decisions, matched rules, required actions, and audit evidence.
+- Added legacy algorithm exception review workflows with independent reviewer, reviewer notes, approval, rejection, and operation state promotion on approval.
+- Added key rotation scheduling and completion workflows with requester, reason, actor, evidence, duplicate-completion protection, key-domain rotation state, and audit evidence.
+- Extended API helpers and view models with key-domain consoles, operation queues, exception queues, rotation consoles, entropy consoles, audit timelines, analytics, homomorphic workspace state, and shared default service state.
+- Extended the ENCR capability contract with operation governance configuration, exception/rotation/audit routes, 9 deterministic rules, and theme components for generated APG applications.
+- Extended ENCR package registration with operation governance, exception review, threat-adaptive rotation, audit endpoints, `encr:review`, and `encr:rotate`.
+- Replaced stale embedded semantic evidence in `app.py` with contract-derived semantic evidence and refreshed `semantic_model.json`, `release_report.json`, and `package_manifest.json`.
+- Renamed the stale package test file to `tests/test_package_contract.py`.
+- Added positive key-domain-operation-legacy-review-rotation-audit coverage and API-helper/view-model coverage.
+- Added negative missing tenant, missing owner, restricted non-quantum algorithm, entropy out of range, missing key domain, restricted operation denial, plaintext export denial, low-entropy key generation, active threat without rotation, unnecessary exception review, self exception review, missing exception notes, missing rotation reason, missing rotation evidence, and duplicate rotation completion coverage.
+- Updated `cap_spec.md` with the current executable package scope, adapter boundaries, and focused proof commands.
+- Code review found and fixed legacy algorithm family override bypass, caller-supplied key rotation completion bypass, and mutating API helper default-tenant bypass.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/encr/__init__.py capabilities/common/encr/models.py capabilities/common/encr/service.py capabilities/common/encr/api.py capabilities/common/encr/views.py capabilities/common/encr/capability_contract.py capabilities/common/encr/app.py capabilities/common/encr/tests/test_capability_contract.py capabilities/common/encr/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/encr/tests/test_capability_contract.py capabilities/common/encr/tests/test_package_contract.py` passed with 11 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/encr --json` passed with `ok: true`; ENCR remains `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/encr --json` passed with exception/rotation/audit routes, 9 executable rules, guardrail theme evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n "This package materializes|Tenant-scoped dependency-light capability record|Dependency-light service backed|dependency-light dashboard view model|materialized APG capability package|Materialized capability package|test_materialized_package|Materialized capability package tests|materialized_contract_encr|materialized_app_encr|test_materialized" capabilities/common/encr` returned no stale ENCR package markers. A broader raw `materialized` search still finds legitimate SQL materialized-view comments in `schema.sql`.
+- `git diff --check -- capabilities/common/encr docs/progress_log.md` passed with no whitespace errors.

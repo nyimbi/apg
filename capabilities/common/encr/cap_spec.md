@@ -9,6 +9,65 @@ The APG Encryption Services capability (`encr`) delivers a comprehensive cryptog
 ### APG Platform Context
 This capability serves as the foundational cryptographic layer for all APG capabilities, providing seamless encryption services across the entire APG ecosystem while ensuring compliance, performance, and future-proof security. It integrates deeply with APG's authentication (`auth`), security framework (`secu`), and key management (`keym`) capabilities.
 
+## Current Executable Runtime
+
+The package now exposes a deterministic, dependency-light `EncrService` for
+generated APG applications, capability composition, publish-plan checks, and
+focused package tests. The runtime keeps live HSM, KMS, KEYM, post-quantum,
+zero-knowledge, homomorphic, SIEM, SOAR, DLP, GRC, and AI providers behind
+adapter boundaries while making ENCR guardrails executable in the local
+repository.
+
+Current package behavior:
+
+- registers tenant-scoped key domains with owner, algorithm, data
+  classification, entropy quality, quantum-safety posture, lifecycle state, and
+  rotation state;
+- evaluates encrypt, decrypt, export, compute, and generate-key operations
+  against deterministic ENCR rules, producing `allow`, `require_review`, or
+  `deny` decisions with matched rules and required actions;
+- denies restricted or critical data when the selected algorithm is not
+  quantum-safe;
+- denies plaintext export requests by default;
+- denies low-entropy key generation;
+- marks legacy algorithm operations as `review_required` until an independent
+  crypto exception review approves them;
+- schedules and completes key rotations with actor and evidence;
+- records audit events for key-domain registration, operation decisions,
+  exception reviews, and key rotations;
+- exposes API helpers and UI view models for dashboards, operations, key
+  domains, policy design, entropy, exception queues, rotations, homomorphic
+  workspaces, analytics, audit timelines, and settings.
+
+The compatibility `create_record` and `list_records` helpers remain available
+for older package tooling, while new code should use the domain-specific
+service methods.
+
+## Adapter Boundaries
+
+ENCR intentionally keeps the following live integrations outside the
+dependency-light runtime until future slices verify them directly:
+
+- APG KEYM, HSM, cloud KMS, vault, and hardware security modules;
+- post-quantum cryptography SDKs and hardware entropy sources;
+- zero-knowledge proof systems and homomorphic computation engines;
+- SIEM, SOAR, DLP, GRC, audit-export, and incident-response systems;
+- AI cryptographic policy optimization and threat-intelligence streaming.
+
+Package behavior should remain deterministic without those integrations. Live
+systems should be introduced as adapters around the current service contract.
+
+## Focused Verification
+
+Use these commands for a battery-conscious ENCR package proof:
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/encr/__init__.py capabilities/common/encr/models.py capabilities/common/encr/service.py capabilities/common/encr/api.py capabilities/common/encr/views.py capabilities/common/encr/capability_contract.py capabilities/common/encr/app.py capabilities/common/encr/tests/test_capability_contract.py capabilities/common/encr/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/encr/tests/test_capability_contract.py capabilities/common/encr/tests/test_package_contract.py
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/encr --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/encr --json
+```
+
 ## Business Value Proposition
 
 ### Within APG Ecosystem

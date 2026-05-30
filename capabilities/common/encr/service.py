@@ -28,6 +28,7 @@ import hmac
 import json
 import logging
 import secrets
+from dataclasses import dataclass, field, asdict
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Tuple
 from uuid_extensions import uuid7str
@@ -69,6 +70,546 @@ class ProofVerificationError(ZeroKnowledgeEngineError):
 
 class ThresholdCryptographyError(ZeroKnowledgeEngineError):
 	"""Raised when threshold encryption or decryption cannot be completed."""
+
+
+QUANTUM_SAFE_ALGORITHMS = {
+	"crystals-kyber-512",
+	"crystals-kyber-768",
+	"crystals-kyber-1024",
+	"crystals-dilithium-2",
+	"crystals-dilithium-3",
+	"crystals-dilithium-5",
+	"falcon-512",
+	"falcon-1024",
+	"sphincs-plus-128s",
+	"sphincs-plus-256s",
+}
+LEGACY_ALGORITHMS = {"des", "3des", "rc4", "rsa-1024", "rsa-2048", "sha1"}
+DATA_CLASSIFICATIONS = {"public", "internal", "confidential", "restricted", "critical"}
+
+
+def _utc_now() -> str:
+	return datetime.utcnow().isoformat() + "Z"
+
+
+def _stable_id(prefix: str, *parts: object) -> str:
+	payload = "|".join(str(part) for part in parts)
+	return f"{prefix}_{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]}"
+
+
+def _normalize_algorithm(value: str) -> str:
+	normalized = str(value or "").strip()
+	if not normalized:
+		raise ValueError("crypto_algorithm_required")
+	return normalized
+
+
+def _algorithm_family(algorithm: str, explicit_family: str | None = None) -> str:
+	normalized = algorithm.strip().lower()
+	if normalized in QUANTUM_SAFE_ALGORITHMS:
+		return "post_quantum"
+	if normalized in LEGACY_ALGORITHMS:
+		return "legacy"
+	if explicit_family and str(explicit_family).strip().lower() == "legacy":
+		return "legacy"
+	return "modern"
+
+
+def _is_quantum_safe(algorithm: str) -> bool:
+	return algorithm.strip().lower() in QUANTUM_SAFE_ALGORITHMS
+
+
+def _classification(value: str) -> str:
+	normalized = str(value or "confidential").strip().lower()
+	if normalized not in DATA_CLASSIFICATIONS:
+		raise ValueError(f"unsupported_data_classification:{value}")
+	return normalized
+
+
+def _entropy(value: int | float) -> float:
+	score = float(value)
+	if not 0 <= score <= 1:
+		raise ValueError("entropy_quality_out_of_range")
+	return score
+
+
+def _required_actions(result: dict[str, Any]) -> list[str]:
+	return [
+		str(action["required_action"])
+		for action in result.get("actions", [])
+		if action.get("required_action")
+	]
+
+
+@dataclass(slots=True)
+class CryptoKeyDomainRecord:
+	id: str
+	tenant_id: str
+	name: str
+	owner: str
+	algorithm: str
+	data_classification: str
+	entropy_quality: float
+	algorithm_quantum_safe: bool
+	status: str = "active"
+	rotation_status: str = "current"
+	created_at: str = field(default_factory=_utc_now)
+	last_rotated_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class CryptoOperationRecord:
+	id: str
+	tenant_id: str
+	operation_type: str
+	key_domain_id: str
+	data_classification: str
+	algorithm: str
+	algorithm_family: str
+	algorithm_quantum_safe: bool
+	entropy_quality: float
+	plaintext_export_requested: bool
+	active_threat_signal: bool
+	key_rotation_completed: bool
+	decision: str
+	status: str
+	matched_rules: list[str]
+	required_actions: list[str]
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class CryptoExceptionReviewRecord:
+	id: str
+	tenant_id: str
+	operation_id: str
+	requested_by: str
+	reason: str
+	status: str = "pending"
+	decision: str = ""
+	reviewer: str = ""
+	notes: str = ""
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class KeyRotationRecord:
+	id: str
+	tenant_id: str
+	key_domain_id: str
+	requested_by: str
+	reason: str
+	status: str = "scheduled"
+	actor: str = ""
+	evidence: str = ""
+	created_at: str = field(default_factory=_utc_now)
+	completed_at: str = ""
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+@dataclass(slots=True)
+class CryptoAuditEventRecord:
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	actor: str
+	severity: str = "info"
+	created_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
+class EncrService:
+	"""Dependency-light ENCR service for generated APG applications."""
+
+	def __init__(self) -> None:
+		from .capability_contract import evaluate_capability_rules, get_capability_contract
+
+		self._evaluate_rules = evaluate_capability_rules
+		self._get_contract = get_capability_contract
+		self.key_domains: dict[str, CryptoKeyDomainRecord] = {}
+		self.operations: dict[str, CryptoOperationRecord] = {}
+		self.exception_reviews: dict[str, CryptoExceptionReviewRecord] = {}
+		self.rotations: dict[str, KeyRotationRecord] = {}
+		self.audit_events: dict[str, CryptoAuditEventRecord] = {}
+
+	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
+		return self._get_contract(tenant_id, overrides)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return self._evaluate_rules(dict(context))
+
+	def register_key_domain(
+		self,
+		tenant_id: str,
+		domain_id: str,
+		name: str,
+		owner: str,
+		algorithm: str = "AES-256-GCM",
+		data_classification: str = "confidential",
+		entropy_quality: int | float = 0.99,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(domain_id or "").strip():
+			raise ValueError("key_domain_id_required")
+		if not str(name or "").strip():
+			raise ValueError("key_domain_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("key_domain_owner_required")
+		algorithm_name = _normalize_algorithm(algorithm)
+		classification = _classification(data_classification)
+		entropy_score = _entropy(entropy_quality)
+		quantum_safe = _is_quantum_safe(algorithm_name)
+		if classification in {"restricted", "critical"} and not quantum_safe:
+			raise PermissionError("quantum_safe_algorithm_required")
+		record_id = _stable_id("encr_key_domain", tenant_id, domain_id)
+		if record_id in self.key_domains:
+			raise ValueError(f"key_domain_already_exists:{domain_id}")
+		record = CryptoKeyDomainRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			owner=str(owner).strip(),
+			algorithm=algorithm_name,
+			data_classification=classification,
+			entropy_quality=entropy_score,
+			algorithm_quantum_safe=quantum_safe,
+		)
+		self.key_domains[record.id] = record
+		self._record_event(tenant_id, "key_domain_registered", record.id, f"Key domain registered: {record.name}", owner)
+		return record.to_dict()
+
+	def evaluate_crypto_operation(
+		self,
+		tenant_id: str,
+		operation_id: str,
+		operation_type: str,
+		key_domain_id: str,
+		data_classification: str | None = None,
+		algorithm: str | None = None,
+		algorithm_family: str | None = None,
+		entropy_quality: int | float | None = None,
+		plaintext_export_requested: bool = False,
+		active_threat_signal: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(operation_id or "").strip():
+			raise ValueError("crypto_operation_id_required")
+		if not str(operation_type or "").strip():
+			raise ValueError("crypto_operation_type_required")
+		domain = self._get_key_domain(tenant_id, key_domain_id)
+		algorithm_name = _normalize_algorithm(algorithm or domain.algorithm)
+		family = _algorithm_family(algorithm_name, algorithm_family)
+		classification = _classification(data_classification or domain.data_classification)
+		entropy_score = _entropy(entropy_quality if entropy_quality is not None else domain.entropy_quality)
+		quantum_safe = _is_quantum_safe(algorithm_name)
+		rotation_done = domain.rotation_status == "rotated"
+		context = {
+			"tenant_context_present": True,
+			"operation": str(operation_type).strip().lower(),
+			"data_classification": classification,
+			"algorithm_quantum_safe": quantum_safe,
+			"plaintext_export_requested": bool(plaintext_export_requested),
+			"entropy_quality": entropy_score,
+			"algorithm_family": family,
+			"security_review_recorded": False,
+			"active_threat_signal": bool(active_threat_signal),
+			"key_rotation_completed": rotation_done,
+		}
+		result = self.evaluate(context)
+		status = {
+			"allow": "allowed",
+			"deny": "denied",
+			"require_review": "review_required",
+		}[result["decision"]]
+		record = CryptoOperationRecord(
+			id=_stable_id("encr_operation", tenant_id, operation_id),
+			tenant_id=tenant_id,
+			operation_type=context["operation"],
+			key_domain_id=domain.id,
+			data_classification=classification,
+			algorithm=algorithm_name,
+			algorithm_family=family,
+			algorithm_quantum_safe=quantum_safe,
+			entropy_quality=entropy_score,
+			plaintext_export_requested=bool(plaintext_export_requested),
+			active_threat_signal=bool(active_threat_signal),
+			key_rotation_completed=rotation_done,
+			decision=result["decision"],
+			status=status,
+			matched_rules=list(result["matched_rules"]),
+			required_actions=_required_actions(result),
+		)
+		self.operations[record.id] = record
+		severity = "high" if status == "denied" else "medium" if status == "review_required" else "info"
+		self._record_event(tenant_id, f"crypto_operation_{status}", record.id, f"Crypto operation {status}: {record.operation_type}", domain.owner, severity)
+		return record.to_dict()
+
+	def request_crypto_exception(
+		self,
+		tenant_id: str,
+		review_id: str,
+		operation_id: str,
+		requested_by: str,
+		reason: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(review_id or "").strip():
+			raise ValueError("crypto_exception_review_id_required")
+		operation = self._get_operation(tenant_id, operation_id)
+		if operation.status != "review_required":
+			raise ValueError("crypto_exception_not_required")
+		if not str(requested_by or "").strip():
+			raise ValueError("crypto_exception_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("crypto_exception_reason_required")
+		record_id = _stable_id("encr_exception_review", tenant_id, review_id)
+		if record_id in self.exception_reviews:
+			raise ValueError(f"crypto_exception_review_already_exists:{review_id}")
+		record = CryptoExceptionReviewRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			operation_id=operation.id,
+			requested_by=str(requested_by).strip(),
+			reason=str(reason).strip(),
+		)
+		self.exception_reviews[record.id] = record
+		self._record_event(tenant_id, "crypto_exception_requested", record.id, f"Crypto exception requested: {operation.id}", requested_by, "medium")
+		return record.to_dict()
+
+	def decide_crypto_exception(
+		self,
+		tenant_id: str,
+		review_id: str,
+		reviewer: str,
+		decision: str,
+		notes: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record = self._get_exception_review(tenant_id, review_id)
+		if record.status != "pending":
+			raise ValueError("crypto_exception_already_decided")
+		if decision not in {"approved", "rejected"}:
+			raise ValueError("crypto_exception_decision_invalid")
+		if not str(reviewer or "").strip():
+			raise ValueError("crypto_exception_reviewer_required")
+		if not str(notes or "").strip():
+			raise ValueError("crypto_exception_notes_required")
+		result = self.evaluate({
+			"operation": "decide_crypto_exception",
+			"crypto_exception_reviewer_same_as_requester": reviewer == record.requested_by,
+			"crypto_exception_notes_attached": bool(str(notes).strip()),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record.status = decision
+		record.decision = decision
+		record.reviewer = str(reviewer).strip()
+		record.notes = str(notes).strip()
+		if decision == "approved":
+			operation = self._get_operation(tenant_id, record.operation_id)
+			operation.status = "allowed"
+			operation.decision = "allow"
+			operation.required_actions = []
+		self._record_event(tenant_id, "crypto_exception_decided", record.id, f"Crypto exception {decision}: {record.operation_id}", reviewer, "medium")
+		return record.to_dict()
+
+	def schedule_key_rotation(
+		self,
+		tenant_id: str,
+		rotation_id: str,
+		key_domain_id: str,
+		requested_by: str,
+		reason: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(rotation_id or "").strip():
+			raise ValueError("key_rotation_id_required")
+		domain = self._get_key_domain(tenant_id, key_domain_id)
+		if not str(requested_by or "").strip():
+			raise ValueError("key_rotation_requester_required")
+		if not str(reason or "").strip():
+			raise ValueError("key_rotation_reason_required")
+		record_id = _stable_id("encr_key_rotation", tenant_id, rotation_id)
+		if record_id in self.rotations:
+			raise ValueError(f"key_rotation_already_exists:{rotation_id}")
+		record = KeyRotationRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			key_domain_id=domain.id,
+			requested_by=str(requested_by).strip(),
+			reason=str(reason).strip(),
+		)
+		domain.rotation_status = "scheduled"
+		self.rotations[record.id] = record
+		self._record_event(tenant_id, "key_rotation_scheduled", record.id, f"Key rotation scheduled: {domain.name}", requested_by, "medium")
+		return record.to_dict()
+
+	def complete_key_rotation(
+		self,
+		tenant_id: str,
+		rotation_id: str,
+		actor: str,
+		evidence: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record = self._get_rotation(tenant_id, rotation_id)
+		if record.status == "completed":
+			raise ValueError("key_rotation_already_completed")
+		if not str(actor or "").strip():
+			raise ValueError("key_rotation_actor_required")
+		result = self.evaluate({
+			"operation": "complete_key_rotation",
+			"key_rotation_evidence_attached": bool(str(evidence or "").strip()),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record.status = "completed"
+		record.actor = str(actor).strip()
+		record.evidence = str(evidence).strip()
+		record.completed_at = _utc_now()
+		domain = self._get_key_domain(tenant_id, record.key_domain_id)
+		domain.rotation_status = "rotated"
+		domain.last_rotated_at = record.completed_at
+		self._record_event(tenant_id, "key_rotation_completed", record.id, f"Key rotation completed: {domain.name}", actor, "medium")
+		return record.to_dict()
+
+	def create_record(
+		self,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		metadata = dict(metadata or {})
+		if record_id not in self.key_domains and not record_id.startswith("encr_key_domain_"):
+			return self.register_key_domain(
+				tenant_id=tenant_id,
+				domain_id=record_id,
+				name=str(metadata.get("name") or record_id),
+				owner=str(metadata.get("owner") or metadata.get("created_by") or "system"),
+				algorithm=str(metadata.get("algorithm") or "AES-256-GCM"),
+				data_classification=str(metadata.get("data_classification") or "confidential"),
+				entropy_quality=metadata.get("entropy_quality", 0.99),
+			)
+		return self.evaluate_crypto_operation(
+			tenant_id=tenant_id,
+			operation_id=record_id,
+			operation_type=str(metadata.get("operation_type") or status or "encrypt"),
+			key_domain_id=str(metadata.get("key_domain_id") or record_id),
+			data_classification=metadata.get("data_classification"),
+			algorithm=metadata.get("algorithm"),
+			algorithm_family=metadata.get("algorithm_family"),
+			entropy_quality=metadata.get("entropy_quality"),
+			plaintext_export_requested=bool(metadata.get("plaintext_export_requested", False)),
+			active_threat_signal=bool(metadata.get("active_threat_signal", False)),
+		)
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.list_operations(tenant_id)
+
+	def list_key_domains(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.key_domains, tenant_id)
+
+	def list_operations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.operations, tenant_id)
+
+	def list_exception_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.exception_reviews, tenant_id)
+
+	def list_rotations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.rotations, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.audit_events, tenant_id)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		operations = self.list_operations(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"key_domain_count": len(self.list_key_domains(tenant_id)),
+			"operation_count": len(operations),
+			"denied_operation_count": sum(1 for item in operations if item["status"] == "denied"),
+			"review_required_count": sum(1 for item in operations if item["status"] == "review_required"),
+			"pending_exception_count": sum(1 for item in self.list_exception_reviews(tenant_id) if item["status"] == "pending"),
+			"scheduled_rotation_count": sum(1 for item in self.list_rotations(tenant_id) if item["status"] == "scheduled"),
+			"recent_events": self.list_audit_events(tenant_id)[-5:],
+		}
+
+	def _require_tenant(self, tenant_id: str) -> None:
+		if not str(tenant_id or "").strip():
+			raise PermissionError("tenant_context_required")
+
+	def _get_key_domain(self, tenant_id: str, key_domain_id: str) -> CryptoKeyDomainRecord:
+		record = self.key_domains.get(_stable_id("encr_key_domain", tenant_id, key_domain_id)) or self.key_domains.get(key_domain_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"key_domain_not_found:{key_domain_id}")
+		return record
+
+	def _get_operation(self, tenant_id: str, operation_id: str) -> CryptoOperationRecord:
+		record = self.operations.get(_stable_id("encr_operation", tenant_id, operation_id)) or self.operations.get(operation_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"crypto_operation_not_found:{operation_id}")
+		return record
+
+	def _get_exception_review(self, tenant_id: str, review_id: str) -> CryptoExceptionReviewRecord:
+		record = self.exception_reviews.get(_stable_id("encr_exception_review", tenant_id, review_id)) or self.exception_reviews.get(review_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"crypto_exception_review_not_found:{review_id}")
+		return record
+
+	def _get_rotation(self, tenant_id: str, rotation_id: str) -> KeyRotationRecord:
+		record = self.rotations.get(_stable_id("encr_key_rotation", tenant_id, rotation_id)) or self.rotations.get(rotation_id)
+		if record is None or record.tenant_id != tenant_id:
+			raise KeyError(f"key_rotation_not_found:{rotation_id}")
+		return record
+
+	def _record_event(
+		self,
+		tenant_id: str,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		actor: str,
+		severity: str = "info",
+	) -> dict[str, Any]:
+		record = CryptoAuditEventRecord(
+			id=_stable_id("encr_event", tenant_id, event_type, subject_id, len(self.audit_events)),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			actor=actor,
+			severity=severity,
+		)
+		self.audit_events[record.id] = record
+		return record.to_dict()
+
+	def _first_reason(self, result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "crypto_operation_denied"
+
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		items = [record.to_dict() for record in records.values()]
+		if tenant_id is not None:
+			items = [item for item in items if item["tenant_id"] == tenant_id]
+		return sorted(items, key=lambda item: item["id"])
 
 
 class APGEncryptionService:
@@ -1300,6 +1841,12 @@ encryption_service = APGEncryptionService()
 
 # Export for APG capability integration
 __all__ = [
+	"CryptoAuditEventRecord",
+	"CryptoExceptionReviewRecord",
+	"CryptoKeyDomainRecord",
+	"CryptoOperationRecord",
+	"EncrService",
+	"KeyRotationRecord",
 	"APGEncryptionService",
 	"encryption_service"
 ]
