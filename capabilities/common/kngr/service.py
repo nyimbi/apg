@@ -49,17 +49,21 @@ class KngrService:
 		confidence_score: float,
 		connector: str = "local",
 		status: str = "active",
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._require_tenant(tenant_id)
-		if not owner:
-			raise PermissionError("source_owner_required")
-		if not source_uri:
-			raise PermissionError("source_uri_required")
-		if not evidence_refs:
-			raise PermissionError("source_evidence_required")
 		confidence = self._runtime.normalize_confidence(confidence_score)
-		if confidence <= 0:
-			raise PermissionError("source_confidence_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_source",
+			"source_id_present": bool(source_id),
+			"source_name_present": bool(name),
+			"source_uri_present": bool(source_uri),
+			"source_owner_present": bool(owner),
+			"source_evidence_present": bool(evidence_refs),
+			"confidence_score": confidence,
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_review_required(result, review_recorded)
 		source = KnowledgeSource(
 			id=source_id,
 			tenant_id=tenant_id,
@@ -72,7 +76,7 @@ class KngrService:
 			status=status,
 		)
 		self._sources[source_id] = source
-		self._audit(tenant_id, source_id, "source_registered", owner, "allow", metadata={"connector": connector})
+		self._audit(tenant_id, source_id, "source_registered", owner, result["decision"], reasons=self._reasons(result), metadata={"connector": connector})
 		return source.to_dict()
 
 	def resolve_entity(
@@ -87,19 +91,22 @@ class KngrService:
 		attributes: dict[str, Any] | None = None,
 		confidence_score: float = 1.0,
 		curation_recorded: bool = False,
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
 		source = self._require_source(source_id, tenant_id)
+		confidence = min(source.confidence_score, self._runtime.normalize_confidence(confidence_score))
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "resolve_entity",
+			"entity_id_present": bool(entity_id),
+			"canonical_label_present": bool(canonical_label),
+			"entity_type_present": bool(entity_type),
+			"source_present": bool(source_id),
 			"source_evidence_present": bool(source_evidence_refs),
+			"confidence_score": confidence,
+			"review_recorded": bool(review_recorded),
 		})
-		self._raise_if_denied(result)
-		if not canonical_label:
-			raise PermissionError("canonical_label_required")
-		if not entity_type:
-			raise PermissionError("entity_type_required")
-		confidence = min(source.confidence_score, self._runtime.normalize_confidence(confidence_score))
+		self._raise_if_review_required(result, review_recorded)
 		entity = KnowledgeEntity(
 			id=entity_id,
 			tenant_id=tenant_id,
@@ -139,15 +146,17 @@ class KngrService:
 		self._require_entity(subject_entity_id, tenant_id)
 		self._require_entity(object_entity_id, tenant_id)
 		source = self._require_source(source_id, tenant_id)
-		if not predicate:
-			raise PermissionError("predicate_required")
-		if not evidence_links:
-			raise PermissionError("relationship_evidence_required")
 		confidence = self._runtime.normalize_confidence(confidence_score)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
-			"operation": "enrich",
+			"operation": "link_relationship",
+			"subject_present": bool(subject_entity_id),
+			"object_present": bool(object_entity_id),
+			"predicate_present": bool(predicate),
+			"source_present": bool(source_id),
+			"evidence_links_present": bool(evidence_links),
 			"confidence_score": confidence,
+			"review_recorded": bool(review_recorded),
 		})
 		self._raise_if_review_required(result, review_recorded)
 		relationship = KnowledgeRelationship(
@@ -185,15 +194,14 @@ class KngrService:
 		review_recorded: bool = False,
 	) -> dict[str, Any]:
 		self._require_entity(entity_id, tenant_id)
-		if not semantic_labels:
-			raise PermissionError("semantic_labels_required")
-		if not evidence_links:
-			raise PermissionError("enrichment_evidence_required")
 		confidence = self._runtime.normalize_confidence(confidence_score)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "enrich",
+			"semantic_labels_present": bool(semantic_labels),
+			"evidence_links_present": bool(evidence_links),
 			"confidence_score": confidence,
+			"review_recorded": bool(review_recorded),
 		})
 		self._raise_if_review_required(result, review_recorded)
 		enrichment = SemanticEnrichment(
@@ -230,6 +238,8 @@ class KngrService:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "reason",
+			"query_present": bool(query),
+			"entity_endpoints_present": bool(start_entity_id and end_entity_id),
 			"evidence_links_present": bool(evidence_links),
 			"reasoning_depth": depth,
 			"review_recorded": bool(review_recorded),
@@ -263,12 +273,15 @@ class KngrService:
 		notes: str = "",
 	) -> dict[str, Any]:
 		entity = self._require_entity(entity_id, tenant_id)
-		if not curator:
-			raise PermissionError("curator_required")
-		if not evidence_links:
-			raise PermissionError("curation_evidence_required")
-		if decision not in {"approved", "rejected", "needs_revision"}:
-			raise PermissionError("curation_decision_invalid")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "curate_entity",
+			"curator_present": bool(curator),
+			"curation_decision_present": bool(decision),
+			"curation_decision_allowed": decision in {"approved", "rejected", "needs_revision"},
+			"evidence_links_present": bool(evidence_links),
+		})
+		self._raise_if_denied(result)
 		curation = CurationRecord(
 			id=curation_id,
 			tenant_id=tenant_id,
@@ -294,7 +307,7 @@ class KngrService:
 				status=entity.status,
 				created_at=entity.created_at,
 			)
-		self._audit(tenant_id, curation_id, "entity_curated", curator, "allow", metadata={"entity_id": entity_id, "decision": decision})
+		self._audit(tenant_id, curation_id, "entity_curated", curator, result["decision"], reasons=self._reasons(result), metadata={"entity_id": entity_id, "decision": decision})
 		return curation.to_dict()
 
 	def publish_graph(
@@ -310,11 +323,12 @@ class KngrService:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "publish_graph",
+			"publication_name_present": bool(name),
+			"publisher_present": bool(published_by),
 			"curation_recorded": bool(curation_recorded),
+			"entity_count": len(entity_ids),
 		})
 		self._raise_if_denied(result)
-		if not published_by:
-			raise PermissionError("publisher_required")
 		for entity_id in entity_ids:
 			entity = self._require_entity(entity_id, tenant_id)
 			if curation_recorded and entity.curation_status != "curated":
@@ -372,6 +386,42 @@ class KngrService:
 
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self.list_entities(tenant_id)
+
+	def list_knowledge_graph(self, tenant_id: str | None = None) -> dict[str, Any]:
+		sources = self.list_sources(tenant_id)
+		entities = self.list_entities(tenant_id)
+		relationships = self.list_relationships(tenant_id)
+		enrichments = self.list_enrichments(tenant_id)
+		reasoning_paths = self.list_reasoning_paths(tenant_id)
+		curations = self.list_curations(tenant_id)
+		publications = self.list_publications(tenant_id)
+		audit_events = self.list_audit_events(tenant_id)
+		return {
+			"tenant_id": tenant_id,
+			"sources": sources,
+			"entities": entities,
+			"relationships": relationships,
+			"enrichments": enrichments,
+			"reasoning_paths": reasoning_paths,
+			"curations": curations,
+			"publications": publications,
+			"audit_events": audit_events,
+			"summary": {
+				"tenant_id": tenant_id,
+				"source_count": len(sources),
+				"entity_count": len(entities),
+				"relationship_count": len(relationships),
+				"enrichment_count": len(enrichments),
+				"reasoning_path_count": len(reasoning_paths),
+				"curation_count": len(curations),
+				"publication_count": len(publications),
+				"review_required_count": len([
+					item for item in entities + relationships
+					if item.get("status") == "review_required" or item.get("curation_status") == "review_required"
+				]),
+				"audit_event_count": len(audit_events),
+			},
+		}
 
 	def list_sources(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._sources, tenant_id)

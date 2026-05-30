@@ -44,6 +44,38 @@ def entity_browser_model(service: KngrService, tenant_id: str = "default") -> di
 	}
 
 
+def source_manager_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"sources": service.list_sources(tenant_id),
+		"audit_events": [
+			event for event in service.list_audit_events(tenant_id)
+			if event["event_type"] == "source_registered"
+		],
+	}
+
+
+def relationship_browser_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"entities": service.list_entities(tenant_id),
+		"relationships": service.list_relationships(tenant_id),
+		"sources": service.list_sources(tenant_id),
+	}
+
+
+def enrichment_console_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"entities": service.list_entities(tenant_id),
+		"enrichments": service.list_enrichments(tenant_id),
+		"review_required": [
+			enrichment for enrichment in service.list_enrichments(tenant_id)
+			if enrichment["status"] == "accepted_with_review"
+		],
+	}
+
+
 def curation_queue_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
 	entities = service.list_entities(tenant_id)
 	return {
@@ -78,4 +110,34 @@ def governance_model(service: KngrService, tenant_id: str = "default") -> dict[s
 		"rules": contract["rule_engine"]["rules"],
 		"audit_events": service.list_audit_events(tenant_id),
 		"publications": service.list_publications(tenant_id),
+	}
+
+
+def publication_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"curated_entities": [
+			entity for entity in service.list_entities(tenant_id)
+			if entity["curation_status"] == "curated"
+		],
+		"relationships": service.list_relationships(tenant_id),
+		"publications": service.list_publications(tenant_id),
+	}
+
+
+def audit_timeline_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+	}
+
+
+def settings_model(service: KngrService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"configuration_schema": contract["configuration_schema"],
+		"theme": contract["theme"],
+		"adapters": contract["configuration"]["adapters"],
 	}

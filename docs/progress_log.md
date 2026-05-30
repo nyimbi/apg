@@ -16,6 +16,71 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 10:34 EAT
+
+KNGR knowledge-graph lifecycle/guardrail packet:
+
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with current executable scope, lifecycle workflows, adapter
+  boundaries, UI surfaces, guardrails, and focused proof commands.
+- Expanded `capability_contract.py` with source, entity, relationship,
+  enrichment, reasoning, curation, publication, security, governance,
+  observability, adapter, UI, and theme configuration.
+- Expanded deterministic guardrails to cover tenant context, source identity,
+  source name, source URI, source owner, source evidence, source confidence,
+  low-confidence source review, entity identity, entity label, entity type,
+  entity source, entity evidence, low-confidence entity review, relationship
+  endpoints, predicate, relationship source, relationship evidence,
+  low-confidence relationship review, enrichment labels, enrichment evidence,
+  enrichment confidence, reasoning query, reasoning endpoints, reasoning
+  evidence, deep reasoning review, curation curator, curation decision,
+  curation evidence, publication name, publisher, curation, entity count,
+  Bytewax batch mutation, cross-tenant access, and audit requirements.
+- Extended the dependency-light `KngrService` workflows for review-aware source
+  registration, entity resolution, relationship linking, semantic enrichment,
+  reasoning, curation, publication, aggregate graph listing, and audit evidence.
+- Extended `api.py` and `views.py` with review fields, aggregate graph access,
+  and generated-application view models for source, relationship, enrichment,
+  publication, audit, and settings surfaces.
+- Replaced static `app.py` semantic JSON with contract-derived package evidence
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed the old package test to `tests/test_package_contract.py` and expanded
+  KNGR coverage for contract shape, route/rule counts, Bytewax adapters,
+  package evidence, low-confidence review gates, aggregate graph summaries, UI
+  models, and executable lifecycle flows.
+- Focused review cleanup: fixed aggregate graph summaries so `tenant_id=None`
+  no longer mixes all-tenant record lists with a default-tenant summary.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/kngr/__init__.py
+  capabilities/common/kngr/capability_contract.py capabilities/common/kngr/models.py
+  capabilities/common/kngr/knowledge_runtime.py capabilities/common/kngr/service.py
+  capabilities/common/kngr/api.py capabilities/common/kngr/views.py
+  capabilities/common/kngr/app.py capabilities/common/kngr/test_capability_contract.py
+  capabilities/common/kngr/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/kngr/test_capability_contract.py
+  capabilities/common/kngr/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.kngr import app; result=app.self_test(); print(result); assert result['passed']"`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/kngr --json` passed with KNGR classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/kngr --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- Primary KNGR stale-marker and overclaim search returned no matches for old
+  package markers or overclaim phrases in runtime, docs, tests, and package
+  evidence.
+- `git diff --check -- capabilities/common/kngr docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live graph database, live vector or
+  ontology store, live Bytewax topology, live NLPC/META/SRCH/AUDL/AUTH/MONI/
+  CACH/AICR adapters, rendered browser UI, and performance/resilience
+  benchmarks.
+
 ### 2026-05-30 06:48 EAT
 
 APIG API gateway and management lifecycle/guardrail packet:

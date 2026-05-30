@@ -6,12 +6,18 @@ from capabilities.common.kngr import register_capability
 from capabilities.common.kngr.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.kngr.service import KngrService
 from capabilities.common.kngr.views import (
+	audit_timeline_model,
 	context_explorer_model,
 	curation_queue_model,
 	dashboard_model,
+	enrichment_console_model,
 	entity_browser_model,
 	governance_model,
+	publication_model,
 	reasoning_paths_model,
+	relationship_browser_model,
+	settings_model,
+	source_manager_model,
 )
 
 
@@ -21,10 +27,13 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "kngr"
 	assert contract["configuration"]["tenant_id"] == "tenant-knowledge"
 	assert contract["configuration"]["reasoning"]["max_reasoning_depth"] == 3
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "knowledge", "reasoning", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "entities", "curation", "reasoning", "context", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "sources", "entities", "relationships", "reasoning", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "sources", "entities", "relationships", "enrichment", "curation", "publication", "reasoning", "context", "governance", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/kngr/api/v1"
+	assert contract["ui"]["view_module"] == "views.py"
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.KngrService"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "semantic_graph" in contract["theme"]["components"]
 
@@ -33,8 +42,8 @@ def test_rule_engine_enforces_knowledge_graph_guardrails():
 	result = evaluate_capability_rules({
 		"tenant_context_present": False,
 		"operation": "reason",
-		"source_evidence_present": False,
-		"confidence_score": 0.2,
+		"query_present": True,
+		"entity_endpoints_present": True,
 		"evidence_links_present": False,
 		"reasoning_depth": 9,
 		"review_recorded": False,
@@ -66,7 +75,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "kngr_semantic_console"
 	assert registration["ui_components"]["reasoning"] == "/kngr/reasoning"
 	assert "grph" in registration["dependencies"]
+	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["capabilities"]["graph_publication"]
+	assert registration["endpoints"]["audit"] == "/kngr/api/v1/audit"
 	assert "kngr:reason" in registration["permissions"]
+	assert "kngr:audit" in registration["permissions"]
 
 
 def test_kngr_lifecycle_is_executable():
@@ -166,10 +179,18 @@ def test_kngr_lifecycle_is_executable():
 	assert service.context_neighborhood("tenant-knowledge", request["id"])["neighbor_count"] == 1
 	assert dashboard_model(service, "tenant-knowledge")["summary"]["publication_count"] == 1
 	assert entity_browser_model(service, "tenant-knowledge")["relationships"][0]["predicate"] == "uses_supplier"
+	assert source_manager_model(service, "tenant-knowledge")["sources"][0]["id"] == "src-procurement"
+	assert relationship_browser_model(service, "tenant-knowledge")["relationships"][0]["id"] == "rel-request-supplier"
+	assert enrichment_console_model(service, "tenant-knowledge")["enrichments"][0]["id"] == "enrich-request-risk"
 	assert curation_queue_model(service, "tenant-knowledge")["pending_entities"] == []
 	assert reasoning_paths_model(service, "tenant-knowledge")["reasoning_paths"][0]["id"] == "path-request-supplier"
 	assert context_explorer_model(service, "tenant-knowledge", request["id"])["neighborhood"]["relationship_count"] == 1
 	assert governance_model(service, "tenant-knowledge")["publications"][0]["id"] == "pub-procurement"
+	assert publication_model(service, "tenant-knowledge")["publications"][0]["id"] == "pub-procurement"
+	assert audit_timeline_model(service, "tenant-knowledge")["audit_events"]
+	assert settings_model(service, "tenant-knowledge")["adapters"]["event_stream"] == "bytewax"
+	assert service.list_knowledge_graph("tenant-knowledge")["summary"]["publication_count"] == 1
+	assert service.list_knowledge_graph()["summary"]["entity_count"] == 2
 	assert len(service.list_audit_events("tenant-knowledge")) >= 8
 
 
@@ -196,6 +217,18 @@ def test_kngr_service_enforces_policy_guardrails():
 			owner="",
 			evidence_refs=["evidence"],
 			confidence_score=1.0,
+		)
+
+	with pytest.raises(PermissionError, match="low_confidence_source_review_required"):
+		service.register_source(
+			source_id="src-low-confidence",
+			tenant_id="tenant-knowledge",
+			name="Low confidence",
+			source_uri="meta://low",
+			owner="steward",
+			evidence_refs=["meta:low"],
+			confidence_score=0.4,
+			review_recorded=False,
 		)
 
 	service.register_source(
@@ -234,6 +267,18 @@ def test_kngr_service_enforces_policy_guardrails():
 		source_id="src-knowledge",
 		source_evidence_refs=["doc:b"],
 	)
+
+	with pytest.raises(PermissionError, match="low_confidence_entity_review_required"):
+		service.resolve_entity(
+			entity_id="entity-low-confidence",
+			tenant_id="tenant-knowledge",
+			canonical_label="Entity low",
+			entity_type="concept",
+			source_id="src-knowledge",
+			source_evidence_refs=["doc:low"],
+			confidence_score=0.4,
+			review_recorded=False,
+		)
 
 	with pytest.raises(PermissionError, match="low_confidence_enrichment_review_required"):
 		service.enrich_entity(

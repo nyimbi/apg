@@ -34,6 +34,7 @@ def register_source(payload: dict[str, Any]) -> dict[str, Any]:
 		confidence_score=float(payload.get("confidence_score", 1.0)),
 		connector=str(payload.get("connector") or "local"),
 		status=str(payload.get("status") or "active"),
+		review_recorded=bool(payload.get("review_recorded", False)),
 	)
 
 
@@ -49,6 +50,7 @@ def resolve_entity(payload: dict[str, Any]) -> dict[str, Any]:
 		attributes=dict(payload.get("attributes") or {}),
 		confidence_score=float(payload.get("confidence_score", 1.0)),
 		curation_recorded=bool(payload.get("curation_recorded", False)),
+		review_recorded=bool(payload.get("review_recorded", False)),
 	)
 
 
@@ -131,6 +133,10 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_knowledge_graph(tenant_id: str | None = None) -> dict[str, Any]:
+	return SERVICE.list_knowledge_graph(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

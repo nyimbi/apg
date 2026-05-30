@@ -8,24 +8,126 @@
   },
   "capabilities": {
     "kngr": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.KngrService",
+        "graph": "grph",
+        "helper_runtime": "knowledge_runtime.py",
+        "http_api": "api.py",
+        "metadata": "meta",
+        "metrics_sink": "moni",
+        "nlp": "nlpc",
+        "ontology": "onto",
+        "production_runtime": "service.KngrService",
+        "search": "srch"
+      },
+      "approvals": {
+        "deep_reasoning": "ReasoningPath",
+        "low_confidence_enrichment": "SemanticEnrichment",
+        "low_confidence_entity": "KnowledgeEntity",
+        "low_confidence_relationship": "KnowledgeRelationship",
+        "low_confidence_source": "KnowledgeSource",
+        "publication": "GraphPublication"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.KngrService",
+          "graph": "grph",
+          "helper_runtime": "knowledge_runtime.py",
+          "http_api": "api.py",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "ontology": "onto",
+          "production_runtime": "service.KngrService",
+          "search": "srch"
+        },
+        "curation": {
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "approved_entities_publishable": true,
+          "curator_required": true,
+          "evidence_required": true
+        },
+        "enrichment": {
+          "evidence_required": true,
+          "low_confidence_review_required": true,
+          "minimum_confidence": 0.7,
+          "nlpc_adapter": "nlpc",
+          "semantic_labels_required": true
+        },
+        "entities": {
+          "canonical_label_required": true,
+          "curation_required_for_publication": true,
+          "entity_type_required": true,
+          "evidence_required": true,
+          "source_required": true,
+          "stable_id_required": true
+        },
         "governance": {
           "audit_enrichment": true,
-          "require_tenant_context": true,
-          "source_confidence_required": true
+          "audit_entity_resolution": true,
+          "audit_publication": true,
+          "audit_reasoning": true,
+          "audit_relationship_links": true,
+          "audit_source_registration": true,
+          "require_tenant_context": true
         },
-        "knowledge": {
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "publication": {
           "curation_required": true,
-          "entity_resolution_enabled": true,
-          "semantic_enrichment_enabled": true
+          "minimum_entity_count": 1,
+          "publisher_required": true,
+          "relationship_validation_required": true
         },
         "reasoning": {
           "bounded_reasoning_enabled": true,
+          "deep_reasoning_review_required": true,
+          "entity_endpoints_required": true,
           "evidence_required": true,
-          "max_reasoning_depth": 5
+          "max_reasoning_depth": 5,
+          "query_required": true
+        },
+        "relationships": {
+          "evidence_required": true,
+          "low_confidence_review_required": true,
+          "minimum_confidence": 0.7,
+          "object_required": true,
+          "predicate_required": true,
+          "source_required": true,
+          "subject_required": true
+        },
+        "security": {
+          "cross_tenant_graph_access_allowed": false,
+          "public_graph_requires_curation": true,
+          "rbac_filter_required": true
+        },
+        "sources": {
+          "evidence_required": true,
+          "low_confidence_review_required": true,
+          "minimum_confidence": 0.7,
+          "owner_required": true,
+          "registered_sources_required": true,
+          "source_uri_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -33,16 +135,34 @@
           "default_theme": "kngr_semantic_console"
         },
         "ui": {
+          "enable_audit": true,
           "enable_context_explorer": true,
+          "enable_dashboard": true,
+          "enable_enrichment_console": true,
+          "enable_entity_browser": true,
           "enable_entity_curation": true,
-          "enable_graph_browser": true,
-          "enable_reasoning_paths": true
+          "enable_governance": true,
+          "enable_publication_console": true,
+          "enable_reasoning_paths": true,
+          "enable_relationship_browser": true,
+          "enable_settings": true,
+          "enable_source_manager": true
         }
       },
       "erp_modules": [
         "common"
       ],
       "i18n": {},
+      "knowledge_lifecycle": {
+        "audit": "KngrAuditEvent",
+        "curation": "CurationRecord",
+        "enrichment": "SemanticEnrichment",
+        "entity": "KnowledgeEntity",
+        "publication": "GraphPublication",
+        "reasoning": "ReasoningPath",
+        "relationship": "KnowledgeRelationship",
+        "source": "KnowledgeSource"
+      },
       "master_data": {},
       "name": "Knowledge Graph",
       "provides": [
@@ -65,6 +185,150 @@
           },
           {
             "condition": {
+              "operation": "register_source",
+              "source_id_present": false
+            },
+            "description": "Knowledge sources require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_id_required",
+              "required_action": "attach_source_id"
+            },
+            "name": "source_requires_id"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_name_present": false
+            },
+            "description": "Knowledge sources require display names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_name_required",
+              "required_action": "attach_source_name"
+            },
+            "name": "source_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_uri_present": false
+            },
+            "description": "Knowledge sources require a resolvable source URI.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_uri_required",
+              "required_action": "attach_source_uri"
+            },
+            "name": "source_requires_uri"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_owner_present": false
+            },
+            "description": "Knowledge sources require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "source_evidence_present": false
+            },
+            "description": "Knowledge sources require evidence references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_evidence_required",
+              "required_action": "attach_source_evidence"
+            },
+            "name": "source_requires_evidence"
+          },
+          {
+            "condition": {
+              "confidence_score_lte": 0,
+              "operation": "register_source"
+            },
+            "description": "Knowledge sources require a positive confidence score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_confidence_required",
+              "required_action": "attach_source_confidence"
+            },
+            "name": "source_requires_confidence"
+          },
+          {
+            "condition": {
+              "confidence_score_lt": 0.7,
+              "operation": "register_source",
+              "review_recorded": false
+            },
+            "description": "Low-confidence knowledge sources require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_confidence_source_review_required",
+              "required_action": "record_source_review"
+            },
+            "name": "source_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "resolve_entity",
+              "source_present": false
+            },
+            "description": "Entity resolution requires a registered source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_required",
+              "required_action": "select_registered_source"
+            },
+            "name": "entity_requires_source"
+          },
+          {
+            "condition": {
+              "entity_id_present": false,
+              "operation": "resolve_entity"
+            },
+            "description": "Resolved entities require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "entity_id_required",
+              "required_action": "attach_entity_id"
+            },
+            "name": "entity_requires_id"
+          },
+          {
+            "condition": {
+              "canonical_label_present": false,
+              "operation": "resolve_entity"
+            },
+            "description": "Resolved entities require canonical labels.",
+            "effect": {
+              "decision": "deny",
+              "reason": "canonical_label_required",
+              "required_action": "attach_canonical_label"
+            },
+            "name": "entity_requires_label"
+          },
+          {
+            "condition": {
+              "entity_type_present": false,
+              "operation": "resolve_entity"
+            },
+            "description": "Resolved entities require entity types.",
+            "effect": {
+              "decision": "deny",
+              "reason": "entity_type_required",
+              "required_action": "attach_entity_type"
+            },
+            "name": "entity_requires_type"
+          },
+          {
+            "condition": {
               "operation": "resolve_entity",
               "source_evidence_present": false
             },
@@ -79,15 +343,161 @@
           {
             "condition": {
               "confidence_score_lt": 0.7,
+              "operation": "resolve_entity",
+              "review_recorded": false
+            },
+            "description": "Low-confidence entity resolution requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_confidence_entity_review_required",
+              "required_action": "record_entity_review"
+            },
+            "name": "entity_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "link_relationship",
+              "subject_present": false
+            },
+            "description": "Relationship links require a subject entity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "relationship_subject_required",
+              "required_action": "attach_subject_entity"
+            },
+            "name": "relationship_requires_subject"
+          },
+          {
+            "condition": {
+              "object_present": false,
+              "operation": "link_relationship"
+            },
+            "description": "Relationship links require an object entity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "relationship_object_required",
+              "required_action": "attach_object_entity"
+            },
+            "name": "relationship_requires_object"
+          },
+          {
+            "condition": {
+              "operation": "link_relationship",
+              "predicate_present": false
+            },
+            "description": "Relationship links require a predicate.",
+            "effect": {
+              "decision": "deny",
+              "reason": "predicate_required",
+              "required_action": "attach_predicate"
+            },
+            "name": "relationship_requires_predicate"
+          },
+          {
+            "condition": {
+              "operation": "link_relationship",
+              "source_present": false
+            },
+            "description": "Relationship links require a registered source.",
+            "effect": {
+              "decision": "deny",
+              "reason": "relationship_source_required",
+              "required_action": "select_registered_source"
+            },
+            "name": "relationship_requires_source"
+          },
+          {
+            "condition": {
+              "evidence_links_present": false,
+              "operation": "link_relationship"
+            },
+            "description": "Relationship links require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "relationship_evidence_required",
+              "required_action": "attach_relationship_evidence"
+            },
+            "name": "relationship_requires_evidence"
+          },
+          {
+            "condition": {
+              "confidence_score_lt": 0.7,
+              "operation": "link_relationship",
+              "review_recorded": false
+            },
+            "description": "Low-confidence relationship links require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "low_confidence_relationship_review_required",
+              "required_action": "record_relationship_review"
+            },
+            "name": "relationship_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "enrich",
+              "semantic_labels_present": false
+            },
+            "description": "Semantic enrichment requires labels.",
+            "effect": {
+              "decision": "deny",
+              "reason": "semantic_labels_required",
+              "required_action": "attach_semantic_labels"
+            },
+            "name": "semantic_enrichment_requires_labels"
+          },
+          {
+            "condition": {
+              "evidence_links_present": false,
               "operation": "enrich"
             },
-            "description": "Semantic enrichment requires a minimum confidence score.",
+            "description": "Semantic enrichment requires evidence links.",
+            "effect": {
+              "decision": "deny",
+              "reason": "enrichment_evidence_required",
+              "required_action": "attach_enrichment_evidence"
+            },
+            "name": "semantic_enrichment_requires_evidence"
+          },
+          {
+            "condition": {
+              "confidence_score_lt": 0.7,
+              "operation": "enrich",
+              "review_recorded": false
+            },
+            "description": "Low-confidence semantic enrichment requires review.",
             "effect": {
               "decision": "require_review",
               "reason": "low_confidence_enrichment_review_required",
               "required_action": "record_enrichment_review"
             },
             "name": "semantic_enrichment_requires_confidence"
+          },
+          {
+            "condition": {
+              "operation": "reason",
+              "query_present": false
+            },
+            "description": "Reasoning paths require a natural-language or structured query.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reasoning_query_required",
+              "required_action": "attach_reasoning_query"
+            },
+            "name": "reasoning_requires_query"
+          },
+          {
+            "condition": {
+              "entity_endpoints_present": false,
+              "operation": "reason"
+            },
+            "description": "Reasoning paths require start and end entities.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reasoning_entities_required",
+              "required_action": "attach_reasoning_entities"
+            },
+            "name": "reasoning_requires_entities"
           },
           {
             "condition": {
@@ -104,6 +514,7 @@
           },
           {
             "condition": {
+              "operation": "reason",
               "reasoning_depth_gt": 5,
               "review_recorded": false
             },
@@ -117,6 +528,84 @@
           },
           {
             "condition": {
+              "curator_present": false,
+              "operation": "curate_entity"
+            },
+            "description": "Curation decisions require a curator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curator_required",
+              "required_action": "assign_curator"
+            },
+            "name": "curation_requires_curator"
+          },
+          {
+            "condition": {
+              "curation_decision_present": false,
+              "operation": "curate_entity"
+            },
+            "description": "Curation decisions require a valid decision.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_decision_required",
+              "required_action": "choose_curation_decision"
+            },
+            "name": "curation_requires_decision"
+          },
+          {
+            "condition": {
+              "curation_decision_allowed": false,
+              "operation": "curate_entity"
+            },
+            "description": "Curation decisions must use configured values.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_decision_invalid",
+              "required_action": "choose_allowed_curation_decision"
+            },
+            "name": "curation_decision_requires_allowed_value"
+          },
+          {
+            "condition": {
+              "evidence_links_present": false,
+              "operation": "curate_entity"
+            },
+            "description": "Curation decisions require evidence links.",
+            "effect": {
+              "decision": "deny",
+              "reason": "curation_evidence_required",
+              "required_action": "attach_curation_evidence"
+            },
+            "name": "curation_requires_evidence"
+          },
+          {
+            "condition": {
+              "operation": "publish_graph",
+              "publication_name_present": false
+            },
+            "description": "Graph publications require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_name_required",
+              "required_action": "attach_publication_name"
+            },
+            "name": "publication_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "publish_graph",
+              "publisher_present": false
+            },
+            "description": "Graph publications require an accountable publisher.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publisher_required",
+              "required_action": "assign_publisher"
+            },
+            "name": "publication_requires_publisher"
+          },
+          {
+            "condition": {
               "curation_recorded": false,
               "operation": "publish_graph"
             },
@@ -127,6 +616,57 @@
               "required_action": "record_curation"
             },
             "name": "uncurated_public_graph_blocked"
+          },
+          {
+            "condition": {
+              "entity_count_lt": 1,
+              "operation": "publish_graph"
+            },
+            "description": "Graph publications require at least one curated entity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_entities_required",
+              "required_action": "select_curated_entities"
+            },
+            "name": "publication_requires_entities"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_knowledge_mutation"
+            },
+            "description": "Batch knowledge graph mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_knowledge_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Knowledge graph operations may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_graph_access_denied",
+              "required_action": "use_tenant_local_graph"
+            },
+            "name": "cross_tenant_graph_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Knowledge graph state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "graph_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -146,6 +686,150 @@
         },
         {
           "condition": {
+            "operation": "register_source",
+            "source_id_present": false
+          },
+          "description": "Knowledge sources require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_id_required",
+            "required_action": "attach_source_id"
+          },
+          "name": "source_requires_id"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_name_present": false
+          },
+          "description": "Knowledge sources require display names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_name_required",
+            "required_action": "attach_source_name"
+          },
+          "name": "source_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_uri_present": false
+          },
+          "description": "Knowledge sources require a resolvable source URI.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_uri_required",
+            "required_action": "attach_source_uri"
+          },
+          "name": "source_requires_uri"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_owner_present": false
+          },
+          "description": "Knowledge sources require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "source_evidence_present": false
+          },
+          "description": "Knowledge sources require evidence references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_evidence_required",
+            "required_action": "attach_source_evidence"
+          },
+          "name": "source_requires_evidence"
+        },
+        {
+          "condition": {
+            "confidence_score_lte": 0,
+            "operation": "register_source"
+          },
+          "description": "Knowledge sources require a positive confidence score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_confidence_required",
+            "required_action": "attach_source_confidence"
+          },
+          "name": "source_requires_confidence"
+        },
+        {
+          "condition": {
+            "confidence_score_lt": 0.7,
+            "operation": "register_source",
+            "review_recorded": false
+          },
+          "description": "Low-confidence knowledge sources require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_confidence_source_review_required",
+            "required_action": "record_source_review"
+          },
+          "name": "source_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "resolve_entity",
+            "source_present": false
+          },
+          "description": "Entity resolution requires a registered source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_required",
+            "required_action": "select_registered_source"
+          },
+          "name": "entity_requires_source"
+        },
+        {
+          "condition": {
+            "entity_id_present": false,
+            "operation": "resolve_entity"
+          },
+          "description": "Resolved entities require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "entity_id_required",
+            "required_action": "attach_entity_id"
+          },
+          "name": "entity_requires_id"
+        },
+        {
+          "condition": {
+            "canonical_label_present": false,
+            "operation": "resolve_entity"
+          },
+          "description": "Resolved entities require canonical labels.",
+          "effect": {
+            "decision": "deny",
+            "reason": "canonical_label_required",
+            "required_action": "attach_canonical_label"
+          },
+          "name": "entity_requires_label"
+        },
+        {
+          "condition": {
+            "entity_type_present": false,
+            "operation": "resolve_entity"
+          },
+          "description": "Resolved entities require entity types.",
+          "effect": {
+            "decision": "deny",
+            "reason": "entity_type_required",
+            "required_action": "attach_entity_type"
+          },
+          "name": "entity_requires_type"
+        },
+        {
+          "condition": {
             "operation": "resolve_entity",
             "source_evidence_present": false
           },
@@ -160,15 +844,161 @@
         {
           "condition": {
             "confidence_score_lt": 0.7,
+            "operation": "resolve_entity",
+            "review_recorded": false
+          },
+          "description": "Low-confidence entity resolution requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_confidence_entity_review_required",
+            "required_action": "record_entity_review"
+          },
+          "name": "entity_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "link_relationship",
+            "subject_present": false
+          },
+          "description": "Relationship links require a subject entity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "relationship_subject_required",
+            "required_action": "attach_subject_entity"
+          },
+          "name": "relationship_requires_subject"
+        },
+        {
+          "condition": {
+            "object_present": false,
+            "operation": "link_relationship"
+          },
+          "description": "Relationship links require an object entity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "relationship_object_required",
+            "required_action": "attach_object_entity"
+          },
+          "name": "relationship_requires_object"
+        },
+        {
+          "condition": {
+            "operation": "link_relationship",
+            "predicate_present": false
+          },
+          "description": "Relationship links require a predicate.",
+          "effect": {
+            "decision": "deny",
+            "reason": "predicate_required",
+            "required_action": "attach_predicate"
+          },
+          "name": "relationship_requires_predicate"
+        },
+        {
+          "condition": {
+            "operation": "link_relationship",
+            "source_present": false
+          },
+          "description": "Relationship links require a registered source.",
+          "effect": {
+            "decision": "deny",
+            "reason": "relationship_source_required",
+            "required_action": "select_registered_source"
+          },
+          "name": "relationship_requires_source"
+        },
+        {
+          "condition": {
+            "evidence_links_present": false,
+            "operation": "link_relationship"
+          },
+          "description": "Relationship links require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "relationship_evidence_required",
+            "required_action": "attach_relationship_evidence"
+          },
+          "name": "relationship_requires_evidence"
+        },
+        {
+          "condition": {
+            "confidence_score_lt": 0.7,
+            "operation": "link_relationship",
+            "review_recorded": false
+          },
+          "description": "Low-confidence relationship links require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "low_confidence_relationship_review_required",
+            "required_action": "record_relationship_review"
+          },
+          "name": "relationship_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "enrich",
+            "semantic_labels_present": false
+          },
+          "description": "Semantic enrichment requires labels.",
+          "effect": {
+            "decision": "deny",
+            "reason": "semantic_labels_required",
+            "required_action": "attach_semantic_labels"
+          },
+          "name": "semantic_enrichment_requires_labels"
+        },
+        {
+          "condition": {
+            "evidence_links_present": false,
             "operation": "enrich"
           },
-          "description": "Semantic enrichment requires a minimum confidence score.",
+          "description": "Semantic enrichment requires evidence links.",
+          "effect": {
+            "decision": "deny",
+            "reason": "enrichment_evidence_required",
+            "required_action": "attach_enrichment_evidence"
+          },
+          "name": "semantic_enrichment_requires_evidence"
+        },
+        {
+          "condition": {
+            "confidence_score_lt": 0.7,
+            "operation": "enrich",
+            "review_recorded": false
+          },
+          "description": "Low-confidence semantic enrichment requires review.",
           "effect": {
             "decision": "require_review",
             "reason": "low_confidence_enrichment_review_required",
             "required_action": "record_enrichment_review"
           },
           "name": "semantic_enrichment_requires_confidence"
+        },
+        {
+          "condition": {
+            "operation": "reason",
+            "query_present": false
+          },
+          "description": "Reasoning paths require a natural-language or structured query.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reasoning_query_required",
+            "required_action": "attach_reasoning_query"
+          },
+          "name": "reasoning_requires_query"
+        },
+        {
+          "condition": {
+            "entity_endpoints_present": false,
+            "operation": "reason"
+          },
+          "description": "Reasoning paths require start and end entities.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reasoning_entities_required",
+            "required_action": "attach_reasoning_entities"
+          },
+          "name": "reasoning_requires_entities"
         },
         {
           "condition": {
@@ -185,6 +1015,7 @@
         },
         {
           "condition": {
+            "operation": "reason",
             "reasoning_depth_gt": 5,
             "review_recorded": false
           },
@@ -198,6 +1029,84 @@
         },
         {
           "condition": {
+            "curator_present": false,
+            "operation": "curate_entity"
+          },
+          "description": "Curation decisions require a curator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curator_required",
+            "required_action": "assign_curator"
+          },
+          "name": "curation_requires_curator"
+        },
+        {
+          "condition": {
+            "curation_decision_present": false,
+            "operation": "curate_entity"
+          },
+          "description": "Curation decisions require a valid decision.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_decision_required",
+            "required_action": "choose_curation_decision"
+          },
+          "name": "curation_requires_decision"
+        },
+        {
+          "condition": {
+            "curation_decision_allowed": false,
+            "operation": "curate_entity"
+          },
+          "description": "Curation decisions must use configured values.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_decision_invalid",
+            "required_action": "choose_allowed_curation_decision"
+          },
+          "name": "curation_decision_requires_allowed_value"
+        },
+        {
+          "condition": {
+            "evidence_links_present": false,
+            "operation": "curate_entity"
+          },
+          "description": "Curation decisions require evidence links.",
+          "effect": {
+            "decision": "deny",
+            "reason": "curation_evidence_required",
+            "required_action": "attach_curation_evidence"
+          },
+          "name": "curation_requires_evidence"
+        },
+        {
+          "condition": {
+            "operation": "publish_graph",
+            "publication_name_present": false
+          },
+          "description": "Graph publications require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_name_required",
+            "required_action": "attach_publication_name"
+          },
+          "name": "publication_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "publish_graph",
+            "publisher_present": false
+          },
+          "description": "Graph publications require an accountable publisher.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publisher_required",
+            "required_action": "assign_publisher"
+          },
+          "name": "publication_requires_publisher"
+        },
+        {
+          "condition": {
             "curation_recorded": false,
             "operation": "publish_graph"
           },
@@ -208,15 +1117,72 @@
             "required_action": "record_curation"
           },
           "name": "uncurated_public_graph_blocked"
+        },
+        {
+          "condition": {
+            "entity_count_lt": 1,
+            "operation": "publish_graph"
+          },
+          "description": "Graph publications require at least one curated entity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_entities_required",
+            "required_action": "select_curated_entities"
+          },
+          "name": "publication_requires_entities"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_knowledge_mutation"
+          },
+          "description": "Batch knowledge graph mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_knowledge_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Knowledge graph operations may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_graph_access_denied",
+            "required_action": "use_tenant_local_graph"
+          },
+          "name": "cross_tenant_graph_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Knowledge graph state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "graph_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "knowledge_runtime.py",
+        "service": "service.KngrService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "KnowledgeAuditTimeline",
+          "permission": "kngr:audit",
+          "route": "/kngr/audit"
+        },
         "context": {
           "component": "ContextExplorer",
           "permission": "kngr:query",
@@ -232,41 +1198,94 @@
           "permission": "kngr:view",
           "route": "/kngr/dashboard"
         },
+        "enrichment": {
+          "component": "SemanticEnrichmentConsole",
+          "permission": "kngr:enrich",
+          "route": "/kngr/enrichment"
+        },
         "entities": {
           "component": "EntityBrowser",
           "permission": "kngr:query",
           "route": "/kngr/entities"
+        },
+        "governance": {
+          "component": "KnowledgeGovernance",
+          "permission": "kngr:govern",
+          "route": "/kngr/governance"
+        },
+        "publication": {
+          "component": "GraphPublicationConsole",
+          "permission": "kngr:publish",
+          "route": "/kngr/publication"
         },
         "reasoning": {
           "component": "ReasoningPaths",
           "permission": "kngr:reason",
           "route": "/kngr/reasoning"
         },
+        "relationships": {
+          "component": "RelationshipBrowser",
+          "permission": "kngr:query",
+          "route": "/kngr/relationships"
+        },
         "settings": {
           "component": "KNGRSettings",
           "permission": "kngr:admin",
           "route": "/kngr/settings"
+        },
+        "sources": {
+          "component": "KnowledgeSourceManager",
+          "permission": "kngr:source",
+          "route": "/kngr/sources"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
           "context_panel": {
             "status_style": "source-pill",
             "visual": "neighborhood-list"
+          },
+          "curation_queue": {
+            "status_style": "decision-chip",
+            "visual": "review-list"
+          },
+          "enrichment_panel": {
+            "status_style": "confidence-chip",
+            "visual": "label-stack"
           },
           "entity_card": {
             "icon": "badge",
             "risk_style": "confidence-band",
             "status_indicator": "curation-pill"
           },
+          "publication_card": {
+            "status_style": "release-chip",
+            "visual": "snapshot-summary"
+          },
           "reasoning_path": {
             "threshold_style": "depth-band",
             "visual": "evidence-path"
           },
+          "relationship_panel": {
+            "highlight": "predicate-chip",
+            "icon": "git-branch",
+            "status_style": "review-chip"
+          },
           "semantic_graph": {
             "highlight": "entity-chip",
             "visual": "knowledge-network"
+          },
+          "source_panel": {
+            "icon": "database",
+            "risk_style": "confidence-band",
+            "status_indicator": "source-pill"
           }
         },
         "name": "kngr_semantic_console",
@@ -296,6 +1315,13 @@
             "permission": "kngr:view"
           },
           {
+            "component": "KnowledgeSourceManager",
+            "name": "sources",
+            "nav_group": "Knowledge",
+            "path": "/kngr/sources",
+            "permission": "kngr:source"
+          },
+          {
             "component": "EntityBrowser",
             "name": "entities",
             "nav_group": "Knowledge",
@@ -303,11 +1329,18 @@
             "permission": "kngr:query"
           },
           {
-            "component": "EntityCuration",
-            "name": "curation",
-            "nav_group": "Curation",
-            "path": "/kngr/curation",
-            "permission": "kngr:curate"
+            "component": "RelationshipBrowser",
+            "name": "relationships",
+            "nav_group": "Knowledge",
+            "path": "/kngr/relationships",
+            "permission": "kngr:query"
+          },
+          {
+            "component": "SemanticEnrichmentConsole",
+            "name": "enrichment",
+            "nav_group": "Knowledge",
+            "path": "/kngr/enrichment",
+            "permission": "kngr:enrich"
           },
           {
             "component": "ReasoningPaths",
@@ -324,6 +1357,34 @@
             "permission": "kngr:query"
           },
           {
+            "component": "EntityCuration",
+            "name": "curation",
+            "nav_group": "Curation",
+            "path": "/kngr/curation",
+            "permission": "kngr:curate"
+          },
+          {
+            "component": "GraphPublicationConsole",
+            "name": "publication",
+            "nav_group": "Publication",
+            "path": "/kngr/publication",
+            "permission": "kngr:publish"
+          },
+          {
+            "component": "KnowledgeGovernance",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/kngr/governance",
+            "permission": "kngr:govern"
+          },
+          {
+            "component": "KnowledgeAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/kngr/audit",
+            "permission": "kngr:audit"
+          },
+          {
             "component": "KNGRSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -336,7 +1397,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "__init__.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -350,20 +1411,98 @@
   "contracts": {
     "kngr": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.KngrService",
+          "graph": "grph",
+          "helper_runtime": "knowledge_runtime.py",
+          "http_api": "api.py",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "ontology": "onto",
+          "production_runtime": "service.KngrService",
+          "search": "srch"
+        },
+        "curation": {
+          "allowed_decisions": [
+            "approved",
+            "rejected",
+            "needs_revision"
+          ],
+          "approved_entities_publishable": true,
+          "curator_required": true,
+          "evidence_required": true
+        },
+        "enrichment": {
+          "evidence_required": true,
+          "low_confidence_review_required": true,
+          "minimum_confidence": 0.7,
+          "nlpc_adapter": "nlpc",
+          "semantic_labels_required": true
+        },
+        "entities": {
+          "canonical_label_required": true,
+          "curation_required_for_publication": true,
+          "entity_type_required": true,
+          "evidence_required": true,
+          "source_required": true,
+          "stable_id_required": true
+        },
         "governance": {
           "audit_enrichment": true,
-          "require_tenant_context": true,
-          "source_confidence_required": true
+          "audit_entity_resolution": true,
+          "audit_publication": true,
+          "audit_reasoning": true,
+          "audit_relationship_links": true,
+          "audit_source_registration": true,
+          "require_tenant_context": true
         },
-        "knowledge": {
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "publication": {
           "curation_required": true,
-          "entity_resolution_enabled": true,
-          "semantic_enrichment_enabled": true
+          "minimum_entity_count": 1,
+          "publisher_required": true,
+          "relationship_validation_required": true
         },
         "reasoning": {
           "bounded_reasoning_enabled": true,
+          "deep_reasoning_review_required": true,
+          "entity_endpoints_required": true,
           "evidence_required": true,
-          "max_reasoning_depth": 5
+          "max_reasoning_depth": 5,
+          "query_required": true
+        },
+        "relationships": {
+          "evidence_required": true,
+          "low_confidence_review_required": true,
+          "minimum_confidence": 0.7,
+          "object_required": true,
+          "predicate_required": true,
+          "source_required": true,
+          "subject_required": true
+        },
+        "security": {
+          "cross_tenant_graph_access_allowed": false,
+          "public_graph_requires_curation": true,
+          "rbac_filter_required": true
+        },
+        "sources": {
+          "evidence_required": true,
+          "low_confidence_review_required": true,
+          "minimum_confidence": 0.7,
+          "owner_required": true,
+          "registered_sources_required": true,
+          "source_uri_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -371,10 +1510,18 @@
           "default_theme": "kngr_semantic_console"
         },
         "ui": {
+          "enable_audit": true,
           "enable_context_explorer": true,
+          "enable_dashboard": true,
+          "enable_enrichment_console": true,
+          "enable_entity_browser": true,
           "enable_entity_curation": true,
-          "enable_graph_browser": true,
-          "enable_reasoning_paths": true
+          "enable_governance": true,
+          "enable_publication_console": true,
+          "enable_reasoning_paths": true,
+          "enable_relationship_browser": true,
+          "enable_settings": true,
+          "enable_source_manager": true
         }
       },
       "id": "kngr",
@@ -414,8 +1561,86 @@
   },
   "roles": {},
   "rules": {
+    "batch_knowledge_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_knowledge_mutation"
+      },
+      "description": "Batch knowledge graph mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_knowledge_mutation_requires_bytewax"
+    },
+    "cross_tenant_graph_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Knowledge graph operations may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_graph_access_denied",
+        "required_action": "use_tenant_local_graph"
+      },
+      "name": "cross_tenant_graph_access_denied"
+    },
+    "curation_decision_requires_allowed_value": {
+      "condition": {
+        "curation_decision_allowed": false,
+        "operation": "curate_entity"
+      },
+      "description": "Curation decisions must use configured values.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_decision_invalid",
+        "required_action": "choose_allowed_curation_decision"
+      },
+      "name": "curation_decision_requires_allowed_value"
+    },
+    "curation_requires_curator": {
+      "condition": {
+        "curator_present": false,
+        "operation": "curate_entity"
+      },
+      "description": "Curation decisions require a curator.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curator_required",
+        "required_action": "assign_curator"
+      },
+      "name": "curation_requires_curator"
+    },
+    "curation_requires_decision": {
+      "condition": {
+        "curation_decision_present": false,
+        "operation": "curate_entity"
+      },
+      "description": "Curation decisions require a valid decision.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_decision_required",
+        "required_action": "choose_curation_decision"
+      },
+      "name": "curation_requires_decision"
+    },
+    "curation_requires_evidence": {
+      "condition": {
+        "evidence_links_present": false,
+        "operation": "curate_entity"
+      },
+      "description": "Curation decisions require evidence links.",
+      "effect": {
+        "decision": "deny",
+        "reason": "curation_evidence_required",
+        "required_action": "attach_curation_evidence"
+      },
+      "name": "curation_requires_evidence"
+    },
     "deep_reasoning_requires_review": {
       "condition": {
+        "operation": "reason",
         "reasoning_depth_gt": 5,
         "review_recorded": false
       },
@@ -426,6 +1651,72 @@
         "required_action": "record_reasoning_review"
       },
       "name": "deep_reasoning_requires_review"
+    },
+    "entity_confidence_requires_review": {
+      "condition": {
+        "confidence_score_lt": 0.7,
+        "operation": "resolve_entity",
+        "review_recorded": false
+      },
+      "description": "Low-confidence entity resolution requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_confidence_entity_review_required",
+        "required_action": "record_entity_review"
+      },
+      "name": "entity_confidence_requires_review"
+    },
+    "entity_requires_id": {
+      "condition": {
+        "entity_id_present": false,
+        "operation": "resolve_entity"
+      },
+      "description": "Resolved entities require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "entity_id_required",
+        "required_action": "attach_entity_id"
+      },
+      "name": "entity_requires_id"
+    },
+    "entity_requires_label": {
+      "condition": {
+        "canonical_label_present": false,
+        "operation": "resolve_entity"
+      },
+      "description": "Resolved entities require canonical labels.",
+      "effect": {
+        "decision": "deny",
+        "reason": "canonical_label_required",
+        "required_action": "attach_canonical_label"
+      },
+      "name": "entity_requires_label"
+    },
+    "entity_requires_source": {
+      "condition": {
+        "operation": "resolve_entity",
+        "source_present": false
+      },
+      "description": "Entity resolution requires a registered source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_required",
+        "required_action": "select_registered_source"
+      },
+      "name": "entity_requires_source"
+    },
+    "entity_requires_type": {
+      "condition": {
+        "entity_type_present": false,
+        "operation": "resolve_entity"
+      },
+      "description": "Resolved entities require entity types.",
+      "effect": {
+        "decision": "deny",
+        "reason": "entity_type_required",
+        "required_action": "attach_entity_type"
+      },
+      "name": "entity_requires_type"
     },
     "entity_resolution_requires_source": {
       "condition": {
@@ -440,6 +1731,71 @@
       },
       "name": "entity_resolution_requires_source"
     },
+    "graph_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Knowledge graph state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "graph_state_change_requires_audit"
+    },
+    "publication_requires_entities": {
+      "condition": {
+        "entity_count_lt": 1,
+        "operation": "publish_graph"
+      },
+      "description": "Graph publications require at least one curated entity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "publication_entities_required",
+        "required_action": "select_curated_entities"
+      },
+      "name": "publication_requires_entities"
+    },
+    "publication_requires_name": {
+      "condition": {
+        "operation": "publish_graph",
+        "publication_name_present": false
+      },
+      "description": "Graph publications require a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "publication_name_required",
+        "required_action": "attach_publication_name"
+      },
+      "name": "publication_requires_name"
+    },
+    "publication_requires_publisher": {
+      "condition": {
+        "operation": "publish_graph",
+        "publisher_present": false
+      },
+      "description": "Graph publications require an accountable publisher.",
+      "effect": {
+        "decision": "deny",
+        "reason": "publisher_required",
+        "required_action": "assign_publisher"
+      },
+      "name": "publication_requires_publisher"
+    },
+    "reasoning_requires_entities": {
+      "condition": {
+        "entity_endpoints_present": false,
+        "operation": "reason"
+      },
+      "description": "Reasoning paths require start and end entities.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reasoning_entities_required",
+        "required_action": "attach_reasoning_entities"
+      },
+      "name": "reasoning_requires_entities"
+    },
     "reasoning_requires_evidence": {
       "condition": {
         "evidence_links_present": false,
@@ -453,18 +1809,229 @@
       },
       "name": "reasoning_requires_evidence"
     },
+    "reasoning_requires_query": {
+      "condition": {
+        "operation": "reason",
+        "query_present": false
+      },
+      "description": "Reasoning paths require a natural-language or structured query.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reasoning_query_required",
+        "required_action": "attach_reasoning_query"
+      },
+      "name": "reasoning_requires_query"
+    },
+    "relationship_confidence_requires_review": {
+      "condition": {
+        "confidence_score_lt": 0.7,
+        "operation": "link_relationship",
+        "review_recorded": false
+      },
+      "description": "Low-confidence relationship links require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_confidence_relationship_review_required",
+        "required_action": "record_relationship_review"
+      },
+      "name": "relationship_confidence_requires_review"
+    },
+    "relationship_requires_evidence": {
+      "condition": {
+        "evidence_links_present": false,
+        "operation": "link_relationship"
+      },
+      "description": "Relationship links require evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "relationship_evidence_required",
+        "required_action": "attach_relationship_evidence"
+      },
+      "name": "relationship_requires_evidence"
+    },
+    "relationship_requires_object": {
+      "condition": {
+        "object_present": false,
+        "operation": "link_relationship"
+      },
+      "description": "Relationship links require an object entity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "relationship_object_required",
+        "required_action": "attach_object_entity"
+      },
+      "name": "relationship_requires_object"
+    },
+    "relationship_requires_predicate": {
+      "condition": {
+        "operation": "link_relationship",
+        "predicate_present": false
+      },
+      "description": "Relationship links require a predicate.",
+      "effect": {
+        "decision": "deny",
+        "reason": "predicate_required",
+        "required_action": "attach_predicate"
+      },
+      "name": "relationship_requires_predicate"
+    },
+    "relationship_requires_source": {
+      "condition": {
+        "operation": "link_relationship",
+        "source_present": false
+      },
+      "description": "Relationship links require a registered source.",
+      "effect": {
+        "decision": "deny",
+        "reason": "relationship_source_required",
+        "required_action": "select_registered_source"
+      },
+      "name": "relationship_requires_source"
+    },
+    "relationship_requires_subject": {
+      "condition": {
+        "operation": "link_relationship",
+        "subject_present": false
+      },
+      "description": "Relationship links require a subject entity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "relationship_subject_required",
+        "required_action": "attach_subject_entity"
+      },
+      "name": "relationship_requires_subject"
+    },
     "semantic_enrichment_requires_confidence": {
       "condition": {
         "confidence_score_lt": 0.7,
-        "operation": "enrich"
+        "operation": "enrich",
+        "review_recorded": false
       },
-      "description": "Semantic enrichment requires a minimum confidence score.",
+      "description": "Low-confidence semantic enrichment requires review.",
       "effect": {
         "decision": "require_review",
         "reason": "low_confidence_enrichment_review_required",
         "required_action": "record_enrichment_review"
       },
       "name": "semantic_enrichment_requires_confidence"
+    },
+    "semantic_enrichment_requires_evidence": {
+      "condition": {
+        "evidence_links_present": false,
+        "operation": "enrich"
+      },
+      "description": "Semantic enrichment requires evidence links.",
+      "effect": {
+        "decision": "deny",
+        "reason": "enrichment_evidence_required",
+        "required_action": "attach_enrichment_evidence"
+      },
+      "name": "semantic_enrichment_requires_evidence"
+    },
+    "semantic_enrichment_requires_labels": {
+      "condition": {
+        "operation": "enrich",
+        "semantic_labels_present": false
+      },
+      "description": "Semantic enrichment requires labels.",
+      "effect": {
+        "decision": "deny",
+        "reason": "semantic_labels_required",
+        "required_action": "attach_semantic_labels"
+      },
+      "name": "semantic_enrichment_requires_labels"
+    },
+    "source_confidence_requires_review": {
+      "condition": {
+        "confidence_score_lt": 0.7,
+        "operation": "register_source",
+        "review_recorded": false
+      },
+      "description": "Low-confidence knowledge sources require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "low_confidence_source_review_required",
+        "required_action": "record_source_review"
+      },
+      "name": "source_confidence_requires_review"
+    },
+    "source_requires_confidence": {
+      "condition": {
+        "confidence_score_lte": 0,
+        "operation": "register_source"
+      },
+      "description": "Knowledge sources require a positive confidence score.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_confidence_required",
+        "required_action": "attach_source_confidence"
+      },
+      "name": "source_requires_confidence"
+    },
+    "source_requires_evidence": {
+      "condition": {
+        "operation": "register_source",
+        "source_evidence_present": false
+      },
+      "description": "Knowledge sources require evidence references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_evidence_required",
+        "required_action": "attach_source_evidence"
+      },
+      "name": "source_requires_evidence"
+    },
+    "source_requires_id": {
+      "condition": {
+        "operation": "register_source",
+        "source_id_present": false
+      },
+      "description": "Knowledge sources require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_id_required",
+        "required_action": "attach_source_id"
+      },
+      "name": "source_requires_id"
+    },
+    "source_requires_name": {
+      "condition": {
+        "operation": "register_source",
+        "source_name_present": false
+      },
+      "description": "Knowledge sources require display names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_name_required",
+        "required_action": "attach_source_name"
+      },
+      "name": "source_requires_name"
+    },
+    "source_requires_owner": {
+      "condition": {
+        "operation": "register_source",
+        "source_owner_present": false
+      },
+      "description": "Knowledge sources require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_owner_required",
+        "required_action": "assign_source_owner"
+      },
+      "name": "source_requires_owner"
+    },
+    "source_requires_uri": {
+      "condition": {
+        "operation": "register_source",
+        "source_uri_present": false
+      },
+      "description": "Knowledge sources require a resolvable source URI.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_uri_required",
+        "required_action": "attach_source_uri"
+      },
+      "name": "source_requires_uri"
     },
     "tenant_context_required": {
       "condition": {
@@ -494,7 +2061,10 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "service.py",
+    "knowledge_runtime.py",
+    "views.py"
   ],
   "symbols": {
     "capability.kngr": {

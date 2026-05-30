@@ -5,13 +5,125 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Knowledge Graph package-backed APG capability", "entity_count": 0, "name": "kngr", "version": "1.0.0"}, "capabilities": {"kngr": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_enrichment": true, "require_tenant_context": true, "source_confidence_required": true}, "knowledge": {"curation_required": true, "entity_resolution_enabled": true, "semantic_enrichment_enabled": true}, "reasoning": {"bounded_reasoning_enabled": true, "evidence_required": true, "max_reasoning_depth": 5}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "kngr_semantic_console"}, "ui": {"enable_context_explorer": true, "enable_entity_curation": true, "enable_graph_browser": true, "enable_reasoning_paths": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Knowledge Graph", "provides": ["kngr_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All knowledge graph operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "resolve_entity", "source_evidence_present": false}, "description": "Entity resolution requires source asset evidence.", "effect": {"decision": "deny", "reason": "source_evidence_required", "required_action": "attach_source_evidence"}, "name": "entity_resolution_requires_source"}, {"condition": {"confidence_score_lt": 0.7, "operation": "enrich"}, "description": "Semantic enrichment requires a minimum confidence score.", "effect": {"decision": "require_review", "reason": "low_confidence_enrichment_review_required", "required_action": "record_enrichment_review"}, "name": "semantic_enrichment_requires_confidence"}, {"condition": {"evidence_links_present": false, "operation": "reason"}, "description": "Reasoning paths require evidence links.", "effect": {"decision": "deny", "reason": "reasoning_evidence_required", "required_action": "attach_evidence_links"}, "name": "reasoning_requires_evidence"}, {"condition": {"reasoning_depth_gt": 5, "review_recorded": false}, "description": "Deep reasoning paths require review.", "effect": {"decision": "require_review", "reason": "deep_reasoning_review_required", "required_action": "record_reasoning_review"}, "name": "deep_reasoning_requires_review"}, {"condition": {"curation_recorded": false, "operation": "publish_graph"}, "description": "Public graph publication requires curation.", "effect": {"decision": "deny", "reason": "curation_required", "required_action": "record_curation"}, "name": "uncurated_public_graph_blocked"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All knowledge graph operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "resolve_entity", "source_evidence_present": false}, "description": "Entity resolution requires source asset evidence.", "effect": {"decision": "deny", "reason": "source_evidence_required", "required_action": "attach_source_evidence"}, "name": "entity_resolution_requires_source"}, {"condition": {"confidence_score_lt": 0.7, "operation": "enrich"}, "description": "Semantic enrichment requires a minimum confidence score.", "effect": {"decision": "require_review", "reason": "low_confidence_enrichment_review_required", "required_action": "record_enrichment_review"}, "name": "semantic_enrichment_requires_confidence"}, {"condition": {"evidence_links_present": false, "operation": "reason"}, "description": "Reasoning paths require evidence links.", "effect": {"decision": "deny", "reason": "reasoning_evidence_required", "required_action": "attach_evidence_links"}, "name": "reasoning_requires_evidence"}, {"condition": {"reasoning_depth_gt": 5, "review_recorded": false}, "description": "Deep reasoning paths require review.", "effect": {"decision": "require_review", "reason": "deep_reasoning_review_required", "required_action": "record_reasoning_review"}, "name": "deep_reasoning_requires_review"}, {"condition": {"curation_recorded": false, "operation": "publish_graph"}, "description": "Public graph publication requires curation.", "effect": {"decision": "deny", "reason": "curation_required", "required_action": "record_curation"}, "name": "uncurated_public_graph_blocked"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"context": {"component": "ContextExplorer", "permission": "kngr:query", "route": "/kngr/context"}, "curation": {"component": "EntityCuration", "permission": "kngr:curate", "route": "/kngr/curation"}, "dashboard": {"component": "KNGRDashboard", "permission": "kngr:view", "route": "/kngr/dashboard"}, "entities": {"component": "EntityBrowser", "permission": "kngr:query", "route": "/kngr/entities"}, "reasoning": {"component": "ReasoningPaths", "permission": "kngr:reason", "route": "/kngr/reasoning"}, "settings": {"component": "KNGRSettings", "permission": "kngr:admin", "route": "/kngr/settings"}}, "streaming": {}, "theme": {"components": {"context_panel": {"status_style": "source-pill", "visual": "neighborhood-list"}, "entity_card": {"icon": "badge", "risk_style": "confidence-band", "status_indicator": "curation-pill"}, "reasoning_path": {"threshold_style": "depth-band", "visual": "evidence-path"}, "semantic_graph": {"highlight": "entity-chip", "visual": "knowledge-network"}}, "name": "kngr_semantic_console", "tokens": {"border.radius": "8px", "color.accent": "#6A994E", "color.danger": "#C53030", "color.primary": "#3A506B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/kngr/api/v1", "requires_theme": true, "routes": [{"component": "KNGRDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/kngr/dashboard", "permission": "kngr:view"}, {"component": "EntityBrowser", "name": "entities", "nav_group": "Knowledge", "path": "/kngr/entities", "permission": "kngr:query"}, {"component": "EntityCuration", "name": "curation", "nav_group": "Curation", "path": "/kngr/curation", "permission": "kngr:curate"}, {"component": "ReasoningPaths", "name": "reasoning", "nav_group": "Reasoning", "path": "/kngr/reasoning", "permission": "kngr:reason"}, {"component": "ContextExplorer", "name": "context", "nav_group": "Context", "path": "/kngr/context", "permission": "kngr:query"}, {"component": "KNGRSettings", "name": "settings", "nav_group": "Administration", "path": "/kngr/settings", "permission": "kngr:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"kngr": []}}, "contracts": {"kngr": {"configuration": {"governance": {"audit_enrichment": true, "require_tenant_context": true, "source_confidence_required": true}, "knowledge": {"curation_required": true, "entity_resolution_enabled": true, "semantic_enrichment_enabled": true}, "reasoning": {"bounded_reasoning_enabled": true, "evidence_required": true, "max_reasoning_depth": 5}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "kngr_semantic_console"}, "ui": {"enable_context_explorer": true, "enable_entity_curation": true, "enable_graph_browser": true, "enable_reasoning_paths": true}}, "id": "kngr", "provides": ["kngr_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"kngr": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"deep_reasoning_requires_review": {"condition": {"reasoning_depth_gt": 5, "review_recorded": false}, "description": "Deep reasoning paths require review.", "effect": {"decision": "require_review", "reason": "deep_reasoning_review_required", "required_action": "record_reasoning_review"}, "name": "deep_reasoning_requires_review"}, "entity_resolution_requires_source": {"condition": {"operation": "resolve_entity", "source_evidence_present": false}, "description": "Entity resolution requires source asset evidence.", "effect": {"decision": "deny", "reason": "source_evidence_required", "required_action": "attach_source_evidence"}, "name": "entity_resolution_requires_source"}, "reasoning_requires_evidence": {"condition": {"evidence_links_present": false, "operation": "reason"}, "description": "Reasoning paths require evidence links.", "effect": {"decision": "deny", "reason": "reasoning_evidence_required", "required_action": "attach_evidence_links"}, "name": "reasoning_requires_evidence"}, "semantic_enrichment_requires_confidence": {"condition": {"confidence_score_lt": 0.7, "operation": "enrich"}, "description": "Semantic enrichment requires a minimum confidence score.", "effect": {"decision": "require_review", "reason": "low_confidence_enrichment_review_required", "required_action": "record_enrichment_review"}, "name": "semantic_enrichment_requires_confidence"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All knowledge graph operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, "uncurated_public_graph_blocked": {"condition": {"curation_recorded": false, "operation": "publish_graph"}, "description": "Public graph publication requires curation.", "effect": {"decision": "deny", "reason": "curation_required", "required_action": "record_curation"}, "name": "uncurated_public_graph_blocked"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.kngr": {"file": "capability_contract.py", "id": "capability.kngr", "kind": "capability", "name": "Knowledge Graph", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("kngr_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "kngr",
+			"version": "1.0.0",
+			"description": "Knowledge Graph package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"kngr": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"kngr": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["kngr_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"low_confidence_source": "KnowledgeSource",
+					"low_confidence_entity": "KnowledgeEntity",
+					"low_confidence_relationship": "KnowledgeRelationship",
+					"low_confidence_enrichment": "SemanticEnrichment",
+					"deep_reasoning": "ReasoningPath",
+					"publication": "GraphPublication",
+				},
+				"knowledge_lifecycle": {
+					"source": "KnowledgeSource",
+					"entity": "KnowledgeEntity",
+					"relationship": "KnowledgeRelationship",
+					"enrichment": "SemanticEnrichment",
+					"reasoning": "ReasoningPath",
+					"curation": "CurationRecord",
+					"publication": "GraphPublication",
+					"audit": "KngrAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"kngr": {
+				"id": "kngr",
+				"configuration": contract["configuration"],
+				"provides": ["kngr_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"kngr": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "service.py", "knowledge_runtime.py", "views.py"],
+		"symbols": {
+			"capability.kngr": {
+				"id": "capability.kngr",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +148,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("kngr", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "kngr" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("KNGR semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("KNGR semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("KNGR adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.KngrService":
+		errors.append("KNGR generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

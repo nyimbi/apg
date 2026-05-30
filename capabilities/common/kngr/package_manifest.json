@@ -3,8 +3,13 @@
   "display_name": "Knowledge Graph",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
     "models.py",
+    "knowledge_runtime.py",
     "service.py",
     "api.py",
     "views.py",
