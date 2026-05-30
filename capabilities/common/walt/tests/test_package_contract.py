@@ -25,17 +25,19 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_walt", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_walt", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "walt"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "walt_agents" in contract["provides"]
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_walt", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_walt", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -111,6 +113,7 @@ def test_wallet_instrument_transaction_settlement_and_reconciliation_lifecycle_e
 	assert summary["transaction_count"] == 1
 	assert summary["settlement_batch_count"] == 1
 	assert summary["reconciliation_count"] == 1
+	assert summary["streaming"]["processor"] == "bytewax"
 
 
 def test_wallet_guardrails_require_tenant_owner_encryption_mfa_reconciliation_and_balance():
@@ -130,6 +133,20 @@ def test_wallet_guardrails_require_tenant_owner_encryption_mfa_reconciliation_an
 	else:
 		raise AssertionError("missing wallet owner was accepted")
 
+	try:
+		service.create_wallet("tenant-a", "owner-1", "USD", "", "policy://x")
+	except PermissionError as exc:
+		assert str(exc) == "ledger_integrity_required"
+	else:
+		raise AssertionError("wallet without ledger was accepted")
+
+	try:
+		service.create_wallet("tenant-a", "owner-1", "USD", "ledger://x", "")
+	except PermissionError as exc:
+		assert str(exc) == "compliance_policy_required"
+	else:
+		raise AssertionError("wallet without compliance policy was accepted")
+
 	wallet = service.create_wallet("tenant-a", "owner-1", "USD", "ledger://x", "policy://x", "100.00")
 
 	try:
@@ -138,6 +155,20 @@ def test_wallet_guardrails_require_tenant_owner_encryption_mfa_reconciliation_an
 		assert str(exc) == "instrument_encryption_required"
 	else:
 		raise AssertionError("unencrypted instrument was accepted")
+
+	try:
+		service.register_instrument("tenant-a", wallet["id"], "card://raw", "card", "", True, "vault")
+	except PermissionError as exc:
+		assert str(exc) == "instrument_tokenization_required"
+	else:
+		raise AssertionError("untokenized instrument was accepted")
+
+	try:
+		service.register_instrument("tenant-a", wallet["id"], "card://raw", "card", "tok_1", True, "")
+	except PermissionError as exc:
+		assert str(exc) == "instrument_verification_required"
+	else:
+		raise AssertionError("unverified instrument was accepted")
 
 	instrument = service.register_instrument("tenant-a", wallet["id"], "card://ok", "card", "tok_1", True, "vault")
 
@@ -155,6 +186,13 @@ def test_wallet_guardrails_require_tenant_owner_encryption_mfa_reconciliation_an
 		assert str(exc) == "high_value_mfa_required"
 	else:
 		raise AssertionError("high-value transaction without MFA was accepted")
+
+	try:
+		service.authorize_transaction("tenant-a", wallet["id"], instrument["id"], "10.00", "USD", mfa_completed=True, event_stream="local")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("transaction without Bytewax was accepted")
 
 	review = service.authorize_transaction(
 		tenant_id="tenant-a",
@@ -185,6 +223,67 @@ def test_wallet_guardrails_require_tenant_owner_encryption_mfa_reconciliation_an
 		assert str(exc) == "reconciliation_required"
 	else:
 		raise AssertionError("settlement without reconciliation evidence was accepted")
+
+	try:
+		service.create_settlement_batch("tenant-a", [captured["id"]], "settlement://primary", True, "settlement-ops", approval_ref="")
+	except PermissionError as exc:
+		assert str(exc) == "settlement_approval_required"
+	else:
+		raise AssertionError("settlement without approval was accepted")
+
+	try:
+		service.create_settlement_batch("tenant-a", [captured["id"]], "settlement://primary", True, "settlement-ops", event_stream="local")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("settlement without Bytewax was accepted")
+
+	try:
+		service.record_reconciliation("tenant-a", "missing-batch", "", 0, 0, "recon")
+	except KeyError:
+		pass
+	else:
+		raise AssertionError("missing batch was accepted")
+
+
+def test_walt_agents_and_batch_settlement_guardrails_execute():
+	service = WaltService()
+
+	agent = service.register_walt_agent(
+		tenant_id="tenant-a",
+		name="Risk reviewer",
+		runtime="codex",
+		role="risk_reviewer",
+		scope="review payment risk and settlement evidence",
+	)
+	privileged = service.validate_agent_payment_action(
+		tenant_id="tenant-a",
+		agent_id=agent["id"],
+		action="settle_batch",
+		privileged_scope=True,
+	)
+	approved = service.validate_agent_payment_action(
+		tenant_id="tenant-a",
+		agent_id=agent["id"],
+		action="settle_batch",
+		privileged_scope=True,
+		human_approval_ref="approval://agent/payment",
+	)
+	batch_block = service.validate_batch_settlement("tenant-a", 4, event_stream="local")
+
+	assert agent["runtime"] == "codex"
+	assert privileged["decision"] == "deny"
+	assert privileged["matched_rules"] == ["privileged_agent_payment_action_requires_human_approval"]
+	assert approved["decision"] == "allow"
+	assert batch_block["decision"] == "deny"
+	assert batch_block["matched_rules"] == ["batch_settlement_requires_bytewax"]
+
+	try:
+		service.register_walt_agent("tenant-a", "Unsupported", "unknown", "risk_reviewer", "review")
+	except PermissionError as exc:
+		assert str(exc) == "walt_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported wallet agent runtime was accepted")
 
 
 def test_api_and_view_models_expose_wallet_payment_surfaces():
@@ -235,6 +334,13 @@ def test_api_and_view_models_expose_wallet_payment_surfaces():
 		"matched_count": 1,
 		"exception_count": 0,
 	})
+	agent = api.register_walt_agent({
+		"tenant_id": "tenant-b",
+		"name": "Settlement reviewer",
+		"runtime": "claude_code",
+		"role": "settlement_reviewer",
+		"scope": "review settlement batches",
+	})
 
 	status = api.capability_status("tenant-b")
 	system = api.list_wallet_payments("tenant-b")
@@ -245,10 +351,14 @@ def test_api_and_view_models_expose_wallet_payment_surfaces():
 	settlements = views.settlement_center_model(local_service, "tenant-b")
 	reconciliations = views.reconciliation_queue_model(local_service, "tenant-b")
 	risk = views.risk_model(local_service, "tenant-b")
+	agents = views.agent_workbench_model(local_service, "tenant-b")
+	policy = views.policy_center_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["wallet_count"] == 1
+	assert status["walt_agent_count"] == 1
 	assert system["summary"]["settlement_batch_count"] == 1
+	assert system["walt_agents"][0]["id"] == agent["id"]
 	assert dashboard["summary"]["total_balance"] == 4750.0
 	assert wallets["wallets"][0]["currency"] == "KES"
 	assert transactions["transactions"][0]["status"] == "settled"
@@ -256,4 +366,7 @@ def test_api_and_view_models_expose_wallet_payment_surfaces():
 	assert settlements["settlement_batches"][0]["status"] == "reconciled"
 	assert reconciliations["reconciliations"][0]["status"] == "matched"
 	assert risk["review_required_transactions"] == []
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert policy["streaming"]["processor"] == "bytewax"
 	assert settings["configuration"]["tenant_id"] == "tenant-b"
+	assert settings["streaming"]["processor"] == "bytewax"

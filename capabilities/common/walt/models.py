@@ -7,6 +7,7 @@ from .wallet_runtime import (
 	ReconciliationRecord,
 	SettlementBatchRecord,
 	TransactionRecord,
+	WaltAgentRecord,
 	WalletAuditEventRecord,
 	WalletRecord,
 )
@@ -20,6 +21,7 @@ __all__ = [
 	"ReconciliationRecord",
 	"SettlementBatchRecord",
 	"TransactionRecord",
+	"WaltAgentRecord",
 	"WalletAuditEventRecord",
 	"WalletRecord",
 	"WaltRecord",

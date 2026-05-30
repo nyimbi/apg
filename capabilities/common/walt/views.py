@@ -24,6 +24,7 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -52,6 +53,7 @@ def transaction_console_model(
 		"transactions": service.list_transactions(tenant_id),
 		"transaction_statuses": ["authorized", "captured", "review_required", "declined", "settled"],
 		"high_value_mfa_required": True,
+		"streaming": service.describe(tenant_id)["streaming"],
 	}
 
 
@@ -81,6 +83,7 @@ def settlement_center_model(
 		"settlement_batches": service.list_settlement_batches(tenant_id),
 		"settlement_statuses": ["ready", "reconciled", "exception_review"],
 		"reconciliation_required": True,
+		"streaming": service.describe(tenant_id)["streaming"],
 	}
 
 
@@ -118,6 +121,41 @@ def risk_model(
 	}
 
 
+def agent_workbench_model(
+	service: WaltService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WaltService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/walt/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_walt_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["walt_agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["walt_agents"]["supported_roles"],
+		"human_approval_required": contract["configuration"]["walt_agents"]["human_approval_required"],
+	}
+
+
+def policy_center_model(
+	service: WaltService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or WaltService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/walt/policy",
+		"tenant_id": tenant_id,
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"review_required_transactions": [
+			transaction
+			for transaction in service.list_transactions(tenant_id)
+			if transaction["status"] == "review_required"
+		],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, object]:
 	contract = get_capability_contract(tenant_id)
 	return {
@@ -125,4 +163,5 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}

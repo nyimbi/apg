@@ -3,14 +3,22 @@
   "display_name": "Wallet and Payment Core",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
+    "__init__.py",
     "models.py",
+    "wallet_runtime.py",
     "service.py",
     "api.py",
     "views.py",
     "app.py",
     "semantic_model.json",
-    "release_report.json"
+    "release_report.json",
+    "test_capability_contract.py",
+    "tests/test_package_contract.py"
   ],
   "name": "walt",
   "profile": "capability",

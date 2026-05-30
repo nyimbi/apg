@@ -24,6 +24,9 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"transaction_count": summary["transaction_count"],
 		"settlement_batch_count": summary["settlement_batch_count"],
 		"reconciliation_count": summary["reconciliation_count"],
+		"walt_agent_count": summary["walt_agent_count"],
+		"audit_event_count": summary["audit_event_count"],
+		"streaming": summary["streaming"],
 		"total_balance": summary["total_balance"],
 	}
 
@@ -65,6 +68,7 @@ def authorize_transaction(payload: dict[str, Any]) -> dict[str, Any]:
 		risk_review_recorded=bool(payload.get("risk_review_recorded", False)),
 		idempotency_key=str(payload.get("idempotency_key") or ""),
 		actor=str(payload.get("actor") or "system"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -83,6 +87,38 @@ def create_settlement_batch(payload: dict[str, Any]) -> dict[str, Any]:
 		settlement_account_ref=str(payload.get("settlement_account_ref") or ""),
 		reconciliation_completed=bool(payload.get("reconciliation_completed", False)),
 		created_by=str(payload.get("created_by") or "system"),
+		approval_ref=str(payload.get("approval_ref") or "approval://settlement/default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+	)
+
+
+def register_walt_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_walt_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or "platform"),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+	)
+
+
+def validate_agent_payment_action(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_agent_payment_action(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["agent_id"]),
+		action=str(payload.get("action") or "review"),
+		privileged_scope=bool(payload.get("privileged_scope", False)),
+		human_approval_ref=payload.get("human_approval_ref"),
+	)
+
+
+def validate_batch_settlement(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_settlement(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		batch_count=int(payload.get("batch_count", 0)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -117,6 +153,7 @@ def list_wallet_payments(tenant_id: str = "default") -> dict[str, Any]:
 		"transactions": SERVICE.list_transactions(tenant_id),
 		"settlement_batches": SERVICE.list_settlement_batches(tenant_id),
 		"reconciliations": SERVICE.list_reconciliations(tenant_id),
+		"walt_agents": SERVICE.list_walt_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

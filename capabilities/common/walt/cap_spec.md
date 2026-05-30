@@ -1,158 +1,124 @@
-# Wallet and Payment Core Capability Specification
+# Wallet and Payment Core Capability Packet
 
-- **Capability Name**: Wallet and Payment Core
-- **Capability ID**: `walt`
-- **Category**: common
-- **Version**: 1.0.0
+- Capability Name: Wallet and Payment Core
+- Capability ID: `walt`
+- Category: common
+- Version: 1.0.0
 
 ## Purpose
 
-This package executes the APG contract for `walt` as a deterministic wallet,
-payment, settlement, reconciliation, and financial-governance runtime.
+WALT provides executable APG wallet, payment, settlement, reconciliation,
+payment-risk, agent-review, audit, and Bytewax stream behavior. It lets
+generated applications compose tenant wallet ledgers, tokenized instruments,
+transaction authorization, high-value MFA, risk review, capture, settlement
+approval, reconciliation evidence, exception queues, and AI-assisted review
+lanes.
 
-WALT gives composed APG applications a tenant-scoped local core for:
-
-- wallet creation with owner, ledger, compliance policy, currency, balance, and
-  hold tracking;
-- encrypted and tokenized payment instrument registration;
-- payment authorization, high-value MFA enforcement, risk review routing,
-  capture, balance updates, and ledger audit events;
-- settlement batch creation over captured transactions;
-- reconciliation records, exception queues, and settlement status updates;
-- dashboard, wallet, transaction, instrument, settlement, reconciliation, risk,
-  settings, rule, route, and theme surfaces for UI composition.
-
-Live payment processors, custody stores, bank rails, KYC providers, fraud
-engines, token vaults, and settlement networks are adapter boundaries. The
-checked-in package supplies deterministic local behavior that compiler output,
-capacity examples, tests, publish tooling, and APG composition can execute
-without those live integrations.
-
-## Provided Services
+## Provides
 
 - `wallet_ledger`
 - `payment_instruments`
 - `transaction_authorization`
 - `settlement`
 - `reconciliation`
-- `capability_rules`
-- `visual_theming`
+- `payment_risk_governance`
+- `walt_agents`
 
-## Required Services
+## Requires
 
-- `encr` for production instrument encryption or token-vault integration
-- `auth` for actor identity, MFA evidence, and wallet permissions
-- `comp` for APG composition and capability discovery
-- `audl` for durable financial audit trails
-- Optional `wflo`, `ntfy`, `conn`, and `anom` adapters for approvals,
-  notifications, integrations, and anomaly or fraud analysis
+- `encr`
+- `auth`
+- `comp`
+- `audl`
+- `wflo`
 
-## Configuration
+## Configuration Areas
 
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations.
+WALT configuration is defined by `capability_contract.py` and covers:
 
-Important sections:
+- tenant context;
+- wallet owner, ledger integrity, multi-currency, and balance policy;
+- instrument encryption, tokenization, and verification;
+- high-value MFA, transaction limits, and risk scoring;
+- settlement approval, reconciliation, exception queue, and chargeback policy;
+- first-class wallet/payment agent runtimes, roles, and human approval;
+- audit and financial state-change governance;
+- Bytewax lifecycle-stream observability;
+- adapter boundaries for encryption, authorization, compliance, ledger, audit, and event streaming;
+- UI route toggles and theme tokens.
 
-- `wallets`: owner requirement, ledger integrity, multi-currency support, and
-  negative-balance blocking.
-- `payments`: instrument tokenization, transaction limits, high-value MFA, and
-  risk scoring.
-- `settlement`: settlement approval, reconciliation, exception queues, and
-  chargeback support.
-- `governance`: tenant context, financial audit, encrypted instruments, and
-  compliance policy requirements.
-- `ui`: wallet dashboard, transaction console, settlement center, and
-  reconciliation queue toggles.
-- `theme`: default `walt_wallet_ops` visual theme and tenant override policy.
+## Lifecycle
 
-## Rules
+WALT supports the following lifecycle:
+
+1. Create a tenant wallet with owner, ledger, compliance policy, currency, and balance.
+2. Register encrypted and tokenized payment instruments with verification evidence.
+3. Authorize debit or credit transactions with MFA, risk score, idempotency, and Bytewax stream metadata.
+4. Route high-risk transactions for review.
+5. Capture authorized transactions and update wallet holds and balances.
+6. Create settlement batches only from captured transactions with reconciliation, approval, and Bytewax stream metadata.
+7. Record reconciliation evidence and exception status.
+8. Register governed AI agents that review instruments, payments, risk, settlement, reconciliation, and chargebacks.
+
+## Deterministic Rules
 
 - `tenant_context_required`
 - `wallet_requires_owner`
+- `wallet_requires_ledger`
+- `wallet_requires_compliance_policy`
 - `instrument_requires_encryption`
+- `instrument_requires_token`
+- `instrument_requires_verification`
 - `high_value_requires_mfa`
+- `transaction_requires_risk_score`
+- `transaction_requires_bytewax_stream`
 - `settlement_requires_reconciliation`
+- `settlement_requires_approval`
+- `settlement_requires_bytewax_stream`
+- `reconciliation_requires_evidence`
 - `high_risk_transaction_requires_review`
-
-These rules are enforced in `WaltService` before state-changing operations.
-Deny decisions raise `PermissionError` with the rule reason. Review decisions
-create review-required records with `required_actions` so APG workflows or
-human approval queues can continue the process.
-
-## Runtime Behavior
-
-`service.py` exposes `WaltService`, a dependency-light runtime with:
-
-- `create_wallet()` for tenant-scoped wallet setup, owner checks, ledger
-  references, compliance policy references, initial balances, and audit events;
-- `register_instrument()` for encrypted/tokenized payment instruments;
-- `authorize_transaction()` for debit and credit authorization, MFA, risk
-  scoring, review routing, balance-hold creation, idempotency keys, and audit;
-- `capture_transaction()` for balance and hold updates;
-- `create_settlement_batch()` for captured-transaction settlement with
-  reconciliation evidence;
-- `record_reconciliation()` for matched or exception reconciliation outcomes;
-- list and dashboard helpers for wallets, instruments, transactions,
-  settlements, reconciliations, and audit events;
-- `create_record()` and `list_records()` compatibility shims backed by wallet
-  creation and wallet listing.
-
-`wallet_runtime.py` owns the serializable dataclasses, stable ID generation,
-money conversion helpers, currency and instrument normalization, UTC
-timestamps, and rule required-action extraction.
-
-`api.py` exposes dependency-light function wrappers over the service for APG
-generated runtimes and package smoke tests. `views.py` exposes route-aligned
-view models for dashboard, wallet console, transaction console, instrument
-vault, settlement center, reconciliation queue, risk review, and settings.
+- `batch_settlement_requires_bytewax`
+- `walt_agent_runtime_supported`
+- `walt_agent_role_supported`
+- `privileged_agent_payment_action_requires_human_approval`
 
 ## UI
 
-The package exposes 8 APG Python UI route contracts through `views.py` and the
-package semantic model:
-
-- `/walt/dashboard`
-- `/walt/wallets`
-- `/walt/transactions`
-- `/walt/instruments`
-- `/walt/settlement`
-- `/walt/reconciliation`
-- `/walt/risk`
-- `/walt/settings`
+WALT exposes APG Python view models for dashboard, wallet console, transaction
+console, instrument vault, settlement center, reconciliation queue, payment
+risk, agent workbench, policy center, and settings.
 
 ## Theme
 
-The package uses the `walt_wallet_ops` APG theme contract.
+WALT uses the `walt_wallet_ops` theme with compact density, wallet grids,
+balance pills, ledger bands, transaction lists, risk chips, settlement
+timelines, reconciliation chips, tokenized instrument lists, encryption chips,
+review lanes, and guardrail chips.
 
-Theme tokens cover wallet operations with compact density, wallet grids,
-transaction tables, instrument vaults, settlement timelines, risk chips, and
-reconciliation status styling.
+## Streaming
 
-## Proof Commands
+WALT lifecycle events are described by the Bytewax stream manifest:
 
-Focused package proof:
+- processor: `bytewax`
+- stream: `apg.walt.lifecycle`
+- key: `tenant_id`
+- events: `wallet_created`, `instrument_registered`,
+  `transaction_authorized`, `transaction_captured`,
+  `settlement_batch_created`, `reconciliation_recorded`,
+  `walt_agent_registered`
 
-```bash
-./.venv/bin/python -m py_compile capabilities/common/walt/__init__.py capabilities/common/walt/models.py capabilities/common/walt/wallet_runtime.py capabilities/common/walt/service.py capabilities/common/walt/api.py capabilities/common/walt/views.py capabilities/common/walt/capability_contract.py capabilities/common/walt/app.py capabilities/common/walt/test_capability_contract.py capabilities/common/walt/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/walt/test_capability_contract.py capabilities/common/walt/tests/test_package_contract.py
-./.venv/bin/apg capabilities implementation-audit --root capabilities/common/walt --json
-./.venv/bin/apg capabilities publish-plan capabilities/common/walt --json
-```
+## Adapter Boundaries
 
-Global package health proof:
+The in-package service is dependency-light and stores records in memory for
+generated apps, tests, and publish-plan probes. Production deployments should
+bind token vaults, encryption systems, payment processors, banking or mobile
+money rails, ledger stores, compliance engines, fraud/risk engines, settlement
+networks, audit sinks, and Bytewax workers through APG adapters without
+weakening the deterministic contract.
 
-```bash
-./.venv/bin/apg capabilities implementation-audit --json
-./.venv/bin/apg capabilities audit --strict-package-artifacts --json
-```
+## Focused Verification
 
-## Known Non-Goals
-
-- No live card network, mobile-money, bank, ledger, custody, token-vault, KYC,
-  fraud-model, or settlement-network integration is performed in this package.
-- No real cryptographic storage is performed locally; production instrument
-  protection belongs behind `encr` and token-vault adapters.
-- No external payment side effects are emitted by tests or local package
-  methods.
+- `./.venv/bin/python -m py_compile capabilities/common/walt/__init__.py capabilities/common/walt/models.py capabilities/common/walt/wallet_runtime.py capabilities/common/walt/service.py capabilities/common/walt/api.py capabilities/common/walt/views.py capabilities/common/walt/capability_contract.py capabilities/common/walt/app.py capabilities/common/walt/test_capability_contract.py capabilities/common/walt/tests/test_package_contract.py`
+- `./.venv/bin/pytest -q capabilities/common/walt/test_capability_contract.py capabilities/common/walt/tests/test_package_contract.py`
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/walt --json`
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/walt --json`

@@ -16,6 +16,82 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 21:35 EAT
+
+Common WALT wallet and payment lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the WALT
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with WALT-agent, wallet, payment,
+  settlement, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, wallet owner, ledger
+  reference, compliance policy, instrument encryption, instrument tokenization,
+  instrument verification, high-value MFA, transaction risk score, transaction
+  Bytewax streams, settlement reconciliation, settlement approval, settlement
+  Bytewax streams, reconciliation evidence, high-risk transaction review,
+  batch settlement Bytewax streams, WALT-agent runtime/role, and privileged
+  agent-action approval.
+- Added `WaltAgentRecord` and metadata-rich audit event support, then extended
+  `WaltService` with agent registration, privileged agent-action validation,
+  batch settlement validation, audit counts, Bytewax stream metadata, and
+  stronger wallet/instrument/transaction/settlement/reconciliation guardrails.
+- Extended API helpers and view models with WALT-agent, policy center,
+  dashboard, transaction, settlement, settings, and Bytewax metadata surfaces.
+- Updated package registration to expose WALT agents, policy endpoints,
+  required dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, batch settlement, ledger/compliance, instrument, transaction,
+  and settlement guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/walt/__init__.py
+  capabilities/common/walt/capability_contract.py
+  capabilities/common/walt/models.py capabilities/common/walt/wallet_runtime.py
+  capabilities/common/walt/service.py capabilities/common/walt/api.py
+  capabilities/common/walt/views.py capabilities/common/walt/app.py
+  capabilities/common/walt/test_capability_contract.py
+  capabilities/common/walt/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/walt/test_capability_contract.py
+  capabilities/common/walt/tests/test_package_contract.py` passed with 10 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.walt import WaltService;
+  service=WaltService(); service.register_walt_agent('tenant-proof',
+  'Proof agent', 'codex', 'risk_reviewer', 'review payment gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  WALT-agent registration, audit event emission, and Bytewax stream metadata.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.walt.streaming.processor,
+  .capabilities.walt.provides, .capabilities.walt.requires,
+  .capabilities.walt.screens.agents.route,
+  (.capabilities.walt.rules[] |
+  select(.name=="walt_agent_runtime_supported") | .effect.reason),
+  (.capabilities.walt.rules[] |
+  select(.name=="transaction_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/walt/semantic_model.json` confirmed `bytewax`, WALT-agent
+  provides, required services, `/walt/agents`,
+  `walt_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/walt --json` passed with `walt` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/walt --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `walt`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/walt docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: token vaults, encryption systems, payment processors, banking or
+  mobile money rails, ledger stores, compliance engines, risk engines,
+  settlement networks, audit sinks, live Bytewax topology, rendered browser UI,
+  performance checks, and full repository tests.
+
 ### 2026-05-30 21:26 EAT
 
 Common USRM user-management lifecycle/guardrail packet:

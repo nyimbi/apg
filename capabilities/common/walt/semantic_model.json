@@ -12,14 +12,31 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "compliance": "adapter",
+          "encryption": "adapter",
+          "event_stream": "bytewax",
+          "ledger": "adapter"
+        },
         "governance": {
           "audit_financial_events": true,
           "compliance_policy_required": true,
           "encrypted_instruments_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
+        },
+        "observability": {
+          "emit_settlement_events": true,
+          "emit_transaction_events": true,
+          "emit_wallet_events": true,
+          "event_stream": "apg.walt.lifecycle",
+          "stream_processor": "bytewax"
         },
         "payments": {
           "instrument_tokenization_required": true,
+          "instrument_verification_required": true,
           "mfa_for_high_value": true,
           "risk_scoring_required": true,
           "transaction_limits_required": true
@@ -28,7 +45,8 @@
           "chargeback_supported": true,
           "exception_queue_enabled": true,
           "reconciliation_required": true,
-          "settlement_approval_required": true
+          "settlement_approval_required": true,
+          "settlement_stream_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -36,6 +54,8 @@
           "default_theme": "walt_wallet_ops"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_policy_center": true,
           "enable_reconciliation_queue": true,
           "enable_settlement_center": true,
           "enable_transaction_console": true,
@@ -46,6 +66,26 @@
           "multi_currency_enabled": true,
           "negative_balance_blocking": true,
           "wallet_owner_required": true
+        },
+        "walt_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "payment_reviewer",
+            "risk_reviewer",
+            "settlement_reviewer",
+            "reconciliation_reviewer",
+            "instrument_reviewer",
+            "chargeback_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         }
       },
       "erp_modules": [
@@ -55,9 +95,21 @@
       "master_data": {},
       "name": "Wallet and Payment Core",
       "provides": [
-        "walt_operations"
+        "wallet_ledger",
+        "payment_instruments",
+        "transaction_authorization",
+        "settlement",
+        "reconciliation",
+        "payment_risk_governance",
+        "walt_agents"
       ],
-      "requires": [],
+      "requires": [
+        "encr",
+        "auth",
+        "comp",
+        "audl",
+        "wflo"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,7 +139,34 @@
           },
           {
             "condition": {
+              "ledger_ref_present": false,
+              "operation": "create_wallet"
+            },
+            "description": "Wallets require ledger integrity evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ledger_integrity_required",
+              "required_action": "attach_ledger_reference"
+            },
+            "name": "wallet_requires_ledger"
+          },
+          {
+            "condition": {
+              "compliance_policy_present": false,
+              "operation": "create_wallet"
+            },
+            "description": "Wallets require a compliance policy reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_policy_required",
+              "required_action": "attach_compliance_policy"
+            },
+            "name": "wallet_requires_compliance_policy"
+          },
+          {
+            "condition": {
               "instrument_encrypted": false,
+              "operation": "register_instrument",
               "payment_instrument_present": true
             },
             "description": "Payment instruments must be encrypted or tokenized.",
@@ -97,6 +176,32 @@
               "required_action": "encrypt_or_tokenize_instrument"
             },
             "name": "instrument_requires_encryption"
+          },
+          {
+            "condition": {
+              "instrument_token_present": false,
+              "operation": "register_instrument"
+            },
+            "description": "Payment instruments require a token reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instrument_tokenization_required",
+              "required_action": "attach_instrument_token"
+            },
+            "name": "instrument_requires_token"
+          },
+          {
+            "condition": {
+              "instrument_verifier_present": false,
+              "operation": "register_instrument"
+            },
+            "description": "Payment instruments require verification attribution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "instrument_verification_required",
+              "required_action": "record_instrument_verifier"
+            },
+            "name": "instrument_requires_verification"
           },
           {
             "condition": {
@@ -113,6 +218,32 @@
           },
           {
             "condition": {
+              "operation": "authorize_transaction",
+              "risk_score_present": false
+            },
+            "description": "Transaction authorization requires risk score evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_score_required",
+              "required_action": "attach_transaction_risk_score"
+            },
+            "name": "transaction_requires_risk_score"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "authorize_transaction"
+            },
+            "description": "Transaction lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_transaction_lifecycle_to_bytewax"
+            },
+            "name": "transaction_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "operation": "settle_batch",
               "reconciliation_completed": false
             },
@@ -126,6 +257,45 @@
           },
           {
             "condition": {
+              "operation": "settle_batch",
+              "settlement_approval_recorded": false
+            },
+            "description": "Settlement requires approval evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_approval_required",
+              "required_action": "record_settlement_approval"
+            },
+            "name": "settlement_requires_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "settle_batch"
+            },
+            "description": "Settlement lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_settlement_lifecycle_to_bytewax"
+            },
+            "name": "settlement_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "operation": "record_reconciliation",
+              "reconciliation_evidence_present": false
+            },
+            "description": "Reconciliation requires a durable evidence reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reconciliation_evidence_required",
+              "required_action": "attach_reconciliation_evidence"
+            },
+            "name": "reconciliation_requires_evidence"
+          },
+          {
+            "condition": {
               "risk_review_recorded": false,
               "transaction_risk_score_gt": 0.8
             },
@@ -136,6 +306,59 @@
               "required_action": "review_transaction_risk"
             },
             "name": "high_risk_transaction_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_settlement"
+            },
+            "description": "Batch settlement mutation requires Bytewax stream coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_settlement_to_bytewax"
+            },
+            "name": "batch_settlement_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_walt_agent"
+            },
+            "description": "Wallet/payment agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "walt_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "walt_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_walt_agent"
+            },
+            "description": "Wallet/payment agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "walt_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "walt_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_payment_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged payment actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_payment_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -168,7 +391,34 @@
         },
         {
           "condition": {
+            "ledger_ref_present": false,
+            "operation": "create_wallet"
+          },
+          "description": "Wallets require ledger integrity evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ledger_integrity_required",
+            "required_action": "attach_ledger_reference"
+          },
+          "name": "wallet_requires_ledger"
+        },
+        {
+          "condition": {
+            "compliance_policy_present": false,
+            "operation": "create_wallet"
+          },
+          "description": "Wallets require a compliance policy reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_policy_required",
+            "required_action": "attach_compliance_policy"
+          },
+          "name": "wallet_requires_compliance_policy"
+        },
+        {
+          "condition": {
             "instrument_encrypted": false,
+            "operation": "register_instrument",
             "payment_instrument_present": true
           },
           "description": "Payment instruments must be encrypted or tokenized.",
@@ -178,6 +428,32 @@
             "required_action": "encrypt_or_tokenize_instrument"
           },
           "name": "instrument_requires_encryption"
+        },
+        {
+          "condition": {
+            "instrument_token_present": false,
+            "operation": "register_instrument"
+          },
+          "description": "Payment instruments require a token reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instrument_tokenization_required",
+            "required_action": "attach_instrument_token"
+          },
+          "name": "instrument_requires_token"
+        },
+        {
+          "condition": {
+            "instrument_verifier_present": false,
+            "operation": "register_instrument"
+          },
+          "description": "Payment instruments require verification attribution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "instrument_verification_required",
+            "required_action": "record_instrument_verifier"
+          },
+          "name": "instrument_requires_verification"
         },
         {
           "condition": {
@@ -194,6 +470,32 @@
         },
         {
           "condition": {
+            "operation": "authorize_transaction",
+            "risk_score_present": false
+          },
+          "description": "Transaction authorization requires risk score evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_score_required",
+            "required_action": "attach_transaction_risk_score"
+          },
+          "name": "transaction_requires_risk_score"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "authorize_transaction"
+          },
+          "description": "Transaction lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_transaction_lifecycle_to_bytewax"
+          },
+          "name": "transaction_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "operation": "settle_batch",
             "reconciliation_completed": false
           },
@@ -207,6 +509,45 @@
         },
         {
           "condition": {
+            "operation": "settle_batch",
+            "settlement_approval_recorded": false
+          },
+          "description": "Settlement requires approval evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_approval_required",
+            "required_action": "record_settlement_approval"
+          },
+          "name": "settlement_requires_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "settle_batch"
+          },
+          "description": "Settlement lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_settlement_lifecycle_to_bytewax"
+          },
+          "name": "settlement_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "operation": "record_reconciliation",
+            "reconciliation_evidence_present": false
+          },
+          "description": "Reconciliation requires a durable evidence reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reconciliation_evidence_required",
+            "required_action": "attach_reconciliation_evidence"
+          },
+          "name": "reconciliation_requires_evidence"
+        },
+        {
+          "condition": {
             "risk_review_recorded": false,
             "transaction_risk_score_gt": 0.8
           },
@@ -217,6 +558,59 @@
             "required_action": "review_transaction_risk"
           },
           "name": "high_risk_transaction_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_settlement"
+          },
+          "description": "Batch settlement mutation requires Bytewax stream coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_settlement_to_bytewax"
+          },
+          "name": "batch_settlement_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_walt_agent"
+          },
+          "description": "Wallet/payment agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "walt_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "walt_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_walt_agent"
+          },
+          "description": "Wallet/payment agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "walt_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "walt_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_payment_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged payment actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_payment_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -226,6 +620,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "WALTAgentWorkbench",
+          "permission": "walt:admin",
+          "route": "/walt/agents"
+        },
         "dashboard": {
           "component": "WALTDashboard",
           "permission": "walt:view",
@@ -235,6 +634,11 @@
           "component": "PaymentInstruments",
           "permission": "walt:manage_wallets",
           "route": "/walt/instruments"
+        },
+        "policy": {
+          "component": "WALTPolicyCenter",
+          "permission": "walt:admin",
+          "route": "/walt/policy"
         },
         "reconciliation": {
           "component": "ReconciliationQueue",
@@ -267,12 +671,49 @@
           "route": "/walt/wallets"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "wallet_created",
+          "instrument_registered",
+          "transaction_authorized",
+          "transaction_captured",
+          "settlement_batch_created",
+          "reconciliation_recorded",
+          "walt_agent_registered"
+        ],
+        "guardrails": [
+          "transaction_requires_bytewax_stream",
+          "settlement_requires_bytewax_stream",
+          "batch_settlement_requires_bytewax",
+          "privileged_agent_payment_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "active",
+          "authorized",
+          "captured",
+          "review_required",
+          "settled",
+          "reconciled",
+          "exception_review",
+          "blocked"
+        ],
+        "stream": "apg.walt.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
+          },
           "instrument_vault": {
             "status_style": "encryption-chip",
             "visual": "tokenized-card-list"
+          },
+          "policy_center": {
+            "status_style": "guardrail-chip",
+            "visual": "rule-grid"
           },
           "settlement_center": {
             "status_style": "reconciliation-chip",
@@ -357,6 +798,20 @@
             "permission": "walt:view"
           },
           {
+            "component": "WALTAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/walt/agents",
+            "permission": "walt:admin"
+          },
+          {
+            "component": "WALTPolicyCenter",
+            "name": "policy",
+            "nav_group": "Governance",
+            "path": "/walt/policy",
+            "permission": "walt:admin"
+          },
+          {
             "component": "WALTSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -377,20 +832,43 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "walt": []
+      "walt": [
+        "encr",
+        "auth",
+        "comp",
+        "audl",
+        "wflo"
+      ]
     }
   },
   "contracts": {
     "walt": {
       "configuration": {
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "compliance": "adapter",
+          "encryption": "adapter",
+          "event_stream": "bytewax",
+          "ledger": "adapter"
+        },
         "governance": {
           "audit_financial_events": true,
           "compliance_policy_required": true,
           "encrypted_instruments_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
+        },
+        "observability": {
+          "emit_settlement_events": true,
+          "emit_transaction_events": true,
+          "emit_wallet_events": true,
+          "event_stream": "apg.walt.lifecycle",
+          "stream_processor": "bytewax"
         },
         "payments": {
           "instrument_tokenization_required": true,
+          "instrument_verification_required": true,
           "mfa_for_high_value": true,
           "risk_scoring_required": true,
           "transaction_limits_required": true
@@ -399,7 +877,8 @@
           "chargeback_supported": true,
           "exception_queue_enabled": true,
           "reconciliation_required": true,
-          "settlement_approval_required": true
+          "settlement_approval_required": true,
+          "settlement_stream_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -407,6 +886,8 @@
           "default_theme": "walt_wallet_ops"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_policy_center": true,
           "enable_reconciliation_queue": true,
           "enable_settlement_center": true,
           "enable_transaction_console": true,
@@ -417,13 +898,45 @@
           "multi_currency_enabled": true,
           "negative_balance_blocking": true,
           "wallet_owner_required": true
+        },
+        "walt_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "payment_reviewer",
+            "risk_reviewer",
+            "settlement_reviewer",
+            "reconciliation_reviewer",
+            "instrument_reviewer",
+            "chargeback_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         }
       },
       "id": "walt",
       "provides": [
-        "walt_operations"
+        "wallet_ledger",
+        "payment_instruments",
+        "transaction_authorization",
+        "settlement",
+        "reconciliation",
+        "payment_risk_governance",
+        "walt_agents"
       ],
-      "requires": []
+      "requires": [
+        "encr",
+        "auth",
+        "comp",
+        "audl",
+        "wflo"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +948,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +969,19 @@
   },
   "roles": {},
   "rules": {
+    "batch_settlement_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_settlement"
+      },
+      "description": "Batch settlement mutation requires Bytewax stream coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_settlement_to_bytewax"
+      },
+      "name": "batch_settlement_requires_bytewax"
+    },
     "high_risk_transaction_requires_review": {
       "condition": {
         "risk_review_recorded": false,
@@ -485,6 +1011,7 @@
     "instrument_requires_encryption": {
       "condition": {
         "instrument_encrypted": false,
+        "operation": "register_instrument",
         "payment_instrument_present": true
       },
       "description": "Payment instruments must be encrypted or tokenized.",
@@ -494,6 +1021,85 @@
         "required_action": "encrypt_or_tokenize_instrument"
       },
       "name": "instrument_requires_encryption"
+    },
+    "instrument_requires_token": {
+      "condition": {
+        "instrument_token_present": false,
+        "operation": "register_instrument"
+      },
+      "description": "Payment instruments require a token reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "instrument_tokenization_required",
+        "required_action": "attach_instrument_token"
+      },
+      "name": "instrument_requires_token"
+    },
+    "instrument_requires_verification": {
+      "condition": {
+        "instrument_verifier_present": false,
+        "operation": "register_instrument"
+      },
+      "description": "Payment instruments require verification attribution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "instrument_verification_required",
+        "required_action": "record_instrument_verifier"
+      },
+      "name": "instrument_requires_verification"
+    },
+    "privileged_agent_payment_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_payment_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged payment actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_payment_action_requires_human_approval"
+    },
+    "reconciliation_requires_evidence": {
+      "condition": {
+        "operation": "record_reconciliation",
+        "reconciliation_evidence_present": false
+      },
+      "description": "Reconciliation requires a durable evidence reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reconciliation_evidence_required",
+        "required_action": "attach_reconciliation_evidence"
+      },
+      "name": "reconciliation_requires_evidence"
+    },
+    "settlement_requires_approval": {
+      "condition": {
+        "operation": "settle_batch",
+        "settlement_approval_recorded": false
+      },
+      "description": "Settlement requires approval evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "settlement_approval_required",
+        "required_action": "record_settlement_approval"
+      },
+      "name": "settlement_requires_approval"
+    },
+    "settlement_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "settle_batch"
+      },
+      "description": "Settlement lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_settlement_lifecycle_to_bytewax"
+      },
+      "name": "settlement_requires_bytewax_stream"
     },
     "settlement_requires_reconciliation": {
       "condition": {
@@ -520,6 +1126,58 @@
       },
       "name": "tenant_context_required"
     },
+    "transaction_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "authorize_transaction"
+      },
+      "description": "Transaction lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_transaction_lifecycle_to_bytewax"
+      },
+      "name": "transaction_requires_bytewax_stream"
+    },
+    "transaction_requires_risk_score": {
+      "condition": {
+        "operation": "authorize_transaction",
+        "risk_score_present": false
+      },
+      "description": "Transaction authorization requires risk score evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "risk_score_required",
+        "required_action": "attach_transaction_risk_score"
+      },
+      "name": "transaction_requires_risk_score"
+    },
+    "wallet_requires_compliance_policy": {
+      "condition": {
+        "compliance_policy_present": false,
+        "operation": "create_wallet"
+      },
+      "description": "Wallets require a compliance policy reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compliance_policy_required",
+        "required_action": "attach_compliance_policy"
+      },
+      "name": "wallet_requires_compliance_policy"
+    },
+    "wallet_requires_ledger": {
+      "condition": {
+        "ledger_ref_present": false,
+        "operation": "create_wallet"
+      },
+      "description": "Wallets require ledger integrity evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ledger_integrity_required",
+        "required_action": "attach_ledger_reference"
+      },
+      "name": "wallet_requires_ledger"
+    },
     "wallet_requires_owner": {
       "condition": {
         "operation": "create_wallet",
@@ -532,6 +1190,32 @@
         "required_action": "assign_wallet_owner"
       },
       "name": "wallet_requires_owner"
+    },
+    "walt_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_walt_agent"
+      },
+      "description": "Wallet/payment agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "walt_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "walt_agent_role_supported"
+    },
+    "walt_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_walt_agent"
+      },
+      "description": "Wallet/payment agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "walt_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "walt_agent_runtime_supported"
     }
   },
   "security": {},

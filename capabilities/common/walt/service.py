@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_WALT_AGENT_ROLES,
+	SUPPORTED_WALT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .wallet_runtime import (
 	PaymentInstrumentRecord,
 	ReconciliationRecord,
 	SettlementBatchRecord,
 	TransactionRecord,
+	WaltAgentRecord,
 	WalletAuditEventRecord,
 	WalletRecord,
 	money_to_minor_units,
@@ -30,6 +38,7 @@ class WaltService:
 		self.transactions: dict[str, TransactionRecord] = {}
 		self.settlement_batches: dict[str, SettlementBatchRecord] = {}
 		self.reconciliations: dict[str, ReconciliationRecord] = {}
+		self.walt_agents: dict[str, WaltAgentRecord] = {}
 		self.audit_events: dict[str, WalletAuditEventRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -54,14 +63,12 @@ class WaltService:
 			"tenant_context_present": True,
 			"operation": "create_wallet",
 			"wallet_owner_assigned": bool(str(owner_ref or "").strip()),
+			"ledger_ref_present": bool(str(ledger_ref or "").strip()),
+			"compliance_policy_present": bool(str(compliance_policy_ref or "").strip()),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if not str(ledger_ref or "").strip():
-			raise PermissionError("ledger_integrity_required")
-		if not str(compliance_policy_ref or "").strip():
-			raise PermissionError("compliance_policy_required")
 		balance_minor = money_to_minor_units(initial_balance)
 		if balance_minor < 0:
 			raise PermissionError("negative_balance_blocked")
@@ -92,16 +99,15 @@ class WaltService:
 		wallet = self._get_wallet(tenant_id, wallet_id)
 		context = {
 			"tenant_context_present": True,
+			"operation": "register_instrument",
 			"payment_instrument_present": bool(str(instrument_ref or "").strip()),
 			"instrument_encrypted": bool(encrypted),
+			"instrument_token_present": bool(str(token_ref or "").strip()),
+			"instrument_verifier_present": bool(str(verified_by or "").strip()),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if not str(token_ref or "").strip():
-			raise PermissionError("instrument_tokenization_required")
-		if not str(verified_by or "").strip():
-			raise PermissionError("instrument_verification_required")
 		record = PaymentInstrumentRecord(
 			id=stable_id("walt_instrument", tenant_id, wallet.id, instrument_ref),
 			tenant_id=tenant_id,
@@ -129,6 +135,7 @@ class WaltService:
 		risk_review_recorded: bool = False,
 		idempotency_key: str = "",
 		actor: str = "system",
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		wallet = self._get_wallet(tenant_id, wallet_id)
@@ -144,6 +151,8 @@ class WaltService:
 		amount_minor = money_to_minor_units(amount)
 		if amount_minor <= 0:
 			raise ValueError("transaction_amount_must_be_positive")
+		risk_score_present = risk_score is not None
+		risk_score_value = 0.0 if risk_score is None else float(risk_score)
 		context = {
 			"tenant_context_present": True,
 			"operation": "authorize_transaction",
@@ -151,8 +160,10 @@ class WaltService:
 			"instrument_encrypted": bool(instrument.encrypted),
 			"transaction_amount": amount_minor / 100,
 			"mfa_completed": bool(mfa_completed),
-			"transaction_risk_score": float(risk_score),
+			"risk_score_present": risk_score_present,
+			"transaction_risk_score": risk_score_value,
 			"risk_review_recorded": bool(risk_review_recorded),
+			"event_stream": self._normalize_token(event_stream),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -172,7 +183,7 @@ class WaltService:
 			amount_minor=amount_minor,
 			currency=currency_code,
 			status=status,
-			risk_score=float(risk_score),
+			risk_score=risk_score_value,
 			mfa_completed=bool(mfa_completed),
 			risk_review_recorded=bool(risk_review_recorded),
 			idempotency_key=idempotency_key,
@@ -180,7 +191,14 @@ class WaltService:
 			matched_rules=list(result["matched_rules"]),
 		)
 		self.transactions[record.id] = record
-		self._record_event(tenant_id, "transaction_authorized", record.id, f"Transaction {status}", actor)
+		self._record_event(
+			tenant_id,
+			"transaction_authorized",
+			record.id,
+			f"Transaction {status}",
+			actor,
+			metadata={"event_stream": self._normalize_token(event_stream)},
+		)
 		return record.to_dict()
 
 	def capture_transaction(self, tenant_id: str, transaction_id: str, actor: str = "system") -> dict[str, Any]:
@@ -209,12 +227,16 @@ class WaltService:
 		settlement_account_ref: str,
 		reconciliation_completed: bool,
 		created_by: str,
+		approval_ref: str = "approval://settlement/default",
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		context = {
 			"tenant_context_present": True,
 			"operation": "settle_batch",
 			"reconciliation_completed": bool(reconciliation_completed),
+			"settlement_approval_recorded": bool(str(approval_ref or "").strip()),
+			"event_stream": self._normalize_token(event_stream),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -244,7 +266,14 @@ class WaltService:
 		for transaction in transactions:
 			transaction.status = "settled"
 			transaction.settled_at = utc_now()
-		self._record_event(tenant_id, "settlement_batch_created", record.id, "Settlement batch created", created_by)
+		self._record_event(
+			tenant_id,
+			"settlement_batch_created",
+			record.id,
+			"Settlement batch created",
+			created_by,
+			metadata={"event_stream": self._normalize_token(event_stream), "approval_ref": approval_ref},
+		)
 		return record.to_dict()
 
 	def record_reconciliation(
@@ -258,8 +287,14 @@ class WaltService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		batch = self._get_settlement_batch(tenant_id, settlement_batch_id)
-		if not str(reconciliation_ref or "").strip():
-			raise PermissionError("reconciliation_evidence_required")
+		context = {
+			"tenant_context_present": True,
+			"operation": "record_reconciliation",
+			"reconciliation_evidence_present": bool(str(reconciliation_ref or "").strip()),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		if matched_count < 0 or exception_count < 0:
 			raise ValueError("reconciliation_counts_must_be_non_negative")
 		status = "exceptions" if exception_count else "matched"
@@ -277,6 +312,87 @@ class WaltService:
 		self.reconciliations[record.id] = record
 		self._record_event(tenant_id, "reconciliation_recorded", record.id, f"Reconciliation {status}", recorded_by)
 		return record.to_dict()
+
+	def register_walt_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str = "platform",
+		human_approval_required: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_walt_agent",
+			"agent_runtime_supported": runtime_value in SUPPORTED_WALT_AGENT_RUNTIMES,
+			"agent_role_supported": role_value in SUPPORTED_WALT_AGENT_ROLES,
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		record = WaltAgentRecord(
+			id=stable_id("walt_agent", tenant_id, name, runtime_value, role_value),
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=scope,
+			owner=owner,
+			human_approval_required=bool(human_approval_required),
+		)
+		self.walt_agents[record.id] = record
+		self._record_event(
+			tenant_id,
+			"walt_agent_registered",
+			record.id,
+			f"Wallet/payment agent registered: {name}",
+			owner,
+			metadata={"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
+		)
+		return record.to_dict()
+
+	def validate_agent_payment_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		action: str,
+		privileged_scope: bool = False,
+		human_approval_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent = self.walt_agents.get(agent_id)
+		if agent is None or agent.tenant_id != tenant_id:
+			raise KeyError(f"walt_agent_not_found:{agent_id}")
+		context = {
+			"tenant_context_present": True,
+			"operation": "agent_payment_action",
+			"agent_id": agent_id,
+			"agent_role": agent.role,
+			"action": action,
+			"privileged_scope": bool(privileged_scope),
+			"human_approval_recorded": bool(str(human_approval_ref or "").strip()),
+		}
+		return self.evaluate(context)
+
+	def validate_batch_settlement(
+		self,
+		tenant_id: str,
+		batch_count: int,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		context = {
+			"tenant_context_present": True,
+			"operation": "batch_settlement",
+			"batch_count": int(batch_count),
+			"event_stream": self._normalize_token(event_stream),
+		}
+		return self.evaluate(context)
 
 	def create_record(
 		self,
@@ -320,6 +436,9 @@ class WaltService:
 	def list_reconciliations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.reconciliations, tenant_id)
 
+	def list_walt_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.walt_agents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -336,6 +455,9 @@ class WaltService:
 			"captured_transaction_count": sum(1 for item in transactions if item["status"] == "captured"),
 			"settlement_batch_count": len(self.list_settlement_batches(tenant_id)),
 			"reconciliation_count": len(self.list_reconciliations(tenant_id)),
+			"walt_agent_count": len(self.list_walt_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
 			"total_balance": round(sum(item["balance"] for item in wallets), 2),
 			"total_holds": round(sum(item["hold"] for item in wallets), 2),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
@@ -388,6 +510,7 @@ class WaltService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		record = WalletAuditEventRecord(
 			id=stable_id("walt_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -397,6 +520,7 @@ class WaltService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			metadata=dict(metadata or {}),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -406,3 +530,6 @@ class WaltService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
