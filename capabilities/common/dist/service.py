@@ -5,9 +5,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_COMPUTE_AGENT_ROLES,
+	SUPPORTED_COMPUTE_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .distributed_engine import DistributedEngine
 from .models import (
+	ComputeAgent,
 	DistAuditEvent,
 	DistributedJob,
 	JobPartition,
@@ -28,6 +34,7 @@ class DistService:
 		self._partitions: dict[str, JobPartition] = {}
 		self._aggregations: dict[str, ResultAggregation] = {}
 		self._scaling_decisions: dict[str, ScalingDecision] = {}
+		self._agents: dict[str, ComputeAgent] = {}
 		self._audit_events: dict[str, DistAuditEvent] = {}
 		self._idempotency_index: dict[tuple[str, str], str] = {}
 		self._engine = DistributedEngine()
@@ -58,6 +65,9 @@ class DistService:
 			raise PermissionError("worker_health_required")
 		if not queue_name:
 			raise PermissionError("queue_name_required")
+		key = self._key(tenant_id, pool_id)
+		if key in self._worker_pools:
+			raise ValueError("worker_pool_already_exists")
 		pool = WorkerPool(
 			id=pool_id,
 			tenant_id=tenant_id,
@@ -68,7 +78,7 @@ class DistService:
 			queue_name=queue_name,
 			autoscaling=bool(autoscaling),
 		)
-		self._worker_pools[pool_id] = pool
+		self._worker_pools[key] = pool
 		self._record_audit(tenant_id, pool_id, "worker_pool_created", owner, "allow", metadata={"capacity_quota": capacity_quota})
 		return pool.to_dict()
 
@@ -90,6 +100,9 @@ class DistService:
 			raise PermissionError("worker_cpu_slots_required")
 		if memory_gb <= 0:
 			raise PermissionError("worker_memory_required")
+		key = self._key(tenant_id, worker_id)
+		if key in self._workers:
+			raise ValueError("worker_already_registered")
 		worker = WorkerNode(
 			id=worker_id,
 			tenant_id=tenant_id,
@@ -100,7 +113,7 @@ class DistService:
 			labels={str(key): str(value) for key, value in dict(labels or {}).items()},
 			healthy=bool(healthy),
 		)
-		self._workers[worker_id] = worker
+		self._workers[key] = worker
 		self._record_audit(tenant_id, worker_id, "worker_registered", hostname, "allow", metadata={"pool_id": pool_id})
 		return worker.to_dict()
 
@@ -128,22 +141,20 @@ class DistService:
 			"operation": "submit_job",
 			"job_owner_assigned": bool(owner),
 			"idempotency_key_present": bool(idempotency_key),
+			"retry_policy_attached": bool(retry_policy),
 			"worker_pool_selected": bool(worker_pool_id),
 			"health_check_attached": bool(pool.health_check),
 			"quota_policy_attached": bool(quota_policy),
 			"job_submission_requested": True,
 			"partition_count": int(partition_count),
+			"event_stream_attached": bool(event_bus_topic),
+			"aggregation_strategy_attached": bool(aggregation_strategy),
 			"partition_review_recorded": bool(partition_review_recorded),
 		})
 		self._raise_if_denied(result)
-		if not retry_policy:
-			raise PermissionError("retry_policy_required")
-		if partition_count <= 0:
-			raise PermissionError("partition_count_required")
-		if not event_bus_topic:
-			raise PermissionError("event_bus_required")
-		if not aggregation_strategy:
-			raise PermissionError("result_aggregation_required")
+		key = self._key(tenant_id, job_id)
+		if key in self._jobs:
+			raise ValueError("job_already_exists")
 		review_status = "required" if result["decision"] == "require_review" else "approved"
 		status = "pending_review" if review_status == "required" else "queued"
 		job = DistributedJob(
@@ -161,10 +172,10 @@ class DistService:
 			status=status,
 			review_status=review_status,
 		)
-		self._jobs[job_id] = job
+		self._jobs[key] = job
 		self._idempotency_index[idempotency_tuple] = job_id
 		for ordinal, partition_id in enumerate(self._engine.partition_ids(job_id, int(partition_count)), start=1):
-			self._partitions[partition_id] = JobPartition(
+			self._partitions[self._key(tenant_id, partition_id)] = JobPartition(
 				id=partition_id,
 				tenant_id=tenant_id,
 				job_id=job_id,
@@ -188,6 +199,7 @@ class DistService:
 			return job.to_dict()
 		job.status = "queued"
 		job.review_status = "approved"
+		self._jobs[self._key(tenant_id, job_id)] = job
 		self._record_audit(tenant_id, job_id, "partition_review_approved", reviewer, "allow")
 		return job.to_dict()
 
@@ -206,6 +218,7 @@ class DistService:
 			partition.attempt_count += 1
 		job.status = "running"
 		job.started_at = datetime.now(timezone.utc)
+		self._jobs[self._key(tenant_id, job_id)] = job
 		self._record_audit(tenant_id, job_id, "partitions_dispatched", job.owner, "allow", metadata={"partition_count": len(queued)})
 		return [partition.to_dict() for partition in queued]
 
@@ -222,6 +235,7 @@ class DistService:
 		partition.status = status
 		partition.result_hash = self._engine.stable_hash({"partition_id": partition_id, "result": result_payload})
 		partition.completed_at = datetime.now(timezone.utc)
+		self._partitions[self._key(tenant_id, partition_id)] = partition
 		self._record_audit(tenant_id, partition_id, f"partition_{status}", "worker", status, metadata={"job_id": partition.job_id})
 		return partition.to_dict()
 
@@ -244,9 +258,13 @@ class DistService:
 			result_hash=self._engine.result_hash(job_id, [item.to_dict() for item in sorted(partitions, key=lambda item: item.id)]),
 			status=status,
 		)
-		self._aggregations[aggregation_id] = aggregation
+		key = self._key(tenant_id, aggregation_id)
+		if key in self._aggregations:
+			raise ValueError("aggregation_already_exists")
+		self._aggregations[key] = aggregation
 		job.status = status
 		job.completed_at = datetime.now(timezone.utc)
+		self._jobs[self._key(tenant_id, job_id)] = job
 		self._record_audit(tenant_id, aggregation_id, "results_aggregated", job.owner, status, metadata={"job_id": job_id})
 		return aggregation.to_dict()
 
@@ -254,10 +272,13 @@ class DistService:
 		pool = self._require_pool(pool_id, tenant_id)
 		queued_partitions = len([
 			item for item in self._partitions.values()
-			if item.tenant_id == tenant_id and item.status == "queued" and self._jobs[item.job_id].worker_pool_id == pool_id
+			if item.tenant_id == tenant_id and item.status == "queued" and self._jobs[self._key(tenant_id, item.job_id)].worker_pool_id == pool_id
 		])
 		active_workers = len([item for item in self._workers.values() if item.tenant_id == tenant_id and item.pool_id == pool_id and item.healthy])
 		decision, reason, desired_capacity = self._engine.scaling_posture(queued_partitions, active_workers, pool.capacity_quota)
+		key = self._key(tenant_id, decision_id)
+		if key in self._scaling_decisions:
+			raise ValueError("scaling_decision_already_exists")
 		scaling = ScalingDecision(
 			id=decision_id,
 			tenant_id=tenant_id,
@@ -268,9 +289,86 @@ class DistService:
 			current_capacity=active_workers,
 			recorded_by=recorded_by,
 		)
-		self._scaling_decisions[decision_id] = scaling
+		self._scaling_decisions[key] = scaling
 		self._record_audit(tenant_id, decision_id, "scaling_decision_recorded", recorded_by, decision, metadata={"reason": reason})
 		return scaling.to_dict()
+
+	def register_compute_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_compute_agent_runtime(runtime)
+		normalized_role = _normalize_compute_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"compute_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_role_supported": bool(normalized_role),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_denied(result)
+		key = self._key(tenant_id, agent_id)
+		if key in self._agents:
+			raise ValueError("compute_agent_already_registered")
+		agent = ComputeAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref or None,
+		)
+		self._agents[key] = agent
+		self._record_audit(tenant_id, agent_id, "compute_agent_registered", agent.name, result["decision"], metadata={"runtime": normalized_runtime, "role": normalized_role})
+		return agent.to_dict()
+
+	def change_job_state(
+		self,
+		tenant_id: str,
+		job_id: str,
+		status: str,
+		reason: str,
+		actor: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		job = self._require_job(job_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		self._raise_if_denied(result)
+		job.status = status
+		self._jobs[self._key(tenant_id, job_id)] = job
+		self._record_audit(tenant_id, job_id, "job_state_changed", actor, result["decision"], metadata={"status": status, "reason": reason})
+		return job.to_dict()
+
+	def validate_batch_compute_mutation(self, tenant_id: str, event_stream: str, actor: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "batch_compute_mutation",
+			"event_stream": event_stream,
+		})
+		self._raise_if_denied(result)
+		self._record_audit(tenant_id, "batch-compute-mutation", "batch_compute_mutation_validated", actor, result["decision"], metadata={"event_stream": event_stream})
+		return {"tenant_id": tenant_id, "event_stream": event_stream, "decision": result["decision"], "processor": "bytewax"}
 
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		jobs = self.list_jobs(tenant_id)
@@ -287,6 +385,8 @@ class DistService:
 			"running_partition_count": len([item for item in partitions if item["status"] == "running"]),
 			"completed_partition_count": len([item for item in partitions if item["status"] == "completed"]),
 			"failed_partition_count": len([item for item in partitions if item["status"] == "failed"]),
+			"compute_agent_count": len(self.list_compute_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
 	def list_worker_pools(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -307,6 +407,9 @@ class DistService:
 	def list_scaling_decisions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._scaling_decisions, tenant_id)
 
+	def list_compute_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -315,20 +418,20 @@ class DistService:
 		self._raise_if_denied(result)
 
 	def _require_pool(self, pool_id: str, tenant_id: str) -> WorkerPool:
-		pool = self._worker_pools.get(pool_id)
-		if pool is None or pool.tenant_id != tenant_id:
+		pool = self._worker_pools.get(self._key(tenant_id, pool_id))
+		if pool is None:
 			raise KeyError("worker_pool_not_found")
 		return pool
 
 	def _require_job(self, job_id: str, tenant_id: str) -> DistributedJob:
-		job = self._jobs.get(job_id)
-		if job is None or job.tenant_id != tenant_id:
+		job = self._jobs.get(self._key(tenant_id, job_id))
+		if job is None:
 			raise KeyError("job_not_found")
 		return job
 
 	def _require_partition(self, partition_id: str, tenant_id: str) -> JobPartition:
-		partition = self._partitions.get(partition_id)
-		if partition is None or partition.tenant_id != tenant_id:
+		partition = self._partitions.get(self._key(tenant_id, partition_id))
+		if partition is None:
 			raise KeyError("partition_not_found")
 		return partition
 
@@ -373,3 +476,18 @@ class DistService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+	def _key(self, tenant_id: str, object_id: str) -> str:
+		if not tenant_id:
+			raise PermissionError("tenant_context_required")
+		return f"{tenant_id}:{object_id}"
+
+
+def _normalize_compute_agent_runtime(value: str) -> str:
+	value = value.strip().lower()
+	return value if value in SUPPORTED_COMPUTE_AGENT_RUNTIMES else ""
+
+
+def _normalize_compute_agent_role(value: str) -> str:
+	value = value.strip().lower()
+	return value if value in SUPPORTED_COMPUTE_AGENT_ROLES else ""

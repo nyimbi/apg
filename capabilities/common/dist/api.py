@@ -23,6 +23,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"worker_count": summary["worker_count"],
 		"job_count": summary["job_count"],
 		"queued_partition_count": summary["queued_partition_count"],
+		"compute_agent_count": summary["compute_agent_count"],
+		"audit_event_count": summary["audit_event_count"],
 	}
 
 
@@ -110,6 +112,39 @@ def record_scaling_decision(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_compute_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_compute_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=bool(payload.get("registered", True)),
+	)
+
+
+def change_job_state(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.change_job_state(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		job_id=str(payload["job_id"]),
+		status=str(payload["status"]),
+		reason=str(payload.get("reason") or ""),
+		actor=str(payload.get("actor") or "compute-operator"),
+		audit_recorded=bool(payload.get("audit_recorded", True)),
+	)
+
+
+def validate_batch_compute_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_compute_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or ""),
+		actor=str(payload.get("actor") or "compute-operator"),
+	)
+
+
 def distributed_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": SERVICE.dashboard_summary(tenant_id),
@@ -119,5 +154,6 @@ def distributed_state(tenant_id: str = "default") -> dict[str, Any]:
 		"partitions": SERVICE.list_partitions(tenant_id),
 		"aggregations": SERVICE.list_aggregations(tenant_id),
 		"scaling_decisions": SERVICE.list_scaling_decisions(tenant_id),
+		"compute_agents": SERVICE.list_compute_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 	}

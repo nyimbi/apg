@@ -5,6 +5,7 @@ import pytest
 from capabilities.common.dist import register_capability
 from capabilities.common.dist.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.dist.service import DistService
+from capabilities.common.dist.views import analytics_model, audit_trail_model, compute_agents_model, dashboard_model, settings_model
 
 
 def test_contract_exposes_configuration_rules_ui_and_theme():
@@ -13,7 +14,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "dist"
 	assert contract["configuration"]["tenant_id"] == "tenant-dist"
 	assert contract["configuration"]["jobs"]["max_partitions"] == 100
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "jobs", "workers", "coordination", "governance", "ui", "theme"]
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "jobs", "workers", "coordination", "compute_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["configuration"]["compute_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["streaming"]["topic"] == "apg.dist.lifecycle"
 	assert contract["theme"]["name"] == "dist_compute_grid"
 
 
@@ -30,6 +34,8 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "dist"
 	assert "mqeb" in registration["dependencies"]
 	assert registration["ui_components"]["workers"] == "/dist/workers"
+	assert registration["ui_components"]["agents"] == "/dist/agents"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert "dist:submit_jobs" in registration["permissions"]
 
 
@@ -63,6 +69,16 @@ def test_service_runs_partitioned_job_lifecycle_with_aggregation_and_scaling():
 		memory_gb=16,
 		labels={"zone": "b"},
 	)
+	agent = service.register_compute_agent(
+		"tenant-dist",
+		"codex-partition-reviewer",
+		"Codex Partition Reviewer",
+		"codex",
+		"result_reviewer",
+		"Review partition completion evidence and aggregation readiness.",
+		True,
+		"policy:dist:agents:v1",
+	)
 	job = service.submit_job(
 		"job-001",
 		"tenant-dist",
@@ -82,9 +98,16 @@ def test_service_runs_partitioned_job_lifecycle_with_aggregation_and_scaling():
 	aggregation = service.aggregate_results("agg-001", "tenant-dist", "job-001")
 	scaling = service.record_scaling_decision("scale-001", "tenant-dist", "pool-main", "autoscaler")
 	summary = service.dashboard_summary("tenant-dist")
+	views = dashboard_model(service, "tenant-dist")
+	agents = compute_agents_model(service, "tenant-dist")
+	analytics = analytics_model(service, "tenant-dist")
+	audit = audit_trail_model(service, "tenant-dist")
+	settings = settings_model("tenant-dist")
 
 	assert pool["capacity_quota"] == 4
 	assert worker_a["healthy"] is True
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "result_reviewer"
 	assert job["status"] == "queued"
 	assert len(dispatched) == 4
 	assert {item["assigned_worker_id"] for item in dispatched} == {"worker-a", "worker-b"}
@@ -94,7 +117,13 @@ def test_service_runs_partitioned_job_lifecycle_with_aggregation_and_scaling():
 	assert scaling["decision"] in {"hold", "scale_down"}
 	assert summary["completed_job_count"] == 1
 	assert summary["completed_partition_count"] == 4
+	assert summary["compute_agent_count"] == 1
 	assert len(service.list_audit_events("tenant-dist")) >= 8
+	assert views["compute_agents"][0]["id"] == "codex-partition-reviewer"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert analytics["signals"]["completion_rate"] == 1.0
+	assert audit["guardrails"]
+	assert settings["streaming"]["processor"] == "bytewax"
 
 
 def test_service_enforces_distributed_compute_guardrails():
@@ -159,6 +188,36 @@ def test_service_enforces_distributed_compute_guardrails():
 			aggregation_strategy="merge",
 		)
 
+	with pytest.raises(PermissionError, match="retry_policy_required"):
+		service.submit_job(
+			"job-no-retry",
+			"tenant-dist",
+			"No retry",
+			"owner",
+			"pool-main",
+			"idempotency-004",
+			"",
+			partition_count=1,
+			quota_policy="quota",
+			event_bus_topic="topic",
+			aggregation_strategy="merge",
+		)
+
+	with pytest.raises(PermissionError, match="partition_count_required"):
+		service.submit_job(
+			"job-no-partitions",
+			"tenant-dist",
+			"No partitions",
+			"owner",
+			"pool-main",
+			"idempotency-005",
+			"retry",
+			partition_count=0,
+			quota_policy="quota",
+			event_bus_topic="topic",
+			aggregation_strategy="merge",
+		)
+
 	service.submit_job(
 		"job-no-worker",
 		"tenant-dist",
@@ -218,3 +277,51 @@ def test_large_partition_job_requires_review_and_idempotency_is_stable():
 
 	assert approved["status"] == "queued"
 	assert service.dashboard_summary("tenant-dist")["pending_review_count"] == 0
+
+
+def test_compute_agents_state_changes_bytewax_and_tenant_scope():
+	service = DistService()
+	for tenant_id in ("tenant-a", "tenant-b"):
+		service.create_worker_pool("shared-pool", tenant_id, "Shared Pool", "owner", 4, "heartbeat", "queue")
+		service.register_worker("shared-worker", tenant_id, "shared-pool", f"{tenant_id}.worker", 2, 8)
+		service.submit_job(
+			"shared-job",
+			tenant_id,
+			"Shared fanout",
+			"owner",
+			"shared-pool",
+			"shared-idempotency",
+			"retry",
+			partition_count=2,
+			quota_policy="quota",
+			event_bus_topic="bytewax",
+			aggregation_strategy="merge",
+		)
+		service.register_compute_agent(
+			tenant_id,
+			"shared-agent",
+			"Shared Agent",
+			"codex",
+			"partition_operator",
+			f"Operate partitions for {tenant_id}.",
+			True,
+		)
+
+	assert len(service.list_compute_agents("tenant-a")) == 1
+	assert len(service.list_compute_agents("tenant-b")) == 1
+	assert service.list_jobs("tenant-a")[0]["tenant_id"] == "tenant-a"
+
+	paused = service.change_job_state("tenant-a", "shared-job", "paused", "Pause for capacity window.", "owner")
+	assert paused["status"] == "paused"
+	assert service.validate_batch_compute_mutation("tenant-a", "bytewax", "owner")["processor"] == "bytewax"
+
+	with pytest.raises(PermissionError, match="dist_state_change_reason_required"):
+		service.change_job_state("tenant-a", "shared-job", "paused", "", "owner")
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_compute_mutation("tenant-a", "custom-stream", "owner")
+	with pytest.raises(PermissionError, match="compute_agent_runtime_not_supported"):
+		service.register_compute_agent("tenant-a", "bad-runtime", "Bad Runtime", "custom", "partition_operator", "Operate.", True)
+	with pytest.raises(PermissionError, match="compute_agent_role_not_supported"):
+		service.register_compute_agent("tenant-a", "bad-role", "Bad Role", "codex", "owner", "Operate.", True)
+	with pytest.raises(PermissionError, match="compute_agent_disclosure_required"):
+		service.register_compute_agent("tenant-a", "undisclosed", "Undisclosed", "codex", "partition_operator", "Operate.", False)

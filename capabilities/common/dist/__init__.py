@@ -27,8 +27,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["distributed_jobs", "worker_pools", "partitioned_execution", "coordination", "distributed_scaling"],
-	"permissions": ["dist:view", "dist:submit_jobs", "dist:manage_workers", "dist:scale", "dist:admin"]
+	"provides": ["distributed_jobs", "worker_pools", "partitioned_execution", "coordination", "distributed_scaling", "compute_agents"],
+	"permissions": ["dist:view", "dist:submit_jobs", "dist:manage_workers", "dist:scale", "dist:audit", "dist:admin"]
 }
 
 
@@ -42,7 +42,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["cach", "logt", "edge", "schd"],
+		"optional_dependencies": ["cach", "logt", "edge", "schd", "bytewax", "audl"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -51,13 +51,15 @@ def register_capability() -> dict[str, Any]:
 			"worker_pools": "Manage worker pools, health, capacity, and queue assignments",
 			"partitioned_execution": "Coordinate shards, fanout, aggregation, and idempotency",
 			"distributed_scaling": "Scale workloads with monitoring and quota controls",
+			"compute_agents": "Register governed AI compute agents with runtime, role, scope, disclosure, and audit",
 			"capability_rules": "Evaluate deterministic distributed-computing rules",
 			"visual_theming": "Apply distributed-compute theme tokens and components"
 		},
-		"endpoints": {"jobs": "/dist/api/v1/jobs", "workers": "/dist/api/v1/workers", "partitions": "/dist/api/v1/partitions", "queues": "/dist/api/v1/queues", "scaling": "/dist/api/v1/scaling"},
+		"endpoints": {"jobs": "/dist/api/v1/jobs", "workers": "/dist/api/v1/workers", "partitions": "/dist/api/v1/partitions", "queues": "/dist/api/v1/queues", "scaling": "/dist/api/v1/scaling", "agents": "/dist/api/v1/agents", "audit": "/dist/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

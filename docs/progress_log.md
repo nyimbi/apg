@@ -16155,3 +16155,58 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External CICD, ENVM, LOGT, MONI, HLTH, NTFY, AUDL, COMP, or THEM
   adapters.
+
+### 2026-05-30 17:10 EAT
+
+DIST lifecycle and guardrail packet:
+
+- Selected `capabilities/common/dist` as the next common capability after
+  DEPL.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable DIST contract to cover worker pools, workers,
+  distributed jobs, partitions, aggregations, scaling decisions, compute
+  agents, governance, observability, APG adapters, UI routes, visual theme
+  tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, job owner,
+  idempotency keys, retry policy, event stream evidence, aggregation strategy,
+  worker health, partition count, quota policy, large-partition review,
+  compute-agent registration/runtime/scope/disclosure, audit evidence, tenant
+  isolation, and Bytewax batch mutation.
+- Added the `ComputeAgent` runtime model and service methods for compute-agent
+  registration, guarded job state changes, and Bytewax batch-mutation
+  validation.
+- Hardened `DistService` so duplicate IDs are tenant-local across worker
+  pools, workers, jobs, partitions, aggregations, scaling decisions, and
+  agents.
+- Added API helper coverage for compute agents, job state changes, batch
+  mutation validation, listing state, and status summaries.
+- Added agent-panel, audit, analytics, and settings view models, plus richer
+  dashboard metadata with stream and theme information.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, guardrails, idempotency,
+  compute agents, tenant-safe duplicate IDs, Bytewax policy, view models, and
+  publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dist/__init__.py capabilities/common/dist/models.py capabilities/common/dist/distributed_engine.py capabilities/common/dist/service.py capabilities/common/dist/api.py capabilities/common/dist/views.py capabilities/common/dist/capability_contract.py capabilities/common/dist/app.py capabilities/common/dist/test_capability_contract.py capabilities/common/dist/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dist/test_capability_contract.py capabilities/common/dist/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and DIST capability evidence.
+- `jq '.capabilities.dist.streaming.processor, .capabilities.dist.configuration.compute_agents.supported_runtimes, .capabilities.dist.screens.agents.route' capabilities/common/dist/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, and `/dist/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/dist --json` passed with `ok: true`; DIST remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dist --json` passed with 10 UI routes, 19 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/dist docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Kubernetes, Ray, Dask, Spark, Slurm, cloud compute execution, external
+  queues, scheduler loops, cache mutation, worker process management, external
+  AI-agent CLIs, durable compute databases, browser-rendered compute UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External MQEB, MONI, CONF, LOGT, CACH, EDGE, SCHD, AUDL, or THEM adapters.

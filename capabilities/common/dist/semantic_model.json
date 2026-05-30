@@ -12,17 +12,54 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "configuration": "conf",
+          "edge": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DistService",
+          "logs": "logt",
+          "monitoring": "moni",
+          "scheduler": "schd",
+          "view_models": "views.py"
+        },
+        "compute_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "job_planner",
+            "partition_operator",
+            "worker_pool_operator",
+            "result_reviewer",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "coordination": {
           "dead_letter_queue_enabled": true,
           "distributed_locking_enabled": true,
-          "event_bus_required": true,
+          "event_stream": "bytewax",
+          "event_stream_required": true,
           "result_aggregation_required": true
         },
         "governance": {
           "audit_job_execution": true,
+          "batch_event_stream": "bytewax",
           "monitoring_required": true,
           "quota_policy_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
         },
         "jobs": {
           "idempotency_key_required": true,
@@ -30,12 +67,22 @@
           "max_partitions": 1000,
           "retry_policy_required": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "queue_metrics_required": true,
+          "trace_required": true
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "dist_compute_grid"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_compute_dashboard": true,
           "enable_job_console": true,
           "enable_partition_monitor": true,
@@ -55,9 +102,18 @@
       "master_data": {},
       "name": "Distributed Computing",
       "provides": [
-        "dist_operations"
+        "distributed_jobs",
+        "worker_pools",
+        "partitioned_execution",
+        "coordination",
+        "distributed_scaling",
+        "compute_agents"
       ],
-      "requires": [],
+      "requires": [
+        "mqeb",
+        "moni",
+        "conf"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -100,6 +156,45 @@
           },
           {
             "condition": {
+              "operation": "submit_job",
+              "retry_policy_attached": false
+            },
+            "description": "Distributed jobs require retry policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retry_policy_required",
+              "required_action": "attach_retry_policy"
+            },
+            "name": "retry_policy_required"
+          },
+          {
+            "condition": {
+              "event_stream_attached": false,
+              "operation": "submit_job"
+            },
+            "description": "Distributed jobs require an event stream.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_stream_required",
+              "required_action": "attach_event_stream"
+            },
+            "name": "event_stream_required"
+          },
+          {
+            "condition": {
+              "aggregation_strategy_attached": false,
+              "operation": "submit_job"
+            },
+            "description": "Distributed jobs require result aggregation strategy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "result_aggregation_required",
+              "required_action": "attach_aggregation_strategy"
+            },
+            "name": "result_aggregation_required"
+          },
+          {
+            "condition": {
               "health_check_attached": false,
               "worker_pool_selected": true
             },
@@ -110,6 +205,19 @@
               "required_action": "attach_worker_health_check"
             },
             "name": "worker_pool_requires_health"
+          },
+          {
+            "condition": {
+              "operation": "submit_job",
+              "partition_count_lte": 0
+            },
+            "description": "Distributed jobs require at least one partition.",
+            "effect": {
+              "decision": "deny",
+              "reason": "partition_count_required",
+              "required_action": "set_partition_count"
+            },
+            "name": "partition_count_required"
           },
           {
             "condition": {
@@ -136,6 +244,122 @@
               "required_action": "review_partition_plan"
             },
             "name": "large_partition_job_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "compute_agent_present": true
+            },
+            "description": "AI compute agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compute_agent_registration_required",
+              "required_action": "register_compute_agent"
+            },
+            "name": "compute_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "compute_agent_present": true
+            },
+            "description": "AI compute agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compute_agent_runtime_not_supported",
+              "required_action": "choose_supported_compute_agent_runtime"
+            },
+            "name": "compute_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "compute_agent_present": true
+            },
+            "description": "AI compute agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compute_agent_role_not_supported",
+              "required_action": "choose_supported_compute_agent_role"
+            },
+            "name": "compute_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "compute_agent_present": true
+            },
+            "description": "AI compute agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compute_agent_scope_required",
+              "required_action": "set_compute_agent_scope"
+            },
+            "name": "compute_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "compute_agent_present": true
+            },
+            "description": "AI compute-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compute_agent_disclosure_required",
+              "required_action": "disclose_compute_agent"
+            },
+            "name": "compute_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Distributed job state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dist_state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "dist_state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Distributed job state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dist_audit_event_required",
+              "required_action": "record_dist_audit_event"
+            },
+            "name": "dist_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Distributed-compute records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_compute_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_compute_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_compute_mutation"
+            },
+            "description": "Batch compute mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_compute_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -181,6 +405,45 @@
         },
         {
           "condition": {
+            "operation": "submit_job",
+            "retry_policy_attached": false
+          },
+          "description": "Distributed jobs require retry policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retry_policy_required",
+            "required_action": "attach_retry_policy"
+          },
+          "name": "retry_policy_required"
+        },
+        {
+          "condition": {
+            "event_stream_attached": false,
+            "operation": "submit_job"
+          },
+          "description": "Distributed jobs require an event stream.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_stream_required",
+            "required_action": "attach_event_stream"
+          },
+          "name": "event_stream_required"
+        },
+        {
+          "condition": {
+            "aggregation_strategy_attached": false,
+            "operation": "submit_job"
+          },
+          "description": "Distributed jobs require result aggregation strategy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "result_aggregation_required",
+            "required_action": "attach_aggregation_strategy"
+          },
+          "name": "result_aggregation_required"
+        },
+        {
+          "condition": {
             "health_check_attached": false,
             "worker_pool_selected": true
           },
@@ -191,6 +454,19 @@
             "required_action": "attach_worker_health_check"
           },
           "name": "worker_pool_requires_health"
+        },
+        {
+          "condition": {
+            "operation": "submit_job",
+            "partition_count_lte": 0
+          },
+          "description": "Distributed jobs require at least one partition.",
+          "effect": {
+            "decision": "deny",
+            "reason": "partition_count_required",
+            "required_action": "set_partition_count"
+          },
+          "name": "partition_count_required"
         },
         {
           "condition": {
@@ -217,6 +493,122 @@
             "required_action": "review_partition_plan"
           },
           "name": "large_partition_job_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "compute_agent_present": true
+          },
+          "description": "AI compute agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compute_agent_registration_required",
+            "required_action": "register_compute_agent"
+          },
+          "name": "compute_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "compute_agent_present": true
+          },
+          "description": "AI compute agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compute_agent_runtime_not_supported",
+            "required_action": "choose_supported_compute_agent_runtime"
+          },
+          "name": "compute_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "compute_agent_present": true
+          },
+          "description": "AI compute agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compute_agent_role_not_supported",
+            "required_action": "choose_supported_compute_agent_role"
+          },
+          "name": "compute_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "compute_agent_present": true
+          },
+          "description": "AI compute agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compute_agent_scope_required",
+            "required_action": "set_compute_agent_scope"
+          },
+          "name": "compute_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "compute_agent_present": true
+          },
+          "description": "AI compute-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compute_agent_disclosure_required",
+            "required_action": "disclose_compute_agent"
+          },
+          "name": "compute_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Distributed job state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dist_state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "dist_state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Distributed job state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dist_audit_event_required",
+            "required_action": "record_dist_audit_event"
+          },
+          "name": "dist_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Distributed-compute records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_compute_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_compute_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_compute_mutation"
+          },
+          "description": "Batch compute mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_compute_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,10 +618,20 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "ComputeAgentPanel",
+          "permission": "dist:submit_jobs",
+          "route": "/dist/agents"
+        },
         "analytics": {
           "component": "ComputeAnalytics",
           "permission": "dist:view",
           "route": "/dist/analytics"
+        },
+        "audit": {
+          "component": "ComputeAuditTrail",
+          "permission": "dist:audit",
+          "route": "/dist/audit"
         },
         "dashboard": {
           "component": "DISTDashboard",
@@ -267,9 +669,44 @@
           "route": "/dist/workers"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_compute_mutation_requires_bytewax",
+        "events": [
+          "worker_pool_created",
+          "worker_registered",
+          "job_submitted",
+          "partition_review_approved",
+          "job_state_changed",
+          "partitions_dispatched",
+          "partition_completed",
+          "partition_failed",
+          "results_aggregated",
+          "scaling_decision_recorded",
+          "compute_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "worker_pools",
+          "workers",
+          "jobs",
+          "partitions",
+          "aggregations",
+          "scaling_decisions",
+          "compute_agents",
+          "audit_events"
+        ],
+        "topic": "apg.dist.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
+          "audit_timeline": {
+            "icon": "list-checks",
+            "status_style": "governance-chip"
+          },
           "job_grid": {
             "icon": "network",
             "risk_style": "quota-band",
@@ -350,6 +787,20 @@
             "permission": "dist:scale"
           },
           {
+            "component": "ComputeAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/dist/agents",
+            "permission": "dist:submit_jobs"
+          },
+          {
+            "component": "ComputeAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/dist/audit",
+            "permission": "dist:audit"
+          },
+          {
             "component": "ComputeAnalytics",
             "name": "analytics",
             "nav_group": "Operations",
@@ -377,23 +828,64 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "dist": []
+      "dist": [
+        "mqeb",
+        "moni",
+        "conf"
+      ]
     }
   },
   "contracts": {
     "dist": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "cache": "cach",
+          "configuration": "conf",
+          "edge": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.DistService",
+          "logs": "logt",
+          "monitoring": "moni",
+          "scheduler": "schd",
+          "view_models": "views.py"
+        },
+        "compute_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "job_planner",
+            "partition_operator",
+            "worker_pool_operator",
+            "result_reviewer",
+            "incident_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "coordination": {
           "dead_letter_queue_enabled": true,
           "distributed_locking_enabled": true,
-          "event_bus_required": true,
+          "event_stream": "bytewax",
+          "event_stream_required": true,
           "result_aggregation_required": true
         },
         "governance": {
           "audit_job_execution": true,
+          "batch_event_stream": "bytewax",
           "monitoring_required": true,
           "quota_policy_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
         },
         "jobs": {
           "idempotency_key_required": true,
@@ -401,12 +893,22 @@
           "max_partitions": 1000,
           "retry_policy_required": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "queue_metrics_required": true,
+          "trace_required": true
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "dist_compute_grid"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_compute_dashboard": true,
           "enable_job_console": true,
           "enable_partition_monitor": true,
@@ -421,9 +923,18 @@
       },
       "id": "dist",
       "provides": [
-        "dist_operations"
+        "distributed_jobs",
+        "worker_pools",
+        "partitioned_execution",
+        "coordination",
+        "distributed_scaling",
+        "compute_agents"
       ],
-      "requires": []
+      "requires": [
+        "mqeb",
+        "moni",
+        "conf"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +946,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +967,135 @@
   },
   "roles": {},
   "rules": {
+    "batch_compute_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_compute_mutation"
+      },
+      "description": "Batch compute mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_compute_mutation_requires_bytewax"
+    },
+    "compute_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "compute_agent_present": true
+      },
+      "description": "AI compute-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compute_agent_disclosure_required",
+        "required_action": "disclose_compute_agent"
+      },
+      "name": "compute_agent_requires_disclosure"
+    },
+    "compute_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "compute_agent_present": true
+      },
+      "description": "AI compute agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compute_agent_registration_required",
+        "required_action": "register_compute_agent"
+      },
+      "name": "compute_agent_requires_registration"
+    },
+    "compute_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "compute_agent_present": true
+      },
+      "description": "AI compute agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compute_agent_scope_required",
+        "required_action": "set_compute_agent_scope"
+      },
+      "name": "compute_agent_requires_scope"
+    },
+    "compute_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "compute_agent_present": true
+      },
+      "description": "AI compute agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compute_agent_role_not_supported",
+        "required_action": "choose_supported_compute_agent_role"
+      },
+      "name": "compute_agent_role_supported"
+    },
+    "compute_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "compute_agent_present": true
+      },
+      "description": "AI compute agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compute_agent_runtime_not_supported",
+        "required_action": "choose_supported_compute_agent_runtime"
+      },
+      "name": "compute_agent_runtime_supported"
+    },
+    "cross_tenant_compute_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Distributed-compute records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_compute_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_compute_access_denied"
+    },
+    "dist_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Distributed job state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dist_audit_event_required",
+        "required_action": "record_dist_audit_event"
+      },
+      "name": "dist_state_change_requires_audit"
+    },
+    "dist_state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Distributed job state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dist_state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "dist_state_change_requires_reason"
+    },
+    "event_stream_required": {
+      "condition": {
+        "event_stream_attached": false,
+        "operation": "submit_job"
+      },
+      "description": "Distributed jobs require an event stream.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_stream_required",
+        "required_action": "attach_event_stream"
+      },
+      "name": "event_stream_required"
+    },
     "idempotency_key_required": {
       "condition": {
         "idempotency_key_present": false,
@@ -495,6 +1135,19 @@
       },
       "name": "large_partition_job_requires_review"
     },
+    "partition_count_required": {
+      "condition": {
+        "operation": "submit_job",
+        "partition_count_lte": 0
+      },
+      "description": "Distributed jobs require at least one partition.",
+      "effect": {
+        "decision": "deny",
+        "reason": "partition_count_required",
+        "required_action": "set_partition_count"
+      },
+      "name": "partition_count_required"
+    },
     "quota_policy_required": {
       "condition": {
         "job_submission_requested": true,
@@ -507,6 +1160,32 @@
         "required_action": "attach_quota_policy"
       },
       "name": "quota_policy_required"
+    },
+    "result_aggregation_required": {
+      "condition": {
+        "aggregation_strategy_attached": false,
+        "operation": "submit_job"
+      },
+      "description": "Distributed jobs require result aggregation strategy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "result_aggregation_required",
+        "required_action": "attach_aggregation_strategy"
+      },
+      "name": "result_aggregation_required"
+    },
+    "retry_policy_required": {
+      "condition": {
+        "operation": "submit_job",
+        "retry_policy_attached": false
+      },
+      "description": "Distributed jobs require retry policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retry_policy_required",
+        "required_action": "attach_retry_policy"
+      },
+      "name": "retry_policy_required"
     },
     "tenant_context_required": {
       "condition": {
