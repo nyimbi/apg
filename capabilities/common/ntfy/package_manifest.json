@@ -3,11 +3,14 @@
   "display_name": "Notifications and Alerts",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
-    "models.py",
-    "service.py",
-    "api.py",
-    "views.py",
+    "capability_contract.py",
+    "notification_runtime.py",
+    "package_api.py",
+    "view_models.py",
     "app.py",
     "semantic_model.json",
     "release_report.json"

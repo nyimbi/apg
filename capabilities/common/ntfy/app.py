@@ -5,13 +5,121 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Notifications and Alerts package-backed APG capability", "entity_count": 0, "name": "ntfy", "version": "1.0.0"}, "capabilities": {"ntfy": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"channels": {"delivery_retry_attempts": 3, "enabled": ["email", "sms", "push", "websocket", "webhook", "slack", "teams"], "fallback_routing_enabled": true, "provider_health_required": true}, "delivery": {"event_bus_required": true, "max_batch_size": 5000, "priority_override_allowed": true, "quiet_hours_enforced": true}, "governance": {"audit_delivery": true, "require_tenant_context": true, "sensitive_payload_encryption_required": true, "template_approval_required": true}, "preferences": {"channel_preferences_required": true, "consent_audit_required": true, "recipient_opt_in_required": true, "unsubscribe_supported": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ntfy_notification_ops"}, "ui": {"enable_campaign_console": true, "enable_delivery_analytics": true, "enable_notification_dashboard": true, "enable_template_studio": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Notifications and Alerts", "provides": ["ntfy_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All notification operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"message_class": "marketing", "recipient_opted_in": false}, "description": "Non-operational notifications require recipient opt-in.", "effect": {"decision": "deny", "reason": "recipient_opt_in_required", "required_action": "record_recipient_opt_in"}, "name": "recipient_opt_in_required"}, {"condition": {"operation": "send_campaign", "template_approved": false}, "description": "Campaign sends require approved templates.", "effect": {"decision": "deny", "reason": "template_approval_required", "required_action": "approve_template"}, "name": "approved_template_required"}, {"condition": {"payload_encrypted": false, "sensitive_payload": true}, "description": "Sensitive notification payloads require encryption.", "effect": {"decision": "deny", "reason": "payload_encryption_required", "required_action": "encrypt_payload"}, "name": "sensitive_payload_requires_encryption"}, {"condition": {"delivery_requested": true, "provider_health": "unhealthy"}, "description": "Messages cannot route to unhealthy providers.", "effect": {"decision": "deny", "reason": "provider_unhealthy", "required_action": "reroute_or_restore_provider"}, "name": "provider_health_required"}, {"condition": {"batch_review_recorded": false, "recipient_count_gt": 5000}, "description": "Large notification batches require review.", "effect": {"decision": "require_review", "reason": "large_batch_review_required", "required_action": "review_batch"}, "name": "large_batch_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All notification operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"message_class": "marketing", "recipient_opted_in": false}, "description": "Non-operational notifications require recipient opt-in.", "effect": {"decision": "deny", "reason": "recipient_opt_in_required", "required_action": "record_recipient_opt_in"}, "name": "recipient_opt_in_required"}, {"condition": {"operation": "send_campaign", "template_approved": false}, "description": "Campaign sends require approved templates.", "effect": {"decision": "deny", "reason": "template_approval_required", "required_action": "approve_template"}, "name": "approved_template_required"}, {"condition": {"payload_encrypted": false, "sensitive_payload": true}, "description": "Sensitive notification payloads require encryption.", "effect": {"decision": "deny", "reason": "payload_encryption_required", "required_action": "encrypt_payload"}, "name": "sensitive_payload_requires_encryption"}, {"condition": {"delivery_requested": true, "provider_health": "unhealthy"}, "description": "Messages cannot route to unhealthy providers.", "effect": {"decision": "deny", "reason": "provider_unhealthy", "required_action": "reroute_or_restore_provider"}, "name": "provider_health_required"}, {"condition": {"batch_review_recorded": false, "recipient_count_gt": 5000}, "description": "Large notification batches require review.", "effect": {"decision": "require_review", "reason": "large_batch_review_required", "required_action": "review_batch"}, "name": "large_batch_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "DeliveryAnalytics", "permission": "ntfy:view", "route": "/ntfy/analytics"}, "campaigns": {"component": "CampaignConsole", "permission": "ntfy:manage_campaigns", "route": "/ntfy/campaigns"}, "channels": {"component": "ChannelHealth", "permission": "ntfy:admin", "route": "/ntfy/channels"}, "dashboard": {"component": "NTFYDashboard", "permission": "ntfy:view", "route": "/ntfy/dashboard"}, "messages": {"component": "MessageConsole", "permission": "ntfy:send", "route": "/ntfy/messages"}, "preferences": {"component": "PreferenceCenter", "permission": "ntfy:view", "route": "/ntfy/preferences"}, "settings": {"component": "NTFYSettings", "permission": "ntfy:admin", "route": "/ntfy/settings"}, "templates": {"component": "TemplateStudio", "permission": "ntfy:manage_templates", "route": "/ntfy/templates"}}, "streaming": {}, "theme": {"components": {"campaign_table": {"status_style": "approval-chip", "visual": "campaign-list"}, "channel_matrix": {"icon": "send", "risk_style": "health-band", "status_indicator": "channel-pill"}, "delivery_timeline": {"highlight": "latency-chip", "visual": "event-timeline"}, "preference_panel": {"status_style": "consent-chip", "visual": "recipient-controls"}}, "name": "ntfy_notification_ops", "tokens": {"border.radius": "8px", "color.accent": "#D69E2E", "color.danger": "#C53030", "color.primary": "#28536B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/ntfy/api/v1", "requires_theme": true, "routes": [{"component": "NTFYDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/ntfy/dashboard", "permission": "ntfy:view"}, {"component": "MessageConsole", "name": "messages", "nav_group": "Delivery", "path": "/ntfy/messages", "permission": "ntfy:send"}, {"component": "TemplateStudio", "name": "templates", "nav_group": "Design", "path": "/ntfy/templates", "permission": "ntfy:manage_templates"}, {"component": "CampaignConsole", "name": "campaigns", "nav_group": "Campaigns", "path": "/ntfy/campaigns", "permission": "ntfy:manage_campaigns"}, {"component": "PreferenceCenter", "name": "preferences", "nav_group": "Recipients", "path": "/ntfy/preferences", "permission": "ntfy:view"}, {"component": "ChannelHealth", "name": "channels", "nav_group": "Operations", "path": "/ntfy/channels", "permission": "ntfy:admin"}, {"component": "DeliveryAnalytics", "name": "analytics", "nav_group": "Operations", "path": "/ntfy/analytics", "permission": "ntfy:view"}, {"component": "NTFYSettings", "name": "settings", "nav_group": "Administration", "path": "/ntfy/settings", "permission": "ntfy:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"ntfy": []}}, "contracts": {"ntfy": {"configuration": {"channels": {"delivery_retry_attempts": 3, "enabled": ["email", "sms", "push", "websocket", "webhook", "slack", "teams"], "fallback_routing_enabled": true, "provider_health_required": true}, "delivery": {"event_bus_required": true, "max_batch_size": 5000, "priority_override_allowed": true, "quiet_hours_enforced": true}, "governance": {"audit_delivery": true, "require_tenant_context": true, "sensitive_payload_encryption_required": true, "template_approval_required": true}, "preferences": {"channel_preferences_required": true, "consent_audit_required": true, "recipient_opt_in_required": true, "unsubscribe_supported": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "ntfy_notification_ops"}, "ui": {"enable_campaign_console": true, "enable_delivery_analytics": true, "enable_notification_dashboard": true, "enable_template_studio": true}}, "id": "ntfy", "provides": ["ntfy_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"ntfy": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"approved_template_required": {"condition": {"operation": "send_campaign", "template_approved": false}, "description": "Campaign sends require approved templates.", "effect": {"decision": "deny", "reason": "template_approval_required", "required_action": "approve_template"}, "name": "approved_template_required"}, "large_batch_requires_review": {"condition": {"batch_review_recorded": false, "recipient_count_gt": 5000}, "description": "Large notification batches require review.", "effect": {"decision": "require_review", "reason": "large_batch_review_required", "required_action": "review_batch"}, "name": "large_batch_requires_review"}, "provider_health_required": {"condition": {"delivery_requested": true, "provider_health": "unhealthy"}, "description": "Messages cannot route to unhealthy providers.", "effect": {"decision": "deny", "reason": "provider_unhealthy", "required_action": "reroute_or_restore_provider"}, "name": "provider_health_required"}, "recipient_opt_in_required": {"condition": {"message_class": "marketing", "recipient_opted_in": false}, "description": "Non-operational notifications require recipient opt-in.", "effect": {"decision": "deny", "reason": "recipient_opt_in_required", "required_action": "record_recipient_opt_in"}, "name": "recipient_opt_in_required"}, "sensitive_payload_requires_encryption": {"condition": {"payload_encrypted": false, "sensitive_payload": true}, "description": "Sensitive notification payloads require encryption.", "effect": {"decision": "deny", "reason": "payload_encryption_required", "required_action": "encrypt_payload"}, "name": "sensitive_payload_requires_encryption"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All notification operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.ntfy": {"file": "capability_contract.py", "id": "capability.ntfy", "kind": "capability", "name": "Notifications and Alerts", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("ntfy_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "ntfy",
+			"version": "1.0.0",
+			"description": "Notifications and Alerts package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"ntfy": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"ntfy": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["ntfy_operations"],
+				"requires": ["mqeb", "auth", "mten"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"api_helpers": contract["configuration"]["adapters"]["api_helpers"],
+					"views": contract["configuration"]["adapters"]["view_models"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"template_approval": "TemplateApproval",
+					"campaign_approval": "CampaignApproval",
+					"large_batch_review": "BatchReview",
+					"quiet_hours_override": "DeliveryReview",
+				},
+				"notification_lifecycle": {
+					"recipient_preference": "RecipientPreferenceRecord",
+					"channel_provider": "ChannelProviderRecord",
+					"template": "NotificationTemplateRecord",
+					"delivery": "DeliveryRecord",
+					"campaign": "CampaignRecord",
+					"audit": "NotificationAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"ntfy": {
+				"id": "ntfy",
+				"configuration": contract["configuration"],
+				"provides": ["ntfy_operations"],
+				"requires": ["mqeb", "auth", "mten"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"ntfy": ["mqeb", "auth", "mten"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 3},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "notification_runtime.py", "package_api.py", "view_models.py", "app.py"],
+		"symbols": {
+			"capability.ntfy": {
+				"id": "capability.ntfy",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +144,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("ntfy", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "ntfy" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 10:
+		errors.append("NTFY semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("NTFY semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("NTFY adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "notification_runtime.NotificationRuntime":
+		errors.append("NTFY generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

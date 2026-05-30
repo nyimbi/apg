@@ -454,10 +454,10 @@ def pytest_runtest_setup(item):
             pytest.skip("Performance tests disabled in CI")
 
 # Custom pytest hooks
-def pytest_runtest_call(pyfuncitem):
-    """Called to execute the test"""
-    # Add any custom test execution logic here
-    pass
+def pytest_runtest_call(item):
+	"""Called to execute the test"""
+	# Add any custom test execution logic here
+	pass
 
 def pytest_runtest_teardown(item):
     """Called after test execution"""
@@ -476,10 +476,5 @@ def pytest_sessionfinish(session, exitstatus):
     else:
         print(f"\n❌ Some tests failed (exit status: {exitstatus})")
 
-# Pytest plugins
-pytest_plugins = [
-    "pytest_asyncio",
-    "pytest_mock",
-    "pytest_cov",
-    "pytest_xdist"
-]
+# Optional pytest plugins are intentionally not loaded here. The package tests
+# must collect in the dependency-light APG capability environment.

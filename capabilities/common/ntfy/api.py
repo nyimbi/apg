@@ -50,7 +50,7 @@ def create_notification_api(app: Flask) -> Api:
 		app,
 		version='1.0.0',
 		title='APG Notification API',
-		description='Revolutionary enterprise notification system with 25+ channels, AI personalization, and real-time delivery',
+		description='Enterprise notification system with multi-channel delivery, personalization, and real-time delivery',
 		doc='/notification/docs/',
 		prefix='/api/v1/notification',
 		contact='Nyimbi Odero',

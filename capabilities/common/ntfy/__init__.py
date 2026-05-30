@@ -24,8 +24,17 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["multi_channel_notifications", "alert_routing", "campaign_delivery", "user_preferences", "engagement_analytics"],
-	"permissions": ["ntfy:view", "ntfy:send", "ntfy:manage_templates", "ntfy:manage_campaigns", "ntfy:admin"]
+	"provides": [
+		"multi_channel_notifications",
+		"alert_routing",
+		"campaign_delivery",
+		"user_preferences",
+		"template_governance",
+		"channel_health",
+		"delivery_audit",
+		"engagement_analytics",
+	],
+	"permissions": ["ntfy:view", "ntfy:send", "ntfy:manage_templates", "ntfy:manage_campaigns", "ntfy:audit", "ntfy:admin"]
 }
 
 APG_CAPABILITY_INFO = capability_metadata
@@ -41,7 +50,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "aicr", "colb", "mchn"],
+		"optional_dependencies": ["audl", "aicr", "colb", "mchn", "secu", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,16 +59,24 @@ def register_capability() -> dict[str, Any]:
 			"alert_routing": "Route operational and business alerts by policy, severity, and preference",
 			"campaign_delivery": "Manage scheduled and event-driven notification campaigns",
 			"user_preferences": "Respect recipient opt-in, quiet hours, and channel preference controls",
+			"template_governance": "Version and approve tenant notification templates",
+			"channel_health": "Track provider health, fallback routes, and channel ownership",
+			"delivery_audit": "Record notification delivery, preference, template, campaign, and channel audit events",
 			"capability_rules": "Evaluate deterministic notification-governance rules",
 			"visual_theming": "Apply notification-operations theme tokens and components"
 		},
 		"endpoints": {
+			"status": "/ntfy/api/v1/status",
 			"messages": "/ntfy/api/v1/messages",
 			"templates": "/ntfy/api/v1/templates",
 			"campaigns": "/ntfy/api/v1/campaigns",
 			"preferences": "/ntfy/api/v1/preferences",
-			"analytics": "/ntfy/api/v1/analytics"
+			"suppression": "/ntfy/api/v1/suppression",
+			"channels": "/ntfy/api/v1/channels",
+			"analytics": "/ntfy/api/v1/analytics",
+			"audit": "/ntfy/api/v1/audit"
 		},
+		"adapters": contract["configuration"]["adapters"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

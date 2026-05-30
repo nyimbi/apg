@@ -29,6 +29,5 @@ TEST_CONFIG = {
     'log_level': 'DEBUG'
 }
 
-# Test fixtures and utilities
-from .fixtures import *
-from .utils import *
+# Keep this package import side-effect free. Focused package-contract tests must
+# not import legacy integration fixtures unless they explicitly opt in.

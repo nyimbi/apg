@@ -15084,3 +15084,70 @@ Not run to preserve battery:
   MQEB, or CACH adapters.
 - Security certification, compliance certification, regulator interoperability,
   load, latency, authorization, evidence integrity, and throughput benchmarks.
+
+### 2026-05-30 13:19 EAT
+
+NTFY lifecycle and guardrail packet:
+
+- Selected `capabilities/common/ntfy` as the next common capability after COMP.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable NTFY contract to cover tenant configuration,
+  notification channels, provider health, recipient preferences, template
+  governance, campaign approval, sensitive-payload security, observability,
+  Bytewax event streaming, APG adapters, UI routes, and visual theme tokens.
+- Expanded deterministic guardrails to 31 rules covering tenant context,
+  recipient addresses and channel preferences, marketing opt-in, unsubscribe
+  enforcement, quiet-hour review, template ownership/name/locale/content,
+  approved templates, campaign template and approval requirements, sensitive
+  payload encryption, provider health, enabled channels, fallback routing,
+  large-batch review, campaign audience and ownership, duplicate idempotency
+  keys, webhook signatures, channel providers and owners, event bus evidence,
+  audit evidence, delivery TTL, tenant isolation, notification state-change
+  audit, and Bytewax batch mutation.
+- Added a dependency-light notification runtime for generated applications,
+  including recipient preferences, channel registration, template approval,
+  single-message delivery, campaign creation/approval/sending, delivery state,
+  tenant-local storage keys, audit events, and dashboard summaries.
+- Routed single-message sends and campaign sends through the same consent,
+  approval, audit, event-bus, and batch-review rule engine. Marketing campaigns
+  now require all audience recipients to be opted in and block unsubscribed
+  recipients.
+- Resolved code-review findings before commit: idempotency keys are tenant
+  scoped, and campaign sends now require configured, healthy channel providers.
+- Added API helper functions for the generated runtime.
+- Added dashboard, message console, template studio, campaign console,
+  preference center, channel health, analytics, audit, and settings view models.
+- Replaced embedded semantic evidence with a contract-derived semantic model
+  and self-test that checks route count, rule count, Bytewax event streaming,
+  and generated runtime metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale package-test terminology and
+  expanded runtime, API helper, view model, consent, encryption, provider,
+  idempotency, tenant-scoped idempotency, campaign channel-readiness,
+  quiet-hour, large-batch, tenant-isolation, and publishability coverage.
+- Fixed legacy NTFY test-package collection issues by making the pytest hook
+  signature compatible with current pytest and removing unconditional optional
+  plugin loading from the package conftest.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ntfy/__init__.py capabilities/common/ntfy/capability_contract.py capabilities/common/ntfy/notification_runtime.py capabilities/common/ntfy/package_api.py capabilities/common/ntfy/view_models.py capabilities/common/ntfy/app.py capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py capabilities/common/ntfy/api.py capabilities/common/ntfy/tests/__init__.py capabilities/common/ntfy/tests/conftest.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and NTFY capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ntfy --json` passed with `ok: true`; NTFY remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ntfy --json` passed with 10 UI routes, 31 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/ntfy/README.md capabilities/common/ntfy/SPECIFICATION.md capabilities/common/ntfy/PLAN.md capabilities/common/ntfy/cap_spec.md capabilities/common/ntfy/__init__.py capabilities/common/ntfy/capability_contract.py capabilities/common/ntfy/notification_runtime.py capabilities/common/ntfy/package_api.py capabilities/common/ntfy/view_models.py capabilities/common/ntfy/app.py capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py capabilities/common/ntfy/tests/__init__.py capabilities/common/ntfy/tests/conftest.py capabilities/common/ntfy/package_manifest.json capabilities/common/ntfy/release_report.json capabilities/common/ntfy/semantic_model.json capabilities/common/ntfy/api.py` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/ntfy docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live email, SMS, push, WebSocket, webhook, Slack, Teams, analytics,
+  personalization, database, Bytewax runtime, external APG adapters,
+  deliverability, security, performance, and throughput benchmarks.
+- Browser-rendered UI behavior.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External MQEB, AUTH, MTEN, AUDL, AICR, COLB, MCHN, SECU, or CACH adapters.
