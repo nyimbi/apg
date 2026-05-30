@@ -14289,3 +14289,62 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Legacy heavy ANOM service, API, and Flask-AppBuilder tests.
 - Load, latency, precision/recall, drift, and throughput benchmarks.
+
+### 2026-05-30 09:52 EAT
+
+SRCH lifecycle and guardrail packet:
+
+- Selected `capabilities/common/srch` as the next common capability after ANOM
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the packet docs and executable contract.
+- Expanded the SRCH contract to 31 deterministic guardrails, 12 UI routes,
+  index/document/bulk/query/ranking/facet/security/governance/observability/
+  adapter configuration, Bytewax event-stream adapter evidence, and discovery
+  console theme components.
+- Kept `service.SrchService` as the dependency-light generated-app runtime and
+  hardened index creation, embedding readiness, document indexing, bulk
+  indexing, governed query execution, facet calculation, audit events, list
+  surfaces, dashboard summaries, and APG record compatibility.
+- Added executable review-evidence paths for unknown index content types,
+  reviewed non-standard classifications, facet-key deviations, bulk indexing
+  review evidence, unknown query types, and large result-window reviews.
+- Removed service/API fallbacks that could bypass required document titles and
+  query guardrails.
+- Extended `views.py` with generated-app view models for dashboard, search,
+  indices, documents, bulk indexing, facets, analytics, ranking, access review,
+  governance, audit, and settings.
+- Updated capability registration with canonical ETLP, META, NLPC dependencies,
+  optional AUTH/AUDL/CACH/AICR adapters, richer endpoints, and audit
+  permission.
+- Replaced static package evidence with contract-derived `app.py` semantics and
+  refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded focused tests for Bytewax, rule count, route count, audit
+  permission, runtime lifecycle, generated UI models, package evidence, APG
+  record compatibility, tenant isolation, required-field guardrails, review
+  evidence paths, API helper guardrails, and generated-doc existence.
+- Review-agent pass found and fixed non-executable review-required paths and
+  package tests that did not prove advertised generated docs exist.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/srch/__init__.py capabilities/common/srch/capability_contract.py capabilities/common/srch/models.py capabilities/common/srch/search_runtime.py capabilities/common/srch/service.py capabilities/common/srch/api.py capabilities/common/srch/views.py capabilities/common/srch/app.py capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and SRCH capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/srch --json` passed with `ok: true`; SRCH remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/srch --json` passed with 12 UI routes, 31 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/srch/README.md capabilities/common/srch/SPECIFICATION.md capabilities/common/srch/PLAN.md capabilities/common/srch/cap_spec.md capabilities/common/srch/__init__.py capabilities/common/srch/capability_contract.py capabilities/common/srch/models.py capabilities/common/srch/search_runtime.py capabilities/common/srch/service.py capabilities/common/srch/api.py capabilities/common/srch/views.py capabilities/common/srch/app.py capabilities/common/srch/test_capability_contract.py capabilities/common/srch/tests/test_package_contract.py capabilities/common/srch/package_manifest.json capabilities/common/srch/release_report.json capabilities/common/srch/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/srch docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live external search/vector-index backend.
+- Live Bytewax stream execution.
+- External ETLP, META, NLPC, AICR, AUTH, AUDL, MONI, and CACH adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Legacy heavy SRCH service, API, and Flask-AppBuilder tests.
+- Load, latency, ranking-quality, recall, authorization, and throughput
+  benchmarks.

@@ -8,26 +8,125 @@
   },
   "capabilities": {
     "srch": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "data_pipeline": "etlp",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.SrchService",
+        "helper_runtime": "search_runtime.py",
+        "http_api": "api.py",
+        "metadata": "meta",
+        "metrics_sink": "moni",
+        "nlp": "nlpc",
+        "production_runtime": "service.SrchService",
+        "vector_index": "aicr"
+      },
+      "approvals": {
+        "bulk_index": "SearchDocumentRecord",
+        "large_result_window": "QueryRecord",
+        "restricted_index": "SearchIndexRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "data_pipeline": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.SrchService",
+          "helper_runtime": "search_runtime.py",
+          "http_api": "api.py",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "production_runtime": "service.SrchService",
+          "vector_index": "aicr"
+        },
+        "documents": {
+          "body_required": true,
+          "classification_required": true,
+          "id_required": true,
+          "source_lineage_required": true,
+          "title_required": true
+        },
+        "facets": {
+          "allowed_facet_keys": [
+            "module",
+            "kind",
+            "owner",
+            "classification",
+            "source"
+          ],
+          "enabled": true,
+          "max_facets": 50
+        },
         "governance": {
+          "audit_indexing": true,
           "audit_queries": true,
           "require_tenant_context": true,
           "restricted_content_filter_required": true
         },
         "indexing": {
+          "bulk_lineage_required": true,
           "classification_required": true,
           "enabled": true,
           "max_documents_per_batch": 10000,
           "owner_required": true
         },
+        "indices": {
+          "allowed_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "allowed_content_types": [
+            "document",
+            "article",
+            "record",
+            "event",
+            "profile"
+          ],
+          "classification_required": true,
+          "content_type_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
         "query": {
+          "allowed_query_types": [
+            "keyword",
+            "semantic",
+            "hybrid"
+          ],
+          "hybrid_enabled": true,
           "keyword_enabled": true,
           "max_result_window": 1000,
           "rbac_filter_required": true,
           "semantic_enabled": true
+        },
+        "ranking": {
+          "explain_ranking": true,
+          "freshness_boost_enabled": true,
+          "keyword_weight": 1.0,
+          "semantic_weight": 1.0
+        },
+        "security": {
+          "cross_tenant_search_allowed": false,
+          "rbac_filter_required": true,
+          "restricted_content_filter_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -35,10 +134,18 @@
           "default_theme": "srch_discovery_console"
         },
         "ui": {
+          "enable_access_review": true,
+          "enable_audit": true,
+          "enable_bulk_indexing": true,
+          "enable_dashboard": true,
+          "enable_document_indexer": true,
+          "enable_facets": true,
           "enable_governance": true,
           "enable_index_manager": true,
           "enable_query_analytics": true,
-          "enable_search_console": true
+          "enable_ranking": true,
+          "enable_search_console": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -67,6 +174,19 @@
           },
           {
             "condition": {
+              "index_name_present": false,
+              "operation": "create_index"
+            },
+            "description": "Search indices require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "index_name_required",
+              "required_action": "attach_index_name"
+            },
+            "name": "index_requires_name"
+          },
+          {
+            "condition": {
               "operation": "create_index",
               "owner_assigned": false
             },
@@ -80,42 +200,162 @@
           },
           {
             "condition": {
-              "content_classification": "restricted",
-              "rbac_filter_applied": false
+              "content_type_present": false,
+              "operation": "create_index"
             },
-            "description": "Restricted content queries require RBAC filters.",
+            "description": "Search indices require a content type.",
             "effect": {
               "decision": "deny",
-              "reason": "rbac_filter_required",
-              "required_action": "apply_rbac_filter"
+              "reason": "index_content_type_required",
+              "required_action": "attach_content_type"
             },
-            "name": "restricted_query_requires_rbac_filter"
+            "name": "index_requires_content_type"
           },
           {
             "condition": {
-              "embedding_index_ready": false,
-              "query_type": "semantic"
-            },
-            "description": "Semantic search requires an embedding index.",
-            "effect": {
-              "decision": "deny",
-              "reason": "embedding_index_required",
-              "required_action": "build_embedding_index"
-            },
-            "name": "semantic_query_requires_embeddings"
-          },
-          {
-            "condition": {
-              "result_window_gt": 1000,
+              "content_type_known": false,
+              "operation": "create_index",
               "review_recorded": false
             },
-            "description": "Large result windows require review.",
+            "description": "Unknown content types require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "large_result_window_review_required",
-              "required_action": "record_query_review"
+              "reason": "index_content_type_review_required",
+              "required_action": "review_content_type"
             },
-            "name": "large_result_window_requires_review"
+            "name": "index_content_type_requires_review"
+          },
+          {
+            "condition": {
+              "classification_present": false,
+              "operation": "create_index"
+            },
+            "description": "Search indices require a content classification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "index_classification_required",
+              "required_action": "attach_classification"
+            },
+            "name": "index_requires_classification"
+          },
+          {
+            "condition": {
+              "classification_known": false,
+              "operation": "create_index",
+              "review_recorded": false
+            },
+            "description": "Unknown classifications require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "index_classification_review_required",
+              "required_action": "review_classification"
+            },
+            "name": "index_classification_requires_review"
+          },
+          {
+            "condition": {
+              "content_classification": "restricted",
+              "operation": "create_index",
+              "source_lineage_present": false
+            },
+            "description": "Restricted indices require source lineage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "restricted_index_lineage_required",
+              "required_action": "attach_source_lineage"
+            },
+            "name": "restricted_index_requires_lineage"
+          },
+          {
+            "condition": {
+              "index_present": false,
+              "operation": "index_document"
+            },
+            "description": "Documents require a registered search index.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_index_required",
+              "required_action": "select_index"
+            },
+            "name": "document_requires_index"
+          },
+          {
+            "condition": {
+              "document_id_present": false,
+              "operation": "index_document"
+            },
+            "description": "Documents require an identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_id_required",
+              "required_action": "attach_document_id"
+            },
+            "name": "document_requires_id"
+          },
+          {
+            "condition": {
+              "operation": "index_document",
+              "title_present": false
+            },
+            "description": "Documents require a title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_title_required",
+              "required_action": "attach_title"
+            },
+            "name": "document_requires_title"
+          },
+          {
+            "condition": {
+              "body_present": false,
+              "operation": "index_document"
+            },
+            "description": "Documents require searchable body text.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_body_required",
+              "required_action": "attach_body"
+            },
+            "name": "document_requires_body"
+          },
+          {
+            "condition": {
+              "operation": "index_document",
+              "source_lineage_present": false
+            },
+            "description": "Documents require source lineage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_lineage_required",
+              "required_action": "attach_source_lineage"
+            },
+            "name": "document_requires_lineage"
+          },
+          {
+            "condition": {
+              "classification_present": false,
+              "operation": "index_document"
+            },
+            "description": "Documents require classification metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_classification_required",
+              "required_action": "attach_classification"
+            },
+            "name": "document_requires_classification"
+          },
+          {
+            "condition": {
+              "document_count_lt": 1,
+              "operation": "bulk_index"
+            },
+            "description": "Bulk indexing requires documents.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bulk_documents_required",
+              "required_action": "attach_documents"
+            },
+            "name": "bulk_index_requires_documents"
           },
           {
             "condition": {
@@ -129,6 +369,208 @@
               "required_action": "attach_source_lineage"
             },
             "name": "bulk_index_requires_lineage"
+          },
+          {
+            "condition": {
+              "document_count_gt": 10000,
+              "operation": "bulk_index",
+              "review_recorded": false
+            },
+            "description": "Large indexing batches require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "bulk_index_review_required",
+              "required_action": "record_bulk_review"
+            },
+            "name": "bulk_index_batch_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "query",
+              "query_text_present": false
+            },
+            "description": "Queries require query text.",
+            "effect": {
+              "decision": "deny",
+              "reason": "query_text_required",
+              "required_action": "attach_query_text"
+            },
+            "name": "query_requires_text"
+          },
+          {
+            "condition": {
+              "index_ids_present": false,
+              "operation": "query"
+            },
+            "description": "Queries require at least one index.",
+            "effect": {
+              "decision": "deny",
+              "reason": "query_index_required",
+              "required_action": "select_index"
+            },
+            "name": "query_requires_index"
+          },
+          {
+            "condition": {
+              "operation": "query",
+              "query_type_present": false
+            },
+            "description": "Queries require a type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "query_type_required",
+              "required_action": "choose_query_type"
+            },
+            "name": "query_requires_type"
+          },
+          {
+            "condition": {
+              "operation": "query",
+              "query_type_known": false,
+              "review_recorded": false
+            },
+            "description": "Unknown query types require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "query_type_review_required",
+              "required_action": "review_query_type"
+            },
+            "name": "query_type_requires_review"
+          },
+          {
+            "condition": {
+              "content_classification": "restricted",
+              "operation": "query",
+              "rbac_filter_applied": false
+            },
+            "description": "Restricted content queries require RBAC filters.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rbac_filter_required",
+              "required_action": "apply_rbac_filter"
+            },
+            "name": "restricted_query_requires_rbac_filter"
+          },
+          {
+            "condition": {
+              "embedding_index_ready": false,
+              "operation": "query",
+              "query_type": "semantic"
+            },
+            "description": "Semantic search requires an embedding index.",
+            "effect": {
+              "decision": "deny",
+              "reason": "embedding_index_required",
+              "required_action": "build_embedding_index"
+            },
+            "name": "semantic_query_requires_embeddings"
+          },
+          {
+            "condition": {
+              "embedding_index_ready": false,
+              "operation": "query",
+              "query_type": "hybrid"
+            },
+            "description": "Hybrid search requires an embedding index.",
+            "effect": {
+              "decision": "deny",
+              "reason": "embedding_index_required",
+              "required_action": "build_embedding_index"
+            },
+            "name": "hybrid_query_requires_embeddings"
+          },
+          {
+            "condition": {
+              "operation": "query",
+              "result_window_lt": 1
+            },
+            "description": "Result windows must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "result_window_required",
+              "required_action": "choose_positive_result_window"
+            },
+            "name": "result_window_requires_positive_value"
+          },
+          {
+            "condition": {
+              "operation": "query",
+              "result_window_gt": 1000,
+              "result_window_review_check": true,
+              "review_recorded": false
+            },
+            "description": "Large result windows require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "large_result_window_review_required",
+              "required_action": "record_query_review"
+            },
+            "name": "large_result_window_requires_review"
+          },
+          {
+            "condition": {
+              "facet_keys_allowed": false,
+              "operation": "index_document",
+              "review_recorded": false
+            },
+            "description": "Facet keys outside the allowlist require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "facet_key_review_required",
+              "required_action": "review_facet_key"
+            },
+            "name": "facet_key_requires_allowlist"
+          },
+          {
+            "condition": {
+              "cross_tenant_search": true
+            },
+            "description": "Cross-tenant search is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_search_denied",
+              "required_action": "use_tenant_scoped_indices"
+            },
+            "name": "cross_tenant_search_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "configure_batch_indexing"
+            },
+            "description": "Batch indexing streams must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_indexing_requires_bytewax"
+          },
+          {
+            "condition": {
+              "operation": "retire_index",
+              "review_recorded": false
+            },
+            "description": "Index retirement requires review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "index_retire_review_required",
+              "required_action": "record_retire_review"
+            },
+            "name": "index_retire_requires_review"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Search state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "search_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -148,6 +590,19 @@
         },
         {
           "condition": {
+            "index_name_present": false,
+            "operation": "create_index"
+          },
+          "description": "Search indices require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "index_name_required",
+            "required_action": "attach_index_name"
+          },
+          "name": "index_requires_name"
+        },
+        {
+          "condition": {
             "operation": "create_index",
             "owner_assigned": false
           },
@@ -161,42 +616,162 @@
         },
         {
           "condition": {
-            "content_classification": "restricted",
-            "rbac_filter_applied": false
+            "content_type_present": false,
+            "operation": "create_index"
           },
-          "description": "Restricted content queries require RBAC filters.",
+          "description": "Search indices require a content type.",
           "effect": {
             "decision": "deny",
-            "reason": "rbac_filter_required",
-            "required_action": "apply_rbac_filter"
+            "reason": "index_content_type_required",
+            "required_action": "attach_content_type"
           },
-          "name": "restricted_query_requires_rbac_filter"
+          "name": "index_requires_content_type"
         },
         {
           "condition": {
-            "embedding_index_ready": false,
-            "query_type": "semantic"
-          },
-          "description": "Semantic search requires an embedding index.",
-          "effect": {
-            "decision": "deny",
-            "reason": "embedding_index_required",
-            "required_action": "build_embedding_index"
-          },
-          "name": "semantic_query_requires_embeddings"
-        },
-        {
-          "condition": {
-            "result_window_gt": 1000,
+            "content_type_known": false,
+            "operation": "create_index",
             "review_recorded": false
           },
-          "description": "Large result windows require review.",
+          "description": "Unknown content types require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "large_result_window_review_required",
-            "required_action": "record_query_review"
+            "reason": "index_content_type_review_required",
+            "required_action": "review_content_type"
           },
-          "name": "large_result_window_requires_review"
+          "name": "index_content_type_requires_review"
+        },
+        {
+          "condition": {
+            "classification_present": false,
+            "operation": "create_index"
+          },
+          "description": "Search indices require a content classification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "index_classification_required",
+            "required_action": "attach_classification"
+          },
+          "name": "index_requires_classification"
+        },
+        {
+          "condition": {
+            "classification_known": false,
+            "operation": "create_index",
+            "review_recorded": false
+          },
+          "description": "Unknown classifications require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "index_classification_review_required",
+            "required_action": "review_classification"
+          },
+          "name": "index_classification_requires_review"
+        },
+        {
+          "condition": {
+            "content_classification": "restricted",
+            "operation": "create_index",
+            "source_lineage_present": false
+          },
+          "description": "Restricted indices require source lineage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "restricted_index_lineage_required",
+            "required_action": "attach_source_lineage"
+          },
+          "name": "restricted_index_requires_lineage"
+        },
+        {
+          "condition": {
+            "index_present": false,
+            "operation": "index_document"
+          },
+          "description": "Documents require a registered search index.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_index_required",
+            "required_action": "select_index"
+          },
+          "name": "document_requires_index"
+        },
+        {
+          "condition": {
+            "document_id_present": false,
+            "operation": "index_document"
+          },
+          "description": "Documents require an identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_id_required",
+            "required_action": "attach_document_id"
+          },
+          "name": "document_requires_id"
+        },
+        {
+          "condition": {
+            "operation": "index_document",
+            "title_present": false
+          },
+          "description": "Documents require a title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_title_required",
+            "required_action": "attach_title"
+          },
+          "name": "document_requires_title"
+        },
+        {
+          "condition": {
+            "body_present": false,
+            "operation": "index_document"
+          },
+          "description": "Documents require searchable body text.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_body_required",
+            "required_action": "attach_body"
+          },
+          "name": "document_requires_body"
+        },
+        {
+          "condition": {
+            "operation": "index_document",
+            "source_lineage_present": false
+          },
+          "description": "Documents require source lineage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_lineage_required",
+            "required_action": "attach_source_lineage"
+          },
+          "name": "document_requires_lineage"
+        },
+        {
+          "condition": {
+            "classification_present": false,
+            "operation": "index_document"
+          },
+          "description": "Documents require classification metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_classification_required",
+            "required_action": "attach_classification"
+          },
+          "name": "document_requires_classification"
+        },
+        {
+          "condition": {
+            "document_count_lt": 1,
+            "operation": "bulk_index"
+          },
+          "description": "Bulk indexing requires documents.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bulk_documents_required",
+            "required_action": "attach_documents"
+          },
+          "name": "bulk_index_requires_documents"
         },
         {
           "condition": {
@@ -210,19 +785,237 @@
             "required_action": "attach_source_lineage"
           },
           "name": "bulk_index_requires_lineage"
+        },
+        {
+          "condition": {
+            "document_count_gt": 10000,
+            "operation": "bulk_index",
+            "review_recorded": false
+          },
+          "description": "Large indexing batches require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "bulk_index_review_required",
+            "required_action": "record_bulk_review"
+          },
+          "name": "bulk_index_batch_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "query",
+            "query_text_present": false
+          },
+          "description": "Queries require query text.",
+          "effect": {
+            "decision": "deny",
+            "reason": "query_text_required",
+            "required_action": "attach_query_text"
+          },
+          "name": "query_requires_text"
+        },
+        {
+          "condition": {
+            "index_ids_present": false,
+            "operation": "query"
+          },
+          "description": "Queries require at least one index.",
+          "effect": {
+            "decision": "deny",
+            "reason": "query_index_required",
+            "required_action": "select_index"
+          },
+          "name": "query_requires_index"
+        },
+        {
+          "condition": {
+            "operation": "query",
+            "query_type_present": false
+          },
+          "description": "Queries require a type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "query_type_required",
+            "required_action": "choose_query_type"
+          },
+          "name": "query_requires_type"
+        },
+        {
+          "condition": {
+            "operation": "query",
+            "query_type_known": false,
+            "review_recorded": false
+          },
+          "description": "Unknown query types require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "query_type_review_required",
+            "required_action": "review_query_type"
+          },
+          "name": "query_type_requires_review"
+        },
+        {
+          "condition": {
+            "content_classification": "restricted",
+            "operation": "query",
+            "rbac_filter_applied": false
+          },
+          "description": "Restricted content queries require RBAC filters.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rbac_filter_required",
+            "required_action": "apply_rbac_filter"
+          },
+          "name": "restricted_query_requires_rbac_filter"
+        },
+        {
+          "condition": {
+            "embedding_index_ready": false,
+            "operation": "query",
+            "query_type": "semantic"
+          },
+          "description": "Semantic search requires an embedding index.",
+          "effect": {
+            "decision": "deny",
+            "reason": "embedding_index_required",
+            "required_action": "build_embedding_index"
+          },
+          "name": "semantic_query_requires_embeddings"
+        },
+        {
+          "condition": {
+            "embedding_index_ready": false,
+            "operation": "query",
+            "query_type": "hybrid"
+          },
+          "description": "Hybrid search requires an embedding index.",
+          "effect": {
+            "decision": "deny",
+            "reason": "embedding_index_required",
+            "required_action": "build_embedding_index"
+          },
+          "name": "hybrid_query_requires_embeddings"
+        },
+        {
+          "condition": {
+            "operation": "query",
+            "result_window_lt": 1
+          },
+          "description": "Result windows must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "result_window_required",
+            "required_action": "choose_positive_result_window"
+          },
+          "name": "result_window_requires_positive_value"
+        },
+        {
+          "condition": {
+            "operation": "query",
+            "result_window_gt": 1000,
+            "result_window_review_check": true,
+            "review_recorded": false
+          },
+          "description": "Large result windows require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "large_result_window_review_required",
+            "required_action": "record_query_review"
+          },
+          "name": "large_result_window_requires_review"
+        },
+        {
+          "condition": {
+            "facet_keys_allowed": false,
+            "operation": "index_document",
+            "review_recorded": false
+          },
+          "description": "Facet keys outside the allowlist require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "facet_key_review_required",
+            "required_action": "review_facet_key"
+          },
+          "name": "facet_key_requires_allowlist"
+        },
+        {
+          "condition": {
+            "cross_tenant_search": true
+          },
+          "description": "Cross-tenant search is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_search_denied",
+            "required_action": "use_tenant_scoped_indices"
+          },
+          "name": "cross_tenant_search_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "configure_batch_indexing"
+          },
+          "description": "Batch indexing streams must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_indexing_requires_bytewax"
+        },
+        {
+          "condition": {
+            "operation": "retire_index",
+            "review_recorded": false
+          },
+          "description": "Index retirement requires review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "index_retire_review_required",
+            "required_action": "record_retire_review"
+          },
+          "name": "index_retire_requires_review"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Search state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "search_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "search_runtime.py",
+        "service": "service.SrchService",
         "views": "views.py"
       },
       "screens": {
+        "access": {
+          "component": "SearchAccessReview",
+          "permission": "srch:govern",
+          "route": "/srch/access"
+        },
         "analytics": {
           "component": "QueryAnalytics",
           "permission": "srch:view",
           "route": "/srch/analytics"
+        },
+        "audit": {
+          "component": "SearchAuditTimeline",
+          "permission": "srch:audit",
+          "route": "/srch/audit"
+        },
+        "bulk": {
+          "component": "BulkIndexQueue",
+          "permission": "srch:index",
+          "route": "/srch/bulk"
         },
         "dashboard": {
           "component": "SRCHDashboard",
@@ -234,6 +1027,11 @@
           "permission": "srch:index",
           "route": "/srch/documents"
         },
+        "facets": {
+          "component": "FacetExplorer",
+          "permission": "srch:view",
+          "route": "/srch/facets"
+        },
         "governance": {
           "component": "SearchGovernance",
           "permission": "srch:govern",
@@ -243,6 +1041,11 @@
           "component": "IndexManager",
           "permission": "srch:manage_indices",
           "route": "/srch/indices"
+        },
+        "ranking": {
+          "component": "RankingWorkbench",
+          "permission": "srch:govern",
+          "route": "/srch/ranking"
         },
         "search": {
           "component": "SearchConsole",
@@ -255,9 +1058,29 @@
           "route": "/srch/settings"
         }
       },
-      "streaming": {},
+      "search_lifecycle": {
+        "audit": "SearchAuditEventRecord",
+        "document": "SearchDocumentRecord",
+        "index": "SearchIndexRecord",
+        "query": "QueryRecord"
+      },
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "access_review": {
+            "status_style": "rbac-chip",
+            "visual": "policy-table"
+          },
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
+          "bulk_queue": {
+            "status_style": "bytewax-chip",
+            "visual": "queue-table"
+          },
           "facet_panel": {
             "highlight": "active-chip",
             "visual": "filter-stack"
@@ -269,6 +1092,10 @@
           "query_trace": {
             "threshold_style": "latency-band",
             "visual": "retrieval-timeline"
+          },
+          "ranking_panel": {
+            "status_style": "explain-chip",
+            "visual": "weight-grid"
           },
           "result_card": {
             "icon": "search",
@@ -324,6 +1151,20 @@
             "permission": "srch:index"
           },
           {
+            "component": "BulkIndexQueue",
+            "name": "bulk",
+            "nav_group": "Indexes",
+            "path": "/srch/bulk",
+            "permission": "srch:index"
+          },
+          {
+            "component": "FacetExplorer",
+            "name": "facets",
+            "nav_group": "Search",
+            "path": "/srch/facets",
+            "permission": "srch:view"
+          },
+          {
             "component": "QueryAnalytics",
             "name": "analytics",
             "nav_group": "Operations",
@@ -331,11 +1172,32 @@
             "permission": "srch:view"
           },
           {
+            "component": "RankingWorkbench",
+            "name": "ranking",
+            "nav_group": "Operations",
+            "path": "/srch/ranking",
+            "permission": "srch:govern"
+          },
+          {
+            "component": "SearchAccessReview",
+            "name": "access",
+            "nav_group": "Governance",
+            "path": "/srch/access",
+            "permission": "srch:govern"
+          },
+          {
             "component": "SearchGovernance",
             "name": "governance",
             "nav_group": "Governance",
             "path": "/srch/governance",
             "permission": "srch:govern"
+          },
+          {
+            "component": "SearchAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/srch/audit",
+            "permission": "srch:audit"
           },
           {
             "component": "SRCHSettings",
@@ -350,7 +1212,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "__init__.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -364,22 +1226,101 @@
   "contracts": {
     "srch": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "data_pipeline": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.SrchService",
+          "helper_runtime": "search_runtime.py",
+          "http_api": "api.py",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "nlp": "nlpc",
+          "production_runtime": "service.SrchService",
+          "vector_index": "aicr"
+        },
+        "documents": {
+          "body_required": true,
+          "classification_required": true,
+          "id_required": true,
+          "source_lineage_required": true,
+          "title_required": true
+        },
+        "facets": {
+          "allowed_facet_keys": [
+            "module",
+            "kind",
+            "owner",
+            "classification",
+            "source"
+          ],
+          "enabled": true,
+          "max_facets": 50
+        },
         "governance": {
+          "audit_indexing": true,
           "audit_queries": true,
           "require_tenant_context": true,
           "restricted_content_filter_required": true
         },
         "indexing": {
+          "bulk_lineage_required": true,
           "classification_required": true,
           "enabled": true,
           "max_documents_per_batch": 10000,
           "owner_required": true
         },
+        "indices": {
+          "allowed_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "allowed_content_types": [
+            "document",
+            "article",
+            "record",
+            "event",
+            "profile"
+          ],
+          "classification_required": true,
+          "content_type_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
         "query": {
+          "allowed_query_types": [
+            "keyword",
+            "semantic",
+            "hybrid"
+          ],
+          "hybrid_enabled": true,
           "keyword_enabled": true,
           "max_result_window": 1000,
           "rbac_filter_required": true,
           "semantic_enabled": true
+        },
+        "ranking": {
+          "explain_ranking": true,
+          "freshness_boost_enabled": true,
+          "keyword_weight": 1.0,
+          "semantic_weight": 1.0
+        },
+        "security": {
+          "cross_tenant_search_allowed": false,
+          "rbac_filter_required": true,
+          "restricted_content_filter_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -387,10 +1328,18 @@
           "default_theme": "srch_discovery_console"
         },
         "ui": {
+          "enable_access_review": true,
+          "enable_audit": true,
+          "enable_bulk_indexing": true,
+          "enable_dashboard": true,
+          "enable_document_indexer": true,
+          "enable_facets": true,
           "enable_governance": true,
           "enable_index_manager": true,
           "enable_query_analytics": true,
-          "enable_search_console": true
+          "enable_ranking": true,
+          "enable_search_console": true,
+          "enable_settings": true
         }
       },
       "id": "srch",
@@ -430,6 +1379,46 @@
   },
   "roles": {},
   "rules": {
+    "batch_indexing_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "configure_batch_indexing"
+      },
+      "description": "Batch indexing streams must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_indexing_requires_bytewax"
+    },
+    "bulk_index_batch_requires_review": {
+      "condition": {
+        "document_count_gt": 10000,
+        "operation": "bulk_index",
+        "review_recorded": false
+      },
+      "description": "Large indexing batches require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "bulk_index_review_required",
+        "required_action": "record_bulk_review"
+      },
+      "name": "bulk_index_batch_requires_review"
+    },
+    "bulk_index_requires_documents": {
+      "condition": {
+        "document_count_lt": 1,
+        "operation": "bulk_index"
+      },
+      "description": "Bulk indexing requires documents.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bulk_documents_required",
+        "required_action": "attach_documents"
+      },
+      "name": "bulk_index_requires_documents"
+    },
     "bulk_index_requires_lineage": {
       "condition": {
         "operation": "bulk_index",
@@ -442,6 +1431,204 @@
         "required_action": "attach_source_lineage"
       },
       "name": "bulk_index_requires_lineage"
+    },
+    "cross_tenant_search_denied": {
+      "condition": {
+        "cross_tenant_search": true
+      },
+      "description": "Cross-tenant search is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_search_denied",
+        "required_action": "use_tenant_scoped_indices"
+      },
+      "name": "cross_tenant_search_denied"
+    },
+    "document_requires_body": {
+      "condition": {
+        "body_present": false,
+        "operation": "index_document"
+      },
+      "description": "Documents require searchable body text.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_body_required",
+        "required_action": "attach_body"
+      },
+      "name": "document_requires_body"
+    },
+    "document_requires_classification": {
+      "condition": {
+        "classification_present": false,
+        "operation": "index_document"
+      },
+      "description": "Documents require classification metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_classification_required",
+        "required_action": "attach_classification"
+      },
+      "name": "document_requires_classification"
+    },
+    "document_requires_id": {
+      "condition": {
+        "document_id_present": false,
+        "operation": "index_document"
+      },
+      "description": "Documents require an identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_id_required",
+        "required_action": "attach_document_id"
+      },
+      "name": "document_requires_id"
+    },
+    "document_requires_index": {
+      "condition": {
+        "index_present": false,
+        "operation": "index_document"
+      },
+      "description": "Documents require a registered search index.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_index_required",
+        "required_action": "select_index"
+      },
+      "name": "document_requires_index"
+    },
+    "document_requires_lineage": {
+      "condition": {
+        "operation": "index_document",
+        "source_lineage_present": false
+      },
+      "description": "Documents require source lineage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_lineage_required",
+        "required_action": "attach_source_lineage"
+      },
+      "name": "document_requires_lineage"
+    },
+    "document_requires_title": {
+      "condition": {
+        "operation": "index_document",
+        "title_present": false
+      },
+      "description": "Documents require a title.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_title_required",
+        "required_action": "attach_title"
+      },
+      "name": "document_requires_title"
+    },
+    "facet_key_requires_allowlist": {
+      "condition": {
+        "facet_keys_allowed": false,
+        "operation": "index_document",
+        "review_recorded": false
+      },
+      "description": "Facet keys outside the allowlist require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "facet_key_review_required",
+        "required_action": "review_facet_key"
+      },
+      "name": "facet_key_requires_allowlist"
+    },
+    "hybrid_query_requires_embeddings": {
+      "condition": {
+        "embedding_index_ready": false,
+        "operation": "query",
+        "query_type": "hybrid"
+      },
+      "description": "Hybrid search requires an embedding index.",
+      "effect": {
+        "decision": "deny",
+        "reason": "embedding_index_required",
+        "required_action": "build_embedding_index"
+      },
+      "name": "hybrid_query_requires_embeddings"
+    },
+    "index_classification_requires_review": {
+      "condition": {
+        "classification_known": false,
+        "operation": "create_index",
+        "review_recorded": false
+      },
+      "description": "Unknown classifications require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "index_classification_review_required",
+        "required_action": "review_classification"
+      },
+      "name": "index_classification_requires_review"
+    },
+    "index_content_type_requires_review": {
+      "condition": {
+        "content_type_known": false,
+        "operation": "create_index",
+        "review_recorded": false
+      },
+      "description": "Unknown content types require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "index_content_type_review_required",
+        "required_action": "review_content_type"
+      },
+      "name": "index_content_type_requires_review"
+    },
+    "index_requires_classification": {
+      "condition": {
+        "classification_present": false,
+        "operation": "create_index"
+      },
+      "description": "Search indices require a content classification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "index_classification_required",
+        "required_action": "attach_classification"
+      },
+      "name": "index_requires_classification"
+    },
+    "index_requires_content_type": {
+      "condition": {
+        "content_type_present": false,
+        "operation": "create_index"
+      },
+      "description": "Search indices require a content type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "index_content_type_required",
+        "required_action": "attach_content_type"
+      },
+      "name": "index_requires_content_type"
+    },
+    "index_requires_name": {
+      "condition": {
+        "index_name_present": false,
+        "operation": "create_index"
+      },
+      "description": "Search indices require a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "index_name_required",
+        "required_action": "attach_index_name"
+      },
+      "name": "index_requires_name"
+    },
+    "index_retire_requires_review": {
+      "condition": {
+        "operation": "retire_index",
+        "review_recorded": false
+      },
+      "description": "Index retirement requires review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "index_retire_review_required",
+        "required_action": "record_retire_review"
+      },
+      "name": "index_retire_requires_review"
     },
     "indexing_requires_owner": {
       "condition": {
@@ -458,7 +1645,9 @@
     },
     "large_result_window_requires_review": {
       "condition": {
+        "operation": "query",
         "result_window_gt": 1000,
+        "result_window_review_check": true,
         "review_recorded": false
       },
       "description": "Large result windows require review.",
@@ -469,9 +1658,77 @@
       },
       "name": "large_result_window_requires_review"
     },
+    "query_requires_index": {
+      "condition": {
+        "index_ids_present": false,
+        "operation": "query"
+      },
+      "description": "Queries require at least one index.",
+      "effect": {
+        "decision": "deny",
+        "reason": "query_index_required",
+        "required_action": "select_index"
+      },
+      "name": "query_requires_index"
+    },
+    "query_requires_text": {
+      "condition": {
+        "operation": "query",
+        "query_text_present": false
+      },
+      "description": "Queries require query text.",
+      "effect": {
+        "decision": "deny",
+        "reason": "query_text_required",
+        "required_action": "attach_query_text"
+      },
+      "name": "query_requires_text"
+    },
+    "query_requires_type": {
+      "condition": {
+        "operation": "query",
+        "query_type_present": false
+      },
+      "description": "Queries require a type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "query_type_required",
+        "required_action": "choose_query_type"
+      },
+      "name": "query_requires_type"
+    },
+    "query_type_requires_review": {
+      "condition": {
+        "operation": "query",
+        "query_type_known": false,
+        "review_recorded": false
+      },
+      "description": "Unknown query types require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "query_type_review_required",
+        "required_action": "review_query_type"
+      },
+      "name": "query_type_requires_review"
+    },
+    "restricted_index_requires_lineage": {
+      "condition": {
+        "content_classification": "restricted",
+        "operation": "create_index",
+        "source_lineage_present": false
+      },
+      "description": "Restricted indices require source lineage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "restricted_index_lineage_required",
+        "required_action": "attach_source_lineage"
+      },
+      "name": "restricted_index_requires_lineage"
+    },
     "restricted_query_requires_rbac_filter": {
       "condition": {
         "content_classification": "restricted",
+        "operation": "query",
         "rbac_filter_applied": false
       },
       "description": "Restricted content queries require RBAC filters.",
@@ -482,9 +1739,36 @@
       },
       "name": "restricted_query_requires_rbac_filter"
     },
+    "result_window_requires_positive_value": {
+      "condition": {
+        "operation": "query",
+        "result_window_lt": 1
+      },
+      "description": "Result windows must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "result_window_required",
+        "required_action": "choose_positive_result_window"
+      },
+      "name": "result_window_requires_positive_value"
+    },
+    "search_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Search state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "search_state_change_requires_audit"
+    },
     "semantic_query_requires_embeddings": {
       "condition": {
         "embedding_index_ready": false,
+        "operation": "query",
         "query_type": "semantic"
       },
       "description": "Semantic search requires an embedding index.",
@@ -510,7 +1794,10 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "service.py",
+    "search_runtime.py",
+    "views.py"
   ],
   "symbols": {
     "capability.srch": {

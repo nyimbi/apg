@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["indexing", "keyword_search", "semantic_search", "faceted_search", "access_filtered_retrieval"],
-	"permissions": ["srch:view", "srch:query", "srch:index", "srch:manage_indices", "srch:govern", "srch:admin"]
+	"provides": ["indexing", "keyword_search", "semantic_search", "hybrid_search", "faceted_search", "access_filtered_retrieval", "query_analytics"],
+	"permissions": ["srch:view", "srch:query", "srch:index", "srch:manage_indices", "srch:govern", "srch:audit", "srch:admin"]
 }
 
 
@@ -43,11 +43,16 @@ def register_capability() -> dict[str, Any]:
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"adapters": contract["configuration"]["adapters"],
 		"capabilities": {
 			"indexing": "Index tenant-scoped structured and unstructured content",
+			"bulk_indexing": "Coordinate lineage-protected Bytewax-backed indexing batches",
 			"keyword_search": "Run governed full-text search with facets",
 			"semantic_search": "Run embedding-backed semantic retrieval through NLPC/AICR",
+			"hybrid_search": "Combine lexical and embedding-backed retrieval",
 			"access_filtered_retrieval": "Apply tenant, RBAC, and classification filters before result return",
+			"facet_navigation": "Expose governed facet counts and filters",
+			"query_analytics": "Track query decisions, reviews, denials, and retrieval health",
 			"capability_rules": "Evaluate deterministic search-governance rules",
 			"visual_theming": "Apply search-console theme tokens and components"
 		},
@@ -55,8 +60,10 @@ def register_capability() -> dict[str, Any]:
 			"query": "/srch/api/v1/query",
 			"indices": "/srch/api/v1/indices",
 			"documents": "/srch/api/v1/documents",
+			"bulk": "/srch/api/v1/bulk",
 			"facets": "/srch/api/v1/facets",
-			"analytics": "/srch/api/v1/analytics"
+			"analytics": "/srch/api/v1/analytics",
+			"audit": "/srch/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],

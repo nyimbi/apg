@@ -31,10 +31,11 @@ def create_index(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		name=str(payload["name"]),
 		owner=str(payload.get("owner") or ""),
-		content_type=str(payload.get("content_type") or "document"),
-		classification=str(payload.get("classification") or "internal"),
+		content_type=str(payload.get("content_type") or ""),
+		classification=str(payload.get("classification") or ""),
 		source_lineage_ref=payload.get("source_lineage_ref"),
 		embedding_index_ready=bool(payload.get("embedding_index_ready", False)),
+		review_recorded=bool(payload.get("review_recorded", False)),
 	)
 
 
@@ -51,12 +52,13 @@ def index_document(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		index_id=str(payload["index_id"]),
 		document_id=str(payload["document_id"]),
-		title=str(payload.get("title") or payload["document_id"]),
+		title=str(payload.get("title") or ""),
 		body=str(payload.get("body") or ""),
 		classification=payload.get("classification"),
 		facets=dict(payload.get("facets") or {}),
 		metadata=dict(payload.get("metadata") or {}),
 		source_lineage_ref=payload.get("source_lineage_ref"),
+		review_recorded=bool(payload.get("review_recorded", False)),
 	)
 
 
@@ -66,6 +68,7 @@ def bulk_index_documents(payload: dict[str, Any]) -> list[dict[str, Any]]:
 		index_id=str(payload["index_id"]),
 		documents=list(payload.get("documents") or []),
 		source_lineage_ref=payload.get("source_lineage_ref"),
+		review_recorded=bool(payload.get("review_recorded", False)),
 	)
 
 
@@ -74,7 +77,7 @@ def query(payload: dict[str, Any]) -> dict[str, Any]:
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		query_text=str(payload["query_text"]),
 		index_ids=list(payload.get("index_ids") or []),
-		query_type=str(payload.get("query_type") or "keyword"),
+		query_type=str(payload.get("query_type") or ""),
 		result_window=int(payload.get("result_window", 10)),
 		rbac_filter_applied=bool(payload.get("rbac_filter_applied", True)),
 		review_recorded=bool(payload.get("review_recorded", False)),

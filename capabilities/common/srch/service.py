@@ -38,29 +38,40 @@ class SrchService:
 		tenant_id: str,
 		name: str,
 		owner: str,
-		content_type: str = "document",
-		classification: str = "internal",
+		content_type: str = "",
+		classification: str = "",
 		source_lineage_ref: str | None = None,
 		embedding_index_ready: bool = False,
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		if not str(name or "").strip():
-			raise ValueError("index_name_required")
+		config = self.describe(tenant_id)["configuration"]
+		classification_value = str(classification or "").strip().lower()
+		content_type_value = str(content_type or "").strip().lower()
+		classification_known = classification_value in config["indices"]["allowed_classifications"]
+		stored_classification = classification_value if classification_known else "restricted"
 		context = {
 			"tenant_context_present": True,
 			"operation": "create_index",
+			"index_name_present": bool(str(name or "").strip()),
 			"owner_assigned": bool(str(owner or "").strip()),
+			"content_type_present": bool(content_type_value),
+			"content_type_known": content_type_value in config["indices"]["allowed_content_types"],
+			"classification_present": bool(classification_value),
+			"classification_known": classification_known,
+			"content_classification": stored_classification,
+			"source_lineage_present": bool(str(source_lineage_ref or "").strip()),
+			"review_recorded": bool(review_recorded),
 		}
 		result = self.evaluate(context)
-		if result["decision"] == "deny":
-			self._raise_policy(result)
+		self._raise_if_blocked(result)
 		record = SearchIndexRecord(
 			id=stable_id("srch_index", tenant_id, name),
 			tenant_id=tenant_id,
 			name=name,
 			owner=owner,
-			content_type=str(content_type or "document"),
-			classification=normalize_classification(classification),
+			content_type=content_type_value,
+			classification=normalize_classification(stored_classification),
 			source_lineage_ref=source_lineage_ref,
 			embedding_index_ready=bool(embedding_index_ready),
 			status="embedding_ready" if embedding_index_ready else "ready",
@@ -94,17 +105,32 @@ class SrchService:
 		facets: dict[str, str] | None = None,
 		metadata: dict[str, Any] | None = None,
 		source_lineage_ref: str | None = None,
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		index = self._get_index(tenant_id, index_id)
-		if not str(document_id or "").strip():
-			raise ValueError("document_id_required")
-		if not str(title or "").strip():
-			raise ValueError("document_title_required")
-		if not str(body or "").strip():
-			raise ValueError("document_body_required")
-		if not (source_lineage_ref or index.source_lineage_ref):
-			raise PermissionError("source_lineage_required")
+		index_present = any(
+			item.id == index_id or item.name == index_id
+			for item in self.indices.values()
+			if item.tenant_id == tenant_id
+		)
+		index = self._get_index(tenant_id, index_id) if index_present else None
+		allowed_facets = set(self.describe(tenant_id)["configuration"]["facets"]["allowed_facet_keys"])
+		facet_keys = set(str(key) for key in dict(facets or {}))
+		classification_present = bool(str(classification or (index.classification if index else "")).strip())
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "index_document",
+			"index_present": index_present,
+			"document_id_present": bool(str(document_id or "").strip()),
+			"title_present": bool(str(title or "").strip()),
+			"body_present": bool(str(body or "").strip()),
+			"source_lineage_present": bool(source_lineage_ref or (index.source_lineage_ref if index else None)),
+			"classification_present": classification_present,
+			"facet_keys_allowed": facet_keys <= allowed_facets,
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(result)
+		assert index is not None
 		record = SearchDocumentRecord(
 			id=stable_id("srch_doc", tenant_id, index.id, document_id),
 			tenant_id=tenant_id,
@@ -128,31 +154,33 @@ class SrchService:
 		index_id: str,
 		documents: list[dict[str, Any]],
 		source_lineage_ref: str | None,
+		review_recorded: bool = False,
 	) -> list[dict[str, Any]]:
 		self._require_tenant(tenant_id)
+		document_count = len(documents)
 		context = {
 			"tenant_context_present": True,
 			"operation": "bulk_index",
 			"source_lineage_present": bool(str(source_lineage_ref or "").strip()),
+			"document_count": document_count,
+			"review_recorded": bool(review_recorded),
 		}
 		result = self.evaluate(context)
-		if result["decision"] == "deny":
-			self._raise_policy(result)
-		if not documents:
-			raise ValueError("bulk_documents_required")
-		if len(documents) > int(self.describe(tenant_id)["configuration"]["indexing"]["max_documents_per_batch"]):
+		self._raise_if_blocked(result)
+		if not review_recorded and len(documents) > int(self.describe(tenant_id)["configuration"]["indexing"]["max_documents_per_batch"]):
 			raise ValueError("bulk_document_batch_too_large")
 		return [
 			self.index_document(
 				tenant_id=tenant_id,
 				index_id=index_id,
 				document_id=str(document["document_id"]),
-				title=str(document.get("title") or document["document_id"]),
+				title=str(document.get("title") or ""),
 				body=str(document.get("body") or ""),
 				classification=document.get("classification"),
 				facets=dict(document.get("facets") or {}),
 				metadata=dict(document.get("metadata") or {}),
 				source_lineage_ref=source_lineage_ref,
+				review_recorded=review_recorded,
 			)
 			for document in documents
 		]
@@ -162,27 +190,41 @@ class SrchService:
 		tenant_id: str,
 		query_text: str,
 		index_ids: list[str],
-		query_type: str = "keyword",
+		query_type: str = "",
 		result_window: int = 10,
 		rbac_filter_applied: bool = True,
 		review_recorded: bool = False,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		if not str(query_text or "").strip():
-			raise ValueError("query_text_required")
-		if result_window <= 0:
-			raise ValueError("result_window_must_be_positive")
+		config = self.describe(tenant_id)["configuration"]
+		query_type_value = str(query_type or "").strip().lower()
+		preflight = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "query",
+			"query_text_present": bool(str(query_text or "").strip()),
+			"index_ids_present": bool(index_ids),
+			"query_type_present": bool(query_type_value),
+			"query_type_known": query_type_value in config["query"]["allowed_query_types"],
+			"result_window": int(result_window),
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(preflight)
 		indices = [self._get_index(tenant_id, index_id) for index_id in index_ids]
-		normalized_query_type = normalize_query_type(query_type)
+		if query_type_value in config["query"]["allowed_query_types"]:
+			normalized_query_type = normalize_query_type(query_type)
+		else:
+			normalized_query_type = query_type_value
 		restricted = any(index.classification == "restricted" for index in indices)
 		embedding_ready = all(index.embedding_index_ready for index in indices)
 		context = {
 			"tenant_context_present": True,
+			"operation": "query",
 			"content_classification": "restricted" if restricted else "internal",
 			"rbac_filter_applied": bool(rbac_filter_applied),
-			"query_type": "semantic" if normalized_query_type in {"semantic", "hybrid"} else "keyword",
+			"query_type": normalized_query_type,
 			"embedding_index_ready": bool(embedding_ready),
 			"result_window": int(result_window),
+			"result_window_review_check": True,
 			"review_recorded": bool(review_recorded),
 		}
 		result = self.evaluate(context)
@@ -277,6 +319,11 @@ class SrchService:
 	def _raise_policy(self, result: dict[str, Any]) -> None:
 		reasons = ", ".join(action.get("reason", "srch_policy_blocked") for action in result["actions"])
 		raise PermissionError(reasons or "srch_policy_blocked")
+
+	def _raise_if_blocked(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "allow":
+			return
+		self._raise_policy(result)
 
 	def _get_index(self, tenant_id: str, index_id: str) -> SearchIndexRecord:
 		index = self.indices.get(index_id)

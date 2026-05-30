@@ -5,13 +5,118 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Search Engine package-backed APG capability", "entity_count": 0, "name": "srch", "version": "1.0.0"}, "capabilities": {"srch": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_queries": true, "require_tenant_context": true, "restricted_content_filter_required": true}, "indexing": {"classification_required": true, "enabled": true, "max_documents_per_batch": 10000, "owner_required": true}, "query": {"keyword_enabled": true, "max_result_window": 1000, "rbac_filter_required": true, "semantic_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "srch_discovery_console"}, "ui": {"enable_governance": true, "enable_index_manager": true, "enable_query_analytics": true, "enable_search_console": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Search Engine", "provides": ["srch_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All search operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_index", "owner_assigned": false}, "description": "Search indices require an owner.", "effect": {"decision": "deny", "reason": "index_owner_required", "required_action": "assign_owner"}, "name": "indexing_requires_owner"}, {"condition": {"content_classification": "restricted", "rbac_filter_applied": false}, "description": "Restricted content queries require RBAC filters.", "effect": {"decision": "deny", "reason": "rbac_filter_required", "required_action": "apply_rbac_filter"}, "name": "restricted_query_requires_rbac_filter"}, {"condition": {"embedding_index_ready": false, "query_type": "semantic"}, "description": "Semantic search requires an embedding index.", "effect": {"decision": "deny", "reason": "embedding_index_required", "required_action": "build_embedding_index"}, "name": "semantic_query_requires_embeddings"}, {"condition": {"result_window_gt": 1000, "review_recorded": false}, "description": "Large result windows require review.", "effect": {"decision": "require_review", "reason": "large_result_window_review_required", "required_action": "record_query_review"}, "name": "large_result_window_requires_review"}, {"condition": {"operation": "bulk_index", "source_lineage_present": false}, "description": "Bulk indexing requires source lineage.", "effect": {"decision": "deny", "reason": "source_lineage_required", "required_action": "attach_source_lineage"}, "name": "bulk_index_requires_lineage"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All search operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "create_index", "owner_assigned": false}, "description": "Search indices require an owner.", "effect": {"decision": "deny", "reason": "index_owner_required", "required_action": "assign_owner"}, "name": "indexing_requires_owner"}, {"condition": {"content_classification": "restricted", "rbac_filter_applied": false}, "description": "Restricted content queries require RBAC filters.", "effect": {"decision": "deny", "reason": "rbac_filter_required", "required_action": "apply_rbac_filter"}, "name": "restricted_query_requires_rbac_filter"}, {"condition": {"embedding_index_ready": false, "query_type": "semantic"}, "description": "Semantic search requires an embedding index.", "effect": {"decision": "deny", "reason": "embedding_index_required", "required_action": "build_embedding_index"}, "name": "semantic_query_requires_embeddings"}, {"condition": {"result_window_gt": 1000, "review_recorded": false}, "description": "Large result windows require review.", "effect": {"decision": "require_review", "reason": "large_result_window_review_required", "required_action": "record_query_review"}, "name": "large_result_window_requires_review"}, {"condition": {"operation": "bulk_index", "source_lineage_present": false}, "description": "Bulk indexing requires source lineage.", "effect": {"decision": "deny", "reason": "source_lineage_required", "required_action": "attach_source_lineage"}, "name": "bulk_index_requires_lineage"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"analytics": {"component": "QueryAnalytics", "permission": "srch:view", "route": "/srch/analytics"}, "dashboard": {"component": "SRCHDashboard", "permission": "srch:view", "route": "/srch/dashboard"}, "documents": {"component": "DocumentIndexer", "permission": "srch:index", "route": "/srch/documents"}, "governance": {"component": "SearchGovernance", "permission": "srch:govern", "route": "/srch/governance"}, "indices": {"component": "IndexManager", "permission": "srch:manage_indices", "route": "/srch/indices"}, "search": {"component": "SearchConsole", "permission": "srch:query", "route": "/srch/search"}, "settings": {"component": "SRCHSettings", "permission": "srch:admin", "route": "/srch/settings"}}, "streaming": {}, "theme": {"components": {"facet_panel": {"highlight": "active-chip", "visual": "filter-stack"}, "index_health": {"status_style": "freshness-pill", "visual": "coverage-meter"}, "query_trace": {"threshold_style": "latency-band", "visual": "retrieval-timeline"}, "result_card": {"icon": "search", "risk_style": "access-band", "status_indicator": "classification-pill"}}, "name": "srch_discovery_console", "tokens": {"border.radius": "8px", "color.accent": "#F1A208", "color.danger": "#C53030", "color.primary": "#235789", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/srch/api/v1", "requires_theme": true, "routes": [{"component": "SRCHDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/srch/dashboard", "permission": "srch:view"}, {"component": "SearchConsole", "name": "search", "nav_group": "Search", "path": "/srch/search", "permission": "srch:query"}, {"component": "IndexManager", "name": "indices", "nav_group": "Indexes", "path": "/srch/indices", "permission": "srch:manage_indices"}, {"component": "DocumentIndexer", "name": "documents", "nav_group": "Indexes", "path": "/srch/documents", "permission": "srch:index"}, {"component": "QueryAnalytics", "name": "analytics", "nav_group": "Operations", "path": "/srch/analytics", "permission": "srch:view"}, {"component": "SearchGovernance", "name": "governance", "nav_group": "Governance", "path": "/srch/governance", "permission": "srch:govern"}, {"component": "SRCHSettings", "name": "settings", "nav_group": "Administration", "path": "/srch/settings", "permission": "srch:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"srch": []}}, "contracts": {"srch": {"configuration": {"governance": {"audit_queries": true, "require_tenant_context": true, "restricted_content_filter_required": true}, "indexing": {"classification_required": true, "enabled": true, "max_documents_per_batch": 10000, "owner_required": true}, "query": {"keyword_enabled": true, "max_result_window": 1000, "rbac_filter_required": true, "semantic_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "srch_discovery_console"}, "ui": {"enable_governance": true, "enable_index_manager": true, "enable_query_analytics": true, "enable_search_console": true}}, "id": "srch", "provides": ["srch_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"srch": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"bulk_index_requires_lineage": {"condition": {"operation": "bulk_index", "source_lineage_present": false}, "description": "Bulk indexing requires source lineage.", "effect": {"decision": "deny", "reason": "source_lineage_required", "required_action": "attach_source_lineage"}, "name": "bulk_index_requires_lineage"}, "indexing_requires_owner": {"condition": {"operation": "create_index", "owner_assigned": false}, "description": "Search indices require an owner.", "effect": {"decision": "deny", "reason": "index_owner_required", "required_action": "assign_owner"}, "name": "indexing_requires_owner"}, "large_result_window_requires_review": {"condition": {"result_window_gt": 1000, "review_recorded": false}, "description": "Large result windows require review.", "effect": {"decision": "require_review", "reason": "large_result_window_review_required", "required_action": "record_query_review"}, "name": "large_result_window_requires_review"}, "restricted_query_requires_rbac_filter": {"condition": {"content_classification": "restricted", "rbac_filter_applied": false}, "description": "Restricted content queries require RBAC filters.", "effect": {"decision": "deny", "reason": "rbac_filter_required", "required_action": "apply_rbac_filter"}, "name": "restricted_query_requires_rbac_filter"}, "semantic_query_requires_embeddings": {"condition": {"embedding_index_ready": false, "query_type": "semantic"}, "description": "Semantic search requires an embedding index.", "effect": {"decision": "deny", "reason": "embedding_index_required", "required_action": "build_embedding_index"}, "name": "semantic_query_requires_embeddings"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All search operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.srch": {"file": "capability_contract.py", "id": "capability.srch", "kind": "capability", "name": "Search Engine", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("srch_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "srch",
+			"version": "1.0.0",
+			"description": "Search Engine package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"srch": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"srch": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["srch_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"large_result_window": "QueryRecord",
+					"bulk_index": "SearchDocumentRecord",
+					"restricted_index": "SearchIndexRecord",
+				},
+				"search_lifecycle": {
+					"index": "SearchIndexRecord",
+					"document": "SearchDocumentRecord",
+					"query": "QueryRecord",
+					"audit": "SearchAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"srch": {
+				"id": "srch",
+				"configuration": contract["configuration"],
+				"provides": ["srch_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"srch": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "service.py", "search_runtime.py", "views.py"],
+		"symbols": {
+			"capability.srch": {
+				"id": "capability.srch",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +141,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("srch", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "srch" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("SRCH semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("SRCH semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("SRCH adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.SrchService":
+		errors.append("SRCH generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",
