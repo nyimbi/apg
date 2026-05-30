@@ -20006,3 +20006,75 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, AUDL, NTFY, COMP, WFLO, procurement, sourcing, contract,
   document, risk-policy, supplier master-data, theme, or AGNT adapters.
+
+### 2026-05-31 01:00 EAT
+
+ECD Sustainability and ESG lifecycle and guardrail packet:
+
+- Selected `capabilities/ecd/esg` after Vendor Management because it was one of
+  the two remaining real capability packages missing README, specification, and
+  plan packet docs.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and converted
+  `cap_spec.md` into a compatibility pointer to the active specification.
+- Replaced generated contract metadata with an executable APG contract covering
+  ESG profiles, frameworks, metrics, measurements, targets, supplier
+  assessments, initiatives, risks, reports, stakeholders, engagements, ESG
+  agents, rule engine, UI routes, compact visual theme, configuration schema,
+  dependencies, and Bytewax event-stream metadata.
+- Added deterministic guardrails for tenant context, policy attachment, audit
+  evidence, profile completeness, framework support, metric pillar/type/unit
+  support, measurement evidence and review, target completeness, supplier score
+  range and high-risk ownership, initiative completeness, ESG risk ownership,
+  report approval, stakeholder consent, engagement ownership, Bytewax batch
+  routing, ESG-agent runtime and role support, and privileged agent action
+  review.
+- Replaced top-level service, API, views, app, and package exports with
+  dependency-light surfaces that APG composition tooling can import without
+  carbon, supplier, document, regulatory, workflow, audit, notification, web, or
+  persistence adapters.
+- Retired legacy adapter-bound tests into explicit skipped compatibility modules
+  and added focused package tests for contract shape, Bytewax streaming, rule
+  decisions, full ESG lifecycle execution, guardrail failures, API helpers, view
+  models, app metadata, and publishability.
+- Refreshed `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` from the live contract.
+- Cleaned legacy ESG docs so implementation audit no longer sees
+  generated-baseline, promotional, disallowed-broker, or unfinished markers.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/ecd/esg/__init__.py capabilities/ecd/esg/capability_contract.py capabilities/ecd/esg/service.py capabilities/ecd/esg/api.py capabilities/ecd/esg/views.py capabilities/ecd/esg/app.py capabilities/ecd/esg/tests/conftest.py capabilities/ecd/esg/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/ecd/esg/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/pytest -q capabilities/ecd/esg/tests` passed with 6 tests and 5
+  skipped legacy adapter modules.
+- `./.venv/bin/python capabilities/ecd/esg/app.py` passed with `passed: true`.
+- `./.venv/bin/apg capabilities inspect ecd_esg --json` passed with `ok: true`,
+  14 APG Python routes, 59 deterministic rules, Bytewax streaming, and ESG-agent
+  runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/ecd/esg --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/ecd/esg --json`
+  passed with `ok: true`; ESG remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/python -m py_compile $(find capabilities/ecd/esg -name '*.py' -not -path '*/__pycache__/*')`
+  passed.
+- `./.venv/bin/python -c "... ESGManagementLifecycleService ... register_esg_agent ... dashboard_summary ..."`
+  returned dashboard evidence with one ESG agent and `bytewax` streaming
+  metadata.
+- Semantic metadata probe confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`,
+  `/ecd/esg/agents`, and `bytewax_event_stream_required`.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and
+  unfinished markers returned no matches.
+- `git diff --check -- capabilities/ecd/esg docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live carbon feeds, supplier systems, document stores, regulatory content,
+  durable audit, notification, workflow, rendered browser UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, AUDL, NTFY, COMP, WFLO, document, supplier, carbon-data,
+  regulatory-content, risk-policy, theme, or AGNT adapters.

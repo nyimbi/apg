@@ -260,7 +260,7 @@ class ESGManagementService:
 CAPABILITY_METADATA = {
 	"name": "sustainability_esg_management",
 	"version": "1.0.0",
-	"description": "Revolutionary ESG management with AI intelligence",
+	"description": "Governed ESG management with AI intelligence",
 	"category": "general_cross_functional",
 	"requires": [
 		"auth_rbac",
@@ -1220,7 +1220,7 @@ self.addEventListener('fetch', function(event) {
 {
   "name": "APG ESG Management",
   "short_name": "ESG Manager",
-  "description": "Revolutionary ESG management platform",
+  "description": "Governed ESG management platform",
   "start_url": "/esg/executive/dashboard",
   "display": "standalone",
   "background_color": "#2E7D32",
@@ -2372,7 +2372,7 @@ class ESGErrorHandler:
 
 ## Conclusion
 
-This developer guide provides comprehensive technical documentation for the APG Sustainability & ESG Management capability. The platform leverages modern async Python patterns, comprehensive APG ecosystem integration, and enterprise-grade security to deliver revolutionary ESG management capabilities.
+This developer guide provides comprehensive technical documentation for the APG Sustainability & ESG Management capability. The platform leverages modern async Python patterns, comprehensive APG ecosystem integration, and enterprise-grade security to deliver governed ESG management capabilities.
 
 For additional technical support and advanced integration scenarios, please consult the APG platform documentation or contact the development team.
 

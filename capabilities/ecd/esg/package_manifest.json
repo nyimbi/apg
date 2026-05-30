@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Sustainability & ESG Management - Revolutionary",
+  "display_name": "Sustainability and ESG Management",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,39 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 14,
+  "rule_count": 59,
+  "streaming": {
+    "events": [
+      "esg_profile_created",
+      "esg_framework_added",
+      "esg_metric_defined",
+      "esg_measurement_recorded",
+      "esg_target_set",
+      "esg_supplier_assessed",
+      "esg_initiative_recorded",
+      "esg_risk_recorded",
+      "esg_report_created",
+      "esg_stakeholder_registered",
+      "esg_engagement_recorded",
+      "esg_agent_registered"
+    ],
+    "guardrails": [
+      "esg_batch_requires_bytewax",
+      "esg_measurement_review_required",
+      "esg_report_approval_required",
+      "esg_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "active",
+      "recorded",
+      "approved",
+      "open",
+      "blocked"
+    ],
+    "stream": "apg.ecd.esg.lifecycle"
+  },
+  "version": "2.1.0"
 }

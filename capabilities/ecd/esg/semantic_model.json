@@ -1,60 +1,250 @@
 {
-  "agents": {},
   "app": {
-    "description": "Sustainability & ESG Management - Revolutionary package-backed APG capability",
-    "entity_count": 0,
+    "description": "Sustainability and ESG package-backed APG capability",
+    "entity_count": 12,
     "name": "ecd_esg",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "ecd_esg": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Ecd",
-          "enabled": true,
-          "id": "ecd_esg",
-          "name": "Sustainability & ESG Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/ecd/esg/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "carbon_data": "adapter",
+          "documents": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "regulatory_content": "adapter",
+          "supplier_data": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "engagements": {
+          "channel_required": true,
+          "owner_required_for_negative_sentiment": true,
+          "stakeholder_required": true,
+          "topic_required": true
+        },
+        "esg_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "sustainability_reviewer",
+            "carbon_reviewer",
+            "compliance_reviewer",
+            "supplier_esg_reviewer",
+            "report_reviewer",
+            "stakeholder_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "frameworks": {
+          "owner_required": true,
+          "profile_required": true,
+          "supported_frameworks": [
+            "gri",
+            "sasb",
+            "tcfd",
+            "issb",
+            "csrd",
+            "sec_climate",
+            "local_regulatory"
+          ],
+          "version_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "initiatives": {
+          "expected_impact_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "pillar_required": true,
+          "profile_required": true
+        },
+        "measurements": {
+          "evidence_required": true,
+          "metric_required": true,
+          "period_required": true,
+          "review_required_for_calculation_or_supplier": true,
+          "supported_sources": [
+            "manual",
+            "meter",
+            "import",
+            "api",
+            "supplier",
+            "calculation"
+          ],
+          "value_required": true
+        },
+        "metrics": {
+          "owner_required": true,
+          "profile_required": true,
+          "supported_pillars": [
+            "environmental",
+            "social",
+            "governance"
+          ],
+          "supported_types": [
+            "emissions",
+            "energy",
+            "water",
+            "waste",
+            "labor",
+            "safety",
+            "diversity",
+            "ethics",
+            "board",
+            "supply_chain"
+          ],
+          "supported_units": [
+            "tco2e",
+            "kwh",
+            "m3",
+            "tonnes",
+            "percent",
+            "count",
+            "score",
+            "currency"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_measurement_events": true,
+          "emit_metric_events": true,
+          "emit_profile_events": true,
+          "emit_report_events": true,
+          "event_stream": "apg.ecd.esg.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "country_required": true,
+          "industry_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "reporting_year_required": true
+        },
+        "reports": {
+          "approval_required": true,
+          "frameworks_required": true,
+          "measurements_required": true,
+          "profile_required": true,
+          "supported_types": [
+            "annual",
+            "quarterly",
+            "regulatory",
+            "board",
+            "investor",
+            "supplier"
+          ]
+        },
+        "risks": {
+          "owner_required_for_high_or_critical": true,
+          "profile_required": true,
+          "supported_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "stakeholders": {
+          "channel_required": true,
+          "consent_required": true,
+          "name_required": true,
+          "profile_required": true,
+          "type_required": true
+        },
+        "supplier_assessments": {
+          "evidence_required": true,
+          "owner_required_for_high_risk": true,
+          "period_required": true,
+          "score_range": [
+            0,
+            100
+          ],
+          "supplier_required": true
+        },
+        "targets": {
+          "baseline_required": true,
+          "due_date_required": true,
+          "metric_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "absolute",
+            "intensity",
+            "reduction",
+            "compliance"
+          ],
+          "target_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "ecd_esg_operations"
+          "default_theme": "esg_control"
         },
         "ui": {
+          "enable_agents": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_frameworks": true,
+          "enable_initiatives": true,
+          "enable_measurements": true,
+          "enable_metrics": true,
+          "enable_profiles": true,
+          "enable_reports": true,
+          "enable_risks": true,
+          "enable_settings": true,
+          "enable_stakeholders": true,
+          "enable_suppliers": true,
+          "enable_targets": true
         }
       },
-      "erp_modules": [
-        "ecd"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Sustainability & ESG Management - Revolutionary",
+      "name": "Sustainability and ESG Management",
       "provides": [
-        "ecd_esg_operations"
+        "esg_profile_lifecycle",
+        "esg_framework_lifecycle",
+        "esg_metric_lifecycle",
+        "esg_measurement_lifecycle",
+        "esg_target_lifecycle",
+        "esg_supplier_assessment_lifecycle",
+        "esg_initiative_lifecycle",
+        "esg_risk_lifecycle",
+        "esg_report_workflow",
+        "esg_stakeholder_lifecycle",
+        "esg_engagement_lifecycle",
+        "esg_dashboard_service",
+        "esg_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "document_management",
+        "supplier_master_data",
+        "carbon_data_provider",
+        "regulatory_content",
+        "risk_policy"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Sustainability & ESG Management - Revolutionary operations require tenant context.",
+            "description": "ESG operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,7 +257,7 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Sustainability & ESG Management - Revolutionary write operations require policy enforcement.",
+            "description": "ESG write operations require policy enforcement.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
@@ -77,16 +267,749 @@
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "name_present": false,
+              "operation": "create_esg_profile"
             },
-            "description": "High-risk Sustainability & ESG Management - Revolutionary operations require review.",
+            "description": "ESG profiles require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_profile_name_required",
+              "required_action": "provide_name"
+            },
+            "name": "profile_name_required"
+          },
+          {
+            "condition": {
+              "industry_present": false,
+              "operation": "create_esg_profile"
+            },
+            "description": "ESG profiles require an industry.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_profile_industry_required",
+              "required_action": "provide_industry"
+            },
+            "name": "profile_industry_required"
+          },
+          {
+            "condition": {
+              "country_present": false,
+              "operation": "create_esg_profile"
+            },
+            "description": "ESG profiles require a country.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_profile_country_required",
+              "required_action": "provide_country"
+            },
+            "name": "profile_country_required"
+          },
+          {
+            "condition": {
+              "operation": "create_esg_profile",
+              "reporting_year_present": false
+            },
+            "description": "ESG profiles require a reporting year.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_profile_reporting_year_required",
+              "required_action": "provide_reporting_year"
+            },
+            "name": "profile_year_required"
+          },
+          {
+            "condition": {
+              "operation": "create_esg_profile",
+              "owner_present": false
+            },
+            "description": "ESG profiles require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_profile_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "profile_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "add_framework",
+              "profile_present": false
+            },
+            "description": "Frameworks require an ESG profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_framework_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "framework_profile_required"
+          },
+          {
+            "condition": {
+              "framework_supported": false,
+              "operation": "add_framework"
+            },
+            "description": "Framework code must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_framework_not_supported",
+              "required_action": "choose_supported_framework"
+            },
+            "name": "framework_supported"
+          },
+          {
+            "condition": {
+              "operation": "add_framework",
+              "version_present": false
+            },
+            "description": "Frameworks require a version.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_framework_version_required",
+              "required_action": "provide_version"
+            },
+            "name": "framework_version_required"
+          },
+          {
+            "condition": {
+              "operation": "add_framework",
+              "owner_present": false
+            },
+            "description": "Frameworks require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_framework_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "framework_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "define_metric",
+              "profile_present": false
+            },
+            "description": "Metrics require an ESG profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_metric_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "metric_profile_required"
+          },
+          {
+            "condition": {
+              "operation": "define_metric",
+              "pillar_supported": false
+            },
+            "description": "Metric pillar must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_metric_pillar_not_supported",
+              "required_action": "choose_supported_pillar"
+            },
+            "name": "metric_pillar_supported"
+          },
+          {
+            "condition": {
+              "metric_type_supported": false,
+              "operation": "define_metric"
+            },
+            "description": "Metric type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_metric_type_not_supported",
+              "required_action": "choose_supported_metric_type"
+            },
+            "name": "metric_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "define_metric",
+              "unit_supported": false
+            },
+            "description": "Metric unit must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_metric_unit_not_supported",
+              "required_action": "choose_supported_unit"
+            },
+            "name": "metric_unit_supported"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "define_metric"
+            },
+            "description": "Metrics require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_metric_name_required",
+              "required_action": "provide_metric_name"
+            },
+            "name": "metric_name_required"
+          },
+          {
+            "condition": {
+              "operation": "define_metric",
+              "owner_present": false
+            },
+            "description": "Metrics require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_metric_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "metric_owner_required"
+          },
+          {
+            "condition": {
+              "metric_present": false,
+              "operation": "record_measurement"
+            },
+            "description": "Measurements require a metric.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_measurement_metric_required",
+              "required_action": "select_metric"
+            },
+            "name": "measurement_metric_required"
+          },
+          {
+            "condition": {
+              "operation": "record_measurement",
+              "period_present": false
+            },
+            "description": "Measurements require a period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_measurement_period_required",
+              "required_action": "provide_period"
+            },
+            "name": "measurement_period_required"
+          },
+          {
+            "condition": {
+              "operation": "record_measurement",
+              "value_present": false
+            },
+            "description": "Measurements require a value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_measurement_value_required",
+              "required_action": "provide_value"
+            },
+            "name": "measurement_value_required"
+          },
+          {
+            "condition": {
+              "operation": "record_measurement",
+              "source_supported": false
+            },
+            "description": "Measurement source must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_measurement_source_not_supported",
+              "required_action": "choose_supported_source"
+            },
+            "name": "measurement_source_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_measurement"
+            },
+            "description": "Measurements require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_measurement_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "measurement_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_measurement",
+              "review_recorded": false,
+              "review_required": true
+            },
+            "description": "Supplier or calculated measurements require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "esg_measurement_review_required",
+              "required_action": "record_measurement_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "measurement_review_required"
+          },
+          {
+            "condition": {
+              "metric_present": false,
+              "operation": "set_target"
+            },
+            "description": "Targets require a metric.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_target_metric_required",
+              "required_action": "select_metric"
+            },
+            "name": "target_metric_required"
+          },
+          {
+            "condition": {
+              "operation": "set_target",
+              "target_type_supported": false
+            },
+            "description": "Target type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_target_type_not_supported",
+              "required_action": "choose_supported_target_type"
+            },
+            "name": "target_type_supported"
+          },
+          {
+            "condition": {
+              "baseline_present": false,
+              "operation": "set_target"
+            },
+            "description": "Targets require baseline value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_target_baseline_required",
+              "required_action": "provide_baseline"
+            },
+            "name": "target_baseline_required"
+          },
+          {
+            "condition": {
+              "operation": "set_target",
+              "target_present": false
+            },
+            "description": "Targets require target value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_target_value_required",
+              "required_action": "provide_target"
+            },
+            "name": "target_value_required"
+          },
+          {
+            "condition": {
+              "due_date_present": false,
+              "operation": "set_target"
+            },
+            "description": "Targets require a due date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_target_due_date_required",
+              "required_action": "provide_due_date"
+            },
+            "name": "target_due_date_required"
+          },
+          {
+            "condition": {
+              "operation": "set_target",
+              "owner_present": false
+            },
+            "description": "Targets require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_target_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "target_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "record_supplier_assessment",
+              "supplier_present": false
+            },
+            "description": "Supplier assessments require supplier id.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_supplier_required",
+              "required_action": "select_supplier"
+            },
+            "name": "supplier_required"
+          },
+          {
+            "condition": {
+              "operation": "record_supplier_assessment",
+              "period_present": false
+            },
+            "description": "Supplier assessments require a period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_supplier_period_required",
+              "required_action": "provide_period"
+            },
+            "name": "supplier_period_required"
+          },
+          {
+            "condition": {
+              "operation": "record_supplier_assessment",
+              "score_in_range": false
+            },
+            "description": "Supplier ESG scores must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_supplier_score_out_of_range",
+              "required_action": "correct_score"
+            },
+            "name": "supplier_score_range"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_supplier_assessment"
+            },
+            "description": "Supplier assessments require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_supplier_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "supplier_evidence_required"
+          },
+          {
+            "condition": {
+              "high_risk": true,
+              "operation": "record_supplier_assessment",
+              "owner_present": false
+            },
+            "description": "High-risk supplier ESG assessments require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_supplier_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "supplier_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "record_initiative",
+              "profile_present": false
+            },
+            "description": "Initiatives require an ESG profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_initiative_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "initiative_profile_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "record_initiative"
+            },
+            "description": "Initiatives require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_initiative_name_required",
+              "required_action": "provide_name"
+            },
+            "name": "initiative_name_required"
+          },
+          {
+            "condition": {
+              "operation": "record_initiative",
+              "pillar_supported": false
+            },
+            "description": "Initiative pillar must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_initiative_pillar_not_supported",
+              "required_action": "choose_supported_pillar"
+            },
+            "name": "initiative_pillar_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_initiative",
+              "owner_present": false
+            },
+            "description": "Initiatives require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_initiative_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "initiative_owner_required"
+          },
+          {
+            "condition": {
+              "impact_present": false,
+              "operation": "record_initiative"
+            },
+            "description": "Initiatives require expected impact.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_initiative_impact_required",
+              "required_action": "provide_expected_impact"
+            },
+            "name": "initiative_impact_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "profile_present": false
+            },
+            "description": "ESG risks require a profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_risk_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "risk_profile_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "risk_tier_supported": false
+            },
+            "description": "ESG risk tier must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_risk_tier_not_supported",
+              "required_action": "choose_supported_tier"
+            },
+            "name": "risk_tier_supported"
+          },
+          {
+            "condition": {
+              "description_present": false,
+              "operation": "record_risk"
+            },
+            "description": "ESG risks require description.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_risk_description_required",
+              "required_action": "provide_description"
+            },
+            "name": "risk_description_required"
+          },
+          {
+            "condition": {
+              "high_or_critical": true,
+              "operation": "record_risk",
+              "owner_present": false
+            },
+            "description": "High or critical ESG risks require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_risk_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "risk_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "create_report",
+              "profile_present": false
+            },
+            "description": "Reports require an ESG profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_report_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "report_profile_required"
+          },
+          {
+            "condition": {
+              "operation": "create_report",
+              "report_type_supported": false
+            },
+            "description": "Report type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_report_type_not_supported",
+              "required_action": "choose_supported_report_type"
+            },
+            "name": "report_type_supported"
+          },
+          {
+            "condition": {
+              "frameworks_present": false,
+              "operation": "create_report"
+            },
+            "description": "Reports require frameworks.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_report_frameworks_required",
+              "required_action": "attach_frameworks"
+            },
+            "name": "report_frameworks_required"
+          },
+          {
+            "condition": {
+              "measurements_present": false,
+              "operation": "create_report"
+            },
+            "description": "Reports require measurements.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_report_measurements_required",
+              "required_action": "attach_measurements"
+            },
+            "name": "report_measurements_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_report"
+            },
+            "description": "Reports require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_report_approval_required",
+              "required_action": "record_report_approval"
+            },
+            "name": "report_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "register_stakeholder",
+              "profile_present": false
+            },
+            "description": "Stakeholders require a profile.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_stakeholder_profile_required",
+              "required_action": "select_profile"
+            },
+            "name": "stakeholder_profile_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "register_stakeholder"
+            },
+            "description": "Stakeholders require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_stakeholder_name_required",
+              "required_action": "provide_name"
+            },
+            "name": "stakeholder_name_required"
+          },
+          {
+            "condition": {
+              "consent_recorded": false,
+              "operation": "register_stakeholder"
+            },
+            "description": "Stakeholders require engagement consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_stakeholder_consent_required",
+              "required_action": "record_consent"
+            },
+            "name": "stakeholder_consent_required"
+          },
+          {
+            "condition": {
+              "operation": "record_engagement",
+              "stakeholder_present": false
+            },
+            "description": "Engagements require a stakeholder.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_engagement_stakeholder_required",
+              "required_action": "select_stakeholder"
+            },
+            "name": "engagement_stakeholder_required"
+          },
+          {
+            "condition": {
+              "operation": "record_engagement",
+              "topic_present": false
+            },
+            "description": "Engagements require topic.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_engagement_topic_required",
+              "required_action": "provide_topic"
+            },
+            "name": "engagement_topic_required"
+          },
+          {
+            "condition": {
+              "negative_sentiment": true,
+              "operation": "record_engagement",
+              "owner_present": false
+            },
+            "description": "Negative ESG engagement sentiment requires an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_engagement_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "negative_engagement_owner_required"
+          },
+          {
+            "condition": {
+              "event_stream": "queue",
+              "operation": "esg_batch"
+            },
+            "description": "ESG batches must use Bytewax event stream metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_to_bytewax_stream"
+            },
+            "name": "bytewax_event_stream_required"
+          },
+          {
+            "condition": {
+              "operation": "register_esg_agent",
+              "runtime_supported": false
+            },
+            "description": "ESG agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_agent_runtime_not_supported",
+              "required_action": "choose_supported_runtime"
+            },
+            "name": "agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_esg_agent",
+              "role_supported": false
+            },
+            "description": "ESG agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_agent_role_not_supported",
+              "required_action": "choose_supported_role"
+            },
+            "name": "agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approved": false,
+              "operation": "agent_action",
+              "privileged_action": true
+            },
+            "description": "ESG agents cannot autonomously post privileged state changes.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "esg_agent_human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "agent_scope_limited"
+          },
+          {
+            "condition": {
+              "audit_enabled": false,
+              "operation_type": "write"
+            },
+            "description": "ESG state changes must be auditable.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esg_audit_required",
+              "required_action": "enable_audit"
+            },
+            "name": "audit_required_for_state_change"
           }
         ],
         "type": "deterministic"
@@ -96,7 +1019,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Sustainability & ESG Management - Revolutionary operations require tenant context.",
+          "description": "ESG operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,7 +1032,7 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Sustainability & ESG Management - Revolutionary write operations require policy enforcement.",
+          "description": "ESG write operations require policy enforcement.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
@@ -119,16 +1042,749 @@
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "name_present": false,
+            "operation": "create_esg_profile"
           },
-          "description": "High-risk Sustainability & ESG Management - Revolutionary operations require review.",
+          "description": "ESG profiles require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_profile_name_required",
+            "required_action": "provide_name"
+          },
+          "name": "profile_name_required"
+        },
+        {
+          "condition": {
+            "industry_present": false,
+            "operation": "create_esg_profile"
+          },
+          "description": "ESG profiles require an industry.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_profile_industry_required",
+            "required_action": "provide_industry"
+          },
+          "name": "profile_industry_required"
+        },
+        {
+          "condition": {
+            "country_present": false,
+            "operation": "create_esg_profile"
+          },
+          "description": "ESG profiles require a country.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_profile_country_required",
+            "required_action": "provide_country"
+          },
+          "name": "profile_country_required"
+        },
+        {
+          "condition": {
+            "operation": "create_esg_profile",
+            "reporting_year_present": false
+          },
+          "description": "ESG profiles require a reporting year.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_profile_reporting_year_required",
+            "required_action": "provide_reporting_year"
+          },
+          "name": "profile_year_required"
+        },
+        {
+          "condition": {
+            "operation": "create_esg_profile",
+            "owner_present": false
+          },
+          "description": "ESG profiles require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_profile_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "profile_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "add_framework",
+            "profile_present": false
+          },
+          "description": "Frameworks require an ESG profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_framework_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "framework_profile_required"
+        },
+        {
+          "condition": {
+            "framework_supported": false,
+            "operation": "add_framework"
+          },
+          "description": "Framework code must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_framework_not_supported",
+            "required_action": "choose_supported_framework"
+          },
+          "name": "framework_supported"
+        },
+        {
+          "condition": {
+            "operation": "add_framework",
+            "version_present": false
+          },
+          "description": "Frameworks require a version.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_framework_version_required",
+            "required_action": "provide_version"
+          },
+          "name": "framework_version_required"
+        },
+        {
+          "condition": {
+            "operation": "add_framework",
+            "owner_present": false
+          },
+          "description": "Frameworks require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_framework_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "framework_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "define_metric",
+            "profile_present": false
+          },
+          "description": "Metrics require an ESG profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_metric_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "metric_profile_required"
+        },
+        {
+          "condition": {
+            "operation": "define_metric",
+            "pillar_supported": false
+          },
+          "description": "Metric pillar must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_metric_pillar_not_supported",
+            "required_action": "choose_supported_pillar"
+          },
+          "name": "metric_pillar_supported"
+        },
+        {
+          "condition": {
+            "metric_type_supported": false,
+            "operation": "define_metric"
+          },
+          "description": "Metric type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_metric_type_not_supported",
+            "required_action": "choose_supported_metric_type"
+          },
+          "name": "metric_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "define_metric",
+            "unit_supported": false
+          },
+          "description": "Metric unit must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_metric_unit_not_supported",
+            "required_action": "choose_supported_unit"
+          },
+          "name": "metric_unit_supported"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "define_metric"
+          },
+          "description": "Metrics require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_metric_name_required",
+            "required_action": "provide_metric_name"
+          },
+          "name": "metric_name_required"
+        },
+        {
+          "condition": {
+            "operation": "define_metric",
+            "owner_present": false
+          },
+          "description": "Metrics require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_metric_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "metric_owner_required"
+        },
+        {
+          "condition": {
+            "metric_present": false,
+            "operation": "record_measurement"
+          },
+          "description": "Measurements require a metric.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_measurement_metric_required",
+            "required_action": "select_metric"
+          },
+          "name": "measurement_metric_required"
+        },
+        {
+          "condition": {
+            "operation": "record_measurement",
+            "period_present": false
+          },
+          "description": "Measurements require a period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_measurement_period_required",
+            "required_action": "provide_period"
+          },
+          "name": "measurement_period_required"
+        },
+        {
+          "condition": {
+            "operation": "record_measurement",
+            "value_present": false
+          },
+          "description": "Measurements require a value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_measurement_value_required",
+            "required_action": "provide_value"
+          },
+          "name": "measurement_value_required"
+        },
+        {
+          "condition": {
+            "operation": "record_measurement",
+            "source_supported": false
+          },
+          "description": "Measurement source must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_measurement_source_not_supported",
+            "required_action": "choose_supported_source"
+          },
+          "name": "measurement_source_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_measurement"
+          },
+          "description": "Measurements require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_measurement_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "measurement_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_measurement",
+            "review_recorded": false,
+            "review_required": true
+          },
+          "description": "Supplier or calculated measurements require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "esg_measurement_review_required",
+            "required_action": "record_measurement_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "measurement_review_required"
+        },
+        {
+          "condition": {
+            "metric_present": false,
+            "operation": "set_target"
+          },
+          "description": "Targets require a metric.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_target_metric_required",
+            "required_action": "select_metric"
+          },
+          "name": "target_metric_required"
+        },
+        {
+          "condition": {
+            "operation": "set_target",
+            "target_type_supported": false
+          },
+          "description": "Target type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_target_type_not_supported",
+            "required_action": "choose_supported_target_type"
+          },
+          "name": "target_type_supported"
+        },
+        {
+          "condition": {
+            "baseline_present": false,
+            "operation": "set_target"
+          },
+          "description": "Targets require baseline value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_target_baseline_required",
+            "required_action": "provide_baseline"
+          },
+          "name": "target_baseline_required"
+        },
+        {
+          "condition": {
+            "operation": "set_target",
+            "target_present": false
+          },
+          "description": "Targets require target value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_target_value_required",
+            "required_action": "provide_target"
+          },
+          "name": "target_value_required"
+        },
+        {
+          "condition": {
+            "due_date_present": false,
+            "operation": "set_target"
+          },
+          "description": "Targets require a due date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_target_due_date_required",
+            "required_action": "provide_due_date"
+          },
+          "name": "target_due_date_required"
+        },
+        {
+          "condition": {
+            "operation": "set_target",
+            "owner_present": false
+          },
+          "description": "Targets require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_target_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "target_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "record_supplier_assessment",
+            "supplier_present": false
+          },
+          "description": "Supplier assessments require supplier id.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_supplier_required",
+            "required_action": "select_supplier"
+          },
+          "name": "supplier_required"
+        },
+        {
+          "condition": {
+            "operation": "record_supplier_assessment",
+            "period_present": false
+          },
+          "description": "Supplier assessments require a period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_supplier_period_required",
+            "required_action": "provide_period"
+          },
+          "name": "supplier_period_required"
+        },
+        {
+          "condition": {
+            "operation": "record_supplier_assessment",
+            "score_in_range": false
+          },
+          "description": "Supplier ESG scores must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_supplier_score_out_of_range",
+            "required_action": "correct_score"
+          },
+          "name": "supplier_score_range"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_supplier_assessment"
+          },
+          "description": "Supplier assessments require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_supplier_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "supplier_evidence_required"
+        },
+        {
+          "condition": {
+            "high_risk": true,
+            "operation": "record_supplier_assessment",
+            "owner_present": false
+          },
+          "description": "High-risk supplier ESG assessments require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_supplier_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "supplier_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "record_initiative",
+            "profile_present": false
+          },
+          "description": "Initiatives require an ESG profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_initiative_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "initiative_profile_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "record_initiative"
+          },
+          "description": "Initiatives require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_initiative_name_required",
+            "required_action": "provide_name"
+          },
+          "name": "initiative_name_required"
+        },
+        {
+          "condition": {
+            "operation": "record_initiative",
+            "pillar_supported": false
+          },
+          "description": "Initiative pillar must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_initiative_pillar_not_supported",
+            "required_action": "choose_supported_pillar"
+          },
+          "name": "initiative_pillar_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_initiative",
+            "owner_present": false
+          },
+          "description": "Initiatives require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_initiative_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "initiative_owner_required"
+        },
+        {
+          "condition": {
+            "impact_present": false,
+            "operation": "record_initiative"
+          },
+          "description": "Initiatives require expected impact.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_initiative_impact_required",
+            "required_action": "provide_expected_impact"
+          },
+          "name": "initiative_impact_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "profile_present": false
+          },
+          "description": "ESG risks require a profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_risk_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "risk_profile_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "risk_tier_supported": false
+          },
+          "description": "ESG risk tier must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_risk_tier_not_supported",
+            "required_action": "choose_supported_tier"
+          },
+          "name": "risk_tier_supported"
+        },
+        {
+          "condition": {
+            "description_present": false,
+            "operation": "record_risk"
+          },
+          "description": "ESG risks require description.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_risk_description_required",
+            "required_action": "provide_description"
+          },
+          "name": "risk_description_required"
+        },
+        {
+          "condition": {
+            "high_or_critical": true,
+            "operation": "record_risk",
+            "owner_present": false
+          },
+          "description": "High or critical ESG risks require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_risk_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "risk_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "create_report",
+            "profile_present": false
+          },
+          "description": "Reports require an ESG profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_report_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "report_profile_required"
+        },
+        {
+          "condition": {
+            "operation": "create_report",
+            "report_type_supported": false
+          },
+          "description": "Report type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_report_type_not_supported",
+            "required_action": "choose_supported_report_type"
+          },
+          "name": "report_type_supported"
+        },
+        {
+          "condition": {
+            "frameworks_present": false,
+            "operation": "create_report"
+          },
+          "description": "Reports require frameworks.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_report_frameworks_required",
+            "required_action": "attach_frameworks"
+          },
+          "name": "report_frameworks_required"
+        },
+        {
+          "condition": {
+            "measurements_present": false,
+            "operation": "create_report"
+          },
+          "description": "Reports require measurements.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_report_measurements_required",
+            "required_action": "attach_measurements"
+          },
+          "name": "report_measurements_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_report"
+          },
+          "description": "Reports require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_report_approval_required",
+            "required_action": "record_report_approval"
+          },
+          "name": "report_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "register_stakeholder",
+            "profile_present": false
+          },
+          "description": "Stakeholders require a profile.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_stakeholder_profile_required",
+            "required_action": "select_profile"
+          },
+          "name": "stakeholder_profile_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "register_stakeholder"
+          },
+          "description": "Stakeholders require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_stakeholder_name_required",
+            "required_action": "provide_name"
+          },
+          "name": "stakeholder_name_required"
+        },
+        {
+          "condition": {
+            "consent_recorded": false,
+            "operation": "register_stakeholder"
+          },
+          "description": "Stakeholders require engagement consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_stakeholder_consent_required",
+            "required_action": "record_consent"
+          },
+          "name": "stakeholder_consent_required"
+        },
+        {
+          "condition": {
+            "operation": "record_engagement",
+            "stakeholder_present": false
+          },
+          "description": "Engagements require a stakeholder.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_engagement_stakeholder_required",
+            "required_action": "select_stakeholder"
+          },
+          "name": "engagement_stakeholder_required"
+        },
+        {
+          "condition": {
+            "operation": "record_engagement",
+            "topic_present": false
+          },
+          "description": "Engagements require topic.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_engagement_topic_required",
+            "required_action": "provide_topic"
+          },
+          "name": "engagement_topic_required"
+        },
+        {
+          "condition": {
+            "negative_sentiment": true,
+            "operation": "record_engagement",
+            "owner_present": false
+          },
+          "description": "Negative ESG engagement sentiment requires an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_engagement_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "negative_engagement_owner_required"
+        },
+        {
+          "condition": {
+            "event_stream": "queue",
+            "operation": "esg_batch"
+          },
+          "description": "ESG batches must use Bytewax event stream metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_to_bytewax_stream"
+          },
+          "name": "bytewax_event_stream_required"
+        },
+        {
+          "condition": {
+            "operation": "register_esg_agent",
+            "runtime_supported": false
+          },
+          "description": "ESG agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_agent_runtime_not_supported",
+            "required_action": "choose_supported_runtime"
+          },
+          "name": "agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_esg_agent",
+            "role_supported": false
+          },
+          "description": "ESG agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_agent_role_not_supported",
+            "required_action": "choose_supported_role"
+          },
+          "name": "agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approved": false,
+            "operation": "agent_action",
+            "privileged_action": true
+          },
+          "description": "ESG agents cannot autonomously post privileged state changes.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "esg_agent_human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "agent_scope_limited"
+        },
+        {
+          "condition": {
+            "audit_enabled": false,
+            "operation_type": "write"
+          },
+          "description": "ESG state changes must be auditable.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esg_audit_required",
+            "required_action": "enable_audit"
+          },
+          "name": "audit_required_for_state_change"
         }
       ],
       "runtime": {
@@ -138,54 +1794,176 @@
         "views": "views.py"
       },
       "screens": {
-        "dashboard": {
-          "component": "CapabilityDashboard",
-          "permission": "ecd_esg:view",
-          "route": "/ecd-esg/dashboard"
+        "agents": {
+          "component": "ESGAgentWorkbench",
+          "permission": "ecd_esg:agent_manage",
+          "route": "/ecd/esg/agents"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "ecd_esg:operate",
-          "route": "/ecd-esg/operations"
+        "dashboard": {
+          "component": "ESGDashboard",
+          "permission": "ecd_esg:view",
+          "route": "/ecd/esg/dashboard"
+        },
+        "frameworks": {
+          "component": "ESGFrameworkDesk",
+          "permission": "ecd_esg:manage_frameworks",
+          "route": "/ecd/esg/frameworks"
+        },
+        "initiatives": {
+          "component": "ESGInitiativeBoard",
+          "permission": "ecd_esg:manage_initiatives",
+          "route": "/ecd/esg/initiatives"
+        },
+        "measurements": {
+          "component": "ESGMeasurementLedger",
+          "permission": "ecd_esg:record_data",
+          "route": "/ecd/esg/measurements"
+        },
+        "metrics": {
+          "component": "ESGMetricCatalog",
+          "permission": "ecd_esg:manage_metrics",
+          "route": "/ecd/esg/metrics"
+        },
+        "profiles": {
+          "component": "ESGProfileWorkbench",
+          "permission": "ecd_esg:manage_profiles",
+          "route": "/ecd/esg/profiles"
+        },
+        "reports": {
+          "component": "ESGReportDesk",
+          "permission": "ecd_esg:report",
+          "route": "/ecd/esg/reports"
+        },
+        "risks": {
+          "component": "ESGRiskRegister",
+          "permission": "ecd_esg:govern",
+          "route": "/ecd/esg/risks"
         },
         "rules": {
-          "component": "CapabilityRules",
+          "component": "ESGRules",
           "permission": "ecd_esg:govern",
-          "route": "/ecd-esg/rules"
+          "route": "/ecd/esg/rules"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "ESGSettings",
           "permission": "ecd_esg:admin",
-          "route": "/ecd-esg/settings"
+          "route": "/ecd/esg/settings"
+        },
+        "stakeholders": {
+          "component": "ESGStakeholderDesk",
+          "permission": "ecd_esg:engage",
+          "route": "/ecd/esg/stakeholders"
+        },
+        "suppliers": {
+          "component": "ESGSupplierAssessmentDesk",
+          "permission": "ecd_esg:assess_suppliers",
+          "route": "/ecd/esg/suppliers"
+        },
+        "targets": {
+          "component": "ESGTargetBoard",
+          "permission": "ecd_esg:manage_targets",
+          "route": "/ecd/esg/targets"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "delivery": "at_least_once",
+        "event_stream": "apg.ecd.esg.lifecycle",
+        "events": [
+          "esg_profile_created",
+          "esg_framework_added",
+          "esg_metric_defined",
+          "esg_measurement_recorded",
+          "esg_target_set",
+          "esg_supplier_assessed",
+          "esg_initiative_recorded",
+          "esg_risk_recorded",
+          "esg_report_created",
+          "esg_stakeholder_registered",
+          "esg_engagement_recorded",
+          "esg_agent_registered"
+        ],
+        "ordering_key": "tenant_id",
+        "processor": "bytewax"
+      },
       "theme": {
         "components": {
+          "agents": {
+            "icon": "bot",
+            "status_style": "agent-chip",
+            "visual": "agent-roster"
+          },
           "dashboard": {
             "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+            "status_indicator": "health-pill",
+            "visual": "esg-grid"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "frameworks": {
+            "icon": "book-open-check",
+            "status_style": "framework-chip",
+            "visual": "framework-list"
+          },
+          "initiatives": {
+            "icon": "leaf",
+            "status_style": "initiative-chip",
+            "visual": "initiative-board"
+          },
+          "measurements": {
+            "icon": "database",
+            "status_style": "evidence-chip",
+            "visual": "measurement-ledger"
+          },
+          "metrics": {
+            "icon": "ruler",
+            "status_style": "metric-chip",
+            "visual": "metric-table"
+          },
+          "profiles": {
+            "icon": "building-2",
+            "status_style": "profile-chip",
+            "visual": "profile-table"
+          },
+          "reports": {
+            "icon": "file-text",
+            "status_style": "report-chip",
+            "visual": "report-list"
+          },
+          "risks": {
+            "icon": "shield-alert",
+            "status_style": "risk-chip",
+            "visual": "risk-register"
           },
           "rules": {
+            "icon": "list-checks",
             "status_style": "decision-chip",
             "visual": "rule-list"
           },
           "settings": {
             "density": "compact",
+            "icon": "settings",
             "visual": "settings-panel"
+          },
+          "stakeholders": {
+            "icon": "users",
+            "status_style": "engagement-chip",
+            "visual": "stakeholder-list"
+          },
+          "suppliers": {
+            "icon": "network",
+            "status_style": "supplier-chip",
+            "visual": "supplier-assessments"
+          },
+          "targets": {
+            "icon": "target",
+            "status_style": "target-chip",
+            "visual": "target-board"
           }
         },
-        "name": "ecd_esg_operations",
+        "name": "esg_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
+          "color.accent": "#7A5C1E",
           "color.danger": "#C53030",
-          "color.primary": "#28536B",
+          "color.primary": "#2F5D50",
           "color.success": "#2F855A",
           "color.warning": "#B7791F",
           "density": "compact",
@@ -196,35 +1974,105 @@
         }
       },
       "ui": {
-        "api_prefix": "/ecd-esg/api/v1",
+        "api_prefix": "/ecd/esg/api/v1",
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "ESGDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
-            "path": "/ecd-esg/dashboard",
+            "path": "/ecd/esg/dashboard",
             "permission": "ecd_esg:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/ecd-esg/operations",
-            "permission": "ecd_esg:operate"
+            "component": "ESGProfileWorkbench",
+            "name": "profiles",
+            "nav_group": "Setup",
+            "path": "/ecd/esg/profiles",
+            "permission": "ecd_esg:manage_profiles"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "ESGFrameworkDesk",
+            "name": "frameworks",
+            "nav_group": "Setup",
+            "path": "/ecd/esg/frameworks",
+            "permission": "ecd_esg:manage_frameworks"
+          },
+          {
+            "component": "ESGMetricCatalog",
+            "name": "metrics",
+            "nav_group": "Data",
+            "path": "/ecd/esg/metrics",
+            "permission": "ecd_esg:manage_metrics"
+          },
+          {
+            "component": "ESGMeasurementLedger",
+            "name": "measurements",
+            "nav_group": "Data",
+            "path": "/ecd/esg/measurements",
+            "permission": "ecd_esg:record_data"
+          },
+          {
+            "component": "ESGTargetBoard",
+            "name": "targets",
+            "nav_group": "Planning",
+            "path": "/ecd/esg/targets",
+            "permission": "ecd_esg:manage_targets"
+          },
+          {
+            "component": "ESGSupplierAssessmentDesk",
+            "name": "suppliers",
+            "nav_group": "Supply Chain",
+            "path": "/ecd/esg/suppliers",
+            "permission": "ecd_esg:assess_suppliers"
+          },
+          {
+            "component": "ESGInitiativeBoard",
+            "name": "initiatives",
+            "nav_group": "Planning",
+            "path": "/ecd/esg/initiatives",
+            "permission": "ecd_esg:manage_initiatives"
+          },
+          {
+            "component": "ESGRiskRegister",
+            "name": "risks",
             "nav_group": "Governance",
-            "path": "/ecd-esg/rules",
+            "path": "/ecd/esg/risks",
             "permission": "ecd_esg:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ESGReportDesk",
+            "name": "reports",
+            "nav_group": "Reporting",
+            "path": "/ecd/esg/reports",
+            "permission": "ecd_esg:report"
+          },
+          {
+            "component": "ESGStakeholderDesk",
+            "name": "stakeholders",
+            "nav_group": "Engagement",
+            "path": "/ecd/esg/stakeholders",
+            "permission": "ecd_esg:engage"
+          },
+          {
+            "component": "ESGAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/ecd/esg/agents",
+            "permission": "ecd_esg:agent_manage"
+          },
+          {
+            "component": "ESGRules",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/ecd/esg/rules",
+            "permission": "ecd_esg:govern"
+          },
+          {
+            "component": "ESGSettings",
             "name": "settings",
             "nav_group": "Administration",
-            "path": "/ecd-esg/settings",
+            "path": "/ecd/esg/settings",
             "permission": "ecd_esg:admin"
           }
         ],
@@ -234,50 +2082,279 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "esg_review": {
+        "roles": [
+          "sustainability_reviewer",
+          "carbon_reviewer",
+          "compliance_reviewer",
+          "supplier_esg_reviewer",
+          "report_reviewer",
+          "stakeholder_query_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "ecd_esg": []
+      "ecd_esg": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "document_management",
+        "supplier_master_data",
+        "carbon_data_provider",
+        "regulatory_content",
+        "risk_policy"
+      ]
     }
   },
   "contracts": {
     "ecd_esg": {
       "configuration": {
-        "capability": {
-          "category": "Ecd",
-          "enabled": true,
-          "id": "ecd_esg",
-          "name": "Sustainability & ESG Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/ecd/esg/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "carbon_data": "adapter",
+          "documents": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "regulatory_content": "adapter",
+          "supplier_data": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "engagements": {
+          "channel_required": true,
+          "owner_required_for_negative_sentiment": true,
+          "stakeholder_required": true,
+          "topic_required": true
+        },
+        "esg_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "sustainability_reviewer",
+            "carbon_reviewer",
+            "compliance_reviewer",
+            "supplier_esg_reviewer",
+            "report_reviewer",
+            "stakeholder_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "frameworks": {
+          "owner_required": true,
+          "profile_required": true,
+          "supported_frameworks": [
+            "gri",
+            "sasb",
+            "tcfd",
+            "issb",
+            "csrd",
+            "sec_climate",
+            "local_regulatory"
+          ],
+          "version_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "initiatives": {
+          "expected_impact_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "pillar_required": true,
+          "profile_required": true
+        },
+        "measurements": {
+          "evidence_required": true,
+          "metric_required": true,
+          "period_required": true,
+          "review_required_for_calculation_or_supplier": true,
+          "supported_sources": [
+            "manual",
+            "meter",
+            "import",
+            "api",
+            "supplier",
+            "calculation"
+          ],
+          "value_required": true
+        },
+        "metrics": {
+          "owner_required": true,
+          "profile_required": true,
+          "supported_pillars": [
+            "environmental",
+            "social",
+            "governance"
+          ],
+          "supported_types": [
+            "emissions",
+            "energy",
+            "water",
+            "waste",
+            "labor",
+            "safety",
+            "diversity",
+            "ethics",
+            "board",
+            "supply_chain"
+          ],
+          "supported_units": [
+            "tco2e",
+            "kwh",
+            "m3",
+            "tonnes",
+            "percent",
+            "count",
+            "score",
+            "currency"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_measurement_events": true,
+          "emit_metric_events": true,
+          "emit_profile_events": true,
+          "emit_report_events": true,
+          "event_stream": "apg.ecd.esg.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "profiles": {
+          "country_required": true,
+          "industry_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "reporting_year_required": true
+        },
+        "reports": {
+          "approval_required": true,
+          "frameworks_required": true,
+          "measurements_required": true,
+          "profile_required": true,
+          "supported_types": [
+            "annual",
+            "quarterly",
+            "regulatory",
+            "board",
+            "investor",
+            "supplier"
+          ]
+        },
+        "risks": {
+          "owner_required_for_high_or_critical": true,
+          "profile_required": true,
+          "supported_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "stakeholders": {
+          "channel_required": true,
+          "consent_required": true,
+          "name_required": true,
+          "profile_required": true,
+          "type_required": true
+        },
+        "supplier_assessments": {
+          "evidence_required": true,
+          "owner_required_for_high_risk": true,
+          "period_required": true,
+          "score_range": [
+            0,
+            100
+          ],
+          "supplier_required": true
+        },
+        "targets": {
+          "baseline_required": true,
+          "due_date_required": true,
+          "metric_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "absolute",
+            "intensity",
+            "reduction",
+            "compliance"
+          ],
+          "target_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "ecd_esg_operations"
+          "default_theme": "esg_control"
         },
         "ui": {
+          "enable_agents": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_frameworks": true,
+          "enable_initiatives": true,
+          "enable_measurements": true,
+          "enable_metrics": true,
+          "enable_profiles": true,
+          "enable_reports": true,
+          "enable_risks": true,
+          "enable_settings": true,
+          "enable_stakeholders": true,
+          "enable_suppliers": true,
+          "enable_targets": true
         }
       },
       "id": "ecd_esg",
       "provides": [
-        "ecd_esg_operations"
+        "esg_profile_lifecycle",
+        "esg_framework_lifecycle",
+        "esg_metric_lifecycle",
+        "esg_measurement_lifecycle",
+        "esg_target_lifecycle",
+        "esg_supplier_assessment_lifecycle",
+        "esg_initiative_lifecycle",
+        "esg_risk_lifecycle",
+        "esg_report_workflow",
+        "esg_stakeholder_lifecycle",
+        "esg_engagement_lifecycle",
+        "esg_dashboard_service",
+        "esg_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "document_management",
+        "supplier_master_data",
+        "carbon_data_provider",
+        "regulatory_content",
+        "risk_policy"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +2362,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 11,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "ecd_esg": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Sustainability & ESG Management - Revolutionary operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Sustainability & ESG Management - Revolutionary write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Sustainability & ESG Management - Revolutionary operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.ecd_esg": {
-      "file": "capability_contract.py",
-      "id": "capability.ecd_esg",
-      "kind": "capability",
-      "name": "Sustainability & ESG Management - Revolutionary",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }
