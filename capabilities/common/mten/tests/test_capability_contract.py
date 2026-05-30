@@ -44,11 +44,13 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"resources",
 		"orchestration",
 		"governance",
+		"agents",
+		"streaming",
 		"analytics",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 10
+	assert len(contract["rule_engine"]["rules"]) >= 14
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"tenants",
@@ -59,15 +61,19 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"templates",
 		"analytics",
 		"optimization",
+		"agents",
 		"audit",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/mten/api/v1"
-	assert contract["theme"]["tokens"]["border.radius"] == "12px"
+	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "tenant_health_card" in contract["theme"]["components"]
 	assert "capacity_approval_queue" in contract["theme"]["components"]
 	assert "isolation_incident_panel" in contract["theme"]["components"]
 	assert "live_migration_runbook" in contract["theme"]["components"]
+	assert "tenant_agent_roster" in contract["theme"]["components"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_rule_engine_enforces_multi_tenant_guardrails():
@@ -95,6 +101,19 @@ def test_rule_engine_enforces_multi_tenant_guardrails():
 		"operation": "approve_live_migration",
 		"migration_reviewer_same_as_requester": True,
 	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"requested_operation": "tenant_lifecycle_batch",
+		"event_stream": "non_bytewax",
+	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"requested_operation": "register_tenant_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"privileged_action": True,
+		"human_approval_required": False,
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -109,6 +128,12 @@ def test_rule_engine_enforces_multi_tenant_guardrails():
 	}
 	assert capacity_review["matched_rules"] == ["capacity_review_requires_independent_reviewer"]
 	assert migration_review["matched_rules"] == ["live_migration_requires_independent_reviewer"]
+	assert batch_result["matched_rules"] == ["bytewax_tenant_stream_required"]
+	assert set(agent_result["matched_rules"]) == {
+		"tenant_agent_runtime_supported",
+		"tenant_agent_role_supported",
+		"tenant_agent_privileged_action_requires_approval",
+	}
 
 
 def test_registration_includes_full_capability_contract():
@@ -118,9 +143,12 @@ def test_registration_includes_full_capability_contract():
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "mten_control_fabric"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["engine"] == "bytewax"
 	assert registration["ui_components"]["capacity_approvals"] == "/mten/capacity/approvals"
 	assert registration["ui_components"]["isolation"] == "/mten/isolation"
 	assert registration["ui_components"]["live_migrations"] == "/mten/migrations"
+	assert registration["ui_components"]["agents"] == "/mten/agents"
 	assert registration["ui_components"]["audit"] == "/mten/audit"
 	assert "mten:approve_capacity" in registration["permissions"]
 	assert "mten:migrate" in registration["permissions"]
@@ -143,6 +171,20 @@ def test_service_runs_tenant_capacity_isolation_and_migration_lifecycle():
 		reviewer="capacity-reviewer",
 		decision="approved",
 		notes="Forecast, quota, and cost center verified.",
+	)
+	batch = service.validate_lifecycle_batch(
+		tenant_id="platform",
+		record_count=25,
+		event_stream="bytewax",
+	)
+	agent = service.register_tenant_agent(
+		agent_id="agent-alpha",
+		tenant_id="platform",
+		name="Tenant Capacity Reviewer",
+		runtime="codex",
+		role="capacity_reviewer",
+		purpose="Review tenant overcommit and capacity approvals.",
+		owner="capacity-reviewer",
 	)
 	tenant = service.register_tenant(
 		target_tenant_id="tenant-alpha",
@@ -198,6 +240,8 @@ def test_service_runs_tenant_capacity_isolation_and_migration_lifecycle():
 	model = view_models.dashboard_model(service, "platform")
 
 	assert activated["status"] == "active"
+	assert batch["accepted"] is True
+	assert agent["runtime"] == "codex"
 	assert executed["status"] == "completed"
 	assert incident["suspended"] is True
 	assert reactivated["status"] == "active"
@@ -205,9 +249,13 @@ def test_service_runs_tenant_capacity_isolation_and_migration_lifecycle():
 	assert model["summary"]["capacity_approval_count"] == 1
 	assert model["summary"]["isolation_incident_count"] == 1
 	assert model["summary"]["live_migration_count"] == 1
+	assert model["summary"]["agent_count"] == 1
+	assert model["streaming"]["engine"] == "bytewax"
+	assert view_models.tenant_agent_model(service, "platform")["agents"][0]["id"] == "agent-alpha"
 	assert {event["event_type"] for event in model["governance_events"]} >= {
 		"capacity_approval_requested",
 		"capacity_approval_decided",
+		"tenant_agent_registered",
 		"tenant_registered",
 		"tenant_activated",
 		"live_migration_requested",
@@ -250,6 +298,36 @@ def test_service_blocks_tenant_guardrail_violations():
 			owner="tenant-owner",
 			primary_domain="over.example.com",
 			projected_compute_units=1400,
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_tenant_stream_required"):
+		service.validate_lifecycle_batch(
+			tenant_id="platform",
+			record_count=3,
+			event_stream="queue",
+		)
+
+	with pytest.raises(PermissionError, match="tenant_agent_runtime_unsupported"):
+		service.register_tenant_agent(
+			agent_id="agent-bad-runtime",
+			tenant_id="platform",
+			name="Unsupported Tenant Agent",
+			runtime="unsupported",
+			role="tenant_support",
+			purpose="Invalid runtime proof.",
+			owner="tenant-admin",
+		)
+
+	with pytest.raises(PermissionError, match="tenant_agent_human_approval_required"):
+		service.register_tenant_agent(
+			agent_id="agent-no-approval",
+			tenant_id="platform",
+			name="Migration Agent",
+			runtime="opencode",
+			role="migration_reviewer",
+			purpose="Privileged migration review.",
+			owner="migration-lead",
+			human_approval_required=False,
 		)
 
 	approval = service.request_capacity_approval(
@@ -408,13 +486,26 @@ def test_api_helpers_and_view_models_share_default_state():
 		"target_provider": "azure",
 		"runbook": "Drain traffic and verify checksums.",
 	})
+	agent = api_helpers.register_tenant_agent({
+		"id": "agent-api",
+		"tenant_id": "platform-api",
+		"name": "Tenant Support Agent",
+		"runtime": "claude_code",
+		"role": "tenant_support",
+		"purpose": "Support tenant activation workflows.",
+		"owner": "api-owner",
+	})
 	model = view_models.dashboard_model(tenant_id="platform-api")
 	provisioning = view_models.provisioning_model(tenant_id="platform-api")
 	migrations = view_models.migration_model(tenant_id="platform-api")
+	agents = view_models.tenant_agent_model(tenant_id="platform-api")
 	governance = view_models.governance_model(tenant_id="platform-api")
 
 	assert api_helpers.capability_status("platform-api")["tenant_count"] == 1
+	assert api_helpers.capability_status("platform-api")["agent_count"] == 1
 	assert model["summary"]["live_migration_count"] == 1
 	assert provisioning["active"][0]["id"] == "tenant-api"
 	assert migrations["migrations"][0]["id"] == "migration-api"
+	assert agent["runtime"] == "claude_code"
+	assert agents["agents"][0]["id"] == "agent-api"
 	assert governance["events"]

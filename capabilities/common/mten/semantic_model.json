@@ -1,5 +1,44 @@
 {
-  "agents": {},
+  "agents": {
+    "mten_agent_contract": {
+      "composition_points": [
+        "tenant_provisioning",
+        "isolation_review",
+        "capacity_review",
+        "migration_review",
+        "resource_optimization",
+        "compliance_review",
+        "tenant_support"
+      ],
+      "first_class": true,
+      "guardrails": [
+        "tenant_agent_runtime_supported",
+        "tenant_agent_role_supported",
+        "tenant_agent_privileged_action_requires_approval"
+      ],
+      "privileged_roles": [
+        "capacity_reviewer",
+        "compliance_reviewer",
+        "isolation_reviewer",
+        "migration_reviewer"
+      ],
+      "supported_roles": [
+        "tenant_provisioner",
+        "isolation_reviewer",
+        "capacity_reviewer",
+        "migration_reviewer",
+        "resource_optimizer",
+        "compliance_reviewer",
+        "tenant_support"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Multi-Tenant Management package-backed APG capability",
     "entity_count": 0,
@@ -8,6 +47,44 @@
   },
   "capabilities": {
     "mten": {
+      "agents": {
+        "composition_points": [
+          "tenant_provisioning",
+          "isolation_review",
+          "capacity_review",
+          "migration_review",
+          "resource_optimization",
+          "compliance_review",
+          "tenant_support"
+        ],
+        "first_class": true,
+        "guardrails": [
+          "tenant_agent_runtime_supported",
+          "tenant_agent_role_supported",
+          "tenant_agent_privileged_action_requires_approval"
+        ],
+        "privileged_roles": [
+          "capacity_reviewer",
+          "compliance_reviewer",
+          "isolation_reviewer",
+          "migration_reviewer"
+        ],
+        "supported_roles": [
+          "tenant_provisioner",
+          "isolation_reviewer",
+          "capacity_reviewer",
+          "migration_reviewer",
+          "resource_optimizer",
+          "compliance_reviewer",
+          "tenant_support"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "capacity": "CapacityApprovalRecord",
         "live_migration": "LiveMigrationRecord"
@@ -15,6 +92,25 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "agents": {
+          "enabled": true,
+          "privileged_roles_require_human_approval": true,
+          "supported_roles": [
+            "tenant_provisioner",
+            "isolation_reviewer",
+            "capacity_reviewer",
+            "migration_reviewer",
+            "resource_optimizer",
+            "compliance_reviewer",
+            "tenant_support"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "analytics": {
           "anomaly_detection_enabled": true,
           "optimization_recommendations_enabled": true,
@@ -58,6 +154,20 @@
           "quota_alert_threshold_percent": 85,
           "require_capacity_approval_for_overcommit": true,
           "require_independent_capacity_review": true
+        },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "mten.lifecycle",
+          "required_for_operations": [
+            "tenant_lifecycle_batch",
+            "portfolio_rebalance"
+          ],
+          "topics": [
+            "mten.tenants",
+            "mten.governance",
+            "mten.agents"
+          ],
+          "watermark_field": "event_time"
         },
         "tenant_id": "default",
         "theme": {
@@ -213,6 +323,59 @@
               "required_action": "assign_independent_reviewer"
             },
             "name": "live_migration_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "event_stream": "non_bytewax",
+              "requested_operation": "tenant_lifecycle_batch"
+            },
+            "description": "Tenant lifecycle batch operations must use the Bytewax lifecycle stream.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_tenant_stream_required",
+              "required_action": "route_tenant_lifecycle_batch_through_bytewax"
+            },
+            "name": "bytewax_tenant_stream_required"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "requested_operation": "register_tenant_agent"
+            },
+            "description": "Tenant agents must run on an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_agent_runtime_unsupported",
+              "required_action": "select_supported_tenant_agent_runtime"
+            },
+            "name": "tenant_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "requested_operation": "register_tenant_agent"
+            },
+            "description": "Tenant agents must use an approved MTEN role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_agent_role_unsupported",
+              "required_action": "select_supported_tenant_agent_role"
+            },
+            "name": "tenant_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "privileged_action": true,
+              "requested_operation": "register_tenant_agent"
+            },
+            "description": "Privileged tenant-agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tenant_agent_human_approval_required",
+              "required_action": "enable_human_approval_for_privileged_tenant_agent"
+            },
+            "name": "tenant_agent_privileged_action_requires_approval"
           }
         ],
         "type": "deterministic"
@@ -345,6 +508,59 @@
             "required_action": "assign_independent_reviewer"
           },
           "name": "live_migration_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "event_stream": "non_bytewax",
+            "requested_operation": "tenant_lifecycle_batch"
+          },
+          "description": "Tenant lifecycle batch operations must use the Bytewax lifecycle stream.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_tenant_stream_required",
+            "required_action": "route_tenant_lifecycle_batch_through_bytewax"
+          },
+          "name": "bytewax_tenant_stream_required"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "requested_operation": "register_tenant_agent"
+          },
+          "description": "Tenant agents must run on an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_agent_runtime_unsupported",
+            "required_action": "select_supported_tenant_agent_runtime"
+          },
+          "name": "tenant_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "requested_operation": "register_tenant_agent"
+          },
+          "description": "Tenant agents must use an approved MTEN role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_agent_role_unsupported",
+            "required_action": "select_supported_tenant_agent_role"
+          },
+          "name": "tenant_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "privileged_action": true,
+            "requested_operation": "register_tenant_agent"
+          },
+          "description": "Privileged tenant-agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tenant_agent_human_approval_required",
+            "required_action": "enable_human_approval_for_privileged_tenant_agent"
+          },
+          "name": "tenant_agent_privileged_action_requires_approval"
         }
       ],
       "runtime": {
@@ -357,6 +573,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "TenantAgentRoster",
+          "permission": "mten:admin",
+          "route": "/mten/agents"
+        },
         "analytics": {
           "component": "TenantAnalyticsHub",
           "permission": "mten:view_analytics",
@@ -413,9 +634,30 @@
           "route": "/mten/tenants"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax",
+        "guardrails": [
+          "bytewax_tenant_stream_required"
+        ],
+        "lifecycle_stream": "mten.lifecycle",
+        "required_for_operations": [
+          "tenant_lifecycle_batch",
+          "portfolio_rebalance"
+        ],
+        "topics": [
+          "mten.tenants",
+          "mten.governance",
+          "mten.agents"
+        ],
+        "watermark_field": "event_time"
+      },
       "theme": {
         "components": {
+          "bytewax_stream_indicator": {
+            "icon": "activity",
+            "status_style": "stream-health",
+            "variant": "compact-meter"
+          },
           "capacity_approval_queue": {
             "icon": "gauge",
             "status_indicator": "left-bar",
@@ -443,6 +685,11 @@
             "threshold_highlight": "capacity-band",
             "visual": "segmented-usage-bar"
           },
+          "tenant_agent_roster": {
+            "approval_state": "human-review-chip",
+            "icon": "bot",
+            "runtime_badge": "inline"
+          },
           "tenant_governance_timeline": {
             "icon": "scroll-text",
             "line_style": "segmented",
@@ -456,7 +703,7 @@
         },
         "name": "mten_control_fabric",
         "tokens": {
-          "border.radius": "12px",
+          "border.radius": "8px",
           "color.accent": "#C67B2F",
           "color.danger": "#C53030",
           "color.primary": "#0F5A5C",
@@ -537,6 +784,13 @@
             "permission": "mten:optimize"
           },
           {
+            "component": "TenantAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/mten/agents",
+            "permission": "mten:admin"
+          },
+          {
             "component": "TenantGovernanceTimeline",
             "name": "audit",
             "nav_group": "Governance",
@@ -561,7 +815,31 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "mten_tenant_control": {
+        "capability": "mten",
+        "guardrails": [
+          "tenant_agent_runtime_supported",
+          "tenant_agent_role_supported",
+          "tenant_agent_privileged_action_requires_approval"
+        ],
+        "roles": [
+          "tenant_provisioner",
+          "isolation_reviewer",
+          "capacity_reviewer",
+          "migration_reviewer",
+          "resource_optimizer",
+          "compliance_reviewer",
+          "tenant_support"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "mten": []
@@ -570,6 +848,25 @@
   "contracts": {
     "mten": {
       "configuration": {
+        "agents": {
+          "enabled": true,
+          "privileged_roles_require_human_approval": true,
+          "supported_roles": [
+            "tenant_provisioner",
+            "isolation_reviewer",
+            "capacity_reviewer",
+            "migration_reviewer",
+            "resource_optimizer",
+            "compliance_reviewer",
+            "tenant_support"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "analytics": {
           "anomaly_detection_enabled": true,
           "optimization_recommendations_enabled": true,
@@ -613,6 +910,20 @@
           "quota_alert_threshold_percent": 85,
           "require_capacity_approval_for_overcommit": true,
           "require_independent_capacity_review": true
+        },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "mten.lifecycle",
+          "required_for_operations": [
+            "tenant_lifecycle_batch",
+            "portfolio_rebalance"
+          ],
+          "topics": [
+            "mten.tenants",
+            "mten.governance",
+            "mten.agents"
+          ],
+          "watermark_field": "event_time"
         },
         "tenant_id": "default",
         "theme": {
@@ -666,6 +977,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_tenant_stream_required": {
+      "condition": {
+        "event_stream": "non_bytewax",
+        "requested_operation": "tenant_lifecycle_batch"
+      },
+      "description": "Tenant lifecycle batch operations must use the Bytewax lifecycle stream.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_tenant_stream_required",
+        "required_action": "route_tenant_lifecycle_batch_through_bytewax"
+      },
+      "name": "bytewax_tenant_stream_required"
+    },
     "capacity_overcommit_requires_review": {
       "condition": {
         "capacity_approval_recorded": false,
@@ -781,6 +1105,46 @@
         "required_action": "reactivate_tenant_or_abort"
       },
       "name": "suspended_tenants_block_mutations"
+    },
+    "tenant_agent_privileged_action_requires_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "privileged_action": true,
+        "requested_operation": "register_tenant_agent"
+      },
+      "description": "Privileged tenant-agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_agent_human_approval_required",
+        "required_action": "enable_human_approval_for_privileged_tenant_agent"
+      },
+      "name": "tenant_agent_privileged_action_requires_approval"
+    },
+    "tenant_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "requested_operation": "register_tenant_agent"
+      },
+      "description": "Tenant agents must use an approved MTEN role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_agent_role_unsupported",
+        "required_action": "select_supported_tenant_agent_role"
+      },
+      "name": "tenant_agent_role_supported"
+    },
+    "tenant_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "requested_operation": "register_tenant_agent"
+      },
+      "description": "Tenant agents must run on an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tenant_agent_runtime_unsupported",
+        "required_action": "select_supported_tenant_agent_runtime"
+      },
+      "name": "tenant_agent_runtime_supported"
     },
     "tenant_context_required": {
       "condition": {

@@ -7,7 +7,8 @@ Author: Nyimbi Odero
 
 Enterprise-grade multi-tenant management with AI-powered optimization.
 Provides <60 second tenant provisioning, AI-powered resource optimization,
-and universal cloud abstraction surpassing industry leaders by 10x.
+agent-governed operations, and universal cloud abstraction for composed APG
+applications.
 """
 
 from .models import (
@@ -156,7 +157,8 @@ def register_capability() -> dict:
 			'tenant_analytics': 'Expose tenant portfolio analytics and health views',
 			'resource_optimization': 'Drive AI-assisted rightsizing and migration decisions',
 			'capability_rules': 'Evaluate deterministic capability-specific tenancy rules',
-			'visual_theming': 'Apply tenant-aware control plane theme tokens and components'
+			'visual_theming': 'Apply tenant-aware control plane theme tokens and components',
+			'tenant_agent_composition': 'Register governed tenant agents for provisioning, isolation, capacity, migration, optimization, and support'
 		},
 		'endpoints': {
 			'tenants': '/mten/api/v1/tenants',
@@ -169,7 +171,8 @@ def register_capability() -> dict:
 			'upgrade': '/mten/api/v1/tenants/{tenant_id}/upgrade',
 			'suspend': '/mten/api/v1/tenants/{tenant_id}/suspend',
 			'stats': '/mten/api/v1/stats',
-			'optimization': '/mten/api/v1/optimize'
+			'optimization': '/mten/api/v1/optimize',
+			'agents': '/mten/api/v1/agents'
 		},
 		'ui_components': {
 			route['name']: route['path']
@@ -177,6 +180,8 @@ def register_capability() -> dict:
 		},
 		'ui_manifest': contract['ui'],
 		'theme': contract['theme'],
+		'agents': contract['agents'],
+		'streaming': contract['streaming'],
 		'permissions': [
 			'mten:view',
 			'mten:create',
@@ -191,7 +196,7 @@ def register_capability() -> dict:
 		]
 	}
 
-# Performance benchmarks demonstrating 10x improvement over industry leaders
+# Performance benchmarks for tenant control-plane behavior
 PERFORMANCE_BENCHMARKS = {
 	'provisioning_speed': {
 		'mten_capability': '<60 seconds',
@@ -220,12 +225,12 @@ PERFORMANCE_BENCHMARKS = {
 	}
 }
 
-# Revolutionary differentiators
+# Production-grade differentiators
 COMPETITIVE_ADVANTAGES = [
 	'Lightning Provisioning: <60 second tenant deployment vs 2-4 hour industry standard',
 	'AI-Native Intelligence: ML-powered optimization with 85%+ prediction accuracy',
 	'Universal Cloud Abstraction: Single API for AWS, Azure, GCP with auto-optimization',
-	'Revolutionary Security: Multi-dimensional isolation with quantum-ready encryption',
+	'Governed Security: Multi-dimensional isolation with cryptographic boundary controls',
 	'Native APG Integration: Seamless auth_rbac, audit_compliance, ai_orchestration',
 	'Predictive Analytics: Real-time optimization with automatic resource rightsizing',
 	'Zero-Downtime Operations: Live migration with automatic rollback capabilities',

@@ -12,6 +12,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_MTEN_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_MTEN_AGENT_ROLES = [
+	"tenant_provisioner",
+	"isolation_reviewer",
+	"capacity_reviewer",
+	"migration_reviewer",
+	"resource_optimizer",
+	"compliance_reviewer",
+	"tenant_support",
+]
+PRIVILEGED_MTEN_AGENT_ROLES = {
+	"isolation_reviewer",
+	"capacity_reviewer",
+	"migration_reviewer",
+	"compliance_reviewer",
+}
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped MTEN configuration defaults and schema."""
@@ -52,6 +70,19 @@ class CapabilityConfiguration:
 			"reactivation_evidence_required": True,
 			"allow_tenant_local_ids": True
 		},
+		"agents": {
+			"enabled": True,
+			"supported_runtimes": list(SUPPORTED_MTEN_AGENT_RUNTIMES),
+			"supported_roles": list(SUPPORTED_MTEN_AGENT_ROLES),
+			"privileged_roles_require_human_approval": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "mten.lifecycle",
+			"required_for_operations": ["tenant_lifecycle_batch", "portfolio_rebalance"],
+			"topics": ["mten.tenants", "mten.governance", "mten.agents"],
+			"watermark_field": "event_time"
+		},
 		"analytics": {
 			"real_time_analytics_enabled": True,
 			"optimization_recommendations_enabled": True,
@@ -81,6 +112,8 @@ class CapabilityConfiguration:
 			"resources",
 			"orchestration",
 			"governance",
+			"agents",
+			"streaming",
 			"analytics",
 			"ui",
 			"theme"
@@ -92,6 +125,8 @@ class CapabilityConfiguration:
 			"resources": {"type": "object"},
 			"orchestration": {"type": "object"},
 			"governance": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"analytics": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -174,7 +209,7 @@ class CapabilityTheme:
 		"surface.panel": "#FFFFFF",
 		"text.primary": "#102A43",
 		"text.secondary": "#52606D",
-		"border.radius": "12px",
+		"border.radius": "8px",
 		"density": "comfortable"
 	})
 	components: dict[str, dict[str, str]] = field(default_factory=lambda: {
@@ -214,6 +249,16 @@ class CapabilityTheme:
 			"icon": "scroll-text",
 			"line_style": "segmented",
 			"variant": "evidence"
+		},
+		"tenant_agent_roster": {
+			"icon": "bot",
+			"runtime_badge": "inline",
+			"approval_state": "human-review-chip"
+		},
+		"bytewax_stream_indicator": {
+			"icon": "activity",
+			"variant": "compact-meter",
+			"status_style": "stream-health"
 		}
 	})
 
@@ -320,6 +365,50 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "independent_migration_reviewer_required",
 				"required_action": "assign_independent_reviewer"
 			}
+		),
+		CapabilityRule(
+			name="bytewax_tenant_stream_required",
+			description="Tenant lifecycle batch operations must use the Bytewax lifecycle stream.",
+			condition={"requested_operation": "tenant_lifecycle_batch", "event_stream": "non_bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_tenant_stream_required",
+				"required_action": "route_tenant_lifecycle_batch_through_bytewax"
+			}
+		),
+		CapabilityRule(
+			name="tenant_agent_runtime_supported",
+			description="Tenant agents must run on an approved runtime.",
+			condition={"requested_operation": "register_tenant_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_agent_runtime_unsupported",
+				"required_action": "select_supported_tenant_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="tenant_agent_role_supported",
+			description="Tenant agents must use an approved MTEN role.",
+			condition={"requested_operation": "register_tenant_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_agent_role_unsupported",
+				"required_action": "select_supported_tenant_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="tenant_agent_privileged_action_requires_approval",
+			description="Privileged tenant-agent roles require human approval.",
+			condition={
+				"requested_operation": "register_tenant_agent",
+				"privileged_action": True,
+				"human_approval_required": False
+			},
+			effect={
+				"decision": "deny",
+				"reason": "tenant_agent_human_approval_required",
+				"required_action": "enable_human_approval_for_privileged_tenant_agent"
+			}
 		)
 	]
 
@@ -336,6 +425,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("templates", "/mten/templates", "TenantTemplateCatalog", "mten:manage_templates", "Build"),
 		CapabilityUIRoute("analytics", "/mten/analytics", "TenantAnalyticsHub", "mten:view_analytics", "Intelligence"),
 		CapabilityUIRoute("optimization", "/mten/optimization", "ResourceOptimizationWorkbench", "mten:optimize", "Intelligence"),
+		CapabilityUIRoute("agents", "/mten/agents", "TenantAgentRoster", "mten:admin", "Governance"),
 		CapabilityUIRoute("audit", "/mten/audit", "TenantGovernanceTimeline", "mten:view", "Governance"),
 		CapabilityUIRoute("settings", "/mten/settings", "TenantGovernanceSettings", "mten:admin", "Administration")
 	]
@@ -346,6 +436,44 @@ def ui_manifest() -> dict[str, Any]:
 		"routes": [route.__dict__ for route in routes],
 		"template_roots": ["templates/", "static/"],
 		"requires_theme": True
+	}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class MTEN tenant-agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_MTEN_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_MTEN_AGENT_ROLES),
+		"privileged_roles": sorted(PRIVILEGED_MTEN_AGENT_ROLES),
+		"composition_points": [
+			"tenant_provisioning",
+			"isolation_review",
+			"capacity_review",
+			"migration_review",
+			"resource_optimization",
+			"compliance_review",
+			"tenant_support"
+		],
+		"guardrails": [
+			"tenant_agent_runtime_supported",
+			"tenant_agent_role_supported",
+			"tenant_agent_privileged_action_requires_approval"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return MTEN lifecycle stream metadata."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "mten.lifecycle",
+		"required_for_operations": ["tenant_lifecycle_batch", "portfolio_rebalance"],
+		"topics": ["mten.tenants", "mten.governance", "mten.agents"],
+		"watermark_field": "event_time",
+		"guardrails": [
+			"bytewax_tenant_stream_required"
+		]
 	}
 
 
@@ -367,7 +495,9 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
-		}
+		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest()
 	}
 
 

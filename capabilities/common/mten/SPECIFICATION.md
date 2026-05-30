@@ -6,7 +6,9 @@
 control plane for generated APG applications: tenant provisioning, tenant
 activation, tenant isolation, custom domain validation, capacity governance,
 suspension, live migration governance, resource posture, UI composition, and
-audit evidence.
+audit evidence. It also registers first-class tenant agents and publishes
+Bytewax lifecycle-stream metadata so generated APG applications can compose
+tenant operations, reviews, and automation safely.
 
 The capability must remain executable without starting cloud providers, AI
 engines, analytics engines, FastAPI, Flask-AppBuilder, deployment bundles, or
@@ -21,6 +23,12 @@ production databases. Those systems are adapters behind the package contract.
 - Suspend tenants on isolation breach evidence.
 - Block mutations against suspended tenants until explicit reactivation.
 - Require runbook and independent review for live migration.
+- Register governed tenant agents for provisioning, isolation review, capacity
+  review, migration review, resource optimization, compliance review, and
+  tenant support.
+- Require approved tenant-agent runtimes and human approval for privileged
+  tenant-agent roles.
+- Require Bytewax routing for tenant lifecycle batch operations.
 - Expose API helpers, view models, UI routes, theme components, rules, semantic
   evidence, and focused tests for generated APG applications.
 
@@ -110,6 +118,23 @@ Required evidence:
 - `reasons`
 - `metadata`
 
+### Tenant Agent
+
+First-class AI or automation worker registered for tenant control-plane work.
+
+Required evidence:
+
+- `id`
+- `tenant_id`
+- `name`
+- `runtime`
+- `role`
+- `purpose`
+- `owner`
+- `human_approval_required`
+- `status`
+- `configuration`
+
 ## Lifecycle Requirements
 
 ### Tenant Registration
@@ -153,6 +178,23 @@ Required evidence:
 - Approved migration records can be executed as a dependency-light evidence
   transition; production movers remain adapters.
 
+### Tenant Agent Composition
+
+- Supported runtimes are `codex`, `claude_code`, `opencode`, and `pi`.
+- Supported roles are `tenant_provisioner`, `isolation_reviewer`,
+  `capacity_reviewer`, `migration_reviewer`, `resource_optimizer`,
+  `compliance_reviewer`, and `tenant_support`.
+- Privileged roles require `human_approval_required`.
+- Tenant agent registration emits governance evidence.
+
+### Lifecycle Streaming
+
+- Tenant lifecycle batches must use the Bytewax lifecycle stream.
+- The stream contract is `mten.lifecycle`.
+- The stream topics are `mten.tenants`, `mten.governance`, and `mten.agents`.
+- Local package proof validates routing and metadata without starting a live
+  Bytewax worker.
+
 ## Rules
 
 The deterministic rule engine must enforce at least:
@@ -167,6 +209,10 @@ The deterministic rule engine must enforce at least:
 - `isolation_breach_requires_suspension`
 - `live_migration_requires_runbook`
 - `live_migration_requires_independent_reviewer`
+- `bytewax_tenant_stream_required`
+- `tenant_agent_runtime_supported`
+- `tenant_agent_role_supported`
+- `tenant_agent_privileged_action_requires_approval`
 
 ## UI Surfaces
 
@@ -181,6 +227,7 @@ MTEN must expose routes and theme components for:
 - Template catalog
 - Analytics hub
 - Optimization workbench
+- Tenant agent roster
 - Audit/governance timeline
 - Settings
 

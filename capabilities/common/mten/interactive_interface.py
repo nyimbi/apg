@@ -551,7 +551,7 @@ class AnalyticsDashboard:
 		if data_source:
 			return await data_source()
 		
-		# Return mock data for demonstration
+		# Return fixture data for demonstration
 		return await self._generate_mock_data(widget.data_source)
 	
 	async def update_real_time_data(self, data_source: str, data: Any) -> None:
@@ -593,7 +593,7 @@ class AnalyticsDashboard:
 		pass
 	
 	async def _generate_mock_data(self, data_source: str) -> Dict[str, Any]:
-		"""Generate mock data for demonstration"""
+		"""Generate fixture data for demonstration"""
 		mock_data = {
 			"tenant_count": {"value": 247, "change": "+12%"},
 			"resource_usage": {

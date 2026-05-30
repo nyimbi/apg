@@ -24,8 +24,10 @@ def dashboard_model(service: MtenService | None = None, tenant_id: str = "defaul
 		"capacity_approvals": service.list_capacity_approvals(tenant_id),
 		"isolation_incidents": service.list_isolation_incidents(tenant_id),
 		"live_migrations": service.list_live_migrations(tenant_id),
+		"agents": service.list_tenant_agents(tenant_id),
 		"governance_events": service.list_governance_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -74,6 +76,22 @@ def migration_model(service: MtenService | None = None, tenant_id: str = "defaul
 	return {
 		"tenant_id": tenant_id,
 		"migrations": service.list_live_migrations(tenant_id),
+	}
+
+
+def tenant_agent_model(service: MtenService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or api_helpers.SERVICE
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_tenant_agents(tenant_id),
+		"agent_contract": contract["agents"],
+		"streaming": contract["streaming"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"approval_required_roles": contract["agents"]["privileged_roles"],
+		"required_fields": ["id", "name", "runtime", "role", "purpose", "owner"],
+		"theme_component": contract["theme"]["components"]["tenant_agent_roster"],
 	}
 
 

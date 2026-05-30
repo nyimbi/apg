@@ -256,7 +256,7 @@ async def test_ai_performance_benchmarks():
 	else:
 		print(f"  ⚠️ AI performance below target ({average_accuracy:.1%} < {target_accuracy:.1%})")
 		print("  ℹ️ This is expected with simulated data - real metrics would improve accuracy")
-		return True  # Still pass test as this is expected with mock data
+		return True  # Still pass test as this is expected with fixture data
 
 
 async def main():

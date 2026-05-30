@@ -39,6 +39,28 @@ def register_tenant(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		record_count=int(payload["record_count"]),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+	)
+
+
+def register_tenant_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_tenant_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		purpose=str(payload["purpose"]),
+		owner=str(payload["owner"]),
+		human_approval_required=_payload_bool(payload, "human_approval_required", True),
+		configuration=dict(payload.get("configuration") or {}),
+	)
+
+
 def activate_tenant(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.activate_tenant(
 		target_tenant_id=str(payload["id"]),
@@ -133,6 +155,10 @@ def list_isolation_incidents(tenant_id: str | None = None) -> list[dict[str, Any
 
 def list_live_migrations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_live_migrations(tenant_id)
+
+
+def list_tenant_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_tenant_agents(tenant_id)
 
 
 def list_governance_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

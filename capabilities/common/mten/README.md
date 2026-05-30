@@ -6,6 +6,65 @@
 
 The Multi-Tenancy capability (`mten`) is a critical enterprise infrastructure capability that provides comprehensive multi-tenant architecture support for the APG platform. It enables secure tenant isolation, resource management, and context-aware operations across all system components.
 
+## Current Executable Package
+
+The package-backed MTEN slice is dependency-light and can be composed by
+generated APG applications without starting cloud providers, DNS services,
+deployment bundles, analytics engines, AI providers, web servers, or production
+databases. The local runtime is `mten_runtime.MtenService`; generated
+applications should use `api_helpers.py` and `view_models.py` for stable
+package surfaces.
+
+It currently provides:
+
+- tenant-qualified tenant registration and activation;
+- DNS, isolation, capacity, suspension, reactivation, and live migration
+  guardrails;
+- first-class tenant agent registration for `codex`, `claude_code`,
+  `opencode`, and `pi`;
+- role and approval guardrails for tenant agents;
+- Bytewax lifecycle-stream metadata and batch validation guardrails;
+- UI/view-model surfaces for tenant portfolio, provisioning, capacity,
+  isolation, migration, agents, governance, analytics, optimization, and
+  settings.
+
+### Dependency-Light Usage
+
+```python
+from capabilities.common.mten.mten_runtime import MtenService
+
+service = MtenService()
+
+service.validate_lifecycle_batch(
+    tenant_id="platform",
+    record_count=25,
+    event_stream="bytewax",
+)
+
+agent = service.register_tenant_agent(
+    agent_id="agent-001",
+    tenant_id="platform",
+    name="Tenant Capacity Reviewer",
+    runtime="codex",
+    role="capacity_reviewer",
+    purpose="Review tenant overcommit and capacity approvals.",
+    owner="capacity-reviewer",
+)
+
+tenant = service.register_tenant(
+    target_tenant_id="tenant-alpha",
+    tenant_id="platform",
+    name="tenant-alpha",
+    owner="tenant-owner",
+    tier="enterprise",
+    primary_domain="alpha.example.com",
+    projected_compute_units=900,
+)
+```
+
+Use `service.describe("platform")` to inspect configuration, rules, UI routes,
+theme tokens, tenant-agent metadata, and Bytewax stream metadata.
+
 ## Features
 
 ### ✅ Core Features

@@ -31,6 +31,8 @@ def test_package_contract_shape_is_valid():
 	assert contract["ui"]["routes"]
 	assert len(contract["ui"]["routes"]) >= 11
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -46,3 +48,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "mten" in model["capabilities"]
 	assert "capacity" in model["capabilities"]["mten"]["approvals"]
+	assert model["agents"]["mten_agent_contract"]["first_class"] is True
+	assert model["capabilities"]["mten"]["streaming"]["engine"] == "bytewax"

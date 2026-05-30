@@ -60,6 +60,7 @@ def semantic_model() -> dict[str, Any]:
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
 				"runtime": {
 					"api": "api.py",
 					"api_helpers": "api_helpers.py",
@@ -77,7 +78,7 @@ def semantic_model() -> dict[str, Any]:
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
@@ -95,7 +96,14 @@ def semantic_model() -> dict[str, Any]:
 		"composition": {
 			"capability_dependencies": {"mten": []},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"mten_tenant_control": {
+					"capability": "mten",
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"guardrails": contract["agents"]["guardrails"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -119,7 +127,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"mten_agent_contract": contract["agents"]
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -162,6 +172,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("component manifest semantic model interface mismatch")
 	if len(routes) < 11:
 		errors.append("MTEN semantic model route manifest is stale")
+	if not model.get("agents"):
+		errors.append("MTEN semantic model agent manifest is stale")
+	if model.get("capabilities", {}).get("mten", {}).get("streaming", {}).get("engine") != "bytewax":
+		errors.append("MTEN semantic model Bytewax stream manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

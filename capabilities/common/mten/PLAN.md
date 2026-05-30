@@ -10,6 +10,9 @@ This turns MTEN into an executable APG foundation capability that generated
 applications can compose without booting the full async production manager,
 cloud orchestration, analytics, AI, or web stacks.
 
+The next coherent packet extends that foundation with first-class tenant-agent
+composition and Bytewax lifecycle-stream guardrails.
+
 ## Implementation Steps
 
 1. Add dependency-light lifecycle records:
@@ -64,6 +67,26 @@ cloud orchestration, analytics, AI, or web stacks.
    - stale marker search
    - diff whitespace check
 
+## Packet 2: Tenant Agent Composition And Bytewax Guardrails
+
+1. Extend `capability_contract.py` with:
+   - supported tenant-agent runtimes `codex`, `claude_code`, `opencode`, and
+     `pi`;
+   - supported roles for provisioning, isolation, capacity, migration,
+     optimization, compliance, and tenant support;
+   - privileged-role approval rules;
+   - Bytewax lifecycle stream metadata;
+   - `/mten/agents` route and theme components.
+2. Extend `models.py` and `mten_runtime.py` with `TenantAgentRecord`, tenant
+   agent registration, tenant lifecycle batch validation, list helpers, and
+   summary counts.
+3. Extend `api_helpers.py` and `view_models.py` with tenant-agent and stream
+   surfaces for generated applications.
+4. Refresh semantic model, manifest evidence, release evidence, README,
+   specification, and progress log.
+5. Run focused compile, pytest, self-test, inspect, implementation-audit,
+   publish-plan, service smoke, stale-marker, package-doc, and diff checks.
+
 ## Non-Goals For This Slice
 
 - Live cloud tenant provisioning.
@@ -86,3 +109,8 @@ Those remain adapters after the executable lifecycle is stable.
   current package contract terminology.
 - Capacity approval must be backed by package state; caller booleans are not
   governance evidence.
+- Tenant-agent registration must remain tenant-qualified and fail closed for
+  unsupported runtimes, unsupported roles, and privileged roles without human
+  approval.
+- Bytewax metadata must stay sourced from the executable contract and appear in
+  generated semantic evidence.

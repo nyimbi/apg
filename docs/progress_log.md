@@ -20320,3 +20320,62 @@ Not run to preserve battery:
 - Live Elasticsearch/OpenSearch, SIEM/GRC/DLP exporters, cryptographic
   timestamping services, rendered browser UI, persistent storage, live Bytewax
   stream execution, and performance/load tests.
+
+### 2026-05-31 03:43 EAT
+
+MTEN tenant-agent composition and Bytewax guardrail packet:
+
+- Selected `capabilities/common/mten` as the next common foundation capability
+  after CONF and AUDL.
+- Added first-class tenant agents to the executable contract, runtime model,
+  service, API helpers, view models, app semantic model, package evidence,
+  docs, and focused tests.
+- Added supported MTEN agent runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`, with roles for tenant provisioning, isolation review, capacity review,
+  migration review, resource optimization, compliance review, and tenant
+  support.
+- Added deterministic guardrails for unsupported MTEN agent runtime,
+  unsupported MTEN agent role, privileged tenant-agent registration without
+  human approval, and non-Bytewax tenant lifecycle batch routing.
+- Added Bytewax lifecycle stream metadata on `mten.lifecycle`, exposed it
+  through the contract, app semantic model, package manifest, view models,
+  service batch validation, and tests.
+- Added `/mten/agents`, tenant-agent roster view models, and theme component
+  metadata while aligning the MTEN border-radius token to the current 8px UI
+  standard.
+- Replaced legacy `cap_spec.md` with a source-of-truth pointer to
+  `SPECIFICATION.md`.
+- Removed stale generated-promotion markers from the MTEN package text and
+  code files while preserving the existing production-oriented adapters.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mten/capability_contract.py capabilities/common/mten/models.py capabilities/common/mten/mten_runtime.py capabilities/common/mten/api_helpers.py capabilities/common/mten/view_models.py capabilities/common/mten/app.py capabilities/common/mten/__init__.py capabilities/common/mten/tests/test_capability_contract.py capabilities/common/mten/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/mten/tests/test_capability_contract.py capabilities/common/mten/tests/test_package_contract.py`
+  passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/mten/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect mten --json` passed with `ok: true`,
+  12 APG Python routes, 14 deterministic rules, Bytewax streaming, and MTEN
+  agent runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mten --json`
+  passed with `ok: true`; MTEN remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mten --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/mten -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "... MtenService ... validate_lifecycle_batch ... register_tenant_agent ... register_tenant ..."`
+  returned one agent, one tenant, `pi` runtime, and `bytewax` stream evidence.
+- Package-doc scan over capability-like directories returned `count 0`.
+- Stale-marker scan over `capabilities/common/mten` returned no matches.
+- `git diff --check -- capabilities/common/mten docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live cloud providers, live DNS validation, IAM/service-mesh mutation,
+  billing systems, analytics engines, AI optimization providers, rendered
+  browser UI, persistent storage, live Bytewax stream execution, and
+  performance/load tests.

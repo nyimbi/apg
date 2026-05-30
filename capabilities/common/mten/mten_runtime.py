@@ -7,11 +7,18 @@ from typing import Any
 
 from uuid_extensions import uuid7str
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_MTEN_AGENT_ROLES,
+	SUPPORTED_MTEN_AGENT_ROLES,
+	SUPPORTED_MTEN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	CapacityApprovalRecord,
 	IsolationIncidentRecord,
 	LiveMigrationRecord,
+	TenantAgentRecord,
 	TenantEnvironmentRecord,
 	TenantGovernanceEvent,
 )
@@ -25,6 +32,7 @@ class MtenService:
 		self._capacity_approvals: dict[tuple[str, str], CapacityApprovalRecord] = {}
 		self._isolation_incidents: dict[tuple[str, str], IsolationIncidentRecord] = {}
 		self._migrations: dict[tuple[str, str], LiveMigrationRecord] = {}
+		self._agents: dict[tuple[str, str], TenantAgentRecord] = {}
 		self._governance_events: dict[tuple[str, str], TenantGovernanceEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -96,6 +104,89 @@ class MtenService:
 			decision=result["decision"],
 			reasons=self._reasons(result),
 			metadata={"tier": tier, "custom_domain": custom_domain},
+		)
+		return record.to_dict()
+
+	def validate_lifecycle_batch(
+		self,
+		tenant_id: str,
+		record_count: int,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		"""Validate tenant lifecycle batch routing before orchestration."""
+		self._tenant_key(tenant_id, "batch-validation")
+		if record_count < 1:
+			raise ValueError("tenant_lifecycle_batch_empty")
+		stream_name = event_stream.strip().lower()
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "tenant_lifecycle_batch",
+			"event_stream": stream_name if stream_name == "bytewax" else "non_bytewax",
+		})
+		_raise_if_denied(result)
+		return {
+			"tenant_id": tenant_id,
+			"record_count": record_count,
+			"event_stream": "bytewax",
+			"accepted": True,
+			"matched_rules": result["matched_rules"],
+		}
+
+	def register_tenant_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		purpose: str,
+		owner: str,
+		human_approval_required: bool = True,
+		configuration: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		"""Register a first-class tenant agent under MTEN governance."""
+		self._ensure_new(self._agents, tenant_id, agent_id, "tenant agent")
+		if not name:
+			raise ValueError("tenant_agent_name_required")
+		if not purpose:
+			raise ValueError("tenant_agent_purpose_required")
+		if not owner:
+			raise ValueError("tenant_agent_owner_required")
+		runtime = runtime.strip()
+		role = role.strip()
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "register_tenant_agent",
+			"agent_runtime_supported": runtime in SUPPORTED_MTEN_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_MTEN_AGENT_ROLES,
+			"privileged_action": role in PRIVILEGED_MTEN_AGENT_ROLES,
+			"human_approval_required": human_approval_required,
+		})
+		_raise_if_denied(result)
+		record = TenantAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			purpose=purpose,
+			owner=owner,
+			human_approval_required=human_approval_required,
+			configuration=dict(configuration or {}),
+		)
+		self._agents[self._tenant_key(tenant_id, agent_id)] = record
+		self._record_governance(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="tenant_agent_registered",
+			actor=owner,
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={
+				"runtime": runtime,
+				"role": role,
+				"human_approval_required": human_approval_required,
+			},
 		)
 		return record.to_dict()
 
@@ -375,6 +466,9 @@ class MtenService:
 	def list_live_migrations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._migrations.values(), tenant_id)
 
+	def list_tenant_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents.values(), tenant_id)
+
 	def list_governance_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._governance_events.values(), tenant_id)
 
@@ -383,6 +477,7 @@ class MtenService:
 		approvals = self.list_capacity_approvals(tenant_id)
 		incidents = self.list_isolation_incidents(tenant_id)
 		migrations = self.list_live_migrations(tenant_id)
+		agents = self.list_tenant_agents(tenant_id)
 		events = self.list_governance_events(tenant_id)
 		return {
 			"tenant_count": len(tenants),
@@ -391,6 +486,7 @@ class MtenService:
 			"capacity_approval_count": len(approvals),
 			"isolation_incident_count": len(incidents),
 			"live_migration_count": len(migrations),
+			"agent_count": len(agents),
 			"governance_event_count": len(events),
 		}
 

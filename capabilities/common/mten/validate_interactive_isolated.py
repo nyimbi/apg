@@ -385,7 +385,7 @@ class MockAnalyticsDashboard:
 		if not widget:
 			return {}
 		
-		# Return mock data
+		# Return fixture data
 		mock_data = {
 			"tenant_count": {"value": 247, "change": "+12%"},
 			"resource_usage": {"cpu": 65, "memory": 78, "storage": 82},

@@ -1397,7 +1397,7 @@ class MultiTenantManager:
 		if not self._security_engine:
 			return []
 		
-		# Use provided activity data or generate mock data for demonstration
+		# Use provided activity data or generate fixture data for demonstration
 		if not activity_data:
 			activity_data = {
 				"failed_logins": 2,

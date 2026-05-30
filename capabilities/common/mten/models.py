@@ -223,6 +223,36 @@ class TenantGovernanceEvent:
 		}
 
 
+@dataclass(frozen=True)
+class TenantAgentRecord:
+	"""First-class tenant agent registered for MTEN governance work."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	purpose: str
+	owner: str
+	human_approval_required: bool = True
+	status: str = "active"
+	configuration: Dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> Dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"purpose": self.purpose,
+			"owner": self.owner,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"configuration": dict(self.configuration),
+		}
+
+
 class ResourceAllocation(BaseModel):
 	"""Tenant resource allocation configuration"""
 	model_config = ConfigDict(extra='forbid', validate_by_name=True, validate_by_alias=True)
