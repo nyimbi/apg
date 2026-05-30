@@ -16,6 +16,71 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 15:49 EAT
+
+POSE pose-estimation lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` with a compatibility pointer to the current executable packet.
+- Replaced heavyweight runtime/API/view/model surfaces with dependency-light
+  executable POSE lifecycle code for model registration, session start, frame
+  capture, pose estimates, analysis, 3D reconstruction, scoped AI pose agents,
+  session state changes, dashboard summaries, and audit events.
+- Expanded `capability_contract.py` with model, session, tracking, analysis,
+  pose-agent, governance, observability, adapter, UI, theme, and Bytewax
+  streaming configuration.
+- Expanded deterministic rules to cover tenant context, model owner/policy,
+  session owner/source/subject consent, secure streams, sensitive-use approval,
+  frame timestamps, required keypoints, person limits, low-quality review,
+  medical review, 3D calibration, AI pose-agent registration/runtime/scope/
+  disclosure, state-change reason/audit, cross-tenant access, and Bytewax batch
+  mutation enforcement.
+- Replaced older overclaiming support modules with explicit adapter-boundary
+  manifests for blueprint metadata, biomechanical analysis, multi-camera
+  fusion, 3D reconstruction, model selection, and production follow-up work.
+- Updated registration metadata, permissions, API helpers, view models, and
+  generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) to match the expanded
+  contract.
+- Renamed the package test to `tests/test_package_contract.py` and expanded
+  coverage for Bytewax, AI pose agents, executable lifecycle operations, UI
+  models, and guardrail failures.
+- Focused review cleanup: tightened the contract so subject consent is enforced
+  at session creation as well as downstream analysis.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/pose/__init__.py
+  capabilities/common/pose/capability_contract.py capabilities/common/pose/models.py
+  capabilities/common/pose/service.py capabilities/common/pose/api.py
+  capabilities/common/pose/views.py
+  capabilities/common/pose/test_capability_contract.py
+  capabilities/common/pose/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/pose/test_capability_contract.py
+  capabilities/common/pose/tests/test_package_contract.py` passed with 7 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.pose import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.pose.streaming.processor,
+  .capabilities.pose.configuration.pose_agents.supported_runtimes,
+  .capabilities.pose.screens.agents.route'
+  capabilities/common/pose/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/pose/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/pose --json` passed with `pose` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/pose --json`
+  passed with `side_effect_free: true` and no warnings.
+- POSE stale-marker and banned stream search returned no matches for old package
+  markers, unsupported overclaims, unfinished scaffolding, TODOs, or Kafka
+  references.
+- `git diff --check -- capabilities/common/pose docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live camera/video capture, live
+  HuggingFace/OpenCV/ONNX/Torch inference, production CVSN/AICR/MLCM/AUDL/MONI/
+  edge adapters, live Bytewax topology, rendered browser UI, and performance,
+  resilience, clinical, or medical-certification checks.
+
 ### 2026-05-30 14:48 EAT
 
 RECS recommender-systems lifecycle/guardrail packet:

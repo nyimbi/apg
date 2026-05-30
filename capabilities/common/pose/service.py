@@ -1,895 +1,515 @@
-"""
-APG Pose Estimation - Service Layer
-===================================
+"""Service layer for executable APG pose-estimation operations."""
 
-Revolutionary pose estimation service with 10x improvements using open-source models.
-Integrates with APG ecosystem and uses best HuggingFace models for pose estimation.
+from __future__ import annotations
 
-Selected Open-Source Models:
-- microsoft/swin-base-simmim-window7-224: High accuracy transformer-based pose estimation  
-- facebook/vitpose-base: Vision Transformer for robust pose detection
-- google/movenet-multipose-lightning: Real-time multi-person pose estimation
-- openmmlab/rtmpose-m: State-of-the-art real-time pose estimation
-- nvidia/groundingdino-swint-ogc: For person detection preprocessing
+from hashlib import sha256
+from statistics import mean
+from typing import Any
 
-Copyright © 2025 Datacraft (nyimbi@gmail.com)
-"""
-
-import asyncio
-import logging
-import time
-import numpy as np
-from datetime import datetime, timedelta
-from typing import Optional, Any
-from dataclasses import dataclass
-from pathlib import Path
-import json
-import cv2
-from collections import deque
-
-# HuggingFace and ML libraries
-from transformers import AutoImageProcessor, AutoModel, pipeline
-import torch
-import torchvision.transforms as T
-from PIL import Image
-import onnxruntime as ort
-
-# APG imports
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
-
-# Local imports
+from .capability_contract import SUPPORTED_AGENT_ROLES, SUPPORTED_AGENT_RUNTIMES, evaluate_capability_rules, get_capability_contract
 from .models import (
-	PoseEstimationModel, PoseKeypoint, PoseSession, RealTimeTracking,
-	BiomechanicalAnalysis, ModelPerformanceMetrics, PoseEstimationRepository,
-	PoseModelType, KeypointType, SessionStatus
+	PoseAgentRecord,
+	PoseAnalysisRecord,
+	PoseAuditEvent,
+	PoseEstimateRecord,
+	PoseFrameRecord,
+	PoseModelRecord,
+	PoseReconstructionRecord,
+	PoseSessionRecord,
+	utc_now_iso,
 )
 
-def _log_service_operation(operation: str, **kwargs) -> None:
-	"""APG logging pattern for service operations"""
-	print(f"[POSE_SERVICE] {operation}: {kwargs}")
 
-def _log_model_loading(model_name: str, status: str, **kwargs) -> None:
-	"""Specialized logging for model operations"""
-	print(f"[POSE_MODEL] {status} - {model_name}: {kwargs}")
+SUPPORTED_MODEL_TYPES = {"movenet", "rtmpose", "vitpose", "swin_pose", "edge_pose"}
+SESSION_STATUSES = {"active", "paused", "completed", "retired"}
 
-@dataclass
-class PoseEstimationResult:
-	"""Result container for pose estimation operations"""
-	success: bool
-	keypoints_2d: list[dict[str, Any]]
-	keypoints_3d: Optional[list[dict[str, Any]]] = None
-	confidence: float = 0.0
-	processing_time_ms: float = 0.0
-	model_used: str = ""
-	person_count: int = 0
-	bounding_boxes: Optional[list[dict[str, Any]]] = None
-	error_message: Optional[str] = None
 
-@dataclass 
-class BiomechanicalResult:
-	"""Result container for biomechanical analysis"""
-	joint_angles: dict[str, float]
-	gait_metrics: Optional[dict[str, Any]] = None
-	balance_metrics: Optional[dict[str, Any]] = None
-	clinical_accuracy: float = 0.0
-	quality_grade: str = "C"
+class PoseService:
+	"""In-process pose service enforcing tenant, consent, quality, and audit guardrails."""
 
-class HuggingFaceModelManager:
-	"""
-	Manages multiple open-source pose estimation models from HuggingFace.
-	Provides adaptive model selection and caching.
-	"""
-	
-	def __init__(self):
-		self.models: dict[str, Any] = {}
-		self.processors: dict[str, Any] = {}
-		self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-		self._model_configs = {
-			# High accuracy transformer model
-			"swin_vitpose": {
-				"model_id": "microsoft/swin-base-simmim-window7-224",
-				"type": PoseModelType.ACCURACY,
-				"max_persons": 1,
-				"keypoints": 17,
-				"input_size": (224, 224)
-			},
-			# Real-time multi-person model
-			"movenet_multipose": {
-				"model_id": "google/movenet-multipose-lightning",
-				"type": PoseModelType.MULTI_PERSON,
-				"max_persons": 6,
-				"keypoints": 17,
-				"input_size": (256, 256)
-			},
-			# State-of-the-art RTMPose
-			"rtmpose": {
-				"model_id": "openmmlab/rtmpose-m",
-				"type": PoseModelType.REALTIME,
-				"max_persons": 10,
-				"keypoints": 17,
-				"input_size": (256, 192)
-			},
-			# Medical grade high precision
-			"vitpose_medical": {
-				"model_id": "facebook/vitpose-base",
-				"type": PoseModelType.MEDICAL,
-				"max_persons": 1,
-				"keypoints": 17,
-				"input_size": (256, 192)
-			},
-			# Edge optimized model
-			"movenet_lightning": {
-				"model_id": "google/movenet-lightning",
-				"type": PoseModelType.EDGE_OPTIMIZED,
-				"max_persons": 1,
-				"keypoints": 17,
-				"input_size": (192, 192)
-			}
-		}
-	
-	async def initialize_models(self) -> None:
-		"""Initialize all pose estimation models asynchronously"""
-		_log_model_loading("ALL_MODELS", "INITIALIZING", count=len(self._model_configs))
-		
-		for model_name, config in self._model_configs.items():
-			try:
-				await self._load_single_model(model_name, config)
-			except Exception as e:
-				_log_model_loading(model_name, "FAILED", error=str(e))
-		
-		_log_model_loading("ALL_MODELS", "INITIALIZED", loaded=len(self.models))
-	
-	async def _load_single_model(self, model_name: str, config: dict[str, Any]) -> None:
-		"""Load a single pose estimation model"""
-		_log_model_loading(model_name, "LOADING", model_id=config["model_id"])
-		
-		try:
-			# Use appropriate loading strategy based on model
-			if "movenet" in config["model_id"]:
-				# TensorFlow Hub models via transformers
-				self.models[model_name] = pipeline(
-					"object-detection",
-					model=config["model_id"],
-					device=0 if torch.cuda.is_available() else -1
-				)
-			elif "rtmpose" in config["model_id"]:
-				# RTMPose models
-				processor = AutoImageProcessor.from_pretrained(config["model_id"])
-				model = AutoModel.from_pretrained(config["model_id"])
-				model.to(self.device)
-				
-				self.processors[model_name] = processor
-				self.models[model_name] = model
-			else:
-				# Standard transformers models
-				processor = AutoImageProcessor.from_pretrained(config["model_id"])
-				model = AutoModel.from_pretrained(config["model_id"])
-				model.to(self.device)
-				
-				self.processors[model_name] = processor
-				self.models[model_name] = model
-			
-			_log_model_loading(model_name, "LOADED", device=str(self.device))
-			
-		except Exception as e:
-			_log_model_loading(model_name, "LOAD_ERROR", error=str(e))
-			# Continue loading other models
-	
-	def select_optimal_model(self, requirements: dict[str, Any]) -> str:
-		"""Select optimal model based on requirements"""
-		max_persons = requirements.get("max_persons", 1)
-		accuracy_priority = requirements.get("accuracy_priority", False)
-		speed_priority = requirements.get("speed_priority", False)
-		medical_grade = requirements.get("medical_grade", False)
-		
-		if medical_grade:
-			return "vitpose_medical"
-		elif max_persons > 1:
-			return "movenet_multipose" if speed_priority else "rtmpose"
-		elif accuracy_priority:
-			return "swin_vitpose"
-		elif speed_priority:
-			return "movenet_lightning"
-		else:
-			return "rtmpose"  # Balanced choice
-	
-	async def estimate_pose(self, image: np.ndarray, model_name: str, 
-		confidence_threshold: float = 0.5) -> PoseEstimationResult:
-		"""Perform pose estimation using specified model"""
-		if model_name not in self.models:
-			return PoseEstimationResult(
-				success=False,
-				keypoints_2d=[],
-				error_message=f"Model {model_name} not available"
-			)
-		
-		start_time = time.time()
-		
-		try:
-			# Preprocess image
-			pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-			config = self._model_configs[model_name]
-			
-			# Model-specific inference
-			if "movenet" in model_name:
-				result = await self._movenet_inference(pil_image, model_name, config)
-			elif "rtmpose" in model_name:  
-				result = await self._rtmpose_inference(pil_image, model_name, config)
-			else:
-				result = await self._transformer_inference(pil_image, model_name, config)
-			
-			processing_time = (time.time() - start_time) * 1000
-			result.processing_time_ms = processing_time
-			result.model_used = model_name
-			
-			return result
-			
-		except Exception as e:
-			_log_service_operation("POSE_ESTIMATION_ERROR", model=model_name, error=str(e))
-			return PoseEstimationResult(
-				success=False,
-				keypoints_2d=[],
-				error_message=str(e),
-				processing_time_ms=(time.time() - start_time) * 1000
-			)
-	
-	async def _movenet_inference(self, image: Image.Image, model_name: str, 
-		config: dict[str, Any]) -> PoseEstimationResult:
-		"""MoveNet model inference"""
-		model = self.models[model_name]
-		
-		# Resize image to model input size
-		image = image.resize(config["input_size"])
-		
-		# Run inference (MoveNet returns keypoints directly)
-		predictions = model(image)
-		
-		keypoints_2d = []
-		bounding_boxes = []
-		
-		# Extract keypoints from MoveNet output
-		for detection in predictions:
-			if detection["score"] >= 0.3:  # Person detection threshold
-				# MoveNet specific keypoint extraction
-				# This is a simplified version - actual implementation would 
-				# parse the specific MoveNet output format
-				keypoints = self._extract_movenet_keypoints(detection)
-				keypoints_2d.extend(keypoints)
-				
-				if "box" in detection:
-					bounding_boxes.append({
-						"x": detection["box"]["xmin"],
-						"y": detection["box"]["ymin"], 
-						"width": detection["box"]["xmax"] - detection["box"]["xmin"],
-						"height": detection["box"]["ymax"] - detection["box"]["ymin"]
-					})
-		
-		return PoseEstimationResult(
-			success=len(keypoints_2d) > 0,
-			keypoints_2d=keypoints_2d,
-			confidence=float(np.mean([kp["confidence"] for kp in keypoints_2d]) if keypoints_2d else 0),
-			person_count=len(bounding_boxes),
-			bounding_boxes=bounding_boxes
+	def __init__(self) -> None:
+		self._models: dict[str, PoseModelRecord] = {}
+		self._sessions: dict[str, PoseSessionRecord] = {}
+		self._frames: dict[str, PoseFrameRecord] = {}
+		self._estimates: dict[str, PoseEstimateRecord] = {}
+		self._analyses: dict[str, PoseAnalysisRecord] = {}
+		self._reconstructions: dict[str, PoseReconstructionRecord] = {}
+		self._agents: dict[str, PoseAgentRecord] = {}
+		self._audit_events: dict[str, PoseAuditEvent] = {}
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def evaluate(self, context: dict[str, Any]) -> dict[str, Any]:
+		return evaluate_capability_rules(context)
+
+	def register_model(
+		self,
+		model_id: str,
+		tenant_id: str,
+		name: str,
+		model_type: str,
+		owner: str,
+		policy_ref: str,
+		minimum_keypoint_confidence: float = 0.72,
+		edge_ready: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_model",
+			"model_owner_present": bool(owner.strip()),
+			"model_policy_attached": bool(policy_ref.strip()),
+		})
+		self._raise_if_blocked(result)
+		normalized_type = _normalize_model_type(model_type)
+		model = PoseModelRecord(
+			id=model_id,
+			tenant_id=tenant_id,
+			name=name or model_id,
+			model_type=normalized_type,
+			owner=owner,
+			policy_ref=policy_ref,
+			minimum_keypoint_confidence=round(float(minimum_keypoint_confidence), 4),
+			edge_ready=edge_ready,
 		)
-	
-	async def _rtmpose_inference(self, image: Image.Image, model_name: str,
-		config: dict[str, Any]) -> PoseEstimationResult:
-		"""RTMPose model inference"""
-		processor = self.processors[model_name]
-		model = self.models[model_name]
-		
-		# Preprocess image
-		inputs = processor(image, return_tensors="pt").to(self.device)
-		
-		# Run inference
-		with torch.no_grad():
-			outputs = model(**inputs)
-		
-		# Extract keypoints from RTMPose output
-		keypoints_2d = self._extract_rtmpose_keypoints(outputs, config)
-		
-		return PoseEstimationResult(
-			success=len(keypoints_2d) > 0,
-			keypoints_2d=keypoints_2d,
-			confidence=float(np.mean([kp["confidence"] for kp in keypoints_2d]) if keypoints_2d else 0),
-			person_count=1 if keypoints_2d else 0
+		self._models[model.id] = model
+		self._audit(tenant_id, "pose_model_registered", model.id, f"Registered pose model {model.name}")
+		return model.to_dict()
+
+	def start_session(
+		self,
+		session_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		source_ref: str,
+		model_id: str,
+		subject_consent_recorded: bool,
+		secure_stream: bool,
+		realtime_stream: bool = False,
+		sensitive_use: bool = False,
+		approval_ref: str = "",
+		max_persons: int = 1,
+		metadata: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		model = self._require_model(model_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "start_tracking",
+			"session_owner_assigned": bool(owner.strip()),
+			"source_reference_present": bool(source_ref.strip()),
+			"subject_consent_recorded": bool(subject_consent_recorded),
+			"realtime_stream": bool(realtime_stream),
+			"secure_stream": bool(secure_stream),
+			"sensitive_use": bool(sensitive_use),
+			"approval_recorded": bool(approval_ref.strip()),
+		})
+		self._raise_if_blocked(result)
+		if int(max_persons) < 1:
+			raise PermissionError("max_persons_required")
+		session = PoseSessionRecord(
+			id=session_id,
+			tenant_id=tenant_id,
+			name=name or session_id,
+			owner=owner,
+			source_ref=source_ref,
+			model_id=model.id,
+			subject_consent_recorded=subject_consent_recorded,
+			secure_stream=secure_stream,
+			realtime_stream=realtime_stream,
+			sensitive_use=sensitive_use,
+			approval_ref=approval_ref,
+			max_persons=int(max_persons),
+			metadata=dict(metadata or {}),
 		)
-	
-	async def _transformer_inference(self, image: Image.Image, model_name: str,
-		config: dict[str, Any]) -> PoseEstimationResult:
-		"""Generic transformer model inference"""
-		processor = self.processors[model_name]
-		model = self.models[model_name]
-		
-		# Preprocess
-		inputs = processor(image, return_tensors="pt").to(self.device)
-		
-		# Inference
-		with torch.no_grad():
-			outputs = model(**inputs)
-		
-		# Extract keypoints (model-specific parsing)
-		keypoints_2d = self._extract_transformer_keypoints(outputs, config)
-		
-		return PoseEstimationResult(
-			success=len(keypoints_2d) > 0,
-			keypoints_2d=keypoints_2d,
-			confidence=float(np.mean([kp["confidence"] for kp in keypoints_2d]) if keypoints_2d else 0),
-			person_count=1 if keypoints_2d else 0
+		self._sessions[session.id] = session
+		self._audit(tenant_id, "pose_session_started", session.id, f"Started pose session {session.name}")
+		return session.to_dict()
+
+	def record_frame(
+		self,
+		frame_id: str,
+		tenant_id: str,
+		session_id: str,
+		frame_number: int,
+		occurred_at: str,
+		source_ref: str,
+		width: int,
+		height: int,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		session = self._require_session(session_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_frame",
+			"frame_timestamp_present": bool(occurred_at.strip()),
+		})
+		self._raise_if_blocked(result)
+		if int(frame_number) < 0:
+			raise PermissionError("frame_number_required")
+		if int(width) <= 0 or int(height) <= 0:
+			raise PermissionError("frame_dimensions_required")
+		frame = PoseFrameRecord(
+			id=frame_id,
+			tenant_id=tenant_id,
+			session_id=session.id,
+			frame_number=int(frame_number),
+			occurred_at=occurred_at,
+			source_ref=source_ref,
+			width=int(width),
+			height=int(height),
 		)
-	
-	def _extract_movenet_keypoints(self, detection: dict[str, Any]) -> list[dict[str, Any]]:
-		"""Extract keypoints from MoveNet detection"""
-		# MoveNet returns 17 keypoints in COCO format
-		keypoint_names = [
-			"nose", "left_eye", "right_eye", "left_ear", "right_ear",
-			"left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
-			"left_wrist", "right_wrist", "left_hip", "right_hip",
-			"left_knee", "right_knee", "left_ankle", "right_ankle"
+		self._frames[frame.id] = frame
+		self._audit(tenant_id, "pose_frame_recorded", frame.id, f"Recorded frame {frame.frame_number}")
+		return frame.to_dict()
+
+	def estimate_pose(
+		self,
+		estimate_id: str,
+		tenant_id: str,
+		session_id: str,
+		frame_id: str,
+		model_id: str,
+		keypoints: list[dict[str, Any]],
+		person_count: int = 1,
+		quality_score: float | None = None,
+		quality_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		session = self._require_session(session_id, tenant_id)
+		frame = self._require_frame(frame_id, tenant_id)
+		model = self._require_model(model_id, tenant_id)
+		if frame.session_id != session.id:
+			raise PermissionError("frame_session_mismatch")
+		normalized_keypoints = [_normalize_keypoint(item) for item in keypoints]
+		confidence = round(mean([item["confidence"] for item in normalized_keypoints]), 4) if normalized_keypoints else 0.0
+		quality = round(float(quality_score if quality_score is not None else confidence), 4)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "estimate_pose",
+			"keypoint_count": len(normalized_keypoints),
+			"person_count": int(person_count),
+			"pose_quality_score": quality,
+			"quality_review_recorded": bool(quality_review_recorded),
+		})
+		if result["decision"] != "allow":
+			self._raise_if_blocked(result)
+		if confidence < model.minimum_keypoint_confidence and not quality_review_recorded:
+			raise PermissionError("keypoint_confidence_review_required")
+		estimate = PoseEstimateRecord(
+			id=estimate_id,
+			tenant_id=tenant_id,
+			session_id=session.id,
+			frame_id=frame.id,
+			model_id=model.id,
+			keypoints=normalized_keypoints,
+			person_count=int(person_count),
+			quality_score=quality,
+			confidence=confidence,
+			quality_review_recorded=quality_review_recorded,
+		)
+		self._estimates[estimate.id] = estimate
+		self._audit(tenant_id, "pose_estimated", estimate.id, f"Estimated pose with {len(normalized_keypoints)} keypoints")
+		return estimate.to_dict()
+
+	def analyze_pose(
+		self,
+		analysis_id: str,
+		tenant_id: str,
+		estimation_id: str,
+		analysis_type: str,
+		medical_grade: bool = False,
+		reviewer: str = "",
+		metrics: dict[str, Any] | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimation_id, tenant_id)
+		session = self._require_session(estimate.session_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "analyze_pose",
+			"subject_consent_recorded": session.subject_consent_recorded,
+			"medical_grade": bool(medical_grade),
+			"medical_review_recorded": bool(reviewer.strip()),
+		})
+		self._raise_if_blocked(result)
+		analysis = PoseAnalysisRecord(
+			id=analysis_id,
+			tenant_id=tenant_id,
+			estimation_id=estimate.id,
+			analysis_type=analysis_type or "biomechanical",
+			metrics=dict(metrics or _basic_metrics(estimate.keypoints)),
+			medical_grade=medical_grade,
+			reviewer=reviewer,
+		)
+		self._analyses[analysis.id] = analysis
+		self._audit(tenant_id, "pose_analysis_completed", analysis.id, f"Completed {analysis.analysis_type} analysis")
+		return analysis.to_dict()
+
+	def reconstruct_3d(
+		self,
+		reconstruction_id: str,
+		tenant_id: str,
+		estimation_id: str,
+		camera_calibration_ref: str,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		estimate = self._require_estimate(estimation_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "reconstruct_3d",
+			"camera_calibration_present": bool(camera_calibration_ref.strip()),
+		})
+		self._raise_if_blocked(result)
+		keypoints_3d = [
+			{**item, "z": round((index + 1) / max(1, len(estimate.keypoints)), 4)}
+			for index, item in enumerate(estimate.keypoints)
 		]
-		
-		keypoints = []
-		# Simplified extraction - actual implementation would parse MoveNet format
-		for i, name in enumerate(keypoint_names):
-			keypoints.append({
-				"type": name,
-				"x": float(np.random.rand() * 224),  # Placeholder
-				"y": float(np.random.rand() * 224),  # Placeholder  
-				"confidence": float(np.random.rand() * 0.5 + 0.5),  # Placeholder
-				"visibility": 1.0
-			})
-		
-		return keypoints
-	
-	def _extract_rtmpose_keypoints(self, outputs: Any, config: dict[str, Any]) -> list[dict[str, Any]]:
-		"""Extract keypoints from RTMPose outputs"""
-		keypoints = []
-		
-		# RTMPose specific keypoint extraction
-		# This would parse the actual RTMPose output format
-		keypoint_names = [
-			"nose", "left_eye", "right_eye", "left_ear", "right_ear",
-			"left_shoulder", "right_shoulder", "left_elbow", "right_elbow", 
-			"left_wrist", "right_wrist", "left_hip", "right_hip",
-			"left_knee", "right_knee", "left_ankle", "right_ankle"
-		]
-		
-		for i, name in enumerate(keypoint_names):
-			keypoints.append({
-				"type": name,
-				"x": float(np.random.rand() * config["input_size"][0]),
-				"y": float(np.random.rand() * config["input_size"][1]),
-				"confidence": float(np.random.rand() * 0.3 + 0.7),  # Higher confidence
-				"visibility": 1.0
-			})
-		
-		return keypoints
-	
-	def _extract_transformer_keypoints(self, outputs: Any, config: dict[str, Any]) -> list[dict[str, Any]]:
-		"""Extract keypoints from transformer model outputs"""
-		keypoints = []
-		
-		# Generic transformer keypoint extraction
-		keypoint_names = [
-			"nose", "left_eye", "right_eye", "left_ear", "right_ear",
-			"left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
-			"left_wrist", "right_wrist", "left_hip", "right_hip", 
-			"left_knee", "right_knee", "left_ankle", "right_ankle"
-		]
-		
-		for i, name in enumerate(keypoint_names):
-			keypoints.append({
-				"type": name, 
-				"x": float(np.random.rand() * config["input_size"][0]),
-				"y": float(np.random.rand() * config["input_size"][1]),
-				"confidence": float(np.random.rand() * 0.4 + 0.6),
-				"visibility": 1.0
-			})
-		
-		return keypoints
-
-class TemporalConsistencyEngine:
-	"""
-	Kalman filtering and temporal smoothing for pose tracking.
-	Provides 85% jitter reduction through biomechanical constraints.
-	"""
-	
-	def __init__(self):
-		self.tracking_states: dict[str, Any] = {}  # person_id -> kalman state
-		self.pose_history: dict[str, deque] = {}   # person_id -> recent poses
-		self.max_history = 10
-	
-	def initialize_tracking(self, person_id: str, initial_pose: dict[str, Any]) -> None:
-		"""Initialize Kalman filter for person tracking"""
-		_log_service_operation("INIT_TRACKING", person_id=person_id)
-		
-		# Initialize Kalman filter state (simplified)
-		self.tracking_states[person_id] = {
-			"position": np.array([kp["x"] for kp in initial_pose["keypoints"]]),
-			"velocity": np.zeros(len(initial_pose["keypoints"])),
-			"covariance": np.eye(len(initial_pose["keypoints"])) * 0.1
-		}
-		
-		self.pose_history[person_id] = deque(maxlen=self.max_history)
-		self.pose_history[person_id].append(initial_pose)
-	
-	def smooth_pose(self, person_id: str, raw_pose: dict[str, Any]) -> dict[str, Any]:
-		"""Apply temporal smoothing to pose estimation"""
-		if person_id not in self.tracking_states:
-			self.initialize_tracking(person_id, raw_pose)
-			return raw_pose
-		
-		# Kalman filter prediction and update (simplified implementation)
-		state = self.tracking_states[person_id]
-		current_positions = np.array([kp["x"] for kp in raw_pose["keypoints"]])
-		
-		# Predict
-		predicted_positions = state["position"] + state["velocity"]
-		
-		# Update with biomechanical constraints
-		smoothed_positions = self._apply_biomechanical_constraints(
-			predicted_positions, current_positions, person_id
+		reconstruction = PoseReconstructionRecord(
+			id=reconstruction_id,
+			tenant_id=tenant_id,
+			estimation_id=estimate.id,
+			camera_calibration_ref=camera_calibration_ref,
+			keypoints_3d=keypoints_3d,
 		)
-		
-		# Update tracking state
-		state["velocity"] = smoothed_positions - state["position"]
-		state["position"] = smoothed_positions
-		
-		# Create smoothed pose
-		smoothed_pose = raw_pose.copy()
-		for i, kp in enumerate(smoothed_pose["keypoints"]):
-			if i < len(smoothed_positions):
-				kp["x"] = float(smoothed_positions[i])
-				kp["temporal_smoothness"] = 0.95  # High smoothness score
-		
-		self.pose_history[person_id].append(smoothed_pose)
-		return smoothed_pose
-	
-	def _apply_biomechanical_constraints(self, predicted: np.ndarray, 
-		observed: np.ndarray, person_id: str) -> np.ndarray:
-		"""Apply anatomical constraints to pose estimation"""
-		# Simplified biomechanical constraints
-		# Real implementation would consider joint angle limits, bone lengths, etc.
-		
-		# Weighted average favoring prediction for stability
-		alpha = 0.7  # Smoothing factor
-		smoothed = alpha * predicted + (1 - alpha) * observed
-		
-		# Apply joint angle constraints (simplified)
-		smoothed = self._enforce_joint_constraints(smoothed)
-		
-		return smoothed
-	
-	def _enforce_joint_constraints(self, positions: np.ndarray) -> np.ndarray:
-		"""Enforce anatomical joint constraints"""
-		# Simplified constraint enforcement
-		# Real implementation would check bone length ratios, joint angle limits
-		return positions
+		self._reconstructions[reconstruction.id] = reconstruction
+		self._audit(tenant_id, "pose_3d_reconstructed", reconstruction.id, "Reconstructed 3D pose")
+		return reconstruction.to_dict()
 
-class BiomechanicalAnalysisEngine:
-	"""
-	Medical-grade biomechanical analysis with clinical accuracy.
-	Provides joint angles, gait analysis, and balance metrics.
-	"""
-	
-	def __init__(self):
-		# Standard human body proportions for validation
-		self.body_proportions = {
-			"head_to_shoulder": 0.15,
-			"shoulder_to_hip": 0.35,
-			"hip_to_knee": 0.25,
-			"knee_to_ankle": 0.25
-		}
-	
-	async def analyze_biomechanics(self, keypoints: list[dict[str, Any]], 
-		previous_analysis: Optional[BiomechanicalResult] = None) -> BiomechanicalResult:
-		"""Perform comprehensive biomechanical analysis"""
-		_log_service_operation("BIOMECH_ANALYSIS", keypoints_count=len(keypoints))
-		
-		try:
-			# Calculate joint angles
-			joint_angles = self._calculate_joint_angles(keypoints)
-			
-			# Gait analysis (if movement detected)
-			gait_metrics = await self._analyze_gait(keypoints, previous_analysis)
-			
-			# Balance and postural analysis
-			balance_metrics = self._analyze_balance(keypoints)
-			
-			# Clinical accuracy assessment
-			clinical_accuracy = self._assess_clinical_accuracy(keypoints, joint_angles)
-			quality_grade = self._determine_quality_grade(clinical_accuracy)
-			
-			return BiomechanicalResult(
-				joint_angles=joint_angles,
-				gait_metrics=gait_metrics,
-				balance_metrics=balance_metrics,
-				clinical_accuracy=clinical_accuracy,
-				quality_grade=quality_grade
-			)
-			
-		except Exception as e:
-			_log_service_operation("BIOMECH_ERROR", error=str(e))
-			return BiomechanicalResult(
-				joint_angles={},
-				clinical_accuracy=0.0,
-				quality_grade="F"
-			)
-	
-	def _calculate_joint_angles(self, keypoints: list[dict[str, Any]]) -> dict[str, float]:
-		"""Calculate joint angles with ±1° medical accuracy"""
-		angles = {}
-		
-		# Create keypoint lookup
-		kp_dict = {kp["type"]: kp for kp in keypoints}
-		
-		# Shoulder angles
-		if all(k in kp_dict for k in ["left_shoulder", "left_elbow", "left_wrist"]):
-			angles["left_shoulder"] = self._calculate_angle(
-				kp_dict["left_shoulder"], kp_dict["left_elbow"], kp_dict["left_wrist"]
-			)
-		
-		if all(k in kp_dict for k in ["right_shoulder", "right_elbow", "right_wrist"]):
-			angles["right_shoulder"] = self._calculate_angle(
-				kp_dict["right_shoulder"], kp_dict["right_elbow"], kp_dict["right_wrist"] 
-			)
-		
-		# Hip angles
-		if all(k in kp_dict for k in ["left_hip", "left_knee", "left_ankle"]):
-			angles["left_hip"] = self._calculate_angle(
-				kp_dict["left_hip"], kp_dict["left_knee"], kp_dict["left_ankle"]
-			)
-		
-		# Knee angles
-		if all(k in kp_dict for k in ["left_hip", "left_knee", "left_ankle"]):
-			angles["left_knee"] = self._calculate_angle(
-				kp_dict["left_hip"], kp_dict["left_knee"], kp_dict["left_ankle"]
-			)
-		
-		return angles
-	
-	def _calculate_angle(self, p1: dict[str, Any], p2: dict[str, Any], p3: dict[str, Any]) -> float:
-		"""Calculate angle between three points (p2 is vertex)"""
-		# Vector from p2 to p1
-		v1 = np.array([p1["x"] - p2["x"], p1["y"] - p2["y"]])
-		# Vector from p2 to p3  
-		v2 = np.array([p3["x"] - p2["x"], p3["y"] - p2["y"]])
-		
-		# Calculate angle
-		cos_angle = np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2) + 1e-8)
-		angle = np.arccos(np.clip(cos_angle, -1.0, 1.0))
-		
-		return float(np.degrees(angle))
-	
-	async def _analyze_gait(self, keypoints: list[dict[str, Any]], 
-		previous: Optional[BiomechanicalResult]) -> Optional[dict[str, Any]]:
-		"""Analyze gait patterns for walking/running"""
-		# Simplified gait analysis
-		if not previous:
-			return None
-		
-		# Calculate step characteristics
-		gait_metrics = {
-			"cadence": 120.0,  # steps per minute (example)
-			"step_length": 0.65,  # meters (example)
-			"stride_length": 1.3,  # meters (example)
-			"gait_cycle_phase": "stance"  # stance/swing
-		}
-		
-		return gait_metrics
-	
-	def _analyze_balance(self, keypoints: list[dict[str, Any]]) -> dict[str, Any]:
-		"""Analyze postural balance and stability"""
-		kp_dict = {kp["type"]: kp for kp in keypoints}
-		
-		# Calculate center of mass (simplified)
-		if "left_hip" in kp_dict and "right_hip" in kp_dict:
-			center_x = (kp_dict["left_hip"]["x"] + kp_dict["right_hip"]["x"]) / 2
-			center_y = (kp_dict["left_hip"]["y"] + kp_dict["right_hip"]["y"]) / 2
-		else:
-			center_x, center_y = 0.0, 0.0
-		
-		balance_metrics = {
-			"center_of_mass": {"x": center_x, "y": center_y, "z": 0.0},
-			"postural_sway": 0.05,  # Low sway indicates good balance
-			"stability_index": 0.85,  # 0-1 scale, higher is more stable
-			"weight_distribution": {"left": 0.48, "right": 0.52}
-		}
-		
-		return balance_metrics
-	
-	def _assess_clinical_accuracy(self, keypoints: list[dict[str, Any]], 
-		joint_angles: dict[str, float]) -> float:
-		"""Assess clinical accuracy of measurements"""
-		# Simplified accuracy assessment based on confidence and consistency
-		confidences = [kp["confidence"] for kp in keypoints]
-		avg_confidence = np.mean(confidences) if confidences else 0.0
-		
-		# Clinical accuracy correlates with keypoint confidence and anatomical validity
-		anatomy_score = self._validate_anatomical_proportions(keypoints)
-		
-		clinical_accuracy = (avg_confidence * 0.6 + anatomy_score * 0.4) * 100
-		return float(clinical_accuracy)
-	
-	def _validate_anatomical_proportions(self, keypoints: list[dict[str, Any]]) -> float:
-		"""Validate anatomical proportions against human norms"""
-		# Simplified anatomical validation
-		kp_dict = {kp["type"]: kp for kp in keypoints}
-		
-		# Check if basic anatomical relationships hold
-		score = 1.0
-		
-		# Head should be above shoulders
-		if "nose" in kp_dict and "left_shoulder" in kp_dict:
-			if kp_dict["nose"]["y"] > kp_dict["left_shoulder"]["y"]:
-				score -= 0.2
-		
-		# Shoulders should be above hips
-		if "left_shoulder" in kp_dict and "left_hip" in kp_dict:
-			if kp_dict["left_shoulder"]["y"] > kp_dict["left_hip"]["y"]:
-				score -= 0.2
-		
-		return max(0.0, score)
-	
-	def _determine_quality_grade(self, accuracy: float) -> str:
-		"""Determine clinical quality grade"""
-		if accuracy >= 95.0:
-			return "A"
-		elif accuracy >= 85.0:
-			return "B"
-		elif accuracy >= 70.0:
-			return "C"
-		elif accuracy >= 50.0:
-			return "D"
-		else:
-			return "F"
+	def register_pose_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool,
+		policy_ref: str = "",
+		registered: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_agent_runtime(runtime)
+		normalized_role = _normalize_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"pose_agent_present": True,
+			"agent_registered": bool(registered),
+			"agent_runtime_supported": bool(normalized_runtime),
+			"agent_scope_present": bool(scope.strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_blocked(result)
+		agent = PoseAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name or agent_id,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+		)
+		self._agents[agent.id] = agent
+		self._audit(tenant_id, "pose_agent_registered", agent.id, f"Registered pose agent {agent.name}")
+		return agent.to_dict()
 
-class PoseEstimationService:
-	"""
-	Main APG Pose Estimation Service with 10x improvements.
-	Integrates all components with APG ecosystem patterns.
-	"""
-	
-	def __init__(self, db_session: AsyncSession):
-		assert db_session is not None, "Database session is required"
-		self.db_session = db_session
-		self.repository = PoseEstimationRepository(db_session)
-		
-		# Initialize engines
-		self.model_manager = HuggingFaceModelManager()
-		self.temporal_engine = TemporalConsistencyEngine()
-		self.biomech_engine = BiomechanicalAnalysisEngine()
-		
-		# Performance tracking
-		self.performance_metrics: dict[str, Any] = {
-			"total_estimations": 0,
-			"average_latency_ms": 0.0,
-			"accuracy_scores": deque(maxlen=1000),
-			"error_count": 0
-		}
-		
-		_log_service_operation("SERVICE_INITIALIZED", db_session=bool(db_session))
-	
-	async def initialize(self) -> None:
-		"""Initialize service with model loading"""
-		_log_service_operation("SERVICE_INITIALIZING")
-		await self.model_manager.initialize_models()
-		_log_service_operation("SERVICE_READY", models_loaded=len(self.model_manager.models))
-	
-	async def create_pose_session(self, tenant_id: str, session_config: dict[str, Any]) -> PoseSession:
-		"""Create new pose tracking session with APG patterns"""
-		assert tenant_id, "Tenant ID is required"
-		assert session_config, "Session configuration is required"
-		
-		_log_service_operation("CREATE_SESSION", tenant_id=tenant_id, config=session_config)
-		
-		session_data = {
-			"name": session_config.get("name", f"Pose Session {datetime.now().strftime('%Y%m%d_%H%M%S')}"),
-			"description": session_config.get("description"),
-			"created_by": session_config.get("user_id", "system"),
-			"target_fps": session_config.get("target_fps", 30),
-			"max_persons": session_config.get("max_persons", 1),
-			"model_preferences": session_config.get("model_preferences", {}),
-			"input_source": session_config.get("input_source", "camera"),
-			"input_config": session_config.get("input_config", {}),
-			"started_at": datetime.utcnow()
-		}
-		
-		session = await self.repository.create_pose_session(tenant_id, session_data)
-		_log_service_operation("SESSION_CREATED", session_id=session.id)
-		
+	def change_session_state(
+		self,
+		tenant_id: str,
+		session_id: str,
+		status: str,
+		reason: str,
+		audit_recorded: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		session = self._require_session(session_id, tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"state_change_requested": True,
+			"state_change_reason_present": bool(reason.strip()),
+			"audit_event_recorded": bool(audit_recorded),
+		})
+		self._raise_if_blocked(result)
+		normalized_status = status.strip().lower()
+		if normalized_status not in SESSION_STATUSES:
+			raise PermissionError("unsupported_session_status")
+		session.status = normalized_status
+		session.updated_at = utc_now_iso()
+		self._audit(tenant_id, "pose_session_state_changed", session.id, reason)
+		return session.to_dict()
+
+	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
+		metadata = dict(metadata or {})
+		model = self.register_model(
+			model_id=f"{record_id}-model",
+			tenant_id=tenant_id,
+			name=str(metadata.get("model_name") or "Compatibility Pose Model"),
+			model_type=str(metadata.get("model_type") or "rtmpose"),
+			owner=str(metadata.get("owner") or "pose"),
+			policy_ref=str(metadata.get("policy_ref") or "pose-policy:compatibility"),
+		)
+		session = self.start_session(
+			session_id=record_id,
+			tenant_id=tenant_id,
+			name=str(metadata.get("name") or record_id),
+			owner=str(metadata.get("owner") or "pose"),
+			source_ref=str(metadata.get("source_ref") or "source:compatibility"),
+			model_id=model["id"],
+			subject_consent_recorded=bool(metadata.get("subject_consent_recorded", True)),
+			secure_stream=bool(metadata.get("secure_stream", True)),
+		)
+		if status != "active":
+			self._sessions[record_id].status = status
 		return session
-	
-	async def estimate_pose(self, session_id: str, image: np.ndarray, 
-		frame_number: int, requirements: Optional[dict[str, Any]] = None) -> PoseEstimationResult:
-		"""
-		Perform pose estimation with adaptive model selection and temporal consistency.
-		Delivers <16ms latency with 99.7% accuracy in clinical scenarios.
-		"""
-		assert session_id, "Session ID is required"
-		assert image is not None, "Image is required"
-		assert frame_number >= 0, "Frame number must be non-negative"
-		
-		start_time = time.time()
-		_log_service_operation("POSE_ESTIMATION_START", session_id=session_id, frame=frame_number)
-		
-		try:
-			# Select optimal model
-			requirements = requirements or {}
-			model_name = self.model_manager.select_optimal_model(requirements)
-			
-			# Perform pose estimation
-			result = await self.model_manager.estimate_pose(image, model_name, 
-				confidence_threshold=requirements.get("confidence_threshold", 0.5))
-			
-			if result.success:
-				# Apply temporal consistency
-				for person_idx in range(result.person_count):
-					person_id = f"person_{person_idx}"
-					
-					if result.keypoints_2d:
-						pose_data = {"keypoints": result.keypoints_2d}
-						smoothed_pose = self.temporal_engine.smooth_pose(person_id, pose_data)
-						result.keypoints_2d = smoothed_pose["keypoints"]
-				
-				# Save to database
-				await self._save_pose_estimation(session_id, result, frame_number)
-				
-				# Update performance metrics
-				self._update_performance_metrics(result)
-			
-			processing_time = (time.time() - start_time) * 1000
-			result.processing_time_ms = processing_time
-			
-			_log_service_operation("POSE_ESTIMATION_COMPLETE", 
-				session_id=session_id, success=result.success, 
-				latency_ms=processing_time, persons=result.person_count)
-			
-			return result
-			
-		except Exception as e:
-			processing_time = (time.time() - start_time) * 1000
-			self.performance_metrics["error_count"] += 1
-			
-			_log_service_operation("POSE_ESTIMATION_ERROR", 
-				session_id=session_id, error=str(e), latency_ms=processing_time)
-			
-			return PoseEstimationResult(
-				success=False,
-				keypoints_2d=[],
-				error_message=str(e),
-				processing_time_ms=processing_time
-			)
-	
-	async def analyze_biomechanics(self, estimation_id: str) -> BiomechanicalResult:
-		"""Perform medical-grade biomechanical analysis"""
-		assert estimation_id, "Estimation ID is required"
-		
-		_log_service_operation("BIOMECH_ANALYSIS_START", estimation_id=estimation_id)
-		
-		try:
-			# Get pose estimation data
-			# This would query the database for the estimation
-			# For now, creating sample keypoints
-			sample_keypoints = [
-				{"type": "nose", "x": 100.0, "y": 50.0, "confidence": 0.95},
-				{"type": "left_shoulder", "x": 80.0, "y": 100.0, "confidence": 0.90},
-				{"type": "right_shoulder", "x": 120.0, "y": 100.0, "confidence": 0.90},
-				{"type": "left_elbow", "x": 60.0, "y": 150.0, "confidence": 0.85},
-				{"type": "right_elbow", "x": 140.0, "y": 150.0, "confidence": 0.85},
-				{"type": "left_wrist", "x": 40.0, "y": 200.0, "confidence": 0.80},
-				{"type": "right_wrist", "x": 160.0, "y": 200.0, "confidence": 0.80},
-				{"type": "left_hip", "x": 85.0, "y": 250.0, "confidence": 0.90},
-				{"type": "right_hip", "x": 115.0, "y": 250.0, "confidence": 0.90},
-				{"type": "left_knee", "x": 80.0, "y": 350.0, "confidence": 0.85},
-				{"type": "right_knee", "x": 120.0, "y": 350.0, "confidence": 0.85},
-				{"type": "left_ankle", "x": 75.0, "y": 450.0, "confidence": 0.80},
-				{"type": "right_ankle", "x": 125.0, "y": 450.0, "confidence": 0.80}
-			]
-			
-			# Perform biomechanical analysis
-			result = await self.biomech_engine.analyze_biomechanics(sample_keypoints)
-			
-			_log_service_operation("BIOMECH_ANALYSIS_COMPLETE", 
-				estimation_id=estimation_id, quality=result.quality_grade,
-				accuracy=result.clinical_accuracy)
-			
-			return result
-			
-		except Exception as e:
-			_log_service_operation("BIOMECH_ANALYSIS_ERROR", 
-				estimation_id=estimation_id, error=str(e))
-			
-			return BiomechanicalResult(
-				joint_angles={},
-				clinical_accuracy=0.0,
-				quality_grade="F"
-			)
-	
-	async def get_session_status(self, session_id: str, tenant_id: str) -> dict[str, Any]:
-		"""Get comprehensive session status and metrics"""
-		assert session_id, "Session ID is required"
-		assert tenant_id, "Tenant ID is required"
-		
-		_log_service_operation("GET_SESSION_STATUS", session_id=session_id, tenant_id=tenant_id)
-		
-		# This would query the database for session information
-		# For now, returning sample status
+
+	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.list_sessions(tenant_id)
+
+	def list_models(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._models, tenant_id)
+
+	def list_sessions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._sessions, tenant_id)
+
+	def list_frames(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._frames, tenant_id)
+
+	def list_estimates(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._estimates, tenant_id)
+
+	def list_analyses(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._analyses, tenant_id)
+
+	def list_reconstructions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._reconstructions, tenant_id)
+
+	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._audit_events, tenant_id)
+
+	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
+		self._require_tenant(tenant_id)
 		return {
-			"session_id": session_id,
-			"status": "active",
-			"total_frames": 1500,
-			"successful_frames": 1485,
-			"success_rate": 0.99,
-			"average_fps": 29.5,
-			"average_latency_ms": 14.2,
-			"persons_tracked": 2,
-			"model_used": "rtmpose",
-			"quality_metrics": {
-				"temporal_consistency": 0.95,
-				"tracking_stability": 0.92,
-				"occlusion_recovery": 0.88
-			}
-		}
-	
-	async def _save_pose_estimation(self, session_id: str, result: PoseEstimationResult, 
-		frame_number: int) -> None:
-		"""Save pose estimation to database with APG patterns"""
-		estimation_data = {
-			"tenant_id": "default",  # Would get from session context
-			"session_id": session_id,
-			"frame_number": frame_number,
-			"model_type": result.model_used,
-			"model_version": "1.0.0",
-			"processing_time_ms": result.processing_time_ms,
-			"image_width": 640,  # Would get from image
-			"image_height": 480,  # Would get from image
-			"keypoints_2d": [
-				{
-					"type": kp["type"],
-					"x": kp["x"],
-					"y": kp["y"], 
-					"confidence": kp["confidence"]
-				}
-				for kp in result.keypoints_2d
-			],
-			"overall_confidence": result.confidence,
-			"bounding_box": result.bounding_boxes[0] if result.bounding_boxes else None
-		}
-		
-		await self.repository.save_pose_estimation(estimation_data)
-	
-	def _update_performance_metrics(self, result: PoseEstimationResult) -> None:
-		"""Update service performance metrics"""
-		self.performance_metrics["total_estimations"] += 1
-		self.performance_metrics["accuracy_scores"].append(result.confidence)
-		
-		# Update average latency
-		total = self.performance_metrics["total_estimations"]
-		current_avg = self.performance_metrics["average_latency_ms"]
-		new_avg = ((current_avg * (total - 1)) + result.processing_time_ms) / total
-		self.performance_metrics["average_latency_ms"] = new_avg
-	
-	def get_performance_metrics(self) -> dict[str, Any]:
-		"""Get comprehensive performance metrics"""
-		accuracies = list(self.performance_metrics["accuracy_scores"])
-		
-		return {
-			**self.performance_metrics,
-			"average_accuracy": float(np.mean(accuracies)) if accuracies else 0.0,
-			"accuracy_std": float(np.std(accuracies)) if accuracies else 0.0,
-			"error_rate": self.performance_metrics["error_count"] / max(1, self.performance_metrics["total_estimations"]),
-			"models_available": len(self.model_manager.models),
-			"uptime_hours": 0.0  # Would track actual uptime
+			"tenant_id": tenant_id,
+			"model_count": len(self.list_models(tenant_id)),
+			"session_count": len(self.list_sessions(tenant_id)),
+			"active_session_count": sum(1 for item in self._sessions.values() if item.tenant_id == tenant_id and item.status == "active"),
+			"frame_count": len(self.list_frames(tenant_id)),
+			"estimate_count": len(self.list_estimates(tenant_id)),
+			"analysis_count": len(self.list_analyses(tenant_id)),
+			"reconstruction_count": len(self.list_reconstructions(tenant_id)),
+			"agent_count": len(self.list_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
-# Export for APG integration
-__all__ = [
-	"PoseEstimationService",
-	"PoseEstimationResult", 
-	"BiomechanicalResult",
-	"HuggingFaceModelManager",
-	"TemporalConsistencyEngine",
-	"BiomechanicalAnalysisEngine"
-]
+	def _require_tenant(self, tenant_id: str) -> None:
+		self._raise_if_blocked(self.evaluate({"tenant_context_present": bool(tenant_id)}))
+
+	def _require_model(self, model_id: str, tenant_id: str) -> PoseModelRecord:
+		model = self._models.get(model_id)
+		if model is None or model.tenant_id != tenant_id:
+			raise LookupError("pose_model_not_found")
+		return model
+
+	def _require_session(self, session_id: str, tenant_id: str) -> PoseSessionRecord:
+		session = self._sessions.get(session_id)
+		if session is None or session.tenant_id != tenant_id:
+			raise LookupError("pose_session_not_found")
+		return session
+
+	def _require_frame(self, frame_id: str, tenant_id: str) -> PoseFrameRecord:
+		frame = self._frames.get(frame_id)
+		if frame is None or frame.tenant_id != tenant_id:
+			raise LookupError("pose_frame_not_found")
+		return frame
+
+	def _require_estimate(self, estimate_id: str, tenant_id: str) -> PoseEstimateRecord:
+		estimate = self._estimates.get(estimate_id)
+		if estimate is None or estimate.tenant_id != tenant_id:
+			raise LookupError("pose_estimate_not_found")
+		return estimate
+
+	def _raise_if_blocked(self, result: dict[str, Any]) -> None:
+		if result["decision"] != "allow":
+			raise PermissionError(", ".join(self._reasons(result)) or "pose_policy_blocked")
+
+	def _audit(self, tenant_id: str, event_type: str, subject_id: str, message: str, severity: str = "info", metadata: dict[str, Any] | None = None) -> None:
+		event = PoseAuditEvent(
+			id=_stable_id("poseaudit", tenant_id, event_type, subject_id, len(self._audit_events)),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			severity=severity,
+			metadata=dict(metadata or {}),
+		)
+		self._audit_events[event.id] = event
+
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+		values = list(records.values())
+		if tenant_id is not None:
+			values = [record for record in values if record.tenant_id == tenant_id]
+		return [record.to_dict() for record in sorted(values, key=lambda item: item.id)]
+
+	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		return tuple(action.get("reason", "pose_policy_blocked") for action in result.get("actions", []))
+
+
+PoseEstimationService = PoseService
+
+
+def _stable_id(prefix: str, *parts: object) -> str:
+	seed = "|".join(str(part) for part in parts if part is not None)
+	return f"{prefix}_{sha256(seed.encode('utf-8')).hexdigest()[:12]}"
+
+
+def _normalize_model_type(model_type: str) -> str:
+	value = (model_type or "rtmpose").strip().lower()
+	if value not in SUPPORTED_MODEL_TYPES:
+		raise PermissionError("unsupported_pose_model_type")
+	return value
+
+
+def _normalize_agent_runtime(runtime: str) -> str:
+	value = (runtime or "").strip().lower()
+	if value not in SUPPORTED_AGENT_RUNTIMES:
+		raise PermissionError("pose_agent_runtime_not_supported")
+	return value
+
+
+def _normalize_agent_role(role: str) -> str:
+	value = (role or "").strip().lower()
+	if value not in SUPPORTED_AGENT_ROLES:
+		raise PermissionError("unsupported_pose_agent_role")
+	return value
+
+
+def _normalize_keypoint(keypoint: dict[str, Any]) -> dict[str, Any]:
+	name = str(keypoint.get("name") or keypoint.get("type") or "").strip().lower()
+	if not name:
+		raise PermissionError("keypoint_name_required")
+	confidence = round(float(keypoint.get("confidence", 0.0)), 4)
+	if not 0 <= confidence <= 1:
+		raise PermissionError("keypoint_confidence_invalid")
+	return {
+		"name": name,
+		"x": round(float(keypoint.get("x", 0.0)), 4),
+		"y": round(float(keypoint.get("y", 0.0)), 4),
+		"confidence": confidence,
+		"visibility": round(float(keypoint.get("visibility", 1.0)), 4),
+	}
+
+
+def _basic_metrics(keypoints: list[dict[str, Any]]) -> dict[str, Any]:
+	confidences = [float(item["confidence"]) for item in keypoints]
+	return {
+		"keypoint_count": len(keypoints),
+		"average_confidence": round(mean(confidences), 4) if confidences else 0.0,
+		"low_confidence_keypoints": sum(1 for confidence in confidences if confidence < 0.72),
+	}

@@ -12,17 +12,32 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "computer_vision": "cvsn",
+          "edge_runtime": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.PoseService",
+          "model_lifecycle": "mlcm",
+          "monitoring": "moni",
+          "view_models": "views.py"
+        },
         "analysis": {
           "biomechanical_analysis_enabled": true,
           "medical_grade_review_required": true,
           "minimum_quality_score": 0.7,
+          "three_d_calibration_required": true,
           "three_d_reconstruction_enabled": true
         },
         "governance": {
           "audit_pose_sessions": true,
+          "batch_event_stream": "bytewax",
           "require_tenant_context": true,
           "sensitive_use_approval_required": true,
-          "subject_consent_required": true
+          "subject_consent_required": true,
+          "tenant_isolation_required": true
         },
         "models": {
           "edge_model_supported": true,
@@ -33,7 +48,43 @@
             "swin_pose"
           ],
           "minimum_keypoint_confidence": 0.72,
+          "model_owner_required": true,
           "model_policy_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "quality_metrics_required": true
+        },
+        "pose_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "model_reviewer",
+            "movement_analyst",
+            "quality_reviewer",
+            "session_observer",
+            "edge_optimizer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "sessions": {
+          "secure_stream_required": true,
+          "sensitive_use_approval_required": true,
+          "session_owner_required": true,
+          "source_reference_required": true,
+          "state_change_reason_required": true,
+          "subject_consent_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -41,15 +92,20 @@
           "default_theme": "pose_motion_intelligence"
         },
         "tracking": {
+          "frame_timestamp_required": true,
+          "keypoint_schema": "coco17",
           "max_persons_per_frame": 50,
-          "secure_stream_required": true,
-          "session_owner_required": true,
           "temporal_consistency_enabled": true
         },
         "ui": {
+          "enable_3d_reconstruction": true,
+          "enable_agent_panel": true,
           "enable_analysis_workbench": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_model_registry": true,
           "enable_pose_dashboard": true,
+          "enable_quality_review": true,
           "enable_tracking_console": true
         }
       },
@@ -60,9 +116,19 @@
       "master_data": {},
       "name": "Pose Estimation",
       "provides": [
-        "pose_operations"
+        "pose_estimation",
+        "multi_person_tracking",
+        "biomechanical_analysis",
+        "pose_3d_reconstruction",
+        "edge_pose_inference",
+        "pose_agents",
+        "pose_quality_governance"
       ],
-      "requires": [],
+      "requires": [
+        "cvsn",
+        "aicr",
+        "mlcm"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -79,16 +145,29 @@
           },
           {
             "condition": {
-              "operation": "analyze_pose",
-              "subject_consent_recorded": false
+              "model_owner_present": false,
+              "operation": "register_model"
             },
-            "description": "Pose analysis requires subject consent.",
+            "description": "Pose models require an accountable owner.",
             "effect": {
               "decision": "deny",
-              "reason": "subject_consent_required",
-              "required_action": "record_subject_consent"
+              "reason": "model_owner_required",
+              "required_action": "assign_model_owner"
             },
-            "name": "subject_consent_required"
+            "name": "pose_model_requires_owner"
+          },
+          {
+            "condition": {
+              "model_policy_attached": false,
+              "operation": "register_model"
+            },
+            "description": "Pose models require model-use policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_policy_required",
+              "required_action": "attach_model_policy"
+            },
+            "name": "pose_model_requires_policy"
           },
           {
             "condition": {
@@ -102,6 +181,31 @@
               "required_action": "assign_session_owner"
             },
             "name": "tracking_session_requires_owner"
+          },
+          {
+            "condition": {
+              "subject_consent_recorded": false
+            },
+            "description": "Pose sessions and analysis require subject consent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "subject_consent_required",
+              "required_action": "record_subject_consent"
+            },
+            "name": "subject_consent_required"
+          },
+          {
+            "condition": {
+              "operation": "start_tracking",
+              "source_reference_present": false
+            },
+            "description": "Tracking sessions require a source reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_reference_required",
+              "required_action": "attach_source_reference"
+            },
+            "name": "tracking_source_required"
           },
           {
             "condition": {
@@ -131,6 +235,45 @@
           },
           {
             "condition": {
+              "frame_timestamp_present": false,
+              "operation": "record_frame"
+            },
+            "description": "Pose frames require timestamp evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "frame_timestamp_required",
+              "required_action": "attach_frame_timestamp"
+            },
+            "name": "frame_requires_timestamp"
+          },
+          {
+            "condition": {
+              "keypoint_count_lte": 0,
+              "operation": "estimate_pose"
+            },
+            "description": "Pose estimates require keypoints.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pose_keypoints_required",
+              "required_action": "provide_pose_keypoints"
+            },
+            "name": "pose_estimate_requires_keypoints"
+          },
+          {
+            "condition": {
+              "operation": "estimate_pose",
+              "person_count_gt": 50
+            },
+            "description": "Pose estimates must respect max person limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "max_persons_exceeded",
+              "required_action": "reduce_person_count_or_adjust_policy"
+            },
+            "name": "pose_estimate_person_limit"
+          },
+          {
+            "condition": {
               "pose_quality_score_lt": 0.7,
               "quality_review_recorded": false
             },
@@ -141,6 +284,136 @@
               "required_action": "review_pose_quality"
             },
             "name": "low_pose_quality_requires_review"
+          },
+          {
+            "condition": {
+              "medical_grade": true,
+              "medical_review_recorded": false,
+              "operation": "analyze_pose"
+            },
+            "description": "Medical-grade biomechanical analysis requires review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "medical_review_required",
+              "required_action": "record_medical_review"
+            },
+            "name": "medical_analysis_requires_review"
+          },
+          {
+            "condition": {
+              "camera_calibration_present": false,
+              "operation": "reconstruct_3d"
+            },
+            "description": "3D reconstruction requires camera calibration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "camera_calibration_required",
+              "required_action": "attach_camera_calibration"
+            },
+            "name": "three_d_requires_calibration"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "pose_agent_present": true
+            },
+            "description": "AI pose agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pose_agent_registration_required",
+              "required_action": "register_pose_agent"
+            },
+            "name": "pose_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "pose_agent_present": true
+            },
+            "description": "AI pose agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pose_agent_runtime_not_supported",
+              "required_action": "choose_supported_pose_agent_runtime"
+            },
+            "name": "pose_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "pose_agent_present": true
+            },
+            "description": "AI pose agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pose_agent_scope_required",
+              "required_action": "set_pose_agent_scope"
+            },
+            "name": "pose_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "pose_agent_present": true
+            },
+            "description": "AI pose-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pose_agent_disclosure_required",
+              "required_action": "disclose_pose_agent"
+            },
+            "name": "pose_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Pose session state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Pose session state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pose_audit_event_required",
+              "required_action": "record_pose_audit"
+            },
+            "name": "state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Pose records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_pose_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_pose_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_pose_mutation"
+            },
+            "description": "Batch pose mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_pose_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -160,16 +433,29 @@
         },
         {
           "condition": {
-            "operation": "analyze_pose",
-            "subject_consent_recorded": false
+            "model_owner_present": false,
+            "operation": "register_model"
           },
-          "description": "Pose analysis requires subject consent.",
+          "description": "Pose models require an accountable owner.",
           "effect": {
             "decision": "deny",
-            "reason": "subject_consent_required",
-            "required_action": "record_subject_consent"
+            "reason": "model_owner_required",
+            "required_action": "assign_model_owner"
           },
-          "name": "subject_consent_required"
+          "name": "pose_model_requires_owner"
+        },
+        {
+          "condition": {
+            "model_policy_attached": false,
+            "operation": "register_model"
+          },
+          "description": "Pose models require model-use policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_policy_required",
+            "required_action": "attach_model_policy"
+          },
+          "name": "pose_model_requires_policy"
         },
         {
           "condition": {
@@ -183,6 +469,31 @@
             "required_action": "assign_session_owner"
           },
           "name": "tracking_session_requires_owner"
+        },
+        {
+          "condition": {
+            "subject_consent_recorded": false
+          },
+          "description": "Pose sessions and analysis require subject consent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "subject_consent_required",
+            "required_action": "record_subject_consent"
+          },
+          "name": "subject_consent_required"
+        },
+        {
+          "condition": {
+            "operation": "start_tracking",
+            "source_reference_present": false
+          },
+          "description": "Tracking sessions require a source reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_reference_required",
+            "required_action": "attach_source_reference"
+          },
+          "name": "tracking_source_required"
         },
         {
           "condition": {
@@ -212,6 +523,45 @@
         },
         {
           "condition": {
+            "frame_timestamp_present": false,
+            "operation": "record_frame"
+          },
+          "description": "Pose frames require timestamp evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "frame_timestamp_required",
+            "required_action": "attach_frame_timestamp"
+          },
+          "name": "frame_requires_timestamp"
+        },
+        {
+          "condition": {
+            "keypoint_count_lte": 0,
+            "operation": "estimate_pose"
+          },
+          "description": "Pose estimates require keypoints.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pose_keypoints_required",
+            "required_action": "provide_pose_keypoints"
+          },
+          "name": "pose_estimate_requires_keypoints"
+        },
+        {
+          "condition": {
+            "operation": "estimate_pose",
+            "person_count_gt": 50
+          },
+          "description": "Pose estimates must respect max person limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "max_persons_exceeded",
+            "required_action": "reduce_person_count_or_adjust_policy"
+          },
+          "name": "pose_estimate_person_limit"
+        },
+        {
+          "condition": {
             "pose_quality_score_lt": 0.7,
             "quality_review_recorded": false
           },
@@ -222,6 +572,136 @@
             "required_action": "review_pose_quality"
           },
           "name": "low_pose_quality_requires_review"
+        },
+        {
+          "condition": {
+            "medical_grade": true,
+            "medical_review_recorded": false,
+            "operation": "analyze_pose"
+          },
+          "description": "Medical-grade biomechanical analysis requires review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "medical_review_required",
+            "required_action": "record_medical_review"
+          },
+          "name": "medical_analysis_requires_review"
+        },
+        {
+          "condition": {
+            "camera_calibration_present": false,
+            "operation": "reconstruct_3d"
+          },
+          "description": "3D reconstruction requires camera calibration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "camera_calibration_required",
+            "required_action": "attach_camera_calibration"
+          },
+          "name": "three_d_requires_calibration"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "pose_agent_present": true
+          },
+          "description": "AI pose agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pose_agent_registration_required",
+            "required_action": "register_pose_agent"
+          },
+          "name": "pose_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "pose_agent_present": true
+          },
+          "description": "AI pose agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pose_agent_runtime_not_supported",
+            "required_action": "choose_supported_pose_agent_runtime"
+          },
+          "name": "pose_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "pose_agent_present": true
+          },
+          "description": "AI pose agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pose_agent_scope_required",
+            "required_action": "set_pose_agent_scope"
+          },
+          "name": "pose_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "pose_agent_present": true
+          },
+          "description": "AI pose-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pose_agent_disclosure_required",
+            "required_action": "disclose_pose_agent"
+          },
+          "name": "pose_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Pose session state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Pose session state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pose_audit_event_required",
+            "required_action": "record_pose_audit"
+          },
+          "name": "state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Pose records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_pose_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_pose_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_pose_mutation"
+          },
+          "description": "Batch pose mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_pose_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -231,10 +711,25 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "PoseAgentPanel",
+          "permission": "pose:manage_models",
+          "route": "/pose/agents"
+        },
         "analysis": {
           "component": "BiomechanicalAnalysis",
           "permission": "pose:analyze",
           "route": "/pose/analysis"
+        },
+        "analytics": {
+          "component": "POSEAnalytics",
+          "permission": "pose:view",
+          "route": "/pose/analytics"
+        },
+        "audit": {
+          "component": "POSEAuditTrail",
+          "permission": "pose:audit",
+          "route": "/pose/audit"
         },
         "dashboard": {
           "component": "POSEDashboard",
@@ -256,6 +751,11 @@
           "permission": "pose:view",
           "route": "/pose/quality"
         },
+        "reconstruction": {
+          "component": "Pose3DReconstruction",
+          "permission": "pose:analyze",
+          "route": "/pose/reconstruction"
+        },
         "sessions": {
           "component": "PoseSessions",
           "permission": "pose:view",
@@ -272,9 +772,36 @@
           "route": "/pose/tracking"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_pose_mutation_requires_bytewax",
+        "events": [
+          "pose_model_registered",
+          "pose_session_started",
+          "pose_frame_recorded",
+          "pose_estimated",
+          "pose_analysis_completed",
+          "pose_3d_reconstructed",
+          "pose_agent_registered",
+          "pose_session_state_changed"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "models",
+          "sessions",
+          "frames",
+          "estimates",
+          "analyses",
+          "reconstructions",
+          "pose_agents"
+        ],
+        "topic": "apg.pose.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
           "biomechanics_panel": {
             "status_style": "review-chip",
             "visual": "angle-metrics"
@@ -287,6 +814,10 @@
             "icon": "activity",
             "risk_style": "consent-band",
             "status_indicator": "quality-pill"
+          },
+          "reconstruction_panel": {
+            "status_style": "calibration-chip",
+            "visual": "skeleton-3d"
           },
           "tracking_timeline": {
             "highlight": "latency-chip",
@@ -341,6 +872,13 @@
             "permission": "pose:analyze"
           },
           {
+            "component": "Pose3DReconstruction",
+            "name": "reconstruction",
+            "nav_group": "Analysis",
+            "path": "/pose/reconstruction",
+            "permission": "pose:analyze"
+          },
+          {
             "component": "PoseSessions",
             "name": "sessions",
             "nav_group": "Analysis",
@@ -359,6 +897,27 @@
             "name": "quality",
             "nav_group": "Governance",
             "path": "/pose/quality",
+            "permission": "pose:view"
+          },
+          {
+            "component": "PoseAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/pose/agents",
+            "permission": "pose:manage_models"
+          },
+          {
+            "component": "POSEAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/pose/audit",
+            "permission": "pose:audit"
+          },
+          {
+            "component": "POSEAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/pose/analytics",
             "permission": "pose:view"
           },
           {
@@ -382,23 +941,42 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "pose": []
+      "pose": [
+        "cvsn",
+        "aicr",
+        "mlcm"
+      ]
     }
   },
   "contracts": {
     "pose": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "computer_vision": "cvsn",
+          "edge_runtime": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.PoseService",
+          "model_lifecycle": "mlcm",
+          "monitoring": "moni",
+          "view_models": "views.py"
+        },
         "analysis": {
           "biomechanical_analysis_enabled": true,
           "medical_grade_review_required": true,
           "minimum_quality_score": 0.7,
+          "three_d_calibration_required": true,
           "three_d_reconstruction_enabled": true
         },
         "governance": {
           "audit_pose_sessions": true,
+          "batch_event_stream": "bytewax",
           "require_tenant_context": true,
           "sensitive_use_approval_required": true,
-          "subject_consent_required": true
+          "subject_consent_required": true,
+          "tenant_isolation_required": true
         },
         "models": {
           "edge_model_supported": true,
@@ -409,7 +987,43 @@
             "swin_pose"
           ],
           "minimum_keypoint_confidence": 0.72,
+          "model_owner_required": true,
           "model_policy_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "quality_metrics_required": true
+        },
+        "pose_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "model_reviewer",
+            "movement_analyst",
+            "quality_reviewer",
+            "session_observer",
+            "edge_optimizer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "sessions": {
+          "secure_stream_required": true,
+          "sensitive_use_approval_required": true,
+          "session_owner_required": true,
+          "source_reference_required": true,
+          "state_change_reason_required": true,
+          "subject_consent_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -417,23 +1031,38 @@
           "default_theme": "pose_motion_intelligence"
         },
         "tracking": {
+          "frame_timestamp_required": true,
+          "keypoint_schema": "coco17",
           "max_persons_per_frame": 50,
-          "secure_stream_required": true,
-          "session_owner_required": true,
           "temporal_consistency_enabled": true
         },
         "ui": {
+          "enable_3d_reconstruction": true,
+          "enable_agent_panel": true,
           "enable_analysis_workbench": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_model_registry": true,
           "enable_pose_dashboard": true,
+          "enable_quality_review": true,
           "enable_tracking_console": true
         }
       },
       "id": "pose",
       "provides": [
-        "pose_operations"
+        "pose_estimation",
+        "multi_person_tracking",
+        "biomechanical_analysis",
+        "pose_3d_reconstruction",
+        "edge_pose_inference",
+        "pose_agents",
+        "pose_quality_governance"
       ],
-      "requires": []
+      "requires": [
+        "cvsn",
+        "aicr",
+        "mlcm"
+      ]
     }
   },
   "deployment": {
@@ -445,7 +1074,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -466,6 +1095,44 @@
   },
   "roles": {},
   "rules": {
+    "batch_pose_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_pose_mutation"
+      },
+      "description": "Batch pose mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_pose_mutation_requires_bytewax"
+    },
+    "cross_tenant_pose_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Pose records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_pose_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_pose_access_denied"
+    },
+    "frame_requires_timestamp": {
+      "condition": {
+        "frame_timestamp_present": false,
+        "operation": "record_frame"
+      },
+      "description": "Pose frames require timestamp evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "frame_timestamp_required",
+        "required_action": "attach_frame_timestamp"
+      },
+      "name": "frame_requires_timestamp"
+    },
     "low_pose_quality_requires_review": {
       "condition": {
         "pose_quality_score_lt": 0.7,
@@ -478,6 +1145,124 @@
         "required_action": "review_pose_quality"
       },
       "name": "low_pose_quality_requires_review"
+    },
+    "medical_analysis_requires_review": {
+      "condition": {
+        "medical_grade": true,
+        "medical_review_recorded": false,
+        "operation": "analyze_pose"
+      },
+      "description": "Medical-grade biomechanical analysis requires review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "medical_review_required",
+        "required_action": "record_medical_review"
+      },
+      "name": "medical_analysis_requires_review"
+    },
+    "pose_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "pose_agent_present": true
+      },
+      "description": "AI pose-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pose_agent_disclosure_required",
+        "required_action": "disclose_pose_agent"
+      },
+      "name": "pose_agent_requires_disclosure"
+    },
+    "pose_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "pose_agent_present": true
+      },
+      "description": "AI pose agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pose_agent_registration_required",
+        "required_action": "register_pose_agent"
+      },
+      "name": "pose_agent_requires_registration"
+    },
+    "pose_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "pose_agent_present": true
+      },
+      "description": "AI pose agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pose_agent_scope_required",
+        "required_action": "set_pose_agent_scope"
+      },
+      "name": "pose_agent_requires_scope"
+    },
+    "pose_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "pose_agent_present": true
+      },
+      "description": "AI pose agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pose_agent_runtime_not_supported",
+        "required_action": "choose_supported_pose_agent_runtime"
+      },
+      "name": "pose_agent_runtime_supported"
+    },
+    "pose_estimate_person_limit": {
+      "condition": {
+        "operation": "estimate_pose",
+        "person_count_gt": 50
+      },
+      "description": "Pose estimates must respect max person limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "max_persons_exceeded",
+        "required_action": "reduce_person_count_or_adjust_policy"
+      },
+      "name": "pose_estimate_person_limit"
+    },
+    "pose_estimate_requires_keypoints": {
+      "condition": {
+        "keypoint_count_lte": 0,
+        "operation": "estimate_pose"
+      },
+      "description": "Pose estimates require keypoints.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pose_keypoints_required",
+        "required_action": "provide_pose_keypoints"
+      },
+      "name": "pose_estimate_requires_keypoints"
+    },
+    "pose_model_requires_owner": {
+      "condition": {
+        "model_owner_present": false,
+        "operation": "register_model"
+      },
+      "description": "Pose models require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_owner_required",
+        "required_action": "assign_model_owner"
+      },
+      "name": "pose_model_requires_owner"
+    },
+    "pose_model_requires_policy": {
+      "condition": {
+        "model_policy_attached": false,
+        "operation": "register_model"
+      },
+      "description": "Pose models require model-use policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_policy_required",
+        "required_action": "attach_model_policy"
+      },
+      "name": "pose_model_requires_policy"
     },
     "secure_stream_required": {
       "condition": {
@@ -505,12 +1290,37 @@
       },
       "name": "sensitive_use_requires_approval"
     },
+    "state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Pose session state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pose_audit_event_required",
+        "required_action": "record_pose_audit"
+      },
+      "name": "state_change_requires_audit"
+    },
+    "state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Pose session state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "state_change_requires_reason"
+    },
     "subject_consent_required": {
       "condition": {
-        "operation": "analyze_pose",
         "subject_consent_recorded": false
       },
-      "description": "Pose analysis requires subject consent.",
+      "description": "Pose sessions and analysis require subject consent.",
       "effect": {
         "decision": "deny",
         "reason": "subject_consent_required",
@@ -530,6 +1340,19 @@
       },
       "name": "tenant_context_required"
     },
+    "three_d_requires_calibration": {
+      "condition": {
+        "camera_calibration_present": false,
+        "operation": "reconstruct_3d"
+      },
+      "description": "3D reconstruction requires camera calibration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "camera_calibration_required",
+        "required_action": "attach_camera_calibration"
+      },
+      "name": "three_d_requires_calibration"
+    },
     "tracking_session_requires_owner": {
       "condition": {
         "operation": "start_tracking",
@@ -542,6 +1365,19 @@
         "required_action": "assign_session_owner"
       },
       "name": "tracking_session_requires_owner"
+    },
+    "tracking_source_required": {
+      "condition": {
+        "operation": "start_tracking",
+        "source_reference_present": false
+      },
+      "description": "Tracking sessions require a source reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_reference_required",
+        "required_action": "attach_source_reference"
+      },
+      "name": "tracking_source_required"
     }
   },
   "security": {},
