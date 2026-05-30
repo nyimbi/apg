@@ -5,7 +5,12 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_SECURITY_AGENT_ROLES,
+	SUPPORTED_SECURITY_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	AuthAccessDecision,
 	AuthAuditEvent,
@@ -15,6 +20,7 @@ from .models import (
 	AuthRole,
 	AuthRoleAssignment,
 	AuthRoleAssignmentApproval,
+	AuthSecurityAgent,
 	AuthSession,
 )
 
@@ -31,6 +37,7 @@ class AuthService:
 		self._access_decisions: dict[tuple[str, str], AuthAccessDecision] = {}
 		self._privacy_queries: dict[tuple[str, str], AuthPrivacyQuery] = {}
 		self._privacy_approvals: dict[tuple[str, str], AuthPrivacyBudgetApproval] = {}
+		self._security_agents: dict[tuple[str, str], AuthSecurityAgent] = {}
 		self._audit_events: dict[tuple[str, str], AuthAuditEvent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -539,6 +546,84 @@ class AuthService:
 	def list_privacy_queries(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._privacy_queries.values(), tenant_id)
 
+	def register_security_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		registered: bool = True,
+		contribution_disclosed: bool = True,
+		policy_ref: str | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"security_agent_present": True,
+			"agent_registered": registered,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_SECURITY_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_SECURITY_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		self._ensure_new(self._security_agents, tenant_id, agent_id, "security agent")
+		if not name:
+			raise ValueError("security_agent_name_required")
+		agent = AuthSecurityAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+			status=status,
+		)
+		self._security_agents[self._tenant_key(tenant_id, agent_id)] = agent
+		self._record_audit(
+			tenant_id=tenant_id,
+			subject_id=agent_id,
+			event_type="security_agent_registered",
+			actor="system",
+			decision=result["decision"],
+			reasons=self._reasons(result),
+			metadata={"runtime": agent.runtime, "role": agent.role, "scope": scope},
+		)
+		return agent.to_dict()
+
+	def list_security_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._security_agents.values(), tenant_id)
+
+	def validate_batch_auth_mutation(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"requested_operation": "batch_auth_mutation",
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+		})
+		self._raise_if_denied(result)
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+			"accepted": True,
+			"rule_result": result,
+		}
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		identities = [item for item in self._identities.values() if item.tenant_id == tenant_id]
 		sessions = [item for item in self._sessions.values() if item.tenant_id == tenant_id]
@@ -562,6 +647,7 @@ class AuthService:
 				item for item in self._privacy_approvals.values()
 				if item.tenant_id == tenant_id and item.status == "pending"
 			]),
+			"security_agent_count": len([item for item in self._security_agents.values() if item.tenant_id == tenant_id]),
 			"denied_decision_count": len([item for item in decisions if item.decision == "deny"]),
 			"privacy_review_count": len([
 				item for item in self._privacy_queries.values()
@@ -831,3 +917,7 @@ def _coerce_bool(value: Any) -> bool:
 	if isinstance(value, str):
 		return value.strip().lower() in {"1", "true", "yes", "on"}
 	return bool(value)
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")

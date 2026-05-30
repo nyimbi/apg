@@ -3,6 +3,7 @@
   "display_name": "Authentication & RBAC",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
     "SPECIFICATION.md",
     "PLAN.md",
     "cap_spec.md",

@@ -30,6 +30,10 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "auth"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["security_agents"]["supported_runtimes"]
+	for required_doc in ("README.md", "SPECIFICATION.md", "PLAN.md", "cap_spec.md"):
+		assert (PACKAGE_DIR / required_doc).exists()
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -44,3 +48,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "auth" in model["capabilities"]
+	assert model["capabilities"]["auth"]["streaming"]["processor"] == "bytewax"
+	assert model["capabilities"]["auth"]["screens"]["security_agents"]["route"] == "/auth/security/agents"

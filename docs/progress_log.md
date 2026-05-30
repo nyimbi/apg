@@ -16,6 +16,64 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 17:54 EAT
+
+AUTH authentication/security-agent lifecycle/guardrail packet:
+
+- Added a practical `README.md`, refreshed `SPECIFICATION.md` and `PLAN.md`,
+  and replaced `cap_spec.md` with a compatibility pointer to the active
+  specification.
+- Expanded `capability_contract.py` with first-class security-agent,
+  governance, observability, adapter, UI, theme, provides/requires, and
+  Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for security-agent registration, supported
+  runtime, supported role, explicit scope, contribution disclosure, AUTH
+  state-change audit evidence, and Bytewax batch mutation enforcement.
+- Cleaned stale login/dashboard route names and added security-agent, audit,
+  and analytics route metadata.
+- Added `AuthSecurityAgent` model support and extended `AuthService` with
+  tenant-qualified security-agent registration, listing, dashboard counts,
+  normalized runtime/role tokens, and batch mutation validation.
+- Extended API helpers and view models with security-agent, audit, analytics,
+  settings, and Bytewax stream surfaces.
+- Expanded focused tests for security-agent registration, unsupported runtime,
+  Bytewax batch mutation, API helper exposure, view model exposure, generated
+  semantic stream metadata, and package documentation presence.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/auth/models.py
+  capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py
+  capabilities/common/auth/view_models.py
+  capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py
+  capabilities/common/auth/tests/test_capability_contract.py
+  capabilities/common/auth/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py
+  capabilities/common/auth/tests/test_package_contract.py` passed with 13 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.auth import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.auth.streaming.processor,
+  .capabilities.auth.configuration.security_agents.supported_runtimes,
+  .capabilities.auth.screens.security_agents.route'
+  capabilities/common/auth/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/auth/security/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/auth --json` passed with `auth` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json`
+  passed with `side_effect_free: true` and no warnings.
+- AUTH stale-marker and unsupported stream search returned no matches for the
+  touched packet files.
+- `git diff --check -- capabilities/common/auth docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live identity provider/JWT/session/
+  biometric/behavioral/cryptographic/federation providers, production AUDL/
+  MTEN/KEYM/SECU/MFAU/BIOM adapters, live Bytewax topology, rendered browser
+  UI, and performance/resilience checks.
+
 ### 2026-05-30 16:46 EAT
 
 CONS consent/privacy lifecycle/guardrail packet:

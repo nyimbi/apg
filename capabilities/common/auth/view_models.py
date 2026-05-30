@@ -40,8 +40,10 @@ def dashboard_model(
 		"access_decisions": service.list_access_decisions(tenant_id),
 		"privacy_queries": service.list_privacy_queries(tenant_id),
 		"privacy_approvals": service.list_privacy_budget_approvals(tenant_id),
+		"security_agents": service.list_security_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -130,6 +132,47 @@ def audit_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"theme": contract["theme"],
+	}
+
+
+def security_agents_model(
+	service: AuthService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	contract = get_capability_contract(tenant_id)
+	return {
+		"agents": service.list_security_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["security_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["security_agents"]["allowed_roles"],
+		"actions": ["register", "scope", "review_contribution", "deactivate"],
+		"required_fields": ["name", "runtime", "role", "scope", "contribution_disclosed"],
+	}
+
+
+def analytics_model(
+	service: AuthService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = _service_or_default(service)
+	summary = service.dashboard_summary(tenant_id)
+	return {
+		"summary": summary,
+		"admin_assignment_rate": _safe_ratio(summary["admin_assignment_count"], summary["role_count"]),
+		"denial_rate": _safe_ratio(summary["denied_decision_count"], len(service.list_access_decisions(tenant_id))),
+		"privacy_review_rate": _safe_ratio(summary["privacy_review_count"], len(service.list_privacy_queries(tenant_id))),
+		"agent_coverage": _safe_ratio(summary["security_agent_count"], max(summary["identity_count"], 1)),
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -143,3 +186,7 @@ def _service_or_default(service: AuthService | None) -> AuthService:
 		return SERVICE
 	except ImportError:  # pragma: no cover - standalone package loading path
 		return AuthService()
+
+
+def _safe_ratio(numerator: int, denominator: int) -> float:
+	return round(numerator / denominator, 4) if denominator else 0.0

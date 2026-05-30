@@ -18,6 +18,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"streaming": contract["streaming"],
 		**SERVICE.dashboard_summary(tenant_id),
 	}
 
@@ -153,6 +154,29 @@ def revoke_session(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_security_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_security_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "identity_reviewer"),
+		scope=str(payload.get("scope") or ""),
+		registered=_payload_bool(payload, "registered", True),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		policy_ref=str(payload["policy_ref"]) if payload.get("policy_ref") else None,
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def validate_batch_auth_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_auth_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+	)
+
+
 def list_identities(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_identities(tenant_id)
 
@@ -187,6 +211,10 @@ def list_privacy_queries(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_audit_events(tenant_id)
+
+
+def list_security_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_security_agents(tenant_id)
 
 
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:

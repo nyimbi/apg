@@ -8,13 +8,22 @@
   },
   "capabilities": {
     "auth": {
-      "approvals": {
-        "privacy_budget": "AuthPrivacyBudgetApproval",
-        "role_assignment": "AuthRoleAssignmentApproval"
-      },
+      "approvals": {},
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "biometrics": "biom",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AuthService",
+          "key_management": "keym",
+          "mfa": "mfau",
+          "multi_tenancy": "mten",
+          "security": "secu",
+          "view_models": "view_models.py"
+        },
         "authentication": {
           "enable_behavioral_auth": true,
           "enable_biometric_fusion": true,
@@ -34,11 +43,44 @@
           "minimum_trust_level": "medium",
           "require_trusted_issuer": true
         },
+        "governance": {
+          "audit_required": true,
+          "batch_event_stream": "bytewax",
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "identity_metrics_required": true,
+          "trace_required": true
+        },
         "privacy": {
           "allow_behavioral_data_export": false,
           "analytics_retention_days": 90,
           "default_privacy_budget": 1.0,
           "enable_privacy_analytics": true
+        },
+        "security_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "identity_reviewer",
+            "role_reviewer",
+            "session_reviewer",
+            "privacy_reviewer",
+            "federation_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "sessions": {
           "absolute_timeout_hours": 8,
@@ -52,6 +94,9 @@
           "default_theme": "auth_trust_fabric"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_behavioral_console": true,
           "enable_federation_console": true,
           "enable_role_workbench": true,
@@ -65,9 +110,19 @@
       "master_data": {},
       "name": "Authentication & RBAC",
       "provides": [
-        "auth_operations"
+        "identity_registry",
+        "role_governance",
+        "session_control",
+        "access_decisions",
+        "privacy_budget_governance",
+        "security_agents"
       ],
-      "requires": [],
+      "requires": [
+        "audl",
+        "mten",
+        "keym",
+        "secu"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -186,6 +241,97 @@
               "required_action": "route_to_independent_privacy_reviewer"
             },
             "name": "privacy_budget_approval_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "security_agent_present": true
+            },
+            "description": "AI security agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_registration_required",
+              "required_action": "register_security_agent"
+            },
+            "name": "security_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "security_agent_present": true
+            },
+            "description": "AI security agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_runtime_not_supported",
+              "required_action": "choose_supported_security_agent_runtime"
+            },
+            "name": "security_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "security_agent_present": true
+            },
+            "description": "AI security agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_role_not_supported",
+              "required_action": "choose_supported_security_agent_role"
+            },
+            "name": "security_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "security_agent_present": true
+            },
+            "description": "AI security agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_scope_required",
+              "required_action": "set_security_agent_scope"
+            },
+            "name": "security_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "security_agent_present": true
+            },
+            "description": "AI security-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_disclosure_required",
+              "required_action": "disclose_security_agent"
+            },
+            "name": "security_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "AUTH lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "auth_audit_event_required",
+              "required_action": "record_auth_audit_event"
+            },
+            "name": "auth_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_auth_mutation"
+            },
+            "description": "Batch AUTH mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_auth_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -307,14 +453,103 @@
             "required_action": "route_to_independent_privacy_reviewer"
           },
           "name": "privacy_budget_approval_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "security_agent_present": true
+          },
+          "description": "AI security agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_registration_required",
+            "required_action": "register_security_agent"
+          },
+          "name": "security_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "security_agent_present": true
+          },
+          "description": "AI security agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_runtime_not_supported",
+            "required_action": "choose_supported_security_agent_runtime"
+          },
+          "name": "security_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "security_agent_present": true
+          },
+          "description": "AI security agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_role_not_supported",
+            "required_action": "choose_supported_security_agent_role"
+          },
+          "name": "security_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "security_agent_present": true
+          },
+          "description": "AI security agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_scope_required",
+            "required_action": "set_security_agent_scope"
+          },
+          "name": "security_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "security_agent_present": true
+          },
+          "description": "AI security-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_disclosure_required",
+            "required_action": "disclose_security_agent"
+          },
+          "name": "security_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "AUTH lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "auth_audit_event_required",
+            "required_action": "record_auth_audit_event"
+          },
+          "name": "auth_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_auth_mutation"
+          },
+          "description": "Batch AUTH mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_auth_mutation_requires_bytewax"
         }
       ],
       "runtime": {
         "api": "api.py",
-        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
@@ -322,6 +557,16 @@
           "component": "AccessDecisionConsole",
           "permission": "auth:view",
           "route": "/auth/access/decisions"
+        },
+        "analytics": {
+          "component": "AuthAnalytics",
+          "permission": "auth:view",
+          "route": "/auth/analytics"
+        },
+        "audit": {
+          "component": "AuthAuditTrail",
+          "permission": "auth:admin",
+          "route": "/auth/audit"
         },
         "behavioral_analysis": {
           "component": "BehavioralTrustWorkbench",
@@ -344,9 +589,9 @@
           "route": "/auth/biometric/manage"
         },
         "dashboard": {
-          "component": "RevolutionaryAuthenticationDashboard",
+          "component": "AuthenticationDashboard",
           "permission": "auth:view",
-          "route": "/auth/revolutionary/dashboard"
+          "route": "/auth/access/dashboard"
         },
         "federated_mesh": {
           "component": "FederatedIdentityMeshConsole",
@@ -354,9 +599,9 @@
           "route": "/auth/federated/mesh"
         },
         "login": {
-          "component": "RevolutionaryLoginScreen",
+          "component": "AuthenticationLoginScreen",
           "permission": "public",
-          "route": "/auth/revolutionary/login"
+          "route": "/auth/access/login"
         },
         "metrics": {
           "component": "AuthenticationMetricsOverview",
@@ -403,18 +648,57 @@
           "permission": "auth:manage_roles",
           "route": "/auth/roles/workbench"
         },
+        "security_agents": {
+          "component": "SecurityAgentPanel",
+          "permission": "auth:approve_roles",
+          "route": "/auth/security/agents"
+        },
         "sessions": {
           "component": "SessionTrustCenter",
           "permission": "auth:manage_sessions",
           "route": "/auth/sessions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_auth_mutation_requires_bytewax",
+        "events": [
+          "identity_registered",
+          "role_defined",
+          "role_assignment_approval_requested",
+          "role_assignment_approval_decided",
+          "role_assigned",
+          "session_started",
+          "session_revoked",
+          "access_evaluated",
+          "privacy_budget_approval_requested",
+          "privacy_budget_approval_decided",
+          "privacy_query_evaluated",
+          "security_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "identities",
+          "roles",
+          "role_approvals",
+          "assignments",
+          "sessions",
+          "access_decisions",
+          "privacy_queries",
+          "privacy_approvals",
+          "security_agents",
+          "audit_events"
+        ],
+        "topic": "apg.auth.lifecycle"
+      },
       "theme": {
         "components": {
           "access_decision_panel": {
             "status_style": "decision-chip",
             "visual": "permission-matrix"
+          },
+          "audit_timeline": {
+            "icon": "list-checks",
+            "status_style": "governance-chip"
           },
           "identity_signal_card": {
             "icon": "shield-lock",
@@ -441,6 +725,10 @@
             "approval_badge": "inline",
             "line_style": "stepped"
           },
+          "security_agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
           "session_trust_badge": {
             "icon": "fingerprint",
             "variant": "elevated"
@@ -466,17 +754,17 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "RevolutionaryLoginScreen",
+            "component": "AuthenticationLoginScreen",
             "name": "login",
             "nav_group": "Access",
-            "path": "/auth/revolutionary/login",
+            "path": "/auth/access/login",
             "permission": "public"
           },
           {
-            "component": "RevolutionaryAuthenticationDashboard",
+            "component": "AuthenticationDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
-            "path": "/auth/revolutionary/dashboard",
+            "path": "/auth/access/dashboard",
             "permission": "auth:view"
           },
           {
@@ -585,6 +873,27 @@
             "permission": "auth:manage_federation"
           },
           {
+            "component": "SecurityAgentPanel",
+            "name": "security_agents",
+            "nav_group": "Governance",
+            "path": "/auth/security/agents",
+            "permission": "auth:approve_roles"
+          },
+          {
+            "component": "AuthAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/auth/audit",
+            "permission": "auth:admin"
+          },
+          {
+            "component": "AuthAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/auth/analytics",
+            "permission": "auth:view"
+          },
+          {
             "component": "AuthenticationMetricsOverview",
             "name": "metrics",
             "nav_group": "Operations",
@@ -604,12 +913,29 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "auth": []
+      "auth": [
+        "audl",
+        "mten",
+        "keym",
+        "secu"
+      ]
     }
   },
   "contracts": {
     "auth": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api_helpers.py",
+          "audit_sink": "audl",
+          "biometrics": "biom",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AuthService",
+          "key_management": "keym",
+          "mfa": "mfau",
+          "multi_tenancy": "mten",
+          "security": "secu",
+          "view_models": "view_models.py"
+        },
         "authentication": {
           "enable_behavioral_auth": true,
           "enable_biometric_fusion": true,
@@ -629,11 +955,44 @@
           "minimum_trust_level": "medium",
           "require_trusted_issuer": true
         },
+        "governance": {
+          "audit_required": true,
+          "batch_event_stream": "bytewax",
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "identity_metrics_required": true,
+          "trace_required": true
+        },
         "privacy": {
           "allow_behavioral_data_export": false,
           "analytics_retention_days": 90,
           "default_privacy_budget": 1.0,
           "enable_privacy_analytics": true
+        },
+        "security_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "identity_reviewer",
+            "role_reviewer",
+            "session_reviewer",
+            "privacy_reviewer",
+            "federation_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "sessions": {
           "absolute_timeout_hours": 8,
@@ -647,6 +1006,9 @@
           "default_theme": "auth_trust_fabric"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_behavioral_console": true,
           "enable_federation_console": true,
           "enable_role_workbench": true,
@@ -655,9 +1017,19 @@
       },
       "id": "auth",
       "provides": [
-        "auth_operations"
+        "identity_registry",
+        "role_governance",
+        "session_control",
+        "access_decisions",
+        "privacy_budget_governance",
+        "security_agents"
       ],
-      "requires": []
+      "requires": [
+        "audl",
+        "mten",
+        "keym",
+        "secu"
+      ]
     }
   },
   "deployment": {
@@ -669,7 +1041,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -690,6 +1062,32 @@
   },
   "roles": {},
   "rules": {
+    "auth_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "AUTH lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "auth_audit_event_required",
+        "required_action": "record_auth_audit_event"
+      },
+      "name": "auth_state_change_requires_audit"
+    },
+    "batch_auth_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_auth_mutation"
+      },
+      "description": "Batch AUTH mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_auth_mutation_requires_bytewax"
+    },
     "cross_tenant_access_requires_membership": {
       "condition": {
         "tenant_membership_confirmed": false,
@@ -793,6 +1191,71 @@
         "required_action": "route_to_independent_reviewer"
       },
       "name": "role_assignment_approval_requires_independent_reviewer"
+    },
+    "security_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "security_agent_present": true
+      },
+      "description": "AI security-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_disclosure_required",
+        "required_action": "disclose_security_agent"
+      },
+      "name": "security_agent_requires_disclosure"
+    },
+    "security_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "security_agent_present": true
+      },
+      "description": "AI security agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_registration_required",
+        "required_action": "register_security_agent"
+      },
+      "name": "security_agent_requires_registration"
+    },
+    "security_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "security_agent_present": true
+      },
+      "description": "AI security agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_scope_required",
+        "required_action": "set_security_agent_scope"
+      },
+      "name": "security_agent_requires_scope"
+    },
+    "security_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "security_agent_present": true
+      },
+      "description": "AI security agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_role_not_supported",
+        "required_action": "choose_supported_security_agent_role"
+      },
+      "name": "security_agent_role_supported"
+    },
+    "security_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "security_agent_present": true
+      },
+      "description": "AI security agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_runtime_not_supported",
+        "required_action": "choose_supported_security_agent_runtime"
+      },
+      "name": "security_agent_runtime_supported"
     },
     "untrusted_federation_denied": {
       "condition": {

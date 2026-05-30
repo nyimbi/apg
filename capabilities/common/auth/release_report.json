@@ -4,20 +4,13 @@
       "capability_contract": {
         "display_name": "Authentication & RBAC",
         "errors": [],
-        "route_count": 18,
-        "rule_count": 9
+        "route_count": 21,
+        "rule_count": 16
       }
     },
     "self_test": {
       "capability": "auth",
-      "errors": [],
       "passed": true,
-      "routes": [
-        "/health",
-        "/self-test",
-        "/component.json",
-        "/semantic-model.json"
-      ],
       "status": "ok"
     },
     "semantic_model": {

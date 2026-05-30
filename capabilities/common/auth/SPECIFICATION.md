@@ -38,6 +38,9 @@ state, role/session/access decisions, and composition behavior.
   sessions without step-up, and privileged access without MFA.
 - Data and privacy teams can meter privacy-preserving analytics against
   tenant-scoped privacy budgets.
+- Security owners can register AI security agents for identity, role, session,
+  privacy, and federation review support while preserving runtime, role, scope,
+  disclosure, and audit evidence.
 - Generated APG applications can compose AUTH with AUDL, MTEN, KEYM, NTFY,
   SECU, MFAU, BIOM, AICR, and downstream ERP capabilities.
 
@@ -58,6 +61,8 @@ AUTH owns these package-level records:
 - `AuthPrivacyQuery`: privacy-budget query decision and remaining budget.
 - `AuthPrivacyBudgetApproval`: independent approval request and decision for
   privacy-budget exhaustion overrides.
+- `AuthSecurityAgent`: governed AI security-agent registration with tenant,
+  runtime, role, scope, disclosure, policy, and status evidence.
 - `AuthAuditEvent`: tenant-scoped governance event for identity, role, session,
   access, privacy, and approval lifecycle changes.
 
@@ -86,7 +91,10 @@ The focused lifecycle is:
 10. Revoke sessions by tenant-local session ID and list current tenant identity,
    role, session, decision,
    privacy, approval, and audit state.
-11. Emit tenant-scoped audit events for identity, role, approval, assignment,
+11. Register security agents only when they use a supported runtime, supported
+    role, explicit scope, registration state, and contribution disclosure.
+12. Validate batch AUTH mutation intent against the Bytewax lifecycle stream.
+13. Emit tenant-scoped audit events for identity, role, approval, assignment,
     session, access, privacy, and revocation lifecycle changes.
 
 ## Rules And Guardrails
@@ -107,6 +115,20 @@ The contract rules are executable guardrails:
   review.
 - `privacy_budget_approval_requires_independent_reviewer`: privacy-budget
   reviewers cannot approve their own requests.
+- `security_agent_requires_registration`: AI security agents must be
+  registered before use in AUTH review workflows.
+- `security_agent_runtime_supported`: AI security agents must use a supported
+  runtime: `codex`, `claude_code`, `opencode`, or `pi`.
+- `security_agent_role_supported`: AI security agents must use a supported
+  review role.
+- `security_agent_requires_scope`: AI security agents must declare explicit
+  operating scope.
+- `security_agent_requires_disclosure`: AI-assisted contributions must be
+  disclosed.
+- `auth_state_change_requires_audit`: AUTH lifecycle state changes require
+  audit evidence.
+- `batch_auth_mutation_requires_bytewax`: batch AUTH mutation intent must use
+  Bytewax event streams.
 
 Service methods must enforce these rules and expose the same decisions through
 API helpers and view models.
@@ -132,12 +154,50 @@ AUTH exposes route and view-model surfaces for:
 - behavioral analysis;
 - privacy analytics;
 - federation console;
+- security-agent panel;
+- audit trail;
+- analytics dashboard;
 - metrics and audit evidence.
 
 The `auth_trust_fabric` theme must provide semantic tokens and component
 metadata for identity signal cards, risk posture meters, role assignment
 timelines, approval queues, session trust badges, access decision panels, and
 privacy budget meters.
+
+## Security-Agent Composition
+
+AUTH supports first-class AI security-agent composition without directly
+invoking agent CLIs or provider SDKs. The dependency-light package records the
+agent registration and validates guardrails. Production adapters can later bind
+these registrations to Codex, Claude Code, OpenCode, Pi, or other approved
+runtimes through platform orchestration.
+
+Supported roles are:
+
+- `identity_reviewer`;
+- `role_reviewer`;
+- `session_reviewer`;
+- `privacy_reviewer`;
+- `federation_reviewer`.
+
+Generated applications must display agent scope and contribution disclosure in
+review surfaces so human approvers can distinguish agent-assisted summaries
+from direct reviewer decisions.
+
+## Streaming
+
+AUTH publishes Bytewax lifecycle stream metadata through the capability
+contract and generated semantic model:
+
+- processor: `bytewax`;
+- topic: `apg.auth.lifecycle`;
+- state collections: identities, roles, role approvals, assignments, sessions,
+  access decisions, privacy queries, privacy approvals, security agents, and
+  audit events;
+- events: identity registration, role definition, approval decisions, role
+  assignment, session start/revocation, access evaluation, privacy decisions,
+  and security-agent registration;
+- batch mutation guardrail: `batch_auth_mutation_requires_bytewax`.
 
 ## Adapter Boundaries
 
@@ -150,6 +210,7 @@ These integrations remain replaceable:
 - federated identity mesh adapters;
 - neuromorphic decision processors;
 - audit, notification, key management, multi-tenancy, and security services.
+- live Bytewax topology execution.
 
 Local package tests must not require those systems.
 
@@ -173,5 +234,23 @@ Local package tests must not require those systems.
   the same session ID in another tenant.
 - Tenant-qualified state allows duplicate IDs across tenants without collision.
 - API helpers and view models expose the same lifecycle state.
+- Security agents can be registered with supported runtime, supported role,
+  scope, disclosure, and policy evidence.
+- Unsupported security-agent runtime, missing scope, or undisclosed agent
+  contribution fails closed.
+- Batch AUTH mutation validation accepts Bytewax and denies other stream
+  providers.
+- Generated semantic model exposes the current login/dashboard route names,
+  security-agent route, provides/requires metadata, and Bytewax stream metadata.
 - Publish-plan and implementation-audit checks pass.
 - Legacy generated-package naming is removed from package tests.
+
+## Focused Proof Commands
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/python -c "from capabilities.common.auth import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json
+```

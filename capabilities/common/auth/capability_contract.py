@@ -10,7 +10,11 @@ the full runtime stack.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from numbers import Number
 from typing import Any
+
+SUPPORTED_SECURITY_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_SECURITY_AGENT_ROLES = ["identity_reviewer", "role_reviewer", "session_reviewer", "privacy_reviewer", "federation_reviewer"]
 
 
 @dataclass(frozen=True)
@@ -50,11 +54,48 @@ class CapabilityConfiguration:
 			"analytics_retention_days": 90,
 			"allow_behavioral_data_export": False
 		},
+		"security_agents": {
+			"agent_assist_enabled": True,
+			"agent_registration_required": True,
+			"agent_runtime_required": True,
+			"agent_scope_required": True,
+			"agent_contribution_disclosure_required": True,
+			"supported_runtimes": SUPPORTED_SECURITY_AGENT_RUNTIMES,
+			"allowed_roles": SUPPORTED_SECURITY_AGENT_ROLES
+		},
+		"governance": {
+			"tenant_isolation_required": True,
+			"audit_required": True,
+			"state_change_reason_required": True,
+			"batch_event_stream": "bytewax"
+		},
+		"observability": {
+			"audit_required": True,
+			"trace_required": True,
+			"identity_metrics_required": True,
+			"agent_activity_required": True,
+			"event_stream": "bytewax"
+		},
+		"adapters": {
+			"generated_app_runtime": "service.AuthService",
+			"api_helpers": "api_helpers.py",
+			"view_models": "view_models.py",
+			"event_stream": "bytewax",
+			"audit_sink": "audl",
+			"multi_tenancy": "mten",
+			"key_management": "keym",
+			"security": "secu",
+			"mfa": "mfau",
+			"biometrics": "biom"
+		},
 		"ui": {
 			"enable_trust_dashboard": True,
 			"enable_role_workbench": True,
 			"enable_behavioral_console": True,
-			"enable_federation_console": True
+			"enable_federation_console": True,
+			"enable_agent_panel": True,
+			"enable_audit": True,
+			"enable_analytics": True
 		},
 		"theme": {
 			"default_theme": "auth_trust_fabric",
@@ -70,6 +111,10 @@ class CapabilityConfiguration:
 			"sessions",
 			"federation",
 			"privacy",
+			"security_agents",
+			"governance",
+			"observability",
+			"adapters",
 			"ui",
 			"theme"
 		],
@@ -80,6 +125,10 @@ class CapabilityConfiguration:
 			"sessions": {"type": "object"},
 			"federation": {"type": "object"},
 			"privacy": {"type": "object"},
+			"security_agents": {"type": "object"},
+			"governance": {"type": "object"},
+			"observability": {"type": "object"},
+			"adapters": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -197,6 +246,14 @@ class CapabilityTheme:
 		"privacy_approval_queue": {
 			"icon": "file-check",
 			"status_style": "review-chip"
+		},
+		"security_agent_panel": {
+			"icon": "bot",
+			"status_style": "scope-chip"
+		},
+		"audit_timeline": {
+			"icon": "list-checks",
+			"status_style": "governance-chip"
 		}
 	})
 
@@ -293,6 +350,76 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "independent_privacy_budget_reviewer_required",
 				"required_action": "route_to_independent_privacy_reviewer"
 			}
+		),
+		CapabilityRule(
+			name="security_agent_requires_registration",
+			description="AI security agents must be registered.",
+			condition={"security_agent_present": True, "agent_registered": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_registration_required",
+				"required_action": "register_security_agent"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_runtime_supported",
+			description="AI security agents must use a supported runtime.",
+			condition={"security_agent_present": True, "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_runtime_not_supported",
+				"required_action": "choose_supported_security_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_role_supported",
+			description="AI security agents must use a supported role.",
+			condition={"security_agent_present": True, "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_role_not_supported",
+				"required_action": "choose_supported_security_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_requires_scope",
+			description="AI security agents require explicit scope.",
+			condition={"security_agent_present": True, "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_scope_required",
+				"required_action": "set_security_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_requires_disclosure",
+			description="AI security-agent contributions require disclosure.",
+			condition={"security_agent_present": True, "agent_contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_disclosure_required",
+				"required_action": "disclose_security_agent"
+			}
+		),
+		CapabilityRule(
+			name="auth_state_change_requires_audit",
+			description="AUTH lifecycle state changes require audit evidence.",
+			condition={"state_change_requested": True, "audit_event_recorded": False},
+			effect={
+				"decision": "deny",
+				"reason": "auth_audit_event_required",
+				"required_action": "record_auth_audit_event"
+			}
+		),
+		CapabilityRule(
+			name="batch_auth_mutation_requires_bytewax",
+			description="Batch AUTH mutations must use Bytewax event streams.",
+			condition={"requested_operation": "batch_auth_mutation", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_event_stream_required",
+				"required_action": "use_bytewax_event_stream"
+			}
 		)
 	]
 
@@ -300,8 +427,8 @@ def default_rules() -> list[CapabilityRule]:
 def ui_manifest() -> dict[str, Any]:
 	"""Return AUTH UI surface manifest."""
 	routes = [
-		CapabilityUIRoute("login", "/auth/revolutionary/login", "RevolutionaryLoginScreen", "public", "Access"),
-		CapabilityUIRoute("dashboard", "/auth/revolutionary/dashboard", "RevolutionaryAuthenticationDashboard", "auth:view", "Overview"),
+		CapabilityUIRoute("login", "/auth/access/login", "AuthenticationLoginScreen", "public", "Access"),
+		CapabilityUIRoute("dashboard", "/auth/access/dashboard", "AuthenticationDashboard", "auth:view", "Overview"),
 		CapabilityUIRoute("role_workbench", "/auth/roles/workbench", "RoleWorkbench", "auth:manage_roles", "Authorization"),
 		CapabilityUIRoute("role_approvals", "/auth/roles/approvals", "RoleApprovalQueue", "auth:approve_roles", "Authorization"),
 		CapabilityUIRoute("sessions", "/auth/sessions", "SessionTrustCenter", "auth:manage_sessions", "Access"),
@@ -317,6 +444,9 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("privacy_reviews", "/auth/privacy/reviews", "PrivacyBudgetApprovalQueue", "auth:approve_privacy", "Governance"),
 		CapabilityUIRoute("neuromorphic_dashboard", "/auth/neuromorphic/dashboard", "NeuromorphicDecisionConsole", "auth:view_risk", "Intelligence"),
 		CapabilityUIRoute("federated_mesh", "/auth/federated/mesh", "FederatedIdentityMeshConsole", "auth:manage_federation", "Federation"),
+		CapabilityUIRoute("security_agents", "/auth/security/agents", "SecurityAgentPanel", "auth:approve_roles", "Governance"),
+		CapabilityUIRoute("audit", "/auth/audit", "AuthAuditTrail", "auth:admin", "Governance"),
+		CapabilityUIRoute("analytics", "/auth/analytics", "AuthAnalytics", "auth:view", "Operations"),
 		CapabilityUIRoute("metrics", "/auth/metrics/overview", "AuthenticationMetricsOverview", "auth:admin", "Operations")
 	]
 	return {
@@ -328,6 +458,40 @@ def ui_manifest() -> dict[str, Any]:
 		"requires_theme": True
 	}
 
+def streaming_manifest() -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for AUTH."""
+	return {
+		"processor": "bytewax",
+		"topic": "apg.auth.lifecycle",
+		"state": [
+			"identities",
+			"roles",
+			"role_approvals",
+			"assignments",
+			"sessions",
+			"access_decisions",
+			"privacy_queries",
+			"privacy_approvals",
+			"security_agents",
+			"audit_events"
+		],
+		"events": [
+			"identity_registered",
+			"role_defined",
+			"role_assignment_approval_requested",
+			"role_assignment_approval_decided",
+			"role_assigned",
+			"session_started",
+			"session_revoked",
+			"access_evaluated",
+			"privacy_budget_approval_requested",
+			"privacy_budget_approval_decided",
+			"privacy_query_evaluated",
+			"security_agent_registered"
+		],
+		"batch_mutation_guardrail": "batch_auth_mutation_requires_bytewax"
+	}
+
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable AUTH capability contract."""
@@ -336,6 +500,15 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "auth",
 		"display_name": "Authentication & RBAC",
+		"provides": [
+			"identity_registry",
+			"role_governance",
+			"session_control",
+			"access_decisions",
+			"privacy_budget_governance",
+			"security_agents"
+		],
+		"requires": ["audl", "mten", "keym", "secu"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -347,7 +520,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
-		}
+		},
+		"streaming": streaming_manifest()
 	}
 
 
@@ -358,9 +532,28 @@ def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
 
 def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 	for key, expected in condition.items():
-		if key.endswith("_gt"):
+		if key.endswith("_lte"):
+			field_name = key[:-4]
+			actual = context.get(field_name)
+			if not isinstance(actual, Number) or not actual <= expected:
+				return False
+		elif key.endswith("_lt"):
 			field_name = key[:-3]
-			if not context.get(field_name, 0) > expected:
+			actual = context.get(field_name)
+			if not isinstance(actual, Number) or not actual < expected:
+				return False
+		elif key.endswith("_gt"):
+			field_name = key[:-3]
+			actual = context.get(field_name)
+			if not isinstance(actual, Number) or not actual > expected:
+				return False
+		elif key.endswith("_gte"):
+			field_name = key[:-4]
+			actual = context.get(field_name)
+			if not isinstance(actual, Number) or not actual >= expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

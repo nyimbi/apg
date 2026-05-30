@@ -2,105 +2,89 @@
 
 ## Current State
 
-AUTH has a rich production-oriented authentication module with advanced
-behavioral, biometric, quantum-safe, federation, privacy, Flask API, and
-Flask-AppBuilder surfaces. It also has a dependency-light `AuthService`,
-capability contract, package evidence, and contract tests.
+AUTH has a production-oriented authentication module plus a dependency-light
+package surface for generated APG applications. The package already covers
+identity registration, tenant-aware role governance, role-assignment approval,
+session lifecycle, access decisions, privacy-budget approvals, audit events,
+API helpers, view models, and generated package evidence.
 
-The package-level composition gap is that privileged role assignment and
-privacy-budget exhaustion can be represented as caller-supplied booleans instead
-of first-class approval state, session revocation is not tenant-addressable, and
-the dependency-light state stores are not fully tenant-qualified. Generated APG
-applications need a fail-closed, composable lifecycle for identity, role
-approval, privacy approval, assignment, session, access, privacy, view models,
-and audit evidence.
+The current packet closes the remaining composition gap for AI-assisted AUTH
+governance: security agents must be first-class, governed participants; batch
+AUTH mutation must declare the Bytewax lifecycle stream; route names should
+avoid stale legacy naming; and package documentation must describe how builders
+compose AUTH into executable applications.
 
-## Packet 1: Governed Role, Privacy, And Access Lifecycle
+## Packet: Security-Agent And Bytewax Governance
 
-Deliver a focused lifecycle packet:
+Deliver a focused lifecycle and guardrail packet:
 
-- add package-level role-assignment approval state;
-- add package-level privacy-budget approval state;
-- key mutable service stores by tenant plus record ID;
-- request role-assignment approval with requester and justification evidence;
-- approve or reject role-assignment requests with independent reviewer notes;
-- assign administrative roles only with approved matching approval evidence;
-- request and decide privacy-budget approvals with independent reviewer notes;
-- complete budget-exhausted privacy queries only with matching approved
-  privacy-budget approval evidence;
-- require real tenant actors with role-backed permissions before requesting,
-  deciding, or applying approval-governed changes;
-- infer privileged MFA requirements from admin permissions and assigned
-  privileged roles when access callers omit a permission tier;
-- mutate privacy budgets only on tenant-local identity records;
-- revoke tenant-local sessions by tenant without impacting duplicate session IDs
-  in other tenants;
-- preserve identity, role, session, access, privacy, and audit lifecycles;
-- add API-helper and view-model surfaces for generated APG applications;
-- update contract routes, rules, theme metadata, semantic evidence, and release
-  evidence;
-- rename generated-package tests to package contract naming;
-- update package documentation and progress evidence.
+- add a practical root `README.md`;
+- keep `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` aligned with the
+  executable package surface;
+- add first-class AI security-agent configuration for Codex, Claude Code,
+  OpenCode, and Pi style runtimes;
+- require security-agent registration, supported runtime, supported role,
+  explicit scope, and contribution disclosure;
+- add `AuthSecurityAgent` model state;
+- add service, API-helper, and view-model methods for security-agent
+  registration and listing;
+- add Bytewax stream metadata to the contract and generated semantic model;
+- require Bytewax for batch AUTH mutation intent;
+- expose security-agent, audit, analytics, and settings UI state;
+- clean stale login/dashboard route names in the contract;
+- refresh generated package evidence from the live contract;
+- extend focused tests for the new rules and view/API surfaces;
+- record progress evidence and commit the verified slice.
 
 ## Implementation Steps
 
-1. Extend `models.py` with `AuthRoleAssignmentApproval` and
-   `AuthPrivacyBudgetApproval`.
-2. Update `service.py` so identities, roles, approvals, assignments, sessions,
-   decisions, privacy queries, privacy approvals, and audit events are
-   tenant-qualified.
-3. Add role approval request/decision methods and enforce approved evidence in
-   `assign_role`.
-4. Add privacy-budget approval request/decision methods and enforce approved
-   evidence in `run_privacy_query`.
-5. Add tenant-scoped session revocation for duplicate tenant-local session IDs.
-6. Add actor permission checks for role approval, role assignment,
-   privacy-budget approval, and privacy override decisions.
-7. Infer privileged access tier for admin permissions and assigned privileged
-   roles.
-8. Restrict privacy-budget mutation to tenant-local identity records.
-9. Add `api_helpers.py` for dependency-light generated application calls.
-10. Add `view_models.py` for trust dashboard, role workbench, approval queue,
-   session center, access console, privacy center, and audit surfaces.
-11. Update `capability_contract.py` with role-approval and privacy-approval
-   routes, independent reviewer rules, and theme components.
-12. Update registration metadata with role-approval and privacy-review
-   capabilities, endpoints, and permissions.
-13. Replace stale embedded semantic evidence in `app.py` with contract-derived
-   evidence.
-14. Extend package tests with positive identity-role-approval-assignment-session
-   access-privacy approval coverage and negative direct-admin-assignment,
-   rejected approval, self-approval, missing notes, tenant-mismatch,
-   cross-tenant privacy, raw boolean bypass, duplicate-ID isolation,
-   API-helper, and view-model coverage.
-15. Rename generated-package tests to package contract naming.
-16. Update `cap_spec.md` with the current executable lifecycle and proof
-    commands.
-17. Run focused package proof, implementation audit, publish-plan, review, and
-    diff checks.
+1. Extend `capability_contract.py` with security-agent, governance,
+   observability, adapter, UI, theme, provides/requires, and Bytewax stream
+   metadata.
+2. Extend the rule engine with security-agent registration/runtime/role/scope/
+   disclosure guardrails and Bytewax batch mutation enforcement.
+3. Add `AuthSecurityAgent` to `models.py`.
+4. Extend `AuthService` with tenant-qualified security-agent state,
+   registration, listing, dashboard counts, token normalization, and batch
+   mutation validation.
+5. Extend `api_helpers.py` with security-agent and batch mutation helpers.
+6. Extend `view_models.py` with security-agent, analytics, audit, settings,
+   and stream surfaces.
+7. Update focused tests to cover contract shape, rule evaluation, service,
+   API helpers, view models, generated package evidence, and Bytewax metadata.
+8. Replace stale `cap_spec.md` content with a pointer to the active spec.
+9. Add `README.md` and update `SPECIFICATION.md`.
+10. Regenerate `app.py`, `semantic_model.json`, `package_manifest.json`, and
+    `release_report.json` from the contract.
+11. Run focused compile, package tests, self-test, implementation audit,
+    publish-plan, stale-marker scan for touched files, and diff checks.
 
 ## Review Checklist
 
-- Identity, role, approval, assignment, session, decision, privacy, and audit
-  state is tenant-qualified.
-- Administrative role assignment requires approved matching approval evidence.
-- Approval reviewers cannot approve their own requests.
-- Approval decisions require reviewer identity and notes.
-- Locked users, missing MFA, high-risk sessions, untrusted federation, and
-  tenant mismatches fail closed.
-- Privacy budget exhaustion creates review-required state unless review is
-  approved with matching privacy-budget approval evidence.
-- Caller-supplied booleans do not bypass privileged role assignment or
-  budget-exhausted privacy queries.
-- Approval and assignment actors must exist and hold the required tenant
-  permissions.
-- Admin permissions require MFA even when callers omit `requested_permission_tier`.
-- Cross-tenant privacy queries fail unless a tenant-local budget identity
-  exists.
-- Tenant-local session revocation does not affect duplicate session IDs in
-  other tenants.
+- Security-agent runtime and role values normalize predictable CLI/provider
+  names.
+- Unsupported agent runtimes fail closed.
+- Unsupported agent roles fail closed.
+- Missing security-agent scope fails closed.
+- Undisclosed security-agent contribution fails closed.
+- Batch AUTH mutation fails unless `event_stream` is `bytewax`.
+- Tenant-qualified state remains intact for identity, role, approval,
+  assignment, session, access, privacy, security-agent, and audit records.
 - API helpers expose the same behavior as service methods.
-- View models expose dashboard, role, approval, session, access, privacy,
-  federation, theme, and audit state.
-- Production JWT, biometric, behavioral, quantum, federation, and web-server
+- View models expose dashboard, agent, audit, analytics, settings, and stream
+  state.
+- Generated semantic model exposes the current route names, provides/requires
+  metadata, security-agent configuration, and Bytewax stream metadata.
+- Production JWT, biometric, behavioral, cryptographic, federation, and web
   stacks remain adapter boundaries.
+
+## Verification Commands
+
+```bash
+./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py
+./.venv/bin/python -c "from capabilities.common.auth import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json
+git diff --check -- capabilities/common/auth docs/progress_log.md
+```

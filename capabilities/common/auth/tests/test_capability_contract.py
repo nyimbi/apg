@@ -74,9 +74,17 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"sessions",
 		"federation",
 		"privacy",
+		"security_agents",
+		"governance",
+		"observability",
+		"adapters",
 		"ui",
 		"theme"
 	]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["configuration"]["security_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert set(contract["provides"]) >= {"identity_registry", "role_governance", "security_agents"}
+	assert contract["requires"] == ["audl", "mten", "keym", "secu"]
 	assert len(contract["rule_engine"]["rules"]) >= 9
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"login",
@@ -90,6 +98,9 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"behavioral_analysis",
 		"privacy_analytics",
 		"privacy_reviews",
+		"security_agents",
+		"audit",
+		"analytics",
 		"federated_mesh",
 		"metrics"
 	}
@@ -123,6 +134,10 @@ def test_rule_engine_denies_unsafe_privileged_access():
 		"requested_operation": "approve_privacy_budget",
 		"reviewer_same_as_requester": True,
 	})
+	batch_result = evaluate_capability_rules({
+		"requested_operation": "batch_auth_mutation",
+		"event_stream": "memory",
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -135,6 +150,7 @@ def test_rule_engine_denies_unsafe_privileged_access():
 	}
 	assert approval_result["matched_rules"] == ["role_assignment_approval_requires_independent_reviewer"]
 	assert privacy_approval_result["matched_rules"] == ["privacy_budget_approval_requires_independent_reviewer"]
+	assert batch_result["matched_rules"] == ["batch_auth_mutation_requires_bytewax"]
 
 
 def test_capability_info_and_registration_include_manifest_and_theme():
@@ -245,6 +261,7 @@ def test_auth_service_runs_identity_role_session_access_and_privacy_lifecycle():
 		"pending_role_approval_count": 0,
 		"privacy_approval_count": 0,
 		"pending_privacy_approval_count": 0,
+		"security_agent_count": 0,
 		"denied_decision_count": 0,
 		"privacy_review_count": 0,
 		"average_trust_score": session["trust_score"],
@@ -415,6 +432,54 @@ def test_auth_service_keeps_duplicate_ids_isolated_by_tenant():
 		)
 
 
+def test_auth_security_agents_and_bytewax_guardrails():
+	service = AuthService()
+	agent = service.register_security_agent(
+		agent_id="security-agent-1",
+		tenant_id="tenant-auth-agent",
+		name="Role Review Assistant",
+		runtime="claude-code",
+		role="role-reviewer",
+		scope="privileged role review summaries",
+		contribution_disclosed=True,
+		policy_ref="auth-agent-policy",
+	)
+	batch = service.validate_batch_auth_mutation(
+		tenant_id="tenant-auth-agent",
+		event_stream="bytewax",
+		mutation_count=2,
+	)
+	dashboard = view_models.dashboard_model(service, "tenant-auth-agent")
+	agents = view_models.security_agents_model(service, "tenant-auth-agent")
+	analytics = view_models.analytics_model(service, "tenant-auth-agent")
+	settings = view_models.settings_model("tenant-auth-agent")
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "role_reviewer"
+	assert batch["accepted"] is True
+	assert dashboard["security_agents"][0]["id"] == "security-agent-1"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert analytics["summary"]["security_agent_count"] == 1
+	assert settings["streaming"]["processor"] == "bytewax"
+
+	with pytest.raises(PermissionError, match="security_agent_runtime_not_supported"):
+		service.register_security_agent(
+			agent_id="bad-runtime",
+			tenant_id="tenant-auth-agent",
+			name="Bad Runtime",
+			runtime="unsupported",
+			role="role_reviewer",
+			scope="role review",
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_auth_mutation(
+			tenant_id="tenant-auth-agent",
+			event_stream="memory",
+			mutation_count=1,
+		)
+
+
 def test_api_helpers_and_view_models_expose_auth_lifecycle():
 	identity = api_helpers.register_identity({
 		"id": "api-user",
@@ -520,6 +585,27 @@ def test_api_helpers_and_view_models_expose_auth_lifecycle():
 	assert approval_queue["decided_approvals"][0]["id"] == "api-approval"
 	assert privacy_center["decided_approvals"][0]["id"] == "api-privacy-approval"
 	assert view_models.dashboard_model(tenant_id=identity["tenant_id"])["summary"]["admin_assignment_count"] == 1
+
+
+def test_api_helpers_expose_security_agents_and_batch_guardrail():
+	agent = api_helpers.register_security_agent({
+		"id": "api-security-agent",
+		"tenant_id": "tenant-api-security-agent",
+		"name": "API Security Agent",
+		"runtime": "opencode",
+		"role": "identity_reviewer",
+		"scope": "identity risk review",
+		"contribution_disclosed": True,
+	})
+	batch = api_helpers.validate_batch_auth_mutation({
+		"tenant_id": "tenant-api-security-agent",
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+	})
+
+	assert agent["runtime"] == "opencode"
+	assert api_helpers.list_security_agents("tenant-api-security-agent")[0]["id"] == "api-security-agent"
+	assert batch["accepted"] is True
 
 
 def test_auth_service_infers_privileged_access_tier_from_permission_and_role():
