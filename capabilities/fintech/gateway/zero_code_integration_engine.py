@@ -1,8 +1,8 @@
 """
-Zero-Code Integration Engine - Revolutionary Visual Payment Integration
+Zero-Code Integration Engine - Advanced Visual Payment Integration
 
 Visual drag-and-drop integration builder with auto-generated SDKs, smart API discovery,
-and one-click platform integrations that makes payment integration 10x easier.
+and one-click platform integrations that makes payment integration measurable easier.
 
 © 2025 Datacraft. All rights reserved.
 """
@@ -170,7 +170,7 @@ class SDKGenerationRequest(BaseModel):
 
 class ZeroCodeIntegrationEngine:
 	"""
-	Revolutionary Zero-Code Integration Engine
+	Advanced Zero-Code Integration Engine
 	
 	Provides visual drag-and-drop payment flow builder, auto-generated SDKs,
 	smart API discovery, and one-click platform integrations.

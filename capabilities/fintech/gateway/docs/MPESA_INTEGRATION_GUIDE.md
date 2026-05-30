@@ -531,4 +531,4 @@ mpesa_config.monitoring.log_all_responses = True
 
 ---
 
-This implementation provides a complete, production-ready MPESA integration with all features fully implemented. No mocking, no placeholders - just real, working code ready for production deployment.
+This implementation provides a complete, production-ready MPESA integration with all features fully implemented. No mocking, no extension points - just real, working code ready for production deployment.

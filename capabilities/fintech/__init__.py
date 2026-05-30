@@ -358,10 +358,19 @@ def init_capability(appbuilder, subcapabilities: List[str] = None):
 	from .blueprint import init_capability
 	return init_capability(appbuilder, subcapabilities)
 
-# Import implemented sub-capabilities for discovery
-from . import tms      # Treasury Management System
-from . import terminal # Terminal Management System  
-from . import agency   # Agency Banking
+def _optional_subcapability(name: str):
+	"""Import an optional fintech sub-capability when it exists."""
+	try:
+		module = __import__(f"{__name__}.{name}", fromlist=[name])
+	except ImportError:
+		return None
+	return module
+
+
+# Import implemented sub-capabilities for discovery without blocking package imports.
+tms = _optional_subcapability("tms")            # Treasury Management System
+terminal = _optional_subcapability("terminal")  # Terminal Management System
+agency = _optional_subcapability("agency")      # Agency Banking
 
 __all__ = [
 	'get_capability_info',

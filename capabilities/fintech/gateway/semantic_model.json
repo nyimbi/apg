@@ -1,60 +1,212 @@
 {
-  "agents": {},
   "app": {
-    "description": "Payment Gateway package-backed APG capability",
-    "entity_count": 0,
+    "description": "Fintech Gateway package-backed APG capability",
+    "entity_count": 12,
     "name": "fintech_gateway",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "fintech_gateway": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Fintech",
-          "enabled": true,
-          "id": "fintech_gateway",
-          "name": "Payment Gateway",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fintech/gateway/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "customer_relationship_management": "adapter",
+          "event_stream": "bytewax",
+          "ledger": "adapter",
+          "notification": "adapter",
+          "provider_network": "adapter",
+          "theme": "adapter",
+          "vault": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "authorization": {
+          "approval_required_for_high_value": true,
+          "blocked_risk_denied": true,
+          "provider_required": true,
+          "routing_decision_required": true
+        },
+        "capture": {
+          "authorized_payment_required": true,
+          "capture_amount_positive_required": true,
+          "overcapture_blocked": true
+        },
+        "disputes": {
+          "owner_required": true,
+          "payment_required": true,
+          "reason_required": true,
+          "resolution_review_required": true,
+          "supported_reasons": [
+            "fraud",
+            "duplicate",
+            "product_not_received",
+            "service_not_provided",
+            "authorization",
+            "processing_error",
+            "other"
+          ]
+        },
+        "gateway_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "merchant_underwriter",
+            "routing_reviewer",
+            "fraud_reviewer",
+            "settlement_reviewer",
+            "dispute_reviewer",
+            "provider_operations_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "merchants": {
+          "country_required": true,
+          "kyc_required": true,
+          "legal_name_required": true,
+          "manual_review_required_for_high_risk": true,
+          "merchant_code_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_dispute_events": true,
+          "emit_merchant_events": true,
+          "emit_payment_events": true,
+          "emit_provider_events": true,
+          "emit_risk_events": true,
+          "emit_settlement_events": true,
+          "emit_webhook_events": true,
+          "event_stream": "apg.fintech.gateway.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payment_intents": {
+          "amount_positive_required": true,
+          "currency_supported_required": true,
+          "merchant_required": true,
+          "payment_method_required": true,
+          "risk_review_required_for_high_risk": true
+        },
+        "payment_methods": {
+          "customer_reference_required": true,
+          "method_type_required": true,
+          "supported_methods": [
+            "card",
+            "bank_transfer",
+            "mobile_money",
+            "wallet",
+            "cash_voucher"
+          ],
+          "token_reference_required": true
+        },
+        "provider_connections": {
+          "credential_reference_required": true,
+          "provider_required": true,
+          "provider_type_required": true,
+          "supported_provider_types": [
+            "card",
+            "bank",
+            "mobile_money",
+            "wallet",
+            "settlement",
+            "fraud"
+          ],
+          "supported_providers": [
+            "stripe",
+            "adyen",
+            "mpesa",
+            "dpo",
+            "flutterwave",
+            "pesapal",
+            "paypal",
+            "manual"
+          ]
+        },
+        "refunds": {
+          "captured_payment_required": true,
+          "overrefund_blocked": true,
+          "refund_amount_positive_required": true,
+          "review_required_for_large_refund": true
+        },
+        "settlements": {
+          "amount_nonnegative_required": true,
+          "provider_required": true,
+          "reconciliation_review_required_for_variance": true,
+          "settlement_reference_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "fintech_gateway_operations"
+          "default_theme": "fintech_gateway_control"
         },
         "ui": {
+          "enable_agents": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_disputes": true,
+          "enable_merchants": true,
+          "enable_payment_methods": true,
+          "enable_payments": true,
+          "enable_providers": true,
+          "enable_risk": true,
+          "enable_routing": true,
+          "enable_settings": true,
+          "enable_settlements": true,
+          "enable_webhooks": true
+        },
+        "webhooks": {
+          "event_id_required": true,
+          "idempotency_required": true,
+          "provider_required": true,
+          "signature_required": true
         }
       },
-      "erp_modules": [
-        "fintech"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Payment Gateway",
+      "name": "Fintech Gateway",
       "provides": [
-        "fintech_gateway_operations"
+        "merchant_onboarding_lifecycle",
+        "provider_connection_lifecycle",
+        "payment_method_tokenization_workflow",
+        "payment_intent_lifecycle",
+        "payment_routing_workflow",
+        "fraud_risk_review_workflow",
+        "authorization_capture_workflow",
+        "refund_lifecycle",
+        "webhook_ingestion_workflow",
+        "settlement_reconciliation_workflow",
+        "payment_dispute_workflow",
+        "gateway_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "keym",
+        "encr",
+        "cash_management",
+        "accounts_receivable",
+        "customer_relationship_management",
+        "business_intelligence"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Payment Gateway operations require tenant context.",
+            "description": "Gateway operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +219,604 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Payment Gateway write operations require policy enforcement.",
+            "description": "Gateway writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "gateway_write_requires_policy"
           },
           {
             "condition": {
+              "merchant_code_present": false,
+              "operation": "onboard_merchant"
+            },
+            "description": "Merchants require merchant code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_code_required",
+              "required_action": "set_merchant_code"
+            },
+            "name": "merchant_requires_code"
+          },
+          {
+            "condition": {
+              "legal_name_present": false,
+              "operation": "onboard_merchant"
+            },
+            "description": "Merchants require legal name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_legal_name_required",
+              "required_action": "set_merchant_legal_name"
+            },
+            "name": "merchant_requires_legal_name"
+          },
+          {
+            "condition": {
+              "country_present": false,
+              "operation": "onboard_merchant"
+            },
+            "description": "Merchants require country.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_country_required",
+              "required_action": "set_country"
+            },
+            "name": "merchant_requires_country"
+          },
+          {
+            "condition": {
+              "operation": "onboard_merchant",
               "review_recorded": false,
               "risk_level": "high"
             },
-            "description": "High-risk Payment Gateway operations require review.",
+            "description": "High-risk merchant onboarding requires review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "merchant_review_required",
+              "required_action": "record_merchant_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "high_risk_merchant_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "connect_provider",
+              "provider_supported": false
+            },
+            "description": "Provider must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_not_supported",
+              "required_action": "select_supported_provider"
+            },
+            "name": "provider_name_supported"
+          },
+          {
+            "condition": {
+              "operation": "connect_provider",
+              "provider_type_supported": false
+            },
+            "description": "Provider type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_type_not_supported",
+              "required_action": "select_supported_provider_type"
+            },
+            "name": "provider_type_supported"
+          },
+          {
+            "condition": {
+              "credential_reference_present": false,
+              "operation": "connect_provider"
+            },
+            "description": "Provider connections require credential reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_credential_reference_required",
+              "required_action": "attach_credential_reference"
+            },
+            "name": "provider_requires_credentials"
+          },
+          {
+            "condition": {
+              "merchant_present": false,
+              "operation": "tokenize_payment_method"
+            },
+            "description": "Payment methods require merchant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_method_merchant_required",
+              "required_action": "select_merchant"
+            },
+            "name": "payment_method_requires_merchant"
+          },
+          {
+            "condition": {
+              "customer_reference_present": false,
+              "operation": "tokenize_payment_method"
+            },
+            "description": "Payment methods require customer reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_reference_required",
+              "required_action": "attach_customer_reference"
+            },
+            "name": "payment_method_requires_customer"
+          },
+          {
+            "condition": {
+              "operation": "tokenize_payment_method",
+              "payment_method_type_supported": false
+            },
+            "description": "Payment method type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_method_type_not_supported",
+              "required_action": "select_supported_payment_method_type"
+            },
+            "name": "payment_method_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "tokenize_payment_method",
+              "token_reference_present": false
+            },
+            "description": "Payment methods require token reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "token_reference_required",
+              "required_action": "attach_token_reference"
+            },
+            "name": "payment_method_requires_token"
+          },
+          {
+            "condition": {
+              "merchant_present": false,
+              "operation": "create_payment_intent"
+            },
+            "description": "Payment intents require merchant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "merchant_required",
+              "required_action": "select_merchant"
+            },
+            "name": "payment_intent_requires_merchant"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "create_payment_intent"
+            },
+            "description": "Payment intent amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_amount_positive_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "payment_intent_amount_positive"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_payment_intent"
+            },
+            "description": "Payment intent currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "payment_intent_currency_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_payment_intent",
+              "payment_method_present": false
+            },
+            "description": "Payment intents require payment method.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_method_required",
+              "required_action": "select_payment_method"
+            },
+            "name": "payment_intent_requires_method"
+          },
+          {
+            "condition": {
+              "operation": "assess_payment_risk",
+              "payment_present": false
+            },
+            "description": "Risk assessment requires payment intent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_required",
+              "required_action": "select_payment"
+            },
+            "name": "risk_requires_payment"
+          },
+          {
+            "condition": {
+              "operation": "assess_payment_risk",
+              "review_recorded": false,
+              "risk_level": "high"
+            },
+            "description": "High-risk payments require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "payment_risk_review_required",
+              "required_action": "record_risk_review"
+            },
+            "name": "high_risk_payment_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "authorize_payment",
+              "risk_level": "blocked"
+            },
+            "description": "Blocked risk denies authorization.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_risk_blocked",
+              "required_action": "resolve_risk_block"
+            },
+            "name": "blocked_risk_denies_authorization"
+          },
+          {
+            "condition": {
+              "operation": "authorize_payment",
+              "payment_present": false
+            },
+            "description": "Authorization requires payment intent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_intent_required",
+              "required_action": "select_payment_intent"
+            },
+            "name": "authorization_requires_payment_intent"
+          },
+          {
+            "condition": {
+              "operation": "authorize_payment",
+              "provider_present": false
+            },
+            "description": "Payment authorization requires provider.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_required",
+              "required_action": "select_provider"
+            },
+            "name": "authorization_requires_provider"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "high_value": true,
+              "operation": "authorize_payment"
+            },
+            "description": "High-value authorization requires approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_value_payment_approval_required",
+              "required_action": "record_payment_approval"
+            },
+            "name": "high_value_authorization_requires_approval"
+          },
+          {
+            "condition": {
+              "authorized_payment_present": false,
+              "operation": "capture_payment"
+            },
+            "description": "Capture requires authorized payment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "authorized_payment_required",
+              "required_action": "authorize_payment"
+            },
+            "name": "capture_requires_authorized_payment"
+          },
+          {
+            "condition": {
+              "capture_amount_lte": 0,
+              "operation": "capture_payment"
+            },
+            "description": "Capture amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "capture_amount_positive_required",
+              "required_action": "set_positive_capture_amount"
+            },
+            "name": "capture_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "capture_payment",
+              "overcapture": true
+            },
+            "description": "Capture cannot exceed authorized amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "overcapture_blocked",
+              "required_action": "reduce_capture_amount"
+            },
+            "name": "capture_blocks_overcapture"
+          },
+          {
+            "condition": {
+              "captured_payment_present": false,
+              "operation": "refund_payment"
+            },
+            "description": "Refund requires captured payment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "captured_payment_required",
+              "required_action": "capture_payment"
+            },
+            "name": "refund_requires_captured_payment"
+          },
+          {
+            "condition": {
+              "operation": "refund_payment",
+              "refund_amount_lte": 0
+            },
+            "description": "Refund amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "refund_amount_positive_required",
+              "required_action": "set_positive_refund_amount"
+            },
+            "name": "refund_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "refund_payment",
+              "overrefund": true
+            },
+            "description": "Refund cannot exceed captured balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "overrefund_blocked",
+              "required_action": "reduce_refund_amount"
+            },
+            "name": "refund_blocks_overrefund"
+          },
+          {
+            "condition": {
+              "large_refund": true,
+              "operation": "refund_payment",
+              "review_recorded": false
+            },
+            "description": "Large refunds require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "refund_review_required",
+              "required_action": "record_refund_review"
+            },
+            "name": "large_refund_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "ingest_webhook",
+              "provider_present": false
+            },
+            "description": "Webhook ingestion requires provider.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_provider_required",
+              "required_action": "attach_provider"
+            },
+            "name": "webhook_requires_provider"
+          },
+          {
+            "condition": {
+              "event_id_present": false,
+              "operation": "ingest_webhook"
+            },
+            "description": "Webhook ingestion requires event ID.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_event_id_required",
+              "required_action": "attach_event_id"
+            },
+            "name": "webhook_requires_event_id"
+          },
+          {
+            "condition": {
+              "operation": "ingest_webhook",
+              "signature_present": false
+            },
+            "description": "Webhook ingestion requires signature.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_signature_required",
+              "required_action": "attach_signature"
+            },
+            "name": "webhook_requires_signature"
+          },
+          {
+            "condition": {
+              "idempotency_key_present": false,
+              "operation": "ingest_webhook"
+            },
+            "description": "Webhook ingestion requires idempotency key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "webhook_idempotency_required",
+              "required_action": "attach_idempotency_key"
+            },
+            "name": "webhook_requires_idempotency"
+          },
+          {
+            "condition": {
+              "operation": "record_settlement",
+              "provider_present": false
+            },
+            "description": "Settlement requires provider.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_provider_required",
+              "required_action": "attach_provider"
+            },
+            "name": "settlement_requires_provider"
+          },
+          {
+            "condition": {
+              "operation": "record_settlement",
+              "settlement_reference_present": false
+            },
+            "description": "Settlement requires reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_reference_required",
+              "required_action": "attach_settlement_reference"
+            },
+            "name": "settlement_requires_reference"
+          },
+          {
+            "condition": {
+              "operation": "record_settlement",
+              "settlement_amount_lt": 0
+            },
+            "description": "Settlement amount cannot be negative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "settlement_amount_nonnegative_required",
+              "required_action": "set_nonnegative_settlement_amount"
+            },
+            "name": "settlement_amount_nonnegative"
+          },
+          {
+            "condition": {
+              "operation": "record_settlement",
+              "review_recorded": false,
+              "variance_detected": true
+            },
+            "description": "Settlement variance requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "settlement_variance_review_required",
+              "required_action": "record_settlement_review"
+            },
+            "name": "settlement_variance_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "open_dispute",
+              "payment_present": false
+            },
+            "description": "Disputes require payment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_required",
+              "required_action": "select_payment"
+            },
+            "name": "dispute_requires_payment"
+          },
+          {
+            "condition": {
+              "dispute_reason_supported": false,
+              "operation": "open_dispute"
+            },
+            "description": "Dispute reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reason_not_supported",
+              "required_action": "select_supported_reason"
+            },
+            "name": "dispute_reason_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_dispute",
+              "owner_present": false
+            },
+            "description": "Disputes require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "dispute_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "resolve_dispute",
+              "resolution_review_recorded": false
+            },
+            "description": "Dispute resolution requires review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_resolution_review_required",
+              "required_action": "record_resolution_review"
+            },
+            "name": "dispute_resolution_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "gateway_batch"
+            },
+            "description": "Gateway batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_gateway_batch_to_bytewax"
+            },
+            "name": "gateway_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "gateway_event"
+            },
+            "description": "Gateway events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_gateway_event_to_bytewax"
+            },
+            "name": "gateway_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "gateway_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "gateway_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "gateway_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged gateway actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_gateway_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +826,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Payment Gateway operations require tenant context.",
+          "description": "Gateway operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +839,604 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Payment Gateway write operations require policy enforcement.",
+          "description": "Gateway writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "gateway_write_requires_policy"
         },
         {
           "condition": {
+            "merchant_code_present": false,
+            "operation": "onboard_merchant"
+          },
+          "description": "Merchants require merchant code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_code_required",
+            "required_action": "set_merchant_code"
+          },
+          "name": "merchant_requires_code"
+        },
+        {
+          "condition": {
+            "legal_name_present": false,
+            "operation": "onboard_merchant"
+          },
+          "description": "Merchants require legal name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_legal_name_required",
+            "required_action": "set_merchant_legal_name"
+          },
+          "name": "merchant_requires_legal_name"
+        },
+        {
+          "condition": {
+            "country_present": false,
+            "operation": "onboard_merchant"
+          },
+          "description": "Merchants require country.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_country_required",
+            "required_action": "set_country"
+          },
+          "name": "merchant_requires_country"
+        },
+        {
+          "condition": {
+            "operation": "onboard_merchant",
             "review_recorded": false,
             "risk_level": "high"
           },
-          "description": "High-risk Payment Gateway operations require review.",
+          "description": "High-risk merchant onboarding requires review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "merchant_review_required",
+            "required_action": "record_merchant_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "high_risk_merchant_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "connect_provider",
+            "provider_supported": false
+          },
+          "description": "Provider must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_not_supported",
+            "required_action": "select_supported_provider"
+          },
+          "name": "provider_name_supported"
+        },
+        {
+          "condition": {
+            "operation": "connect_provider",
+            "provider_type_supported": false
+          },
+          "description": "Provider type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_type_not_supported",
+            "required_action": "select_supported_provider_type"
+          },
+          "name": "provider_type_supported"
+        },
+        {
+          "condition": {
+            "credential_reference_present": false,
+            "operation": "connect_provider"
+          },
+          "description": "Provider connections require credential reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_credential_reference_required",
+            "required_action": "attach_credential_reference"
+          },
+          "name": "provider_requires_credentials"
+        },
+        {
+          "condition": {
+            "merchant_present": false,
+            "operation": "tokenize_payment_method"
+          },
+          "description": "Payment methods require merchant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_method_merchant_required",
+            "required_action": "select_merchant"
+          },
+          "name": "payment_method_requires_merchant"
+        },
+        {
+          "condition": {
+            "customer_reference_present": false,
+            "operation": "tokenize_payment_method"
+          },
+          "description": "Payment methods require customer reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_reference_required",
+            "required_action": "attach_customer_reference"
+          },
+          "name": "payment_method_requires_customer"
+        },
+        {
+          "condition": {
+            "operation": "tokenize_payment_method",
+            "payment_method_type_supported": false
+          },
+          "description": "Payment method type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_method_type_not_supported",
+            "required_action": "select_supported_payment_method_type"
+          },
+          "name": "payment_method_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "tokenize_payment_method",
+            "token_reference_present": false
+          },
+          "description": "Payment methods require token reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "token_reference_required",
+            "required_action": "attach_token_reference"
+          },
+          "name": "payment_method_requires_token"
+        },
+        {
+          "condition": {
+            "merchant_present": false,
+            "operation": "create_payment_intent"
+          },
+          "description": "Payment intents require merchant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "merchant_required",
+            "required_action": "select_merchant"
+          },
+          "name": "payment_intent_requires_merchant"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "create_payment_intent"
+          },
+          "description": "Payment intent amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_amount_positive_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "payment_intent_amount_positive"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_payment_intent"
+          },
+          "description": "Payment intent currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "payment_intent_currency_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_payment_intent",
+            "payment_method_present": false
+          },
+          "description": "Payment intents require payment method.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_method_required",
+            "required_action": "select_payment_method"
+          },
+          "name": "payment_intent_requires_method"
+        },
+        {
+          "condition": {
+            "operation": "assess_payment_risk",
+            "payment_present": false
+          },
+          "description": "Risk assessment requires payment intent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_required",
+            "required_action": "select_payment"
+          },
+          "name": "risk_requires_payment"
+        },
+        {
+          "condition": {
+            "operation": "assess_payment_risk",
+            "review_recorded": false,
+            "risk_level": "high"
+          },
+          "description": "High-risk payments require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "payment_risk_review_required",
+            "required_action": "record_risk_review"
+          },
+          "name": "high_risk_payment_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "authorize_payment",
+            "risk_level": "blocked"
+          },
+          "description": "Blocked risk denies authorization.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_risk_blocked",
+            "required_action": "resolve_risk_block"
+          },
+          "name": "blocked_risk_denies_authorization"
+        },
+        {
+          "condition": {
+            "operation": "authorize_payment",
+            "payment_present": false
+          },
+          "description": "Authorization requires payment intent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_intent_required",
+            "required_action": "select_payment_intent"
+          },
+          "name": "authorization_requires_payment_intent"
+        },
+        {
+          "condition": {
+            "operation": "authorize_payment",
+            "provider_present": false
+          },
+          "description": "Payment authorization requires provider.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_required",
+            "required_action": "select_provider"
+          },
+          "name": "authorization_requires_provider"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "high_value": true,
+            "operation": "authorize_payment"
+          },
+          "description": "High-value authorization requires approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_value_payment_approval_required",
+            "required_action": "record_payment_approval"
+          },
+          "name": "high_value_authorization_requires_approval"
+        },
+        {
+          "condition": {
+            "authorized_payment_present": false,
+            "operation": "capture_payment"
+          },
+          "description": "Capture requires authorized payment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "authorized_payment_required",
+            "required_action": "authorize_payment"
+          },
+          "name": "capture_requires_authorized_payment"
+        },
+        {
+          "condition": {
+            "capture_amount_lte": 0,
+            "operation": "capture_payment"
+          },
+          "description": "Capture amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "capture_amount_positive_required",
+            "required_action": "set_positive_capture_amount"
+          },
+          "name": "capture_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "capture_payment",
+            "overcapture": true
+          },
+          "description": "Capture cannot exceed authorized amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "overcapture_blocked",
+            "required_action": "reduce_capture_amount"
+          },
+          "name": "capture_blocks_overcapture"
+        },
+        {
+          "condition": {
+            "captured_payment_present": false,
+            "operation": "refund_payment"
+          },
+          "description": "Refund requires captured payment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "captured_payment_required",
+            "required_action": "capture_payment"
+          },
+          "name": "refund_requires_captured_payment"
+        },
+        {
+          "condition": {
+            "operation": "refund_payment",
+            "refund_amount_lte": 0
+          },
+          "description": "Refund amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "refund_amount_positive_required",
+            "required_action": "set_positive_refund_amount"
+          },
+          "name": "refund_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "refund_payment",
+            "overrefund": true
+          },
+          "description": "Refund cannot exceed captured balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "overrefund_blocked",
+            "required_action": "reduce_refund_amount"
+          },
+          "name": "refund_blocks_overrefund"
+        },
+        {
+          "condition": {
+            "large_refund": true,
+            "operation": "refund_payment",
+            "review_recorded": false
+          },
+          "description": "Large refunds require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "refund_review_required",
+            "required_action": "record_refund_review"
+          },
+          "name": "large_refund_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "ingest_webhook",
+            "provider_present": false
+          },
+          "description": "Webhook ingestion requires provider.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_provider_required",
+            "required_action": "attach_provider"
+          },
+          "name": "webhook_requires_provider"
+        },
+        {
+          "condition": {
+            "event_id_present": false,
+            "operation": "ingest_webhook"
+          },
+          "description": "Webhook ingestion requires event ID.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_event_id_required",
+            "required_action": "attach_event_id"
+          },
+          "name": "webhook_requires_event_id"
+        },
+        {
+          "condition": {
+            "operation": "ingest_webhook",
+            "signature_present": false
+          },
+          "description": "Webhook ingestion requires signature.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_signature_required",
+            "required_action": "attach_signature"
+          },
+          "name": "webhook_requires_signature"
+        },
+        {
+          "condition": {
+            "idempotency_key_present": false,
+            "operation": "ingest_webhook"
+          },
+          "description": "Webhook ingestion requires idempotency key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "webhook_idempotency_required",
+            "required_action": "attach_idempotency_key"
+          },
+          "name": "webhook_requires_idempotency"
+        },
+        {
+          "condition": {
+            "operation": "record_settlement",
+            "provider_present": false
+          },
+          "description": "Settlement requires provider.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_provider_required",
+            "required_action": "attach_provider"
+          },
+          "name": "settlement_requires_provider"
+        },
+        {
+          "condition": {
+            "operation": "record_settlement",
+            "settlement_reference_present": false
+          },
+          "description": "Settlement requires reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_reference_required",
+            "required_action": "attach_settlement_reference"
+          },
+          "name": "settlement_requires_reference"
+        },
+        {
+          "condition": {
+            "operation": "record_settlement",
+            "settlement_amount_lt": 0
+          },
+          "description": "Settlement amount cannot be negative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "settlement_amount_nonnegative_required",
+            "required_action": "set_nonnegative_settlement_amount"
+          },
+          "name": "settlement_amount_nonnegative"
+        },
+        {
+          "condition": {
+            "operation": "record_settlement",
+            "review_recorded": false,
+            "variance_detected": true
+          },
+          "description": "Settlement variance requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "settlement_variance_review_required",
+            "required_action": "record_settlement_review"
+          },
+          "name": "settlement_variance_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "open_dispute",
+            "payment_present": false
+          },
+          "description": "Disputes require payment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_required",
+            "required_action": "select_payment"
+          },
+          "name": "dispute_requires_payment"
+        },
+        {
+          "condition": {
+            "dispute_reason_supported": false,
+            "operation": "open_dispute"
+          },
+          "description": "Dispute reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reason_not_supported",
+            "required_action": "select_supported_reason"
+          },
+          "name": "dispute_reason_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_dispute",
+            "owner_present": false
+          },
+          "description": "Disputes require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "dispute_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "resolve_dispute",
+            "resolution_review_recorded": false
+          },
+          "description": "Dispute resolution requires review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_resolution_review_required",
+            "required_action": "record_resolution_review"
+          },
+          "name": "dispute_resolution_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "gateway_batch"
+          },
+          "description": "Gateway batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_gateway_batch_to_bytewax"
+          },
+          "name": "gateway_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "gateway_event"
+          },
+          "description": "Gateway events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_gateway_event_to_bytewax"
+          },
+          "name": "gateway_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "gateway_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "gateway_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "gateway_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged gateway actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_gateway_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,58 +1446,154 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "GatewayAgentWorkbench",
+          "permission": "fintech_gateway:admin",
+          "route": "/fintech-gateway/agents"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "GatewayDashboard",
           "permission": "fintech_gateway:view",
           "route": "/fintech-gateway/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "fintech_gateway:operate",
-          "route": "/fintech-gateway/operations"
+        "disputes": {
+          "component": "PaymentDisputeWorkbench",
+          "permission": "fintech_gateway:disputes",
+          "route": "/fintech-gateway/disputes"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "fintech_gateway:govern",
-          "route": "/fintech-gateway/rules"
+        "merchants": {
+          "component": "MerchantWorkbench",
+          "permission": "fintech_gateway:manage_merchants",
+          "route": "/fintech-gateway/merchants"
+        },
+        "payment_methods": {
+          "component": "PaymentMethodVault",
+          "permission": "fintech_gateway:manage_payment_methods",
+          "route": "/fintech-gateway/payment-methods"
+        },
+        "payments": {
+          "component": "PaymentOperationsConsole",
+          "permission": "fintech_gateway:process",
+          "route": "/fintech-gateway/payments"
+        },
+        "providers": {
+          "component": "ProviderConnectionWorkbench",
+          "permission": "fintech_gateway:manage_providers",
+          "route": "/fintech-gateway/providers"
+        },
+        "risk": {
+          "component": "FraudRiskConsole",
+          "permission": "fintech_gateway:risk",
+          "route": "/fintech-gateway/risk"
+        },
+        "routing": {
+          "component": "RoutingWorkbench",
+          "permission": "fintech_gateway:route",
+          "route": "/fintech-gateway/routing"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "GatewaySettings",
           "permission": "fintech_gateway:admin",
           "route": "/fintech-gateway/settings"
+        },
+        "settlements": {
+          "component": "SettlementConsole",
+          "permission": "fintech_gateway:settle",
+          "route": "/fintech-gateway/settlements"
+        },
+        "webhooks": {
+          "component": "WebhookInbox",
+          "permission": "fintech_gateway:webhooks",
+          "route": "/fintech-gateway/webhooks"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "merchant_onboarded",
+          "provider_connected",
+          "payment_method_tokenized",
+          "payment_intent_created",
+          "payment_risk_assessed",
+          "payment_authorized",
+          "payment_captured",
+          "payment_refunded",
+          "webhook_ingested",
+          "settlement_recorded",
+          "payment_dispute_opened",
+          "payment_dispute_resolved",
+          "gateway_agent_registered"
+        ],
+        "guardrails": [
+          "gateway_batch_requires_bytewax",
+          "gateway_event_requires_bytewax",
+          "privileged_gateway_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "review",
+          "authorized",
+          "captured",
+          "refunded",
+          "settled",
+          "disputed",
+          "resolved",
+          "blocked"
+        ],
+        "stream": "apg.fintech.gateway.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "disputes": {
+            "status_style": "dispute-chip",
+            "visual": "case-board"
           },
-          "rules": {
+          "merchants": {
+            "icon": "store",
+            "risk_style": "underwriting-band",
+            "status_indicator": "merchant-pill"
+          },
+          "payments": {
+            "status_style": "payment-chip",
+            "visual": "payment-timeline"
+          },
+          "providers": {
+            "status_style": "connectivity-chip",
+            "visual": "provider-grid"
+          },
+          "risk": {
+            "status_style": "risk-chip",
+            "visual": "risk-queue"
+          },
+          "routing": {
             "status_style": "decision-chip",
-            "visual": "rule-list"
+            "visual": "route-lane"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "settlements": {
+            "status_style": "variance-chip",
+            "visual": "settlement-grid"
+          },
+          "webhooks": {
+            "status_style": "event-chip",
+            "visual": "event-inbox"
           }
         },
-        "name": "fintech_gateway_operations",
+        "name": "fintech_gateway_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
-          "color.danger": "#C53030",
-          "color.primary": "#28536B",
-          "color.success": "#2F855A",
+          "color.accent": "#D97706",
+          "color.danger": "#B42318",
+          "color.primary": "#1E5B5A",
+          "color.success": "#237A57",
           "color.warning": "#B7791F",
           "density": "compact",
-          "surface.canvas": "#F7F8FA",
+          "surface.canvas": "#F6F8F8",
           "surface.panel": "#FFFFFF",
           "text.primary": "#172033",
           "text.secondary": "#52606D"
@@ -200,28 +1604,84 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "GatewayDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/fintech-gateway/dashboard",
             "permission": "fintech_gateway:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
+            "component": "MerchantWorkbench",
+            "name": "merchants",
+            "nav_group": "Merchants",
+            "path": "/fintech-gateway/merchants",
+            "permission": "fintech_gateway:manage_merchants"
+          },
+          {
+            "component": "ProviderConnectionWorkbench",
+            "name": "providers",
+            "nav_group": "Providers",
+            "path": "/fintech-gateway/providers",
+            "permission": "fintech_gateway:manage_providers"
+          },
+          {
+            "component": "PaymentMethodVault",
+            "name": "payment_methods",
+            "nav_group": "Payments",
+            "path": "/fintech-gateway/payment-methods",
+            "permission": "fintech_gateway:manage_payment_methods"
+          },
+          {
+            "component": "PaymentOperationsConsole",
+            "name": "payments",
+            "nav_group": "Payments",
+            "path": "/fintech-gateway/payments",
+            "permission": "fintech_gateway:process"
+          },
+          {
+            "component": "RoutingWorkbench",
+            "name": "routing",
             "nav_group": "Operations",
-            "path": "/fintech-gateway/operations",
-            "permission": "fintech_gateway:operate"
+            "path": "/fintech-gateway/routing",
+            "permission": "fintech_gateway:route"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/fintech-gateway/rules",
-            "permission": "fintech_gateway:govern"
+            "component": "FraudRiskConsole",
+            "name": "risk",
+            "nav_group": "Risk",
+            "path": "/fintech-gateway/risk",
+            "permission": "fintech_gateway:risk"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "WebhookInbox",
+            "name": "webhooks",
+            "nav_group": "Operations",
+            "path": "/fintech-gateway/webhooks",
+            "permission": "fintech_gateway:webhooks"
+          },
+          {
+            "component": "SettlementConsole",
+            "name": "settlements",
+            "nav_group": "Finance",
+            "path": "/fintech-gateway/settlements",
+            "permission": "fintech_gateway:settle"
+          },
+          {
+            "component": "PaymentDisputeWorkbench",
+            "name": "disputes",
+            "nav_group": "Risk",
+            "path": "/fintech-gateway/disputes",
+            "permission": "fintech_gateway:disputes"
+          },
+          {
+            "component": "GatewayAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/fintech-gateway/agents",
+            "permission": "fintech_gateway:admin"
+          },
+          {
+            "component": "GatewaySettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/fintech-gateway/settings",
@@ -234,50 +1694,241 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "gateway_operations_review": {
+        "roles": [
+          "merchant_underwriter",
+          "routing_reviewer",
+          "fraud_reviewer",
+          "settlement_reviewer",
+          "dispute_reviewer",
+          "provider_operations_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "fintech_gateway": []
+      "fintech_gateway": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "keym",
+        "encr",
+        "cash_management",
+        "accounts_receivable",
+        "customer_relationship_management",
+        "business_intelligence"
+      ]
     }
   },
   "contracts": {
     "fintech_gateway": {
       "configuration": {
-        "capability": {
-          "category": "Fintech",
-          "enabled": true,
-          "id": "fintech_gateway",
-          "name": "Payment Gateway",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fintech/gateway/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "customer_relationship_management": "adapter",
+          "event_stream": "bytewax",
+          "ledger": "adapter",
+          "notification": "adapter",
+          "provider_network": "adapter",
+          "theme": "adapter",
+          "vault": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "authorization": {
+          "approval_required_for_high_value": true,
+          "blocked_risk_denied": true,
+          "provider_required": true,
+          "routing_decision_required": true
+        },
+        "capture": {
+          "authorized_payment_required": true,
+          "capture_amount_positive_required": true,
+          "overcapture_blocked": true
+        },
+        "disputes": {
+          "owner_required": true,
+          "payment_required": true,
+          "reason_required": true,
+          "resolution_review_required": true,
+          "supported_reasons": [
+            "fraud",
+            "duplicate",
+            "product_not_received",
+            "service_not_provided",
+            "authorization",
+            "processing_error",
+            "other"
+          ]
+        },
+        "gateway_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "merchant_underwriter",
+            "routing_reviewer",
+            "fraud_reviewer",
+            "settlement_reviewer",
+            "dispute_reviewer",
+            "provider_operations_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "merchants": {
+          "country_required": true,
+          "kyc_required": true,
+          "legal_name_required": true,
+          "manual_review_required_for_high_risk": true,
+          "merchant_code_required": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_dispute_events": true,
+          "emit_merchant_events": true,
+          "emit_payment_events": true,
+          "emit_provider_events": true,
+          "emit_risk_events": true,
+          "emit_settlement_events": true,
+          "emit_webhook_events": true,
+          "event_stream": "apg.fintech.gateway.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payment_intents": {
+          "amount_positive_required": true,
+          "currency_supported_required": true,
+          "merchant_required": true,
+          "payment_method_required": true,
+          "risk_review_required_for_high_risk": true
+        },
+        "payment_methods": {
+          "customer_reference_required": true,
+          "method_type_required": true,
+          "supported_methods": [
+            "card",
+            "bank_transfer",
+            "mobile_money",
+            "wallet",
+            "cash_voucher"
+          ],
+          "token_reference_required": true
+        },
+        "provider_connections": {
+          "credential_reference_required": true,
+          "provider_required": true,
+          "provider_type_required": true,
+          "supported_provider_types": [
+            "card",
+            "bank",
+            "mobile_money",
+            "wallet",
+            "settlement",
+            "fraud"
+          ],
+          "supported_providers": [
+            "stripe",
+            "adyen",
+            "mpesa",
+            "dpo",
+            "flutterwave",
+            "pesapal",
+            "paypal",
+            "manual"
+          ]
+        },
+        "refunds": {
+          "captured_payment_required": true,
+          "overrefund_blocked": true,
+          "refund_amount_positive_required": true,
+          "review_required_for_large_refund": true
+        },
+        "settlements": {
+          "amount_nonnegative_required": true,
+          "provider_required": true,
+          "reconciliation_review_required_for_variance": true,
+          "settlement_reference_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "fintech_gateway_operations"
+          "default_theme": "fintech_gateway_control"
         },
         "ui": {
+          "enable_agents": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_disputes": true,
+          "enable_merchants": true,
+          "enable_payment_methods": true,
+          "enable_payments": true,
+          "enable_providers": true,
+          "enable_risk": true,
+          "enable_routing": true,
+          "enable_settings": true,
+          "enable_settlements": true,
+          "enable_webhooks": true
+        },
+        "webhooks": {
+          "event_id_required": true,
+          "idempotency_required": true,
+          "provider_required": true,
+          "signature_required": true
         }
       },
       "id": "fintech_gateway",
       "provides": [
-        "fintech_gateway_operations"
+        "merchant_onboarding_lifecycle",
+        "provider_connection_lifecycle",
+        "payment_method_tokenization_workflow",
+        "payment_intent_lifecycle",
+        "payment_routing_workflow",
+        "fraud_risk_review_workflow",
+        "authorization_capture_workflow",
+        "refund_lifecycle",
+        "webhook_ingestion_workflow",
+        "settlement_reconciliation_workflow",
+        "payment_dispute_workflow",
+        "gateway_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "keym",
+        "encr",
+        "cash_management",
+        "accounts_receivable",
+        "customer_relationship_management",
+        "business_intelligence"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1936,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 11,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "fintech_gateway": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Payment Gateway operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Payment Gateway write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Payment Gateway operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.fintech_gateway": {
-      "file": "capability_contract.py",
-      "id": "capability.fintech_gateway",
-      "kind": "capability",
-      "name": "Payment Gateway",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

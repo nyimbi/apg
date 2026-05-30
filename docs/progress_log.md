@@ -16,6 +16,137 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 00:39 EAT
+
+Fintech gateway lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md`, replaced the package `README.md`,
+  and refreshed `cap_spec.md` with the active payment-orchestration runtime
+  summary.
+- Replaced the generated contract wrapper with explicit merchant, provider
+  connection, payment method, payment intent, payment risk, authorization,
+  capture, refund, webhook, settlement, dispute, gateway-agent, governance,
+  observability, adapter, UI, theme, provides/requires, and Bytewax
+  lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  merchant code/legal name/country/high-risk review, supported provider names
+  and types, provider credential references, payment method customer/type/token,
+  payment intent merchant/method/positive amount/currency, high-risk payment
+  review, blocked-risk authorization denial, high-value authorization approval,
+  capture amount/authorized payment/overcapture, refund captured payment/
+  positive amount/overrefund/large-refund review, webhook provider/event ID/
+  signature/idempotency, settlement provider/reference/nonnegative amount/
+  variance review, dispute payment/reason/owner/resolution review, gateway
+  batch/event Bytewax streams, gateway-agent runtime/role, and privileged
+  agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light gateway lifecycle helpers for merchants, provider
+  connections, payment methods, payment intents, risk reviews, authorizations,
+  captures, refunds, webhooks, settlements, disputes, gateway-agent
+  registration, batch validation, dashboard summaries, API helpers, and screen
+  models.
+- Preserved `PaymentGatewayService` and `GatewayService` as compatibility
+  aliases while keeping optional Flask, database, provider SDK, provider
+  credential, and live external-system imports out of the top-level APG
+  surface.
+- Made `capabilities/fintech/__init__.py` tolerate missing optional fintech
+  sub-capabilities during discovery, because its eager `tms` import blocked
+  normal `capabilities.fintech.gateway` composition imports.
+- Review hardening: added explicit parent-record guardrails for payment-method
+  tokenization, risk assessment, and authorization, and kept the
+  `PaymentGatewayService` compatibility alias tolerant of legacy configuration
+  dictionaries.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the expanded contract.
+- Replaced the old package test with focused contract, rule, service,
+  guardrail, API/view, app, semantic, gateway-agent, capture, settlement,
+  dispute, webhook, and Bytewax tests.
+- Cleaned stale generated wording in gateway legacy docs, examples, helper
+  modules, scripts, and tests so package hygiene scans are clean.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fintech/__init__.py
+  capabilities/fintech/gateway/__init__.py
+  capabilities/fintech/gateway/capability_contract.py
+  capabilities/fintech/gateway/service.py
+  capabilities/fintech/gateway/api.py
+  capabilities/fintech/gateway/views.py
+  capabilities/fintech/gateway/app.py
+  capabilities/fintech/gateway/tests/conftest.py
+  capabilities/fintech/gateway/tests/test_package_contract.py` passed.
+- Syntax-only compile for edited legacy helper modules and examples
+  (`advanced_fraud_detection.py`, `advanced_merchant_operations.py`,
+  `adyen_reporting.py`, `capability_registry.py`,
+  `conversational_payments.py`, `embedded_financial_services.py`,
+  `examples/flask_adyen_app.py`, `examples/flask_stripe_app.py`,
+  `examples/stripe_client_example.py`, `health_dashboard.py`,
+  `hyper_personalized_customer_experience.py`,
+  `immersive_analytics_dashboard.py`, `instant_settlement_network.py`,
+  `intelligent_payment_recovery.py`, `intelligent_transaction_analysis.py`,
+  `ml_fraud_detection.py`, `predictive_optimization.py`,
+  `predictive_payment_orchestration.py`, `realtime_risk_mitigation.py`,
+  `scripts/deploy_validation.py`, `self_healing_payment_infrastructure.py`,
+  `test_webhook_simple.py`, `tests/test_payment_gateway_service.py`,
+  `tests/test_stripe_integration.py`,
+  `universal_payment_method_abstraction.py`,
+  `zero_code_integration_engine.py`, and
+  `zero_latency_global_processing.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/fintech/gateway/tests/test_package_contract.py` passed with 6
+  tests after narrowing gateway test configuration away from broad fintech
+  package imports.
+- `./.venv/bin/python capabilities/fintech/gateway/app.py` passed package
+  self-test.
+- `./.venv/bin/apg capabilities inspect fintech_gateway --json` confirmed
+  `ok: true`, 12 routes, 47 rules, and `fintech_gateway_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fintech/gateway --json` confirmed side-effect-free publish
+  planning with Bytewax stream metadata and no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fintech/gateway --json` passed with `domain_specific`
+  implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "import json;
+  m=json.load(open('capabilities/fintech/gateway/semantic_model.json'));
+  c=m['capabilities']['fintech_gateway'];
+  print(c['streaming']['processor']); print('gateway_agents' in
+  c['provides']); print(c['screens']['agents']['route']);
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='gateway_agent_runtime_supported'));
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='gateway_batch_requires_bytewax'));
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='capture_blocks_overcapture'));
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='risk_requires_payment'))"` confirmed `bytewax`,
+  gateway-agent provides, `/fintech-gateway/agents`,
+  `gateway_agent_runtime_not_supported`, `bytewax_event_stream_required`, and
+  `overcapture_blocked`, and `payment_required`.
+- `./.venv/bin/python -c "from capabilities.fintech.gateway import
+  FintechGatewayService; s=FintechGatewayService();
+  m=s.onboard_merchant('merchant','tenant-proof','MERCH','Merchant','KE');
+  p=s.connect_provider('provider','tenant-proof','mpesa','mobile_money',
+  'vault://mpesa'); pm=s.tokenize_payment_method('method','tenant-proof',
+  m['id'],'customer','mobile_money','tok'); intent=s.create_payment_intent(
+  'intent','tenant-proof',m['id'],pm['id'],500,'KES');
+  s.assess_payment_risk('risk','tenant-proof',intent['id'],'low',0.1);
+  auth=s.authorize_payment('auth','tenant-proof',intent['id'],p['id']);
+  s.capture_payment('capture','tenant-proof',auth['id'],500);
+  s.register_gateway_agent('tenant-proof','Proof agent','codex',
+  'fraud_reviewer','review risk');
+  print(s.dashboard_summary('tenant-proof'))"` passed and confirmed payment
+  capture, gateway-agent registration, audit event emission, and Bytewax
+  stream metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- `git diff --check -- capabilities/fintech capabilities/fintech/gateway
+  docs/progress_log.md` passed.
+- Not run: live payment processor calls, durable payment/provider/webhook/
+  settlement/dispute stores, live auth/audit/notification/key/encryption/CRM/
+  BI/AR/cash adapters, durable Bytewax topology, rendered browser UI,
+  provider sandbox reconciliation, gateway performance/failover checks, and
+  full repository tests.
+
 ### 2026-05-31 00:42 EAT
 
 FIN ARC accounts receivable lifecycle/guardrail packet:

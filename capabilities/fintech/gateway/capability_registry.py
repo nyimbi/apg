@@ -20,7 +20,7 @@ class CapabilityMetadata:
 	id: str = field(default_factory=uuid7str)
 	name: str = "payment_gateway"
 	version: str = "1.0.0"
-	description: str = "Revolutionary payment processing gateway with AI-powered features"
+	description: str = "Advanced payment processing gateway with AI-powered features"
 	category: str = "financial_services"
 	tags: List[str] = field(default_factory=lambda: [
 		"payments", "financial", "ai", "ml", "fraud_detection", 

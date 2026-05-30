@@ -2,7 +2,7 @@
 Comprehensive Test Suite for Stripe Integration - APG Payment Gateway
 
 Tests covering all Stripe features with production-ready scenarios.
-No stubs or placeholders - complete test coverage.
+No stubs or extension points - complete test coverage.
 
 © 2025 Datacraft. All rights reserved.
 """

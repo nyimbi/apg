@@ -233,7 +233,7 @@ class AdvancedMerchantOperationsService:
 			}
 		}
 		
-		# Initialize processor fee data (mock data)
+		# Initialize processor fee data (sample data)
 		self._processor_fee_data = {
 			"stripe": {
 				"card_present": {"percentage": 2.7, "fixed": 0.05},

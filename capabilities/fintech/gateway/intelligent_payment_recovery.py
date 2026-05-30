@@ -1,7 +1,7 @@
 """
 Intelligent Payment Recovery - Automated Failed Payment Resurrection
 
-Revolutionary payment recovery system that automatically resurrects failed payments
+Advanced payment recovery system that automatically resurrects failed payments
 using alternative processors, provides real-time customer coaching, optimizes retry
 timing based on behavior patterns, and implements ML-driven dunning management.
 

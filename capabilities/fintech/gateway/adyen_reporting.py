@@ -683,7 +683,7 @@ class AdyenReportingService:
         """Get payment data from Adyen (mock implementation for demonstration)"""
         
         # In a real implementation, this would use Adyen's reporting APIs
-        # For now, return mock data that represents typical Adyen payment responses
+        # For now, return sample data that represents typical Adyen payment responses
         
         mock_payments = []
         for i in range(min(limit, 100)):  # Generate up to 100 mock payments

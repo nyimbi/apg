@@ -2,7 +2,7 @@
 Comprehensive Test Suite for Payment Gateway Service - APG Payment Gateway
 
 Tests covering all payment providers, methods, and scenarios with >95% coverage.
-Production-ready test suite with no stubs or placeholders.
+Production-ready test suite with no stubs or extension points.
 
 © 2025 Datacraft. All rights reserved.
 """

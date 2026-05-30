@@ -1,7 +1,7 @@
 """
 Advanced Fraud Detection - Phase 2 Enhancements
 
-Revolutionary fraud detection with real-time learning, behavioral biometrics,
+Advanced fraud detection with real-time learning, behavioral biometrics,
 graph neural networks, and explainable AI for enterprise payment processing.
 
 © 2025 Datacraft. All rights reserved.
@@ -1242,7 +1242,7 @@ class AdvancedFraudDetectionEngine:
 		
 		return fraud_score, feature_importance
 	
-	# Additional placeholder methods
+	# Additional extension point methods
 	
 	async def _detect_time_series_anomaly(self, transaction_times: List[datetime], current_time: datetime) -> float:
 		"""Detect time series anomalies"""

@@ -1,7 +1,7 @@
 """
 Intelligent Transaction Analysis Engine - Advanced AI-Powered Insights
 
-Revolutionary transaction analysis using ML clustering, pattern recognition,
+Advanced transaction analysis using ML clustering, pattern recognition,
 behavioral modeling, and predictive analytics for APG Payment Gateway.
 
 © 2025 Datacraft. All rights reserved.

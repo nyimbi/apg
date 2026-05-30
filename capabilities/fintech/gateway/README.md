@@ -1,409 +1,143 @@
-# APG Payment Gateway - Complete Multi-Provider Integration
+# APG Fintech Gateway Capability
 
-A comprehensive payment processing solution for the APG platform supporting multiple payment providers, currencies, and payment methods across Africa and globally.
+`fintech_gateway` is the APG payment orchestration capability for merchant onboarding, provider connections, payment method tokenization, payment intents, routing, fraud-risk review, authorization, capture, refunds, webhooks, settlements, disputes, and gateway-focused AI agent review.
 
-## Supported Payment Providers
+The package keeps live provider integrations behind adapter boundaries. Importing `capabilities.fintech.gateway` does not require Flask, databases, payment SDKs, provider credentials, or external services.
 
-### 1. Stripe
-- **Global leader** in online payments
-- **Features**: Cards, digital wallets, subscriptions, Connect marketplace
-- **Coverage**: Global, 47+ countries
-- **Best for**: International businesses, subscriptions, marketplaces
+## Capability ID
 
-### 2. Adyen
-- **Enterprise-grade** payment platform
-- **Features**: Unified commerce, marketplace, recurring payments
-- **Coverage**: 200+ payment methods, 150+ currencies
-- **Best for**: Large enterprises, omnichannel commerce
+- ID: `fintech_gateway`
+- Display name: `Fintech Gateway`
+- Version: `2.1.0`
+- Event stream: `apg.fintech.gateway.lifecycle`
+- Stream processor: `bytewax`
+- Primary package files: `capability_contract.py`, `service.py`, `api.py`, `views.py`, `app.py`
 
-### 3. Flutterwave
-- **African payment specialist**
-- **Features**: Mobile money, cards, bank transfers, Barter (virtual cards)
-- **Coverage**: 34+ African countries
-- **Best for**: African businesses, mobile money payments
+## What It Provides
 
-### 4. Pesapal
-- **East African focused**
-- **Features**: M-Pesa, Airtel Money, cards, bank transfers
-- **Coverage**: Kenya, Tanzania, Uganda, Rwanda
-- **Best for**: East African businesses, local payment methods
+- Merchant onboarding lifecycle.
+- Provider connection lifecycle for card, bank, mobile money, wallet, settlement, and fraud providers.
+- Payment method tokenization workflow.
+- Payment intent lifecycle.
+- Payment routing workflow.
+- Fraud-risk review workflow.
+- Authorization and capture workflow.
+- Refund lifecycle.
+- Webhook ingestion workflow with idempotency.
+- Settlement reconciliation workflow.
+- Payment dispute workflow.
+- Gateway agent registration and privileged-action approval rules.
+- UI routes, theme metadata, semantic app metadata, and APG publish evidence.
 
-### 5. DPO (Direct Pay Online)
-- **Pan-African payment gateway**
-- **Features**: Mobile money, cards, bank transfers across Africa
-- **Coverage**: 40+ African countries
-- **Best for**: Pan-African businesses, comprehensive coverage
+## Required Capabilities
 
-## Quick Start
+The contract declares composition dependencies on:
 
-### Installation
+- `auth`
+- `audl`
+- `ntfy`
+- `composition_events`
+- `composition_config`
+- `keym`
+- `encr`
+- `cash_management`
+- `accounts_receivable`
+- `customer_relationship_management`
+- `business_intelligence`
+
+The current runtime exposes adapter boundaries for these dependencies and does not require live providers during focused package checks.
+
+## Quick Use
+
+```python
+from capabilities.fintech.gateway import FintechGatewayService
+
+svc = FintechGatewayService()
+merchant = svc.onboard_merchant("merchant-1", "tenant-1", "MERCH-001", "Merchant One", "KE")
+provider = svc.connect_provider("provider-1", "tenant-1", "mpesa", "mobile_money", "vault://mpesa")
+method = svc.tokenize_payment_method("method-1", "tenant-1", merchant["id"], "customer-1", "mobile_money", "tok-1")
+intent = svc.create_payment_intent("intent-1", "tenant-1", merchant["id"], method["id"], 1000, "KES")
+svc.assess_payment_risk("risk-1", "tenant-1", intent["id"], "medium", 0.35)
+authorization = svc.authorize_payment("auth-1", "tenant-1", intent["id"], provider["id"])
+svc.capture_payment("capture-1", "tenant-1", authorization["id"], 1000)
+print(svc.dashboard_summary("tenant-1"))
+```
+
+## Rule And Guardrail Coverage
+
+The deterministic rule engine enforces:
+
+- tenant context for operations;
+- policy attachment for writes;
+- required merchant code, legal name, country, and review for high-risk merchants;
+- supported provider names, provider types, and credential references;
+- merchant, customer reference, supported method type, and token reference for payment methods;
+- merchant, positive amount, supported currency, and payment method for payment intents;
+- payment risk parent intent, high-risk payment review, and blocked-risk denial;
+- payment intent, provider, and approval gates for authorization;
+- authorized payment, positive amount, and overcapture blocking for capture;
+- captured payment, positive amount, overrefund blocking, and large-refund review;
+- provider, event ID, signature, and idempotency key for webhooks;
+- provider, settlement reference, nonnegative amount, and variance review for settlements;
+- payment, supported reason, owner, and reviewed resolution for disputes;
+- Bytewax routing for gateway batches and events;
+- gateway agent runtime, role, and privileged-action approval controls.
+
+## UI Surface
+
+The contract and `views.py` expose these screens:
+
+- Dashboard
+- Merchants
+- Providers
+- Payment Methods
+- Payments
+- Routing
+- Risk
+- Webhooks
+- Settlements
+- Disputes
+- Agents
+- Settings
+
+The theme is `fintech_gateway_control` and uses compact operational layouts for provider status, routing decisions, risk queues, event inboxes, settlement variance, dispute cases, and agent review lanes.
+
+## AI Agent Composition
+
+Gateway agents are first-class records. Supported runtimes are:
+
+- `codex`
+- `claude_code`
+- `opencode`
+- `pi`
+
+Supported roles are:
+
+- `merchant_underwriter`
+- `routing_reviewer`
+- `fraud_reviewer`
+- `settlement_reviewer`
+- `dispute_reviewer`
+- `provider_operations_reviewer`
+
+Agents may prepare and review gateway operations. Privileged actions require recorded human approval.
+
+## Focused Proof Commands
 
 ```bash
-# Install required dependencies
-pip install -r requirements.txt
-
-# Set environment variables
-export STRIPE_SECRET_KEY="sk_test_..."
-export FLUTTERWAVE_SECRET_KEY="FLWSECK_TEST..."
-export PESAPAL_CONSUMER_KEY="..."
-export DPO_COMPANY_TOKEN_SANDBOX="..."
+./.venv/bin/python -m py_compile capabilities/fintech/gateway/__init__.py capabilities/fintech/gateway/capability_contract.py capabilities/fintech/gateway/service.py capabilities/fintech/gateway/api.py capabilities/fintech/gateway/views.py capabilities/fintech/gateway/app.py capabilities/fintech/gateway/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/fintech/gateway/tests/test_package_contract.py
+./.venv/bin/python capabilities/fintech/gateway/app.py
+./.venv/bin/apg capabilities inspect fintech_gateway --json
+./.venv/bin/apg capabilities publish-plan capabilities/fintech/gateway --json
+./.venv/bin/apg capabilities implementation-audit --root capabilities/fintech/gateway --json
+git diff --check -- capabilities/fintech/gateway
 ```
 
-### Basic Usage
-
-```python
-from payment_gateway_service import PaymentGatewayService
-from models import PaymentTransaction, PaymentMethod, PaymentMethodType
-from decimal import Decimal
-
-# Initialize service
-service = PaymentGatewayService()
-await service.initialize()
-
-# Create transaction
-transaction = PaymentTransaction(
-    id="TXN_001",
-    amount=Decimal("1000.00"),
-    currency="KES",
-    description="Test payment",
-    customer_email="customer@example.com"
-)
-
-# Create payment method
-payment_method = PaymentMethod(
-    method_type=PaymentMethodType.MOBILE_MONEY,
-    metadata={
-        'phone': '254700000000',
-        'provider': 'MPESA'
-    }
-)
-
-# Process payment
-result = await service.process_payment(transaction, payment_method, provider="flutterwave")
-print(f"Payment result: {result.success}")
-```
-
-## Payment Methods by Provider
-
-### Mobile Money Support
-
-| Provider | M-Pesa | Airtel Money | MTN MoMo | Orange Money | Tigo Pesa |
-|----------|--------|--------------|----------|--------------|-----------|
-| Stripe | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Adyen | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Flutterwave | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Pesapal | ✅ | ✅ | ❌ | ❌ | ❌ |
-| DPO | ✅ | ✅ | ✅ | ✅ | ✅ |
-
-### Card Support
-
-| Provider | Visa | Mastercard | Amex | 3D Secure |
-|----------|------|------------|------|-----------|
-| Stripe | ✅ | ✅ | ✅ | ✅ |
-| Adyen | ✅ | ✅ | ✅ | ✅ |
-| Flutterwave | ✅ | ✅ | ✅ | ✅ |
-| Pesapal | ✅ | ✅ | ✅ | ✅ |
-| DPO | ✅ | ✅ | ✅ | ✅ |
-
-### Bank Transfers
-
-| Provider | Local Banks | SEPA | ACH | Instant |
-|----------|-------------|------|-----|---------|
-| Stripe | ✅ | ✅ | ✅ | ✅ |
-| Adyen | ✅ | ✅ | ✅ | ✅ |
-| Flutterwave | ✅ | ❌ | ❌ | ✅ |
-| Pesapal | ✅ | ❌ | ❌ | ❌ |
-| DPO | ✅ | ❌ | ❌ | ❌ |
-
-## Country Coverage
-
-### African Countries
-
-| Country | Stripe | Adyen | Flutterwave | Pesapal | DPO |
-|---------|--------|-------|-------------|---------|-----|
-| Kenya | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Nigeria | ✅ | ✅ | ✅ | ❌ | ✅ |
-| South Africa | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Ghana | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Tanzania | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Uganda | ❌ | ✅ | ✅ | ✅ | ✅ |
-| Rwanda | ❌ | ✅ | ✅ | ✅ | ✅ |
-
-## API Examples
-
-### Process Mobile Money Payment
-
-```python
-# M-Pesa payment via Flutterwave
-transaction = PaymentTransaction(
-    id="MPESA_001",
-    amount=Decimal("500.00"),
-    currency="KES",
-    description="M-Pesa payment"
-)
-
-payment_method = PaymentMethod(
-    method_type=PaymentMethodType.MOBILE_MONEY,
-    metadata={
-        'phone': '254700000000',
-        'provider': 'MPESA',
-        'network': 'MPESA'
-    }
-)
-
-result = await service.process_payment(transaction, payment_method, provider="flutterwave")
-```
-
-### Process Card Payment
-
-```python
-# Card payment via Stripe
-payment_method = PaymentMethod(
-    method_type=PaymentMethodType.CARD,
-    metadata={
-        'card_number': '4242424242424242',
-        'exp_month': '12',
-        'exp_year': '2025',
-        'cvc': '123'
-    }
-)
-
-result = await service.process_payment(transaction, payment_method, provider="stripe")
-```
-
-### Verify Payment
-
-```python
-# Verify payment status
-result = await service.verify_payment("txn_id", provider="stripe")
-print(f"Status: {result.status.value}")
-```
-
-### Process Refund
-
-```python
-# Process refund
-refund_result = await service.refund_payment(
-    transaction_id="txn_id", 
-    amount=Decimal("100.00"),
-    reason="Customer request",
-    provider="stripe"
-)
-```
-
-## Webhook Integration
-
-### Flask Example
-
-```python
-from flask import Flask, request, jsonify
-from payment_gateway_service import PaymentGatewayService
-
-app = Flask(__name__)
-service = PaymentGatewayService()
-
-@app.route('/webhooks/stripe', methods=['POST'])
-async def stripe_webhook():
-    payload = request.get_data()
-    sig_header = request.headers.get('Stripe-Signature')
-    
-    result = await service.process_webhook(
-        provider="stripe",
-        payload=payload,
-        headers={'Stripe-Signature': sig_header}
-    )
-    
-    return jsonify(result)
-
-@app.route('/webhooks/flutterwave', methods=['POST'])
-async def flutterwave_webhook():
-    payload = request.get_json()
-    
-    result = await service.process_webhook(
-        provider="flutterwave",
-        payload=payload,
-        headers=request.headers
-    )
-    
-    return jsonify(result)
-```
-
-## Configuration
-
-### Environment Variables
-
-```bash
-# Stripe
-STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-
-# Adyen
-ADYEN_API_KEY=...
-ADYEN_MERCHANT_ACCOUNT=...
-ADYEN_CLIENT_KEY=...
-ADYEN_HMAC_KEY=...
-
-# Flutterwave
-FLUTTERWAVE_PUBLIC_KEY=FLWPUBK_TEST-...
-FLUTTERWAVE_SECRET_KEY=FLWSECK_TEST-...
-FLUTTERWAVE_ENCRYPTION_KEY=FLWSECK_TEST...
-
-# Pesapal
-PESAPAL_CONSUMER_KEY=...
-PESAPAL_CONSUMER_SECRET=...
-
-# DPO
-DPO_COMPANY_TOKEN_SANDBOX=...
-DPO_COMPANY_TOKEN_LIVE=...
-DPO_CALLBACK_URL=https://yoursite.com/callbacks/dpo
-```
-
-### YAML Configuration
-
-```yaml
-# config/payment_gateway.yaml
-providers:
-  stripe:
-    enabled: true
-    environment: "sandbox"
-    default_currency: "USD"
-    
-  flutterwave:
-    enabled: true
-    environment: "sandbox"
-    default_currency: "KES"
-    
-  pesapal:
-    enabled: true
-    environment: "sandbox"
-    default_currency: "KES"
-```
-
-## Testing
-
-### Unit Tests
-
-```bash
-# Run all tests
-python -m pytest tests/ -v
-
-# Run specific provider tests
-python -m pytest tests/test_stripe_integration.py -v
-python -m pytest tests/test_flutterwave_integration.py -v
-```
-
-### Test Cards
-
-```python
-# Stripe test cards
-STRIPE_TEST_CARDS = {
-    'visa_success': '4242424242424242',
-    'visa_declined': '4000000000000002',
-    'visa_3ds': '4000000000003220'
-}
-
-# Flutterwave test cards
-FLUTTERWAVE_TEST_CARDS = {
-    'visa_success': '5531886652142950',
-    'mastercard_success': '5438898014560229'
-}
-```
-
-## Error Handling
-
-```python
-from payment_gateway_service import PaymentError, ValidationError
-
-try:
-    result = await service.process_payment(transaction, payment_method)
-except ValidationError as e:
-    print(f"Validation error: {e.message}")
-except PaymentError as e:
-    print(f"Payment error: {e.message}")
-    print(f"Error code: {e.code}")
-```
-
-## Monitoring & Logging
-
-### Health Checks
-
-```python
-# Check service health
-health = await service.health_check()
-print(f"Status: {health.status.value}")
-print(f"Response time: {health.response_time_ms}ms")
-```
-
-### Metrics
-
-```python
-# Get service metrics
-metrics = await service.get_metrics()
-print(f"Total transactions: {metrics['total_transactions']}")
-print(f"Success rate: {metrics['success_rate']}")
-```
-
-## Production Deployment
-
-### Security Checklist
-
-- [ ] Use environment variables for all secrets
-- [ ] Enable webhook signature verification
-- [ ] Use HTTPS for all endpoints
-- [ ] Implement rate limiting
-- [ ] Enable request logging
-- [ ] Set up monitoring and alerting
-- [ ] Configure backup payment providers
-- [ ] Test disaster recovery procedures
-
-### Performance Optimization
-
-- [ ] Enable connection pooling
-- [ ] Configure async processing
-- [ ] Set up caching for static data
-- [ ] Implement request batching where possible
-- [ ] Monitor and optimize database queries
-- [ ] Set up CDN for static assets
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Webhook Verification Fails**
-   - Check webhook secret configuration
-   - Verify payload is raw (not parsed)
-   - Ensure correct signature header
-
-2. **Mobile Money Payments Fail**
-   - Verify phone number format
-   - Check provider-specific requirements
-   - Ensure sufficient balance for testing
-
-3. **3D Secure Issues**
-   - Test with 3DS-enabled test cards
-   - Verify redirect URLs are accessible
-   - Check SCA compliance settings
-
-### Debug Mode
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Enable detailed request logging
-service = PaymentGatewayService(debug=True)
-```
-
-## Support
-
-For issues and questions:
-
-- 📧 Email: nyimbi@gmail.com
-- 🌐 Website: www.datacraft.co.ke
-- 📚 Documentation: /docs/
-- 🐛 Issues: Create an issue in the repository
-
-## License
-
-© 2025 Datacraft. All rights reserved.
+## Next Extensions
+
+- Wire durable payment, provider, webhook, settlement, and dispute stores.
+- Connect live provider adapters for Stripe, Adyen, MPESA, DPO, Flutterwave, Pesapal, PayPal, and regional networks.
+- Add durable Bytewax topology deployment and replay checks.
+- Add rendered UI validation for the APG shell.
+- Add provider failover and settlement reconciliation tests against provider sandboxes.

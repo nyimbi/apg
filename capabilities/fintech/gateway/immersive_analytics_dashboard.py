@@ -1,5 +1,5 @@
 """
-Immersive Payment Analytics Dashboard - Revolutionary Real-Time Visualization
+Immersive Payment Analytics Dashboard - Advanced Real-Time Visualization
 
 Advanced analytics dashboard with immersive data visualization, real-time insights,
 interactive exploration, and AI-powered analytics for payment gateway intelligence.
@@ -133,7 +133,7 @@ class DashboardConfiguration(BaseModel):
 
 class ImmersiveAnalyticsDashboard:
 	"""
-	Revolutionary immersive analytics dashboard providing real-time payment insights
+	Advanced immersive analytics dashboard providing real-time payment insights
 	with advanced visualizations, AI-powered analytics, and interactive exploration.
 	"""
 	

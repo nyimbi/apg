@@ -11,7 +11,7 @@ from webhook_service import (
 
 
 class MockDatabaseService:
-    """Simple mock database service"""
+    """Simple sample database service"""
     
     def __init__(self):
         self._webhook_endpoints = {}

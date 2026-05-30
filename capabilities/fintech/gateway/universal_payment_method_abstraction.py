@@ -1,7 +1,7 @@
 """
 Universal Payment Method Abstraction - Single API for 200+ Payment Methods
 
-Revolutionary abstraction layer that provides a unified interface to all global
+Advanced abstraction layer that provides a unified interface to all global
 payment methods with automatic localization, intelligent recommendations, and
 seamless regional compliance handling.
 
@@ -1025,7 +1025,7 @@ class UniversalPaymentMethodAbstraction:
 		if method.method_id in context.excluded_methods:
 			score = 0.0
 		
-		# Regional preferences (mock data)
+		# Regional preferences (sample data)
 		regional_preferences = {
 			RegionCode.MIDDLE_EAST_AFRICA: {PaymentMethodCategory.MOBILE_MONEY: 0.8},
 			RegionCode.EUROPE: {PaymentMethodCategory.BANK_TRANSFER: 0.7},

@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Payment Gateway",
+  "display_name": "Fintech Gateway",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,44 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 12,
+  "rule_count": 47,
+  "streaming": {
+    "events": [
+      "merchant_onboarded",
+      "provider_connected",
+      "payment_method_tokenized",
+      "payment_intent_created",
+      "payment_risk_assessed",
+      "payment_authorized",
+      "payment_captured",
+      "payment_refunded",
+      "webhook_ingested",
+      "settlement_recorded",
+      "payment_dispute_opened",
+      "payment_dispute_resolved",
+      "gateway_agent_registered"
+    ],
+    "guardrails": [
+      "gateway_batch_requires_bytewax",
+      "gateway_event_requires_bytewax",
+      "privileged_gateway_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "review",
+      "authorized",
+      "captured",
+      "refunded",
+      "settled",
+      "disputed",
+      "resolved",
+      "blocked"
+    ],
+    "stream": "apg.fintech.gateway.lifecycle"
+  },
+  "version": "2.1.0"
 }

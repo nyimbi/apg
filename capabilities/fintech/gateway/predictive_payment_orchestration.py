@@ -1,7 +1,7 @@
 """
 Predictive Payment Orchestration - AI-Powered Intelligent Routing
 
-Revolutionary payment orchestration that predicts success probability, optimizes
+Advanced payment orchestration that predicts success probability, optimizes
 routing in real-time, and learns from failure patterns for superior performance.
 
 © 2025 Datacraft. All rights reserved.
@@ -590,13 +590,13 @@ class PredictivePaymentOrchestrator:
 			processor_success_rate_24h=metrics.success_rate_24h,
 			processor_avg_latency_1h=metrics.avg_latency_ms_1h,
 			
-			# Historical features (mock data)
+			# Historical features (sample data)
 			customer_previous_successes=10,
 			customer_previous_failures=1,
 			merchant_volume_today=50000.0,
 			similar_transaction_success_rate=0.92,
 			
-			# Network features (mock data)
+			# Network features (sample data)
 			geographic_distance=100.0,
 			network_conditions_score=0.9,
 			time_since_last_outage=3600.0

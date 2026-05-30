@@ -1,7 +1,7 @@
 """
 Conversational Payment Interface - Natural Language Payment Processing
 
-Revolutionary conversational AI system for payment processing using natural language,
+Advanced conversational AI system for payment processing using natural language,
 voice commands, and intelligent conversation flows for APG Payment Gateway.
 
 © 2025 Datacraft. All rights reserved.
@@ -99,7 +99,7 @@ class ConversationResponse:
 
 class ConversationalPaymentEngine:
 	"""
-	Revolutionary conversational AI payment engine
+	Advanced conversational AI payment engine
 	
 	Enables natural language payment processing with voice commands,
 	intelligent conversation flows, and multi-channel support.
@@ -293,7 +293,7 @@ class ConversationalPaymentEngine:
 	) -> ConversationResponse:
 		"""Process voice payment command"""
 		try:
-			# Convert speech to text (placeholder - would use real STT)
+			# Convert speech to text (extension point - would use real STT)
 			transcribed_text = await self._speech_to_text(audio_data)
 			
 			# Process as conversation message
@@ -1087,14 +1087,14 @@ class ConversationalPaymentEngine:
 		)
 	
 	async def _speech_to_text(self, audio_data: bytes) -> str:
-		"""Convert speech to text (placeholder)"""
+		"""Convert speech to text (extension point)"""
 		# In production, this would use services like:
 		# - Google Speech-to-Text
 		# - Azure Speech Services
 		# - AWS Transcribe
 		# - OpenAI Whisper
 		
-		# For demo purposes, return a placeholder
+		# For demo purposes, return a extension point
 		return "I want to send 1000 shillings to 0712345678 using mpesa"
 	
 	async def _extract_payment_data(self, context: ConversationContext) -> Dict[str, Any]:

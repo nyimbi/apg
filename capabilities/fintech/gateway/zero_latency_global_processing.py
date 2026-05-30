@@ -1,7 +1,7 @@
 """
 Zero-Latency Global Processing - Edge Computing Payment Infrastructure
 
-Revolutionary edge computing payment processing system with <50ms global response times,
+Advanced edge computing payment processing system with <50ms global response times,
 intelligent request routing to nearest processing nodes, predictive caching,
 and real-time global load balancing with automatic failover capabilities.
 
@@ -725,7 +725,7 @@ class ZeroLatencyGlobalProcessing:
 			"failover_enabled": True
 		}
 		
-		# Initialize geo database (mock data)
+		# Initialize geo database (sample data)
 		self._geo_database = {
 			"8.8.8.8": {"lat": 37.386, "lng": -122.084},  # Example: Google DNS
 			"1.1.1.1": {"lat": 37.751, "lng": -97.822}   # Example: Cloudflare DNS

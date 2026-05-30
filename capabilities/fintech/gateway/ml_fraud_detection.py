@@ -1,7 +1,7 @@
 """
 ML-Powered Fraud Detection Engine - Advanced AI Models
 
-Revolutionary fraud detection using ensemble ML models, real-time analysis,
+Advanced fraud detection using ensemble ML models, real-time analysis,
 behavioral biometrics, and adaptive learning for APG Payment Gateway.
 
 © 2025 Datacraft. All rights reserved.

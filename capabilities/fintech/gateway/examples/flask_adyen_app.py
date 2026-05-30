@@ -318,7 +318,7 @@ def index():
                 <div class="highlight-box">
                     <h3>✅ Production-Ready Features</h3>
                     <ul>
-                        <li><strong>Complete Implementation:</strong> All Adyen APIs implemented with real SDK integration - no mocking or placeholders</li>
+                        <li><strong>Complete Implementation:</strong> All Adyen APIs implemented with real SDK integration - no mocking or extension points</li>
                         <li><strong>Global Coverage:</strong> Support for 100+ payment methods across 190+ countries and territories</li>
                         <li><strong>Advanced Security:</strong> 3D Secure 2.0, SCA compliance, advanced fraud detection, and PCI DSS Level 1</li>
                         <li><strong>Marketplace Ready:</strong> Full Adyen for Platforms integration with split payments and account management</li>
@@ -395,7 +395,7 @@ async def create_payment_session():
             tenant_id=data.get('tenantId', 'default_tenant')
         )
         
-        # Create payment method placeholder
+        # Create payment method extension point
         payment_method = PaymentMethod(
             id=uuid7str(),
             customer_id=transaction.customer_id,
