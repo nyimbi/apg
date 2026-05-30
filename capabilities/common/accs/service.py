@@ -5,8 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from .accessibility_engine import AccessibilityAuditEngine
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_ACCESSIBILITY_AGENT_ROLES,
+	SUPPORTED_ACCESSIBILITY_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
+	AccessibilityAgent,
 	AccessibilityAudit,
 	AccessibilityAuditEvent,
 	AccessibilityFinding,
@@ -27,6 +33,7 @@ class AccsService:
 		self._remediations: dict[str, RemediationTask] = {}
 		self._audits: dict[str, AccessibilityAudit] = {}
 		self._reviews: dict[str, AccessibilityReview] = {}
+		self._agents: dict[str, AccessibilityAgent] = {}
 		self._events: list[AccessibilityAuditEvent] = []
 		self._engine = AccessibilityAuditEngine()
 		self.register_standard(
@@ -61,7 +68,17 @@ class AccsService:
 			level=level,
 			criteria=tuple(criteria or ("perceivable", "operable", "understandable", "robust")),
 		)
-		self._standards[standard_id] = standard
+		key = self._key(tenant_id, standard_id)
+		if key in self._standards:
+			raise ValueError(f"duplicate accessibility standard for tenant: {standard_id}")
+		self._standards[key] = standard
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="standard_registered",
+			subject_id=standard_id,
+			message=f"Registered accessibility standard {standard_id}.",
+			evidence={"version": version, "level": level},
+		)
 		return standard.to_dict()
 
 	def list_standards(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -98,7 +115,17 @@ class AccsService:
 			media_content_present=media_content_present,
 			captions_available=captions_available,
 		)
-		self._targets[target_id] = target
+		key = self._key(tenant_id, target_id)
+		if key in self._targets:
+			raise ValueError(f"duplicate accessibility target for tenant: {target_id}")
+		self._targets[key] = target
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="target_registered",
+			subject_id=target_id,
+			message=f"Registered accessibility target {target_id}.",
+			evidence={"route": route, "published_ui": published_ui},
+		)
 		return target.to_dict()
 
 	def list_targets(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -143,13 +170,14 @@ class AccsService:
 		target_ids: list[str] | tuple[str, ...],
 		remediation_owner: str | None = None,
 	) -> dict[str, Any]:
-		self._enforce_audit_policy(tenant_id, bool(standard_id and standard_id in self._standards))
+		standard = self._get_standard(tenant_id, standard_id)
+		self._enforce_audit_policy(tenant_id, standard is not None)
 		if not target_ids:
 			raise ValueError("at least one accessibility target is required")
-		standard = self._standards[standard_id]
+		assert standard is not None
 		finding_ids: list[str] = []
 		for target_id in target_ids:
-			target = self._targets.get(target_id)
+			target = self._targets.get(self._key(tenant_id, target_id))
 			if target is None or target.tenant_id != tenant_id:
 				raise KeyError(f"unknown accessibility target: {target_id}")
 			for index, draft in enumerate(self._engine.audit_target(standard, target), start=1):
@@ -171,10 +199,20 @@ class AccsService:
 			target_ids=tuple(target_ids),
 			finding_ids=tuple(finding_ids),
 		)
-		self._audits[audit_id] = audit
+		key = self._key(tenant_id, audit_id)
+		if key in self._audits:
+			raise ValueError(f"duplicate accessibility audit for tenant: {audit_id}")
+		self._audits[key] = audit
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="audit_completed",
+			subject_id=audit_id,
+			message=f"Completed accessibility audit {audit_id}.",
+			evidence={"finding_count": len(finding_ids), "standard_id": standard_id},
+		)
 		return {
 			**audit.to_dict(),
-			"summary": self._engine.summarize_findings([self._findings[item].to_dict() for item in finding_ids]),
+			"summary": self._engine.summarize_findings([self._findings[self._key(tenant_id, item)].to_dict() for item in finding_ids]),
 		}
 
 	def list_audits(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -210,10 +248,13 @@ class AccsService:
 			review_recorded=review_recorded,
 			evidence=dict(evidence or {}),
 		)
-		self._findings[finding_id] = finding
+		key = self._key(tenant_id, finding_id)
+		if key in self._findings:
+			raise ValueError(f"duplicate accessibility finding for tenant: {finding_id}")
+		self._findings[key] = finding
 		if remediation_owner:
 			self._remediations.setdefault(
-				finding_id,
+				key,
 				RemediationTask(
 					id=f"remediate:{finding_id}",
 					tenant_id=tenant_id,
@@ -246,7 +287,8 @@ class AccsService:
 		due_date: str | None = None,
 		tenant_id: str | None = None,
 	) -> dict[str, Any]:
-		task = self._remediations.get(finding_id)
+		key = self._find_remediation_key(finding_id, tenant_id)
+		task = self._remediations.get(key)
 		if task is None:
 			raise KeyError(f"unknown remediation task: {finding_id}")
 		if tenant_id is not None and task.tenant_id != tenant_id:
@@ -260,7 +302,7 @@ class AccsService:
 			due_date=due_date or task.due_date,
 			review_recorded=review_recorded or task.review_recorded,
 		)
-		self._remediations[finding_id] = updated
+		self._remediations[key] = updated
 		self._record_event(
 			tenant_id=updated.tenant_id,
 			event_type="remediation_updated",
@@ -279,7 +321,8 @@ class AccsService:
 		notes: str,
 	) -> dict[str, Any]:
 		self._enforce_tenant(tenant_id)
-		finding = self._findings.get(finding_id)
+		key = self._key(tenant_id, finding_id)
+		finding = self._findings.get(key)
 		if finding is None or finding.tenant_id != tenant_id:
 			raise KeyError(f"unknown accessibility finding for tenant: {finding_id}")
 		if not reviewer:
@@ -296,9 +339,10 @@ class AccsService:
 			decision=decision,
 			notes=notes,
 		)
-		self._reviews[review.id] = review
+		review_key = self._key(tenant_id, review.id)
+		self._reviews[review_key] = review
 		reviewed_status = "open" if decision == "approved" and finding.status == "review_required" else finding.status
-		self._findings[finding_id] = AccessibilityFinding(
+		self._findings[key] = AccessibilityFinding(
 			id=finding.id,
 			tenant_id=finding.tenant_id,
 			target_id=finding.target_id,
@@ -312,9 +356,9 @@ class AccsService:
 			resolution=finding.resolution,
 			evidence=finding.evidence,
 		)
-		task = self._remediations.get(finding_id)
+		task = self._remediations.get(key)
 		if task is not None:
-			self._remediations[finding_id] = RemediationTask(
+			self._remediations[key] = RemediationTask(
 				id=task.id,
 				tenant_id=task.tenant_id,
 				finding_id=task.finding_id,
@@ -339,7 +383,8 @@ class AccsService:
 		resolution: str,
 	) -> dict[str, Any]:
 		self._enforce_tenant(tenant_id)
-		finding = self._findings.get(finding_id)
+		key = self._key(tenant_id, finding_id)
+		finding = self._findings.get(key)
 		if finding is None or finding.tenant_id != tenant_id:
 			raise KeyError(f"unknown accessibility finding for tenant: {finding_id}")
 		if not resolution:
@@ -362,10 +407,10 @@ class AccsService:
 			resolution=resolution,
 			evidence=finding.evidence,
 		)
-		self._findings[finding_id] = closed
-		task = self._remediations.get(finding_id)
+		self._findings[key] = closed
+		task = self._remediations.get(key)
 		if task is not None:
-			self._remediations[finding_id] = RemediationTask(
+			self._remediations[key] = RemediationTask(
 				id=task.id,
 				tenant_id=task.tenant_id,
 				finding_id=task.finding_id,
@@ -382,6 +427,87 @@ class AccsService:
 			evidence={"resolution": resolution},
 		)
 		return closed.to_dict()
+
+	def register_accessibility_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		registered: bool = True,
+		contribution_disclosed: bool = True,
+		policy_ref: str | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		normalized_runtime = self._normalize_accessibility_agent_runtime(runtime)
+		normalized_role = self._normalize_accessibility_agent_role(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"accessibility_agent_present": True,
+			"agent_registered": registered,
+			"agent_runtime_supported": normalized_runtime is not None,
+			"agent_role_supported": normalized_role is not None,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		_raise_if_blocked(result)
+		if not name:
+			raise ValueError("accessibility agent name is required")
+		key = self._key(tenant_id, agent_id)
+		if key in self._agents:
+			raise ValueError(f"duplicate accessibility agent for tenant: {agent_id}")
+		agent = AccessibilityAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime or runtime,
+			role=normalized_role or role,
+			scope=scope,
+			registered=registered,
+			contribution_disclosed=contribution_disclosed,
+			policy_ref=policy_ref,
+			status=status,
+		)
+		self._agents[key] = agent
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="accessibility_agent_registered",
+			subject_id=agent_id,
+			message=f"Registered accessibility agent {agent_id}.",
+			evidence={"runtime": agent.runtime, "role": agent.role, "scope": scope},
+		)
+		return agent.to_dict()
+
+	def list_accessibility_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		agents = list(self._agents.values())
+		if tenant_id is not None:
+			agents = [item for item in agents if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(agents, key=lambda item: item.id)]
+
+	def validate_batch_accessibility_mutation(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "batch_accessibility_mutation",
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+		})
+		_raise_if_blocked(result)
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+			"accepted": True,
+			"rule_result": result,
+		}
 
 	def list_remediations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		tasks = list(self._remediations.values())
@@ -402,7 +528,7 @@ class AccsService:
 		return [item.to_dict() for item in events]
 
 	def validate_publication(self, target_id: str, tenant_id: str | None = None) -> dict[str, Any]:
-		target = self._targets.get(target_id)
+		target = self._get_target(target_id, tenant_id)
 		if target is None:
 			raise KeyError(f"unknown accessibility target: {target_id}")
 		if tenant_id is not None and target.tenant_id != tenant_id:
@@ -433,6 +559,7 @@ class AccsService:
 			"open_finding_count": len(open_findings),
 			"remediation_count": len(remediations),
 			"review_count": len(self.list_reviews(tenant_id)),
+			"accessibility_agent_count": len(self.list_accessibility_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"critical_or_high_count": self._engine.summarize_findings(findings)["critical_or_high_count"],
 		}
@@ -495,6 +622,34 @@ class AccsService:
 		if not reviews:
 			return finding.review_recorded
 		return any(review.decision == "approved" for review in reviews)
+
+	def _key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
+	def _get_standard(self, tenant_id: str, standard_id: str) -> AccessibilityStandard | None:
+		return self._standards.get(self._key(tenant_id, standard_id)) or self._standards.get(self._key("default", standard_id))
+
+	def _get_target(self, target_id: str, tenant_id: str | None = None) -> AccessibilityTarget | None:
+		if tenant_id is not None:
+			return self._targets.get(self._key(tenant_id, target_id))
+		matches = [target for target in self._targets.values() if target.id == target_id]
+		return matches[0] if len(matches) == 1 else None
+
+	def _find_remediation_key(self, finding_id: str, tenant_id: str | None = None) -> str:
+		if tenant_id is not None:
+			return self._key(tenant_id, finding_id)
+		matches = [key for key, task in self._remediations.items() if task.finding_id == finding_id]
+		if len(matches) == 1:
+			return matches[0]
+		return self._key("", finding_id)
+
+	def _normalize_accessibility_agent_runtime(self, runtime: str) -> str | None:
+		normalized = runtime.strip().lower().replace("-", "_").replace(" ", "_")
+		return normalized if normalized in SUPPORTED_ACCESSIBILITY_AGENT_RUNTIMES else None
+
+	def _normalize_accessibility_agent_role(self, role: str) -> str | None:
+		normalized = role.strip().lower().replace("-", "_").replace(" ", "_")
+		return normalized if normalized in SUPPORTED_ACCESSIBILITY_AGENT_ROLES else None
 
 
 def _raise_if_blocked(result: dict[str, Any]) -> None:

@@ -18,6 +18,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"streaming": contract["streaming"],
 		**SERVICE.compliance_summary(tenant_id),
 	}
 
@@ -102,6 +103,29 @@ def close_finding(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_accessibility_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_accessibility_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "audit_reviewer"),
+		scope=str(payload.get("scope") or ""),
+		registered=bool(payload.get("registered", True)),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		policy_ref=payload.get("policy_ref"),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def validate_batch_accessibility_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_accessibility_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+	)
+
+
 def validate_publication(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.validate_publication(
 		target_id=str(payload["target_id"]),
@@ -140,3 +164,7 @@ def list_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_audit_events(tenant_id)
+
+
+def list_accessibility_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_accessibility_agents(tenant_id)

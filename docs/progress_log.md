@@ -16267,3 +16267,59 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External PRED, IOTD, GEOS, CVSN, MCHN, ANOM, EDGE, AUDL, or THEM
   adapters.
+
+### 2026-05-30 17:32 EAT
+
+ACCS lifecycle and guardrail packet:
+
+- Selected `capabilities/common/accs` after DTWN because it already had the
+  critical-finding review lifecycle but still lacked a local README and the
+  newer common-capability agent, stream, and tenant-isolation surfaces.
+- Added local `README.md`, refreshed `SPECIFICATION.md` and `PLAN.md`, and
+  replaced `cap_spec.md` with a compatibility pointer to the active
+  specification.
+- Expanded the executable ACCS contract to cover accessibility standards,
+  targets, audits, findings, remediation tasks, reviews, audit events,
+  accessibility agents, governance, observability, APG adapters, UI routes,
+  visual theme tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, audit standard
+  selection, remediation owner assignment, contrast validation, captions or
+  transcripts, critical review, finding closure evidence, accessibility-agent
+  registration/runtime/role/scope/disclosure, audit evidence, tenant
+  isolation, and Bytewax batch mutation.
+- Added the `AccessibilityAgent` runtime model and service methods for
+  accessibility-agent registration, tenant-safe listing, and Bytewax
+  batch-mutation validation.
+- Hardened `AccsService` so duplicate IDs are tenant-local across standards,
+  targets, audits, findings, remediation tasks, reviews, and agents.
+- Added API helper coverage for accessibility agents, batch mutation
+  validation, listing state, and status summaries.
+- Added agent-panel, audit-trail, analytics, and settings view models, plus
+  richer dashboard metadata with stream and theme information.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, guardrails, critical
+  review and closure, accessibility agents, tenant-safe duplicate IDs, Bytewax
+  policy, view models, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/accs/__init__.py capabilities/common/accs/models.py capabilities/common/accs/accessibility_engine.py capabilities/common/accs/service.py capabilities/common/accs/api.py capabilities/common/accs/views.py capabilities/common/accs/capability_contract.py capabilities/common/accs/app.py capabilities/common/accs/test_capability_contract.py capabilities/common/accs/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/accs/test_capability_contract.py capabilities/common/accs/tests/test_package_contract.py` passed with 12 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and ACCS capability evidence.
+- `jq '.capabilities.accs.streaming.processor, .capabilities.accs.configuration.accessibility_agents.supported_runtimes, .capabilities.accs.screens.agents.route' capabilities/common/accs/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, and `/accs/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/accs --json` passed with `ok: true`; ACCS remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/accs --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/accs docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live browser or DOM scanners, assistive-technology providers, captioning
+  engines, workflow systems, compliance export destinations, external
+  AI-agent CLIs, durable accessibility databases, browser-rendered
+  accessibility UI, and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External THEM, I18N, NLPC, AUDL, COMP, HELP, WSBL, or AICR adapters.

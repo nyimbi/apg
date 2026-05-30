@@ -12,6 +12,37 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "accessibility_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "audit_reviewer",
+            "remediation_planner",
+            "caption_reviewer",
+            "standards_advisor",
+            "release_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AccsService",
+          "i18n": "i18n",
+          "nlp_guidance": "nlpc",
+          "theme": "them",
+          "view_models": "views.py"
+        },
         "assistive": {
           "keyboard_navigation_required": true,
           "media_captions_required": true,
@@ -26,9 +57,19 @@
         },
         "governance": {
           "audit_change_logging": true,
+          "batch_event_stream": "bytewax",
           "compliance_exports_enabled": true,
           "remediation_owner_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "accessibility_metrics_required": true,
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "trace_required": true
         },
         "standards": {
           "default_standard": "WCAG-2.2-AA",
@@ -42,8 +83,11 @@
           "default_theme": "accs_accessibility_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
           "enable_assistive_preview": true,
           "enable_audit_console": true,
+          "enable_audit_events": true,
           "enable_findings_board": true,
           "enable_remediation_queue": true
         }
@@ -55,9 +99,18 @@
       "master_data": {},
       "name": "Accessibility Services",
       "provides": [
-        "accs_operations"
+        "accessibility_audits",
+        "remediation_workflows",
+        "assistive_metadata",
+        "media_accessibility",
+        "standards_governance",
+        "accessibility_agents"
       ],
-      "requires": [],
+      "requires": [
+        "them",
+        "i18n",
+        "nlpc"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -136,6 +189,122 @@
               "required_action": "review_critical_issue"
             },
             "name": "critical_issue_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "close_finding",
+              "resolution_evidence_present": false
+            },
+            "description": "Finding closure requires resolution evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "resolution_evidence_required",
+              "required_action": "attach_resolution_evidence"
+            },
+            "name": "finding_closure_requires_resolution"
+          },
+          {
+            "condition": {
+              "accessibility_agent_present": true,
+              "agent_registered": false
+            },
+            "description": "AI accessibility agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_agent_registration_required",
+              "required_action": "register_accessibility_agent"
+            },
+            "name": "accessibility_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "accessibility_agent_present": true,
+              "agent_runtime_supported": false
+            },
+            "description": "AI accessibility agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_agent_runtime_not_supported",
+              "required_action": "choose_supported_accessibility_agent_runtime"
+            },
+            "name": "accessibility_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "accessibility_agent_present": true,
+              "agent_role_supported": false
+            },
+            "description": "AI accessibility agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_agent_role_not_supported",
+              "required_action": "choose_supported_accessibility_agent_role"
+            },
+            "name": "accessibility_agent_role_supported"
+          },
+          {
+            "condition": {
+              "accessibility_agent_present": true,
+              "agent_scope_present": false
+            },
+            "description": "AI accessibility agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_agent_scope_required",
+              "required_action": "set_accessibility_agent_scope"
+            },
+            "name": "accessibility_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "accessibility_agent_present": true,
+              "agent_contribution_disclosed": false
+            },
+            "description": "AI accessibility-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_agent_disclosure_required",
+              "required_action": "disclose_accessibility_agent"
+            },
+            "name": "accessibility_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Accessibility lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accs_audit_event_required",
+              "required_action": "record_accessibility_audit_event"
+            },
+            "name": "accs_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Accessibility records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_accessibility_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_accessibility_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_accessibility_mutation"
+            },
+            "description": "Batch accessibility mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_accessibility_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -217,6 +386,122 @@
             "required_action": "review_critical_issue"
           },
           "name": "critical_issue_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "close_finding",
+            "resolution_evidence_present": false
+          },
+          "description": "Finding closure requires resolution evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "resolution_evidence_required",
+            "required_action": "attach_resolution_evidence"
+          },
+          "name": "finding_closure_requires_resolution"
+        },
+        {
+          "condition": {
+            "accessibility_agent_present": true,
+            "agent_registered": false
+          },
+          "description": "AI accessibility agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_agent_registration_required",
+            "required_action": "register_accessibility_agent"
+          },
+          "name": "accessibility_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "accessibility_agent_present": true,
+            "agent_runtime_supported": false
+          },
+          "description": "AI accessibility agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_agent_runtime_not_supported",
+            "required_action": "choose_supported_accessibility_agent_runtime"
+          },
+          "name": "accessibility_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "accessibility_agent_present": true,
+            "agent_role_supported": false
+          },
+          "description": "AI accessibility agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_agent_role_not_supported",
+            "required_action": "choose_supported_accessibility_agent_role"
+          },
+          "name": "accessibility_agent_role_supported"
+        },
+        {
+          "condition": {
+            "accessibility_agent_present": true,
+            "agent_scope_present": false
+          },
+          "description": "AI accessibility agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_agent_scope_required",
+            "required_action": "set_accessibility_agent_scope"
+          },
+          "name": "accessibility_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "accessibility_agent_present": true,
+            "agent_contribution_disclosed": false
+          },
+          "description": "AI accessibility-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_agent_disclosure_required",
+            "required_action": "disclose_accessibility_agent"
+          },
+          "name": "accessibility_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Accessibility lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accs_audit_event_required",
+            "required_action": "record_accessibility_audit_event"
+          },
+          "name": "accs_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Accessibility records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_accessibility_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_accessibility_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_accessibility_mutation"
+          },
+          "description": "Batch accessibility mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_accessibility_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,10 +511,25 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "AccessibilityAgentPanel",
+          "permission": "accs:audit",
+          "route": "/accs/agents"
+        },
+        "analytics": {
+          "component": "AccessibilityAnalytics",
+          "permission": "accs:view",
+          "route": "/accs/analytics"
+        },
         "assistive": {
           "component": "AssistivePreview",
           "permission": "accs:audit",
           "route": "/accs/assistive"
+        },
+        "audit": {
+          "component": "AccessibilityAuditTrail",
+          "permission": "accs:audit",
+          "route": "/accs/audit"
         },
         "audits": {
           "component": "AuditConsole",
@@ -267,9 +567,37 @@
           "route": "/accs/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_accessibility_mutation_requires_bytewax",
+        "events": [
+          "standard_registered",
+          "target_registered",
+          "audit_completed",
+          "finding_recorded",
+          "remediation_updated",
+          "finding_review_recorded",
+          "finding_closed",
+          "accessibility_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "standards",
+          "targets",
+          "audits",
+          "findings",
+          "remediations",
+          "reviews",
+          "accessibility_agents",
+          "audit_events"
+        ],
+        "topic": "apg.accs.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
           "assistive_preview": {
             "status_style": "label-chip",
             "visual": "semantic-tree"
@@ -278,6 +606,10 @@
             "icon": "badge-check",
             "risk_style": "severity-band",
             "status_indicator": "score-pill"
+          },
+          "audit_timeline": {
+            "icon": "list-checks",
+            "status_style": "governance-chip"
           },
           "compliance_panel": {
             "status_style": "evidence-chip",
@@ -357,6 +689,27 @@
             "permission": "accs:manage_standards"
           },
           {
+            "component": "AccessibilityAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/accs/agents",
+            "permission": "accs:audit"
+          },
+          {
+            "component": "AccessibilityAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/accs/audit",
+            "permission": "accs:audit"
+          },
+          {
+            "component": "AccessibilityAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/accs/analytics",
+            "permission": "accs:view"
+          },
+          {
             "component": "ACCSSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -377,12 +730,47 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "accs": []
+      "accs": [
+        "them",
+        "i18n",
+        "nlpc"
+      ]
     }
   },
   "contracts": {
     "accs": {
       "configuration": {
+        "accessibility_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "audit_reviewer",
+            "remediation_planner",
+            "caption_reviewer",
+            "standards_advisor",
+            "release_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AccsService",
+          "i18n": "i18n",
+          "nlp_guidance": "nlpc",
+          "theme": "them",
+          "view_models": "views.py"
+        },
         "assistive": {
           "keyboard_navigation_required": true,
           "media_captions_required": true,
@@ -397,9 +785,19 @@
         },
         "governance": {
           "audit_change_logging": true,
+          "batch_event_stream": "bytewax",
           "compliance_exports_enabled": true,
           "remediation_owner_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "accessibility_metrics_required": true,
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "trace_required": true
         },
         "standards": {
           "default_standard": "WCAG-2.2-AA",
@@ -413,17 +811,29 @@
           "default_theme": "accs_accessibility_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
           "enable_assistive_preview": true,
           "enable_audit_console": true,
+          "enable_audit_events": true,
           "enable_findings_board": true,
           "enable_remediation_queue": true
         }
       },
       "id": "accs",
       "provides": [
-        "accs_operations"
+        "accessibility_audits",
+        "remediation_workflows",
+        "assistive_metadata",
+        "media_accessibility",
+        "standards_governance",
+        "accessibility_agents"
       ],
-      "requires": []
+      "requires": [
+        "them",
+        "i18n",
+        "nlpc"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +845,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +866,84 @@
   },
   "roles": {},
   "rules": {
+    "accessibility_agent_requires_disclosure": {
+      "condition": {
+        "accessibility_agent_present": true,
+        "agent_contribution_disclosed": false
+      },
+      "description": "AI accessibility-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_agent_disclosure_required",
+        "required_action": "disclose_accessibility_agent"
+      },
+      "name": "accessibility_agent_requires_disclosure"
+    },
+    "accessibility_agent_requires_registration": {
+      "condition": {
+        "accessibility_agent_present": true,
+        "agent_registered": false
+      },
+      "description": "AI accessibility agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_agent_registration_required",
+        "required_action": "register_accessibility_agent"
+      },
+      "name": "accessibility_agent_requires_registration"
+    },
+    "accessibility_agent_requires_scope": {
+      "condition": {
+        "accessibility_agent_present": true,
+        "agent_scope_present": false
+      },
+      "description": "AI accessibility agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_agent_scope_required",
+        "required_action": "set_accessibility_agent_scope"
+      },
+      "name": "accessibility_agent_requires_scope"
+    },
+    "accessibility_agent_role_supported": {
+      "condition": {
+        "accessibility_agent_present": true,
+        "agent_role_supported": false
+      },
+      "description": "AI accessibility agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_agent_role_not_supported",
+        "required_action": "choose_supported_accessibility_agent_role"
+      },
+      "name": "accessibility_agent_role_supported"
+    },
+    "accessibility_agent_runtime_supported": {
+      "condition": {
+        "accessibility_agent_present": true,
+        "agent_runtime_supported": false
+      },
+      "description": "AI accessibility agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_agent_runtime_not_supported",
+        "required_action": "choose_supported_accessibility_agent_runtime"
+      },
+      "name": "accessibility_agent_runtime_supported"
+    },
+    "accs_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Accessibility lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accs_audit_event_required",
+        "required_action": "record_accessibility_audit_event"
+      },
+      "name": "accs_state_change_requires_audit"
+    },
     "audit_requires_standard": {
       "condition": {
         "operation": "start_audit",
@@ -469,6 +957,19 @@
       },
       "name": "audit_requires_standard"
     },
+    "batch_accessibility_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_accessibility_mutation"
+      },
+      "description": "Batch accessibility mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_accessibility_mutation_requires_bytewax"
+    },
     "critical_issue_requires_review": {
       "condition": {
         "issue_severity": "critical",
@@ -481,6 +982,31 @@
         "required_action": "review_critical_issue"
       },
       "name": "critical_issue_requires_review"
+    },
+    "cross_tenant_accessibility_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Accessibility records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_accessibility_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_accessibility_access_denied"
+    },
+    "finding_closure_requires_resolution": {
+      "condition": {
+        "operation": "close_finding",
+        "resolution_evidence_present": false
+      },
+      "description": "Finding closure requires resolution evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "resolution_evidence_required",
+        "required_action": "attach_resolution_evidence"
+      },
+      "name": "finding_closure_requires_resolution"
     },
     "media_requires_captions": {
       "condition": {

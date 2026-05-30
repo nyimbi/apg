@@ -14,18 +14,25 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "accs"
 	assert contract["configuration"]["tenant_id"] == "tenant-accs"
 	assert contract["configuration"]["standards"]["default_standard"] == "EN-301-549"
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "standards", "audits", "assistive", "governance", "ui", "theme"]
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "audits", "findings", "remediation", "assistive", "media", "compliance", "settings"}
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "standards", "audits", "assistive", "accessibility_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["configuration"]["accessibility_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert set(contract["provides"]) >= {"accessibility_audits", "remediation_workflows", "accessibility_agents"}
+	assert contract["requires"] == ["them", "i18n", "nlpc"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "audits", "findings", "remediation", "assistive", "media", "compliance", "agents", "audit", "analytics", "settings"}
 	assert contract["theme"]["name"] == "accs_accessibility_ops"
 
 
 def test_rule_engine_enforces_accs_guardrails():
 	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "start_audit", "standard_selected": False, "violation_detected": True, "remediation_owner_assigned": False, "published_ui": True, "contrast_passed": False, "media_content_present": True, "captions_available": False, "issue_severity": "critical", "review_recorded": False})
 	review_result = evaluate_capability_rules({"tenant_context_present": True, "issue_severity": "critical", "review_recorded": False})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_accessibility_mutation", "event_stream": "memory"})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "audit_requires_standard", "violation_requires_remediation_owner", "published_ui_requires_contrast", "media_requires_captions", "critical_issue_requires_review"}
 	assert review_result["decision"] == "require_review"
+	assert batch_result["decision"] == "deny"
+	assert batch_result["matched_rules"] == ["batch_accessibility_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -33,7 +40,10 @@ def test_registration_includes_full_capability_contract():
 
 	assert registration["name"] == "accs"
 	assert "nlpc" in registration["dependencies"]
+	assert "bytewax" in registration["optional_dependencies"]
 	assert registration["ui_components"]["remediation"] == "/accs/remediation"
+	assert registration["ui_components"]["agents"] == "/accs/agents"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert "accs:remediate" in registration["permissions"]
 
 
@@ -204,6 +214,70 @@ def test_critical_finding_closure_enforces_tenant_and_resolution_guardrails():
 		service.close_finding(finding["id"], tenant_id="tenant-accs", resolution="")
 
 
+def test_accessibility_agents_tenant_scope_and_bytewax_guardrail():
+	service = AccsService()
+	service.register_target(
+		target_id="shared",
+		tenant_id="tenant-a",
+		surface="Tenant A Screen",
+		route="/a",
+		owner="owner-a",
+	)
+	service.register_target(
+		target_id="shared",
+		tenant_id="tenant-b",
+		surface="Tenant B Screen",
+		route="/b",
+		owner="owner-b",
+	)
+	agent = service.register_accessibility_agent(
+		agent_id="reviewer-1",
+		tenant_id="tenant-a",
+		name="Accessibility Reviewer",
+		runtime="claude-code",
+		role="release-reviewer",
+		scope="release gates and critical-finding evidence",
+		contribution_disclosed=True,
+		policy_ref="accs-agent-policy",
+	)
+	batch = service.validate_batch_accessibility_mutation(
+		tenant_id="tenant-a",
+		event_stream="bytewax",
+		mutation_count=2,
+	)
+	dashboard = views.dashboard_model(service, "tenant-a")
+	agents = views.accessibility_agents_model(service, "tenant-a")
+	analytics = views.analytics_model(service, "tenant-a")
+	settings = views.settings_model("tenant-a")
+
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "release_reviewer"
+	assert batch["accepted"] is True
+	assert len(service.list_targets("tenant-a")) == 1
+	assert len(service.list_targets("tenant-b")) == 1
+	assert dashboard["accessibility_agents"][0]["id"] == "reviewer-1"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert analytics["summary"]["accessibility_agent_count"] == 1
+	assert settings["streaming"]["processor"] == "bytewax"
+
+	with pytest.raises(PermissionError, match="accessibility_agent_runtime_not_supported"):
+		service.register_accessibility_agent(
+			agent_id="bad-runtime",
+			tenant_id="tenant-a",
+			name="Bad Runtime",
+			runtime="unsupported",
+			role="audit_reviewer",
+			scope="audits",
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_accessibility_mutation(
+			tenant_id="tenant-a",
+			event_stream="memory",
+			mutation_count=1,
+		)
+
+
 def test_api_helpers_expose_review_and_closure_lifecycle():
 	target = api.register_target({
 		"id": "api-admin",
@@ -235,3 +309,24 @@ def test_api_helpers_expose_review_and_closure_lifecycle():
 	assert review["reviewer"] == "api-reviewer"
 	assert closed["status"] == "closed"
 	assert api.list_reviews(target["tenant_id"])[0]["finding_id"] == audit["finding_ids"][0]
+
+
+def test_api_helpers_expose_accessibility_agents():
+	agent = api.register_accessibility_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api-agent",
+		"name": "API Accessibility Agent",
+		"runtime": "opencode",
+		"role": "audit_reviewer",
+		"scope": "audit triage",
+		"contribution_disclosed": True,
+	})
+	batch = api.validate_batch_accessibility_mutation({
+		"tenant_id": "tenant-api-agent",
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+	})
+
+	assert agent["runtime"] == "opencode"
+	assert api.list_accessibility_agents("tenant-api-agent")[0]["id"] == "api-agent"
+	assert batch["accepted"] is True

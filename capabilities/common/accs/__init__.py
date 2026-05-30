@@ -25,8 +25,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["accessibility_audits", "remediation_workflows", "assistive_metadata", "media_accessibility", "standards_governance"],
-	"permissions": ["accs:view", "accs:audit", "accs:remediate", "accs:manage_standards", "accs:admin"]
+	"provides": ["accessibility_audits", "remediation_workflows", "assistive_metadata", "media_accessibility", "standards_governance", "accessibility_agents"],
+	"permissions": ["accs:view", "accs:audit", "accs:remediate", "accs:manage_standards", "accs:review", "accs:admin"]
 }
 
 
@@ -40,7 +40,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "comp", "help", "wsbl"],
+		"optional_dependencies": ["audl", "comp", "help", "wsbl", "bytewax", "aicr"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,13 +50,15 @@ def register_capability() -> dict[str, Any]:
 			"review_governance": "Record formal review decisions before critical findings can close",
 			"assistive_metadata": "Manage labels, descriptions, landmarks, and assistive hints",
 			"media_accessibility": "Govern captions, transcripts, alt text, and media alternatives",
+			"accessibility_agents": "Register governed AI accessibility agents with runtime, role, scope, disclosure, and audit",
 			"capability_rules": "Evaluate deterministic accessibility-governance rules",
 			"visual_theming": "Apply accessibility-operations theme tokens and components"
 		},
-		"endpoints": {"audits": "/accs/api/v1/audits", "findings": "/accs/api/v1/findings", "remediation": "/accs/api/v1/remediation", "reviews": "/accs/api/v1/reviews", "assistive": "/accs/api/v1/assistive", "standards": "/accs/api/v1/standards"},
+		"endpoints": {"audits": "/accs/api/v1/audits", "findings": "/accs/api/v1/findings", "remediation": "/accs/api/v1/remediation", "reviews": "/accs/api/v1/reviews", "assistive": "/accs/api/v1/assistive", "standards": "/accs/api/v1/standards", "agents": "/accs/api/v1/agents", "audit": "/accs/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

@@ -26,8 +26,10 @@ def dashboard_model(
 		"findings": service.list_findings(tenant_id),
 		"remediations": service.list_remediations(tenant_id),
 		"reviews": service.list_reviews(tenant_id),
+		"accessibility_agents": service.list_accessibility_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -106,6 +108,65 @@ def compliance_evidence_model(
 	}
 
 
+def accessibility_agents_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	contract = service.describe(tenant_id)
+	return {
+		"agents": service.list_accessibility_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["accessibility_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["accessibility_agents"]["allowed_roles"],
+		"actions": ["register", "scope", "review_contribution", "deactivate"],
+		"required_fields": ["name", "runtime", "role", "scope", "contribution_disclosed"],
+	}
+
+
+def audit_trail_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	return {
+		"audit_events": service.list_audit_events(tenant_id),
+		"event_types": [
+			"standard_registered",
+			"target_registered",
+			"audit_completed",
+			"finding_recorded",
+			"remediation_updated",
+			"finding_review_recorded",
+			"finding_closed",
+			"accessibility_agent_registered",
+		],
+	}
+
+
+def analytics_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	summary = service.compliance_summary(tenant_id)
+	return {
+		"summary": summary,
+		"closure_rate": _safe_ratio(summary["finding_count"] - summary["open_finding_count"], summary["finding_count"]),
+		"review_rate": _safe_ratio(summary["review_count"], summary["critical_or_high_count"]),
+		"agent_coverage": _safe_ratio(summary["accessibility_agent_count"], max(summary["target_count"], 1)),
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"theme": contract["theme"],
+	}
+
+
 def assistive_preview_model(target: dict[str, object]) -> dict[str, object]:
 	return {
 		"target_id": target["id"],
@@ -115,3 +176,7 @@ def assistive_preview_model(target: dict[str, object]) -> dict[str, object]:
 		"media_ready": not target.get("media_content_present") or bool(target.get("captions_available")),
 		"preview_sections": ["landmarks", "labels", "keyboard_order", "media_alternatives"],
 	}
+
+
+def _safe_ratio(numerator: int, denominator: int) -> float:
+	return round(numerator / denominator, 4) if denominator else 0.0
