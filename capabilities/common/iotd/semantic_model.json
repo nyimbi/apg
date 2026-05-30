@@ -12,28 +12,86 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "digital_twin": "dtwn",
+          "edge_runtime": "edge",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.IotdService",
+          "identity": "auth",
+          "logs": "logt",
+          "monitoring": "moni",
+          "view_models": "views.py"
+        },
         "commands": {
           "ack_timeout_seconds": 30,
           "command_approval_required": true,
           "command_audit_required": true,
+          "command_name_required": true,
           "dangerous_command_review_required": true
         },
         "devices": {
+          "certificate_required": true,
           "certificate_rotation_days": 90,
           "device_identity_required": true,
           "fleet_grouping_enabled": true,
-          "owner_required": true
+          "owner_required": true,
+          "tenant_isolation_required": true
+        },
+        "firmware": {
+          "artifact_uri_required": true,
+          "rollback_supported": true,
+          "rollout_device_validation_required": true,
+          "signature_required": true
         },
         "governance": {
+          "batch_event_stream": "bytewax",
           "device_rbac_required": true,
           "firmware_signature_required": true,
           "require_tenant_context": true,
-          "stale_device_review_days": 30
+          "stale_device_review_days": 30,
+          "state_change_audit_required": true
+        },
+        "iotd_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "fleet_operator",
+            "telemetry_reviewer",
+            "command_reviewer",
+            "firmware_reviewer",
+            "security_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "command_metrics_required": true,
+          "device_health_metrics_required": true,
+          "event_stream": "bytewax",
+          "telemetry_metrics_required": true
         },
         "telemetry": {
           "encryption_required": true,
-          "event_bus_required": true,
+          "event_stream": "bytewax",
+          "event_stream_required": true,
           "offline_buffering_enabled": true,
+          "required_fields": [
+            "timestamp"
+          ],
           "schema_validation_required": true
         },
         "tenant_id": "default",
@@ -42,9 +100,12 @@
           "default_theme": "iotd_device_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_command_center": true,
           "enable_device_console": true,
           "enable_firmware_manager": true,
+          "enable_health": true,
           "enable_telemetry_monitor": true
         }
       },
@@ -55,9 +116,20 @@
       "master_data": {},
       "name": "IoT Device Integration",
       "provides": [
-        "iotd_operations"
+        "device_registry",
+        "telemetry_ingestion",
+        "command_dispatch",
+        "firmware_lifecycle",
+        "device_security",
+        "device_health",
+        "iotd_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "encr",
+        "audl",
+        "conf"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +159,45 @@
           },
           {
             "condition": {
+              "device_owner_present": false,
+              "operation": "register_device"
+            },
+            "description": "Devices require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_owner_required",
+              "required_action": "assign_device_owner"
+            },
+            "name": "device_requires_owner"
+          },
+          {
+            "condition": {
+              "certificate_present": false,
+              "operation": "register_device"
+            },
+            "description": "Devices require certificate identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "device_certificate_required",
+              "required_action": "attach_device_certificate"
+            },
+            "name": "device_requires_certificate"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "ingest_telemetry"
+            },
+            "description": "Telemetry ingestion requires Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "telemetry_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "encryption_applied": false,
               "operation": "ingest_telemetry"
             },
@@ -97,6 +208,32 @@
               "required_action": "encrypt_telemetry"
             },
             "name": "telemetry_requires_encryption"
+          },
+          {
+            "condition": {
+              "operation": "ingest_telemetry",
+              "schema_valid": false
+            },
+            "description": "Telemetry ingestion requires schema validation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "telemetry_schema_invalid",
+              "required_action": "fix_telemetry_schema"
+            },
+            "name": "telemetry_requires_schema"
+          },
+          {
+            "condition": {
+              "command_name_present": false,
+              "operation": "dispatch_command"
+            },
+            "description": "Commands require a command name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "command_name_required",
+              "required_action": "set_command_name"
+            },
+            "name": "command_requires_name"
           },
           {
             "condition": {
@@ -114,7 +251,7 @@
           {
             "condition": {
               "firmware_signature_verified": false,
-              "operation": "deploy_firmware"
+              "operation": "register_firmware"
             },
             "description": "Firmware updates require signed artifacts.",
             "effect": {
@@ -123,6 +260,32 @@
               "required_action": "verify_firmware_signature"
             },
             "name": "firmware_requires_signature"
+          },
+          {
+            "condition": {
+              "artifact_uri_present": false,
+              "operation": "register_firmware"
+            },
+            "description": "Firmware registration requires an artifact URI.",
+            "effect": {
+              "decision": "deny",
+              "reason": "firmware_artifact_required",
+              "required_action": "attach_firmware_artifact"
+            },
+            "name": "firmware_requires_artifact"
+          },
+          {
+            "condition": {
+              "deployment_device_count_lte": 0,
+              "operation": "deploy_firmware"
+            },
+            "description": "Firmware deployment requires target devices.",
+            "effect": {
+              "decision": "deny",
+              "reason": "deployment_devices_required",
+              "required_action": "select_deployment_devices"
+            },
+            "name": "deployment_requires_devices"
           },
           {
             "condition": {
@@ -136,6 +299,97 @@
               "required_action": "review_device_status"
             },
             "name": "stale_device_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "iotd_agent_present": true
+            },
+            "description": "AI IoT agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "iotd_agent_registration_required",
+              "required_action": "register_iotd_agent"
+            },
+            "name": "iotd_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "iotd_agent_present": true
+            },
+            "description": "AI IoT agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "iotd_agent_runtime_not_supported",
+              "required_action": "choose_supported_iotd_agent_runtime"
+            },
+            "name": "iotd_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "iotd_agent_present": true
+            },
+            "description": "AI IoT agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "iotd_agent_role_not_supported",
+              "required_action": "choose_supported_iotd_agent_role"
+            },
+            "name": "iotd_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "iotd_agent_present": true
+            },
+            "description": "AI IoT agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "iotd_agent_scope_required",
+              "required_action": "set_iotd_agent_scope"
+            },
+            "name": "iotd_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "iotd_agent_present": true
+            },
+            "description": "AI IoT-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "iotd_agent_disclosure_required",
+              "required_action": "disclose_iotd_agent"
+            },
+            "name": "iotd_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "IoT lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "iotd_audit_event_required",
+              "required_action": "record_iotd_audit_event"
+            },
+            "name": "iotd_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_iot_mutation"
+            },
+            "description": "Batch IoT mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_iot_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +422,45 @@
         },
         {
           "condition": {
+            "device_owner_present": false,
+            "operation": "register_device"
+          },
+          "description": "Devices require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_owner_required",
+            "required_action": "assign_device_owner"
+          },
+          "name": "device_requires_owner"
+        },
+        {
+          "condition": {
+            "certificate_present": false,
+            "operation": "register_device"
+          },
+          "description": "Devices require certificate identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "device_certificate_required",
+            "required_action": "attach_device_certificate"
+          },
+          "name": "device_requires_certificate"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "ingest_telemetry"
+          },
+          "description": "Telemetry ingestion requires Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "telemetry_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "encryption_applied": false,
             "operation": "ingest_telemetry"
           },
@@ -178,6 +471,32 @@
             "required_action": "encrypt_telemetry"
           },
           "name": "telemetry_requires_encryption"
+        },
+        {
+          "condition": {
+            "operation": "ingest_telemetry",
+            "schema_valid": false
+          },
+          "description": "Telemetry ingestion requires schema validation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "telemetry_schema_invalid",
+            "required_action": "fix_telemetry_schema"
+          },
+          "name": "telemetry_requires_schema"
+        },
+        {
+          "condition": {
+            "command_name_present": false,
+            "operation": "dispatch_command"
+          },
+          "description": "Commands require a command name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "command_name_required",
+            "required_action": "set_command_name"
+          },
+          "name": "command_requires_name"
         },
         {
           "condition": {
@@ -195,7 +514,7 @@
         {
           "condition": {
             "firmware_signature_verified": false,
-            "operation": "deploy_firmware"
+            "operation": "register_firmware"
           },
           "description": "Firmware updates require signed artifacts.",
           "effect": {
@@ -204,6 +523,32 @@
             "required_action": "verify_firmware_signature"
           },
           "name": "firmware_requires_signature"
+        },
+        {
+          "condition": {
+            "artifact_uri_present": false,
+            "operation": "register_firmware"
+          },
+          "description": "Firmware registration requires an artifact URI.",
+          "effect": {
+            "decision": "deny",
+            "reason": "firmware_artifact_required",
+            "required_action": "attach_firmware_artifact"
+          },
+          "name": "firmware_requires_artifact"
+        },
+        {
+          "condition": {
+            "deployment_device_count_lte": 0,
+            "operation": "deploy_firmware"
+          },
+          "description": "Firmware deployment requires target devices.",
+          "effect": {
+            "decision": "deny",
+            "reason": "deployment_devices_required",
+            "required_action": "select_deployment_devices"
+          },
+          "name": "deployment_requires_devices"
         },
         {
           "condition": {
@@ -217,6 +562,97 @@
             "required_action": "review_device_status"
           },
           "name": "stale_device_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "iotd_agent_present": true
+          },
+          "description": "AI IoT agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "iotd_agent_registration_required",
+            "required_action": "register_iotd_agent"
+          },
+          "name": "iotd_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "iotd_agent_present": true
+          },
+          "description": "AI IoT agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "iotd_agent_runtime_not_supported",
+            "required_action": "choose_supported_iotd_agent_runtime"
+          },
+          "name": "iotd_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "iotd_agent_present": true
+          },
+          "description": "AI IoT agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "iotd_agent_role_not_supported",
+            "required_action": "choose_supported_iotd_agent_role"
+          },
+          "name": "iotd_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "iotd_agent_present": true
+          },
+          "description": "AI IoT agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "iotd_agent_scope_required",
+            "required_action": "set_iotd_agent_scope"
+          },
+          "name": "iotd_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "iotd_agent_present": true
+          },
+          "description": "AI IoT-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "iotd_agent_disclosure_required",
+            "required_action": "disclose_iotd_agent"
+          },
+          "name": "iotd_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "IoT lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "iotd_audit_event_required",
+            "required_action": "record_iotd_audit_event"
+          },
+          "name": "iotd_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_iot_mutation"
+          },
+          "description": "Batch IoT mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_iot_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,6 +662,16 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "IOTDAgentPanel",
+          "permission": "iotd:admin",
+          "route": "/iotd/agents"
+        },
+        "audit": {
+          "component": "DeviceAuditTrail",
+          "permission": "iotd:admin",
+          "route": "/iotd/audit"
+        },
         "commands": {
           "component": "CommandCenter",
           "permission": "iotd:command",
@@ -245,6 +691,11 @@
           "component": "FirmwareManager",
           "permission": "iotd:manage_firmware",
           "route": "/iotd/firmware"
+        },
+        "health": {
+          "component": "DeviceHealth",
+          "permission": "iotd:view",
+          "route": "/iotd/health"
         },
         "rules": {
           "component": "DeviceRules",
@@ -267,9 +718,40 @@
           "route": "/iotd/telemetry"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_iot_mutation_requires_bytewax",
+        "events": [
+          "iotd_device_registered",
+          "iotd_telemetry_ingested",
+          "iotd_command_dispatched",
+          "iotd_command_acknowledged",
+          "iotd_firmware_registered",
+          "iotd_firmware_deployed",
+          "iotd_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "devices",
+          "telemetry",
+          "commands",
+          "firmware",
+          "deployments",
+          "health_reports",
+          "iotd_agents",
+          "audit_events"
+        ],
+        "topic": "apg.iotd.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "device-chip",
+            "visual": "event-timeline"
+          },
           "command_center": {
             "status_style": "ack-chip",
             "visual": "approval-console"
@@ -282,6 +764,10 @@
           "firmware_manager": {
             "status_style": "signature-chip",
             "visual": "rollout-lanes"
+          },
+          "health_dashboard": {
+            "status_style": "freshness-chip",
+            "visual": "health-grid"
           },
           "telemetry_stream": {
             "highlight": "schema-chip",
@@ -343,6 +829,20 @@
             "permission": "iotd:manage_firmware"
           },
           {
+            "component": "IOTDAgentPanel",
+            "name": "agents",
+            "nav_group": "Operations",
+            "path": "/iotd/agents",
+            "permission": "iotd:admin"
+          },
+          {
+            "component": "DeviceHealth",
+            "name": "health",
+            "nav_group": "Operations",
+            "path": "/iotd/health",
+            "permission": "iotd:view"
+          },
+          {
             "component": "DeviceSecurity",
             "name": "security",
             "nav_group": "Security",
@@ -354,6 +854,13 @@
             "name": "rules",
             "nav_group": "Governance",
             "path": "/iotd/rules",
+            "permission": "iotd:admin"
+          },
+          {
+            "component": "DeviceAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/iotd/audit",
             "permission": "iotd:admin"
           },
           {
@@ -377,34 +884,97 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "iotd": []
+      "iotd": [
+        "auth",
+        "encr",
+        "audl",
+        "conf"
+      ]
     }
   },
   "contracts": {
     "iotd": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "digital_twin": "dtwn",
+          "edge_runtime": "edge",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.IotdService",
+          "identity": "auth",
+          "logs": "logt",
+          "monitoring": "moni",
+          "view_models": "views.py"
+        },
         "commands": {
           "ack_timeout_seconds": 30,
           "command_approval_required": true,
           "command_audit_required": true,
+          "command_name_required": true,
           "dangerous_command_review_required": true
         },
         "devices": {
+          "certificate_required": true,
           "certificate_rotation_days": 90,
           "device_identity_required": true,
           "fleet_grouping_enabled": true,
-          "owner_required": true
+          "owner_required": true,
+          "tenant_isolation_required": true
+        },
+        "firmware": {
+          "artifact_uri_required": true,
+          "rollback_supported": true,
+          "rollout_device_validation_required": true,
+          "signature_required": true
         },
         "governance": {
+          "batch_event_stream": "bytewax",
           "device_rbac_required": true,
           "firmware_signature_required": true,
           "require_tenant_context": true,
-          "stale_device_review_days": 30
+          "stale_device_review_days": 30,
+          "state_change_audit_required": true
+        },
+        "iotd_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "fleet_operator",
+            "telemetry_reviewer",
+            "command_reviewer",
+            "firmware_reviewer",
+            "security_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "command_metrics_required": true,
+          "device_health_metrics_required": true,
+          "event_stream": "bytewax",
+          "telemetry_metrics_required": true
         },
         "telemetry": {
           "encryption_required": true,
-          "event_bus_required": true,
+          "event_stream": "bytewax",
+          "event_stream_required": true,
           "offline_buffering_enabled": true,
+          "required_fields": [
+            "timestamp"
+          ],
           "schema_validation_required": true
         },
         "tenant_id": "default",
@@ -413,17 +983,31 @@
           "default_theme": "iotd_device_ops"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_command_center": true,
           "enable_device_console": true,
           "enable_firmware_manager": true,
+          "enable_health": true,
           "enable_telemetry_monitor": true
         }
       },
       "id": "iotd",
       "provides": [
-        "iotd_operations"
+        "device_registry",
+        "telemetry_ingestion",
+        "command_dispatch",
+        "firmware_lifecycle",
+        "device_security",
+        "device_health",
+        "iotd_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "encr",
+        "audl",
+        "conf"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +1019,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +1040,32 @@
   },
   "roles": {},
   "rules": {
+    "batch_iot_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_iot_mutation"
+      },
+      "description": "Batch IoT mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_iot_mutation_requires_bytewax"
+    },
+    "command_requires_name": {
+      "condition": {
+        "command_name_present": false,
+        "operation": "dispatch_command"
+      },
+      "description": "Commands require a command name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "command_name_required",
+        "required_action": "set_command_name"
+      },
+      "name": "command_requires_name"
+    },
     "dangerous_command_requires_approval": {
       "condition": {
         "approval_recorded": false,
@@ -468,6 +1078,32 @@
         "required_action": "record_command_approval"
       },
       "name": "dangerous_command_requires_approval"
+    },
+    "deployment_requires_devices": {
+      "condition": {
+        "deployment_device_count_lte": 0,
+        "operation": "deploy_firmware"
+      },
+      "description": "Firmware deployment requires target devices.",
+      "effect": {
+        "decision": "deny",
+        "reason": "deployment_devices_required",
+        "required_action": "select_deployment_devices"
+      },
+      "name": "deployment_requires_devices"
+    },
+    "device_requires_certificate": {
+      "condition": {
+        "certificate_present": false,
+        "operation": "register_device"
+      },
+      "description": "Devices require certificate identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_certificate_required",
+        "required_action": "attach_device_certificate"
+      },
+      "name": "device_requires_certificate"
     },
     "device_requires_identity": {
       "condition": {
@@ -482,10 +1118,36 @@
       },
       "name": "device_requires_identity"
     },
+    "device_requires_owner": {
+      "condition": {
+        "device_owner_present": false,
+        "operation": "register_device"
+      },
+      "description": "Devices require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "device_owner_required",
+        "required_action": "assign_device_owner"
+      },
+      "name": "device_requires_owner"
+    },
+    "firmware_requires_artifact": {
+      "condition": {
+        "artifact_uri_present": false,
+        "operation": "register_firmware"
+      },
+      "description": "Firmware registration requires an artifact URI.",
+      "effect": {
+        "decision": "deny",
+        "reason": "firmware_artifact_required",
+        "required_action": "attach_firmware_artifact"
+      },
+      "name": "firmware_requires_artifact"
+    },
     "firmware_requires_signature": {
       "condition": {
         "firmware_signature_verified": false,
-        "operation": "deploy_firmware"
+        "operation": "register_firmware"
       },
       "description": "Firmware updates require signed artifacts.",
       "effect": {
@@ -494,6 +1156,84 @@
         "required_action": "verify_firmware_signature"
       },
       "name": "firmware_requires_signature"
+    },
+    "iotd_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "iotd_agent_present": true
+      },
+      "description": "AI IoT-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "iotd_agent_disclosure_required",
+        "required_action": "disclose_iotd_agent"
+      },
+      "name": "iotd_agent_requires_disclosure"
+    },
+    "iotd_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "iotd_agent_present": true
+      },
+      "description": "AI IoT agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "iotd_agent_registration_required",
+        "required_action": "register_iotd_agent"
+      },
+      "name": "iotd_agent_requires_registration"
+    },
+    "iotd_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "iotd_agent_present": true
+      },
+      "description": "AI IoT agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "iotd_agent_scope_required",
+        "required_action": "set_iotd_agent_scope"
+      },
+      "name": "iotd_agent_requires_scope"
+    },
+    "iotd_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "iotd_agent_present": true
+      },
+      "description": "AI IoT agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "iotd_agent_role_not_supported",
+        "required_action": "choose_supported_iotd_agent_role"
+      },
+      "name": "iotd_agent_role_supported"
+    },
+    "iotd_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "iotd_agent_present": true
+      },
+      "description": "AI IoT agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "iotd_agent_runtime_not_supported",
+        "required_action": "choose_supported_iotd_agent_runtime"
+      },
+      "name": "iotd_agent_runtime_supported"
+    },
+    "iotd_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "IoT lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "iotd_audit_event_required",
+        "required_action": "record_iotd_audit_event"
+      },
+      "name": "iotd_state_change_requires_audit"
     },
     "stale_device_requires_review": {
       "condition": {
@@ -508,6 +1248,19 @@
       },
       "name": "stale_device_requires_review"
     },
+    "telemetry_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "ingest_telemetry"
+      },
+      "description": "Telemetry ingestion requires Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "telemetry_requires_bytewax_stream"
+    },
     "telemetry_requires_encryption": {
       "condition": {
         "encryption_applied": false,
@@ -520,6 +1273,19 @@
         "required_action": "encrypt_telemetry"
       },
       "name": "telemetry_requires_encryption"
+    },
+    "telemetry_requires_schema": {
+      "condition": {
+        "operation": "ingest_telemetry",
+        "schema_valid": false
+      },
+      "description": "Telemetry ingestion requires schema validation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "telemetry_schema_invalid",
+        "required_action": "fix_telemetry_schema"
+      },
+      "name": "telemetry_requires_schema"
     },
     "tenant_context_required": {
       "condition": {

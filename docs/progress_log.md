@@ -17006,3 +17006,61 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External CONF, AUTH, AUDL, NLPC, MCHN, HELP, THEM, AGNT, or WFLO adapters.
+
+### 2026-05-30 19:38 EAT
+
+IOTD lifecycle and guardrail packet:
+
+- Selected `capabilities/common/iotd` after I18N because it was the next
+  capability with an existing `cap_spec.md` but missing the local README,
+  specification, and plan packet.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable IOTD contract to cover device registry, telemetry
+  ingestion, command dispatch, firmware lifecycle, device security, device
+  health, IOTD agents, observability, APG adapters, UI routes, visual theme
+  tokens, and Bytewax event streaming.
+- Added deterministic guardrails for tenant context, device identity, device
+  owner, device certificate, Bytewax telemetry stream, telemetry encryption,
+  telemetry schema validation, command name, dangerous-command approval,
+  signed firmware, firmware artifact URI, deployment target devices,
+  stale-device review, AI-agent registration, supported AI-agent runtime and
+  role, agent scope, contribution disclosure, audited state changes, and
+  Bytewax-backed batch IoT mutation.
+- Added the `IotdAgent` model and extended `IotdService` with tenant-local
+  lifecycle IDs, IOTD-agent registration, Bytewax telemetry enforcement,
+  batch-mutation validation, stronger device/telemetry/command/firmware
+  guardrails, and dashboard streaming metadata.
+- Added API helpers for IOTD-agent registration, audit listing, and batch
+  mutation validation.
+- Added dashboard streaming metadata plus AI-agent, audit-trail, and health
+  view models.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle rules, IOTD-agent guardrails,
+  tenant-local IDs, Bytewax telemetry and batch policy, generated evidence,
+  and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/iotd/__init__.py capabilities/common/iotd/capability_contract.py capabilities/common/iotd/models.py capabilities/common/iotd/device_runtime.py capabilities/common/iotd/service.py capabilities/common/iotd/api.py capabilities/common/iotd/views.py capabilities/common/iotd/app.py capabilities/common/iotd/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/iotd/test_capability_contract.py`
+  passed with 7 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... IotdService ... register_iotd_agent ... dashboard_summary ..."` returned dashboard evidence with one IOTD agent and `bytewax` streaming metadata; import emitted the existing optional OpenTelemetry warning.
+- `jq '.capabilities.iotd.streaming.processor, .capabilities.iotd.configuration.iotd_agents.supported_runtimes, .capabilities.iotd.screens.agents.route, ...' capabilities/common/iotd/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, `/iotd/agents`, `iotd_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/iotd --json` passed with `ok: true`; IOTD remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/iotd --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker,
+  and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/iotd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live device broker, edge gateway, certificate authority, durable audit
+  store, digital twin, monitoring system, rendered browser UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, ENCR, AUDL, CONF, EDGE, DTWN, LOGT, MONI, AGNT, or WFLO
+  adapters.

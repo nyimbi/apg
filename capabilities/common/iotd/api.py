@@ -48,7 +48,7 @@ def ingest_telemetry(payload: dict[str, Any]) -> dict[str, Any]:
 		schema_name=str(payload.get("schema_name") or "default"),
 		payload=dict(payload.get("payload") or {}),
 		encryption_applied=bool(payload.get("encryption_applied", True)),
-		event_bus=str(payload.get("event_bus") or "mqeb"),
+		event_bus=str(payload.get("event_bus") or "bytewax"),
 		required_fields=list(payload.get("required_fields") or ["timestamp"]),
 	)
 
@@ -95,6 +95,22 @@ def health_report(report_id: str, tenant_id: str = "default") -> dict[str, Any]:
 	return SERVICE.health_report(report_id, tenant_id)
 
 
+def register_iotd_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_iotd_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=payload.get("id"),
+	)
+
+
+def validate_batch_iot_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_iot_mutation(event_stream)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -106,6 +122,14 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_iotd_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_iotd_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

@@ -208,3 +208,31 @@ class DeviceHealthReport:
 			"unsigned_firmware_count": self.unsigned_firmware_count,
 			"created_at": self.created_at,
 		}
+
+
+@dataclass
+class IotdAgent:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = True
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"status": self.status,
+			"created_at": self.created_at,
+		}

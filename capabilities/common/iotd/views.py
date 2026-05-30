@@ -21,6 +21,7 @@ def dashboard_model(service: IotdService | None = None, tenant_id: str = "defaul
 		"routes": capability_routes(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -72,4 +73,32 @@ def rules_model(service: IotdService, tenant_id: str = "default") -> dict[str, o
 		"route": "/iotd/rules",
 		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
 		"health_reports": service.list_health_reports(tenant_id),
+	}
+
+
+def iotd_agent_model(service: IotdService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/iotd/agents",
+		"iotd_agents": service.list_iotd_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["iotd_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["iotd_agents"]["allowed_roles"],
+		"permissions": ["iotd:view", "iotd:admin"],
+	}
+
+
+def audit_trail_model(service: IotdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/iotd/audit",
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["iotd:admin"],
+	}
+
+
+def health_model(service: IotdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/iotd/health",
+		"summary": service.dashboard_summary(tenant_id),
+		"health_reports": service.list_health_reports(tenant_id),
+		"stale_devices": service.stale_device_queue(tenant_id),
 	}
