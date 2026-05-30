@@ -88,6 +88,14 @@ def plan_execution(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def validate_batch_agent_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_agent_mutation(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+	)
+
+
 def list_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_agents(tenant_id)
 
@@ -96,8 +104,8 @@ def list_teams(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_teams(tenant_id)
 
 
-def list_runtimes() -> list[dict[str, Any]]:
-	return SERVICE.list_runtimes()
+def list_runtimes(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_runtimes(tenant_id)
 
 
 def list_runtime_approvals(tenant_id: str | None = None) -> list[dict[str, Any]]:

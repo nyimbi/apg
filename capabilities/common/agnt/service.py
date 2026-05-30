@@ -21,7 +21,7 @@ class AgntService:
 		self._events: list[AgentAuditEvent] = []
 		self._planner = AgentCompositionPlanner()
 		for runtime in _default_runtimes():
-			self._runtimes[runtime.name] = runtime
+			self._runtimes[self._key(runtime.tenant_id, runtime.name)] = runtime
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -48,9 +48,11 @@ class AgntService:
 			sandbox_policy_attached=bool(sandbox_policy),
 			external_runtime=external_runtime,
 			approval_recorded=approved,
+			cost_limit_present=cost_limit is not None,
 		)
 		runtime = AgentRuntime(
 			name=name,
+			tenant_id=tenant_id,
 			kind=kind,
 			approved=approved,
 			workspace_runtime=workspace_runtime,
@@ -59,7 +61,10 @@ class AgntService:
 			capabilities=tuple(capabilities or ()),
 			cost_limit=cost_limit,
 		)
-		self._runtimes[name] = runtime
+		key = self._key(tenant_id, name)
+		if key in self._runtimes:
+			raise ValueError(f"duplicate agent runtime for tenant: {name}")
+		self._runtimes[key] = runtime
 		self._record_event(
 			tenant_id=tenant_id,
 			event_type="runtime_registered",
@@ -69,8 +74,11 @@ class AgntService:
 		)
 		return runtime.to_dict()
 
-	def list_runtimes(self) -> list[dict[str, Any]]:
-		return [runtime.to_dict() for runtime in sorted(self._runtimes.values(), key=lambda item: item.name)]
+	def list_runtimes(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		runtimes = list(self._runtimes.values())
+		if tenant_id is not None:
+			runtimes = [runtime for runtime in runtimes if runtime.tenant_id in {tenant_id, "default"}]
+		return [runtime.to_dict() for runtime in sorted(runtimes, key=lambda item: (item.tenant_id, item.name))]
 
 	def request_runtime_approval(
 		self,
@@ -91,6 +99,9 @@ class AgntService:
 			sandbox_policy_attached=bool(sandbox_policy),
 			external_runtime=False,
 			approval_recorded=True,
+			cost_limit_present=cost_limit is not None,
+			operation="request_runtime_approval",
+			runtime_requester_present=bool(requested_by),
 		)
 		if not runtime_name:
 			raise ValueError("runtime_name is required")
@@ -107,7 +118,10 @@ class AgntService:
 			capabilities=tuple(capabilities or ()),
 			cost_limit=cost_limit,
 		)
-		self._runtime_approvals[request_id] = request
+		key = self._key(tenant_id, request_id)
+		if key in self._runtime_approvals:
+			raise ValueError(f"duplicate runtime approval request for tenant: {request_id}")
+		self._runtime_approvals[key] = request
 		self._record_event(
 			tenant_id=tenant_id,
 			event_type="runtime_approval_requested",
@@ -126,15 +140,13 @@ class AgntService:
 		notes: str,
 	) -> dict[str, Any]:
 		self._enforce_tenant(tenant_id)
-		request = self._runtime_approvals.get(request_id)
+		self._enforce_approval_decision_policy(tenant_id, reviewer, notes)
+		key = self._key(tenant_id, request_id)
+		request = self._runtime_approvals.get(key)
 		if request is None or request.tenant_id != tenant_id:
 			raise KeyError(f"unknown runtime approval request for tenant: {request_id}")
 		if decision not in {"approved", "rejected"}:
 			raise ValueError("runtime approval decision must be approved or rejected")
-		if not reviewer:
-			raise ValueError("reviewer is required")
-		if not notes:
-			raise ValueError("approval notes are required")
 		decided = RuntimeApprovalRequest(
 			id=request.id,
 			tenant_id=request.tenant_id,
@@ -149,7 +161,7 @@ class AgntService:
 			reviewer=reviewer,
 			notes=notes,
 		)
-		self._runtime_approvals[request_id] = decided
+		self._runtime_approvals[key] = decided
 		if decision == "approved":
 			self.register_runtime(
 				name=request.runtime_name,
@@ -197,16 +209,20 @@ class AgntService:
 		memory_policy: dict[str, Any] | None = None,
 		status: str = "active",
 	) -> dict[str, Any]:
-		runtime_record = self._runtimes.get(runtime)
+		runtime_record = self._get_runtime(tenant_id, runtime)
 		self._enforce_agent_policy(
 			tenant_id=tenant_id,
 			model_present=bool(model),
+			system_prompt_present=bool(system_prompt),
+			tool_allowlist_present=bool(tool_allowlist),
+			io_contract_present=bool(input_contract) and bool(output_contract),
+			memory_policy_present=bool(memory_policy),
 			runtime_registered=runtime_record is not None and runtime_record.registered,
 			workspace_runtime=bool(runtime_record and runtime_record.workspace_runtime),
 			sandbox_policy_attached=bool(runtime_record and runtime_record.sandbox_policy),
 		)
-		if not system_prompt:
-			raise ValueError("agent system_prompt is required")
+		if runtime_record and runtime_record.tenant_id not in {tenant_id, "default"}:
+			raise KeyError(f"unknown runtime for tenant: {runtime}")
 		agent = AgentDefinition(
 			id=agent_id,
 			tenant_id=tenant_id,
@@ -220,7 +236,10 @@ class AgntService:
 			memory_policy=dict(memory_policy or {}),
 			status=status,
 		)
-		self._agents[agent_id] = agent
+		key = self._key(tenant_id, agent_id)
+		if key in self._agents:
+			raise ValueError(f"duplicate agent for tenant: {agent_id}")
+		self._agents[key] = agent
 		self._record_event(
 			tenant_id=tenant_id,
 			event_type="agent_registered",
@@ -265,7 +284,10 @@ class AgntService:
 			execution_mode=execution_mode,
 			parallel_execution_enabled=parallel_execution_enabled,
 		)
-		self._teams[team_id] = team
+		key = self._key(tenant_id, team_id)
+		if key in self._teams:
+			raise ValueError(f"duplicate agent team for tenant: {team_id}")
+		self._teams[key] = team
 		self._record_event(
 			tenant_id=tenant_id,
 			event_type="team_registered",
@@ -282,15 +304,24 @@ class AgntService:
 		return [team.to_dict() for team in sorted(teams, key=lambda item: item.id)]
 
 	def plan_execution(self, team_id: str, objective: str, tenant_id: str | None = None) -> dict[str, Any]:
-		team = self._teams.get(team_id)
+		if not objective:
+			result = self.evaluate({
+				"tenant_context_present": bool(tenant_id),
+				"operation": "plan_execution",
+				"objective_present": False,
+			})
+			_raise_if_blocked(result)
+		team = self._get_team(team_id, tenant_id)
 		if team is None:
+			if tenant_id is not None:
+				raise KeyError(f"unknown agent team for tenant: {team_id}")
 			raise KeyError(f"unknown agent team: {team_id}")
 		if tenant_id is not None and team.tenant_id != tenant_id:
 			raise KeyError(f"unknown agent team for tenant: {team_id}")
 		plan = self._planner.build_plan(
 			team=team,
-			agents=self._agents,
-			runtimes=self._runtimes,
+			agents=self._tenant_agent_map(team.tenant_id),
+			runtimes=self._tenant_runtime_map(team.tenant_id),
 			objective=objective,
 		).to_dict()
 		self._record_event(
@@ -310,11 +341,12 @@ class AgntService:
 			"tenant_id": tenant_id,
 			"agent_count": len(self.list_agents(tenant_id)),
 			"team_count": len(self.list_teams(tenant_id)),
-			"runtime_count": len(self._runtimes),
+			"runtime_count": len(self.list_runtimes(tenant_id)),
 			"runtime_approval_count": len(self.list_runtime_approvals(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"routes": contract["ui"]["routes"],
 			"theme": contract["theme"],
+			"streaming": contract["streaming"],
 		}
 
 	def _enforce_tenant(self, tenant_id: str) -> None:
@@ -325,6 +357,10 @@ class AgntService:
 		self,
 		tenant_id: str,
 		model_present: bool,
+		system_prompt_present: bool,
+		tool_allowlist_present: bool,
+		io_contract_present: bool,
+		memory_policy_present: bool,
 		runtime_registered: bool,
 		workspace_runtime: bool,
 		sandbox_policy_attached: bool,
@@ -333,6 +369,10 @@ class AgntService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "register_agent",
 			"model_present": model_present,
+			"system_prompt_present": system_prompt_present,
+			"tool_allowlist_present": tool_allowlist_present,
+			"io_contract_present": io_contract_present,
+			"memory_policy_present": memory_policy_present,
 			"runtime_registered": runtime_registered,
 			"workspace_runtime": workspace_runtime,
 			"sandbox_policy_attached": sandbox_policy_attached,
@@ -347,14 +387,29 @@ class AgntService:
 		sandbox_policy_attached: bool,
 		external_runtime: bool,
 		approval_recorded: bool,
+		cost_limit_present: bool,
+		operation: str = "register_runtime",
+		runtime_requester_present: bool = True,
 	) -> None:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": operation,
 			"runtime_registered": registered,
 			"workspace_runtime": workspace_runtime,
 			"sandbox_policy_attached": sandbox_policy_attached,
 			"external_runtime": external_runtime,
 			"approval_recorded": approval_recorded,
+			"cost_limit_present": cost_limit_present,
+			"runtime_requester_present": runtime_requester_present,
+		})
+		_raise_if_blocked(result)
+
+	def _enforce_approval_decision_policy(self, tenant_id: str, reviewer: str, notes: str) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "decide_runtime_approval",
+			"reviewer_present": bool(reviewer),
+			"decision_notes_present": bool(notes),
 		})
 		_raise_if_blocked(result)
 
@@ -365,7 +420,8 @@ class AgntService:
 		agent_ids: list[str] | tuple[str, ...],
 		handoffs: tuple[HandoffEdge, ...],
 	) -> None:
-		unknown_agents = [agent_id for agent_id in agent_ids if agent_id not in self._agents]
+		tenant_agents = self._tenant_agent_map(tenant_id)
+		unknown_agents = [agent_id for agent_id in agent_ids if agent_id not in tenant_agents]
 		endpoints = set(agent_ids)
 		unresolved_handoff = any(edge.source not in endpoints or edge.target not in endpoints for edge in handoffs)
 		result = self.evaluate({
@@ -378,6 +434,48 @@ class AgntService:
 		_raise_if_blocked(result)
 		if unknown_agents:
 			raise KeyError(f"unknown team agent(s): {', '.join(unknown_agents)}")
+
+	def validate_batch_agent_mutation(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "batch_agent_mutation",
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+		})
+		_raise_if_blocked(result)
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": event_stream,
+			"mutation_count": mutation_count,
+			"accepted": True,
+			"rule_result": result,
+		}
+
+	def _key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
+	def _get_runtime(self, tenant_id: str, runtime_name: str) -> AgentRuntime | None:
+		return self._runtimes.get(self._key(tenant_id, runtime_name)) or self._runtimes.get(self._key("default", runtime_name))
+
+	def _get_team(self, team_id: str, tenant_id: str | None = None) -> AgentTeam | None:
+		if tenant_id is not None:
+			return self._teams.get(self._key(tenant_id, team_id))
+		matches = [team for team in self._teams.values() if team.id == team_id]
+		return matches[0] if len(matches) == 1 else None
+
+	def _tenant_agent_map(self, tenant_id: str) -> dict[str, AgentDefinition]:
+		return {agent.id: agent for agent in self._agents.values() if agent.tenant_id == tenant_id}
+
+	def _tenant_runtime_map(self, tenant_id: str) -> dict[str, AgentRuntime]:
+		runtime_map = {runtime.name: runtime for runtime in self._runtimes.values() if runtime.tenant_id == "default"}
+		runtime_map.update({runtime.name: runtime for runtime in self._runtimes.values() if runtime.tenant_id == tenant_id})
+		return runtime_map
 
 	def _record_event(
 		self,

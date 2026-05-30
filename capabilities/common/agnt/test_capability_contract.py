@@ -16,20 +16,25 @@ def test_contract_exposes_agent_runtimes_rules_ui_and_theme():
 	assert contract["configuration"]["runtimes"]["default_runtime"] == "codex"
 	assert set(contract["configuration"]["runtimes"]["registered"]) >= {"local", "codex", "claude_code", "opencode", "pi"}
 	assert set(DEFAULT_AGENT_INTEGRATIONS.names()) >= {"local", "codex", "claude_code", "opencode", "pi"}
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "agents", "teams", "runtimes", "memory", "governance", "ui", "theme"]
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "agents", "teams", "handoffs", "runtimes", "executions", "memory", "settings"}
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "agents", "teams", "runtimes", "memory", "governance", "observability", "adapters", "ui", "theme"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert set(contract["provides"]) >= {"agent_registry", "runtime_registry", "execution_plans", "runtime_approval_governance"}
+	assert contract["requires"] == ["aicr", "sbox", "audl"]
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "agents", "teams", "handoffs", "runtimes", "executions", "memory", "approvals", "audit", "analytics", "settings"}
 	assert contract["theme"]["name"] == "agnt_agent_ops"
 
 
 def test_rule_engine_enforces_agent_composition_guardrails():
-	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "register_agent", "model_present": False, "runtime_registered": False, "handoff_endpoint_resolved": False, "workspace_runtime": True, "sandbox_policy_attached": False})
+	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "register_agent", "model_present": False, "system_prompt_present": False, "tool_allowlist_present": False, "io_contract_present": False, "memory_policy_present": False, "runtime_registered": False, "handoff_endpoint_resolved": False, "workspace_runtime": True, "sandbox_policy_attached": False})
 	team_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "register_team", "agent_count": 0, "runtime_registered": True, "handoff_endpoint_resolved": True})
 	review_result = evaluate_capability_rules({"tenant_context_present": True, "runtime_registered": True, "handoff_endpoint_resolved": True, "external_runtime": True, "approval_recorded": False})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_agent_mutation", "event_stream": "memory"})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {"tenant_context_required", "agent_requires_model", "agent_runtime_must_be_registered", "handoff_endpoint_must_resolve", "workspace_runtime_requires_sandbox"}
+	assert set(result["matched_rules"]) == {"tenant_context_required", "agent_requires_model", "agent_requires_system_prompt", "agent_requires_tool_allowlist", "agent_requires_io_contract", "agent_requires_memory_policy", "agent_runtime_must_be_registered", "handoff_endpoint_must_resolve", "workspace_runtime_requires_sandbox"}
 	assert team_result["matched_rules"] == ["team_requires_agent"]
 	assert review_result["decision"] == "require_review"
+	assert batch_result["matched_rules"] == ["batch_agent_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_agent_capability_contract():
@@ -38,6 +43,8 @@ def test_registration_includes_full_agent_capability_contract():
 	assert registration["name"] == "agnt"
 	assert "aicr" in registration["dependencies"]
 	assert registration["ui_components"]["runtimes"] == "/agnt/runtimes"
+	assert registration["ui_components"]["approvals"] == "/agnt/approvals"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert "agnt:run" in registration["permissions"]
 	assert "runtime_adapters" in registration["capabilities"]
 	assert "runtime_approval_governance" in registration["capabilities"]
@@ -160,6 +167,9 @@ def test_external_runtime_approval_lifecycle_enables_new_provider():
 		runtime="future_agent",
 		system_prompt="Build governed APG slices.",
 		tool_allowlist=["shell"],
+		input_contract={"objective": "string"},
+		output_contract={"plan": "object"},
+		memory_policy={"store": "tenant-vector", "retention_days": 14},
 	)
 	team = service.register_team(
 		team_id="future-delivery",
@@ -225,6 +235,54 @@ def test_runtime_approval_blocks_missing_sandbox_rejections_and_tenant_mismatch(
 	assert "rejected_agent" not in {runtime["name"] for runtime in service.list_runtimes()}
 
 
+def test_tenant_scope_views_and_bytewax_guardrail():
+	service = AgntService()
+	for tenant_id, agent_name in (("tenant-a", "agent-a"), ("tenant-b", "agent-b")):
+		service.register_agent(
+			agent_id="shared-agent",
+			tenant_id=tenant_id,
+			name=agent_name,
+			model="gpt-5.4",
+			runtime="codex",
+			system_prompt="Execute governed APG work.",
+			tool_allowlist=["shell"],
+			input_contract={"objective": "string"},
+			output_contract={"result": "object"},
+			memory_policy={"store": "tenant-vector", "retention_days": 7},
+		)
+		service.register_team(
+			team_id="shared-team",
+			tenant_id=tenant_id,
+			name=f"{agent_name} team",
+			agent_ids=["shared-agent"],
+		)
+	batch = service.validate_batch_agent_mutation(
+		tenant_id="tenant-a",
+		event_stream="bytewax",
+		mutation_count=2,
+	)
+	dashboard = views.dashboard_model(service, "tenant-a")
+	analytics = views.analytics_model(service, "tenant-a")
+	settings = views.settings_model("tenant-a")
+
+	assert batch["accepted"] is True
+	assert service.list_agents("tenant-a")[0]["name"] == "agent-a"
+	assert service.list_agents("tenant-b")[0]["name"] == "agent-b"
+	assert dashboard["streaming"]["processor"] == "bytewax"
+	assert analytics["summary"]["agent_count"] == 1
+	assert settings["streaming"]["topic"] == "apg.agnt.lifecycle"
+
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.validate_batch_agent_mutation(
+			tenant_id="tenant-a",
+			event_stream="memory",
+			mutation_count=1,
+		)
+
+	with pytest.raises(KeyError, match="unknown agent team for tenant"):
+		service.plan_execution("shared-team", "cross tenant attempt", tenant_id="missing-tenant")
+
+
 def test_api_helpers_expose_runtime_approval_lifecycle():
 	request = api.request_runtime_approval({
 		"id": "api-runtime-request",
@@ -234,6 +292,7 @@ def test_api_helpers_expose_runtime_approval_lifecycle():
 		"workspace_runtime": True,
 		"sandbox_policy": "workspace-write",
 		"capabilities": ["code"],
+		"cost_limit": 10.0,
 	})
 	decision = api.decide_runtime_approval({
 		"id": request["id"],
@@ -246,3 +305,13 @@ def test_api_helpers_expose_runtime_approval_lifecycle():
 	assert decision["decision"] == "approved"
 	assert api.list_runtime_approvals(request["tenant_id"])[0]["runtime_name"] == "api_future_agent"
 	assert "runtime_approval_requested" in {event["event_type"] for event in api.list_audit_events(request["tenant_id"])}
+
+
+def test_api_helpers_expose_batch_agent_mutation_guardrail():
+	batch = api.validate_batch_agent_mutation({
+		"tenant_id": "tenant-api-agnt-batch",
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+	})
+
+	assert batch["accepted"] is True

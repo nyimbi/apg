@@ -11,6 +11,7 @@ class AgentRuntime:
 	"""Provider-neutral runtime backend for first-class APG agents."""
 
 	name: str
+	tenant_id: str = "default"
 	kind: str = "local"
 	registered: bool = True
 	approved: bool = True
@@ -23,6 +24,7 @@ class AgentRuntime:
 	def to_dict(self) -> dict[str, Any]:
 		return {
 			"name": self.name,
+			"tenant_id": self.tenant_id,
 			"kind": self.kind,
 			"registered": self.registered,
 			"approved": self.approved,

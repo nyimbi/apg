@@ -25,8 +25,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["agent_registry", "runtime_adapters", "team_composition", "handoff_graphs", "agent_memory_policy"],
-	"permissions": ["agnt:view", "agnt:compose", "agnt:run", "agnt:manage_runtimes", "agnt:admin"]
+	"provides": ["agent_registry", "runtime_registry", "team_composition", "handoff_graphs", "execution_plans", "runtime_approval_governance"],
+	"permissions": ["agnt:view", "agnt:compose", "agnt:run", "agnt:manage_runtimes", "agnt:audit", "agnt:admin"]
 }
 
 
@@ -40,7 +40,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["nlpc", "ragn", "grag", "mchn", "logt", "secu"],
+		"optional_dependencies": ["nlpc", "ragn", "grag", "mchn", "logt", "secu", "bytewax", "audl", "sbox"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,13 +50,15 @@ def register_capability() -> dict[str, Any]:
 			"runtime_approval_governance": "Request and approve external agent runtimes before use",
 			"team_composition": "Compose agents into swarms, teams, and handoff graphs",
 			"handoff_graphs": "Validate agent-to-agent flow edges before execution",
+			"execution_plans": "Build deterministic execution plans with runtime assignments, handoffs, cost limits, and approval evidence",
 			"capability_rules": "Evaluate deterministic agent-composition governance rules",
 			"visual_theming": "Apply AI-agent operations theme tokens and components"
 		},
-		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "executions": "/agnt/api/v1/executions", "memory": "/agnt/api/v1/memory"},
+		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "executions": "/agnt/api/v1/executions", "memory": "/agnt/api/v1/memory", "audit": "/agnt/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

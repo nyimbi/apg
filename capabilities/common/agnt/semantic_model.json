@@ -12,6 +12,16 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_orchestration": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AgntService",
+          "sandbox": "sbox",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
         "agents": {
           "io_contract_required": true,
           "model_required": true,
@@ -21,9 +31,12 @@
         },
         "governance": {
           "audit_agent_runs": true,
+          "batch_event_stream": "bytewax",
           "cost_limit_required": true,
           "human_approval_for_external_side_effects": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
         },
         "memory": {
           "memory_store_required": true,
@@ -31,7 +44,15 @@
           "sensitive_memory_redaction_required": true,
           "vector_memory_supported": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "cost_metrics_required": true,
+          "event_stream": "bytewax",
+          "trace_required": true
+        },
         "runtimes": {
+          "cost_limit_required": true,
           "default_runtime": "local",
           "external_runtime_approval_required": true,
           "registered": [
@@ -41,6 +62,7 @@
             "opencode",
             "pi"
           ],
+          "runtime_requester_required": true,
           "workspace_sandbox_required": true
         },
         "teams": {
@@ -56,6 +78,9 @@
         },
         "ui": {
           "enable_agent_registry": true,
+          "enable_analytics": true,
+          "enable_approval_queue": true,
+          "enable_audit": true,
           "enable_execution_trace": true,
           "enable_runtime_manager": true,
           "enable_team_builder": true
@@ -68,9 +93,18 @@
       "master_data": {},
       "name": "AI Agent Composition",
       "provides": [
-        "agnt_operations"
+        "agent_registry",
+        "runtime_registry",
+        "agent_teams",
+        "handoff_graphs",
+        "execution_plans",
+        "runtime_approval_governance"
       ],
-      "requires": [],
+      "requires": [
+        "aicr",
+        "sbox",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -100,6 +134,58 @@
           },
           {
             "condition": {
+              "operation": "register_agent",
+              "system_prompt_present": false
+            },
+            "description": "First-class AI agents require an explicit system prompt.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_system_prompt_required",
+              "required_action": "declare_agent_system_prompt"
+            },
+            "name": "agent_requires_system_prompt"
+          },
+          {
+            "condition": {
+              "operation": "register_agent",
+              "tool_allowlist_present": false
+            },
+            "description": "First-class AI agents require an explicit tool allowlist.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_tool_allowlist_required",
+              "required_action": "declare_agent_tool_allowlist"
+            },
+            "name": "agent_requires_tool_allowlist"
+          },
+          {
+            "condition": {
+              "io_contract_present": false,
+              "operation": "register_agent"
+            },
+            "description": "First-class AI agents require input and output contracts.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_io_contract_required",
+              "required_action": "declare_agent_io_contract"
+            },
+            "name": "agent_requires_io_contract"
+          },
+          {
+            "condition": {
+              "memory_policy_present": false,
+              "operation": "register_agent"
+            },
+            "description": "First-class AI agents require memory policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_memory_policy_required",
+              "required_action": "declare_agent_memory_policy"
+            },
+            "name": "agent_requires_memory_policy"
+          },
+          {
+            "condition": {
               "runtime_registered": false
             },
             "description": "Agent runtimes must resolve to a registered backend.",
@@ -109,6 +195,58 @@
               "required_action": "register_runtime_backend"
             },
             "name": "agent_runtime_must_be_registered"
+          },
+          {
+            "condition": {
+              "cost_limit_present": false,
+              "operation": "register_runtime"
+            },
+            "description": "Agent runtimes require cost limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "runtime_cost_limit_required",
+              "required_action": "declare_runtime_cost_limit"
+            },
+            "name": "runtime_requires_cost_limit"
+          },
+          {
+            "condition": {
+              "operation": "request_runtime_approval",
+              "runtime_requester_present": false
+            },
+            "description": "External runtime approval requests require requester identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "runtime_requester_required",
+              "required_action": "declare_runtime_requester"
+            },
+            "name": "runtime_approval_requires_requester"
+          },
+          {
+            "condition": {
+              "operation": "decide_runtime_approval",
+              "reviewer_present": false
+            },
+            "description": "Runtime approval decisions require reviewer identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "runtime_approval_reviewer_required",
+              "required_action": "declare_runtime_reviewer"
+            },
+            "name": "runtime_approval_decision_requires_reviewer"
+          },
+          {
+            "condition": {
+              "decision_notes_present": false,
+              "operation": "decide_runtime_approval"
+            },
+            "description": "Runtime approval decisions require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "runtime_approval_notes_required",
+              "required_action": "record_runtime_approval_notes"
+            },
+            "name": "runtime_approval_decision_requires_notes"
           },
           {
             "condition": {
@@ -160,6 +298,57 @@
               "required_action": "review_external_runtime"
             },
             "name": "external_runtime_requires_approval"
+          },
+          {
+            "condition": {
+              "objective_present": false,
+              "operation": "plan_execution"
+            },
+            "description": "Agent execution plans require an objective.",
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_objective_required",
+              "required_action": "declare_execution_objective"
+            },
+            "name": "execution_plan_requires_objective"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Agent composition lifecycle changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agnt_audit_event_required",
+              "required_action": "record_agent_audit_event"
+            },
+            "name": "agnt_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Agent composition records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_agent_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_agent_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_agent_mutation"
+            },
+            "description": "Batch agent mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_agent_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -192,6 +381,58 @@
         },
         {
           "condition": {
+            "operation": "register_agent",
+            "system_prompt_present": false
+          },
+          "description": "First-class AI agents require an explicit system prompt.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_system_prompt_required",
+            "required_action": "declare_agent_system_prompt"
+          },
+          "name": "agent_requires_system_prompt"
+        },
+        {
+          "condition": {
+            "operation": "register_agent",
+            "tool_allowlist_present": false
+          },
+          "description": "First-class AI agents require an explicit tool allowlist.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_tool_allowlist_required",
+            "required_action": "declare_agent_tool_allowlist"
+          },
+          "name": "agent_requires_tool_allowlist"
+        },
+        {
+          "condition": {
+            "io_contract_present": false,
+            "operation": "register_agent"
+          },
+          "description": "First-class AI agents require input and output contracts.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_io_contract_required",
+            "required_action": "declare_agent_io_contract"
+          },
+          "name": "agent_requires_io_contract"
+        },
+        {
+          "condition": {
+            "memory_policy_present": false,
+            "operation": "register_agent"
+          },
+          "description": "First-class AI agents require memory policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_memory_policy_required",
+            "required_action": "declare_agent_memory_policy"
+          },
+          "name": "agent_requires_memory_policy"
+        },
+        {
+          "condition": {
             "runtime_registered": false
           },
           "description": "Agent runtimes must resolve to a registered backend.",
@@ -201,6 +442,58 @@
             "required_action": "register_runtime_backend"
           },
           "name": "agent_runtime_must_be_registered"
+        },
+        {
+          "condition": {
+            "cost_limit_present": false,
+            "operation": "register_runtime"
+          },
+          "description": "Agent runtimes require cost limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "runtime_cost_limit_required",
+            "required_action": "declare_runtime_cost_limit"
+          },
+          "name": "runtime_requires_cost_limit"
+        },
+        {
+          "condition": {
+            "operation": "request_runtime_approval",
+            "runtime_requester_present": false
+          },
+          "description": "External runtime approval requests require requester identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "runtime_requester_required",
+            "required_action": "declare_runtime_requester"
+          },
+          "name": "runtime_approval_requires_requester"
+        },
+        {
+          "condition": {
+            "operation": "decide_runtime_approval",
+            "reviewer_present": false
+          },
+          "description": "Runtime approval decisions require reviewer identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "runtime_approval_reviewer_required",
+            "required_action": "declare_runtime_reviewer"
+          },
+          "name": "runtime_approval_decision_requires_reviewer"
+        },
+        {
+          "condition": {
+            "decision_notes_present": false,
+            "operation": "decide_runtime_approval"
+          },
+          "description": "Runtime approval decisions require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "runtime_approval_notes_required",
+            "required_action": "record_runtime_approval_notes"
+          },
+          "name": "runtime_approval_decision_requires_notes"
         },
         {
           "condition": {
@@ -252,6 +545,57 @@
             "required_action": "review_external_runtime"
           },
           "name": "external_runtime_requires_approval"
+        },
+        {
+          "condition": {
+            "objective_present": false,
+            "operation": "plan_execution"
+          },
+          "description": "Agent execution plans require an objective.",
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_objective_required",
+            "required_action": "declare_execution_objective"
+          },
+          "name": "execution_plan_requires_objective"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Agent composition lifecycle changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agnt_audit_event_required",
+            "required_action": "record_agent_audit_event"
+          },
+          "name": "agnt_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Agent composition records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_agent_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_agent_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_agent_mutation"
+          },
+          "description": "Batch agent mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_agent_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -265,6 +609,21 @@
           "component": "AgentRegistry",
           "permission": "agnt:compose",
           "route": "/agnt/agents"
+        },
+        "analytics": {
+          "component": "AgentAnalytics",
+          "permission": "agnt:view",
+          "route": "/agnt/analytics"
+        },
+        "approvals": {
+          "component": "RuntimeApprovalQueue",
+          "permission": "agnt:manage_runtimes",
+          "route": "/agnt/approvals"
+        },
+        "audit": {
+          "component": "AgentAuditTrail",
+          "permission": "agnt:audit",
+          "route": "/agnt/audit"
         },
         "dashboard": {
           "component": "AGNTDashboard",
@@ -302,13 +661,41 @@
           "route": "/agnt/teams"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_agent_mutation_requires_bytewax",
+        "events": [
+          "runtime_approval_requested",
+          "runtime_approval_decided",
+          "runtime_registered",
+          "agent_registered",
+          "team_registered",
+          "execution_plan_built"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "runtimes",
+          "runtime_approvals",
+          "agents",
+          "teams",
+          "execution_plans",
+          "audit_events"
+        ],
+        "topic": "apg.agnt.lifecycle"
+      },
       "theme": {
         "components": {
           "agent_card": {
             "icon": "bot",
             "risk_style": "approval-band",
             "status_indicator": "runtime-pill"
+          },
+          "approval_queue": {
+            "icon": "shield-check",
+            "status_style": "decision-chip"
+          },
+          "audit_timeline": {
+            "icon": "list-checks",
+            "status_style": "governance-chip"
           },
           "execution_trace": {
             "status_style": "decision-chip",
@@ -392,6 +779,27 @@
             "permission": "agnt:admin"
           },
           {
+            "component": "RuntimeApprovalQueue",
+            "name": "approvals",
+            "nav_group": "Governance",
+            "path": "/agnt/approvals",
+            "permission": "agnt:manage_runtimes"
+          },
+          {
+            "component": "AgentAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/agnt/audit",
+            "permission": "agnt:audit"
+          },
+          {
+            "component": "AgentAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/agnt/analytics",
+            "permission": "agnt:view"
+          },
+          {
             "component": "AGNTSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -412,12 +820,26 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "agnt": []
+      "agnt": [
+        "aicr",
+        "sbox",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "agnt": {
       "configuration": {
+        "adapters": {
+          "ai_orchestration": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AgntService",
+          "sandbox": "sbox",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
         "agents": {
           "io_contract_required": true,
           "model_required": true,
@@ -427,9 +849,12 @@
         },
         "governance": {
           "audit_agent_runs": true,
+          "batch_event_stream": "bytewax",
           "cost_limit_required": true,
           "human_approval_for_external_side_effects": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
         },
         "memory": {
           "memory_store_required": true,
@@ -437,7 +862,15 @@
           "sensitive_memory_redaction_required": true,
           "vector_memory_supported": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "cost_metrics_required": true,
+          "event_stream": "bytewax",
+          "trace_required": true
+        },
         "runtimes": {
+          "cost_limit_required": true,
           "default_runtime": "local",
           "external_runtime_approval_required": true,
           "registered": [
@@ -447,6 +880,7 @@
             "opencode",
             "pi"
           ],
+          "runtime_requester_required": true,
           "workspace_sandbox_required": true
         },
         "teams": {
@@ -462,6 +896,9 @@
         },
         "ui": {
           "enable_agent_registry": true,
+          "enable_analytics": true,
+          "enable_approval_queue": true,
+          "enable_audit": true,
           "enable_execution_trace": true,
           "enable_runtime_manager": true,
           "enable_team_builder": true
@@ -469,9 +906,18 @@
       },
       "id": "agnt",
       "provides": [
-        "agnt_operations"
+        "agent_registry",
+        "runtime_registry",
+        "agent_teams",
+        "handoff_graphs",
+        "execution_plans",
+        "runtime_approval_governance"
       ],
-      "requires": []
+      "requires": [
+        "aicr",
+        "sbox",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -483,7 +929,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -504,6 +950,32 @@
   },
   "roles": {},
   "rules": {
+    "agent_requires_io_contract": {
+      "condition": {
+        "io_contract_present": false,
+        "operation": "register_agent"
+      },
+      "description": "First-class AI agents require input and output contracts.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_io_contract_required",
+        "required_action": "declare_agent_io_contract"
+      },
+      "name": "agent_requires_io_contract"
+    },
+    "agent_requires_memory_policy": {
+      "condition": {
+        "memory_policy_present": false,
+        "operation": "register_agent"
+      },
+      "description": "First-class AI agents require memory policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_memory_policy_required",
+        "required_action": "declare_agent_memory_policy"
+      },
+      "name": "agent_requires_memory_policy"
+    },
     "agent_requires_model": {
       "condition": {
         "model_present": false,
@@ -517,6 +989,32 @@
       },
       "name": "agent_requires_model"
     },
+    "agent_requires_system_prompt": {
+      "condition": {
+        "operation": "register_agent",
+        "system_prompt_present": false
+      },
+      "description": "First-class AI agents require an explicit system prompt.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_system_prompt_required",
+        "required_action": "declare_agent_system_prompt"
+      },
+      "name": "agent_requires_system_prompt"
+    },
+    "agent_requires_tool_allowlist": {
+      "condition": {
+        "operation": "register_agent",
+        "tool_allowlist_present": false
+      },
+      "description": "First-class AI agents require an explicit tool allowlist.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_tool_allowlist_required",
+        "required_action": "declare_agent_tool_allowlist"
+      },
+      "name": "agent_requires_tool_allowlist"
+    },
     "agent_runtime_must_be_registered": {
       "condition": {
         "runtime_registered": false
@@ -528,6 +1026,57 @@
         "required_action": "register_runtime_backend"
       },
       "name": "agent_runtime_must_be_registered"
+    },
+    "agnt_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Agent composition lifecycle changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agnt_audit_event_required",
+        "required_action": "record_agent_audit_event"
+      },
+      "name": "agnt_state_change_requires_audit"
+    },
+    "batch_agent_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_agent_mutation"
+      },
+      "description": "Batch agent mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_agent_mutation_requires_bytewax"
+    },
+    "cross_tenant_agent_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Agent composition records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_agent_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_agent_access_denied"
+    },
+    "execution_plan_requires_objective": {
+      "condition": {
+        "objective_present": false,
+        "operation": "plan_execution"
+      },
+      "description": "Agent execution plans require an objective.",
+      "effect": {
+        "decision": "deny",
+        "reason": "execution_objective_required",
+        "required_action": "declare_execution_objective"
+      },
+      "name": "execution_plan_requires_objective"
     },
     "external_runtime_requires_approval": {
       "condition": {
@@ -553,6 +1102,58 @@
         "required_action": "fix_handoff_reference"
       },
       "name": "handoff_endpoint_must_resolve"
+    },
+    "runtime_approval_decision_requires_notes": {
+      "condition": {
+        "decision_notes_present": false,
+        "operation": "decide_runtime_approval"
+      },
+      "description": "Runtime approval decisions require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "runtime_approval_notes_required",
+        "required_action": "record_runtime_approval_notes"
+      },
+      "name": "runtime_approval_decision_requires_notes"
+    },
+    "runtime_approval_decision_requires_reviewer": {
+      "condition": {
+        "operation": "decide_runtime_approval",
+        "reviewer_present": false
+      },
+      "description": "Runtime approval decisions require reviewer identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "runtime_approval_reviewer_required",
+        "required_action": "declare_runtime_reviewer"
+      },
+      "name": "runtime_approval_decision_requires_reviewer"
+    },
+    "runtime_approval_requires_requester": {
+      "condition": {
+        "operation": "request_runtime_approval",
+        "runtime_requester_present": false
+      },
+      "description": "External runtime approval requests require requester identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "runtime_requester_required",
+        "required_action": "declare_runtime_requester"
+      },
+      "name": "runtime_approval_requires_requester"
+    },
+    "runtime_requires_cost_limit": {
+      "condition": {
+        "cost_limit_present": false,
+        "operation": "register_runtime"
+      },
+      "description": "Agent runtimes require cost limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "runtime_cost_limit_required",
+        "required_action": "declare_runtime_cost_limit"
+      },
+      "name": "runtime_requires_cost_limit"
     },
     "team_requires_agent": {
       "condition": {

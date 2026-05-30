@@ -15,15 +15,17 @@ def dashboard_model(
 	tenant_id: str = "default",
 ) -> dict[str, object]:
 	service = service or AgntService()
+	contract = get_capability_contract(tenant_id)
 	return {
 		"summary": service.composition_summary(tenant_id),
 		"agents": service.list_agents(tenant_id),
 		"teams": service.list_teams(tenant_id),
-		"runtimes": service.list_runtimes(),
+		"runtimes": service.list_runtimes(tenant_id),
 		"runtime_approvals": service.list_runtime_approvals(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"routes": capability_routes(tenant_id),
-		"theme": get_capability_contract(tenant_id)["theme"],
+		"streaming": contract["streaming"],
+		"theme": contract["theme"],
 	}
 
 
@@ -81,6 +83,48 @@ def governance_evidence_model(
 	}
 
 
+def audit_trail_model(
+	service: AgntService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AgntService()
+	return {
+		"audit_events": service.list_audit_events(tenant_id),
+		"event_types": [
+			"runtime_approval_requested",
+			"runtime_approval_decided",
+			"runtime_registered",
+			"agent_registered",
+			"team_registered",
+			"execution_plan_built",
+		],
+	}
+
+
+def analytics_model(
+	service: AgntService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AgntService()
+	summary = service.composition_summary(tenant_id)
+	return {
+		"summary": summary,
+		"agents_per_team": _safe_ratio(summary["agent_count"], summary["team_count"]),
+		"approval_density": _safe_ratio(summary["runtime_approval_count"], summary["runtime_count"]),
+		"audit_events_per_agent": _safe_ratio(summary["audit_event_count"], summary["agent_count"]),
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"theme": contract["theme"],
+	}
+
+
 def execution_trace_model(plan: dict[str, object]) -> dict[str, object]:
 	return {
 		"plan_id": plan["id"],
@@ -89,3 +133,7 @@ def execution_trace_model(plan: dict[str, object]) -> dict[str, object]:
 		"approvals_required": plan["approvals_required"],
 		"trace_columns": ["order", "agent", "runtime", "model", "handoff_targets"],
 	}
+
+
+def _safe_ratio(numerator: int, denominator: int) -> float:
+	return round(numerator / denominator, 4) if denominator else 0.0

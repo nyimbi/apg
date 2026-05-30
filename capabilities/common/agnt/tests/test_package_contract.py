@@ -30,6 +30,8 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "agnt"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["runtimes"]["registered"]
 
 
 def test_package_app_entrypoint_is_publishable():

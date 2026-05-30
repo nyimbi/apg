@@ -16323,3 +16323,60 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External THEM, I18N, NLPC, AUDL, COMP, HELP, WSBL, or AICR adapters.
+
+### 2026-05-30 17:43 EAT
+
+AGNT lifecycle and guardrail packet:
+
+- Selected `capabilities/common/agnt` after ACCS because it already had the
+  external-runtime approval lifecycle but still lacked a local README and the
+  newer stream, tenant-isolation, and stricter first-class-agent guardrails.
+- Added local `README.md`, refreshed `SPECIFICATION.md` and `PLAN.md`, and
+  replaced `cap_spec.md` with a compatibility pointer to the active
+  specification.
+- Expanded the executable AGNT contract to cover runtime registry, runtime
+  approvals, agent definitions, teams, handoff graphs, execution plans, audit
+  events, governance, observability, APG adapters, UI routes, visual theme
+  tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, model, system
+  prompt, tool allowlist, IO contracts, memory policy, runtime registration,
+  runtime cost limits, requester identity, reviewer identity, decision notes,
+  team membership, handoff resolution, workspace sandbox policy, external
+  runtime approval, execution objective, audit evidence, tenant isolation, and
+  Bytewax batch mutation.
+- Added tenant scope to `AgentRuntime` and hardened `AgntService` so duplicate
+  runtime, approval, agent, and team IDs are tenant-local.
+- Added tenant-local runtime resolution, agent maps, team maps, execution
+  planning, and Bytewax batch-mutation validation.
+- Added API helper coverage for batch agent mutation validation and
+  tenant-aware runtime listing.
+- Added audit-trail, analytics, and settings view models, plus richer
+  dashboard metadata with stream and theme information.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for external-runtime approval, stricter agent
+  contracts, tenant-safe duplicate IDs, Bytewax policy, view models, and
+  publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/agnt/__init__.py capabilities/common/agnt/models.py capabilities/common/agnt/agent_composition.py capabilities/common/agnt/service.py capabilities/common/agnt/api.py capabilities/common/agnt/views.py capabilities/common/agnt/capability_contract.py capabilities/common/agnt/app.py capabilities/common/agnt/test_capability_contract.py capabilities/common/agnt/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/agnt/test_capability_contract.py capabilities/common/agnt/tests/test_package_contract.py` passed with 12 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and AGNT capability evidence.
+- `jq '.capabilities.agnt.streaming.processor, .capabilities.agnt.configuration.runtimes.registered, .capabilities.agnt.screens.approvals.route' capabilities/common/agnt/semantic_model.json` confirmed `bytewax`, `local`/`codex`/`claude_code`/`opencode`/`pi`, and `/agnt/approvals`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/agnt --json` passed with `ok: true`; AGNT remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/agnt docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Codex, Claude Code, OpenCode, Pi, local shell, browser, IDE, memory
+  store, vector database, cost/billing provider, approval system, workflow
+  system, durable agent database, browser-rendered agent UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AICR, AUTH, WFLO, SBOX, AUDL, NLPC, RAGN, GRAG, MCHN, LOGT, or
+  SECU adapters.
