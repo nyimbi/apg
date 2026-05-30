@@ -3,14 +3,20 @@
   "display_name": "Sandbox/Testing Environment",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
+    "capability_contract.py",
     "models.py",
+    "sandbox_runtime.py",
     "service.py",
     "api.py",
     "views.py",
     "app.py",
     "semantic_model.json",
-    "release_report.json"
+    "release_report.json",
+    "test_capability_contract.py"
   ],
   "name": "sbox",
   "profile": "capability",

@@ -4,13 +4,20 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_SBOX_AGENT_ROLES,
+	SUPPORTED_SBOX_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+)
 from .models import (
 	IsolationProfile,
 	SandboxDataset,
 	SandboxEnvironment,
 	SandboxRun,
 	SandboxTemplate,
+	SboxAgent,
 	SboxAuditEvent,
 )
 from .sandbox_runtime import (
@@ -36,6 +43,7 @@ class SboxService:
 		self._datasets: dict[str, SandboxDataset] = {}
 		self._sandboxes: dict[str, SandboxEnvironment] = {}
 		self._runs: dict[str, SandboxRun] = {}
+		self._agents: dict[str, SboxAgent] = {}
 		self._audit_events: list[SboxAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -82,7 +90,7 @@ class SboxService:
 			approved_by=approved_by,
 			created_at=utc_now(),
 		)
-		self._isolation_profiles[profile.id] = profile
+		self._isolation_profiles[_state_key(tenant_id, profile.id)] = profile
 		self._record_event(tenant_id, "isolation_profile_created", profile.id, f"Isolation profile {name} created.", approved_by or "system")
 		return profile.to_dict()
 
@@ -112,7 +120,7 @@ class SboxService:
 			tags=normalize_tags(tags),
 			created_at=utc_now(),
 		)
-		self._templates[template.id] = template
+		self._templates[_state_key(tenant_id, template.id)] = template
 		self._record_event(tenant_id, "template_created", template.id, f"Sandbox template {name} created.", owner)
 		return template.to_dict()
 
@@ -129,16 +137,19 @@ class SboxService:
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		dataset_type = normalize_dataset_type(dataset_type)
-		if not owner:
-			raise PermissionError("dataset_owner_required")
-		if not lineage:
-			raise ValueError("dataset_lineage_required")
-		if retention_days <= 0:
-			raise ValueError("retention_policy_required")
-		if dataset_type == "production_sample" and not production_review_recorded:
-			raise PermissionError("production_data_review_required")
-		if dataset_type in {"production_sample", "masked"} and not masked:
-			raise PermissionError("dataset_masking_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_dataset",
+			"dataset_owner_assigned": bool(owner),
+			"dataset_lineage_present": bool(lineage),
+			"retention_days": int(retention_days),
+			"production_dataset": dataset_type == "production_sample",
+			"production_review_recorded": bool(production_review_recorded),
+			"sensitive_dataset": dataset_type in {"production_sample", "masked"},
+			"dataset_masked": bool(masked),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
 		dataset = SandboxDataset(
 			id=stable_id("data", tenant_id, name, dataset_type),
 			tenant_id=tenant_id,
@@ -151,7 +162,7 @@ class SboxService:
 			masked=masked,
 			created_at=utc_now(),
 		)
-		self._datasets[dataset.id] = dataset
+		self._datasets[_state_key(tenant_id, dataset.id)] = dataset
 		self._record_event(tenant_id, "dataset_registered", dataset.id, f"Dataset {name} registered.", owner)
 		return dataset.to_dict()
 
@@ -182,6 +193,7 @@ class SboxService:
 			"tenant_context_present": True,
 			"operation": "create_sandbox",
 			"sandbox_owner_assigned": bool(owner),
+			"template_present": bool(template_id),
 			"isolation_profile_attached": bool(isolation_profile_id),
 			"secret_access_requested": secret_access_requested,
 			"secret_redaction_enabled": isolation.secret_redaction_enabled,
@@ -212,7 +224,7 @@ class SboxService:
 			created_at=utc_now(),
 			updated_at=utc_now(),
 		)
-		self._sandboxes[sandbox.id] = sandbox
+		self._sandboxes[_state_key(tenant_id, sandbox.id)] = sandbox
 		self._record_event(tenant_id, "sandbox_created", sandbox.id, f"Sandbox {name} created.", owner, "warning" if score >= 50 else "info")
 		return sandbox.to_dict()
 
@@ -223,18 +235,28 @@ class SboxService:
 		run_type: str,
 		requested_by: str,
 		tests_requested: int,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		sandbox = self._require_owned(self._sandboxes, sandbox_id, tenant_id, "sandbox_not_found")
 		if sandbox.state in {"expired", "quarantined"}:
 			raise PermissionError("sandbox_not_runnable")
 		run_type = normalize_run_type(run_type)
+		template = self._require_owned(self._templates, sandbox.template_id, tenant_id, "template_not_found")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "start_run",
+			"run_requester_present": bool(requested_by),
+			"tests_requested": int(tests_requested),
+			"plugin_run": run_type == "plugin",
+			"plugin_test_policy_present": bool(template.plugin_test_policy_required),
+			"event_stream": event_stream_name(event_stream),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
 		if run_type == "plugin":
-			template = self._require_owned(self._templates, sandbox.template_id, tenant_id, "template_not_found")
 			if not template.plugin_test_policy_required:
 				raise PermissionError("plugin_test_policy_required")
-		if tests_requested <= 0:
-			raise ValueError("tests_requested_must_be_positive")
 		run = SandboxRun(
 			id=stable_id("run", tenant_id, sandbox_id, run_type, tests_requested, len(self._runs)),
 			tenant_id=tenant_id,
@@ -248,7 +270,7 @@ class SboxService:
 		)
 		sandbox.state = "running"
 		sandbox.updated_at = utc_now()
-		self._runs[run.id] = run
+		self._runs[_state_key(tenant_id, run.id)] = run
 		self._record_event(tenant_id, "sandbox_run_started", run.id, f"{run_type} run started.", requested_by)
 		return run.to_dict()
 
@@ -271,7 +293,7 @@ class SboxService:
 		run.status = run_status(tests_passed, tests_failed, tests_blocked)
 		run.completed_at = utc_now()
 		run.logs.extend(logs or [])
-		sandbox = self._sandboxes[run.sandbox_id]
+		sandbox = self._require_owned(self._sandboxes, run.sandbox_id, tenant_id, "sandbox_not_found")
 		sandbox.state = "completed" if run.status == "passed" else "failed"
 		sandbox.updated_at = utc_now()
 		self._record_event(tenant_id, "sandbox_run_completed", run.id, f"Run completed with status {run.status}.", run.requested_by, "warning" if run.status != "passed" else "info")
@@ -330,20 +352,73 @@ class SboxService:
 			events = [event for event in events if event.tenant_id == tenant_id]
 		return [event.to_dict() for event in events]
 
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self.audit_events(tenant_id)
+
+	def register_sbox_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"sbox_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_SBOX_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_SBOX_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(summarize_decision(result))
+		agent = SboxAgent(
+			id=agent_id or f"sbox-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=bool(contribution_disclosed),
+			created_at=utc_now(),
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._record_event(tenant_id, "sbox_agent_registered", agent.id, f"Sandbox agent {name} registered.", name, metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def validate_batch_sandbox_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_sandbox_mutation",
+			"event_stream": event_stream_name(event_stream),
+		})
+
+	def list_sbox_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
-		sandboxes = [sandbox for sandbox in self._sandboxes.values() if sandbox.tenant_id == tenant_id]
-		runs = [run for run in self._runs.values() if run.tenant_id == tenant_id]
+		sandboxes = self.list_sandboxes(tenant_id)
+		runs = self.list_runs(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"sandbox_count": len(sandboxes),
-			"ready_count": sum(1 for sandbox in sandboxes if sandbox.state == "ready"),
-			"running_count": sum(1 for sandbox in sandboxes if sandbox.state == "running"),
-			"failed_count": sum(1 for sandbox in sandboxes if sandbox.state == "failed"),
-			"dataset_count": sum(1 for dataset in self._datasets.values() if dataset.tenant_id == tenant_id),
+			"ready_count": len([sandbox for sandbox in sandboxes if sandbox["state"] == "ready"]),
+			"running_count": len([sandbox for sandbox in sandboxes if sandbox["state"] == "running"]),
+			"failed_count": len([sandbox for sandbox in sandboxes if sandbox["state"] == "failed"]),
+			"dataset_count": len(self.list_datasets(tenant_id)),
 			"run_count": len(runs),
-			"passed_run_count": sum(1 for run in runs if run.status == "passed"),
-			"blocked_run_count": sum(1 for run in runs if run.status == "blocked"),
-			"high_risk_count": sum(1 for sandbox in sandboxes if sandbox.risk_score >= 50),
+			"passed_run_count": len([run for run in runs if run["status"] == "passed"]),
+			"blocked_run_count": len([run for run in runs if run["status"] == "blocked"]),
+			"high_risk_count": len([sandbox for sandbox in sandboxes if sandbox["risk_score"] >= 50]),
+			"sbox_agent_count": len(self.list_sbox_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _list(self, store: dict[str, Any], tenant_id: str | None) -> list[dict[str, Any]]:
@@ -358,7 +433,7 @@ class SboxService:
 			raise PermissionError(summarize_decision(result))
 
 	def _require_owned(self, store: dict[str, Any], item_id: str, tenant_id: str, missing_reason: str) -> Any:
-		item = store.get(item_id)
+		item = store.get(_state_key(tenant_id, item_id))
 		if item is None or item.tenant_id != tenant_id:
 			raise KeyError(missing_reason)
 		return item
@@ -367,7 +442,7 @@ class SboxService:
 		result = self.evaluate(context)
 		raise PermissionError(summarize_decision(result))
 
-	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info") -> None:
+	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info", metadata: dict[str, Any] | None = None) -> None:
 		self._audit_events.append(SboxAuditEvent(
 			id=stable_id("audit", tenant_id, event_type, subject_id, len(self._audit_events)),
 			tenant_id=tenant_id,
@@ -376,5 +451,14 @@ class SboxService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			metadata=dict(metadata or {}),
 			created_at=utc_now(),
 		))
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"

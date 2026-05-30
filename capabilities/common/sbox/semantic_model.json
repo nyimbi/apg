@@ -12,29 +12,77 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "deployment": "depl",
+          "environment": "envm",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.SboxService",
+          "logging": "logt",
+          "plugins": "plgn",
+          "security": "secu",
+          "view_models": "views.py"
+        },
         "datasets": {
           "dataset_lineage_required": true,
+          "masking_required_for_sensitive_data": true,
           "production_data_review_required": true,
           "retention_policy_required": true,
           "synthetic_data_supported": true
         },
         "governance": {
           "audit_sandbox_runs": true,
+          "batch_event_stream": "bytewax",
           "long_lived_review_hours": 48,
           "plugin_test_policy_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
         },
         "isolation": {
+          "approved_profile_required": true,
           "data_masking_required": true,
           "network_policy_required": true,
           "outbound_access_denied_by_default": true,
           "secret_redaction_required": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "dataset_metrics_required": true,
+          "event_stream": "bytewax",
+          "run_metrics_required": true,
+          "sandbox_metrics_required": true
+        },
         "sandboxes": {
           "environment_isolation_required": true,
+          "run_event_stream": "bytewax",
           "sandbox_owner_required": true,
           "template_required": true,
           "ttl_hours": 24
+        },
+        "sbox_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "isolation_reviewer",
+            "dataset_reviewer",
+            "run_reviewer",
+            "plugin_test_reviewer",
+            "security_reviewer",
+            "lifecycle_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -42,6 +90,8 @@
           "default_theme": "sbox_safe_testing"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_policy_center": true,
           "enable_run_monitor": true,
           "enable_sandbox_console": true,
@@ -55,9 +105,19 @@
       "master_data": {},
       "name": "Sandbox/Testing Environment",
       "provides": [
-        "sbox_operations"
+        "sandbox_registry",
+        "isolation_profiles",
+        "test_runs",
+        "synthetic_datasets",
+        "safety_policy",
+        "sbox_agents"
       ],
-      "requires": [],
+      "requires": [
+        "plgn",
+        "secu",
+        "envm",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,7 +147,21 @@
           },
           {
             "condition": {
-              "isolation_profile_attached": false
+              "operation": "create_sandbox",
+              "template_present": false
+            },
+            "description": "Sandboxes require a template.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sandbox_template_required",
+              "required_action": "attach_sandbox_template"
+            },
+            "name": "sandbox_requires_template"
+          },
+          {
+            "condition": {
+              "isolation_profile_attached": false,
+              "operation": "create_sandbox"
             },
             "description": "Sandboxes require an isolation profile.",
             "effect": {
@@ -96,6 +170,19 @@
               "required_action": "attach_isolation_profile"
             },
             "name": "sandbox_requires_isolation_profile"
+          },
+          {
+            "condition": {
+              "operation": "create_sandbox",
+              "ttl_hours_lt": 1
+            },
+            "description": "Sandboxes require positive TTL.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sandbox_ttl_required",
+              "required_action": "set_sandbox_ttl"
+            },
+            "name": "sandbox_requires_positive_ttl"
           },
           {
             "condition": {
@@ -135,6 +222,217 @@
               "required_action": "review_sandbox_lifecycle"
             },
             "name": "long_lived_sandbox_requires_review"
+          },
+          {
+            "condition": {
+              "dataset_owner_assigned": false,
+              "operation": "register_dataset"
+            },
+            "description": "Sandbox datasets require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_owner_required",
+              "required_action": "assign_dataset_owner"
+            },
+            "name": "dataset_requires_owner"
+          },
+          {
+            "condition": {
+              "dataset_lineage_present": false,
+              "operation": "register_dataset"
+            },
+            "description": "Sandbox datasets require lineage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_lineage_required",
+              "required_action": "attach_dataset_lineage"
+            },
+            "name": "dataset_requires_lineage"
+          },
+          {
+            "condition": {
+              "operation": "register_dataset",
+              "retention_days_lt": 1
+            },
+            "description": "Sandbox datasets require retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_policy_required",
+              "required_action": "set_dataset_retention"
+            },
+            "name": "dataset_requires_retention"
+          },
+          {
+            "condition": {
+              "operation": "register_dataset",
+              "production_dataset": true,
+              "production_review_recorded": false
+            },
+            "description": "Production sample datasets require review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "production_data_review_required",
+              "required_action": "review_production_dataset"
+            },
+            "name": "production_dataset_requires_review"
+          },
+          {
+            "condition": {
+              "dataset_masked": false,
+              "operation": "register_dataset",
+              "sensitive_dataset": true
+            },
+            "description": "Sensitive sandbox datasets require masking.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dataset_masking_required",
+              "required_action": "mask_dataset"
+            },
+            "name": "sensitive_dataset_requires_masking"
+          },
+          {
+            "condition": {
+              "operation": "start_run",
+              "run_requester_present": false
+            },
+            "description": "Sandbox runs require requester identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "run_requester_required",
+              "required_action": "set_run_requester"
+            },
+            "name": "run_requires_requester"
+          },
+          {
+            "condition": {
+              "operation": "start_run",
+              "tests_requested_lt": 1
+            },
+            "description": "Sandbox runs require positive test count.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tests_requested_required",
+              "required_action": "set_tests_requested"
+            },
+            "name": "run_requires_test_count"
+          },
+          {
+            "condition": {
+              "operation": "start_run",
+              "plugin_run": true,
+              "plugin_test_policy_present": false
+            },
+            "description": "Plugin sandbox runs require plugin test policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "plugin_test_policy_required",
+              "required_action": "attach_plugin_test_policy"
+            },
+            "name": "plugin_run_requires_policy"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "start_run"
+            },
+            "description": "Sandbox run lifecycle events require Bytewax streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "run_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "sbox_agent_present": true
+            },
+            "description": "AI sandbox agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sbox_agent_registration_required",
+              "required_action": "register_sbox_agent"
+            },
+            "name": "sbox_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "sbox_agent_present": true
+            },
+            "description": "AI sandbox agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sbox_agent_runtime_not_supported",
+              "required_action": "choose_supported_sbox_agent_runtime"
+            },
+            "name": "sbox_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "sbox_agent_present": true
+            },
+            "description": "AI sandbox agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sbox_agent_role_not_supported",
+              "required_action": "choose_supported_sbox_agent_role"
+            },
+            "name": "sbox_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "sbox_agent_present": true
+            },
+            "description": "AI sandbox agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sbox_agent_scope_required",
+              "required_action": "set_sbox_agent_scope"
+            },
+            "name": "sbox_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "sbox_agent_present": true
+            },
+            "description": "AI sandbox-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sbox_agent_disclosure_required",
+              "required_action": "disclose_sbox_agent"
+            },
+            "name": "sbox_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Sandbox lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sbox_audit_event_required",
+              "required_action": "record_sbox_audit_event"
+            },
+            "name": "sbox_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_sandbox_mutation"
+            },
+            "description": "Batch sandbox mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_sandbox_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -167,7 +465,21 @@
         },
         {
           "condition": {
-            "isolation_profile_attached": false
+            "operation": "create_sandbox",
+            "template_present": false
+          },
+          "description": "Sandboxes require a template.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sandbox_template_required",
+            "required_action": "attach_sandbox_template"
+          },
+          "name": "sandbox_requires_template"
+        },
+        {
+          "condition": {
+            "isolation_profile_attached": false,
+            "operation": "create_sandbox"
           },
           "description": "Sandboxes require an isolation profile.",
           "effect": {
@@ -176,6 +488,19 @@
             "required_action": "attach_isolation_profile"
           },
           "name": "sandbox_requires_isolation_profile"
+        },
+        {
+          "condition": {
+            "operation": "create_sandbox",
+            "ttl_hours_lt": 1
+          },
+          "description": "Sandboxes require positive TTL.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sandbox_ttl_required",
+            "required_action": "set_sandbox_ttl"
+          },
+          "name": "sandbox_requires_positive_ttl"
         },
         {
           "condition": {
@@ -215,6 +540,217 @@
             "required_action": "review_sandbox_lifecycle"
           },
           "name": "long_lived_sandbox_requires_review"
+        },
+        {
+          "condition": {
+            "dataset_owner_assigned": false,
+            "operation": "register_dataset"
+          },
+          "description": "Sandbox datasets require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_owner_required",
+            "required_action": "assign_dataset_owner"
+          },
+          "name": "dataset_requires_owner"
+        },
+        {
+          "condition": {
+            "dataset_lineage_present": false,
+            "operation": "register_dataset"
+          },
+          "description": "Sandbox datasets require lineage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_lineage_required",
+            "required_action": "attach_dataset_lineage"
+          },
+          "name": "dataset_requires_lineage"
+        },
+        {
+          "condition": {
+            "operation": "register_dataset",
+            "retention_days_lt": 1
+          },
+          "description": "Sandbox datasets require retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_policy_required",
+            "required_action": "set_dataset_retention"
+          },
+          "name": "dataset_requires_retention"
+        },
+        {
+          "condition": {
+            "operation": "register_dataset",
+            "production_dataset": true,
+            "production_review_recorded": false
+          },
+          "description": "Production sample datasets require review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "production_data_review_required",
+            "required_action": "review_production_dataset"
+          },
+          "name": "production_dataset_requires_review"
+        },
+        {
+          "condition": {
+            "dataset_masked": false,
+            "operation": "register_dataset",
+            "sensitive_dataset": true
+          },
+          "description": "Sensitive sandbox datasets require masking.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dataset_masking_required",
+            "required_action": "mask_dataset"
+          },
+          "name": "sensitive_dataset_requires_masking"
+        },
+        {
+          "condition": {
+            "operation": "start_run",
+            "run_requester_present": false
+          },
+          "description": "Sandbox runs require requester identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "run_requester_required",
+            "required_action": "set_run_requester"
+          },
+          "name": "run_requires_requester"
+        },
+        {
+          "condition": {
+            "operation": "start_run",
+            "tests_requested_lt": 1
+          },
+          "description": "Sandbox runs require positive test count.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tests_requested_required",
+            "required_action": "set_tests_requested"
+          },
+          "name": "run_requires_test_count"
+        },
+        {
+          "condition": {
+            "operation": "start_run",
+            "plugin_run": true,
+            "plugin_test_policy_present": false
+          },
+          "description": "Plugin sandbox runs require plugin test policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "plugin_test_policy_required",
+            "required_action": "attach_plugin_test_policy"
+          },
+          "name": "plugin_run_requires_policy"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "start_run"
+          },
+          "description": "Sandbox run lifecycle events require Bytewax streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "run_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "sbox_agent_present": true
+          },
+          "description": "AI sandbox agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sbox_agent_registration_required",
+            "required_action": "register_sbox_agent"
+          },
+          "name": "sbox_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "sbox_agent_present": true
+          },
+          "description": "AI sandbox agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sbox_agent_runtime_not_supported",
+            "required_action": "choose_supported_sbox_agent_runtime"
+          },
+          "name": "sbox_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "sbox_agent_present": true
+          },
+          "description": "AI sandbox agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sbox_agent_role_not_supported",
+            "required_action": "choose_supported_sbox_agent_role"
+          },
+          "name": "sbox_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "sbox_agent_present": true
+          },
+          "description": "AI sandbox agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sbox_agent_scope_required",
+            "required_action": "set_sbox_agent_scope"
+          },
+          "name": "sbox_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "sbox_agent_present": true
+          },
+          "description": "AI sandbox-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sbox_agent_disclosure_required",
+            "required_action": "disclose_sbox_agent"
+          },
+          "name": "sbox_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Sandbox lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sbox_audit_event_required",
+            "required_action": "record_sbox_audit_event"
+          },
+          "name": "sbox_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_sandbox_mutation"
+          },
+          "description": "Batch sandbox mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_sandbox_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -224,6 +760,16 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "SBOXAgentPanel",
+          "permission": "sbox:admin",
+          "route": "/sbox/agents"
+        },
+        "audit": {
+          "component": "SandboxAuditTrail",
+          "permission": "sbox:admin",
+          "route": "/sbox/audit"
+        },
         "dashboard": {
           "component": "SBOXDashboard",
           "permission": "sbox:view",
@@ -265,9 +811,39 @@
           "route": "/sbox/templates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_sandbox_mutation_requires_bytewax",
+        "events": [
+          "sbox_isolation_profile_created",
+          "sbox_template_created",
+          "sbox_dataset_registered",
+          "sbox_sandbox_created",
+          "sbox_run_started",
+          "sbox_run_completed",
+          "sbox_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "isolation_profiles",
+          "templates",
+          "datasets",
+          "sandboxes",
+          "runs",
+          "sbox_agents",
+          "audit_events"
+        ],
+        "topic": "apg.sbox.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "sandbox-chip",
+            "visual": "event-timeline"
+          },
           "dataset_manager": {
             "status_style": "lineage-chip",
             "visual": "masked-data-grid"
@@ -341,11 +917,25 @@
             "permission": "sbox:run_tests"
           },
           {
+            "component": "SBOXAgentPanel",
+            "name": "agents",
+            "nav_group": "Operations",
+            "path": "/sbox/agents",
+            "permission": "sbox:admin"
+          },
+          {
             "component": "PolicyCenter",
             "name": "policies",
             "nav_group": "Governance",
             "path": "/sbox/policies",
             "permission": "sbox:manage_policy"
+          },
+          {
+            "component": "SandboxAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/sbox/audit",
+            "permission": "sbox:admin"
           },
           {
             "component": "SandboxLogs",
@@ -375,35 +965,88 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "sbox": []
+      "sbox": [
+        "plgn",
+        "secu",
+        "envm",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "sbox": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "deployment": "depl",
+          "environment": "envm",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.SboxService",
+          "logging": "logt",
+          "plugins": "plgn",
+          "security": "secu",
+          "view_models": "views.py"
+        },
         "datasets": {
           "dataset_lineage_required": true,
+          "masking_required_for_sensitive_data": true,
           "production_data_review_required": true,
           "retention_policy_required": true,
           "synthetic_data_supported": true
         },
         "governance": {
           "audit_sandbox_runs": true,
+          "batch_event_stream": "bytewax",
           "long_lived_review_hours": 48,
           "plugin_test_policy_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
         },
         "isolation": {
+          "approved_profile_required": true,
           "data_masking_required": true,
           "network_policy_required": true,
           "outbound_access_denied_by_default": true,
           "secret_redaction_required": true
         },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "dataset_metrics_required": true,
+          "event_stream": "bytewax",
+          "run_metrics_required": true,
+          "sandbox_metrics_required": true
+        },
         "sandboxes": {
           "environment_isolation_required": true,
+          "run_event_stream": "bytewax",
           "sandbox_owner_required": true,
           "template_required": true,
           "ttl_hours": 24
+        },
+        "sbox_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "isolation_reviewer",
+            "dataset_reviewer",
+            "run_reviewer",
+            "plugin_test_reviewer",
+            "security_reviewer",
+            "lifecycle_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -411,6 +1054,8 @@
           "default_theme": "sbox_safe_testing"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_policy_center": true,
           "enable_run_monitor": true,
           "enable_sandbox_console": true,
@@ -419,9 +1064,19 @@
       },
       "id": "sbox",
       "provides": [
-        "sbox_operations"
+        "sandbox_registry",
+        "isolation_profiles",
+        "test_runs",
+        "synthetic_datasets",
+        "safety_policy",
+        "sbox_agents"
       ],
-      "requires": []
+      "requires": [
+        "plgn",
+        "secu",
+        "envm",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -433,7 +1088,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -454,6 +1109,58 @@
   },
   "roles": {},
   "rules": {
+    "batch_sandbox_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_sandbox_mutation"
+      },
+      "description": "Batch sandbox mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_sandbox_mutation_requires_bytewax"
+    },
+    "dataset_requires_lineage": {
+      "condition": {
+        "dataset_lineage_present": false,
+        "operation": "register_dataset"
+      },
+      "description": "Sandbox datasets require lineage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_lineage_required",
+        "required_action": "attach_dataset_lineage"
+      },
+      "name": "dataset_requires_lineage"
+    },
+    "dataset_requires_owner": {
+      "condition": {
+        "dataset_owner_assigned": false,
+        "operation": "register_dataset"
+      },
+      "description": "Sandbox datasets require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_owner_required",
+        "required_action": "assign_dataset_owner"
+      },
+      "name": "dataset_requires_owner"
+    },
+    "dataset_requires_retention": {
+      "condition": {
+        "operation": "register_dataset",
+        "retention_days_lt": 1
+      },
+      "description": "Sandbox datasets require retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retention_policy_required",
+        "required_action": "set_dataset_retention"
+      },
+      "name": "dataset_requires_retention"
+    },
     "long_lived_sandbox_requires_review": {
       "condition": {
         "lifecycle_review_recorded": false,
@@ -480,9 +1187,77 @@
       },
       "name": "outbound_network_requires_approval"
     },
+    "plugin_run_requires_policy": {
+      "condition": {
+        "operation": "start_run",
+        "plugin_run": true,
+        "plugin_test_policy_present": false
+      },
+      "description": "Plugin sandbox runs require plugin test policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "plugin_test_policy_required",
+        "required_action": "attach_plugin_test_policy"
+      },
+      "name": "plugin_run_requires_policy"
+    },
+    "production_dataset_requires_review": {
+      "condition": {
+        "operation": "register_dataset",
+        "production_dataset": true,
+        "production_review_recorded": false
+      },
+      "description": "Production sample datasets require review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "production_data_review_required",
+        "required_action": "review_production_dataset"
+      },
+      "name": "production_dataset_requires_review"
+    },
+    "run_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "start_run"
+      },
+      "description": "Sandbox run lifecycle events require Bytewax streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "run_requires_bytewax_stream"
+    },
+    "run_requires_requester": {
+      "condition": {
+        "operation": "start_run",
+        "run_requester_present": false
+      },
+      "description": "Sandbox runs require requester identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "run_requester_required",
+        "required_action": "set_run_requester"
+      },
+      "name": "run_requires_requester"
+    },
+    "run_requires_test_count": {
+      "condition": {
+        "operation": "start_run",
+        "tests_requested_lt": 1
+      },
+      "description": "Sandbox runs require positive test count.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tests_requested_required",
+        "required_action": "set_tests_requested"
+      },
+      "name": "run_requires_test_count"
+    },
     "sandbox_requires_isolation_profile": {
       "condition": {
-        "isolation_profile_attached": false
+        "isolation_profile_attached": false,
+        "operation": "create_sandbox"
       },
       "description": "Sandboxes require an isolation profile.",
       "effect": {
@@ -505,6 +1280,110 @@
       },
       "name": "sandbox_requires_owner"
     },
+    "sandbox_requires_positive_ttl": {
+      "condition": {
+        "operation": "create_sandbox",
+        "ttl_hours_lt": 1
+      },
+      "description": "Sandboxes require positive TTL.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sandbox_ttl_required",
+        "required_action": "set_sandbox_ttl"
+      },
+      "name": "sandbox_requires_positive_ttl"
+    },
+    "sandbox_requires_template": {
+      "condition": {
+        "operation": "create_sandbox",
+        "template_present": false
+      },
+      "description": "Sandboxes require a template.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sandbox_template_required",
+        "required_action": "attach_sandbox_template"
+      },
+      "name": "sandbox_requires_template"
+    },
+    "sbox_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "sbox_agent_present": true
+      },
+      "description": "AI sandbox-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sbox_agent_disclosure_required",
+        "required_action": "disclose_sbox_agent"
+      },
+      "name": "sbox_agent_requires_disclosure"
+    },
+    "sbox_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "sbox_agent_present": true
+      },
+      "description": "AI sandbox agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sbox_agent_registration_required",
+        "required_action": "register_sbox_agent"
+      },
+      "name": "sbox_agent_requires_registration"
+    },
+    "sbox_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "sbox_agent_present": true
+      },
+      "description": "AI sandbox agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sbox_agent_scope_required",
+        "required_action": "set_sbox_agent_scope"
+      },
+      "name": "sbox_agent_requires_scope"
+    },
+    "sbox_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "sbox_agent_present": true
+      },
+      "description": "AI sandbox agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sbox_agent_role_not_supported",
+        "required_action": "choose_supported_sbox_agent_role"
+      },
+      "name": "sbox_agent_role_supported"
+    },
+    "sbox_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "sbox_agent_present": true
+      },
+      "description": "AI sandbox agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sbox_agent_runtime_not_supported",
+        "required_action": "choose_supported_sbox_agent_runtime"
+      },
+      "name": "sbox_agent_runtime_supported"
+    },
+    "sbox_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Sandbox lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sbox_audit_event_required",
+        "required_action": "record_sbox_audit_event"
+      },
+      "name": "sbox_state_change_requires_audit"
+    },
     "secrets_require_redaction": {
       "condition": {
         "secret_access_requested": true,
@@ -517,6 +1396,20 @@
         "required_action": "enable_secret_redaction"
       },
       "name": "secrets_require_redaction"
+    },
+    "sensitive_dataset_requires_masking": {
+      "condition": {
+        "dataset_masked": false,
+        "operation": "register_dataset",
+        "sensitive_dataset": true
+      },
+      "description": "Sensitive sandbox datasets require masking.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dataset_masking_required",
+        "required_action": "mask_dataset"
+      },
+      "name": "sensitive_dataset_requires_masking"
     },
     "tenant_context_required": {
       "condition": {

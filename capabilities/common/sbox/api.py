@@ -12,7 +12,6 @@ SERVICE = SboxService()
 
 def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 	contract = SERVICE.describe(tenant_id)
-	summary = SERVICE.dashboard_summary(tenant_id)
 	return {
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
@@ -20,7 +19,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
 		"theme": contract["theme"]["name"],
-		**summary,
+		**SERVICE.dashboard_summary(tenant_id),
 	}
 
 
@@ -84,6 +83,7 @@ def start_run(payload: dict[str, Any]) -> dict[str, Any]:
 		run_type=str(payload.get("run_type") or "integration"),
 		requested_by=str(payload["requested_by"]),
 		tests_requested=int(payload.get("tests_requested", 1)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -106,6 +106,22 @@ def expire_sandbox(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_sbox_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_sbox_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
+def validate_batch_sandbox_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_sandbox_mutation(event_stream)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -125,3 +141,15 @@ def list_sandboxes(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_runs(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_runs(tenant_id)
+
+
+def list_sbox_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_sbox_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
+
+
+def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:
+	return SERVICE.dashboard_summary(tenant_id)

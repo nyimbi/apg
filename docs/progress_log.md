@@ -16,6 +16,79 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 20:34 EAT
+
+Common SBOX sandbox/testing lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the SBOX
+  capability, and replaced `cap_spec.md` with a pointer to the active packet
+  specification.
+- Expanded `capability_contract.py` with SBOX-agent, sandbox, isolation,
+  dataset, run, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, sandbox owner, template,
+  isolation profile, positive TTL, secret redaction, outbound-network approval,
+  long-lived sandbox review, dataset owner/lineage/retention, production sample
+  dataset review, sensitive dataset masking, run requester, positive test
+  count, plugin-test policy, run Bytewax streams, SBOX-agent
+  registration/runtime/role/scope/disclosure, audit-backed state changes, and
+  Bytewax batch sandbox mutation.
+- Added `SboxAgent` model support and extended `SboxService` with SBOX-agent
+  registration, listing, dashboard counts, normalized runtime/role tokens,
+  tenant-local state keys, run stream validation, audit listing, and batch
+  mutation validation.
+- Extended API helpers and view models with SBOX-agent, audit trail, sandbox
+  policy, and Bytewax metadata surfaces.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract, service, agent model, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded `test_capability_contract.py` for focused contract, rule, service,
+  API/view, tenant-isolation, agent, Bytewax, app, semantic evidence, and
+  documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/sbox/__init__.py
+  capabilities/common/sbox/capability_contract.py
+  capabilities/common/sbox/models.py
+  capabilities/common/sbox/sandbox_runtime.py capabilities/common/sbox/service.py
+  capabilities/common/sbox/api.py capabilities/common/sbox/views.py
+  capabilities/common/sbox/app.py
+  capabilities/common/sbox/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/sbox/test_capability_contract.py`
+  passed with 7 tests and only pre-existing adjacent SQLAlchemy/Pydantic
+  deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.sbox import SboxService;
+  service=SboxService(); service.register_sbox_agent('tenant-proof',
+  'Proof agent', 'codex', 'run_reviewer', 'review sandbox run gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  SBOX-agent registration plus Bytewax stream metadata in the lifecycle
+  summary. A basic OpenTelemetry warning was emitted by an adjacent optional
+  monitoring adapter.
+- `jq '.capabilities.sbox.streaming.processor,
+  .capabilities.sbox.configuration.sbox_agents.supported_runtimes,
+  .capabilities.sbox.screens.agents.route,
+  (.capabilities.sbox.rules[] |
+  select(.name=="sbox_agent_runtime_supported") | .effect.reason),
+  (.capabilities.sbox.rules[] |
+  select(.name=="batch_sandbox_mutation_requires_bytewax") | .effect.reason)'
+  capabilities/common/sbox/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/sbox/agents`,
+  `sbox_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/sbox --json` passed with `sbox` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/sbox --json`
+  passed with `side_effect_free: true`, no warnings, and Bytewax event-stream
+  metadata in the publish plan.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/sbox docs/progress_log.md` passed.
+- Not run: live container execution, network policy enforcement, secret vault
+  calls, data masking engines, live Bytewax topology, rendered browser UI,
+  performance checks, and full repository tests.
+
 ### 2026-05-30 20:26 EAT
 
 Common QUAN quantum-computing lifecycle/guardrail packet:

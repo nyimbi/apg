@@ -184,6 +184,7 @@ class SboxAuditEvent:
 	message: str
 	actor: str
 	severity: str = "info"
+	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime | None = None
 
 	def to_dict(self) -> dict[str, Any]:
@@ -195,8 +196,39 @@ class SboxAuditEvent:
 			"message": self.message,
 			"actor": self.actor,
 			"severity": self.severity,
+			"metadata": dict(self.metadata),
 			"created_at": self.created_at.isoformat() if self.created_at else None,
 		}
 
 
 SboxRecord = SandboxEnvironment
+
+
+@dataclass
+class SboxAgent:
+	"""Registered AI sandbox governance agent."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = True
+	status: str = "active"
+	created_at: datetime | None = None
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"status": self.status,
+			"created_at": self.created_at.isoformat() if self.created_at else None,
+		}

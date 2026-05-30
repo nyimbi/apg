@@ -23,6 +23,7 @@ def dashboard_model(service: SboxService | None = None, tenant_id: str = "defaul
 		"runs": service.list_runs(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -81,6 +82,7 @@ def policy_center_model(service: SboxService | None = None, tenant_id: str = "de
 		"title": "Policy Center",
 		"configuration": contract["configuration"],
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -104,4 +106,43 @@ def settings_model(service: SboxService | None = None, tenant_id: str = "default
 		"title": "SBOX Settings",
 		"configuration_schema": contract["configuration_schema"],
 		"configuration": contract["configuration"],
+	}
+
+
+def sbox_agent_model(service: SboxService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or SboxService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/sbox/agents",
+		"title": "SBOX Agent Panel",
+		"sbox_agents": service.list_sbox_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["sbox_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["sbox_agents"]["allowed_roles"],
+		"permissions": ["sbox:view", "sbox:admin"],
+	}
+
+
+def audit_trail_model(service: SboxService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or SboxService()
+	return {
+		"tenant_id": tenant_id,
+		"route": "/sbox/audit",
+		"title": "Sandbox Audit Trail",
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["sbox:admin"],
+	}
+
+
+def sandbox_policy_model(service: SboxService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or SboxService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/sbox/policies",
+		"title": "Sandbox Policy",
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"isolation_profiles": service.list_isolation_profiles(tenant_id),
 	}
