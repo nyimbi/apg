@@ -612,6 +612,33 @@ class ETLPAPIController:
 			raise
 		except Exception as e:
 			raise HTTPException(status_code=500, detail=f"Health check failed: {str(e)}")
+
+	async def get_pipeline_logs(
+		self,
+		pipeline_id: str = Path(..., description="Pipeline ID"),
+		limit: int = Query(100, ge=1, le=1000, description="Maximum log entries to return"),
+		etlp_service: ETLPService = Depends(_get_etlp_service)
+	) -> List[Dict[str, Any]]:
+		"""Return recent execution logs for a pipeline."""
+		try:
+			await self._log_api_access(
+				"GET /pipelines/{id}/logs",
+				etlp_service.user_id,
+				{"pipeline_id": pipeline_id, "limit": limit}
+			)
+			executions = await etlp_service.list_executions(pipeline_id, None, limit, 0)
+			logs: List[Dict[str, Any]] = []
+			for execution in executions:
+				for entry in execution.logs:
+					row = dict(entry)
+					row.setdefault("execution_id", execution.id)
+					row.setdefault("pipeline_id", pipeline_id)
+					logs.append(row)
+					if len(logs) >= limit:
+						return logs
+			return logs
+		except Exception as e:
+			raise HTTPException(status_code=500, detail=f"Pipeline log retrieval failed: {str(e)}")
 	
 	async def optimize_pipeline(
 		self,
@@ -671,6 +698,78 @@ class ETLPAPIController:
 			
 		except Exception as e:
 			raise HTTPException(status_code=500, detail=f"Collaborator retrieval failed: {str(e)}")
+
+	async def list_transformations(self) -> List[TransformationResponse]:
+		"""List registered transformations once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail="Transformation listing requires the ETLP persistence adapter")
+
+	async def get_transformation(self, transformation_id: str = Path(..., description="Transformation ID")) -> TransformationResponse:
+		"""Retrieve a transformation once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Transformation retrieval requires the ETLP persistence adapter: {transformation_id}")
+
+	async def update_transformation(
+		self,
+		request: TransformationCreateRequest,
+		transformation_id: str = Path(..., description="Transformation ID")
+	) -> TransformationResponse:
+		"""Update a transformation once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Transformation update requires the ETLP persistence adapter: {transformation_id}")
+
+	async def delete_transformation(self, transformation_id: str = Path(..., description="Transformation ID")) -> SuccessResponse:
+		"""Delete a transformation once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Transformation deletion requires the ETLP persistence adapter: {transformation_id}")
+
+	async def list_data_sources(self) -> List[DataSourceResponse]:
+		"""List data sources once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail="Datasource listing requires the ETLP persistence adapter")
+
+	async def get_data_source(self, source_id: str = Path(..., description="Data source ID")) -> DataSourceResponse:
+		"""Retrieve a data source once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Datasource retrieval requires the ETLP persistence adapter: {source_id}")
+
+	async def update_data_source(
+		self,
+		request: DataSourceCreateRequest,
+		source_id: str = Path(..., description="Data source ID")
+	) -> DataSourceResponse:
+		"""Update a data source once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Datasource update requires the ETLP persistence adapter: {source_id}")
+
+	async def delete_data_source(self, source_id: str = Path(..., description="Data source ID")) -> SuccessResponse:
+		"""Delete a data source once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Datasource deletion requires the ETLP persistence adapter: {source_id}")
+
+	async def test_data_source(
+		self,
+		source_id: str = Path(..., description="Data source ID"),
+		etlp_service: ETLPService = Depends(_get_etlp_service)
+	) -> Dict[str, Any]:
+		"""Test a data source through the configured runtime adapter."""
+		try:
+			await self._log_api_access("POST /datasources/{id}/test", etlp_service.user_id, {"source_id": source_id})
+			return await etlp_service.test_data_source(source_id)
+		except Exception as e:
+			raise HTTPException(status_code=500, detail=f"Datasource test failed: {str(e)}")
+
+	async def list_quality_rules(self) -> List[QualityRuleResponse]:
+		"""List quality rules once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail="Quality-rule listing requires the ETLP persistence adapter")
+
+	async def get_quality_rule(self, rule_id: str = Path(..., description="Quality rule ID")) -> QualityRuleResponse:
+		"""Retrieve a quality rule once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Quality-rule retrieval requires the ETLP persistence adapter: {rule_id}")
+
+	async def update_quality_rule(
+		self,
+		request: QualityRuleCreateRequest,
+		rule_id: str = Path(..., description="Quality rule ID")
+	) -> QualityRuleResponse:
+		"""Update a quality rule once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Quality-rule update requires the ETLP persistence adapter: {rule_id}")
+
+	async def delete_quality_rule(self, rule_id: str = Path(..., description="Quality rule ID")) -> SuccessResponse:
+		"""Delete a quality rule once the persistence adapter is configured."""
+		raise HTTPException(status_code=501, detail=f"Quality-rule deletion requires the ETLP persistence adapter: {rule_id}")
 	
 	# Real-time Streaming Endpoints
 	
@@ -697,6 +796,30 @@ class ETLPAPIController:
 			
 		except Exception as e:
 			raise HTTPException(status_code=500, detail=f"Log streaming failed: {str(e)}")
+
+	async def stream_execution_progress(
+		self,
+		execution_id: str = Path(..., description="Execution ID"),
+		etlp_service: ETLPService = Depends(_get_etlp_service)
+	) -> StreamingResponse:
+		"""Stream execution progress from the configured runtime adapter."""
+		try:
+			await self._log_api_access("GET /executions/{id}/stream-progress", etlp_service.user_id, {"execution_id": execution_id})
+
+			async def progress_generator():
+				execution = await etlp_service.get_execution(execution_id)
+				if execution is None:
+					yield "data: {'status': 'not_found'}\n\n"
+					return
+				yield f"data: {{'execution_id': '{execution.id}', 'status': '{execution.status}', 'records_processed': {execution.records_processed}}}\n\n"
+
+			return StreamingResponse(
+				progress_generator(),
+				media_type="text/plain",
+				headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+			)
+		except Exception as e:
+			raise HTTPException(status_code=500, detail=f"Progress streaming failed: {str(e)}")
 	
 	# Health Check Endpoint
 	

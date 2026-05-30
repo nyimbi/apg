@@ -13531,3 +13531,49 @@ Not run to preserve battery:
 - Bytewax runtime flow execution.
 - Rendered dashboard/browser behavior.
 - Performance benchmarks.
+
+### 2026-05-30 05:40 EAT
+
+ETLP specification, plan, and package hygiene start:
+
+- Selected `capabilities/common/etlp` as the next common capability after META
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the practical
+  ETL/ELT processing packet.
+- Defined ETLP as a tenant-scoped data pipeline capability covering pipeline
+  registration, datasource registration, field mapping, execution, scheduling,
+  retry/replay/backfill, quality gates, publish review, lineage, audit, UI,
+  theming, and adapter boundaries.
+- Renamed the legacy generated-package test file to
+  `tests/test_package_contract.py` and updated its test/module naming.
+- Fixed an import-time FastAPI route setup failure by adding the missing
+  pipeline log handler.
+- Added explicit adapter-boundary handlers for persistence-backed API routes
+  that were registered but not implemented, so package import now fails at
+  the unsupported operation boundary instead of during module setup.
+- Updated package description language to practical ETLP scope.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/etlp/__init__.py capabilities/common/etlp/capability_contract.py capabilities/common/etlp/models.py capabilities/common/etlp/service.py capabilities/common/etlp/api.py capabilities/common/etlp/field_mapper.py capabilities/common/etlp/views.py capabilities/common/etlp/app.py capabilities/common/etlp/test_capability_contract.py capabilities/common/etlp/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -c "from capabilities.common.etlp import get_capability_info; info=get_capability_info(); print(info['runtime_import_error'])"` returned `None` after the API route setup fixes.
+- `./.venv/bin/pytest -q capabilities/common/etlp/test_capability_contract.py capabilities/common/etlp/tests/test_package_contract.py` passed with 5 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/etlp --json` passed with `ok: true`; ETLP is now classified as `domain_specific`, with 0 baseline markers and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/etlp --json` passed with side-effect-free package evidence and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "Revolutionary" -e "10x" -e "Gartner" -e "test_materialized_package" -e "materialized_contract_etlp" -e "materialized_app_etlp" -e "Materialized capability package" -e "This package materializes" -e "mock data" -e "mock calculation" capabilities/common/etlp/README.md capabilities/common/etlp/SPECIFICATION.md capabilities/common/etlp/PLAN.md capabilities/common/etlp/__init__.py capabilities/common/etlp/api.py capabilities/common/etlp/tests/test_package_contract.py` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/etlp` passed with no whitespace
+  errors.
+
+Known remaining ETLP packet work:
+
+- Replace stale overclaiming legacy docs such as `cap_spec.md`,
+  `docs/README.md`, `FINAL_VALIDATION_REPORT.md`, and
+  `WORLD_CLASS_IMPROVEMENTS.md`.
+- Expand the contract with datasource, mapping, schedule, retry, replay,
+  backfill, adapter, lineage, publish, and destructive-delete guardrails.
+- Add dependency-light generated-application lifecycle records and helper
+  methods beside the production `ETLPService`.
+- Replace static `app.py` semantic JSON with contract-derived evidence and
+  refresh `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json`.
+- Add focused positive and negative lifecycle coverage for the expanded packet.

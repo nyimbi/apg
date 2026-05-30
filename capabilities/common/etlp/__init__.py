@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 APG ETLP (Extract, Transform, Load, Process) Capability
-Next-generation data processing platform with AI-powered optimization
+Tenant-scoped pipeline design, execution, quality, and lineage governance.
 
 Author: APG Platform Team
 Copyright: © 2025 Datacraft
@@ -25,7 +25,7 @@ except Exception as exc:
 __version__ = "1.0.0"
 __capability_name__ = "etlp"
 __capability_type__ = "common"
-__description__ = "AI-powered data processing and pipeline orchestration"
+__description__ = "Tenant-scoped data pipeline design, execution, quality, and lineage governance"
 
 # APG Composition Engine Metadata
 APG_CAPABILITY_METADATA = {
