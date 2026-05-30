@@ -17,6 +17,7 @@ def dashboard_model(service: SchdService, tenant_id: str = "default") -> dict[st
 	return {
 		"title": "Scheduling and Job Orchestration",
 		"summary": service.dashboard_summary(tenant_id),
+		"streaming": contract["streaming"],
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
 	}
@@ -27,14 +28,15 @@ def schedule_console_model(service: SchdService, tenant_id: str = "default") -> 
 		"schedules": service.list_schedules(tenant_id),
 		"calendars": service.list_calendars(tenant_id),
 		"worker_pools": service.list_worker_pools(tenant_id),
-		"actions": ["create_schedule", "disable_schedule", "trigger_run"],
+		"guardrails": ["schedule_owner_required", "timezone_required", "calendar_policy_required", "worker_pool_required", "manual_run_reason_required"],
+		"actions": ["create_schedule", "pause_schedule", "resume_schedule", "disable_schedule", "trigger_run"],
 	}
 
 
 def job_library_model(service: SchdService, tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"jobs": service.list_jobs(tenant_id),
-		"guardrails": ["critical_job_monitoring_required", "external_job_approval_required", "long_running_job_review_required"],
+		"guardrails": ["job_owner_required", "job_command_required", "retry_policy_required", "critical_job_monitoring_required", "external_job_approval_required", "long_running_job_review_required"],
 		"actions": ["define_job"],
 	}
 
@@ -43,14 +45,16 @@ def run_monitor_model(service: SchdService, tenant_id: str = "default") -> dict[
 	return {
 		"runs": service.list_runs(tenant_id),
 		"audit_events": service.audit_events(tenant_id),
-		"actions": ["trigger_run", "complete_run"],
+		"guardrails": ["schedule_not_runnable", "worker_pool_not_ready", "manual_run_reason_required", "bytewax_event_stream_required", "run_audit_required", "run_not_retryable"],
+		"actions": ["trigger_run", "complete_run", "retry_run", "dead_letter_run", "cancel_run"],
 	}
 
 
 def worker_dashboard_model(service: SchdService, tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"worker_pools": service.list_worker_pools(tenant_id),
-		"guardrails": ["worker_pool_required", "health_check_required", "capacity_limits_required"],
+		"guardrails": ["worker_pool_required", "health_check_required", "capacity_limits_required", "worker_drain_reason_required"],
+		"actions": ["register_worker_pool", "change_worker_state"],
 	}
 
 
@@ -75,11 +79,31 @@ def analytics_model(service: SchdService, tenant_id: str = "default") -> dict[st
 	}
 
 
+def scheduler_agent_panel_model(service: SchdService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"agents": service.list_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["scheduler_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["scheduler_agents"]["allowed_roles"],
+		"guardrails": ["scheduler_agent_registration_required", "scheduler_agent_runtime_not_supported", "scheduler_agent_scope_required", "scheduler_agent_disclosure_required"],
+		"actions": ["register_scheduler_agent"],
+	}
+
+
+def audit_trail_model(service: SchdService, tenant_id: str = "default") -> dict[str, Any]:
+	return {
+		"audit_events": service.audit_events(tenant_id),
+		"streaming_topic": get_capability_contract(tenant_id)["streaming"]["topic"],
+		"guardrails": ["scheduler_audit_event_required", "cross_tenant_scheduler_access_denied"],
+	}
+
+
 def settings_model(service: SchdService, tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"configuration": contract["configuration"],
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
-		"permissions": ["schd:view", "schd:schedule", "schd:run_jobs", "schd:manage_workers", "schd:admin"],
+		"permissions": ["schd:view", "schd:schedule", "schd:run_jobs", "schd:manage_workers", "schd:audit", "schd:admin"],
 	}

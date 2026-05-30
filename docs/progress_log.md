@@ -15480,3 +15480,60 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External MQEB, AUTH, AUDL, AICR, SCHD, NTFY, COMP, SCPT, or THEM adapters.
+
+### 2026-05-30 14:54 EAT
+
+SCHD lifecycle and guardrail packet:
+
+- Selected `capabilities/common/schd` as the next common capability after
+  WFLO.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable SCHD contract to cover schedules, jobs, job runs,
+  workers, scheduler agents, governance, observability, APG adapters, UI
+  routes, visual theme tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, schedule owner,
+  timezone, calendar policy, worker pool, manual-run reason, event policy,
+  job owner, job command, retry policy, critical monitoring, external approval,
+  long-running runtime review, worker queue, positive capacity, health evidence,
+  drain reason, active schedules, ready workers, requesting actor, Bytewax run
+  streams, run audit evidence, non-negative run metrics, retry eligibility,
+  cancellation reason, dead-letter reason, pause/disable reasons, scheduler
+  agent registration/runtime/scope/disclosure, audit evidence, tenant
+  isolation, and Bytewax batch mutation.
+- Added runtime fields for worker health/state evidence, job retry policy,
+  event schedule policy, run event stream, cancellation/dead-letter/retry
+  lineage, completion evidence, and scheduler-agent records.
+- Hardened `SchdService` with worker state changes, pause/resume/disable,
+  Bytewax runtime enforcement, run completion evidence, retry, cancellation,
+  dead-letter, scheduler-agent registration with tenant-local scope, and
+  batch-mutation validation.
+- Added API helper coverage for worker state, run recovery, schedule state,
+  scheduler-agent registration, audit events, and batch mutation validation.
+- Added agent-panel and audit view models, plus richer dashboard, schedule,
+  run, worker, analytics, and settings metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, recovery guardrails,
+  scheduler agents, Bytewax policy, view models, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/schd/__init__.py capabilities/common/schd/models.py capabilities/common/schd/scheduling_runtime.py capabilities/common/schd/service.py capabilities/common/schd/api.py capabilities/common/schd/views.py capabilities/common/schd/capability_contract.py capabilities/common/schd/app.py capabilities/common/schd/test_capability_contract.py capabilities/common/schd/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/schd/test_capability_contract.py capabilities/common/schd/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and SCHD capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/schd --json` passed with `ok: true`; SCHD remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/schd --json` passed with 10 UI routes, 36 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and placeholder markers returned no matches.
+- `git diff --check -- capabilities/common/schd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live scheduler loops, distributed worker execution, notification providers,
+  monitoring backends, audit stores, external AI-agent CLIs, durable scheduler
+  databases, browser-rendered scheduler UI behavior, and performance/load
+  tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External WFLO, MQEB, MONI, AUDL, NTFY, CACH, COMP, or THEM adapters.

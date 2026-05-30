@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .models import CalendarPolicy, JobDefinition, JobRun, ScheduleDefinition, SchdAuditEvent, WorkerPool
+from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .models import CalendarPolicy, JobDefinition, JobRun, ScheduleDefinition, SchdAuditEvent, SchedulerAgent, WorkerPool
 from .scheduling_runtime import (
 	backoff_seconds,
 	next_run_hint,
@@ -31,6 +31,7 @@ class SchdService:
 		self._jobs: dict[str, JobDefinition] = {}
 		self._schedules: dict[str, ScheduleDefinition] = {}
 		self._runs: dict[str, JobRun] = {}
+		self._agents: dict[str, SchedulerAgent] = {}
 		self._audit_events: list[SchdAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -77,12 +78,20 @@ class SchdService:
 		max_concurrency: int,
 		state: str = "ready",
 		autoscaling_enabled: bool = False,
+		heartbeat_ref: str = "local://worker-health",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
-		if not queue:
-			raise ValueError("worker_queue_required")
-		if max_concurrency <= 0:
-			raise ValueError("worker_capacity_must_be_positive")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "register_worker_pool",
+			"worker_queue_present": bool(str(queue or "").strip()),
+			"max_concurrency": int(max_concurrency),
+			"health_check_attached": bool(str(heartbeat_ref or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
 		pool = WorkerPool(
 			id=stable_id("wrk", tenant_id, name, queue),
 			tenant_id=tenant_id,
@@ -91,10 +100,32 @@ class SchdService:
 			max_concurrency=max_concurrency,
 			state=normalize_worker_state(state),
 			autoscaling_enabled=autoscaling_enabled,
+			heartbeat_ref=heartbeat_ref,
 			created_at=utc_now(),
+			updated_at=utc_now(),
 		)
 		self._workers[pool.id] = pool
 		self._record_event(tenant_id, "worker_pool_registered", pool.id, f"Worker pool {name} registered.", "system")
+		return pool.to_dict()
+
+	def change_worker_state(self, tenant_id: str, worker_pool_id: str, state: str, actor: str, reason: str = "") -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		pool = self._require_owned(self._workers, worker_pool_id, tenant_id, "worker_pool_not_found")
+		target_state = normalize_worker_state(state)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "change_worker_state",
+			"target_worker_state": target_state,
+			"state_change_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		pool.state = target_state
+		pool.state_reason = reason
+		pool.updated_at = utc_now()
+		self._record_event(tenant_id, "worker_pool_state_changed", pool.id, f"Worker pool {pool.name} changed to {target_state}.", actor, "warning" if target_state != "ready" else "info")
 		return pool.to_dict()
 
 	def define_job(
@@ -110,6 +141,7 @@ class SchdService:
 		approval_recorded: bool = False,
 		runtime_review_recorded: bool = False,
 		retry_strategy: str = "fixed",
+		retry_policy_ref: str = "retry://default",
 		max_attempts: int = 3,
 		tags: list[str] | None = None,
 	) -> dict[str, Any]:
@@ -132,6 +164,10 @@ class SchdService:
 			"approval_recorded": approval_recorded,
 			"expected_runtime_minutes": expected_runtime_minutes,
 			"runtime_review_recorded": runtime_review_recorded,
+			"operation": "define_job",
+			"job_owner_assigned": bool(str(owner or "").strip()),
+			"job_command_present": bool(str(command or "").strip()),
+			"retry_policy_attached": bool(str(retry_policy_ref or "").strip()) and retry_strategy != "none",
 		}
 		result = self.evaluate(policy_context)
 		if result["decision"] == "deny" or (result["decision"] == "require_review" and not runtime_review_recorded):
@@ -148,6 +184,7 @@ class SchdService:
 			monitoring_attached=monitoring_attached,
 			approval_recorded=approval_recorded,
 			retry_strategy=retry_strategy,
+			retry_policy_ref=retry_policy_ref,
 			max_attempts=max_attempts,
 			tags=normalize_tags(tags),
 			created_at=utc_now(),
@@ -169,6 +206,7 @@ class SchdService:
 		interval_minutes: int | None = None,
 		cron: str | None = None,
 		manual_reason: str | None = None,
+		event_policy_ref: str = "",
 		enabled: bool = True,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
@@ -178,7 +216,7 @@ class SchdService:
 			self._raise_policy({"tenant_context_present": True, "operation": "create_schedule", "schedule_owner_assigned": bool(owner), "timezone_present": False})
 		job = self._require_owned(self._jobs, job_id, tenant_id, "job_not_found")
 		self._require_owned(self._calendars, calendar_policy_id, tenant_id, "calendar_policy_not_found")
-		self._require_owned(self._workers, worker_pool_id, tenant_id, "worker_pool_not_found")
+		worker = self._require_owned(self._workers, worker_pool_id, tenant_id, "worker_pool_not_found")
 		trigger_type = normalize_trigger_type(trigger_type)
 		if trigger_type == "interval" and not interval_minutes:
 			raise ValueError("interval_minutes_required")
@@ -186,6 +224,26 @@ class SchdService:
 			raise ValueError("cron_expression_required")
 		if trigger_type == "manual" and not manual_reason:
 			raise PermissionError("manual_run_reason_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "create_schedule",
+			"schedule_owner_assigned": bool(str(owner or "").strip()),
+			"timezone_present": bool(str(timezone or "").strip()),
+			"calendar_policy_present": bool(calendar_policy_id),
+			"worker_pool_present": bool(worker_pool_id),
+			"manual_trigger": trigger_type == "manual",
+			"manual_reason_present": bool(manual_reason),
+			"event_trigger": trigger_type == "event",
+			"event_policy_attached": bool(str(event_policy_ref or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		if not job.enabled:
+			raise PermissionError("job_not_runnable")
+		if worker.state == "offline":
+			raise PermissionError("worker_pool_not_ready")
 		schedule = ScheduleDefinition(
 			id=stable_id("sch", tenant_id, name, job.id, trigger_type),
 			tenant_id=tenant_id,
@@ -199,6 +257,7 @@ class SchdService:
 			enabled=enabled,
 			interval_minutes=interval_minutes,
 			cron=cron,
+			event_policy_ref=event_policy_ref,
 			manual_reason=manual_reason,
 			next_run_hint=next_run_hint(trigger_type, timezone, interval_minutes),
 			state=schedule_state(enabled),
@@ -209,13 +268,34 @@ class SchdService:
 		self._record_event(tenant_id, "schedule_created", schedule.id, f"Schedule {name} created.", owner)
 		return schedule.to_dict()
 
-	def trigger_run(self, tenant_id: str, schedule_id: str, requested_by: str, manual_reason: str | None = None) -> dict[str, Any]:
+	def trigger_run(
+		self,
+		tenant_id: str,
+		schedule_id: str,
+		requested_by: str,
+		manual_reason: str | None = None,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		schedule = self._require_owned(self._schedules, schedule_id, tenant_id, "schedule_not_found")
-		if not schedule.enabled or schedule.state != "active":
-			raise PermissionError("schedule_not_runnable")
-		if schedule.trigger_type == "manual" and not manual_reason:
-			raise PermissionError("manual_run_reason_required")
+		job = self._require_owned(self._jobs, schedule.job_id, tenant_id, "job_not_found")
+		worker = self._require_owned(self._workers, schedule.worker_pool_id, tenant_id, "worker_pool_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "trigger_run",
+			"schedule_active": schedule.enabled and schedule.state == "active",
+			"worker_pool_ready": worker.state == "ready",
+			"manual_trigger": schedule.trigger_type == "manual",
+			"manual_reason_present": bool(str(manual_reason or schedule.manual_reason or "").strip()),
+			"requested_by_present": bool(str(requested_by or "").strip()),
+			"event_stream": event_stream,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		if not job.enabled:
+			raise PermissionError("job_not_runnable")
 		run = JobRun(
 			id=stable_id("run", tenant_id, schedule_id, len(self._runs) + 1),
 			tenant_id=tenant_id,
@@ -223,6 +303,7 @@ class SchdService:
 			job_id=schedule.job_id,
 			worker_pool_id=schedule.worker_pool_id,
 			requested_by=requested_by,
+			event_stream=event_stream,
 			status="running",
 			started_at=utc_now(),
 			logs=[f"Started schedule {schedule.name}."],
@@ -240,11 +321,19 @@ class SchdService:
 		exit_code: int = 0,
 		logs: list[str] | None = None,
 		blocked_count: int = 0,
+		completion_evidence_ref: str = "run://local-evidence",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		run = self._require_owned(self._runs, run_id, tenant_id, "run_not_found")
-		if records_processed < 0 or error_count < 0:
-			raise ValueError("run_counts_must_be_non_negative")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "complete_run",
+			"run_counts_valid": records_processed >= 0 and error_count >= 0 and blocked_count >= 0,
+			"audit_event_recorded": bool(str(completion_evidence_ref or "").strip()),
+			"state_change_requested": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
 		job = self._require_owned(self._jobs, run.job_id, tenant_id, "job_not_found")
 		run.records_processed = records_processed
 		run.error_count = error_count
@@ -255,18 +344,177 @@ class SchdService:
 		if run.status == "failed":
 			run.next_retry_seconds = backoff_seconds(job.retry_strategy, run.attempt)
 		run.logs.extend(logs or [])
+		run.completion_evidence_ref = completion_evidence_ref
 		run.completed_at = utc_now()
 		self._record_event(tenant_id, "job_run_completed", run.id, f"Run completed with status {run.status}.", run.requested_by, "warning" if run.status != "succeeded" else "info")
 		return run.to_dict()
 
-	def disable_schedule(self, tenant_id: str, schedule_id: str, actor: str) -> dict[str, Any]:
+	def retry_run(self, tenant_id: str, run_id: str, requested_by: str, reason: str = "") -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		run = self._require_owned(self._runs, run_id, tenant_id, "run_not_found")
+		job = self._require_owned(self._jobs, run.job_id, tenant_id, "job_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "retry_run",
+			"run_retryable": run.status in {"failed", "dead_lettered"} and run.attempt < job.max_attempts,
+			"state_change_requested": True,
+			"audit_event_recorded": bool(str(reason or "").strip()),
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		retry = JobRun(
+			id=stable_id("run", tenant_id, run.schedule_id, len(self._runs) + 1),
+			tenant_id=tenant_id,
+			schedule_id=run.schedule_id,
+			job_id=run.job_id,
+			worker_pool_id=run.worker_pool_id,
+			requested_by=requested_by,
+			event_stream=run.event_stream,
+			status="running",
+			attempt=run.attempt + 1,
+			parent_run_id=run.id,
+			started_at=utc_now(),
+			logs=[f"Retrying run {run.id}: {reason}"],
+		)
+		self._runs[retry.id] = retry
+		self._record_event(tenant_id, "job_run_retried", retry.id, f"Retry started for run {run.id}.", requested_by)
+		return retry.to_dict()
+
+	def dead_letter_run(self, tenant_id: str, run_id: str, actor: str, reason: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		run = self._require_owned(self._runs, run_id, tenant_id, "run_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "dead_letter_run",
+			"dead_letter_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		run.status = "dead_lettered"
+		run.dead_letter_reason = reason
+		run.completed_at = utc_now()
+		self._record_event(tenant_id, "job_run_dead_lettered", run.id, f"Run dead-lettered: {reason}", actor, "high")
+		return run.to_dict()
+
+	def cancel_run(self, tenant_id: str, run_id: str, actor: str, reason: str) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		run = self._require_owned(self._runs, run_id, tenant_id, "run_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "cancel_run",
+			"cancel_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		run.status = "cancelled"
+		run.cancel_reason = reason
+		run.completed_at = utc_now()
+		self._record_event(tenant_id, "job_run_cancelled", run.id, f"Run cancelled: {reason}", actor, "warning")
+		return run.to_dict()
+
+	def pause_schedule(self, tenant_id: str, schedule_id: str, actor: str, reason: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		schedule = self._require_owned(self._schedules, schedule_id, tenant_id, "schedule_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "pause_schedule",
+			"pause_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		schedule.enabled = True
+		schedule.state = schedule_state(True, paused=True)
+		schedule.state_reason = reason
+		schedule.updated_at = utc_now()
+		self._record_event(tenant_id, "schedule_paused", schedule.id, f"Schedule {schedule.name} paused: {reason}", actor, "warning")
+		return schedule.to_dict()
+
+	def resume_schedule(self, tenant_id: str, schedule_id: str, actor: str, reason: str = "resume approved") -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		schedule = self._require_owned(self._schedules, schedule_id, tenant_id, "schedule_not_found")
+		result = self.evaluate({"tenant_context_present": True, "state_change_requested": True, "audit_event_recorded": bool(reason)})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		schedule.enabled = True
+		schedule.state = schedule_state(True)
+		schedule.state_reason = reason
+		schedule.updated_at = utc_now()
+		self._record_event(tenant_id, "schedule_resumed", schedule.id, f"Schedule {schedule.name} resumed.", actor)
+		return schedule.to_dict()
+
+	def disable_schedule(self, tenant_id: str, schedule_id: str, actor: str, reason: str = "disabled by operator") -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		schedule = self._require_owned(self._schedules, schedule_id, tenant_id, "schedule_not_found")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "disable_schedule",
+			"disable_reason_present": bool(str(reason or "").strip()),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
 		schedule.enabled = False
 		schedule.state = schedule_state(False)
+		schedule.state_reason = reason
 		schedule.updated_at = utc_now()
 		self._record_event(tenant_id, "schedule_disabled", schedule.id, f"Schedule {schedule.name} disabled.", actor)
 		return schedule.to_dict()
+
+	def register_scheduler_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope_ref: str,
+		registered_by: str,
+		contribution_disclosed: bool,
+	) -> dict[str, Any]:
+		config = DEFAULT_CONFIGURATION["scheduler_agents"]
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"scheduler_agent_present": True,
+			"agent_registered": bool(name and registered_by),
+			"agent_runtime_supported": runtime in config["supported_runtimes"],
+			"agent_scope_present": bool(str(scope_ref or "").strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		if role not in config["allowed_roles"]:
+			raise PermissionError("scheduler_agent_role_not_supported")
+		if not self._scope_exists_for_tenant(tenant_id, scope_ref):
+			raise KeyError("scheduler_agent_scope_not_found")
+		agent = SchedulerAgent(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime,
+			role=role,
+			scope_ref=scope_ref,
+			registered_by=registered_by,
+			contribution_disclosed=bool(contribution_disclosed),
+			created_at=utc_now(),
+		)
+		self._agents[agent.id] = agent
+		self._record_event(tenant_id, "scheduler_agent_registered", agent.id, f"Scheduler agent {name} registered.", registered_by)
+		return agent.to_dict()
+
+	def validate_batch_mutation(self, event_stream: str) -> dict[str, Any]:
+		result = self.evaluate({"tenant_context_present": True, "operation": "batch_scheduler_mutation", "event_stream": event_stream})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		return result
 
 	def create_record(
 		self,
@@ -313,6 +561,9 @@ class SchdService:
 	def list_runs(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._runs, tenant_id)
 
+	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
 		if tenant_id is not None:
@@ -333,6 +584,7 @@ class SchdService:
 			"succeeded_run_count": sum(1 for item in runs if item["status"] == "succeeded"),
 			"failed_run_count": sum(1 for item in runs if item["status"] in {"failed", "dead_lettered"}),
 			"calendar_count": len(self.list_calendars(tenant_id)),
+			"agent_count": len(self.list_agents(tenant_id)),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -345,8 +597,18 @@ class SchdService:
 			raise KeyError(missing_reason)
 		return item
 
+	def _scope_exists_for_tenant(self, tenant_id: str, scope_ref: str) -> bool:
+		for store in (self._calendars, self._workers, self._jobs, self._schedules, self._runs):
+			item = store.get(scope_ref)
+			if item is not None:
+				return item.tenant_id == tenant_id
+		return False
+
 	def _raise_policy(self, context: dict[str, Any]) -> None:
 		result = self.evaluate(context)
+		self._raise_policy_result(result)
+
+	def _raise_policy_result(self, result: dict[str, Any]) -> None:
 		raise PermissionError(summarize_decision(result))
 
 	def _record_event(self, tenant_id: str, event_type: str, subject_id: str, message: str, actor: str, severity: str = "info") -> None:
