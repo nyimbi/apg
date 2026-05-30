@@ -8,6 +8,7 @@ from typing import Any
 from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .graph_runtime import GraphQualityInspector, GraphTraversalPlanner
 from .models import (
+	GraphAuditEventRecord,
 	GraphEdge,
 	GraphKind,
 	GraphNode,
@@ -27,6 +28,7 @@ class GrphService:
 		self._edges: dict[str, GraphEdge] = {}
 		self._traversals: dict[str, GraphTraversalResult] = {}
 		self._quality_reports: dict[str, GraphQualityReport] = {}
+		self._audit_events: dict[str, GraphAuditEventRecord] = {}
 		self._counter = count(1)
 		self._traversal_planner = GraphTraversalPlanner()
 		self._quality_inspector = GraphQualityInspector()
@@ -46,23 +48,39 @@ class GrphService:
 		node_types: dict[str, list[str]] | None = None,
 		edge_types: dict[str, dict[str, Any]] | None = None,
 		source_asset_id: str | None = None,
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._enforce_graph_policy(
-			tenant_id=tenant_id,
-			operation="write_schema",
-			graph_type=graph_kind,
-			source_asset_present=bool(source_asset_id),
-		)
+		config = self.describe(tenant_id or "default")["configuration"]
+		kind_value = str(graph_kind or "").strip().lower()
+		kind_known = kind_value in config["schemas"]["allowed_graph_kinds"]
+		stored_kind = kind_value if kind_known else GraphKind.PROPERTY.value
+		node_type_count = len(node_types or {})
+		edge_type_count = len(edge_types or {})
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "write_schema",
+			"schema_id_present": bool(str(schema_id or "").strip()),
+			"schema_name_present": bool(str(name or "").strip()),
+			"graph_kind_present": bool(kind_value),
+			"graph_kind_known": kind_known,
+			"graph_type": stored_kind,
+			"source_asset_present": bool(str(source_asset_id or "").strip()),
+			"node_type_count": node_type_count,
+			"edge_type_count": edge_type_count,
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(result)
 		schema = GraphSchema(
 			id=schema_id,
 			tenant_id=tenant_id,
 			name=name,
-			graph_kind=GraphKind(graph_kind),
+			graph_kind=GraphKind(stored_kind),
 			node_types={key: list(value) for key, value in (node_types or {}).items()},
 			edge_types={key: dict(value) for key, value in (edge_types or {}).items()},
 			source_asset_id=source_asset_id,
 		)
 		self._schemas[schema_id] = schema
+		self._record_event(tenant_id, "schema_created", schema.id, f"Graph schema created: {name}", "system")
 		return schema.to_dict()
 
 	def create_node(
@@ -75,27 +93,39 @@ class GrphService:
 		labels: list[str] | None = None,
 		properties: dict[str, Any] | None = None,
 		source_asset_id: str | None = None,
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._require_schema(schema_id, tenant_id)
-		self._enforce_graph_policy(
-			tenant_id=tenant_id,
-			operation="write_node",
-			owner_assigned=bool(owner_id),
-		)
-		schema = self._schemas[schema_id]
-		if schema.node_types and node_type not in schema.node_types:
-			raise ValueError("node_type_not_in_schema")
+		schema = self._schemas.get(schema_id)
+		config = self.describe(tenant_id or "default")["configuration"]
+		label_values = [str(label) for label in (labels or [])]
+		allowed_prefixes = tuple(config["nodes"]["allowed_label_prefixes"])
+		labels_allowed = all(label.startswith(allowed_prefixes) for label in label_values) if label_values else True
+		node_type_allowed = bool(schema and (not schema.node_types or node_type in schema.node_types))
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "write_node",
+			"schema_present": bool(schema and schema.tenant_id == tenant_id),
+			"node_id_present": bool(str(node_id or "").strip()),
+			"node_type_present": bool(str(node_type or "").strip()),
+			"owner_assigned": bool(str(owner_id or "").strip()),
+			"node_type_allowed": node_type_allowed,
+			"labels_allowed": labels_allowed,
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(result)
+		assert schema is not None
 		node = GraphNode(
 			id=node_id,
 			tenant_id=tenant_id,
 			schema_id=schema_id,
 			node_type=node_type,
 			owner_id=owner_id,
-			labels=list(labels or []),
+			labels=label_values,
 			properties=dict(properties or {}),
 			source_asset_id=source_asset_id,
 		)
 		self._nodes[node_id] = node
+		self._record_event(tenant_id, "node_created", node.id, f"Graph node created: {node_id}", owner_id)
 		return node.to_dict()
 
 	def create_edge(
@@ -109,22 +139,42 @@ class GrphService:
 		owner_id: str,
 		classification: str = RelationshipClassification.INTERNAL.value,
 		properties: dict[str, Any] | None = None,
-		review_recorded: bool = True,
+		review_recorded: bool = False,
 	) -> dict[str, Any]:
-		self._require_schema(schema_id, tenant_id)
-		self._require_node(from_node_id, tenant_id)
-		self._require_node(to_node_id, tenant_id)
-		self._enforce_graph_policy(
-			tenant_id=tenant_id,
-			operation="write_edge",
-			owner_assigned=bool(owner_id),
-			edge_type_present=bool(edge_type),
-			relationship_classification=classification,
-			review_recorded=review_recorded,
+		schema = self._schemas.get(schema_id)
+		source_any = self._nodes.get(from_node_id)
+		target_any = self._nodes.get(to_node_id)
+		source = source_any if source_any and source_any.tenant_id == tenant_id else None
+		target = target_any if target_any and target_any.tenant_id == tenant_id else None
+		edge_type_allowed = bool(schema and (not schema.edge_types or edge_type in schema.edge_types))
+		cross_tenant_edge = bool(
+			source_any
+			and target_any
+			and (source_any.tenant_id != tenant_id or target_any.tenant_id != tenant_id or source_any.tenant_id != target_any.tenant_id)
 		)
-		schema = self._schemas[schema_id]
-		if schema.edge_types and edge_type not in schema.edge_types:
-			raise ValueError("edge_type_not_in_schema")
+		classification_value = str(classification or "").strip().lower()
+		allowed_classifications = self.describe(tenant_id or "default")["configuration"]["edges"]["allowed_classifications"]
+		classification_known = classification_value in allowed_classifications
+		stored_classification = classification_value if classification_known else RelationshipClassification.RESTRICTED.value
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "write_edge",
+			"schema_present": bool(schema and schema.tenant_id == tenant_id),
+			"edge_id_present": bool(str(edge_id or "").strip()),
+			"source_node_present": bool(source),
+			"target_node_present": bool(target),
+			"edge_type_present": bool(str(edge_type or "").strip()),
+			"owner_assigned": bool(str(owner_id or "").strip()),
+			"classification_present": bool(classification_value),
+			"classification_known": classification_known,
+			"edge_type_allowed": edge_type_allowed,
+			"cross_tenant_edge": cross_tenant_edge,
+			"relationship_classification": stored_classification,
+			"self_edge": bool(from_node_id and from_node_id == to_node_id),
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(result)
+		assert schema is not None
 		edge = GraphEdge(
 			id=edge_id,
 			tenant_id=tenant_id,
@@ -133,10 +183,11 @@ class GrphService:
 			to_node_id=to_node_id,
 			edge_type=edge_type,
 			owner_id=owner_id,
-			classification=RelationshipClassification(classification),
+			classification=RelationshipClassification(stored_classification),
 			properties=dict(properties or {}),
 		)
 		self._edges[edge_id] = edge
+		self._record_event(tenant_id, "edge_created", edge.id, f"Graph edge created: {edge_type}", owner_id)
 		return edge.to_dict()
 
 	def traverse(
@@ -145,22 +196,31 @@ class GrphService:
 		tenant_id: str,
 		start_node_id: str,
 		max_depth: int = 1,
-		review_recorded: bool = True,
+		review_recorded: bool = False,
+		rbac_filter_applied: bool = True,
 	) -> dict[str, Any]:
-		self._require_node(start_node_id, tenant_id)
-		self._enforce_graph_policy(
-			tenant_id=tenant_id,
-			operation="traverse",
-			traversal_depth=max_depth,
-			review_recorded=review_recorded,
+		start_node = self._nodes.get(start_node_id)
+		restricted_in_scope = any(
+			edge.tenant_id == tenant_id and edge.classification == RelationshipClassification.RESTRICTED
+			for edge in self._edges.values()
 		)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "traverse",
+			"start_node_present": bool(start_node and start_node.tenant_id == tenant_id),
+			"traversal_depth": int(max_depth),
+			"review_recorded": bool(review_recorded),
+			"restricted_relationships_in_scope": restricted_in_scope,
+			"rbac_filter_applied": bool(rbac_filter_applied),
+		})
+		self._raise_if_blocked(result)
 		node_ids, edge_ids = self._traversal_planner.traverse(
 			tenant_id=tenant_id,
 			start_node_id=start_node_id,
 			max_depth=max_depth,
 			edges=list(self._edges.values()),
 		)
-		result = GraphTraversalResult(
+		traversal = GraphTraversalResult(
 			id=traversal_id,
 			tenant_id=tenant_id,
 			start_node_id=start_node_id,
@@ -168,8 +228,9 @@ class GrphService:
 			node_ids=node_ids,
 			edge_ids=edge_ids,
 		)
-		self._traversals[traversal_id] = result
-		return result.to_dict()
+		self._traversals[traversal_id] = traversal
+		self._record_event(tenant_id, "traversal_completed", traversal.id, f"Graph traversal completed: {traversal_id}", "system")
+		return traversal.to_dict()
 
 	def lineage_path(
 		self,
@@ -178,23 +239,59 @@ class GrphService:
 		source_asset_id: str,
 		start_node_id: str,
 		max_depth: int = 2,
-		review_recorded: bool = True,
+		review_recorded: bool = False,
+		rbac_filter_applied: bool = True,
 	) -> dict[str, Any]:
-		self._enforce_graph_policy(
-			tenant_id=tenant_id,
-			operation="lineage_query",
-			graph_type=GraphKind.LINEAGE.value,
-			source_asset_present=bool(source_asset_id),
-			traversal_depth=max_depth,
-			review_recorded=review_recorded,
-		)
-		return self.traverse(traversal_id, tenant_id, start_node_id, max_depth, review_recorded)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "lineage_query",
+			"source_asset_present": bool(str(source_asset_id or "").strip()),
+		})
+		self._raise_if_blocked(result)
+		return self.traverse(traversal_id, tenant_id, start_node_id, max_depth, review_recorded, rbac_filter_applied)
 
-	def quality_report(self, report_id: str, tenant_id: str, schema_id: str) -> dict[str, Any]:
-		self._require_schema(schema_id, tenant_id)
+	def impact_analysis(
+		self,
+		traversal_id: str,
+		tenant_id: str,
+		start_node_id: str,
+		max_depth: int = 3,
+		review_recorded: bool = False,
+		rbac_filter_applied: bool = True,
+	) -> dict[str, Any]:
+		return self.traverse(traversal_id, tenant_id, start_node_id, max_depth, review_recorded, rbac_filter_applied)
+
+	def neighborhood(
+		self,
+		traversal_id: str,
+		tenant_id: str,
+		start_node_id: str,
+		review_recorded: bool = False,
+		rbac_filter_applied: bool = True,
+	) -> dict[str, Any]:
+		return self.traverse(traversal_id, tenant_id, start_node_id, 1, review_recorded, rbac_filter_applied)
+
+	def quality_report(
+		self,
+		report_id: str,
+		tenant_id: str,
+		schema_id: str,
+		review_recorded: bool = False,
+	) -> dict[str, Any]:
+		schema = self._schemas.get(schema_id)
+		if schema is None or schema.tenant_id != tenant_id:
+			raise PermissionError("schema_missing")
 		schema_nodes = [node for node in self._nodes.values() if node.tenant_id == tenant_id and node.schema_id == schema_id]
 		schema_edges = [edge for edge in self._edges.values() if edge.tenant_id == tenant_id and edge.schema_id == schema_id]
 		metrics = self._quality_inspector.inspect(schema_nodes, schema_edges)
+		quality_issue_count = metrics["orphan_node_count"] + metrics["missing_owner_count"]
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "quality_report",
+			"quality_issue_count": quality_issue_count,
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(result)
 		report = GraphQualityReport(
 			id=report_id,
 			tenant_id=tenant_id,
@@ -204,7 +301,20 @@ class GrphService:
 			restricted_edge_count=metrics["restricted_edge_count"],
 		)
 		self._quality_reports[report_id] = report
+		self._record_event(tenant_id, "quality_report_created", report.id, f"Graph quality report created: {report_id}", "system")
 		return report.to_dict()
+
+	def retire_schema(self, tenant_id: str, schema_id: str, review_recorded: bool = False) -> dict[str, Any]:
+		self._raise_if_blocked(self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "retire_schema",
+			"review_recorded": bool(review_recorded),
+		}))
+		schema = self._schemas.pop(schema_id, None)
+		if schema is None or schema.tenant_id != tenant_id:
+			raise PermissionError("schema_missing")
+		self._record_event(tenant_id, "schema_retired", schema_id, f"Graph schema retired: {schema_id}", "system", "medium")
+		return schema.to_dict() | {"status": "retired"}
 
 	def create_record(
 		self,
@@ -216,22 +326,26 @@ class GrphService:
 		"""Compatibility helper for generated package probes."""
 		data = dict(metadata or {})
 		schema_id = str(data.get("schema_id") or f"{record_id}-schema")
+		node_type = str(data.get("node_type") or "Entity")
+		edge_type = str(data.get("edge_type") or "RELATED_TO")
 		if schema_id not in self._schemas:
 			self.create_schema(
 				schema_id=schema_id,
 				tenant_id=tenant_id,
 				name=str(data.get("schema_name") or "Compatibility Graph"),
-				node_types={str(data.get("node_type") or "Entity"): []},
-				edge_types={str(data.get("edge_type") or "RELATED_TO"): {}},
+				node_types={node_type: []},
+				edge_types={edge_type: {}},
+				review_recorded=True,
 			)
 		return self.create_node(
 			node_id=record_id,
 			tenant_id=tenant_id,
 			schema_id=schema_id,
-			node_type=str(data.get("node_type") or "Entity"),
+			node_type=node_type,
 			owner_id=str(data.get("owner_id") or "system"),
-			labels=list(data.get("labels") or [status]),
+			labels=list(data.get("labels") or [f"entity-{status}"]),
 			properties=data,
+			review_recorded=True,
 		)
 
 	def list_schemas(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -248,6 +362,9 @@ class GrphService:
 
 	def list_quality_reports(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._quality_reports, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._audit_events, tenant_id)
 
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		records: list[dict[str, Any]] = []
@@ -267,44 +384,34 @@ class GrphService:
 			"restricted_edge_count": len(restricted_edges),
 			"traversal_count": len(self.list_traversals(tenant_id)),
 			"quality_report_count": len(self.list_quality_reports(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
-	def _enforce_graph_policy(
+	def _raise_if_blocked(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "allow":
+			return
+		reasons = ", ".join(action.get("reason", "graph_policy_blocked") for action in result["actions"])
+		raise PermissionError(reasons or "graph_policy_blocked")
+
+	def _record_event(
 		self,
 		tenant_id: str,
-		operation: str,
-		owner_assigned: bool = True,
-		edge_type_present: bool = True,
-		relationship_classification: str = RelationshipClassification.INTERNAL.value,
-		review_recorded: bool = True,
-		traversal_depth: int = 0,
-		graph_type: str = GraphKind.PROPERTY.value,
-		source_asset_present: bool = True,
+		event_type: str,
+		subject_id: str,
+		message: str,
+		actor: str,
+		severity: str = "low",
 	) -> None:
-		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
-			"operation": operation,
-			"owner_assigned": owner_assigned,
-			"edge_type_present": edge_type_present,
-			"relationship_classification": relationship_classification,
-			"review_recorded": review_recorded,
-			"traversal_depth": traversal_depth,
-			"graph_type": graph_type,
-			"source_asset_present": source_asset_present,
-		})
-		if result["decision"] != "allow":
-			reasons = ", ".join(action.get("reason", "graph_policy_blocked") for action in result["actions"])
-			raise PermissionError(reasons or "graph_policy_blocked")
-
-	def _require_schema(self, schema_id: str, tenant_id: str) -> None:
-		schema = self._schemas.get(schema_id)
-		if schema is None or schema.tenant_id != tenant_id:
-			raise PermissionError("schema_missing")
-
-	def _require_node(self, node_id: str, tenant_id: str) -> None:
-		node = self._nodes.get(node_id)
-		if node is None or node.tenant_id != tenant_id:
-			raise PermissionError("node_missing")
+		record = GraphAuditEventRecord(
+			id=f"grph_audit_{next(self._counter)}",
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject_id=subject_id,
+			message=message,
+			actor=actor,
+			severity=severity,
+		)
+		self._audit_events[record.id] = record
 
 	def _list(self, store: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = list(store.values())

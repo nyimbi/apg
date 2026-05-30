@@ -5,13 +5,121 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Graph Data Management package-backed APG capability", "entity_count": 0, "name": "grph", "version": "1.0.0"}, "capabilities": {"grph": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_mutations": true, "require_tenant_context": true, "restricted_relationship_review_required": true}, "graph": {"lineage_graphs_enabled": true, "max_traversal_depth": 8, "schema_required": true}, "storage": {"edge_type_required": true, "node_owner_required": true, "property_validation_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "grph_relationship_console"}, "ui": {"enable_graph_explorer": true, "enable_lineage_viewer": true, "enable_quality_console": true, "enable_schema_manager": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Graph Data Management", "provides": ["grph_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All graph operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "write_node", "owner_assigned": false}, "description": "Graph node writes require an owner.", "effect": {"decision": "deny", "reason": "node_owner_required", "required_action": "assign_owner"}, "name": "node_write_requires_owner"}, {"condition": {"edge_type_present": false, "operation": "write_edge"}, "description": "Graph edge writes require an edge type.", "effect": {"decision": "deny", "reason": "edge_type_required", "required_action": "attach_edge_type"}, "name": "edge_write_requires_type"}, {"condition": {"relationship_classification": "restricted", "review_recorded": false}, "description": "Restricted relationships require governance review.", "effect": {"decision": "require_review", "reason": "restricted_relationship_review_required", "required_action": "record_relationship_review"}, "name": "restricted_relationship_requires_review"}, {"condition": {"review_recorded": false, "traversal_depth_gt": 8}, "description": "Deep graph traversals require review.", "effect": {"decision": "require_review", "reason": "deep_traversal_review_required", "required_action": "record_traversal_review"}, "name": "deep_traversal_requires_review"}, {"condition": {"graph_type": "lineage", "source_asset_present": false}, "description": "Lineage graph mutations require source asset linkage.", "effect": {"decision": "deny", "reason": "source_asset_required", "required_action": "attach_source_asset"}, "name": "lineage_graph_requires_source_asset"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All graph operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "write_node", "owner_assigned": false}, "description": "Graph node writes require an owner.", "effect": {"decision": "deny", "reason": "node_owner_required", "required_action": "assign_owner"}, "name": "node_write_requires_owner"}, {"condition": {"edge_type_present": false, "operation": "write_edge"}, "description": "Graph edge writes require an edge type.", "effect": {"decision": "deny", "reason": "edge_type_required", "required_action": "attach_edge_type"}, "name": "edge_write_requires_type"}, {"condition": {"relationship_classification": "restricted", "review_recorded": false}, "description": "Restricted relationships require governance review.", "effect": {"decision": "require_review", "reason": "restricted_relationship_review_required", "required_action": "record_relationship_review"}, "name": "restricted_relationship_requires_review"}, {"condition": {"review_recorded": false, "traversal_depth_gt": 8}, "description": "Deep graph traversals require review.", "effect": {"decision": "require_review", "reason": "deep_traversal_review_required", "required_action": "record_traversal_review"}, "name": "deep_traversal_requires_review"}, {"condition": {"graph_type": "lineage", "source_asset_present": false}, "description": "Lineage graph mutations require source asset linkage.", "effect": {"decision": "deny", "reason": "source_asset_required", "required_action": "attach_source_asset"}, "name": "lineage_graph_requires_source_asset"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "GRPHDashboard", "permission": "grph:view", "route": "/grph/dashboard"}, "explorer": {"component": "GraphExplorer", "permission": "grph:query", "route": "/grph/explorer"}, "lineage": {"component": "LineageGraphViewer", "permission": "grph:view", "route": "/grph/lineage"}, "quality": {"component": "GraphQualityConsole", "permission": "grph:govern", "route": "/grph/quality"}, "schema": {"component": "GraphSchemaManager", "permission": "grph:manage_schema", "route": "/grph/schema"}, "settings": {"component": "GRPHSettings", "permission": "grph:admin", "route": "/grph/settings"}}, "streaming": {}, "theme": {"components": {"edge_panel": {"highlight": "type-chip", "visual": "relationship-list"}, "graph_canvas": {"icon": "network", "status_indicator": "schema-chip", "visual": "node-link"}, "lineage_path": {"threshold_style": "depth-band", "visual": "path-trace"}, "node_panel": {"risk_style": "classification-band", "visual": "property-list"}}, "name": "grph_relationship_console", "tokens": {"border.radius": "8px", "color.accent": "#D98E04", "color.danger": "#C53030", "color.primary": "#2A5D67", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/grph/api/v1", "requires_theme": true, "routes": [{"component": "GRPHDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/grph/dashboard", "permission": "grph:view"}, {"component": "GraphExplorer", "name": "explorer", "nav_group": "Graph", "path": "/grph/explorer", "permission": "grph:query"}, {"component": "GraphSchemaManager", "name": "schema", "nav_group": "Schema", "path": "/grph/schema", "permission": "grph:manage_schema"}, {"component": "LineageGraphViewer", "name": "lineage", "nav_group": "Lineage", "path": "/grph/lineage", "permission": "grph:view"}, {"component": "GraphQualityConsole", "name": "quality", "nav_group": "Quality", "path": "/grph/quality", "permission": "grph:govern"}, {"component": "GRPHSettings", "name": "settings", "nav_group": "Administration", "path": "/grph/settings", "permission": "grph:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"grph": []}}, "contracts": {"grph": {"configuration": {"governance": {"audit_mutations": true, "require_tenant_context": true, "restricted_relationship_review_required": true}, "graph": {"lineage_graphs_enabled": true, "max_traversal_depth": 8, "schema_required": true}, "storage": {"edge_type_required": true, "node_owner_required": true, "property_validation_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "grph_relationship_console"}, "ui": {"enable_graph_explorer": true, "enable_lineage_viewer": true, "enable_quality_console": true, "enable_schema_manager": true}}, "id": "grph", "provides": ["grph_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"grph": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"deep_traversal_requires_review": {"condition": {"review_recorded": false, "traversal_depth_gt": 8}, "description": "Deep graph traversals require review.", "effect": {"decision": "require_review", "reason": "deep_traversal_review_required", "required_action": "record_traversal_review"}, "name": "deep_traversal_requires_review"}, "edge_write_requires_type": {"condition": {"edge_type_present": false, "operation": "write_edge"}, "description": "Graph edge writes require an edge type.", "effect": {"decision": "deny", "reason": "edge_type_required", "required_action": "attach_edge_type"}, "name": "edge_write_requires_type"}, "lineage_graph_requires_source_asset": {"condition": {"graph_type": "lineage", "source_asset_present": false}, "description": "Lineage graph mutations require source asset linkage.", "effect": {"decision": "deny", "reason": "source_asset_required", "required_action": "attach_source_asset"}, "name": "lineage_graph_requires_source_asset"}, "node_write_requires_owner": {"condition": {"operation": "write_node", "owner_assigned": false}, "description": "Graph node writes require an owner.", "effect": {"decision": "deny", "reason": "node_owner_required", "required_action": "assign_owner"}, "name": "node_write_requires_owner"}, "restricted_relationship_requires_review": {"condition": {"relationship_classification": "restricted", "review_recorded": false}, "description": "Restricted relationships require governance review.", "effect": {"decision": "require_review", "reason": "restricted_relationship_review_required", "required_action": "record_relationship_review"}, "name": "restricted_relationship_requires_review"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All graph operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.grph": {"file": "capability_contract.py", "id": "capability.grph", "kind": "capability", "name": "Graph Data Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("grph_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "grph",
+			"version": "1.0.0",
+			"description": "Graph Data Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"grph": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"grph": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["grph_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"restricted_relationship": "GraphEdge",
+					"deep_traversal": "GraphTraversalResult",
+					"quality_report": "GraphQualityReport",
+					"schema_retire": "GraphSchema",
+				},
+				"graph_lifecycle": {
+					"schema": "GraphSchema",
+					"node": "GraphNode",
+					"edge": "GraphEdge",
+					"traversal": "GraphTraversalResult",
+					"quality": "GraphQualityReport",
+					"audit": "GraphAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"grph": {
+				"id": "grph",
+				"configuration": contract["configuration"],
+				"provides": ["grph_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"grph": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "service.py", "graph_runtime.py", "views.py"],
+		"symbols": {
+			"capability.grph": {
+				"id": "capability.grph",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +144,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("grph", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "grph" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("GRPH semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("GRPH semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("GRPH adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.GrphService":
+		errors.append("GRPH generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

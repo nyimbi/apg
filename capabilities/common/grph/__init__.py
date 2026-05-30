@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["graph_store", "relationship_modeling", "graph_traversal", "lineage_graphs", "graph_quality"],
-	"permissions": ["grph:view", "grph:query", "grph:write", "grph:manage_schema", "grph:govern", "grph:admin"]
+	"provides": ["graph_store", "relationship_modeling", "graph_traversal", "lineage_graphs", "impact_analysis", "graph_quality", "graph_audit"],
+	"permissions": ["grph:view", "grph:query", "grph:write", "grph:manage_schema", "grph:govern", "grph:audit", "grph:admin"]
 }
 
 
@@ -43,20 +43,27 @@ def register_capability() -> dict[str, Any]:
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"adapters": contract["configuration"]["adapters"],
 		"capabilities": {
 			"graph_store": "Persist tenant-scoped nodes, edges, properties, and labels",
 			"relationship_modeling": "Govern relationship schema and entity links",
 			"graph_traversal": "Run bounded graph traversals and path queries",
 			"lineage_graphs": "Represent lineage and dependency graphs for data assets",
+			"impact_analysis": "Trace dependency and lineage impact paths",
+			"graph_quality": "Inspect graph completeness, ownership, and relationship health",
+			"graph_audit": "Expose graph mutation and query audit events",
 			"capability_rules": "Evaluate deterministic graph-governance rules",
 			"visual_theming": "Apply graph-console theme tokens and components"
 		},
 		"endpoints": {
+			"schemas": "/grph/api/v1/schemas",
 			"nodes": "/grph/api/v1/nodes",
 			"edges": "/grph/api/v1/edges",
-			"queries": "/grph/api/v1/queries",
-			"schema": "/grph/api/v1/schema",
-			"lineage": "/grph/api/v1/lineage"
+			"traversal": "/grph/api/v1/traversal",
+			"lineage": "/grph/api/v1/lineage",
+			"impact": "/grph/api/v1/impact",
+			"quality": "/grph/api/v1/quality",
+			"audit": "/grph/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],

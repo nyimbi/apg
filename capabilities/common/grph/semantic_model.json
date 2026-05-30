@@ -8,40 +8,165 @@
   },
   "capabilities": {
     "grph": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "data_pipeline": "etlp",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.GrphService",
+        "helper_runtime": "graph_runtime.py",
+        "http_api": "api.py",
+        "knowledge_graph": "kngr",
+        "master_data": "mdm",
+        "metadata": "meta",
+        "metrics_sink": "moni",
+        "production_runtime": "service.GrphService",
+        "search": "srch"
+      },
+      "approvals": {
+        "deep_traversal": "GraphTraversalResult",
+        "quality_report": "GraphQualityReport",
+        "restricted_relationship": "GraphEdge",
+        "schema_retire": "GraphSchema"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "data_pipeline": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.GrphService",
+          "helper_runtime": "graph_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "master_data": "mdm",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "production_runtime": "service.GrphService",
+          "search": "srch"
+        },
+        "edges": {
+          "allowed_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "id_required": true,
+          "owner_required": true,
+          "restricted_review_required": true,
+          "self_edge_review_required": true,
+          "source_required": true,
+          "target_required": true,
+          "type_required": true
+        },
         "governance": {
           "audit_mutations": true,
+          "audit_queries": true,
           "require_tenant_context": true,
-          "restricted_relationship_review_required": true
+          "review_required_for_restricted_relationships": true
         },
-        "graph": {
-          "lineage_graphs_enabled": true,
-          "max_traversal_depth": 8,
-          "schema_required": true
+        "lineage": {
+          "dependency_edges_enabled": true,
+          "enabled": true,
+          "source_asset_required": true
         },
-        "storage": {
-          "edge_type_required": true,
-          "node_owner_required": true,
-          "property_validation_enabled": true
+        "nodes": {
+          "allowed_label_prefixes": [
+            "apg",
+            "data",
+            "asset",
+            "entity",
+            "process",
+            "service",
+            "customer"
+          ],
+          "id_required": true,
+          "max_labels": 20,
+          "owner_required": true,
+          "property_validation_enabled": true,
+          "type_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "quality": {
+          "enabled": true,
+          "missing_owner_threshold": 1,
+          "orphan_review_threshold": 50,
+          "restricted_edge_review_threshold": 100
+        },
+        "schemas": {
+          "allowed_graph_kinds": [
+            "property",
+            "lineage",
+            "knowledge",
+            "dependency"
+          ],
+          "edge_types_required": true,
+          "id_required": true,
+          "kind_required": true,
+          "name_required": true,
+          "node_types_required": true,
+          "retire_requires_review": true
+        },
+        "security": {
+          "cross_tenant_edges_allowed": false,
+          "rbac_filter_required": true,
+          "restricted_relationship_filter_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "grph_relationship_console"
         },
+        "traversal": {
+          "allowed_query_types": [
+            "traverse",
+            "lineage",
+            "impact",
+            "neighborhood"
+          ],
+          "max_depth": 8,
+          "max_result_window": 1000,
+          "rbac_filter_required": true
+        },
         "ui": {
-          "enable_graph_explorer": true,
-          "enable_lineage_viewer": true,
-          "enable_quality_console": true,
-          "enable_schema_manager": true
+          "enable_audit": true,
+          "enable_dashboard": true,
+          "enable_edge_manager": true,
+          "enable_explorer": true,
+          "enable_governance": true,
+          "enable_impact": true,
+          "enable_lineage": true,
+          "enable_node_manager": true,
+          "enable_quality": true,
+          "enable_schema_manager": true,
+          "enable_settings": true,
+          "enable_traversal": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "graph_lifecycle": {
+        "audit": "GraphAuditEventRecord",
+        "edge": "GraphEdge",
+        "node": "GraphNode",
+        "quality": "GraphQualityReport",
+        "schema": "GraphSchema",
+        "traversal": "GraphTraversalResult"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Graph Data Management",
@@ -65,6 +190,138 @@
           },
           {
             "condition": {
+              "operation": "write_schema",
+              "schema_id_present": false
+            },
+            "description": "Graph schemas require a stable identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_id_required",
+              "required_action": "attach_schema_id"
+            },
+            "name": "schema_requires_id"
+          },
+          {
+            "condition": {
+              "operation": "write_schema",
+              "schema_name_present": false
+            },
+            "description": "Graph schemas require a display name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_name_required",
+              "required_action": "attach_schema_name"
+            },
+            "name": "schema_requires_name"
+          },
+          {
+            "condition": {
+              "graph_kind_present": false,
+              "operation": "write_schema"
+            },
+            "description": "Graph schemas require a graph kind.",
+            "effect": {
+              "decision": "deny",
+              "reason": "graph_kind_required",
+              "required_action": "choose_graph_kind"
+            },
+            "name": "schema_requires_kind"
+          },
+          {
+            "condition": {
+              "graph_kind_known": false,
+              "operation": "write_schema",
+              "review_recorded": false
+            },
+            "description": "Unknown graph kinds require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "graph_kind_review_required",
+              "required_action": "review_graph_kind"
+            },
+            "name": "schema_kind_requires_review"
+          },
+          {
+            "condition": {
+              "node_type_count_lt": 1,
+              "operation": "write_schema"
+            },
+            "description": "Graph schemas require node type declarations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_node_types_required",
+              "required_action": "declare_node_types"
+            },
+            "name": "schema_requires_node_types"
+          },
+          {
+            "condition": {
+              "edge_type_count_lt": 1,
+              "operation": "write_schema"
+            },
+            "description": "Graph schemas require edge type declarations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_edge_types_required",
+              "required_action": "declare_edge_types"
+            },
+            "name": "schema_requires_edge_types"
+          },
+          {
+            "condition": {
+              "graph_type": "lineage",
+              "operation": "write_schema",
+              "source_asset_present": false
+            },
+            "description": "Lineage schemas require source asset linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_asset_required",
+              "required_action": "attach_source_asset"
+            },
+            "name": "lineage_schema_requires_source_asset"
+          },
+          {
+            "condition": {
+              "operation": "write_node",
+              "schema_present": false
+            },
+            "description": "Node writes require a registered schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_required",
+              "required_action": "select_schema"
+            },
+            "name": "node_requires_schema"
+          },
+          {
+            "condition": {
+              "node_id_present": false,
+              "operation": "write_node"
+            },
+            "description": "Node writes require a stable identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "node_id_required",
+              "required_action": "attach_node_id"
+            },
+            "name": "node_requires_id"
+          },
+          {
+            "condition": {
+              "node_type_present": false,
+              "operation": "write_node"
+            },
+            "description": "Node writes require a node type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "node_type_required",
+              "required_action": "attach_node_type"
+            },
+            "name": "node_requires_type"
+          },
+          {
+            "condition": {
               "operation": "write_node",
               "owner_assigned": false
             },
@@ -75,6 +332,85 @@
               "required_action": "assign_owner"
             },
             "name": "node_write_requires_owner"
+          },
+          {
+            "condition": {
+              "node_type_allowed": false,
+              "operation": "write_node"
+            },
+            "description": "Node types must be declared in the schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "node_type_not_in_schema",
+              "required_action": "update_schema_node_types"
+            },
+            "name": "node_type_requires_schema_membership"
+          },
+          {
+            "condition": {
+              "labels_allowed": false,
+              "operation": "write_node",
+              "review_recorded": false
+            },
+            "description": "Labels outside the configured prefixes require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "node_label_review_required",
+              "required_action": "review_node_labels"
+            },
+            "name": "node_label_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "write_edge",
+              "schema_present": false
+            },
+            "description": "Edge writes require a registered schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_required",
+              "required_action": "select_schema"
+            },
+            "name": "edge_requires_schema"
+          },
+          {
+            "condition": {
+              "edge_id_present": false,
+              "operation": "write_edge"
+            },
+            "description": "Edge writes require a stable identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "edge_id_required",
+              "required_action": "attach_edge_id"
+            },
+            "name": "edge_requires_id"
+          },
+          {
+            "condition": {
+              "operation": "write_edge",
+              "source_node_present": false
+            },
+            "description": "Edge writes require a source node.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_node_required",
+              "required_action": "attach_source_node"
+            },
+            "name": "edge_requires_source"
+          },
+          {
+            "condition": {
+              "operation": "write_edge",
+              "target_node_present": false
+            },
+            "description": "Edge writes require a target node.",
+            "effect": {
+              "decision": "deny",
+              "reason": "target_node_required",
+              "required_action": "attach_target_node"
+            },
+            "name": "edge_requires_target"
           },
           {
             "condition": {
@@ -91,6 +427,73 @@
           },
           {
             "condition": {
+              "operation": "write_edge",
+              "owner_assigned": false
+            },
+            "description": "Graph edge writes require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "edge_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "edge_requires_owner"
+          },
+          {
+            "condition": {
+              "classification_present": false,
+              "operation": "write_edge"
+            },
+            "description": "Graph edges require relationship classification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "edge_classification_required",
+              "required_action": "attach_classification"
+            },
+            "name": "edge_requires_classification"
+          },
+          {
+            "condition": {
+              "classification_known": false,
+              "operation": "write_edge",
+              "review_recorded": false
+            },
+            "description": "Unknown relationship classifications require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "edge_classification_review_required",
+              "required_action": "review_edge_classification"
+            },
+            "name": "edge_classification_requires_review"
+          },
+          {
+            "condition": {
+              "edge_type_allowed": false,
+              "operation": "write_edge"
+            },
+            "description": "Edge types must be declared in the schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "edge_type_not_in_schema",
+              "required_action": "update_schema_edge_types"
+            },
+            "name": "edge_type_requires_schema_membership"
+          },
+          {
+            "condition": {
+              "cross_tenant_edge": true,
+              "operation": "write_edge"
+            },
+            "description": "Edges may not connect nodes across tenants.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_edge_denied",
+              "required_action": "use_tenant_local_nodes"
+            },
+            "name": "cross_tenant_edge_denied"
+          },
+          {
+            "condition": {
+              "operation": "write_edge",
               "relationship_classification": "restricted",
               "review_recorded": false
             },
@@ -104,6 +507,47 @@
           },
           {
             "condition": {
+              "operation": "write_edge",
+              "review_recorded": false,
+              "self_edge": true
+            },
+            "description": "Self-referential edges require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "self_edge_review_required",
+              "required_action": "review_self_edge"
+            },
+            "name": "self_edge_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "traverse",
+              "start_node_present": false
+            },
+            "description": "Traversals require a tenant-local start node.",
+            "effect": {
+              "decision": "deny",
+              "reason": "start_node_required",
+              "required_action": "attach_start_node"
+            },
+            "name": "traversal_requires_start_node"
+          },
+          {
+            "condition": {
+              "operation": "traverse",
+              "traversal_depth_lt": 1
+            },
+            "description": "Traversal depth must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "traversal_depth_required",
+              "required_action": "choose_positive_depth"
+            },
+            "name": "traversal_depth_requires_positive_value"
+          },
+          {
+            "condition": {
+              "operation": "traverse",
               "review_recorded": false,
               "traversal_depth_gt": 8
             },
@@ -117,16 +561,83 @@
           },
           {
             "condition": {
-              "graph_type": "lineage",
+              "operation": "traverse",
+              "rbac_filter_applied": false,
+              "restricted_relationships_in_scope": true
+            },
+            "description": "Restricted relationship traversals require RBAC filtering.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rbac_filter_required",
+              "required_action": "apply_rbac_filter"
+            },
+            "name": "restricted_traversal_requires_rbac_filter"
+          },
+          {
+            "condition": {
+              "operation": "lineage_query",
               "source_asset_present": false
             },
-            "description": "Lineage graph mutations require source asset linkage.",
+            "description": "Lineage queries require source asset context.",
             "effect": {
               "decision": "deny",
               "reason": "source_asset_required",
               "required_action": "attach_source_asset"
             },
-            "name": "lineage_graph_requires_source_asset"
+            "name": "lineage_query_requires_source_asset"
+          },
+          {
+            "condition": {
+              "operation": "quality_report",
+              "quality_issue_count_gt": 50,
+              "review_recorded": false
+            },
+            "description": "Poor graph quality above thresholds requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "quality_review_required",
+              "required_action": "review_graph_quality"
+            },
+            "name": "quality_threshold_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_mutation"
+            },
+            "description": "Batch graph mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "operation": "retire_schema",
+              "review_recorded": false
+            },
+            "description": "Schema retirement requires review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_retire_review_required",
+              "required_action": "record_schema_retire_review"
+            },
+            "name": "schema_retire_requires_review"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Graph state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "graph_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -146,6 +657,138 @@
         },
         {
           "condition": {
+            "operation": "write_schema",
+            "schema_id_present": false
+          },
+          "description": "Graph schemas require a stable identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_id_required",
+            "required_action": "attach_schema_id"
+          },
+          "name": "schema_requires_id"
+        },
+        {
+          "condition": {
+            "operation": "write_schema",
+            "schema_name_present": false
+          },
+          "description": "Graph schemas require a display name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_name_required",
+            "required_action": "attach_schema_name"
+          },
+          "name": "schema_requires_name"
+        },
+        {
+          "condition": {
+            "graph_kind_present": false,
+            "operation": "write_schema"
+          },
+          "description": "Graph schemas require a graph kind.",
+          "effect": {
+            "decision": "deny",
+            "reason": "graph_kind_required",
+            "required_action": "choose_graph_kind"
+          },
+          "name": "schema_requires_kind"
+        },
+        {
+          "condition": {
+            "graph_kind_known": false,
+            "operation": "write_schema",
+            "review_recorded": false
+          },
+          "description": "Unknown graph kinds require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "graph_kind_review_required",
+            "required_action": "review_graph_kind"
+          },
+          "name": "schema_kind_requires_review"
+        },
+        {
+          "condition": {
+            "node_type_count_lt": 1,
+            "operation": "write_schema"
+          },
+          "description": "Graph schemas require node type declarations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_node_types_required",
+            "required_action": "declare_node_types"
+          },
+          "name": "schema_requires_node_types"
+        },
+        {
+          "condition": {
+            "edge_type_count_lt": 1,
+            "operation": "write_schema"
+          },
+          "description": "Graph schemas require edge type declarations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_edge_types_required",
+            "required_action": "declare_edge_types"
+          },
+          "name": "schema_requires_edge_types"
+        },
+        {
+          "condition": {
+            "graph_type": "lineage",
+            "operation": "write_schema",
+            "source_asset_present": false
+          },
+          "description": "Lineage schemas require source asset linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_asset_required",
+            "required_action": "attach_source_asset"
+          },
+          "name": "lineage_schema_requires_source_asset"
+        },
+        {
+          "condition": {
+            "operation": "write_node",
+            "schema_present": false
+          },
+          "description": "Node writes require a registered schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_required",
+            "required_action": "select_schema"
+          },
+          "name": "node_requires_schema"
+        },
+        {
+          "condition": {
+            "node_id_present": false,
+            "operation": "write_node"
+          },
+          "description": "Node writes require a stable identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "node_id_required",
+            "required_action": "attach_node_id"
+          },
+          "name": "node_requires_id"
+        },
+        {
+          "condition": {
+            "node_type_present": false,
+            "operation": "write_node"
+          },
+          "description": "Node writes require a node type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "node_type_required",
+            "required_action": "attach_node_type"
+          },
+          "name": "node_requires_type"
+        },
+        {
+          "condition": {
             "operation": "write_node",
             "owner_assigned": false
           },
@@ -156,6 +799,85 @@
             "required_action": "assign_owner"
           },
           "name": "node_write_requires_owner"
+        },
+        {
+          "condition": {
+            "node_type_allowed": false,
+            "operation": "write_node"
+          },
+          "description": "Node types must be declared in the schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "node_type_not_in_schema",
+            "required_action": "update_schema_node_types"
+          },
+          "name": "node_type_requires_schema_membership"
+        },
+        {
+          "condition": {
+            "labels_allowed": false,
+            "operation": "write_node",
+            "review_recorded": false
+          },
+          "description": "Labels outside the configured prefixes require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "node_label_review_required",
+            "required_action": "review_node_labels"
+          },
+          "name": "node_label_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "write_edge",
+            "schema_present": false
+          },
+          "description": "Edge writes require a registered schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_required",
+            "required_action": "select_schema"
+          },
+          "name": "edge_requires_schema"
+        },
+        {
+          "condition": {
+            "edge_id_present": false,
+            "operation": "write_edge"
+          },
+          "description": "Edge writes require a stable identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "edge_id_required",
+            "required_action": "attach_edge_id"
+          },
+          "name": "edge_requires_id"
+        },
+        {
+          "condition": {
+            "operation": "write_edge",
+            "source_node_present": false
+          },
+          "description": "Edge writes require a source node.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_node_required",
+            "required_action": "attach_source_node"
+          },
+          "name": "edge_requires_source"
+        },
+        {
+          "condition": {
+            "operation": "write_edge",
+            "target_node_present": false
+          },
+          "description": "Edge writes require a target node.",
+          "effect": {
+            "decision": "deny",
+            "reason": "target_node_required",
+            "required_action": "attach_target_node"
+          },
+          "name": "edge_requires_target"
         },
         {
           "condition": {
@@ -172,6 +894,73 @@
         },
         {
           "condition": {
+            "operation": "write_edge",
+            "owner_assigned": false
+          },
+          "description": "Graph edge writes require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "edge_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "edge_requires_owner"
+        },
+        {
+          "condition": {
+            "classification_present": false,
+            "operation": "write_edge"
+          },
+          "description": "Graph edges require relationship classification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "edge_classification_required",
+            "required_action": "attach_classification"
+          },
+          "name": "edge_requires_classification"
+        },
+        {
+          "condition": {
+            "classification_known": false,
+            "operation": "write_edge",
+            "review_recorded": false
+          },
+          "description": "Unknown relationship classifications require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "edge_classification_review_required",
+            "required_action": "review_edge_classification"
+          },
+          "name": "edge_classification_requires_review"
+        },
+        {
+          "condition": {
+            "edge_type_allowed": false,
+            "operation": "write_edge"
+          },
+          "description": "Edge types must be declared in the schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "edge_type_not_in_schema",
+            "required_action": "update_schema_edge_types"
+          },
+          "name": "edge_type_requires_schema_membership"
+        },
+        {
+          "condition": {
+            "cross_tenant_edge": true,
+            "operation": "write_edge"
+          },
+          "description": "Edges may not connect nodes across tenants.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_edge_denied",
+            "required_action": "use_tenant_local_nodes"
+          },
+          "name": "cross_tenant_edge_denied"
+        },
+        {
+          "condition": {
+            "operation": "write_edge",
             "relationship_classification": "restricted",
             "review_recorded": false
           },
@@ -185,6 +974,47 @@
         },
         {
           "condition": {
+            "operation": "write_edge",
+            "review_recorded": false,
+            "self_edge": true
+          },
+          "description": "Self-referential edges require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "self_edge_review_required",
+            "required_action": "review_self_edge"
+          },
+          "name": "self_edge_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "traverse",
+            "start_node_present": false
+          },
+          "description": "Traversals require a tenant-local start node.",
+          "effect": {
+            "decision": "deny",
+            "reason": "start_node_required",
+            "required_action": "attach_start_node"
+          },
+          "name": "traversal_requires_start_node"
+        },
+        {
+          "condition": {
+            "operation": "traverse",
+            "traversal_depth_lt": 1
+          },
+          "description": "Traversal depth must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "traversal_depth_required",
+            "required_action": "choose_positive_depth"
+          },
+          "name": "traversal_depth_requires_positive_value"
+        },
+        {
+          "condition": {
+            "operation": "traverse",
             "review_recorded": false,
             "traversal_depth_gt": 8
           },
@@ -198,59 +1028,163 @@
         },
         {
           "condition": {
-            "graph_type": "lineage",
+            "operation": "traverse",
+            "rbac_filter_applied": false,
+            "restricted_relationships_in_scope": true
+          },
+          "description": "Restricted relationship traversals require RBAC filtering.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rbac_filter_required",
+            "required_action": "apply_rbac_filter"
+          },
+          "name": "restricted_traversal_requires_rbac_filter"
+        },
+        {
+          "condition": {
+            "operation": "lineage_query",
             "source_asset_present": false
           },
-          "description": "Lineage graph mutations require source asset linkage.",
+          "description": "Lineage queries require source asset context.",
           "effect": {
             "decision": "deny",
             "reason": "source_asset_required",
             "required_action": "attach_source_asset"
           },
-          "name": "lineage_graph_requires_source_asset"
+          "name": "lineage_query_requires_source_asset"
+        },
+        {
+          "condition": {
+            "operation": "quality_report",
+            "quality_issue_count_gt": 50,
+            "review_recorded": false
+          },
+          "description": "Poor graph quality above thresholds requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "quality_review_required",
+            "required_action": "review_graph_quality"
+          },
+          "name": "quality_threshold_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_mutation"
+          },
+          "description": "Batch graph mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "operation": "retire_schema",
+            "review_recorded": false
+          },
+          "description": "Schema retirement requires review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_retire_review_required",
+            "required_action": "record_schema_retire_review"
+          },
+          "name": "schema_retire_requires_review"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Graph state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "graph_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "graph_runtime.py",
+        "service": "service.GrphService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "GraphAuditTimeline",
+          "permission": "grph:audit",
+          "route": "/grph/audit"
+        },
         "dashboard": {
           "component": "GRPHDashboard",
           "permission": "grph:view",
           "route": "/grph/dashboard"
+        },
+        "edges": {
+          "component": "GraphEdgeManager",
+          "permission": "grph:write",
+          "route": "/grph/edges"
         },
         "explorer": {
           "component": "GraphExplorer",
           "permission": "grph:query",
           "route": "/grph/explorer"
         },
+        "governance": {
+          "component": "GraphGovernance",
+          "permission": "grph:govern",
+          "route": "/grph/governance"
+        },
+        "impact": {
+          "component": "GraphImpactAnalysis",
+          "permission": "grph:query",
+          "route": "/grph/impact"
+        },
         "lineage": {
           "component": "LineageGraphViewer",
           "permission": "grph:view",
           "route": "/grph/lineage"
+        },
+        "nodes": {
+          "component": "GraphNodeManager",
+          "permission": "grph:write",
+          "route": "/grph/nodes"
         },
         "quality": {
           "component": "GraphQualityConsole",
           "permission": "grph:govern",
           "route": "/grph/quality"
         },
-        "schema": {
+        "schemas": {
           "component": "GraphSchemaManager",
           "permission": "grph:manage_schema",
-          "route": "/grph/schema"
+          "route": "/grph/schemas"
         },
         "settings": {
           "component": "GRPHSettings",
           "permission": "grph:admin",
           "route": "/grph/settings"
+        },
+        "traversal": {
+          "component": "GraphTraversalWorkbench",
+          "permission": "grph:query",
+          "route": "/grph/traversal"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
           "edge_panel": {
             "highlight": "type-chip",
             "visual": "relationship-list"
@@ -260,6 +1194,10 @@
             "status_indicator": "schema-chip",
             "visual": "node-link"
           },
+          "impact_map": {
+            "status_style": "blast-radius-chip",
+            "visual": "dependency-map"
+          },
           "lineage_path": {
             "threshold_style": "depth-band",
             "visual": "path-trace"
@@ -267,6 +1205,14 @@
           "node_panel": {
             "risk_style": "classification-band",
             "visual": "property-list"
+          },
+          "quality_panel": {
+            "status_style": "health-chip",
+            "visual": "quality-scorecard"
+          },
+          "traversal_panel": {
+            "status_style": "review-chip",
+            "visual": "depth-control"
           }
         },
         "name": "grph_relationship_console",
@@ -304,10 +1250,31 @@
           },
           {
             "component": "GraphSchemaManager",
-            "name": "schema",
+            "name": "schemas",
             "nav_group": "Schema",
-            "path": "/grph/schema",
+            "path": "/grph/schemas",
             "permission": "grph:manage_schema"
+          },
+          {
+            "component": "GraphNodeManager",
+            "name": "nodes",
+            "nav_group": "Graph",
+            "path": "/grph/nodes",
+            "permission": "grph:write"
+          },
+          {
+            "component": "GraphEdgeManager",
+            "name": "edges",
+            "nav_group": "Graph",
+            "path": "/grph/edges",
+            "permission": "grph:write"
+          },
+          {
+            "component": "GraphTraversalWorkbench",
+            "name": "traversal",
+            "nav_group": "Graph",
+            "path": "/grph/traversal",
+            "permission": "grph:query"
           },
           {
             "component": "LineageGraphViewer",
@@ -317,11 +1284,32 @@
             "permission": "grph:view"
           },
           {
+            "component": "GraphImpactAnalysis",
+            "name": "impact",
+            "nav_group": "Lineage",
+            "path": "/grph/impact",
+            "permission": "grph:query"
+          },
+          {
             "component": "GraphQualityConsole",
             "name": "quality",
             "nav_group": "Quality",
             "path": "/grph/quality",
             "permission": "grph:govern"
+          },
+          {
+            "component": "GraphGovernance",
+            "name": "governance",
+            "nav_group": "Governance",
+            "path": "/grph/governance",
+            "permission": "grph:govern"
+          },
+          {
+            "component": "GraphAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/grph/audit",
+            "permission": "grph:audit"
           },
           {
             "component": "GRPHSettings",
@@ -336,7 +1324,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "__init__.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -350,31 +1338,126 @@
   "contracts": {
     "grph": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "data_pipeline": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.GrphService",
+          "helper_runtime": "graph_runtime.py",
+          "http_api": "api.py",
+          "knowledge_graph": "kngr",
+          "master_data": "mdm",
+          "metadata": "meta",
+          "metrics_sink": "moni",
+          "production_runtime": "service.GrphService",
+          "search": "srch"
+        },
+        "edges": {
+          "allowed_classifications": [
+            "public",
+            "internal",
+            "confidential",
+            "restricted"
+          ],
+          "id_required": true,
+          "owner_required": true,
+          "restricted_review_required": true,
+          "self_edge_review_required": true,
+          "source_required": true,
+          "target_required": true,
+          "type_required": true
+        },
         "governance": {
           "audit_mutations": true,
+          "audit_queries": true,
           "require_tenant_context": true,
-          "restricted_relationship_review_required": true
+          "review_required_for_restricted_relationships": true
         },
-        "graph": {
-          "lineage_graphs_enabled": true,
-          "max_traversal_depth": 8,
-          "schema_required": true
+        "lineage": {
+          "dependency_edges_enabled": true,
+          "enabled": true,
+          "source_asset_required": true
         },
-        "storage": {
-          "edge_type_required": true,
-          "node_owner_required": true,
-          "property_validation_enabled": true
+        "nodes": {
+          "allowed_label_prefixes": [
+            "apg",
+            "data",
+            "asset",
+            "entity",
+            "process",
+            "service",
+            "customer"
+          ],
+          "id_required": true,
+          "max_labels": 20,
+          "owner_required": true,
+          "property_validation_enabled": true,
+          "type_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "quality": {
+          "enabled": true,
+          "missing_owner_threshold": 1,
+          "orphan_review_threshold": 50,
+          "restricted_edge_review_threshold": 100
+        },
+        "schemas": {
+          "allowed_graph_kinds": [
+            "property",
+            "lineage",
+            "knowledge",
+            "dependency"
+          ],
+          "edge_types_required": true,
+          "id_required": true,
+          "kind_required": true,
+          "name_required": true,
+          "node_types_required": true,
+          "retire_requires_review": true
+        },
+        "security": {
+          "cross_tenant_edges_allowed": false,
+          "rbac_filter_required": true,
+          "restricted_relationship_filter_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
           "default_theme": "grph_relationship_console"
         },
+        "traversal": {
+          "allowed_query_types": [
+            "traverse",
+            "lineage",
+            "impact",
+            "neighborhood"
+          ],
+          "max_depth": 8,
+          "max_result_window": 1000,
+          "rbac_filter_required": true
+        },
         "ui": {
-          "enable_graph_explorer": true,
-          "enable_lineage_viewer": true,
-          "enable_quality_console": true,
-          "enable_schema_manager": true
+          "enable_audit": true,
+          "enable_dashboard": true,
+          "enable_edge_manager": true,
+          "enable_explorer": true,
+          "enable_governance": true,
+          "enable_impact": true,
+          "enable_lineage": true,
+          "enable_node_manager": true,
+          "enable_quality": true,
+          "enable_schema_manager": true,
+          "enable_settings": true,
+          "enable_traversal": true
         }
       },
       "id": "grph",
@@ -414,8 +1497,35 @@
   },
   "roles": {},
   "rules": {
+    "batch_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_mutation"
+      },
+      "description": "Batch graph mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_mutation_requires_bytewax"
+    },
+    "cross_tenant_edge_denied": {
+      "condition": {
+        "cross_tenant_edge": true,
+        "operation": "write_edge"
+      },
+      "description": "Edges may not connect nodes across tenants.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_edge_denied",
+        "required_action": "use_tenant_local_nodes"
+      },
+      "name": "cross_tenant_edge_denied"
+    },
     "deep_traversal_requires_review": {
       "condition": {
+        "operation": "traverse",
         "review_recorded": false,
         "traversal_depth_gt": 8
       },
@@ -426,6 +1536,111 @@
         "required_action": "record_traversal_review"
       },
       "name": "deep_traversal_requires_review"
+    },
+    "edge_classification_requires_review": {
+      "condition": {
+        "classification_known": false,
+        "operation": "write_edge",
+        "review_recorded": false
+      },
+      "description": "Unknown relationship classifications require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "edge_classification_review_required",
+        "required_action": "review_edge_classification"
+      },
+      "name": "edge_classification_requires_review"
+    },
+    "edge_requires_classification": {
+      "condition": {
+        "classification_present": false,
+        "operation": "write_edge"
+      },
+      "description": "Graph edges require relationship classification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "edge_classification_required",
+        "required_action": "attach_classification"
+      },
+      "name": "edge_requires_classification"
+    },
+    "edge_requires_id": {
+      "condition": {
+        "edge_id_present": false,
+        "operation": "write_edge"
+      },
+      "description": "Edge writes require a stable identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "edge_id_required",
+        "required_action": "attach_edge_id"
+      },
+      "name": "edge_requires_id"
+    },
+    "edge_requires_owner": {
+      "condition": {
+        "operation": "write_edge",
+        "owner_assigned": false
+      },
+      "description": "Graph edge writes require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "edge_owner_required",
+        "required_action": "assign_owner"
+      },
+      "name": "edge_requires_owner"
+    },
+    "edge_requires_schema": {
+      "condition": {
+        "operation": "write_edge",
+        "schema_present": false
+      },
+      "description": "Edge writes require a registered schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_required",
+        "required_action": "select_schema"
+      },
+      "name": "edge_requires_schema"
+    },
+    "edge_requires_source": {
+      "condition": {
+        "operation": "write_edge",
+        "source_node_present": false
+      },
+      "description": "Edge writes require a source node.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_node_required",
+        "required_action": "attach_source_node"
+      },
+      "name": "edge_requires_source"
+    },
+    "edge_requires_target": {
+      "condition": {
+        "operation": "write_edge",
+        "target_node_present": false
+      },
+      "description": "Edge writes require a target node.",
+      "effect": {
+        "decision": "deny",
+        "reason": "target_node_required",
+        "required_action": "attach_target_node"
+      },
+      "name": "edge_requires_target"
+    },
+    "edge_type_requires_schema_membership": {
+      "condition": {
+        "edge_type_allowed": false,
+        "operation": "write_edge"
+      },
+      "description": "Edge types must be declared in the schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "edge_type_not_in_schema",
+        "required_action": "update_schema_edge_types"
+      },
+      "name": "edge_type_requires_schema_membership"
     },
     "edge_write_requires_type": {
       "condition": {
@@ -440,18 +1655,111 @@
       },
       "name": "edge_write_requires_type"
     },
-    "lineage_graph_requires_source_asset": {
+    "graph_state_change_requires_audit": {
       "condition": {
-        "graph_type": "lineage",
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Graph state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "graph_state_change_requires_audit"
+    },
+    "lineage_query_requires_source_asset": {
+      "condition": {
+        "operation": "lineage_query",
         "source_asset_present": false
       },
-      "description": "Lineage graph mutations require source asset linkage.",
+      "description": "Lineage queries require source asset context.",
       "effect": {
         "decision": "deny",
         "reason": "source_asset_required",
         "required_action": "attach_source_asset"
       },
-      "name": "lineage_graph_requires_source_asset"
+      "name": "lineage_query_requires_source_asset"
+    },
+    "lineage_schema_requires_source_asset": {
+      "condition": {
+        "graph_type": "lineage",
+        "operation": "write_schema",
+        "source_asset_present": false
+      },
+      "description": "Lineage schemas require source asset linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_asset_required",
+        "required_action": "attach_source_asset"
+      },
+      "name": "lineage_schema_requires_source_asset"
+    },
+    "node_label_requires_review": {
+      "condition": {
+        "labels_allowed": false,
+        "operation": "write_node",
+        "review_recorded": false
+      },
+      "description": "Labels outside the configured prefixes require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "node_label_review_required",
+        "required_action": "review_node_labels"
+      },
+      "name": "node_label_requires_review"
+    },
+    "node_requires_id": {
+      "condition": {
+        "node_id_present": false,
+        "operation": "write_node"
+      },
+      "description": "Node writes require a stable identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "node_id_required",
+        "required_action": "attach_node_id"
+      },
+      "name": "node_requires_id"
+    },
+    "node_requires_schema": {
+      "condition": {
+        "operation": "write_node",
+        "schema_present": false
+      },
+      "description": "Node writes require a registered schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_required",
+        "required_action": "select_schema"
+      },
+      "name": "node_requires_schema"
+    },
+    "node_requires_type": {
+      "condition": {
+        "node_type_present": false,
+        "operation": "write_node"
+      },
+      "description": "Node writes require a node type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "node_type_required",
+        "required_action": "attach_node_type"
+      },
+      "name": "node_requires_type"
+    },
+    "node_type_requires_schema_membership": {
+      "condition": {
+        "node_type_allowed": false,
+        "operation": "write_node"
+      },
+      "description": "Node types must be declared in the schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "node_type_not_in_schema",
+        "required_action": "update_schema_node_types"
+      },
+      "name": "node_type_requires_schema_membership"
     },
     "node_write_requires_owner": {
       "condition": {
@@ -466,8 +1774,23 @@
       },
       "name": "node_write_requires_owner"
     },
+    "quality_threshold_requires_review": {
+      "condition": {
+        "operation": "quality_report",
+        "quality_issue_count_gt": 50,
+        "review_recorded": false
+      },
+      "description": "Poor graph quality above thresholds requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "quality_review_required",
+        "required_action": "review_graph_quality"
+      },
+      "name": "quality_threshold_requires_review"
+    },
     "restricted_relationship_requires_review": {
       "condition": {
+        "operation": "write_edge",
         "relationship_classification": "restricted",
         "review_recorded": false
       },
@@ -478,6 +1801,126 @@
         "required_action": "record_relationship_review"
       },
       "name": "restricted_relationship_requires_review"
+    },
+    "restricted_traversal_requires_rbac_filter": {
+      "condition": {
+        "operation": "traverse",
+        "rbac_filter_applied": false,
+        "restricted_relationships_in_scope": true
+      },
+      "description": "Restricted relationship traversals require RBAC filtering.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rbac_filter_required",
+        "required_action": "apply_rbac_filter"
+      },
+      "name": "restricted_traversal_requires_rbac_filter"
+    },
+    "schema_kind_requires_review": {
+      "condition": {
+        "graph_kind_known": false,
+        "operation": "write_schema",
+        "review_recorded": false
+      },
+      "description": "Unknown graph kinds require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "graph_kind_review_required",
+        "required_action": "review_graph_kind"
+      },
+      "name": "schema_kind_requires_review"
+    },
+    "schema_requires_edge_types": {
+      "condition": {
+        "edge_type_count_lt": 1,
+        "operation": "write_schema"
+      },
+      "description": "Graph schemas require edge type declarations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_edge_types_required",
+        "required_action": "declare_edge_types"
+      },
+      "name": "schema_requires_edge_types"
+    },
+    "schema_requires_id": {
+      "condition": {
+        "operation": "write_schema",
+        "schema_id_present": false
+      },
+      "description": "Graph schemas require a stable identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_id_required",
+        "required_action": "attach_schema_id"
+      },
+      "name": "schema_requires_id"
+    },
+    "schema_requires_kind": {
+      "condition": {
+        "graph_kind_present": false,
+        "operation": "write_schema"
+      },
+      "description": "Graph schemas require a graph kind.",
+      "effect": {
+        "decision": "deny",
+        "reason": "graph_kind_required",
+        "required_action": "choose_graph_kind"
+      },
+      "name": "schema_requires_kind"
+    },
+    "schema_requires_name": {
+      "condition": {
+        "operation": "write_schema",
+        "schema_name_present": false
+      },
+      "description": "Graph schemas require a display name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_name_required",
+        "required_action": "attach_schema_name"
+      },
+      "name": "schema_requires_name"
+    },
+    "schema_requires_node_types": {
+      "condition": {
+        "node_type_count_lt": 1,
+        "operation": "write_schema"
+      },
+      "description": "Graph schemas require node type declarations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_node_types_required",
+        "required_action": "declare_node_types"
+      },
+      "name": "schema_requires_node_types"
+    },
+    "schema_retire_requires_review": {
+      "condition": {
+        "operation": "retire_schema",
+        "review_recorded": false
+      },
+      "description": "Schema retirement requires review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_retire_review_required",
+        "required_action": "record_schema_retire_review"
+      },
+      "name": "schema_retire_requires_review"
+    },
+    "self_edge_requires_review": {
+      "condition": {
+        "operation": "write_edge",
+        "review_recorded": false,
+        "self_edge": true
+      },
+      "description": "Self-referential edges require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "self_edge_review_required",
+        "required_action": "review_self_edge"
+      },
+      "name": "self_edge_requires_review"
     },
     "tenant_context_required": {
       "condition": {
@@ -490,11 +1933,40 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "traversal_depth_requires_positive_value": {
+      "condition": {
+        "operation": "traverse",
+        "traversal_depth_lt": 1
+      },
+      "description": "Traversal depth must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "traversal_depth_required",
+        "required_action": "choose_positive_depth"
+      },
+      "name": "traversal_depth_requires_positive_value"
+    },
+    "traversal_requires_start_node": {
+      "condition": {
+        "operation": "traverse",
+        "start_node_present": false
+      },
+      "description": "Traversals require a tenant-local start node.",
+      "effect": {
+        "decision": "deny",
+        "reason": "start_node_required",
+        "required_action": "attach_start_node"
+      },
+      "name": "traversal_requires_start_node"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "service.py",
+    "graph_runtime.py",
+    "views.py"
   ],
   "symbols": {
     "capability.grph": {

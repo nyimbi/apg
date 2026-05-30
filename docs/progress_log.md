@@ -14348,3 +14348,66 @@ Not run to preserve battery:
 - Legacy heavy SRCH service, API, and Flask-AppBuilder tests.
 - Load, latency, ranking-quality, recall, authorization, and throughput
   benchmarks.
+
+### 2026-05-30 10:18 EAT
+
+GRPH lifecycle and guardrail packet:
+
+- Selected `capabilities/common/grph` as the next common capability after SRCH
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the packet docs and executable contract.
+- Expanded the GRPH contract to 33 deterministic guardrails, 12 UI routes,
+  schema/node/edge/traversal/lineage/quality/security/governance/
+  observability/adapter configuration, Bytewax event-stream adapter evidence,
+  and graph-console theme components.
+- Kept `service.GrphService` as the dependency-light generated-app runtime and
+  hardened schema creation, node writes, edge writes, traversals, lineage paths,
+  impact analysis, neighborhood views, quality reports, schema retirement,
+  audit events, list surfaces, dashboard summaries, and APG record
+  compatibility.
+- Added executable review-evidence paths for unknown graph kinds, non-standard
+  node labels, restricted/self-referential edges, non-standard edge
+  classifications, deep traversals, and graph quality threshold reviews.
+- Added explicit edge classification guardrails during direct review so allowed
+  classification configuration is enforced by the runtime rather than only
+  declared in contract metadata.
+- Extended `views.py` with generated-app view models for dashboard, explorer,
+  schemas, nodes, edges, traversal, lineage, impact, quality, governance, audit,
+  and settings.
+- Updated capability registration with canonical MDM, META, ETLP dependencies,
+  optional AUTH/AUDL/CACH/MONI/SRCH/KNGR/AICR adapters, richer endpoints, and
+  audit permission.
+- Replaced static package evidence with contract-derived `app.py` semantics and
+  refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed stale package tests to package-contract language and expanded focused
+  tests for Bytewax, rule count, route count, audit permission, runtime
+  lifecycle, generated UI models, package evidence, APG record compatibility,
+  tenant isolation, required-field guardrails, review evidence paths, API
+  helper guardrails, and generated-doc existence.
+- Review-helper attempt returned no usable report; direct review found and fixed
+  missing edge-classification guardrails before final verification.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/grph/__init__.py capabilities/common/grph/capability_contract.py capabilities/common/grph/models.py capabilities/common/grph/graph_runtime.py capabilities/common/grph/service.py capabilities/common/grph/api.py capabilities/common/grph/views.py capabilities/common/grph/app.py capabilities/common/grph/test_capability_contract.py capabilities/common/grph/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/grph/test_capability_contract.py capabilities/common/grph/tests/test_package_contract.py` passed with 10 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and GRPH capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/grph --json` passed with `ok: true`; GRPH remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/grph --json` passed with 12 UI routes, 33 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/grph/README.md capabilities/common/grph/SPECIFICATION.md capabilities/common/grph/PLAN.md capabilities/common/grph/cap_spec.md capabilities/common/grph/__init__.py capabilities/common/grph/capability_contract.py capabilities/common/grph/models.py capabilities/common/grph/graph_runtime.py capabilities/common/grph/service.py capabilities/common/grph/api.py capabilities/common/grph/views.py capabilities/common/grph/app.py capabilities/common/grph/test_capability_contract.py capabilities/common/grph/tests/test_package_contract.py capabilities/common/grph/package_manifest.json capabilities/common/grph/release_report.json capabilities/common/grph/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/grph docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live external graph database backend.
+- Live Bytewax stream execution.
+- External MDM, META, ETLP, SRCH, KNGR, AICR, AUTH, AUDL, MONI, and CACH
+  adapters.
+- Rendered Flask/browser UI behavior.
+- Persistent database migrations.
+- Legacy heavy GRPH service, API, and Flask-AppBuilder tests.
+- Load, latency, traversal-cost, graph-quality, authorization, and throughput
+  benchmarks.

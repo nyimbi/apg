@@ -26,6 +26,7 @@ class RelationshipClassification(str, Enum):
 
 	PUBLIC = "public"
 	INTERNAL = "internal"
+	CONFIDENTIAL = "confidential"
 	RESTRICTED = "restricted"
 
 
@@ -167,5 +168,32 @@ class GraphQualityReport:
 			"missing_owner_count": self.missing_owner_count,
 			"restricted_edge_count": self.restricted_edge_count,
 			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(slots=True)
+class GraphAuditEventRecord:
+	"""Tenant-scoped graph audit event."""
+
+	id: str
+	tenant_id: str
+	event_type: str
+	subject_id: str
+	message: str
+	actor: str
+	severity: str = "low"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "audit_event",
+			"tenant_id": self.tenant_id,
+			"event_type": self.event_type,
+			"subject_id": self.subject_id,
+			"message": self.message,
+			"actor": self.actor,
+			"severity": self.severity,
 			"created_at": self.created_at,
 		}
