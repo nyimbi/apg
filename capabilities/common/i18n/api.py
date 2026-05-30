@@ -74,6 +74,22 @@ def publish_translations(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_i18n_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_i18n_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=payload.get("id"),
+	)
+
+
+def validate_batch_i18n_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_i18n_mutation(event_stream)
+
+
 def resolve_text(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.resolve_text(
 		tenant_id=str(payload.get("tenant_id") or "default"),
@@ -104,6 +120,14 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_i18n_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_i18n_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
 
 
 def dashboard_summary(tenant_id: str | None = None) -> dict[str, Any]:

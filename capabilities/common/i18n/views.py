@@ -24,6 +24,7 @@ def dashboard_model(
 		"routes": capability_routes(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -84,4 +85,46 @@ def publish_queue_model(
 		"tenant_id": tenant_id,
 		"publish_batches": service.list_publish_batches(tenant_id),
 		"approval_required": True,
+	}
+
+
+def i18n_agent_model(
+	service: I18nService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or I18nService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"i18n_agents": service.list_i18n_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["i18n_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["i18n_agents"]["allowed_roles"],
+		"route": "/i18n/agents",
+		"permissions": ["i18n:view", "i18n:admin"],
+	}
+
+
+def audit_trail_model(
+	service: I18nService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or I18nService()
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"route": "/i18n/audit",
+		"permissions": ["i18n:admin"],
+	}
+
+
+def language_policy_model(
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"supported_language_codes": contract["configuration"]["locales"]["supported_language_codes"],
+		"african_language_codes": contract["configuration"]["locales"]["african_language_codes"],
+		"minimum_coverage_percent": contract["configuration"]["translations"]["minimum_coverage_percent"],
+		"batch_event_stream": contract["configuration"]["governance"]["batch_event_stream"],
 	}

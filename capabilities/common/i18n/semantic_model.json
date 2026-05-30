@@ -12,21 +12,208 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.I18nService",
+          "help_content": "help",
+          "identity": "auth",
+          "machine_translation": "mchn",
+          "natural_language": "nlpc",
+          "theme": "them",
+          "view_models": "views.py"
+        },
         "governance": {
           "audit_translation_changes": true,
+          "batch_event_stream": "bytewax",
           "language_policy_required": true,
           "require_tenant_context": true,
-          "restricted_content_filtering": true
+          "restricted_content_filtering": true,
+          "tenant_isolation_required": true
+        },
+        "i18n_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "locale_planner",
+            "translator",
+            "translation_reviewer",
+            "glossary_steward",
+            "coverage_reviewer",
+            "publication_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "locales": {
+          "african_language_codes": [
+            "af",
+            "ak",
+            "am",
+            "ar",
+            "asa",
+            "bem",
+            "bez",
+            "bm",
+            "byn",
+            "cgg",
+            "dav",
+            "dua",
+            "ebu",
+            "ee",
+            "ewo",
+            "ff",
+            "fon",
+            "gaa",
+            "ha",
+            "ig",
+            "kam",
+            "ki",
+            "kkj",
+            "kln",
+            "ksb",
+            "ksf",
+            "lg",
+            "ln",
+            "lu",
+            "luo",
+            "luy",
+            "mas",
+            "mer",
+            "mfe",
+            "mg",
+            "mgh",
+            "mua",
+            "naq",
+            "nd",
+            "nmg",
+            "nnh",
+            "nso",
+            "ny",
+            "om",
+            "rn",
+            "rw",
+            "seh",
+            "sg",
+            "shi",
+            "sn",
+            "so",
+            "ss",
+            "st",
+            "sw",
+            "teo",
+            "ti",
+            "tn",
+            "ts",
+            "vai",
+            "ve",
+            "wo",
+            "xh",
+            "yo",
+            "zu"
+          ],
           "default_locale": "en-US",
           "fallback_locale_required": true,
           "locale_owner_required": true,
-          "regional_formatting_enabled": true
+          "regional_formatting_enabled": true,
+          "supported_language_codes": [
+            "af",
+            "ak",
+            "am",
+            "ar",
+            "asa",
+            "bem",
+            "bez",
+            "bm",
+            "byn",
+            "cgg",
+            "dav",
+            "de",
+            "dua",
+            "ebu",
+            "ee",
+            "en",
+            "es",
+            "ewo",
+            "ff",
+            "fon",
+            "fr",
+            "gaa",
+            "ha",
+            "hi",
+            "ig",
+            "it",
+            "ja",
+            "kam",
+            "ki",
+            "kkj",
+            "kln",
+            "ko",
+            "ksb",
+            "ksf",
+            "lg",
+            "ln",
+            "lu",
+            "luo",
+            "luy",
+            "mas",
+            "mer",
+            "mfe",
+            "mg",
+            "mgh",
+            "mua",
+            "naq",
+            "nd",
+            "nmg",
+            "nnh",
+            "nso",
+            "ny",
+            "om",
+            "pt",
+            "rn",
+            "rw",
+            "seh",
+            "sg",
+            "shi",
+            "sn",
+            "so",
+            "ss",
+            "st",
+            "sw",
+            "teo",
+            "ti",
+            "tn",
+            "ts",
+            "vai",
+            "ve",
+            "wo",
+            "xh",
+            "yo",
+            "zh",
+            "zu"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "coverage_metrics_required": true,
+          "event_stream": "bytewax",
+          "translation_metrics_required": true
         },
         "publishing": {
           "missing_key_blocking": true,
           "publication_approval_required": true,
+          "release_audit_required": true,
           "rollback_supported": true,
           "versioning_enabled": true
         },
@@ -39,12 +226,16 @@
           "glossary_required": true,
           "machine_translation_review_required": true,
           "minimum_coverage_percent": 95,
+          "restricted_content_filtering_required": true,
           "translation_memory_enabled": true
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_coverage_dashboard": true,
           "enable_glossary_manager": true,
           "enable_locale_console": true,
+          "enable_policies": true,
           "enable_translation_workbench": true
         }
       },
@@ -55,9 +246,20 @@
       "master_data": {},
       "name": "Internationalization",
       "provides": [
-        "i18n_operations"
+        "locale_management",
+        "translation_memory",
+        "content_localization",
+        "language_fallbacks",
+        "regional_formatting",
+        "language_policy",
+        "i18n_agents"
       ],
-      "requires": [],
+      "requires": [
+        "conf",
+        "nlpc",
+        "auth",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +289,84 @@
           },
           {
             "condition": {
+              "language_code_supported": false,
+              "operation": "create_locale"
+            },
+            "description": "Locales must use a supported language code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "language_code_not_supported",
+              "required_action": "choose_supported_language_code"
+            },
+            "name": "locale_language_supported"
+          },
+          {
+            "condition": {
+              "fallback_locale_present": false,
+              "operation": "create_locale"
+            },
+            "description": "Locales require fallback locale policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "fallback_locale_required",
+              "required_action": "set_fallback_locale"
+            },
+            "name": "locale_requires_fallback"
+          },
+          {
+            "condition": {
+              "operation": "create_locale",
+              "regional_format_present": false
+            },
+            "description": "Locales require regional format metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "regional_format_required",
+              "required_action": "set_regional_format"
+            },
+            "name": "locale_requires_regional_format"
+          },
+          {
+            "condition": {
+              "glossary_owner_present": false,
+              "operation": "add_glossary_term"
+            },
+            "description": "Glossary terms require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "glossary_owner_required",
+              "required_action": "assign_glossary_owner"
+            },
+            "name": "glossary_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "upsert_translation",
+              "translation_key_present": false
+            },
+            "description": "Translations require a localization key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "translation_key_required",
+              "required_action": "set_translation_key"
+            },
+            "name": "translation_requires_key"
+          },
+          {
+            "condition": {
+              "operation": "upsert_translation",
+              "translated_text_present": false
+            },
+            "description": "Translations require localized text.",
+            "effect": {
+              "decision": "deny",
+              "reason": "translated_text_required",
+              "required_action": "set_translated_text"
+            },
+            "name": "translation_requires_text"
+          },
+          {
+            "condition": {
               "machine_translation_used": true,
               "translation_review_recorded": false
             },
@@ -97,19 +377,6 @@
               "required_action": "review_translation"
             },
             "name": "machine_translation_requires_review"
-          },
-          {
-            "condition": {
-              "approval_recorded": false,
-              "operation": "publish_translations"
-            },
-            "description": "Translation publication requires approval.",
-            "effect": {
-              "decision": "deny",
-              "reason": "publication_approval_required",
-              "required_action": "record_publication_approval"
-            },
-            "name": "publish_requires_approval"
           },
           {
             "condition": {
@@ -126,6 +393,46 @@
           },
           {
             "condition": {
+              "approval_recorded": false,
+              "operation": "publish_translations"
+            },
+            "description": "Translation publication requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_approval_required",
+              "required_action": "record_publication_approval"
+            },
+            "name": "publish_requires_approval"
+          },
+          {
+            "condition": {
+              "approver_present": false,
+              "operation": "publish_translations"
+            },
+            "description": "Translation publication requires an approver.",
+            "effect": {
+              "decision": "deny",
+              "reason": "publication_approver_required",
+              "required_action": "set_publication_approver"
+            },
+            "name": "publish_requires_approver"
+          },
+          {
+            "condition": {
+              "missing_key_count_gt": 0,
+              "missing_key_review_recorded": false,
+              "operation": "publish_translations"
+            },
+            "description": "Publication blocks missing localization keys unless reviewed.",
+            "effect": {
+              "decision": "deny",
+              "reason": "missing_key_review_required",
+              "required_action": "review_missing_keys"
+            },
+            "name": "publish_blocks_missing_keys"
+          },
+          {
+            "condition": {
               "coverage_percent_lt": 95,
               "coverage_review_recorded": false
             },
@@ -136,6 +443,97 @@
               "required_action": "review_locale_coverage"
             },
             "name": "low_coverage_requires_review"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "i18n_agent_present": true
+            },
+            "description": "AI localization agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "i18n_agent_registration_required",
+              "required_action": "register_i18n_agent"
+            },
+            "name": "i18n_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "i18n_agent_present": true
+            },
+            "description": "AI localization agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "i18n_agent_runtime_not_supported",
+              "required_action": "choose_supported_i18n_agent_runtime"
+            },
+            "name": "i18n_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "i18n_agent_present": true
+            },
+            "description": "AI localization agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "i18n_agent_role_not_supported",
+              "required_action": "choose_supported_i18n_agent_role"
+            },
+            "name": "i18n_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "i18n_agent_present": true
+            },
+            "description": "AI localization agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "i18n_agent_scope_required",
+              "required_action": "set_i18n_agent_scope"
+            },
+            "name": "i18n_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "i18n_agent_present": true
+            },
+            "description": "AI localization-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "i18n_agent_disclosure_required",
+              "required_action": "disclose_i18n_agent"
+            },
+            "name": "i18n_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Localization lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "i18n_audit_event_required",
+              "required_action": "record_i18n_audit_event"
+            },
+            "name": "i18n_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_i18n_mutation"
+            },
+            "description": "Batch localization mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_i18n_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +566,84 @@
         },
         {
           "condition": {
+            "language_code_supported": false,
+            "operation": "create_locale"
+          },
+          "description": "Locales must use a supported language code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "language_code_not_supported",
+            "required_action": "choose_supported_language_code"
+          },
+          "name": "locale_language_supported"
+        },
+        {
+          "condition": {
+            "fallback_locale_present": false,
+            "operation": "create_locale"
+          },
+          "description": "Locales require fallback locale policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "fallback_locale_required",
+            "required_action": "set_fallback_locale"
+          },
+          "name": "locale_requires_fallback"
+        },
+        {
+          "condition": {
+            "operation": "create_locale",
+            "regional_format_present": false
+          },
+          "description": "Locales require regional format metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "regional_format_required",
+            "required_action": "set_regional_format"
+          },
+          "name": "locale_requires_regional_format"
+        },
+        {
+          "condition": {
+            "glossary_owner_present": false,
+            "operation": "add_glossary_term"
+          },
+          "description": "Glossary terms require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "glossary_owner_required",
+            "required_action": "assign_glossary_owner"
+          },
+          "name": "glossary_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "upsert_translation",
+            "translation_key_present": false
+          },
+          "description": "Translations require a localization key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "translation_key_required",
+            "required_action": "set_translation_key"
+          },
+          "name": "translation_requires_key"
+        },
+        {
+          "condition": {
+            "operation": "upsert_translation",
+            "translated_text_present": false
+          },
+          "description": "Translations require localized text.",
+          "effect": {
+            "decision": "deny",
+            "reason": "translated_text_required",
+            "required_action": "set_translated_text"
+          },
+          "name": "translation_requires_text"
+        },
+        {
+          "condition": {
             "machine_translation_used": true,
             "translation_review_recorded": false
           },
@@ -178,19 +654,6 @@
             "required_action": "review_translation"
           },
           "name": "machine_translation_requires_review"
-        },
-        {
-          "condition": {
-            "approval_recorded": false,
-            "operation": "publish_translations"
-          },
-          "description": "Translation publication requires approval.",
-          "effect": {
-            "decision": "deny",
-            "reason": "publication_approval_required",
-            "required_action": "record_publication_approval"
-          },
-          "name": "publish_requires_approval"
         },
         {
           "condition": {
@@ -207,6 +670,46 @@
         },
         {
           "condition": {
+            "approval_recorded": false,
+            "operation": "publish_translations"
+          },
+          "description": "Translation publication requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_approval_required",
+            "required_action": "record_publication_approval"
+          },
+          "name": "publish_requires_approval"
+        },
+        {
+          "condition": {
+            "approver_present": false,
+            "operation": "publish_translations"
+          },
+          "description": "Translation publication requires an approver.",
+          "effect": {
+            "decision": "deny",
+            "reason": "publication_approver_required",
+            "required_action": "set_publication_approver"
+          },
+          "name": "publish_requires_approver"
+        },
+        {
+          "condition": {
+            "missing_key_count_gt": 0,
+            "missing_key_review_recorded": false,
+            "operation": "publish_translations"
+          },
+          "description": "Publication blocks missing localization keys unless reviewed.",
+          "effect": {
+            "decision": "deny",
+            "reason": "missing_key_review_required",
+            "required_action": "review_missing_keys"
+          },
+          "name": "publish_blocks_missing_keys"
+        },
+        {
+          "condition": {
             "coverage_percent_lt": 95,
             "coverage_review_recorded": false
           },
@@ -217,6 +720,97 @@
             "required_action": "review_locale_coverage"
           },
           "name": "low_coverage_requires_review"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "i18n_agent_present": true
+          },
+          "description": "AI localization agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "i18n_agent_registration_required",
+            "required_action": "register_i18n_agent"
+          },
+          "name": "i18n_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "i18n_agent_present": true
+          },
+          "description": "AI localization agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "i18n_agent_runtime_not_supported",
+            "required_action": "choose_supported_i18n_agent_runtime"
+          },
+          "name": "i18n_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "i18n_agent_present": true
+          },
+          "description": "AI localization agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "i18n_agent_role_not_supported",
+            "required_action": "choose_supported_i18n_agent_role"
+          },
+          "name": "i18n_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "i18n_agent_present": true
+          },
+          "description": "AI localization agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "i18n_agent_scope_required",
+            "required_action": "set_i18n_agent_scope"
+          },
+          "name": "i18n_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "i18n_agent_present": true
+          },
+          "description": "AI localization-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "i18n_agent_disclosure_required",
+            "required_action": "disclose_i18n_agent"
+          },
+          "name": "i18n_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Localization lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "i18n_audit_event_required",
+            "required_action": "record_i18n_audit_event"
+          },
+          "name": "i18n_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_i18n_mutation"
+          },
+          "description": "Batch localization mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_i18n_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,6 +820,16 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "I18NAgentPanel",
+          "permission": "i18n:admin",
+          "route": "/i18n/agents"
+        },
+        "audit": {
+          "component": "I18NAuditTrail",
+          "permission": "i18n:admin",
+          "route": "/i18n/audit"
+        },
         "coverage": {
           "component": "CoverageDashboard",
           "permission": "i18n:view",
@@ -267,12 +871,45 @@
           "route": "/i18n/translations"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_i18n_mutation_requires_bytewax",
+        "events": [
+          "i18n_locale_created",
+          "i18n_glossary_term_added",
+          "i18n_translation_upserted",
+          "i18n_translation_published",
+          "i18n_coverage_reported",
+          "i18n_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "locales",
+          "glossary_terms",
+          "translations",
+          "coverage_reports",
+          "publish_batches",
+          "i18n_agents",
+          "audit_events"
+        ],
+        "topic": "apg.i18n.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_trail": {
+            "status_style": "policy-chip",
+            "visual": "event-timeline"
+          },
           "coverage_dashboard": {
             "status_style": "gap-chip",
             "visual": "coverage-grid"
+          },
+          "language_policy": {
+            "status_style": "language-chip",
+            "visual": "policy-table"
           },
           "locale_matrix": {
             "icon": "languages",
@@ -350,6 +987,20 @@
             "permission": "i18n:publish"
           },
           {
+            "component": "I18NAgentPanel",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/i18n/agents",
+            "permission": "i18n:admin"
+          },
+          {
+            "component": "I18NAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/i18n/audit",
+            "permission": "i18n:admin"
+          },
+          {
             "component": "LanguagePolicies",
             "name": "policies",
             "nav_group": "Governance",
@@ -377,27 +1028,219 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "i18n": []
+      "i18n": [
+        "conf",
+        "nlpc",
+        "auth",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "i18n": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.I18nService",
+          "help_content": "help",
+          "identity": "auth",
+          "machine_translation": "mchn",
+          "natural_language": "nlpc",
+          "theme": "them",
+          "view_models": "views.py"
+        },
         "governance": {
           "audit_translation_changes": true,
+          "batch_event_stream": "bytewax",
           "language_policy_required": true,
           "require_tenant_context": true,
-          "restricted_content_filtering": true
+          "restricted_content_filtering": true,
+          "tenant_isolation_required": true
+        },
+        "i18n_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "locale_planner",
+            "translator",
+            "translation_reviewer",
+            "glossary_steward",
+            "coverage_reviewer",
+            "publication_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "locales": {
+          "african_language_codes": [
+            "af",
+            "ak",
+            "am",
+            "ar",
+            "asa",
+            "bem",
+            "bez",
+            "bm",
+            "byn",
+            "cgg",
+            "dav",
+            "dua",
+            "ebu",
+            "ee",
+            "ewo",
+            "ff",
+            "fon",
+            "gaa",
+            "ha",
+            "ig",
+            "kam",
+            "ki",
+            "kkj",
+            "kln",
+            "ksb",
+            "ksf",
+            "lg",
+            "ln",
+            "lu",
+            "luo",
+            "luy",
+            "mas",
+            "mer",
+            "mfe",
+            "mg",
+            "mgh",
+            "mua",
+            "naq",
+            "nd",
+            "nmg",
+            "nnh",
+            "nso",
+            "ny",
+            "om",
+            "rn",
+            "rw",
+            "seh",
+            "sg",
+            "shi",
+            "sn",
+            "so",
+            "ss",
+            "st",
+            "sw",
+            "teo",
+            "ti",
+            "tn",
+            "ts",
+            "vai",
+            "ve",
+            "wo",
+            "xh",
+            "yo",
+            "zu"
+          ],
           "default_locale": "en-US",
           "fallback_locale_required": true,
           "locale_owner_required": true,
-          "regional_formatting_enabled": true
+          "regional_formatting_enabled": true,
+          "supported_language_codes": [
+            "af",
+            "ak",
+            "am",
+            "ar",
+            "asa",
+            "bem",
+            "bez",
+            "bm",
+            "byn",
+            "cgg",
+            "dav",
+            "de",
+            "dua",
+            "ebu",
+            "ee",
+            "en",
+            "es",
+            "ewo",
+            "ff",
+            "fon",
+            "fr",
+            "gaa",
+            "ha",
+            "hi",
+            "ig",
+            "it",
+            "ja",
+            "kam",
+            "ki",
+            "kkj",
+            "kln",
+            "ko",
+            "ksb",
+            "ksf",
+            "lg",
+            "ln",
+            "lu",
+            "luo",
+            "luy",
+            "mas",
+            "mer",
+            "mfe",
+            "mg",
+            "mgh",
+            "mua",
+            "naq",
+            "nd",
+            "nmg",
+            "nnh",
+            "nso",
+            "ny",
+            "om",
+            "pt",
+            "rn",
+            "rw",
+            "seh",
+            "sg",
+            "shi",
+            "sn",
+            "so",
+            "ss",
+            "st",
+            "sw",
+            "teo",
+            "ti",
+            "tn",
+            "ts",
+            "vai",
+            "ve",
+            "wo",
+            "xh",
+            "yo",
+            "zh",
+            "zu"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "coverage_metrics_required": true,
+          "event_stream": "bytewax",
+          "translation_metrics_required": true
         },
         "publishing": {
           "missing_key_blocking": true,
           "publication_approval_required": true,
+          "release_audit_required": true,
           "rollback_supported": true,
           "versioning_enabled": true
         },
@@ -410,20 +1253,35 @@
           "glossary_required": true,
           "machine_translation_review_required": true,
           "minimum_coverage_percent": 95,
+          "restricted_content_filtering_required": true,
           "translation_memory_enabled": true
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_coverage_dashboard": true,
           "enable_glossary_manager": true,
           "enable_locale_console": true,
+          "enable_policies": true,
           "enable_translation_workbench": true
         }
       },
       "id": "i18n",
       "provides": [
-        "i18n_operations"
+        "locale_management",
+        "translation_memory",
+        "content_localization",
+        "language_fallbacks",
+        "regional_formatting",
+        "language_policy",
+        "i18n_agents"
       ],
-      "requires": []
+      "requires": [
+        "conf",
+        "nlpc",
+        "auth",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +1293,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +1314,136 @@
   },
   "roles": {},
   "rules": {
+    "batch_i18n_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_i18n_mutation"
+      },
+      "description": "Batch localization mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_i18n_mutation_requires_bytewax"
+    },
+    "glossary_requires_owner": {
+      "condition": {
+        "glossary_owner_present": false,
+        "operation": "add_glossary_term"
+      },
+      "description": "Glossary terms require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "glossary_owner_required",
+        "required_action": "assign_glossary_owner"
+      },
+      "name": "glossary_requires_owner"
+    },
+    "i18n_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "i18n_agent_present": true
+      },
+      "description": "AI localization-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "i18n_agent_disclosure_required",
+        "required_action": "disclose_i18n_agent"
+      },
+      "name": "i18n_agent_requires_disclosure"
+    },
+    "i18n_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "i18n_agent_present": true
+      },
+      "description": "AI localization agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "i18n_agent_registration_required",
+        "required_action": "register_i18n_agent"
+      },
+      "name": "i18n_agent_requires_registration"
+    },
+    "i18n_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "i18n_agent_present": true
+      },
+      "description": "AI localization agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "i18n_agent_scope_required",
+        "required_action": "set_i18n_agent_scope"
+      },
+      "name": "i18n_agent_requires_scope"
+    },
+    "i18n_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "i18n_agent_present": true
+      },
+      "description": "AI localization agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "i18n_agent_role_not_supported",
+        "required_action": "choose_supported_i18n_agent_role"
+      },
+      "name": "i18n_agent_role_supported"
+    },
+    "i18n_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "i18n_agent_present": true
+      },
+      "description": "AI localization agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "i18n_agent_runtime_not_supported",
+        "required_action": "choose_supported_i18n_agent_runtime"
+      },
+      "name": "i18n_agent_runtime_supported"
+    },
+    "i18n_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Localization lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "i18n_audit_event_required",
+        "required_action": "record_i18n_audit_event"
+      },
+      "name": "i18n_state_change_requires_audit"
+    },
+    "locale_language_supported": {
+      "condition": {
+        "language_code_supported": false,
+        "operation": "create_locale"
+      },
+      "description": "Locales must use a supported language code.",
+      "effect": {
+        "decision": "deny",
+        "reason": "language_code_not_supported",
+        "required_action": "choose_supported_language_code"
+      },
+      "name": "locale_language_supported"
+    },
+    "locale_requires_fallback": {
+      "condition": {
+        "fallback_locale_present": false,
+        "operation": "create_locale"
+      },
+      "description": "Locales require fallback locale policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "fallback_locale_required",
+        "required_action": "set_fallback_locale"
+      },
+      "name": "locale_requires_fallback"
+    },
     "locale_requires_owner": {
       "condition": {
         "locale_owner_assigned": false,
@@ -468,6 +1456,19 @@
         "required_action": "assign_locale_owner"
       },
       "name": "locale_requires_owner"
+    },
+    "locale_requires_regional_format": {
+      "condition": {
+        "operation": "create_locale",
+        "regional_format_present": false
+      },
+      "description": "Locales require regional format metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "regional_format_required",
+        "required_action": "set_regional_format"
+      },
+      "name": "locale_requires_regional_format"
     },
     "low_coverage_requires_review": {
       "condition": {
@@ -495,6 +1496,20 @@
       },
       "name": "machine_translation_requires_review"
     },
+    "publish_blocks_missing_keys": {
+      "condition": {
+        "missing_key_count_gt": 0,
+        "missing_key_review_recorded": false,
+        "operation": "publish_translations"
+      },
+      "description": "Publication blocks missing localization keys unless reviewed.",
+      "effect": {
+        "decision": "deny",
+        "reason": "missing_key_review_required",
+        "required_action": "review_missing_keys"
+      },
+      "name": "publish_blocks_missing_keys"
+    },
     "publish_requires_approval": {
       "condition": {
         "approval_recorded": false,
@@ -507,6 +1522,19 @@
         "required_action": "record_publication_approval"
       },
       "name": "publish_requires_approval"
+    },
+    "publish_requires_approver": {
+      "condition": {
+        "approver_present": false,
+        "operation": "publish_translations"
+      },
+      "description": "Translation publication requires an approver.",
+      "effect": {
+        "decision": "deny",
+        "reason": "publication_approver_required",
+        "required_action": "set_publication_approver"
+      },
+      "name": "publish_requires_approver"
     },
     "restricted_content_requires_filtering": {
       "condition": {
@@ -532,6 +1560,32 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "translation_requires_key": {
+      "condition": {
+        "operation": "upsert_translation",
+        "translation_key_present": false
+      },
+      "description": "Translations require a localization key.",
+      "effect": {
+        "decision": "deny",
+        "reason": "translation_key_required",
+        "required_action": "set_translation_key"
+      },
+      "name": "translation_requires_key"
+    },
+    "translation_requires_text": {
+      "condition": {
+        "operation": "upsert_translation",
+        "translated_text_present": false
+      },
+      "description": "Translations require localized text.",
+      "effect": {
+        "decision": "deny",
+        "reason": "translated_text_required",
+        "required_action": "set_translated_text"
+      },
+      "name": "translation_requires_text"
     }
   },
   "security": {},

@@ -174,3 +174,63 @@ class PublishBatch:
 			"approver_id": self.approver_id,
 			"created_at": self.created_at,
 		}
+
+
+@dataclass(slots=True)
+class I18nAgent:
+	"""Registered AI agent allowed to assist localization work."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = True
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "i18n_agent",
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(slots=True)
+class I18nAuditEvent:
+	"""Audit event emitted by localization lifecycle operations."""
+
+	id: str
+	tenant_id: str
+	subject_id: str
+	event_type: str
+	actor: str
+	decision: str
+	reasons: tuple[str, ...] = ()
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"kind": "audit_event",
+			"tenant_id": self.tenant_id,
+			"subject_id": self.subject_id,
+			"event_type": self.event_type,
+			"actor": self.actor,
+			"decision": self.decision,
+			"reasons": list(self.reasons),
+			"metadata": dict(self.metadata),
+			"created_at": self.created_at,
+		}

@@ -5,11 +5,20 @@ from __future__ import annotations
 from itertools import count
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	SUPPORTED_I18N_AGENT_ROLES,
+	SUPPORTED_I18N_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+	language_code_supported,
+)
 from .localization_runtime import CoverageCalculator, LocaleFallbackResolver, TranslationMemoryMatcher
 from .models import (
 	CoverageReport,
 	GlossaryTerm,
+	I18nAgent,
+	I18nAuditEvent,
 	LocaleDefinition,
 	PublishBatch,
 	TranslationEntry,
@@ -28,6 +37,8 @@ class I18nService:
 		self._translations: dict[str, TranslationEntry] = {}
 		self._coverage_reports: dict[str, CoverageReport] = {}
 		self._publish_batches: dict[str, PublishBatch] = {}
+		self._agents: dict[str, I18nAgent] = {}
+		self._audit_events: dict[str, I18nAuditEvent] = {}
 		self._counter = count(1)
 		self._fallback_resolver = LocaleFallbackResolver()
 		self._memory_matcher = TranslationMemoryMatcher()
@@ -50,10 +61,15 @@ class I18nService:
 		regional_format: dict[str, str] | None = None,
 		timezone: str = "UTC",
 	) -> dict[str, Any]:
+		effective_fallback = fallback_locale or str(DEFAULT_CONFIGURATION["locales"]["default_locale"])
+		effective_regional_format = dict(regional_format or {"date": "yyyy-MM-dd", "number": "1,234.56"})
 		self._enforce_i18n_policy(
 			tenant_id=tenant_id,
 			operation="create_locale",
 			locale_owner_assigned=bool(owner_id),
+			supported_language_code=language_code_supported(locale_code),
+			fallback_locale_present=bool(effective_fallback),
+			regional_format_present=bool(effective_regional_format),
 		)
 		locale = LocaleDefinition(
 			id=locale_id,
@@ -61,11 +77,12 @@ class I18nService:
 			locale_code=locale_code,
 			display_name=display_name,
 			owner_id=owner_id,
-			fallback_locale=fallback_locale or str(DEFAULT_CONFIGURATION["locales"]["default_locale"]),
-			regional_format=dict(regional_format or {}),
+			fallback_locale=effective_fallback,
+			regional_format=effective_regional_format,
 			timezone=timezone,
 		)
-		self._locales[locale_id] = locale
+		self._locales[_state_key(tenant_id, locale_id)] = locale
+		self._record_audit(tenant_id, locale_id, "locale_created", owner_id, "allow", metadata={"locale_code": locale_code})
 		return locale.to_dict()
 
 	def add_glossary_term(
@@ -77,7 +94,11 @@ class I18nService:
 		description: str = "",
 		owner_id: str = "",
 	) -> dict[str, Any]:
-		self._enforce_i18n_policy(tenant_id=tenant_id, operation="add_glossary_term")
+		result = self._enforce_i18n_policy(
+			tenant_id=tenant_id,
+			operation="add_glossary_term",
+			glossary_owner_present=bool(owner_id),
+		)
 		term = GlossaryTerm(
 			id=term_id,
 			tenant_id=tenant_id,
@@ -86,7 +107,8 @@ class I18nService:
 			description=description,
 			owner_id=owner_id,
 		)
-		self._glossary_terms[term_id] = term
+		self._glossary_terms[_state_key(tenant_id, term_id)] = term
+		self._record_audit(tenant_id, term_id, "glossary_term_added", owner_id, result["decision"], metadata={"source_term": source_term})
 		return term.to_dict()
 
 	def upsert_translation(
@@ -107,12 +129,14 @@ class I18nService:
 		self._enforce_i18n_policy(
 			tenant_id=tenant_id,
 			operation="upsert_translation",
+			translation_key_present=bool(key),
+			translated_text_present=bool(translated_text),
 			machine_translation_used=machine_translation_used,
 			translation_review_recorded=translation_review_recorded,
 			restricted_content_present=restricted,
 			rbac_filter_applied=rbac_filter_applied,
 		)
-		existing = self._translations.get(translation_id)
+		existing = self._translations.get(_state_key(tenant_id, translation_id))
 		version = 1 if existing is None else existing.version + 1
 		source = TranslationSource.MACHINE if machine_translation_used else TranslationSource.HUMAN
 		status = TranslationStatus.REVIEWED if translation_review_recorded else TranslationStatus.DRAFT
@@ -129,7 +153,8 @@ class I18nService:
 			restricted=restricted,
 			version=version,
 		)
-		self._translations[translation_id] = entry
+		self._translations[_state_key(tenant_id, translation_id)] = entry
+		self._record_audit(tenant_id, translation_id, "translation_upserted", reviewer_id or "translator", "allow", metadata={"key": key, "locale_code": locale_code, "source": source.value})
 		return entry.to_dict()
 
 	def reuse_translation_memory(
@@ -156,7 +181,8 @@ class I18nService:
 			source=TranslationSource.MEMORY,
 			reviewer_id=reviewer_id,
 		)
-		self._translations[translation_id] = entry
+		self._translations[_state_key(tenant_id, translation_id)] = entry
+		self._record_audit(tenant_id, translation_id, "translation_memory_reused", reviewer_id, "allow", metadata={"matched_translation": match.id, "locale_code": locale_code})
 		return entry.to_dict()
 
 	def publish_translations(
@@ -172,12 +198,19 @@ class I18nService:
 		self._require_locale(tenant_id, locale_code)
 		entries = [self._require_translation(translation_id, tenant_id) for translation_id in translation_ids]
 		coverage = self._coverage_calculator.coverage(locale_code, [entry.key for entry in entries], entries)
-		self._enforce_i18n_policy(
+		missing_keys = [
+			key for key in {entry.key for entry in entries}
+			if not any(entry.key == key and entry.locale_code == locale_code for entry in entries)
+		]
+		result = self._enforce_i18n_policy(
 			tenant_id=tenant_id,
 			operation="publish_translations",
 			approval_recorded=approval_recorded,
+			approver_present=bool(approver_id),
 			coverage_percent=float(coverage["coverage_percent"]),
 			coverage_review_recorded=coverage_review_recorded,
+			missing_key_count=len(missing_keys),
+			missing_key_review_recorded=not missing_keys,
 		)
 		now = utc_now_iso()
 		for entry in entries:
@@ -195,7 +228,8 @@ class I18nService:
 			translation_ids=list(translation_ids),
 			approver_id=approver_id,
 		)
-		self._publish_batches[batch_id] = batch
+		self._publish_batches[_state_key(tenant_id, batch_id)] = batch
+		self._record_audit(tenant_id, batch_id, "translations_published", approver_id, result["decision"], metadata={"locale_code": locale_code, "translation_count": len(translation_ids)})
 		return batch.to_dict()
 
 	def resolve_text(
@@ -256,8 +290,52 @@ class I18nService:
 			coverage_percent=coverage_percent,
 			requires_review=result["decision"] == "require_review",
 		)
-		self._coverage_reports[report_id] = report
+		self._coverage_reports[_state_key(tenant_id, report_id)] = report
+		self._record_audit(tenant_id, report_id, "coverage_reported", "coverage-dashboard", result["decision"], reasons=tuple(action.get("reason", "") for action in result["actions"]), metadata=metrics)
 		return report.to_dict()
+
+	def register_i18n_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"i18n_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_I18N_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_I18N_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(_reasons(result) or "i18n_policy_blocked")
+		agent = I18nAgent(
+			id=agent_id or f"i18n-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._record_audit(tenant_id, agent.id, "i18n_agent_registered", name, result["decision"], metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def validate_batch_i18n_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_i18n_mutation",
+			"event_stream": event_stream,
+		})
 
 	def create_record(
 		self,
@@ -293,9 +371,15 @@ class I18nService:
 	def list_publish_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._publish_batches, tenant_id)
 
+	def list_i18n_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._audit_events, tenant_id)
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		records: list[dict[str, Any]] = []
-		for store in (self._locales, self._glossary_terms, self._translations, self._coverage_reports, self._publish_batches):
+		for store in (self._locales, self._glossary_terms, self._translations, self._coverage_reports, self._publish_batches, self._agents, self._audit_events):
 			records.extend(self._list(store, tenant_id))
 		return sorted(records, key=lambda item: (item["kind"], item["id"]))
 
@@ -311,6 +395,9 @@ class I18nService:
 			"coverage_report_count": len(coverage),
 			"coverage_review_count": len([item for item in coverage if item["requires_review"]]),
 			"publish_batch_count": len(self.list_publish_batches(tenant_id)),
+			"i18n_agent_count": len(self.list_i18n_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _enforce_i18n_policy(
@@ -318,29 +405,47 @@ class I18nService:
 		tenant_id: str,
 		operation: str,
 		locale_owner_assigned: bool = True,
+		supported_language_code: bool = True,
+		fallback_locale_present: bool = True,
+		regional_format_present: bool = True,
 		machine_translation_used: bool = False,
 		translation_review_recorded: bool = True,
 		approval_recorded: bool = True,
+		approver_present: bool = True,
 		restricted_content_present: bool = False,
 		rbac_filter_applied: bool = True,
 		coverage_percent: float = 100.0,
 		coverage_review_recorded: bool = True,
-	) -> None:
+		glossary_owner_present: bool = True,
+		translation_key_present: bool = True,
+		translated_text_present: bool = True,
+		missing_key_count: int = 0,
+		missing_key_review_recorded: bool = True,
+	) -> dict[str, Any]:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": operation,
 			"locale_owner_assigned": locale_owner_assigned,
+			"language_code_supported": supported_language_code,
+			"fallback_locale_present": fallback_locale_present,
+			"regional_format_present": regional_format_present,
+			"glossary_owner_present": glossary_owner_present,
+			"translation_key_present": translation_key_present,
+			"translated_text_present": translated_text_present,
 			"machine_translation_used": machine_translation_used,
 			"translation_review_recorded": translation_review_recorded,
 			"approval_recorded": approval_recorded,
+			"approver_present": approver_present,
 			"restricted_content_present": restricted_content_present,
 			"rbac_filter_applied": rbac_filter_applied,
 			"coverage_percent": coverage_percent,
 			"coverage_review_recorded": coverage_review_recorded,
+			"missing_key_count": missing_key_count,
+			"missing_key_review_recorded": missing_key_review_recorded,
 		})
 		if result["decision"] != "allow":
-			reasons = ", ".join(action.get("reason", "i18n_policy_blocked") for action in result["actions"])
-			raise PermissionError(reasons or "i18n_policy_blocked")
+			raise PermissionError(_reasons(result) or "i18n_policy_blocked")
+		return result
 
 	def _require_locale(self, tenant_id: str, locale_code: str) -> LocaleDefinition:
 		for locale in self._locales.values():
@@ -349,7 +454,7 @@ class I18nService:
 		raise PermissionError("locale_missing")
 
 	def _require_translation(self, translation_id: str, tenant_id: str) -> TranslationEntry:
-		translation = self._translations.get(translation_id)
+		translation = self._translations.get(_state_key(tenant_id, translation_id))
 		if translation is None or translation.tenant_id != tenant_id:
 			raise PermissionError("translation_missing")
 		return translation
@@ -359,3 +464,39 @@ class I18nService:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+	def _record_audit(
+		self,
+		tenant_id: str,
+		subject_id: str,
+		event_type: str,
+		actor: str,
+		decision: str,
+		reasons: tuple[str, ...] = (),
+		metadata: dict[str, Any] | None = None,
+	) -> I18nAuditEvent:
+		event_id = f"audit:{len(self._audit_events) + 1:06d}"
+		event = I18nAuditEvent(
+			id=event_id,
+			tenant_id=tenant_id,
+			subject_id=subject_id,
+			event_type=event_type,
+			actor=actor,
+			decision=decision,
+			reasons=tuple(reason for reason in reasons if reason),
+			metadata=dict(metadata or {}),
+		)
+		self._audit_events[event_id] = event
+		return event
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"
+
+
+def _reasons(result: dict[str, Any]) -> str:
+	return ", ".join(action.get("reason", "i18n_policy_blocked") for action in result["actions"])

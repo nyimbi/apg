@@ -16949,3 +16949,60 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, CONF, AUDL, GEOS, PRED, COMP, IOTD, AGNT, NLPC, or WFLO
   adapters.
+
+### 2026-05-30 19:27 EAT
+
+I18N lifecycle and guardrail packet:
+
+- Selected `capabilities/common/i18n` after ESGC because it was the next
+  capability with an existing `cap_spec.md` but missing the local README,
+  specification, and plan packet.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable I18N contract to cover locale management,
+  translation memory, content localization, language fallbacks, regional
+  formatting, language policy, I18N agents, audit events, observability, APG
+  adapters, UI routes, visual theme tokens, and Bytewax event streaming.
+- Added explicit language-code policy with 64 African language codes exposed
+  through configuration and verified in tests.
+- Added deterministic guardrails for tenant context, locale ownership,
+  supported language code, fallback locale policy, regional format metadata,
+  glossary ownership, translation key and text presence, machine-translation
+  review, restricted-content filtering, publication approval and approver,
+  missing-key review, low-coverage review, AI-agent registration, supported
+  AI-agent runtime and role, agent scope, contribution disclosure, audited
+  state changes, and Bytewax-backed batch localization mutation.
+- Added `I18nAgent` and `I18nAuditEvent` models and extended `I18nService`
+  with tenant-local lifecycle IDs, audit events, I18N-agent registration,
+  language-code enforcement, and Bytewax batch-mutation validation.
+- Added API helpers for I18N-agent registration, audit listing, and batch
+  mutation validation.
+- Added dashboard streaming metadata plus AI-agent, audit-trail, and language
+  policy view models.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for language policy, lifecycle rules, I18N-agent
+  guardrails, tenant-local IDs, generated evidence, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/i18n/__init__.py capabilities/common/i18n/capability_contract.py capabilities/common/i18n/models.py capabilities/common/i18n/localization_runtime.py capabilities/common/i18n/service.py capabilities/common/i18n/api.py capabilities/common/i18n/views.py capabilities/common/i18n/app.py capabilities/common/i18n/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/i18n/test_capability_contract.py`
+  passed with 7 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... I18nService ... register_i18n_agent ... dashboard_summary ..."` returned dashboard evidence with one I18N agent and `bytewax` streaming metadata; import emitted the existing optional OpenTelemetry warning.
+- `jq '.capabilities.i18n.streaming.processor, .capabilities.i18n.configuration.i18n_agents.supported_runtimes, (.capabilities.i18n.configuration.locales.african_language_codes | length), .capabilities.i18n.screens.agents.route, ...' capabilities/common/i18n/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, 64 African language codes, `/i18n/agents`, `i18n_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/i18n --json` passed with `ok: true`; I18N remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/i18n --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker,
+  and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/i18n docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live identity, audit store, machine-translation provider, natural-language
+  provider, help-content store, tenant theme service, rendered browser UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External CONF, AUTH, AUDL, NLPC, MCHN, HELP, THEM, AGNT, or WFLO adapters.
