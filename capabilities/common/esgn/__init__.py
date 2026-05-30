@@ -16,7 +16,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "esgn",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Digital form templates, submissions, e-signature envelopes, signing ceremonies, evidence, and compliance controls",
+	"description": "Digital form templates, submissions, e-signature envelopes, signing ceremonies, evidence, AI signing assistants, and compliance controls",
 	"category": "collaboration_communication",
 	"subcategory": "digital_forms_esign",
 	"vendor": "Datacraft",
@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "form_workflows"],
-	"permissions": ["esgn:view", "esgn:create_forms", "esgn:send_envelopes", "esgn:sign", "esgn:manage_templates", "esgn:admin"]
+	"provides": ["digital_forms", "signature_envelopes", "signing_ceremonies", "evidence_packages", "signing_agent_assist", "form_workflows"],
+	"permissions": ["esgn:view", "esgn:create_forms", "esgn:send_envelopes", "esgn:sign", "esgn:manage_templates", "esgn:audit", "esgn:admin"]
 }
 
 
@@ -39,7 +39,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["wflo", "ntfy", "idfd", "dlpd"],
+		"optional_dependencies": ["wflo", "ntfy", "idfd", "dlpd", "nlpc", "them"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,6 +48,7 @@ def register_capability() -> dict[str, Any]:
 			"signature_envelopes": "Prepare signature envelopes, recipients, routing, and reminders",
 			"signing_ceremonies": "Run identity-verified electronic signature ceremonies",
 			"evidence_packages": "Assemble encrypted audit evidence for completed signatures",
+			"signing_agent_assist": "Register scoped AI assistants for form, routing, clause-review, and evidence tasks",
 			"capability_rules": "Evaluate deterministic digital-form and e-signature rules",
 			"visual_theming": "Apply forms and signing theme tokens and components"
 		},
@@ -56,7 +57,9 @@ def register_capability() -> dict[str, Any]:
 			"submissions": "/esgn/api/v1/submissions",
 			"envelopes": "/esgn/api/v1/envelopes",
 			"signing": "/esgn/api/v1/signing",
-			"evidence": "/esgn/api/v1/evidence"
+			"agents": "/esgn/api/v1/agents",
+			"evidence": "/esgn/api/v1/evidence",
+			"streaming": "/esgn/api/v1/streaming"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],

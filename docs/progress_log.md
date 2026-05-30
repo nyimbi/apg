@@ -15369,3 +15369,58 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External CHAT, NTFY, AUTH, MQEB, MTEN, AUDL, WFLO, VIDC, NLPC, SECU, or CACH
   adapters.
+
+### 2026-05-30 14:22 EAT
+
+ESGN lifecycle and guardrail packet:
+
+- Selected `capabilities/common/esgn` as the next common capability after HELP.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable ESGN contract to cover forms, submissions,
+  envelopes, signatures, evidence, AI signing assistants, governance,
+  observability, APG adapters, UI routes, visual theme tokens, and Bytewax
+  event streaming.
+- Expanded deterministic guardrails to cover tenant context, template owner,
+  template name, schema, compliance framework, regulated DLP, publication
+  approval, regulated-form review, submission schema and audit evidence,
+  envelope subject, recipients, document hash, expiry, signer consent,
+  delegation policy, signer identity, signature intent, active envelope state,
+  routing order, duplicate-recipient signatures, tamper seal, expired
+  envelopes, evidence encryption, completed-envelope evidence, evidence
+  retention, cancellation/rejection reason capture, audit evidence, AI signing
+  assistant registration/runtime/scope/disclosure, tenant isolation, and
+  Bytewax batch mutation.
+- Added document hash, expiry, state reason, and signing-agent models.
+- Hardened `EsgnService` with envelope expiry checks, deterministic tamper-seal
+  verification, ordered signing, cancellation and rejection, evidence sealing,
+  AI signing-assistant registration, and Bytewax batch-mutation validation.
+- Added API helper coverage for cancellation, rejection, signing agents,
+  tamper verification, and batch mutation validation.
+- Added signing-room, signing-agent, audit, and analytics view models.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale package-test terminology and
+  expanded coverage for lifecycle execution, guardrails, AI assistant controls,
+  Bytewax policy, view models, and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/esgn/__init__.py capabilities/common/esgn/capability_contract.py capabilities/common/esgn/models.py capabilities/common/esgn/signing_engine.py capabilities/common/esgn/service.py capabilities/common/esgn/api.py capabilities/common/esgn/views.py capabilities/common/esgn/app.py capabilities/common/esgn/test_capability_contract.py capabilities/common/esgn/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/esgn/test_capability_contract.py capabilities/common/esgn/tests/test_package_contract.py` passed with 9 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and ESGN capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/esgn --json` passed with `ok: true`; ESGN remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/esgn --json` passed with 11 UI routes, 36 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and placeholder markers returned no matches.
+- `git diff --check -- capabilities/common/esgn docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live identity proofing, durable document storage, cryptographic key custody,
+  notification providers, browser-rendered signing UI, external AI-agent CLIs,
+  DLP services, compliance engines, and database persistence.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, ENCR, AUDL, COMP, WFLO, NTFY, IDFD, DLPD, NLPC, or THEM
+  adapters.

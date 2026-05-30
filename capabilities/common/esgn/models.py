@@ -107,10 +107,13 @@ class SignatureEnvelope:
 	subject: str
 	sender: str
 	recipients: tuple[SignatureRecipient, ...]
+	document_hash: str
+	expires_at: str
 	tamper_seal: str
 	signature_intent: str
 	compliance_review_recorded: bool
 	status: str = "sent"
+	state_reason: str = ""
 
 	def to_dict(self) -> dict[str, Any]:
 		return {
@@ -121,10 +124,13 @@ class SignatureEnvelope:
 			"subject": self.subject,
 			"sender": self.sender,
 			"recipients": [recipient.to_dict() for recipient in self.recipients],
+			"document_hash": self.document_hash,
+			"expires_at": self.expires_at,
 			"tamper_seal": self.tamper_seal,
 			"signature_intent": self.signature_intent,
 			"compliance_review_recorded": self.compliance_review_recorded,
 			"status": self.status,
+			"state_reason": self.state_reason,
 		}
 
 
@@ -180,6 +186,34 @@ class EvidencePackage:
 			"seal_digest": self.seal_digest,
 			"encrypted": self.encrypted,
 			"retention_policy": self.retention_policy,
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
+class SigningAgent:
+	"""Registered AI assistant scoped to form, envelope, or evidence work."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope_ref: str
+	registered_by: str
+	contribution_disclosed: bool
+	status: str = "active"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope_ref": self.scope_ref,
+			"registered_by": self.registered_by,
+			"contribution_disclosed": self.contribution_disclosed,
 			"status": self.status,
 		}
 

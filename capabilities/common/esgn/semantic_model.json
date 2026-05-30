@@ -12,29 +12,90 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "document_intelligence": "nlpc",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.EsgnService",
+          "identity": "auth",
+          "notifications": "ntfy",
+          "sealing_engine": "signing_engine.py",
+          "theme": "them",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
+        "envelopes": {
+          "document_hash_required": true,
+          "expiry_in_future_required": true,
+          "expiry_required": true,
+          "ordered_signing_required": true,
+          "recipient_required": true,
+          "routing_order_required": true,
+          "state_change_audit_required": true,
+          "subject_required": true
+        },
         "evidence": {
           "audit_trail_required": true,
           "certificate_of_completion": true,
           "encrypted_evidence_required": true,
-          "retention_policy_required": true
+          "retention_policy_required": true,
+          "tamper_seal_verification_required": true
         },
         "forms": {
+          "form_state_audit_required": true,
           "publication_approval_required": true,
           "regulated_field_dlp_required": true,
           "schema_validation_required": true,
           "template_owner_required": true
         },
         "governance": {
+          "batch_event_stream": "bytewax",
           "compliance_framework_link_required": true,
           "delegated_signing_policy_required": true,
           "recipient_consent_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "envelope_metrics_required": true,
+          "event_stream": "bytewax",
+          "evidence_metrics_required": true
         },
         "signatures": {
+          "duplicate_signing_blocked": true,
           "identity_verification_required": true,
           "multi_party_routing_enabled": true,
+          "sign_after_completion_blocked": true,
           "signature_intent_required": true,
+          "signer_consent_required": true,
           "tamper_seal_required": true
+        },
+        "signing_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "form_assistant",
+            "clause_reviewer",
+            "routing_coordinator",
+            "evidence_auditor"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "submissions": {
+          "audit_trail_required": true,
+          "schema_validation_required": true,
+          "validation_hash_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -42,6 +103,9 @@
           "default_theme": "esgn_forms_signing"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_envelope_console": true,
           "enable_evidence_vault": true,
           "enable_form_builder": true,
@@ -55,9 +119,19 @@
       "master_data": {},
       "name": "Digital Forms and eSign",
       "provides": [
-        "esgn_operations"
+        "digital_forms",
+        "signature_envelopes",
+        "signing_ceremonies",
+        "evidence_packages",
+        "signing_agent_assist",
+        "form_workflows"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "encr",
+        "audl",
+        "comp"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +161,59 @@
           },
           {
             "condition": {
+              "operation": "create_form_template",
+              "template_name_present": false
+            },
+            "description": "Form templates require a readable name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_name_required",
+              "required_action": "name_form_template"
+            },
+            "name": "form_template_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "create_form_template",
+              "schema_fields_present": false
+            },
+            "description": "Form templates require schema fields.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_validation_required",
+              "required_action": "define_form_schema"
+            },
+            "name": "form_template_requires_schema"
+          },
+          {
+            "condition": {
+              "compliance_framework_present": false,
+              "operation": "create_form_template"
+            },
+            "description": "Form templates require compliance framework linkage.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_framework_link_required",
+              "required_action": "attach_compliance_framework"
+            },
+            "name": "form_template_requires_compliance_framework"
+          },
+          {
+            "condition": {
+              "dlp_policy_present": false,
+              "operation": "create_form_template",
+              "regulated_form": true
+            },
+            "description": "Regulated forms require DLP policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "regulated_field_dlp_required",
+              "required_action": "attach_dlp_policy"
+            },
+            "name": "regulated_form_requires_dlp"
+          },
+          {
+            "condition": {
               "operation": "publish_form",
               "publication_approved": false
             },
@@ -97,6 +224,135 @@
               "required_action": "approve_form_publication"
             },
             "name": "form_publication_requires_approval"
+          },
+          {
+            "condition": {
+              "compliance_review_recorded": false,
+              "regulated_form": true
+            },
+            "description": "Regulated forms require compliance review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "compliance_review_required",
+              "required_action": "review_regulated_form"
+            },
+            "name": "regulated_form_requires_compliance_review"
+          },
+          {
+            "condition": {
+              "audit_evidence_present": false,
+              "operation": "submit_form"
+            },
+            "description": "Form submissions require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_trail_required",
+              "required_action": "attach_submission_audit_ref"
+            },
+            "name": "submission_requires_evidence"
+          },
+          {
+            "condition": {
+              "operation": "submit_form",
+              "schema_valid": false
+            },
+            "description": "Form submission data must satisfy the template schema.",
+            "effect": {
+              "decision": "deny",
+              "reason": "schema_validation_required",
+              "required_action": "correct_submission_payload"
+            },
+            "name": "submission_requires_valid_schema"
+          },
+          {
+            "condition": {
+              "operation": "create_envelope",
+              "subject_present": false
+            },
+            "description": "Signature envelopes require a subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envelope_subject_required",
+              "required_action": "add_envelope_subject"
+            },
+            "name": "envelope_requires_subject"
+          },
+          {
+            "condition": {
+              "operation": "create_envelope",
+              "recipient_count_lte": 0
+            },
+            "description": "Signature envelopes require at least one recipient.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_required",
+              "required_action": "add_recipient"
+            },
+            "name": "envelope_requires_recipient"
+          },
+          {
+            "condition": {
+              "document_hash_present": false,
+              "operation": "create_envelope"
+            },
+            "description": "Signature envelopes require a document hash before routing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "document_hash_required",
+              "required_action": "attach_document_hash"
+            },
+            "name": "envelope_requires_document_hash"
+          },
+          {
+            "condition": {
+              "expires_at_present": false,
+              "operation": "create_envelope"
+            },
+            "description": "Signature envelopes require an expiry timestamp.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envelope_expiry_required",
+              "required_action": "set_envelope_expiry"
+            },
+            "name": "envelope_requires_expiry"
+          },
+          {
+            "condition": {
+              "expiry_in_future": false,
+              "operation": "create_envelope"
+            },
+            "description": "Signature envelope expiry must be in the future at send time.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envelope_expiry_in_past",
+              "required_action": "choose_future_expiry"
+            },
+            "name": "envelope_expiry_must_be_future"
+          },
+          {
+            "condition": {
+              "recipient_consent_recorded": false
+            },
+            "description": "Recipients must consent before routing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_consent_required",
+              "required_action": "record_recipient_consent"
+            },
+            "name": "recipient_requires_consent"
+          },
+          {
+            "condition": {
+              "delegated_policy_attached": false,
+              "delegated_signer_present": true
+            },
+            "description": "Delegated signing requires an approved policy reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "delegated_signing_policy_required",
+              "required_action": "attach_delegated_signing_policy"
+            },
+            "name": "delegated_signing_requires_policy"
           },
           {
             "condition": {
@@ -113,6 +369,84 @@
           },
           {
             "condition": {
+              "operation": "sign_envelope",
+              "signature_intent_present": false
+            },
+            "description": "Signing requires explicit signature intent.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signature_intent_required",
+              "required_action": "record_signature_intent"
+            },
+            "name": "signing_requires_intent"
+          },
+          {
+            "condition": {
+              "envelope_signable": false,
+              "operation": "sign_envelope"
+            },
+            "description": "Only active envelopes may be signed.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envelope_not_signable",
+              "required_action": "restore_or_reissue_envelope"
+            },
+            "name": "signing_requires_active_envelope"
+          },
+          {
+            "condition": {
+              "operation": "sign_envelope",
+              "routing_order_ready": false
+            },
+            "description": "Signer routing order must be respected.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signer_routing_order_required",
+              "required_action": "wait_for_prior_signers"
+            },
+            "name": "signing_requires_order"
+          },
+          {
+            "condition": {
+              "operation": "sign_envelope",
+              "recipient_already_signed": true
+            },
+            "description": "A recipient may sign an envelope only once.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_already_signed",
+              "required_action": "review_existing_signature"
+            },
+            "name": "signing_blocks_duplicate_recipient"
+          },
+          {
+            "condition": {
+              "operation": "sign_envelope",
+              "tamper_seal_valid": false
+            },
+            "description": "The envelope tamper seal must validate before signing.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tamper_seal_invalid",
+              "required_action": "rebuild_or_reissue_envelope"
+            },
+            "name": "signing_requires_valid_seal"
+          },
+          {
+            "condition": {
+              "envelope_expired": true,
+              "operation": "sign_envelope"
+            },
+            "description": "Expired envelopes may not be signed.",
+            "effect": {
+              "decision": "deny",
+              "reason": "envelope_expired",
+              "required_action": "reissue_envelope"
+            },
+            "name": "signing_blocks_expired_envelope"
+          },
+          {
+            "condition": {
               "evidence_encrypted": false,
               "evidence_package_created": true
             },
@@ -126,16 +460,145 @@
           },
           {
             "condition": {
-              "compliance_review_recorded": false,
-              "regulated_form": true
+              "envelope_completed": false,
+              "operation": "create_evidence_package"
             },
-            "description": "Regulated forms require compliance review.",
+            "description": "Evidence packages require a completed envelope.",
             "effect": {
-              "decision": "require_review",
-              "reason": "compliance_review_required",
-              "required_action": "review_regulated_form"
+              "decision": "deny",
+              "reason": "envelope_not_completed",
+              "required_action": "complete_all_signatures"
             },
-            "name": "regulated_form_requires_compliance_review"
+            "name": "evidence_requires_completed_envelope"
+          },
+          {
+            "condition": {
+              "operation": "create_evidence_package",
+              "tamper_seal_valid": false
+            },
+            "description": "Evidence packages require valid tamper-seal verification.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tamper_seal_invalid",
+              "required_action": "investigate_envelope_integrity"
+            },
+            "name": "evidence_requires_valid_seal"
+          },
+          {
+            "condition": {
+              "operation": "create_evidence_package",
+              "retention_policy_present": false
+            },
+            "description": "Evidence packages require retention policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_policy_required",
+              "required_action": "attach_retention_policy"
+            },
+            "name": "evidence_requires_retention"
+          },
+          {
+            "condition": {
+              "operation": "change_envelope_state",
+              "state_change_reason_present": false
+            },
+            "description": "Envelope cancellation and rejection require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "envelope_state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "ESGN state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "esgn_audit_event_required",
+              "required_action": "record_esgn_audit_event"
+            },
+            "name": "esgn_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "signing_agent_present": true
+            },
+            "description": "AI signing assistants must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_registration_required",
+              "required_action": "register_signing_agent"
+            },
+            "name": "signing_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "signing_agent_present": true
+            },
+            "description": "AI signing assistants must use a configured runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_runtime_not_supported",
+              "required_action": "choose_supported_signing_agent_runtime"
+            },
+            "name": "signing_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "signing_agent_present": true
+            },
+            "description": "AI signing assistants require envelope or form scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_scope_required",
+              "required_action": "set_signing_agent_scope"
+            },
+            "name": "signing_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "signing_agent_present": true
+            },
+            "description": "AI-assisted signature activity requires visible disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "signing_agent_disclosure_required",
+              "required_action": "disclose_signing_agent"
+            },
+            "name": "signing_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Digital form and e-sign records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_esgn_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_esgn_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_esgn_mutation"
+            },
+            "description": "Batch form and signature mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_esgn_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -168,6 +631,59 @@
         },
         {
           "condition": {
+            "operation": "create_form_template",
+            "template_name_present": false
+          },
+          "description": "Form templates require a readable name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_name_required",
+            "required_action": "name_form_template"
+          },
+          "name": "form_template_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "create_form_template",
+            "schema_fields_present": false
+          },
+          "description": "Form templates require schema fields.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_validation_required",
+            "required_action": "define_form_schema"
+          },
+          "name": "form_template_requires_schema"
+        },
+        {
+          "condition": {
+            "compliance_framework_present": false,
+            "operation": "create_form_template"
+          },
+          "description": "Form templates require compliance framework linkage.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_framework_link_required",
+            "required_action": "attach_compliance_framework"
+          },
+          "name": "form_template_requires_compliance_framework"
+        },
+        {
+          "condition": {
+            "dlp_policy_present": false,
+            "operation": "create_form_template",
+            "regulated_form": true
+          },
+          "description": "Regulated forms require DLP policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "regulated_field_dlp_required",
+            "required_action": "attach_dlp_policy"
+          },
+          "name": "regulated_form_requires_dlp"
+        },
+        {
+          "condition": {
             "operation": "publish_form",
             "publication_approved": false
           },
@@ -178,6 +694,135 @@
             "required_action": "approve_form_publication"
           },
           "name": "form_publication_requires_approval"
+        },
+        {
+          "condition": {
+            "compliance_review_recorded": false,
+            "regulated_form": true
+          },
+          "description": "Regulated forms require compliance review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "compliance_review_required",
+            "required_action": "review_regulated_form"
+          },
+          "name": "regulated_form_requires_compliance_review"
+        },
+        {
+          "condition": {
+            "audit_evidence_present": false,
+            "operation": "submit_form"
+          },
+          "description": "Form submissions require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_trail_required",
+            "required_action": "attach_submission_audit_ref"
+          },
+          "name": "submission_requires_evidence"
+        },
+        {
+          "condition": {
+            "operation": "submit_form",
+            "schema_valid": false
+          },
+          "description": "Form submission data must satisfy the template schema.",
+          "effect": {
+            "decision": "deny",
+            "reason": "schema_validation_required",
+            "required_action": "correct_submission_payload"
+          },
+          "name": "submission_requires_valid_schema"
+        },
+        {
+          "condition": {
+            "operation": "create_envelope",
+            "subject_present": false
+          },
+          "description": "Signature envelopes require a subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envelope_subject_required",
+            "required_action": "add_envelope_subject"
+          },
+          "name": "envelope_requires_subject"
+        },
+        {
+          "condition": {
+            "operation": "create_envelope",
+            "recipient_count_lte": 0
+          },
+          "description": "Signature envelopes require at least one recipient.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_required",
+            "required_action": "add_recipient"
+          },
+          "name": "envelope_requires_recipient"
+        },
+        {
+          "condition": {
+            "document_hash_present": false,
+            "operation": "create_envelope"
+          },
+          "description": "Signature envelopes require a document hash before routing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "document_hash_required",
+            "required_action": "attach_document_hash"
+          },
+          "name": "envelope_requires_document_hash"
+        },
+        {
+          "condition": {
+            "expires_at_present": false,
+            "operation": "create_envelope"
+          },
+          "description": "Signature envelopes require an expiry timestamp.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envelope_expiry_required",
+            "required_action": "set_envelope_expiry"
+          },
+          "name": "envelope_requires_expiry"
+        },
+        {
+          "condition": {
+            "expiry_in_future": false,
+            "operation": "create_envelope"
+          },
+          "description": "Signature envelope expiry must be in the future at send time.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envelope_expiry_in_past",
+            "required_action": "choose_future_expiry"
+          },
+          "name": "envelope_expiry_must_be_future"
+        },
+        {
+          "condition": {
+            "recipient_consent_recorded": false
+          },
+          "description": "Recipients must consent before routing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_consent_required",
+            "required_action": "record_recipient_consent"
+          },
+          "name": "recipient_requires_consent"
+        },
+        {
+          "condition": {
+            "delegated_policy_attached": false,
+            "delegated_signer_present": true
+          },
+          "description": "Delegated signing requires an approved policy reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "delegated_signing_policy_required",
+            "required_action": "attach_delegated_signing_policy"
+          },
+          "name": "delegated_signing_requires_policy"
         },
         {
           "condition": {
@@ -194,6 +839,84 @@
         },
         {
           "condition": {
+            "operation": "sign_envelope",
+            "signature_intent_present": false
+          },
+          "description": "Signing requires explicit signature intent.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signature_intent_required",
+            "required_action": "record_signature_intent"
+          },
+          "name": "signing_requires_intent"
+        },
+        {
+          "condition": {
+            "envelope_signable": false,
+            "operation": "sign_envelope"
+          },
+          "description": "Only active envelopes may be signed.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envelope_not_signable",
+            "required_action": "restore_or_reissue_envelope"
+          },
+          "name": "signing_requires_active_envelope"
+        },
+        {
+          "condition": {
+            "operation": "sign_envelope",
+            "routing_order_ready": false
+          },
+          "description": "Signer routing order must be respected.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signer_routing_order_required",
+            "required_action": "wait_for_prior_signers"
+          },
+          "name": "signing_requires_order"
+        },
+        {
+          "condition": {
+            "operation": "sign_envelope",
+            "recipient_already_signed": true
+          },
+          "description": "A recipient may sign an envelope only once.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_already_signed",
+            "required_action": "review_existing_signature"
+          },
+          "name": "signing_blocks_duplicate_recipient"
+        },
+        {
+          "condition": {
+            "operation": "sign_envelope",
+            "tamper_seal_valid": false
+          },
+          "description": "The envelope tamper seal must validate before signing.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tamper_seal_invalid",
+            "required_action": "rebuild_or_reissue_envelope"
+          },
+          "name": "signing_requires_valid_seal"
+        },
+        {
+          "condition": {
+            "envelope_expired": true,
+            "operation": "sign_envelope"
+          },
+          "description": "Expired envelopes may not be signed.",
+          "effect": {
+            "decision": "deny",
+            "reason": "envelope_expired",
+            "required_action": "reissue_envelope"
+          },
+          "name": "signing_blocks_expired_envelope"
+        },
+        {
+          "condition": {
             "evidence_encrypted": false,
             "evidence_package_created": true
           },
@@ -207,16 +930,145 @@
         },
         {
           "condition": {
-            "compliance_review_recorded": false,
-            "regulated_form": true
+            "envelope_completed": false,
+            "operation": "create_evidence_package"
           },
-          "description": "Regulated forms require compliance review.",
+          "description": "Evidence packages require a completed envelope.",
           "effect": {
-            "decision": "require_review",
-            "reason": "compliance_review_required",
-            "required_action": "review_regulated_form"
+            "decision": "deny",
+            "reason": "envelope_not_completed",
+            "required_action": "complete_all_signatures"
           },
-          "name": "regulated_form_requires_compliance_review"
+          "name": "evidence_requires_completed_envelope"
+        },
+        {
+          "condition": {
+            "operation": "create_evidence_package",
+            "tamper_seal_valid": false
+          },
+          "description": "Evidence packages require valid tamper-seal verification.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tamper_seal_invalid",
+            "required_action": "investigate_envelope_integrity"
+          },
+          "name": "evidence_requires_valid_seal"
+        },
+        {
+          "condition": {
+            "operation": "create_evidence_package",
+            "retention_policy_present": false
+          },
+          "description": "Evidence packages require retention policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_policy_required",
+            "required_action": "attach_retention_policy"
+          },
+          "name": "evidence_requires_retention"
+        },
+        {
+          "condition": {
+            "operation": "change_envelope_state",
+            "state_change_reason_present": false
+          },
+          "description": "Envelope cancellation and rejection require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "envelope_state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "ESGN state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "esgn_audit_event_required",
+            "required_action": "record_esgn_audit_event"
+          },
+          "name": "esgn_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "signing_agent_present": true
+          },
+          "description": "AI signing assistants must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_registration_required",
+            "required_action": "register_signing_agent"
+          },
+          "name": "signing_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "signing_agent_present": true
+          },
+          "description": "AI signing assistants must use a configured runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_runtime_not_supported",
+            "required_action": "choose_supported_signing_agent_runtime"
+          },
+          "name": "signing_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "signing_agent_present": true
+          },
+          "description": "AI signing assistants require envelope or form scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_scope_required",
+            "required_action": "set_signing_agent_scope"
+          },
+          "name": "signing_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "signing_agent_present": true
+          },
+          "description": "AI-assisted signature activity requires visible disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "signing_agent_disclosure_required",
+            "required_action": "disclose_signing_agent"
+          },
+          "name": "signing_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Digital form and e-sign records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_esgn_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_esgn_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_esgn_mutation"
+          },
+          "description": "Batch form and signature mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_esgn_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,6 +1078,21 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "SigningAgentPanel",
+          "permission": "esgn:send_envelopes",
+          "route": "/esgn/agents"
+        },
+        "analytics": {
+          "component": "ESGNAnalytics",
+          "permission": "esgn:view",
+          "route": "/esgn/analytics"
+        },
+        "audit": {
+          "component": "ESGNAuditTrail",
+          "permission": "esgn:audit",
+          "route": "/esgn/audit"
+        },
         "builder": {
           "component": "FormBuilder",
           "permission": "esgn:create_forms",
@@ -267,9 +1134,39 @@
           "route": "/esgn/submissions"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_esgn_mutation_requires_bytewax",
+        "events": [
+          "template_created",
+          "template_published",
+          "form_submitted",
+          "envelope_sent",
+          "envelope_signed",
+          "envelope_cancelled",
+          "envelope_rejected",
+          "evidence_package_created",
+          "signing_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "form_templates",
+          "form_submissions",
+          "signature_envelopes",
+          "signing_ceremonies",
+          "evidence_packages"
+        ],
+        "topic": "apg.esgn.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "assistant-roster"
+          },
+          "audit_timeline": {
+            "status_style": "seal-chip",
+            "visual": "event-timeline"
+          },
           "envelope_console": {
             "highlight": "signature-chip",
             "visual": "recipient-routing"
@@ -286,6 +1183,10 @@
           "signing_room": {
             "status_style": "identity-chip",
             "visual": "signature-ceremony"
+          },
+          "submission_queue": {
+            "status_style": "validation-chip",
+            "visual": "submission-table"
           }
         },
         "name": "esgn_forms_signing",
@@ -350,10 +1251,31 @@
             "permission": "esgn:sign"
           },
           {
+            "component": "SigningAgentPanel",
+            "name": "agents",
+            "nav_group": "Signatures",
+            "path": "/esgn/agents",
+            "permission": "esgn:send_envelopes"
+          },
+          {
             "component": "EvidenceVault",
             "name": "evidence",
             "nav_group": "Governance",
             "path": "/esgn/evidence",
+            "permission": "esgn:view"
+          },
+          {
+            "component": "ESGNAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/esgn/audit",
+            "permission": "esgn:audit"
+          },
+          {
+            "component": "ESGNAnalytics",
+            "name": "analytics",
+            "nav_group": "Operations",
+            "path": "/esgn/analytics",
             "permission": "esgn:view"
           },
           {
@@ -377,35 +1299,101 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "esgn": []
+      "esgn": [
+        "auth",
+        "encr",
+        "audl",
+        "comp"
+      ]
     }
   },
   "contracts": {
     "esgn": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "compliance": "comp",
+          "document_intelligence": "nlpc",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.EsgnService",
+          "identity": "auth",
+          "notifications": "ntfy",
+          "sealing_engine": "signing_engine.py",
+          "theme": "them",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
+        "envelopes": {
+          "document_hash_required": true,
+          "expiry_in_future_required": true,
+          "expiry_required": true,
+          "ordered_signing_required": true,
+          "recipient_required": true,
+          "routing_order_required": true,
+          "state_change_audit_required": true,
+          "subject_required": true
+        },
         "evidence": {
           "audit_trail_required": true,
           "certificate_of_completion": true,
           "encrypted_evidence_required": true,
-          "retention_policy_required": true
+          "retention_policy_required": true,
+          "tamper_seal_verification_required": true
         },
         "forms": {
+          "form_state_audit_required": true,
           "publication_approval_required": true,
           "regulated_field_dlp_required": true,
           "schema_validation_required": true,
           "template_owner_required": true
         },
         "governance": {
+          "batch_event_stream": "bytewax",
           "compliance_framework_link_required": true,
           "delegated_signing_policy_required": true,
           "recipient_consent_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "tenant_isolation_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "envelope_metrics_required": true,
+          "event_stream": "bytewax",
+          "evidence_metrics_required": true
         },
         "signatures": {
+          "duplicate_signing_blocked": true,
           "identity_verification_required": true,
           "multi_party_routing_enabled": true,
+          "sign_after_completion_blocked": true,
           "signature_intent_required": true,
+          "signer_consent_required": true,
           "tamper_seal_required": true
+        },
+        "signing_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "form_assistant",
+            "clause_reviewer",
+            "routing_coordinator",
+            "evidence_auditor"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "submissions": {
+          "audit_trail_required": true,
+          "schema_validation_required": true,
+          "validation_hash_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -413,6 +1401,9 @@
           "default_theme": "esgn_forms_signing"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_envelope_console": true,
           "enable_evidence_vault": true,
           "enable_form_builder": true,
@@ -421,9 +1412,19 @@
       },
       "id": "esgn",
       "provides": [
-        "esgn_operations"
+        "digital_forms",
+        "signature_envelopes",
+        "signing_ceremonies",
+        "evidence_packages",
+        "signing_agent_assist",
+        "form_workflows"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "encr",
+        "audl",
+        "comp"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +1436,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +1457,148 @@
   },
   "roles": {},
   "rules": {
+    "batch_esgn_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_esgn_mutation"
+      },
+      "description": "Batch form and signature mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_esgn_mutation_requires_bytewax"
+    },
+    "cross_tenant_esgn_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Digital form and e-sign records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_esgn_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_esgn_access_denied"
+    },
+    "delegated_signing_requires_policy": {
+      "condition": {
+        "delegated_policy_attached": false,
+        "delegated_signer_present": true
+      },
+      "description": "Delegated signing requires an approved policy reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "delegated_signing_policy_required",
+        "required_action": "attach_delegated_signing_policy"
+      },
+      "name": "delegated_signing_requires_policy"
+    },
+    "envelope_expiry_must_be_future": {
+      "condition": {
+        "expiry_in_future": false,
+        "operation": "create_envelope"
+      },
+      "description": "Signature envelope expiry must be in the future at send time.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envelope_expiry_in_past",
+        "required_action": "choose_future_expiry"
+      },
+      "name": "envelope_expiry_must_be_future"
+    },
+    "envelope_requires_document_hash": {
+      "condition": {
+        "document_hash_present": false,
+        "operation": "create_envelope"
+      },
+      "description": "Signature envelopes require a document hash before routing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "document_hash_required",
+        "required_action": "attach_document_hash"
+      },
+      "name": "envelope_requires_document_hash"
+    },
+    "envelope_requires_expiry": {
+      "condition": {
+        "expires_at_present": false,
+        "operation": "create_envelope"
+      },
+      "description": "Signature envelopes require an expiry timestamp.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envelope_expiry_required",
+        "required_action": "set_envelope_expiry"
+      },
+      "name": "envelope_requires_expiry"
+    },
+    "envelope_requires_recipient": {
+      "condition": {
+        "operation": "create_envelope",
+        "recipient_count_lte": 0
+      },
+      "description": "Signature envelopes require at least one recipient.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recipient_required",
+        "required_action": "add_recipient"
+      },
+      "name": "envelope_requires_recipient"
+    },
+    "envelope_requires_subject": {
+      "condition": {
+        "operation": "create_envelope",
+        "subject_present": false
+      },
+      "description": "Signature envelopes require a subject.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envelope_subject_required",
+        "required_action": "add_envelope_subject"
+      },
+      "name": "envelope_requires_subject"
+    },
+    "envelope_state_change_requires_reason": {
+      "condition": {
+        "operation": "change_envelope_state",
+        "state_change_reason_present": false
+      },
+      "description": "Envelope cancellation and rejection require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "envelope_state_change_requires_reason"
+    },
+    "esgn_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "ESGN state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "esgn_audit_event_required",
+        "required_action": "record_esgn_audit_event"
+      },
+      "name": "esgn_state_change_requires_audit"
+    },
+    "evidence_requires_completed_envelope": {
+      "condition": {
+        "envelope_completed": false,
+        "operation": "create_evidence_package"
+      },
+      "description": "Evidence packages require a completed envelope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envelope_not_completed",
+        "required_action": "complete_all_signatures"
+      },
+      "name": "evidence_requires_completed_envelope"
+    },
     "evidence_requires_encryption": {
       "condition": {
         "evidence_encrypted": false,
@@ -468,6 +1611,32 @@
         "required_action": "encrypt_evidence_package"
       },
       "name": "evidence_requires_encryption"
+    },
+    "evidence_requires_retention": {
+      "condition": {
+        "operation": "create_evidence_package",
+        "retention_policy_present": false
+      },
+      "description": "Evidence packages require retention policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retention_policy_required",
+        "required_action": "attach_retention_policy"
+      },
+      "name": "evidence_requires_retention"
+    },
+    "evidence_requires_valid_seal": {
+      "condition": {
+        "operation": "create_evidence_package",
+        "tamper_seal_valid": false
+      },
+      "description": "Evidence packages require valid tamper-seal verification.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tamper_seal_invalid",
+        "required_action": "investigate_envelope_integrity"
+      },
+      "name": "evidence_requires_valid_seal"
     },
     "form_publication_requires_approval": {
       "condition": {
@@ -482,6 +1651,32 @@
       },
       "name": "form_publication_requires_approval"
     },
+    "form_template_requires_compliance_framework": {
+      "condition": {
+        "compliance_framework_present": false,
+        "operation": "create_form_template"
+      },
+      "description": "Form templates require compliance framework linkage.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compliance_framework_link_required",
+        "required_action": "attach_compliance_framework"
+      },
+      "name": "form_template_requires_compliance_framework"
+    },
+    "form_template_requires_name": {
+      "condition": {
+        "operation": "create_form_template",
+        "template_name_present": false
+      },
+      "description": "Form templates require a readable name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_name_required",
+        "required_action": "name_form_template"
+      },
+      "name": "form_template_requires_name"
+    },
     "form_template_requires_owner": {
       "condition": {
         "operation": "create_form_template",
@@ -494,6 +1689,31 @@
         "required_action": "assign_template_owner"
       },
       "name": "form_template_requires_owner"
+    },
+    "form_template_requires_schema": {
+      "condition": {
+        "operation": "create_form_template",
+        "schema_fields_present": false
+      },
+      "description": "Form templates require schema fields.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_validation_required",
+        "required_action": "define_form_schema"
+      },
+      "name": "form_template_requires_schema"
+    },
+    "recipient_requires_consent": {
+      "condition": {
+        "recipient_consent_recorded": false
+      },
+      "description": "Recipients must consent before routing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recipient_consent_required",
+        "required_action": "record_recipient_consent"
+      },
+      "name": "recipient_requires_consent"
     },
     "regulated_form_requires_compliance_review": {
       "condition": {
@@ -508,6 +1728,111 @@
       },
       "name": "regulated_form_requires_compliance_review"
     },
+    "regulated_form_requires_dlp": {
+      "condition": {
+        "dlp_policy_present": false,
+        "operation": "create_form_template",
+        "regulated_form": true
+      },
+      "description": "Regulated forms require DLP policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "regulated_field_dlp_required",
+        "required_action": "attach_dlp_policy"
+      },
+      "name": "regulated_form_requires_dlp"
+    },
+    "signing_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "signing_agent_present": true
+      },
+      "description": "AI-assisted signature activity requires visible disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_disclosure_required",
+        "required_action": "disclose_signing_agent"
+      },
+      "name": "signing_agent_requires_disclosure"
+    },
+    "signing_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "signing_agent_present": true
+      },
+      "description": "AI signing assistants must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_registration_required",
+        "required_action": "register_signing_agent"
+      },
+      "name": "signing_agent_requires_registration"
+    },
+    "signing_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "signing_agent_present": true
+      },
+      "description": "AI signing assistants require envelope or form scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_scope_required",
+        "required_action": "set_signing_agent_scope"
+      },
+      "name": "signing_agent_requires_scope"
+    },
+    "signing_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "signing_agent_present": true
+      },
+      "description": "AI signing assistants must use a configured runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signing_agent_runtime_not_supported",
+        "required_action": "choose_supported_signing_agent_runtime"
+      },
+      "name": "signing_agent_runtime_supported"
+    },
+    "signing_blocks_duplicate_recipient": {
+      "condition": {
+        "operation": "sign_envelope",
+        "recipient_already_signed": true
+      },
+      "description": "A recipient may sign an envelope only once.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recipient_already_signed",
+        "required_action": "review_existing_signature"
+      },
+      "name": "signing_blocks_duplicate_recipient"
+    },
+    "signing_blocks_expired_envelope": {
+      "condition": {
+        "envelope_expired": true,
+        "operation": "sign_envelope"
+      },
+      "description": "Expired envelopes may not be signed.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envelope_expired",
+        "required_action": "reissue_envelope"
+      },
+      "name": "signing_blocks_expired_envelope"
+    },
+    "signing_requires_active_envelope": {
+      "condition": {
+        "envelope_signable": false,
+        "operation": "sign_envelope"
+      },
+      "description": "Only active envelopes may be signed.",
+      "effect": {
+        "decision": "deny",
+        "reason": "envelope_not_signable",
+        "required_action": "restore_or_reissue_envelope"
+      },
+      "name": "signing_requires_active_envelope"
+    },
     "signing_requires_identity_verification": {
       "condition": {
         "identity_verified": false,
@@ -520,6 +1845,71 @@
         "required_action": "verify_signer_identity"
       },
       "name": "signing_requires_identity_verification"
+    },
+    "signing_requires_intent": {
+      "condition": {
+        "operation": "sign_envelope",
+        "signature_intent_present": false
+      },
+      "description": "Signing requires explicit signature intent.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signature_intent_required",
+        "required_action": "record_signature_intent"
+      },
+      "name": "signing_requires_intent"
+    },
+    "signing_requires_order": {
+      "condition": {
+        "operation": "sign_envelope",
+        "routing_order_ready": false
+      },
+      "description": "Signer routing order must be respected.",
+      "effect": {
+        "decision": "deny",
+        "reason": "signer_routing_order_required",
+        "required_action": "wait_for_prior_signers"
+      },
+      "name": "signing_requires_order"
+    },
+    "signing_requires_valid_seal": {
+      "condition": {
+        "operation": "sign_envelope",
+        "tamper_seal_valid": false
+      },
+      "description": "The envelope tamper seal must validate before signing.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tamper_seal_invalid",
+        "required_action": "rebuild_or_reissue_envelope"
+      },
+      "name": "signing_requires_valid_seal"
+    },
+    "submission_requires_evidence": {
+      "condition": {
+        "audit_evidence_present": false,
+        "operation": "submit_form"
+      },
+      "description": "Form submissions require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_trail_required",
+        "required_action": "attach_submission_audit_ref"
+      },
+      "name": "submission_requires_evidence"
+    },
+    "submission_requires_valid_schema": {
+      "condition": {
+        "operation": "submit_form",
+        "schema_valid": false
+      },
+      "description": "Form submission data must satisfy the template schema.",
+      "effect": {
+        "decision": "deny",
+        "reason": "schema_validation_required",
+        "required_action": "correct_submission_payload"
+      },
+      "name": "submission_requires_valid_schema"
     },
     "tenant_context_required": {
       "condition": {

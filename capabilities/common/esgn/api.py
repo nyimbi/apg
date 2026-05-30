@@ -67,6 +67,8 @@ def create_envelope(payload: dict[str, Any]) -> dict[str, Any]:
 		sender=str(payload.get("sender") or "system"),
 		signature_intent=str(payload.get("signature_intent") or "approval"),
 		compliance_review_recorded=bool(payload.get("compliance_review_recorded", True)),
+		document_hash=str(payload.get("document_hash") or ""),
+		expires_at=str(payload.get("expires_at") or ""),
 	)
 
 
@@ -94,6 +96,47 @@ def create_evidence_package(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def cancel_envelope(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.cancel_envelope(
+		envelope_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		actor=str(payload.get("actor") or "system"),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def reject_envelope(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.reject_envelope(
+		envelope_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		recipient_id=str(payload["recipient_id"]),
+		reason=str(payload.get("reason") or ""),
+	)
+
+
+def register_signing_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_signing_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or ""),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope_ref=str(payload.get("scope_ref") or ""),
+		registered_by=str(payload.get("registered_by") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", False)),
+	)
+
+
+def verify_tamper_seal(payload: dict[str, Any]) -> dict[str, Any]:
+	envelope_id = str(payload["id"])
+	tenant_id = str(payload.get("tenant_id") or "default")
+	return {"id": envelope_id, "tenant_id": tenant_id, "valid": SERVICE.verify_tamper_seal(envelope_id, tenant_id)}
+
+
+def validate_batch_mutation(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_mutation(str(payload.get("event_stream") or ""))
+
+
 def list_form_templates(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_templates(tenant_id)
 
@@ -112,6 +155,10 @@ def list_signing_ceremonies(tenant_id: str | None = None) -> list[dict[str, Any]
 
 def list_evidence_packages(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_evidence_packages(tenant_id)
+
+
+def list_signing_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_signing_agents(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
