@@ -520,7 +520,7 @@ class FileSystemConnector(BaseConnector):
 					results.extend(file_data)
 					processed_count += 1
 			except Exception as e:
-				await _log_error(f\"Failed to read file {file_path}\", e)
+				await _log_error(f"Failed to read file {file_path}", e)
 				continue
 		
 		return results
@@ -547,18 +547,18 @@ class FileSystemConnector(BaseConnector):
 				}
 				results.append(file_info)
 			except Exception as e:
-				await _log_error(f\"Failed to get info for file {file_path}\", e)
+				await _log_error(f"Failed to get info for file {file_path}", e)
 				continue
 		
 		return results
 	
 	async def _find_matching_files(self, base_path: Path, file_pattern: str, format_filter: Optional[str]) -> List[Path]:
-		\"\"\"Find files matching the specified pattern and format\"\"\"
+		"""Find files matching the specified pattern and format"""
 		matching_files = []
 		recursive = self.connection_metadata.get('recursive_scan', True)
 		
 		if recursive:
-			search_pattern = f\"**/{file_pattern}\"
+			search_pattern = f"**/{file_pattern}"
 		else:
 			search_pattern = file_pattern
 		
@@ -579,7 +579,7 @@ class FileSystemConnector(BaseConnector):
 		return matching_files
 	
 	async def _read_file_content(self, file_path: Path, params: Dict[str, Any]) -> List[Dict[str, Any]]:
-		\"\"\"Read and parse file content based on format\"\"\"
+		"""Read and parse file content based on format"""
 		file_format = file_path.suffix[1:].lower()
 		max_rows = params.get('max_rows_per_file', 1000)
 		
@@ -599,7 +599,7 @@ class FileSystemConnector(BaseConnector):
 			return await self._read_text_content(file_path, max_rows)
 	
 	async def _read_csv_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read CSV file content\"\"\"
+		"""Read CSV file content"""
 		try:
 			df = pd.read_csv(file_path, nrows=max_rows)
 			# Convert DataFrame to list of dictionaries
@@ -612,11 +612,11 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read CSV file {file_path}\", e)
+			await _log_error(f"Failed to read CSV file {file_path}", e)
 			return []
 	
 	async def _read_json_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read JSON file content\"\"\"
+		"""Read JSON file content"""
 		try:
 			records = []
 			with open(file_path, 'r') as f:
@@ -651,11 +651,11 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read JSON file {file_path}\", e)
+			await _log_error(f"Failed to read JSON file {file_path}", e)
 			return []
 	
 	async def _read_parquet_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read Parquet file content\"\"\"
+		"""Read Parquet file content"""
 		try:
 			table = pq.read_table(file_path)
 			# Convert to pandas for easier manipulation
@@ -669,11 +669,11 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read Parquet file {file_path}\", e)
+			await _log_error(f"Failed to read Parquet file {file_path}", e)
 			return []
 	
 	async def _read_excel_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read Excel file content\"\"\"
+		"""Read Excel file content"""
 		try:
 			df = pd.read_excel(file_path, nrows=max_rows)
 			records = df.to_dict('records')
@@ -685,11 +685,11 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read Excel file {file_path}\", e)
+			await _log_error(f"Failed to read Excel file {file_path}", e)
 			return []
 	
 	async def _read_xml_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read XML file content\"\"\"
+		"""Read XML file content"""
 		try:
 			tree = ET.parse(file_path)
 			root = tree.getroot()
@@ -722,11 +722,11 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read XML file {file_path}\", e)
+			await _log_error(f"Failed to read XML file {file_path}", e)
 			return []
 	
 	async def _read_yaml_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read YAML file content\"\"\"
+		"""Read YAML file content"""
 		try:
 			with open(file_path, 'r') as f:
 				data = yaml.safe_load(f)
@@ -745,11 +745,11 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read YAML file {file_path}\", e)
+			await _log_error(f"Failed to read YAML file {file_path}", e)
 			return []
 	
 	async def _read_text_content(self, file_path: Path, max_rows: int) -> List[Dict[str, Any]]:
-		\"\"\"Read plain text file content\"\"\"
+		"""Read plain text file content"""
 		try:
 			records = []
 			with open(file_path, 'r', encoding='utf-8') as f:
@@ -767,7 +767,7 @@ class FileSystemConnector(BaseConnector):
 			
 			return records
 		except Exception as e:
-			await _log_error(f\"Failed to read text file {file_path}\", e)
+			await _log_error(f"Failed to read text file {file_path}", e)
 			return []
 	
 	async def get_capabilities(self) -> List[ConnectionCapability]:

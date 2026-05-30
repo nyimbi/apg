@@ -5,11 +5,11 @@ metadata:
   namespace: apg-platform
   labels:
     apg.platform/capability-type: data-processing
-    apg.platform/maturity-level: production
+    apg.platform/maturity-level: packet
     apg.platform/version: "1.0.0"
     apg.platform/tier: core
   annotations:
-    apg.platform/description: "Enterprise Data Virtualization and Federated Query Processing"
+    apg.platform/description: "Governed data virtualization lifecycle and federated query control plane"
     apg.platform/maintainer: "APG Platform Team"
     apg.platform/documentation: "https://docs.apg.platform/capabilities/dvrl"
     apg.platform/support-level: "enterprise"
@@ -17,13 +17,15 @@ metadata:
 spec:
   displayName: "Data Virtualization (DVRL)"
   description: |
-    APG Data Virtualization (DVRL) provides enterprise-grade federated query processing 
-    across heterogeneous data sources with 10x better performance than industry leaders. 
-    Enables natural language queries, real-time streaming, and intelligent caching.
+    APG Data Virtualization (DVRL) provides a governed virtual source,
+    schema, virtual table, query, cache, policy, and source-retirement
+    lifecycle for generated APG applications. Physical connectors,
+    streaming execution, NLP query assistance, and cache backends bind
+    through adapter surfaces.
   
   version: "1.0.0"
   category: "data-processing"
-  maturityLevel: "production"
+  maturityLevel: "packet"
   
   # Capability Dependencies
   dependencies:

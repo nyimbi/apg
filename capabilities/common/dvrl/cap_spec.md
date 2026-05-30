@@ -1,72 +1,75 @@
-# Data Virtualization Capability Specification
+# Data Virtualization Capability Summary
 
-- **Capability Name**: Data Virtualization
+- **Capability name**: Data Virtualization
 - **Capability ID**: `dvrl`
 - **Category**: common
 - **Version**: 1.0.0
 
 ## Purpose
 
-DVRL is APG's package-backed data virtualization capability. It provides
-tenant-scoped virtual source registration, federated query parsing and planning,
-schema discovery, source adapters, Singer tap integration, natural-language
-query assistance, APG service integration, connection health handling,
-governance rule evaluation, UI route metadata, semantic-model publication, and
-publish-plan evidence.
+DVRL gives APG applications a governed data virtualization control plane. It
+lets generated applications register virtual data sources, discover and review
+schemas, publish virtual tables, evaluate federated read-query requests, manage
+cache decisions, review policy changes, retire sources, and emit audit evidence.
 
-The package is not only a generated contract shell: `service.py`, `models.py`,
-`connectors.py`, `adapters.py`, `singer_integration.py`, `nlp_integration.py`,
-`apg_integrations.py`, `error_handling.py`, and `real_implementations.py`
-provide executable runtime behavior for data-source management, federated query
-analysis, connector orchestration, cache metadata, lineage capture, integration
-boundaries, and production validation.
+The current package keeps two boundaries clear:
+
+- `DVRLLifecycleService` is the dependency-light generated-application control
+  plane used by package tests, semantic-model evidence, and composed apps.
+- `DVRLService` remains the production-oriented federation runtime for physical
+  connectors, query parsing, connector orchestration, cache metadata, NLP
+  assistance, Singer integration, and APG service integration.
 
 ## Provided Services
 
 - `dvrl_operations`
+- virtual source lifecycle governance
+- schema refresh and virtual table publication workflows
+- federated query guardrail evaluation
+- query cache lifecycle decisions
+- virtualization policy review tracking
+- generated-application UI route and theme metadata
 
 ## Required Services
 
-- `tenant_context`
-- `keym` or an equivalent credential vault for source secrets
-- `auth`/RBAC for restricted query authorization
-- `audl` for query and source audit trails
-- `cach` for query result cache integration when enabled
+- tenant context
+- `keym` or equivalent credential vault for source secrets
+- `auth` or equivalent RBAC for restricted query authorization
+- `audl` or equivalent audit sink
+- `cach` or equivalent query result cache when cache integration is enabled
+- Bytewax-backed event streaming for future streaming/runtime flow execution
 
 ## Configuration
 
 Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations.
+`get_capability_contract()`. The contract includes source, schema, query,
+cache, governance, optimization, adapter, UI, and theme sections.
 
 ## Rules
 
-- `tenant_context_required`
-- `source_registration_requires_credentials`
-- `restricted_query_requires_rbac`
-- `sensitive_results_block_cache`
-- `query_requires_lineage_capture`
-- `high_cost_query_requires_review`
+DVRL ships deterministic guardrails for:
+
+- tenant context
+- source owner, type, credentials, encryption, and activation approval
+- stale schema refresh review
+- virtual table owner and classification evidence
+- read-only, parameterized, RBAC-authorized, lineage-captured query requests
+- sensitive result cache blocking
+- high-cost and cross-source join review
+- result-row limits and cache TTL limits
+- policy review
+- source retirement impact review
 
 ## UI
 
-The package exposes 8 APG Python UI route contract(s) through
-`views.py` and the package semantic model.
+The generated-application UI contract is exposed through `view_models.py` and
+includes dashboard, query, sources, schemas, virtual tables, federation,
+policies, cache, metrics, adapters, audit, and settings routes.
 
-The UI contract covers the DVRL dashboard, query workbench, virtual source
-manager, schema browser, federation map, policy console, metrics, and settings
-surfaces.
+## Runtime Boundary
 
-## Theme
-
-The package uses the `dvrl_federation_console` APG theme contract.
-
-## External Runtime Boundary
-
-DVRL keeps live database, SaaS, object-store, streaming, and Singer tap
-connections behind connector/adaptor boundaries. Capability tests and publish
-evidence exercise deterministic package behavior without requiring live
-credentials or external systems. Production deployments can bind the connector
-manager to PostgreSQL, MySQL, MongoDB, Snowflake, BigQuery, S3, REST, GraphQL,
-Bytewax, Singer, or other configured source adapters through APG configuration
-and credential-vault services.
+Dependency-light lifecycle tests do not open physical database, SaaS,
+object-store, streaming, or Singer tap connections. Production deployments bind
+the connector registry, query planner, execution engine, metadata catalog,
+cache store, credential vault, audit sink, and Bytewax runtime through APG
+configuration and capability adapters.

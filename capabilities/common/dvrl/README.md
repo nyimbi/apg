@@ -1,351 +1,170 @@
-# APG Data Virtualization (DVRL) Capability
+# APG Data Virtualization (DVRL)
 
-**🚀 Revolutionary Data Virtualization Platform - Production Ready**
+DVRL is APG's governed data virtualization capability. It gives composed APG
+applications a first-class way to register virtual data sources, review schemas,
+publish virtual tables, evaluate federated read-query requests, manage cache
+decisions, change virtualization policies, retire sources, and expose the
+resulting control plane through generated UI models.
 
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](https://github.com/apg/capabilities/dvrl)
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue)](https://github.com/apg/capabilities/dvrl)
-[![APG Integration](https://img.shields.io/badge/APG-Fully%20Integrated-orange)](https://github.com/apg/platform)
-[![Singer.io](https://img.shields.io/badge/Singer.io-100%2B%20Data%20Sources-purple)](https://www.singer.io)
-[![Tests](https://img.shields.io/badge/Tests-847%2F847%20Passing-brightgreen)](https://github.com/apg/capabilities/dvrl)
+DVRL is intentionally split into two layers:
 
-## 🎯 Overview
+- `DVRLLifecycleService`: a dependency-light lifecycle and guardrail service for
+  generated APG applications, package evidence, and fast local tests.
+- `DVRLService`: the production-oriented federation runtime for physical
+  connectors, query parsing, connector orchestration, cache metadata, NLP
+  assistance, Singer integration, APG service integration, and deployment
+  adapters.
 
-The APG Data Virtualization (DVRL) capability is a **world-class, AI-native data virtualization platform** that provides unified access to 100+ data source types through intelligent federated query processing. Built on the APG platform with full multi-tenancy, enterprise security, and Singer.io integration, DVRL is **10x better than industry leaders** like Denodo Platform.
+## What DVRL Provides
 
-### 🏆 Key Achievements
-- **🧠 AI-Native**: Machine learning powered query optimization and caching
-- **🌐 Universal Connectivity**: 100+ data source types via Singer.io integration  
-- **⚡ Real-time Streaming**: Sub-second federated streaming queries
-- **🗣️ Natural Language**: Query data using plain English
-- **🔒 Enterprise Security**: Multi-level security with APG integration
-- **📈 Production Proven**: Validated performance exceeding all benchmarks
+- Tenant-scoped virtual source registration.
+- Source owner, supported-type, credential-vault, and encrypted-connection
+  checks.
+- Source activation approval workflow.
+- Schema refresh review workflow for stale source schemas.
+- Virtual table publication with owner and classification requirements.
+- Federated read-query guardrails for parameterization, write blocking, RBAC,
+  lineage, sensitive result caching, cost review, cross-source join review, and
+  result limits.
+- Query cache lifecycle decisions with TTL enforcement.
+- Virtualization policy review records.
+- Source retirement impact review.
+- Audit events for every lifecycle decision.
+- Generated UI view models for dashboard, source manager, schema browser,
+  virtual table catalog, query workbench, federation map, cache console,
+  policies, metrics, adapter health, audit timeline, and settings.
+- Contract-derived semantic model and publishable package metadata.
 
-## ✨ Revolutionary Features
+## Important Files
 
-### 🧠 AI-Native Query Optimization
-- Machine learning powered query planning and execution
-- Predictive caching with 85%+ hit ratios
-- Automatic performance tuning and self-optimization
-- Smart predicate pushdown and join optimization
+- `SPECIFICATION.md`: full current functional specification.
+- `PLAN.md`: implementation plan and verification strategy for this capability
+  packet.
+- `capability_contract.py`: executable configuration, rules, UI manifest, and
+  theme contract.
+- `service.py`: generated-app lifecycle service plus the existing production
+  federation runtime.
+- `view_models.py`: generated UI data models for APG shells.
+- `app.py`: publishable package entrypoint and semantic model generator.
+- `test_capability_contract.py`: focused lifecycle, rule, and UI contract
+  regression tests.
+- `tests/test_package_contract.py`: publishable package contract tests.
 
-### 🌐 Universal Data Connectivity
-- **100+ data source types** via Singer.io tap integration
-- Traditional databases (PostgreSQL, MySQL, MongoDB, etc.)
-- Modern SaaS platforms (Salesforce, Stripe, HubSpot, GitHub)
-- Cloud data warehouses (Snowflake, BigQuery, Redshift)
-- Streaming platforms (Bytewax, Pulsar, Kinesis)
-- File systems and object storage (S3, HDFS, GCS)
+## Generated-App Usage
 
-### ⚡ Real-time Streaming Federation
-- True real-time streaming query processing
-- Event-driven data federation across multiple sources
-- Sub-second latency for streaming analytics
-- Automatic stream discovery and schema evolution
-
-### 🗣️ Natural Language Queries
-- Convert plain English to optimized SQL queries
-- Semantic understanding of business terminology
-- Contextual query suggestions and auto-completion
-- Voice-enabled query interface support
-
-### 🔍 Intelligent Schema Discovery
-- AI-powered automatic schema discovery with 95% accuracy
-- Semantic data cataloging and lineage tracking
-- Data quality assessment and anomaly detection
-- Business glossary integration and mapping
-
-### 🛡️ Enterprise-Grade Security
-- Multi-level access control with APG RBAC integration
-- Row-level and column-level security enforcement  
-- Automatic PII detection and masking
-- Comprehensive audit trail and compliance reporting
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.11+
-- APG Platform Core
-- PostgreSQL 13+
-- Redis (optional, for caching)
-
-### Installation
-```bash
-# Clone the APG platform
-git clone https://github.com/datacraft/apg.git
-cd apg/capabilities/common/dvrl
-
-# Install dependencies  
-pip install -r requirements.txt
-
-# Install Singer.io taps (optional but recommended)
-pip install tap-postgres tap-mysql tap-salesforce
-```
-
-### Basic Usage
 ```python
-from dvrl.service import DVRLService
+from capabilities.common.dvrl.service import DVRLLifecycleService
 
-# Initialize DVRL service
-dvrl = DVRLService(tenant_id='your-tenant', user_id='your-user')
+service = DVRLLifecycleService()
 
-# Register a data source
-data_source = await dvrl.register_data_source({
-    'name': 'sales_db',
-    'type': 'POSTGRESQL',
-    'connection_config': {
-        'host': 'localhost',
-        'database': 'sales',
-        'user': 'user',
-        'password': 'password'
-    }
-})
-
-# Execute federated query
-result = await dvrl.execute_federated_query(
-    "SELECT * FROM customers WHERE country = 'US' LIMIT 10"
+source = service.register_source(
+    tenant_id="tenant-a",
+    source_id="orders-wh",
+    name="Orders Warehouse",
+    source_type="warehouse",
+    owner="data-platform",
+    credentials_vaulted=True,
+    connection_encrypted=True,
 )
 
-# Execute natural language query
-nl_result = await dvrl.execute_natural_language_query(
-    "Show me top 10 customers by revenue this month"
+service.activate_source(
+    tenant_id="tenant-a",
+    source_id="orders-wh",
+    approver="risk",
+    source_approval_recorded=True,
 )
+
+service.publish_virtual_table(
+    tenant_id="tenant-a",
+    table_id="orders",
+    source_id="orders-wh",
+    name="Orders",
+    owner="analytics",
+    classification="internal",
+    classification_complete=True,
+)
+
+query = service.execute_query(
+    tenant_id="tenant-a",
+    query_id="q-001",
+    sql="SELECT * FROM orders WHERE id = :id",
+    actor="analyst",
+    source_ids=["orders-wh"],
+    data_classification="internal",
+    rbac_authorized=True,
+    parameterized=True,
+    write_query=False,
+    lineage_capture_enabled=True,
+    estimated_query_cost=50.0,
+    cost_review_recorded=False,
+    join_source_count=1,
+    join_review_recorded=False,
+    requested_rows=1000,
+    result_contains_sensitive_data=False,
+    cache_requested=True,
+)
+
+assert query.status == "planned"
 ```
 
-### Singer.io Integration
+## UI Composition
+
 ```python
-# Install and register Singer tap
-await dvrl.install_singer_tap('tap-salesforce')
+from capabilities.common.dvrl.service import DVRLLifecycleService
+from capabilities.common.dvrl.view_models import dashboard_model, source_manager_model
 
-# Configure and register as data source
-salesforce_source = await dvrl.register_singer_tap_data_source(
-    tap_name='tap-salesforce',
-    tap_config={
-        'username': 'your-sf-username',
-        'password': 'your-sf-password',
-        'security_token': 'your-sf-token'
-    },
-    source_name='salesforce_crm'
-)
-
-# Query Salesforce data via federation
-sf_result = await dvrl.execute_federated_query(
-    "SELECT COUNT(*) FROM salesforce_accounts WHERE type = 'Customer'"
-)
+service = DVRLLifecycleService()
+dashboard = dashboard_model(service, "tenant-a")
+sources = source_manager_model(service, "tenant-a")
 ```
 
-## 📊 Architecture
+The generated UI contract is available from:
 
-### System Architecture
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   User Interface │    │   REST API      │    │  GraphQL API    │
-│   (Workbench)   │────│   (Flask)       │────│   (Optional)    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-          │                        │                        │
-          └────────────────────────┼────────────────────────┘
-                                   │
-┌─────────────────────────────────────────────────────────────────┐
-│                     DVRL Service Layer                          │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │ Query       │  │ Federation  │  │ NLP         │            │
-│  │ Optimizer   │  │ Engine      │  │ Processor   │            │
-│  └─────────────┘  └─────────────┘  └─────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-                                   │
-┌─────────────────────────────────────────────────────────────────┐
-│                Universal Connector Framework                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │ SQL         │  │ NoSQL       │  │ Singer.io   │            │
-│  │ Connectors  │  │ Connectors  │  │ Taps        │  ...       │
-│  └─────────────┘  └─────────────┘  └─────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-                                   │
-┌─────────────────────────────────────────────────────────────────┐
-│                      APG Platform Integration                   │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │
-│  │ auth_rbac   │  │ meta        │  │ cach        │  ...       │
-│  │ (Security)  │  │ (Metadata)  │  │ (Caching)   │            │
-│  └─────────────┘  └─────────────┘  └─────────────┘            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Query Processing Pipeline
-1. **Query Input**: SQL or Natural Language
-2. **Parse & Analyze**: Extract tables, joins, conditions
-3. **Optimize**: ML-powered query optimization
-4. **Plan**: Generate federated execution plan
-5. **Execute**: Parallel execution across data sources  
-6. **Cache**: Intelligent result caching
-7. **Return**: Unified result set to user
-
-## 📈 Performance Benchmarks
-
-### Query Performance
-- **Average Response Time**: <2 seconds
-- **Throughput**: 1000+ queries per minute
-- **Concurrent Users**: 100+ supported
-- **Cache Hit Ratio**: 85%+ average
-
-### Scalability
-- **Data Sources**: 100+ concurrent connections
-- **Data Volume**: Petabyte-scale federation tested
-- **Users**: Multi-tenant with tenant isolation
-- **Queries**: Complex federated joins across 10+ sources
-
-### vs Industry Leaders
-| Metric | DVRL | Denodo | Advantage |
-|--------|------|--------|-----------|
-| Data Sources | 100+ | 50+ | **2x More** |
-| Query Latency | <2s | 5-10s | **5x Faster** |
-| Setup Time | Minutes | Days | **100x Faster** |
-| NL Support | Native | None | **Revolutionary** |
-
-## 🔧 Configuration
-
-### Production Configuration
-```json
-{
-  "tenant_config": {
-    "default_tenant": "production",
-    "multi_tenancy": true,
-    "tenant_isolation": "strict"
-  },
-  "performance_config": {
-    "query_timeout_seconds": 300,
-    "connection_pool_size": 20,
-    "cache_ttl_seconds": 3600,
-    "max_concurrent_queries": 50
-  },
-  "singer_config": {
-    "enabled": true,
-    "taps_directory": "/opt/dvrl/singer_taps"
-  }
-}
-```
-
-### APG Integration
 ```python
-APG_INTEGRATION_CONFIG = {
-    'metadata_service': {
-        'enabled': True,
-        'service_url': 'http://apg-meta:8080'
-    },
-    'cache_service': {
-        'enabled': True,
-        'redis_url': 'redis://apg-cache:6379'
-    },
-    'security_service': {
-        'enabled': True,
-        'rbac_url': 'http://apg-auth:8080'
-    }
-}
+from capabilities.common.dvrl.capability_contract import get_capability_contract
+
+routes = get_capability_contract("tenant-a")["ui"]["routes"]
+theme = get_capability_contract("tenant-a")["theme"]
 ```
 
-## 🧪 Testing
+## Production Runtime Boundary
 
-### Run Tests
+The lifecycle service does not open physical database, SaaS, object-store,
+streaming, or Singer tap connections. Production deployments bind these through
+the adapter surfaces in `capability_contract.py`:
+
+- connector registry
+- query planner
+- execution engine
+- metadata catalog
+- cache store
+- credential vault
+- audit sink
+- Bytewax event stream runtime
+
+## Focused Verification
+
+Use focused checks while working on battery:
+
 ```bash
-# Run all tests
-python -m pytest tests/ -v
+./.venv/bin/python -m py_compile \
+  capabilities/common/dvrl/__init__.py \
+  capabilities/common/dvrl/capability_contract.py \
+  capabilities/common/dvrl/service.py \
+  capabilities/common/dvrl/api.py \
+  capabilities/common/dvrl/view_models.py \
+  capabilities/common/dvrl/app.py \
+  capabilities/common/dvrl/test_capability_contract.py \
+  capabilities/common/dvrl/tests/test_package_contract.py
 
-# Run specific test suites
-python -m pytest tests/test_integration.py -v
-python -m pytest tests/test_singer_integration.py -v
+./.venv/bin/pytest -q \
+  capabilities/common/dvrl/test_capability_contract.py \
+  capabilities/common/dvrl/tests/test_package_contract.py
 
-# Run performance benchmarks
-python -m pytest tests/test_performance.py -v --benchmark
+./.venv/bin/apg capabilities implementation-audit --root capabilities/common/dvrl --json
+./.venv/bin/apg capabilities publish-plan capabilities/common/dvrl --json
 ```
 
-### Test Coverage
-- **Unit Tests**: 650+ tests covering all components
-- **Integration Tests**: End-to-end APG integration
-- **Performance Tests**: Load and stress testing
-- **Singer.io Tests**: Complete Singer tap validation
-- **Security Tests**: Authentication and authorization
-
-## 📚 Documentation
-
-### Core Documentation
-- [**Capability Specification**](cap_spec.md) - Complete technical specification
-- [**Production Deployment Guide**](PRODUCTION_DEPLOYMENT_GUIDE.md) - Enterprise deployment
-- [**Capability Validation Report**](CAPABILITY_VALIDATION_REPORT.md) - Comprehensive validation
-- [**Singer.io Integration Guide**](SINGER_INTEGRATION_COMPLETE.md) - Enhanced connectivity
-
-### API Documentation
-- [**REST API Reference**](docs/api_reference.md) - Complete API documentation
-- [**Query Language Guide**](docs/query_language.md) - SQL and NL query syntax
-- [**Connector Development**](docs/connector_development.md) - Custom connectors
-
-### User Guides
-- [**User Guide**](docs/user_guide.md) - End-user documentation
-- [**Administrator Guide**](docs/admin_guide.md) - System administration  
-- [**Developer Guide**](docs/developer_guide.md) - Integration development
-
-## 🤝 Contributing
-
-We welcome contributions to the APG DVRL capability! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
-```bash
-# Fork and clone the repository
-git clone https://github.com/your-username/apg.git
-cd apg/capabilities/common/dvrl
-
-# Create development environment
-python -m venv dvrl_dev
-source dvrl_dev/bin/activate
-pip install -r requirements-dev.txt
-
-# Run tests
-python -m pytest tests/ -v
-```
-
-## 📄 License
-
-This project is licensed under the APG Platform License - see [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-### Community Support
-- **Documentation**: Comprehensive guides and API reference
-- **GitHub Issues**: Bug reports and feature requests
-- **Discussions**: Community discussions and Q&A
-
-### Enterprise Support
-- **Professional Services**: Implementation and consulting
-- **Dedicated Support**: 24/7 enterprise support SLA
-- **Training Programs**: Comprehensive user and administrator training
-
-## 🎉 Acknowledgments
-
-### Development Team
-- **APG Platform Team** - Core development and architecture
-- **Singer.io Community** - Enhanced connectivity ecosystem
-- **Open Source Contributors** - Testing, feedback, and improvements
-
-### Technology Partners
-- **PostgreSQL** - Primary metadata storage
-- **Redis** - High-performance caching
-- **Singer.io** - Universal data connectivity
-- **APG Platform** - Multi-tenant enterprise foundation
-
----
-
-## 🚀 Ready for Production
-
-The APG DVRL capability is **production-ready** and provides:
-
-✅ **Revolutionary Performance** - 10x better than industry leaders  
-✅ **Universal Connectivity** - 100+ data source types  
-✅ **Enterprise Security** - Full APG platform integration  
-✅ **AI-Native Architecture** - Machine learning optimization  
-✅ **Natural Language Queries** - Democratized data access  
-✅ **Comprehensive Testing** - 847/847 tests passing  
-✅ **Production Validation** - Complete enterprise validation  
-
-**🎯 Transform your data virtualization with APG DVRL - the future of federated data access!**
-
----
-
-**Made with ❤️ by the APG Platform Team**  
-**© 2025 Datacraft - www.datacraft.co.ke**
+Full repository tests, live connector tests, rendered browser checks,
+performance benchmarks, and production adapter exercises should be run in a
+dedicated verification window.

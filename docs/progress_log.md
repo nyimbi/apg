@@ -16,6 +16,71 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 06:22 EAT
+
+DVRL data virtualization lifecycle/guardrail packet:
+
+- Added root `SPECIFICATION.md` and `PLAN.md`, and replaced the primary
+  `README.md`, `cap_spec.md`, validation notes, and selected user/deployment
+  docs with current DVRL behavior, adapter boundaries, and focused proof
+  commands.
+- Expanded `capability_contract.py` with source, schema, query, cache,
+  governance, optimization, adapter, UI, and theme configuration.
+- Expanded deterministic guardrails to cover tenant context, source owner,
+  supported source type, vaulted credentials, encrypted connection, source
+  activation approval, stale schema refresh review, virtual table owner and
+  classification, read-only parameterized queries, restricted-data RBAC,
+  sensitive-result cache blocking, lineage capture, high-cost query review,
+  cross-source join review, row limits, cache TTL, policy review, and source
+  retirement impact review.
+- Added dependency-light `DVRLLifecycleService` records and workflows beside
+  the existing production-oriented `DVRLService`.
+- Added generated-application helper functions and `view_models.py` for
+  dashboard, sources, schemas, virtual tables, query workbench, federation,
+  cache, policies, metrics, adapter health, audit, and settings surfaces.
+- Replaced static `app.py` semantic JSON with contract-derived package evidence
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Renamed the legacy materialized package test to
+  `tests/test_package_contract.py` and expanded rule, lifecycle, view-model,
+  app, and package contract coverage.
+- Focused review fixes: added missing `SINGER_TAP` source type, fixed DVRL
+  adapter syntax errors, added the missing `Tuple` import in error handling,
+  and made optional production adapter/NLP/APG integration imports non-blocking
+  for generated-app lifecycle imports.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dvrl/__init__.py
+  capabilities/common/dvrl/capability_contract.py capabilities/common/dvrl/models.py
+  capabilities/common/dvrl/error_handling.py capabilities/common/dvrl/service.py
+  capabilities/common/dvrl/api.py capabilities/common/dvrl/view_models.py
+  capabilities/common/dvrl/app.py capabilities/common/dvrl/adapters.py
+  capabilities/common/dvrl/connectors.py capabilities/common/dvrl/apg_integrations.py
+  capabilities/common/dvrl/nlp_integration.py capabilities/common/dvrl/real_implementations.py
+  capabilities/common/dvrl/singer_integration.py capabilities/common/dvrl/validate_implementation.py
+  capabilities/common/dvrl/test_capability_contract.py
+  capabilities/common/dvrl/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/dvrl/test_capability_contract.py
+  capabilities/common/dvrl/tests/test_package_contract.py` passed with 7 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/dvrl --json` passed with DVRL classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dvrl --json`
+  passed with `side_effect_free: true`, release evidence present, and no
+  warnings.
+- `./.venv/bin/python -c "from capabilities.common.dvrl.service import
+  DVRLLifecycleService; print(DVRLLifecycleService().dashboard_summary()['source_count'])"`
+  passed and printed `0`; optional OpenTelemetry/asyncpg warnings are expected
+  when production adapters are not installed.
+- Primary DVRL stale-marker search outside archived `works/` notes and legacy
+  CI scripts returned no matches for old production/market overclaims.
+- Not run: full repository pytest suite, live physical connector execution,
+  live query optimizer/runtime validation, cache persistence, metadata/catalog
+  sync, credential vault operations, audit persistence, Bytewax runtime flows,
+  rendered dashboard/browser behavior, and performance benchmarks.
+
 ### 2026-05-30 05:00 EAT
 
 MDM master-data lifecycle/guardrail packet:

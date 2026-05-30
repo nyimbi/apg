@@ -504,6 +504,79 @@ def create_dvrl_api(app: Flask, dvrl_service) -> DVRLAPIController:
 	
 	return api_controller
 
+from .service import DVRLLifecycleService
+
+
+SERVICE = DVRLLifecycleService()
+
+
+def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return generated-application DVRL capability status."""
+	return {
+		"capability": "dvrl",
+		"tenant_id": tenant_id,
+		"summary": SERVICE.dashboard_summary(tenant_id),
+		"contract": SERVICE.describe(tenant_id),
+	}
+
+
+def register_source_record(**kwargs) -> Dict[str, Any]:
+	"""Register a virtual source through the dependency-light lifecycle service."""
+	return SERVICE.register_source(**kwargs).__dict__
+
+
+def activate_source_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate source activation guardrails."""
+	return SERVICE.activate_source(**kwargs).__dict__
+
+
+def refresh_schema_record(**kwargs) -> Dict[str, Any]:
+	"""Refresh source schema metadata through generated-app guardrails."""
+	return SERVICE.refresh_schema(**kwargs).__dict__
+
+
+def publish_virtual_table_record(**kwargs) -> Dict[str, Any]:
+	"""Publish a governed virtual table record."""
+	return SERVICE.publish_virtual_table(**kwargs).__dict__
+
+
+def execute_query_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate and record a governed federated query request."""
+	return SERVICE.execute_query(**kwargs).__dict__
+
+
+def cache_result_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate and record a query-cache lifecycle request."""
+	return SERVICE.cache_result(**kwargs).__dict__
+
+
+def change_policy_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate and record a virtualization policy change."""
+	return SERVICE.change_policy(**kwargs).__dict__
+
+
+def retire_source_record(**kwargs) -> Dict[str, Any]:
+	"""Evaluate source retirement guardrails."""
+	return SERVICE.retire_source(**kwargs).__dict__
+
+
+def list_records(tenant_id: str = "default", record_type: str | None = None) -> List[Dict[str, Any]]:
+	"""List dependency-light DVRL lifecycle records."""
+	return SERVICE.list_records(tenant_id, record_type)
+
+
+def list_metadata(tenant_id: str = "default") -> Dict[str, Any]:
+	"""Return DVRL metadata for generated application composition."""
+	return {
+		"status": capability_status(tenant_id),
+		"sources": SERVICE.list_records(tenant_id, "sources"),
+		"schemas": SERVICE.list_records(tenant_id, "schemas"),
+		"virtual_tables": SERVICE.list_records(tenant_id, "virtual_tables"),
+		"queries": SERVICE.list_records(tenant_id, "queries"),
+		"policies": SERVICE.list_records(tenant_id, "policies"),
+	}
+
+
 __all__ = [
 	"DVRLAPIController",
 	"DataSourceModelView",
@@ -512,5 +585,16 @@ __all__ = [
 	"VirtualTableModelView",
 	"DVRLAdminView",
 	"create_dvrl_api",
-	"dvrl_blueprint"
+	"dvrl_blueprint",
+	"capability_status",
+	"register_source_record",
+	"activate_source_record",
+	"refresh_schema_record",
+	"publish_virtual_table_record",
+	"execute_query_record",
+	"cache_result_record",
+	"change_policy_record",
+	"retire_source_record",
+	"list_records",
+	"list_metadata",
 ]

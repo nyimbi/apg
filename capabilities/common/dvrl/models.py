@@ -52,6 +52,7 @@ class DataSourceType(str, Enum):
 	S3 = "s3"
 	HDFS = "hdfs"
 	BYTEWAX = "bytewax"
+	SINGER_TAP = "singer_tap"
 	REST_API = "rest_api"
 	GRAPHQL = "graphql"
 	FILE_CSV = "file_csv"

@@ -8,23 +8,56 @@
   },
   "capabilities": {
     "dvrl": {
-      "approvals": {},
+      "adapters": {
+        "audit_sink": "audl",
+        "cache_store": "cach",
+        "connector_registry": "adapter",
+        "credential_vault": "keym",
+        "event_stream": "bytewax",
+        "execution_engine": "adapter",
+        "generated_app_runtime": "service.DVRLLifecycleService",
+        "metadata_catalog": "meta",
+        "production_runtime": "service.DVRLService",
+        "query_planner": "adapter"
+      },
+      "approvals": {
+        "policy_change": "DVRLPolicyRecord",
+        "query_cost": "DVRLQueryRecord",
+        "schema_refresh": "DVRLSchemaRecord",
+        "source_activation": "DVRLSourceRecord",
+        "source_retirement": "DVRLSourceRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "cache_store": "cach",
+          "connector_registry": "adapter",
+          "credential_vault": "keym",
+          "event_stream": "bytewax",
+          "execution_engine": "adapter",
+          "generated_app_runtime": "service.DVRLLifecycleService",
+          "metadata_catalog": "meta",
+          "production_runtime": "service.DVRLService",
+          "query_planner": "adapter"
+        },
         "cache": {
           "default_ttl_seconds": 900,
+          "max_ttl_seconds": 3600,
           "query_cache_enabled": true,
           "sensitive_result_cache_allowed": false
         },
         "governance": {
           "audit_all_queries": true,
           "lineage_capture_required": true,
+          "policy_review_required": true,
           "rbac_required": true,
           "require_tenant_context": true
         },
         "optimization": {
           "cost_review_threshold": 1000.0,
+          "cross_source_join_review_threshold": 3,
           "join_rewrite_enabled": true,
           "pushdown_enabled": true
         },
@@ -32,13 +65,32 @@
           "cost_estimation_required": true,
           "default_timeout_seconds": 300,
           "federated_query_enabled": true,
-          "max_result_rows": 100000
+          "max_result_rows": 100000,
+          "parameterization_required": true,
+          "write_queries_allowed": false
+        },
+        "schemas": {
+          "classification_required": true,
+          "schema_discovery_required": true,
+          "schema_refresh_review_days": 30,
+          "virtual_table_owner_required": true
         },
         "sources": {
+          "approval_required": true,
           "connection_encryption_required": true,
           "credential_vault": "keym",
           "max_sources_per_tenant": 100,
-          "source_registration_required": true
+          "owner_required": true,
+          "source_registration_required": true,
+          "supported_source_types": [
+            "database",
+            "warehouse",
+            "lakehouse",
+            "api",
+            "file",
+            "stream",
+            "singer_tap"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -46,7 +98,11 @@
           "default_theme": "dvrl_federation_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
+          "enable_cache_console": true,
           "enable_federation_map": true,
+          "enable_policy_review": true,
           "enable_query_workbench": true,
           "enable_schema_browser": true,
           "enable_source_manager": true
@@ -78,6 +134,32 @@
           },
           {
             "condition": {
+              "operation": "register_source",
+              "source_owner_assigned": false
+            },
+            "description": "Virtual sources require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_owner_required",
+              "required_action": "assign_source_owner"
+            },
+            "name": "source_registration_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_source",
+              "unsupported_source_type": true
+            },
+            "description": "Virtual source type must be configured for the tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_source_type",
+              "required_action": "choose_supported_source_type"
+            },
+            "name": "source_type_must_be_supported"
+          },
+          {
+            "condition": {
               "credentials_vaulted": false,
               "operation": "register_source"
             },
@@ -91,7 +173,100 @@
           },
           {
             "condition": {
+              "connection_encrypted": false,
+              "operation": "register_source"
+            },
+            "description": "Virtual source connections require encryption.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connection_encryption_required",
+              "required_action": "enable_connection_encryption"
+            },
+            "name": "source_connection_requires_encryption"
+          },
+          {
+            "condition": {
+              "operation": "activate_source",
+              "source_approval_recorded": false
+            },
+            "description": "Virtual sources require approval before activation.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "source_approval_required",
+              "required_action": "record_source_approval"
+            },
+            "name": "source_activation_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "refresh_schema",
+              "schema_age_days_gt": 30,
+              "schema_review_recorded": false
+            },
+            "description": "Stale virtual schemas require refresh review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "schema_refresh_review_required",
+              "required_action": "record_schema_refresh_review"
+            },
+            "name": "schema_refresh_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "publish_virtual_table",
+              "virtual_table_owner_assigned": false
+            },
+            "description": "Virtual tables require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "virtual_table_owner_required",
+              "required_action": "assign_virtual_table_owner"
+            },
+            "name": "virtual_table_requires_owner"
+          },
+          {
+            "condition": {
+              "classification_complete": false,
+              "operation": "publish_virtual_table"
+            },
+            "description": "Virtual tables require data classification before publication.",
+            "effect": {
+              "decision": "deny",
+              "reason": "classification_required",
+              "required_action": "classify_virtual_table"
+            },
+            "name": "virtual_table_requires_classification"
+          },
+          {
+            "condition": {
+              "operation": "execute_query",
+              "parameterized": false
+            },
+            "description": "Federated queries require parameterization evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "parameterization_required",
+              "required_action": "parameterize_query"
+            },
+            "name": "query_requires_parameterization"
+          },
+          {
+            "condition": {
+              "operation": "execute_query",
+              "write_query": true
+            },
+            "description": "DVRL generated-app queries are read-only by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "write_query_blocked",
+              "required_action": "route_to_write_capability"
+            },
+            "name": "write_query_blocked"
+          },
+          {
+            "condition": {
               "data_classification": "restricted",
+              "operation": "execute_query",
               "rbac_authorized": false
             },
             "description": "Restricted data queries require RBAC authorization.",
@@ -105,6 +280,7 @@
           {
             "condition": {
               "cache_requested": true,
+              "operation": "execute_query",
               "result_contains_sensitive_data": true
             },
             "description": "Sensitive query results cannot be cached by default.",
@@ -131,7 +307,8 @@
           {
             "condition": {
               "cost_review_recorded": false,
-              "estimated_query_cost_gt": 1000.0
+              "estimated_query_cost_gt": 1000.0,
+              "operation": "execute_query"
             },
             "description": "High cost federated queries require review.",
             "effect": {
@@ -140,6 +317,72 @@
               "required_action": "record_query_cost_review"
             },
             "name": "high_cost_query_requires_review"
+          },
+          {
+            "condition": {
+              "join_review_recorded": false,
+              "join_source_count_gt": 3,
+              "operation": "execute_query"
+            },
+            "description": "Cross-source joins above the tenant threshold require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "cross_source_join_review_required",
+              "required_action": "record_join_review"
+            },
+            "name": "cross_source_join_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "execute_query",
+              "requested_rows_gt": 100000
+            },
+            "description": "Federated query result limits cannot exceed tenant configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "query_result_limit_exceeded",
+              "required_action": "reduce_result_limit"
+            },
+            "name": "query_result_limit_enforced"
+          },
+          {
+            "condition": {
+              "cache_ttl_seconds_gt": 3600,
+              "operation": "cache_result"
+            },
+            "description": "Query cache TTL cannot exceed tenant configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cache_ttl_limit_exceeded",
+              "required_action": "reduce_cache_ttl"
+            },
+            "name": "cache_ttl_requires_limit"
+          },
+          {
+            "condition": {
+              "operation": "change_policy",
+              "policy_review_recorded": false
+            },
+            "description": "Virtualization policy changes require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "policy_review_required",
+              "required_action": "record_policy_review"
+            },
+            "name": "policy_change_requires_review"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_source"
+            },
+            "description": "Retiring a virtual source requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_review_required",
+              "required_action": "record_source_impact_review"
+            },
+            "name": "source_retirement_requires_impact_review"
           }
         ],
         "type": "deterministic"
@@ -159,6 +402,32 @@
         },
         {
           "condition": {
+            "operation": "register_source",
+            "source_owner_assigned": false
+          },
+          "description": "Virtual sources require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_owner_required",
+            "required_action": "assign_source_owner"
+          },
+          "name": "source_registration_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_source",
+            "unsupported_source_type": true
+          },
+          "description": "Virtual source type must be configured for the tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_source_type",
+            "required_action": "choose_supported_source_type"
+          },
+          "name": "source_type_must_be_supported"
+        },
+        {
+          "condition": {
             "credentials_vaulted": false,
             "operation": "register_source"
           },
@@ -172,7 +441,100 @@
         },
         {
           "condition": {
+            "connection_encrypted": false,
+            "operation": "register_source"
+          },
+          "description": "Virtual source connections require encryption.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connection_encryption_required",
+            "required_action": "enable_connection_encryption"
+          },
+          "name": "source_connection_requires_encryption"
+        },
+        {
+          "condition": {
+            "operation": "activate_source",
+            "source_approval_recorded": false
+          },
+          "description": "Virtual sources require approval before activation.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "source_approval_required",
+            "required_action": "record_source_approval"
+          },
+          "name": "source_activation_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "refresh_schema",
+            "schema_age_days_gt": 30,
+            "schema_review_recorded": false
+          },
+          "description": "Stale virtual schemas require refresh review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "schema_refresh_review_required",
+            "required_action": "record_schema_refresh_review"
+          },
+          "name": "schema_refresh_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "publish_virtual_table",
+            "virtual_table_owner_assigned": false
+          },
+          "description": "Virtual tables require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "virtual_table_owner_required",
+            "required_action": "assign_virtual_table_owner"
+          },
+          "name": "virtual_table_requires_owner"
+        },
+        {
+          "condition": {
+            "classification_complete": false,
+            "operation": "publish_virtual_table"
+          },
+          "description": "Virtual tables require data classification before publication.",
+          "effect": {
+            "decision": "deny",
+            "reason": "classification_required",
+            "required_action": "classify_virtual_table"
+          },
+          "name": "virtual_table_requires_classification"
+        },
+        {
+          "condition": {
+            "operation": "execute_query",
+            "parameterized": false
+          },
+          "description": "Federated queries require parameterization evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "parameterization_required",
+            "required_action": "parameterize_query"
+          },
+          "name": "query_requires_parameterization"
+        },
+        {
+          "condition": {
+            "operation": "execute_query",
+            "write_query": true
+          },
+          "description": "DVRL generated-app queries are read-only by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "write_query_blocked",
+            "required_action": "route_to_write_capability"
+          },
+          "name": "write_query_blocked"
+        },
+        {
+          "condition": {
             "data_classification": "restricted",
+            "operation": "execute_query",
             "rbac_authorized": false
           },
           "description": "Restricted data queries require RBAC authorization.",
@@ -186,6 +548,7 @@
         {
           "condition": {
             "cache_requested": true,
+            "operation": "execute_query",
             "result_contains_sensitive_data": true
           },
           "description": "Sensitive query results cannot be cached by default.",
@@ -212,7 +575,8 @@
         {
           "condition": {
             "cost_review_recorded": false,
-            "estimated_query_cost_gt": 1000.0
+            "estimated_query_cost_gt": 1000.0,
+            "operation": "execute_query"
           },
           "description": "High cost federated queries require review.",
           "effect": {
@@ -221,15 +585,96 @@
             "required_action": "record_query_cost_review"
           },
           "name": "high_cost_query_requires_review"
+        },
+        {
+          "condition": {
+            "join_review_recorded": false,
+            "join_source_count_gt": 3,
+            "operation": "execute_query"
+          },
+          "description": "Cross-source joins above the tenant threshold require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "cross_source_join_review_required",
+            "required_action": "record_join_review"
+          },
+          "name": "cross_source_join_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "execute_query",
+            "requested_rows_gt": 100000
+          },
+          "description": "Federated query result limits cannot exceed tenant configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "query_result_limit_exceeded",
+            "required_action": "reduce_result_limit"
+          },
+          "name": "query_result_limit_enforced"
+        },
+        {
+          "condition": {
+            "cache_ttl_seconds_gt": 3600,
+            "operation": "cache_result"
+          },
+          "description": "Query cache TTL cannot exceed tenant configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cache_ttl_limit_exceeded",
+            "required_action": "reduce_cache_ttl"
+          },
+          "name": "cache_ttl_requires_limit"
+        },
+        {
+          "condition": {
+            "operation": "change_policy",
+            "policy_review_recorded": false
+          },
+          "description": "Virtualization policy changes require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "policy_review_required",
+            "required_action": "record_policy_review"
+          },
+          "name": "policy_change_requires_review"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_source"
+          },
+          "description": "Retiring a virtual source requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_review_required",
+            "required_action": "record_source_impact_review"
+          },
+          "name": "source_retirement_requires_impact_review"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "DVRLAdapterHealth",
+          "permission": "dvrl:admin",
+          "route": "/dvrl/adapters"
+        },
+        "audit": {
+          "component": "DVRLAuditTimeline",
+          "permission": "dvrl:view_metrics",
+          "route": "/dvrl/audit"
+        },
+        "cache": {
+          "component": "CacheConsole",
+          "permission": "dvrl:manage_policies",
+          "route": "/dvrl/cache"
+        },
         "dashboard": {
           "component": "DVRLDashboard",
           "permission": "dvrl:view",
@@ -269,11 +714,26 @@
           "component": "VirtualSourceManager",
           "permission": "dvrl:manage_sources",
           "route": "/dvrl/sources"
+        },
+        "virtual_tables": {
+          "component": "VirtualTableCatalog",
+          "permission": "dvrl:manage_sources",
+          "route": "/dvrl/virtual-tables"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "adapter_health_panel": {
+            "status_indicator": "health-pill",
+            "visual": "adapter-grid"
+          },
+          "audit_timeline": {
+            "status_style": "decision-pill",
+            "visual": "event-timeline"
+          },
           "cache_result_panel": {
             "status_style": "ttl-pill",
             "visual": "cache-hit-stack"
@@ -282,9 +742,17 @@
             "edge_style": "join-path",
             "visual": "source-topology"
           },
+          "policy_review_queue": {
+            "highlight": "review-chip",
+            "visual": "rule-decision-list"
+          },
           "query_plan_viewer": {
             "highlight": "cost-chip",
             "visual": "execution-tree"
+          },
+          "schema_browser": {
+            "status_indicator": "classification-chip",
+            "visual": "table-tree"
           },
           "virtual_source_card": {
             "icon": "database-zap",
@@ -340,6 +808,13 @@
             "permission": "dvrl:view"
           },
           {
+            "component": "VirtualTableCatalog",
+            "name": "virtual_tables",
+            "nav_group": "Sources",
+            "path": "/dvrl/virtual-tables",
+            "permission": "dvrl:manage_sources"
+          },
+          {
             "component": "FederationMap",
             "name": "federation",
             "nav_group": "Architecture",
@@ -354,10 +829,31 @@
             "permission": "dvrl:manage_policies"
           },
           {
+            "component": "CacheConsole",
+            "name": "cache",
+            "nav_group": "Operations",
+            "path": "/dvrl/cache",
+            "permission": "dvrl:manage_policies"
+          },
+          {
             "component": "DVRLMetrics",
             "name": "metrics",
             "nav_group": "Operations",
             "path": "/dvrl/metrics",
+            "permission": "dvrl:view_metrics"
+          },
+          {
+            "component": "DVRLAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Administration",
+            "path": "/dvrl/adapters",
+            "permission": "dvrl:admin"
+          },
+          {
+            "component": "DVRLAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/dvrl/audit",
             "permission": "dvrl:view_metrics"
           },
           {
@@ -373,7 +869,16 @@
           "templates/",
           "static/"
         ],
-        "view_module": "views.py"
+        "view_module": "view_models.py"
+      },
+      "virtualization_lifecycle": {
+        "audit": "DVRLAuditEventRecord",
+        "cache": "DVRLCacheRecord",
+        "policy": "DVRLPolicyRecord",
+        "query": "DVRLQueryRecord",
+        "schema": "DVRLSchemaRecord",
+        "source": "DVRLSourceRecord",
+        "virtual_table": "DVRLVirtualTableRecord"
       }
     }
   },
@@ -387,19 +892,34 @@
   "contracts": {
     "dvrl": {
       "configuration": {
+        "adapters": {
+          "audit_sink": "audl",
+          "cache_store": "cach",
+          "connector_registry": "adapter",
+          "credential_vault": "keym",
+          "event_stream": "bytewax",
+          "execution_engine": "adapter",
+          "generated_app_runtime": "service.DVRLLifecycleService",
+          "metadata_catalog": "meta",
+          "production_runtime": "service.DVRLService",
+          "query_planner": "adapter"
+        },
         "cache": {
           "default_ttl_seconds": 900,
+          "max_ttl_seconds": 3600,
           "query_cache_enabled": true,
           "sensitive_result_cache_allowed": false
         },
         "governance": {
           "audit_all_queries": true,
           "lineage_capture_required": true,
+          "policy_review_required": true,
           "rbac_required": true,
           "require_tenant_context": true
         },
         "optimization": {
           "cost_review_threshold": 1000.0,
+          "cross_source_join_review_threshold": 3,
           "join_rewrite_enabled": true,
           "pushdown_enabled": true
         },
@@ -407,13 +927,32 @@
           "cost_estimation_required": true,
           "default_timeout_seconds": 300,
           "federated_query_enabled": true,
-          "max_result_rows": 100000
+          "max_result_rows": 100000,
+          "parameterization_required": true,
+          "write_queries_allowed": false
+        },
+        "schemas": {
+          "classification_required": true,
+          "schema_discovery_required": true,
+          "schema_refresh_review_days": 30,
+          "virtual_table_owner_required": true
         },
         "sources": {
+          "approval_required": true,
           "connection_encryption_required": true,
           "credential_vault": "keym",
           "max_sources_per_tenant": 100,
-          "source_registration_required": true
+          "owner_required": true,
+          "source_registration_required": true,
+          "supported_source_types": [
+            "database",
+            "warehouse",
+            "lakehouse",
+            "api",
+            "file",
+            "stream",
+            "singer_tap"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -421,7 +960,11 @@
           "default_theme": "dvrl_federation_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
+          "enable_cache_console": true,
           "enable_federation_map": true,
+          "enable_policy_review": true,
           "enable_query_workbench": true,
           "enable_schema_browser": true,
           "enable_source_manager": true
@@ -464,10 +1007,38 @@
   },
   "roles": {},
   "rules": {
+    "cache_ttl_requires_limit": {
+      "condition": {
+        "cache_ttl_seconds_gt": 3600,
+        "operation": "cache_result"
+      },
+      "description": "Query cache TTL cannot exceed tenant configuration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cache_ttl_limit_exceeded",
+        "required_action": "reduce_cache_ttl"
+      },
+      "name": "cache_ttl_requires_limit"
+    },
+    "cross_source_join_requires_review": {
+      "condition": {
+        "join_review_recorded": false,
+        "join_source_count_gt": 3,
+        "operation": "execute_query"
+      },
+      "description": "Cross-source joins above the tenant threshold require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "cross_source_join_review_required",
+        "required_action": "record_join_review"
+      },
+      "name": "cross_source_join_requires_review"
+    },
     "high_cost_query_requires_review": {
       "condition": {
         "cost_review_recorded": false,
-        "estimated_query_cost_gt": 1000.0
+        "estimated_query_cost_gt": 1000.0,
+        "operation": "execute_query"
       },
       "description": "High cost federated queries require review.",
       "effect": {
@@ -476,6 +1047,19 @@
         "required_action": "record_query_cost_review"
       },
       "name": "high_cost_query_requires_review"
+    },
+    "policy_change_requires_review": {
+      "condition": {
+        "operation": "change_policy",
+        "policy_review_recorded": false
+      },
+      "description": "Virtualization policy changes require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "policy_review_required",
+        "required_action": "record_policy_review"
+      },
+      "name": "policy_change_requires_review"
     },
     "query_requires_lineage_capture": {
       "condition": {
@@ -490,9 +1074,36 @@
       },
       "name": "query_requires_lineage_capture"
     },
+    "query_requires_parameterization": {
+      "condition": {
+        "operation": "execute_query",
+        "parameterized": false
+      },
+      "description": "Federated queries require parameterization evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "parameterization_required",
+        "required_action": "parameterize_query"
+      },
+      "name": "query_requires_parameterization"
+    },
+    "query_result_limit_enforced": {
+      "condition": {
+        "operation": "execute_query",
+        "requested_rows_gt": 100000
+      },
+      "description": "Federated query result limits cannot exceed tenant configuration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "query_result_limit_exceeded",
+        "required_action": "reduce_result_limit"
+      },
+      "name": "query_result_limit_enforced"
+    },
     "restricted_query_requires_rbac": {
       "condition": {
         "data_classification": "restricted",
+        "operation": "execute_query",
         "rbac_authorized": false
       },
       "description": "Restricted data queries require RBAC authorization.",
@@ -503,9 +1114,24 @@
       },
       "name": "restricted_query_requires_rbac"
     },
+    "schema_refresh_requires_review": {
+      "condition": {
+        "operation": "refresh_schema",
+        "schema_age_days_gt": 30,
+        "schema_review_recorded": false
+      },
+      "description": "Stale virtual schemas require refresh review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "schema_refresh_review_required",
+        "required_action": "record_schema_refresh_review"
+      },
+      "name": "schema_refresh_requires_review"
+    },
     "sensitive_results_block_cache": {
       "condition": {
         "cache_requested": true,
+        "operation": "execute_query",
         "result_contains_sensitive_data": true
       },
       "description": "Sensitive query results cannot be cached by default.",
@@ -515,6 +1141,32 @@
         "required_action": "disable_result_cache"
       },
       "name": "sensitive_results_block_cache"
+    },
+    "source_activation_requires_approval": {
+      "condition": {
+        "operation": "activate_source",
+        "source_approval_recorded": false
+      },
+      "description": "Virtual sources require approval before activation.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "source_approval_required",
+        "required_action": "record_source_approval"
+      },
+      "name": "source_activation_requires_approval"
+    },
+    "source_connection_requires_encryption": {
+      "condition": {
+        "connection_encrypted": false,
+        "operation": "register_source"
+      },
+      "description": "Virtual source connections require encryption.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connection_encryption_required",
+        "required_action": "enable_connection_encryption"
+      },
+      "name": "source_connection_requires_encryption"
     },
     "source_registration_requires_credentials": {
       "condition": {
@@ -529,6 +1181,45 @@
       },
       "name": "source_registration_requires_credentials"
     },
+    "source_registration_requires_owner": {
+      "condition": {
+        "operation": "register_source",
+        "source_owner_assigned": false
+      },
+      "description": "Virtual sources require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_owner_required",
+        "required_action": "assign_source_owner"
+      },
+      "name": "source_registration_requires_owner"
+    },
+    "source_retirement_requires_impact_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_source"
+      },
+      "description": "Retiring a virtual source requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "impact_review_required",
+        "required_action": "record_source_impact_review"
+      },
+      "name": "source_retirement_requires_impact_review"
+    },
+    "source_type_must_be_supported": {
+      "condition": {
+        "operation": "register_source",
+        "unsupported_source_type": true
+      },
+      "description": "Virtual source type must be configured for the tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_source_type",
+        "required_action": "choose_supported_source_type"
+      },
+      "name": "source_type_must_be_supported"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -540,6 +1231,45 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "virtual_table_requires_classification": {
+      "condition": {
+        "classification_complete": false,
+        "operation": "publish_virtual_table"
+      },
+      "description": "Virtual tables require data classification before publication.",
+      "effect": {
+        "decision": "deny",
+        "reason": "classification_required",
+        "required_action": "classify_virtual_table"
+      },
+      "name": "virtual_table_requires_classification"
+    },
+    "virtual_table_requires_owner": {
+      "condition": {
+        "operation": "publish_virtual_table",
+        "virtual_table_owner_assigned": false
+      },
+      "description": "Virtual tables require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "virtual_table_owner_required",
+        "required_action": "assign_virtual_table_owner"
+      },
+      "name": "virtual_table_requires_owner"
+    },
+    "write_query_blocked": {
+      "condition": {
+        "operation": "execute_query",
+        "write_query": true
+      },
+      "description": "DVRL generated-app queries are read-only by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "write_query_blocked",
+        "required_action": "route_to_write_capability"
+      },
+      "name": "write_query_blocked"
     }
   },
   "security": {},

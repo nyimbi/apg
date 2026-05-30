@@ -5,13 +5,142 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Data Virtualization package-backed APG capability", "entity_count": 0, "name": "dvrl", "version": "1.0.0"}, "capabilities": {"dvrl": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"cache": {"default_ttl_seconds": 900, "query_cache_enabled": true, "sensitive_result_cache_allowed": false}, "governance": {"audit_all_queries": true, "lineage_capture_required": true, "rbac_required": true, "require_tenant_context": true}, "optimization": {"cost_review_threshold": 1000.0, "join_rewrite_enabled": true, "pushdown_enabled": true}, "queries": {"cost_estimation_required": true, "default_timeout_seconds": 300, "federated_query_enabled": true, "max_result_rows": 100000}, "sources": {"connection_encryption_required": true, "credential_vault": "keym", "max_sources_per_tenant": 100, "source_registration_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "dvrl_federation_console"}, "ui": {"enable_federation_map": true, "enable_query_workbench": true, "enable_schema_browser": true, "enable_source_manager": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Data Virtualization", "provides": ["dvrl_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All virtualization operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"credentials_vaulted": false, "operation": "register_source"}, "description": "Virtual sources require vaulted credentials.", "effect": {"decision": "deny", "reason": "vaulted_credentials_required", "required_action": "store_credentials_in_keym"}, "name": "source_registration_requires_credentials"}, {"condition": {"data_classification": "restricted", "rbac_authorized": false}, "description": "Restricted data queries require RBAC authorization.", "effect": {"decision": "deny", "reason": "rbac_authorization_required", "required_action": "authorize_query_access"}, "name": "restricted_query_requires_rbac"}, {"condition": {"cache_requested": true, "result_contains_sensitive_data": true}, "description": "Sensitive query results cannot be cached by default.", "effect": {"decision": "deny", "reason": "sensitive_result_cache_blocked", "required_action": "disable_result_cache"}, "name": "sensitive_results_block_cache"}, {"condition": {"lineage_capture_enabled": false, "operation": "execute_query"}, "description": "Federated queries require lineage capture.", "effect": {"decision": "deny", "reason": "lineage_capture_required", "required_action": "enable_lineage_capture"}, "name": "query_requires_lineage_capture"}, {"condition": {"cost_review_recorded": false, "estimated_query_cost_gt": 1000.0}, "description": "High cost federated queries require review.", "effect": {"decision": "require_review", "reason": "query_cost_review_required", "required_action": "record_query_cost_review"}, "name": "high_cost_query_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All virtualization operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"credentials_vaulted": false, "operation": "register_source"}, "description": "Virtual sources require vaulted credentials.", "effect": {"decision": "deny", "reason": "vaulted_credentials_required", "required_action": "store_credentials_in_keym"}, "name": "source_registration_requires_credentials"}, {"condition": {"data_classification": "restricted", "rbac_authorized": false}, "description": "Restricted data queries require RBAC authorization.", "effect": {"decision": "deny", "reason": "rbac_authorization_required", "required_action": "authorize_query_access"}, "name": "restricted_query_requires_rbac"}, {"condition": {"cache_requested": true, "result_contains_sensitive_data": true}, "description": "Sensitive query results cannot be cached by default.", "effect": {"decision": "deny", "reason": "sensitive_result_cache_blocked", "required_action": "disable_result_cache"}, "name": "sensitive_results_block_cache"}, {"condition": {"lineage_capture_enabled": false, "operation": "execute_query"}, "description": "Federated queries require lineage capture.", "effect": {"decision": "deny", "reason": "lineage_capture_required", "required_action": "enable_lineage_capture"}, "name": "query_requires_lineage_capture"}, {"condition": {"cost_review_recorded": false, "estimated_query_cost_gt": 1000.0}, "description": "High cost federated queries require review.", "effect": {"decision": "require_review", "reason": "query_cost_review_required", "required_action": "record_query_cost_review"}, "name": "high_cost_query_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "DVRLDashboard", "permission": "dvrl:view", "route": "/dvrl/dashboard"}, "federation": {"component": "FederationMap", "permission": "dvrl:view_lineage", "route": "/dvrl/federation"}, "metrics": {"component": "DVRLMetrics", "permission": "dvrl:view_metrics", "route": "/dvrl/metrics"}, "policies": {"component": "VirtualizationPolicies", "permission": "dvrl:manage_policies", "route": "/dvrl/policies"}, "query": {"component": "QueryWorkbench", "permission": "dvrl:query", "route": "/dvrl/query"}, "schemas": {"component": "SchemaBrowser", "permission": "dvrl:view", "route": "/dvrl/schemas"}, "settings": {"component": "DVRLSettings", "permission": "dvrl:admin", "route": "/dvrl/settings"}, "sources": {"component": "VirtualSourceManager", "permission": "dvrl:manage_sources", "route": "/dvrl/sources"}}, "streaming": {}, "theme": {"components": {"cache_result_panel": {"status_style": "ttl-pill", "visual": "cache-hit-stack"}, "federation_map": {"edge_style": "join-path", "visual": "source-topology"}, "query_plan_viewer": {"highlight": "cost-chip", "visual": "execution-tree"}, "virtual_source_card": {"icon": "database-zap", "risk_style": "policy-band", "status_indicator": "connectivity-pill"}}, "name": "dvrl_federation_console", "tokens": {"border.radius": "8px", "color.accent": "#4ECDC4", "color.danger": "#C53030", "color.primary": "#274060", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/dvrl/api/v1", "requires_theme": true, "routes": [{"component": "DVRLDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/dvrl/dashboard", "permission": "dvrl:view"}, {"component": "QueryWorkbench", "name": "query", "nav_group": "Query", "path": "/dvrl/query", "permission": "dvrl:query"}, {"component": "VirtualSourceManager", "name": "sources", "nav_group": "Sources", "path": "/dvrl/sources", "permission": "dvrl:manage_sources"}, {"component": "SchemaBrowser", "name": "schemas", "nav_group": "Sources", "path": "/dvrl/schemas", "permission": "dvrl:view"}, {"component": "FederationMap", "name": "federation", "nav_group": "Architecture", "path": "/dvrl/federation", "permission": "dvrl:view_lineage"}, {"component": "VirtualizationPolicies", "name": "policies", "nav_group": "Governance", "path": "/dvrl/policies", "permission": "dvrl:manage_policies"}, {"component": "DVRLMetrics", "name": "metrics", "nav_group": "Operations", "path": "/dvrl/metrics", "permission": "dvrl:view_metrics"}, {"component": "DVRLSettings", "name": "settings", "nav_group": "Administration", "path": "/dvrl/settings", "permission": "dvrl:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"dvrl": []}}, "contracts": {"dvrl": {"configuration": {"cache": {"default_ttl_seconds": 900, "query_cache_enabled": true, "sensitive_result_cache_allowed": false}, "governance": {"audit_all_queries": true, "lineage_capture_required": true, "rbac_required": true, "require_tenant_context": true}, "optimization": {"cost_review_threshold": 1000.0, "join_rewrite_enabled": true, "pushdown_enabled": true}, "queries": {"cost_estimation_required": true, "default_timeout_seconds": 300, "federated_query_enabled": true, "max_result_rows": 100000}, "sources": {"connection_encryption_required": true, "credential_vault": "keym", "max_sources_per_tenant": 100, "source_registration_required": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "dvrl_federation_console"}, "ui": {"enable_federation_map": true, "enable_query_workbench": true, "enable_schema_browser": true, "enable_source_manager": true}}, "id": "dvrl", "provides": ["dvrl_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"dvrl": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"high_cost_query_requires_review": {"condition": {"cost_review_recorded": false, "estimated_query_cost_gt": 1000.0}, "description": "High cost federated queries require review.", "effect": {"decision": "require_review", "reason": "query_cost_review_required", "required_action": "record_query_cost_review"}, "name": "high_cost_query_requires_review"}, "query_requires_lineage_capture": {"condition": {"lineage_capture_enabled": false, "operation": "execute_query"}, "description": "Federated queries require lineage capture.", "effect": {"decision": "deny", "reason": "lineage_capture_required", "required_action": "enable_lineage_capture"}, "name": "query_requires_lineage_capture"}, "restricted_query_requires_rbac": {"condition": {"data_classification": "restricted", "rbac_authorized": false}, "description": "Restricted data queries require RBAC authorization.", "effect": {"decision": "deny", "reason": "rbac_authorization_required", "required_action": "authorize_query_access"}, "name": "restricted_query_requires_rbac"}, "sensitive_results_block_cache": {"condition": {"cache_requested": true, "result_contains_sensitive_data": true}, "description": "Sensitive query results cannot be cached by default.", "effect": {"decision": "deny", "reason": "sensitive_result_cache_blocked", "required_action": "disable_result_cache"}, "name": "sensitive_results_block_cache"}, "source_registration_requires_credentials": {"condition": {"credentials_vaulted": false, "operation": "register_source"}, "description": "Virtual sources require vaulted credentials.", "effect": {"decision": "deny", "reason": "vaulted_credentials_required", "required_action": "store_credentials_in_keym"}, "name": "source_registration_requires_credentials"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All virtualization operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.dvrl": {"file": "capability_contract.py", "id": "capability.dvrl", "kind": "capability", "name": "Data Virtualization", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("dvrl_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "dvrl",
+			"version": "1.0.0",
+			"description": "Data Virtualization package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"dvrl": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"dvrl": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["dvrl_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"source_activation": "DVRLSourceRecord",
+					"schema_refresh": "DVRLSchemaRecord",
+					"query_cost": "DVRLQueryRecord",
+					"policy_change": "DVRLPolicyRecord",
+					"source_retirement": "DVRLSourceRecord",
+				},
+				"virtualization_lifecycle": {
+					"source": "DVRLSourceRecord",
+					"schema": "DVRLSchemaRecord",
+					"virtual_table": "DVRLVirtualTableRecord",
+					"query": "DVRLQueryRecord",
+					"cache": "DVRLCacheRecord",
+					"policy": "DVRLPolicyRecord",
+					"audit": "DVRLAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {
+					"engine": contract["configuration"]["adapters"]["event_stream"],
+				},
+			}
+		},
+		"contracts": {
+			"dvrl": {
+				"id": "dvrl",
+				"configuration": contract["configuration"],
+				"provides": ["dvrl_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"dvrl": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.dvrl": {
+				"id": "capability.dvrl",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +165,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("dvrl", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "dvrl" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("DVRL semantic model route manifest is stale")
+	if len(rules) < 20:
+		errors.append("DVRL semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("DVRL adapter manifest must use Bytewax for event streaming")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

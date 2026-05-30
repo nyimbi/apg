@@ -12,7 +12,7 @@ import json
 import traceback
 from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Dict, List, Optional, Callable, Union
+from typing import Any, Dict, List, Optional, Callable, Union, Tuple
 from uuid_extensions import uuid7str
 
 # Import real error handling implementations

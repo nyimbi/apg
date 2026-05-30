@@ -12,11 +12,13 @@ import hashlib
 import json
 import re
 import time
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid_extensions import uuid7str
 
 from . import _log_info, _log_error, _log_warning
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 from .models import (
 	DataSource, DataSourceType, DataSourceStatus, VirtualTable,
 	FederatedQuery, QueryStatus, QueryCache, CacheLevel, 
@@ -24,15 +26,481 @@ from .models import (
 	calculate_query_complexity, estimate_query_cost
 )
 from .connectors import UniversalConnectorManager, BaseConnector, ConnectionHealth
-from . import adapters  # Import adapters to register additional connectors
-from .nlp_integration import APGNLPProcessor, QuerySuggestionEngine, SemanticQueryMatcher
-from .apg_integrations import APGServiceManager
+try:
+	from . import adapters  # Import adapters to register additional connectors
+except Exception as exc:  # pragma: no cover - optional production adapter boundary
+	adapters = None
+	OPTIONAL_ADAPTER_IMPORT_ERROR = exc
+else:
+	OPTIONAL_ADAPTER_IMPORT_ERROR = None
+try:
+	from .nlp_integration import APGNLPProcessor, QuerySuggestionEngine, SemanticQueryMatcher
+except Exception as exc:  # pragma: no cover - optional production NLP boundary
+	APGNLPProcessor = QuerySuggestionEngine = SemanticQueryMatcher = None
+	OPTIONAL_NLP_IMPORT_ERROR = exc
+else:
+	OPTIONAL_NLP_IMPORT_ERROR = None
+try:
+	from .apg_integrations import APGServiceManager
+except Exception as exc:  # pragma: no cover - optional production integration boundary
+	APGServiceManager = None
+	OPTIONAL_APG_INTEGRATION_IMPORT_ERROR = exc
+else:
+	OPTIONAL_APG_INTEGRATION_IMPORT_ERROR = None
 from .error_handling import (
 	DVRLErrorHandler, DVRLLoggingContext, DVRLPerformanceMonitor, 
 	DVRLRetryHandler, error_handler_decorator, safe_execute,
 	ServiceUnavailableError, OperationError, RegistrationError,
 	ConnectionError, QueryExecutionError, ValidationError
 )
+
+
+@dataclass
+class DVRLSourceRecord:
+	source_id: str
+	tenant_id: str
+	name: str
+	source_type: str
+	owner: str | None
+	credentials_vaulted: bool
+	connection_encrypted: bool
+	approved: bool
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLSchemaRecord:
+	schema_id: str
+	tenant_id: str
+	source_id: str
+	name: str
+	schema_age_days: int
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	tables: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLVirtualTableRecord:
+	table_id: str
+	tenant_id: str
+	source_id: str
+	name: str
+	owner: str | None
+	classification: str | None
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	columns: list[dict[str, Any]] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLQueryRecord:
+	query_id: str
+	tenant_id: str
+	sql: str
+	actor: str
+	data_classification: str
+	estimated_query_cost: float
+	requested_rows: int
+	cache_requested: bool
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	source_ids: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLCacheRecord:
+	cache_id: str
+	tenant_id: str
+	query_id: str
+	ttl_seconds: int
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLPolicyRecord:
+	policy_id: str
+	tenant_id: str
+	name: str
+	actor: str
+	status: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLAuditEventRecord:
+	event_id: str
+	tenant_id: str
+	event_type: str
+	subject: str
+	actor: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	details: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class DVRLLifecycleService:
+	"""Dependency-light DVRL lifecycle and guardrail control plane."""
+
+	def __init__(self, tenant_id: str = "default"):
+		self.tenant_id = tenant_id
+		self.sources: dict[str, DVRLSourceRecord] = {}
+		self.schemas: dict[str, DVRLSchemaRecord] = {}
+		self.virtual_tables: dict[str, DVRLVirtualTableRecord] = {}
+		self.queries: dict[str, DVRLQueryRecord] = {}
+		self.caches: dict[str, DVRLCacheRecord] = {}
+		self.policies: dict[str, DVRLPolicyRecord] = {}
+		self.audit_events: list[DVRLAuditEventRecord] = []
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def register_source(
+		self,
+		*,
+		tenant_id: str,
+		source_id: str,
+		name: str,
+		source_type: str,
+		owner: str | None,
+		credentials_vaulted: bool,
+		connection_encrypted: bool,
+		approved: bool = False,
+		metadata: dict[str, Any] | None = None,
+	) -> DVRLSourceRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source_type = self._require_text(source_type, "source_type")
+		supported = set(self.describe(tenant_id)["configuration"]["sources"]["supported_source_types"])
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_source",
+			"source_owner_assigned": bool(str(owner or "").strip()),
+			"unsupported_source_type": source_type not in supported,
+			"credentials_vaulted": credentials_vaulted,
+			"connection_encrypted": connection_encrypted,
+		}
+		decision = evaluate_capability_rules(context)
+		record = DVRLSourceRecord(
+			source_id=self._require_text(source_id, "source_id"),
+			tenant_id=tenant_id,
+			name=self._require_text(name, "name"),
+			source_type=source_type,
+			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
+			credentials_vaulted=credentials_vaulted,
+			connection_encrypted=connection_encrypted,
+			approved=approved,
+			status="registered" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			metadata=dict(metadata or {}),
+		)
+		self.sources[self._key(tenant_id, record.source_id)] = record
+		self._audit(tenant_id, "source.registered", record.source_id, record.owner or "system", decision, context)
+		return record
+
+	def activate_source(self, *, tenant_id: str, source_id: str, approver: str, source_approval_recorded: bool) -> DVRLSourceRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source = self._require_source(tenant_id, source_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "activate_source",
+			"source_approval_recorded": source_approval_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		source.decision = decision["decision"]
+		source.matched_rules = decision["matched_rules"]
+		if decision["decision"] == "allow":
+			source.approved = True
+			source.status = "active"
+			source.updated_at = datetime.utcnow()
+		else:
+			source.status = self._status_for_decision(decision["decision"])
+		self._audit(tenant_id, "source.activation_evaluated", source.source_id, self._require_text(approver, "approver"), decision, context)
+		return source
+
+	def refresh_schema(self, *, tenant_id: str, schema_id: str, source_id: str, name: str, schema_age_days: int, schema_review_recorded: bool, tables: list[str] | None = None) -> DVRLSchemaRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source = self._require_source(tenant_id, source_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "refresh_schema",
+			"schema_age_days": schema_age_days,
+			"schema_review_recorded": schema_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = DVRLSchemaRecord(
+			schema_id=self._require_text(schema_id, "schema_id"),
+			tenant_id=tenant_id,
+			source_id=source.source_id,
+			name=self._require_text(name, "name"),
+			schema_age_days=schema_age_days,
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			tables=list(tables or []),
+		)
+		self.schemas[self._key(tenant_id, record.schema_id)] = record
+		self._audit(tenant_id, "schema.refreshed", record.schema_id, source.owner or "system", decision, context)
+		return record
+
+	def publish_virtual_table(
+		self,
+		*,
+		tenant_id: str,
+		table_id: str,
+		source_id: str,
+		name: str,
+		owner: str | None,
+		classification: str | None,
+		classification_complete: bool,
+		columns: list[dict[str, Any]] | None = None,
+	) -> DVRLVirtualTableRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source = self._require_source(tenant_id, source_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "publish_virtual_table",
+			"virtual_table_owner_assigned": bool(str(owner or "").strip()),
+			"classification_complete": classification_complete,
+		}
+		decision = evaluate_capability_rules(context)
+		record = DVRLVirtualTableRecord(
+			table_id=self._require_text(table_id, "table_id"),
+			tenant_id=tenant_id,
+			source_id=source.source_id,
+			name=self._require_text(name, "name"),
+			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
+			classification=classification,
+			status="published" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			columns=list(columns or []),
+		)
+		self.virtual_tables[self._key(tenant_id, record.table_id)] = record
+		self._audit(tenant_id, "virtual_table.publish_evaluated", record.table_id, record.owner or "system", decision, context)
+		return record
+
+	def execute_query(
+		self,
+		*,
+		tenant_id: str,
+		query_id: str,
+		sql: str,
+		actor: str,
+		source_ids: list[str],
+		data_classification: str,
+		rbac_authorized: bool,
+		parameterized: bool,
+		write_query: bool,
+		lineage_capture_enabled: bool,
+		estimated_query_cost: float,
+		cost_review_recorded: bool,
+		join_source_count: int,
+		join_review_recorded: bool,
+		requested_rows: int,
+		result_contains_sensitive_data: bool,
+		cache_requested: bool,
+	) -> DVRLQueryRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		for source_id in source_ids:
+			self._require_source(tenant_id, source_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "execute_query",
+			"data_classification": data_classification,
+			"rbac_authorized": rbac_authorized,
+			"parameterized": parameterized,
+			"write_query": write_query,
+			"lineage_capture_enabled": lineage_capture_enabled,
+			"estimated_query_cost": estimated_query_cost,
+			"cost_review_recorded": cost_review_recorded,
+			"join_source_count": join_source_count,
+			"join_review_recorded": join_review_recorded,
+			"requested_rows": requested_rows,
+			"result_contains_sensitive_data": result_contains_sensitive_data,
+			"cache_requested": cache_requested,
+		}
+		decision = evaluate_capability_rules(context)
+		record = DVRLQueryRecord(
+			query_id=self._require_text(query_id, "query_id"),
+			tenant_id=tenant_id,
+			sql=self._require_text(sql, "sql"),
+			actor=self._require_text(actor, "actor"),
+			data_classification=data_classification,
+			estimated_query_cost=estimated_query_cost,
+			requested_rows=requested_rows,
+			cache_requested=cache_requested,
+			status="planned" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			source_ids=list(source_ids),
+		)
+		self.queries[self._key(tenant_id, record.query_id)] = record
+		self._audit(tenant_id, "query.evaluated", record.query_id, record.actor, decision, context)
+		return record
+
+	def cache_result(self, *, tenant_id: str, cache_id: str, query_id: str, ttl_seconds: int) -> DVRLCacheRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		query = self._require_query(tenant_id, query_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "cache_result",
+			"cache_ttl_seconds": ttl_seconds,
+		}
+		decision = evaluate_capability_rules(context)
+		record = DVRLCacheRecord(
+			cache_id=self._require_text(cache_id, "cache_id"),
+			tenant_id=tenant_id,
+			query_id=query.query_id,
+			ttl_seconds=ttl_seconds,
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+		)
+		self.caches[self._key(tenant_id, record.cache_id)] = record
+		self._audit(tenant_id, "cache.evaluated", record.cache_id, query.actor, decision, context)
+		return record
+
+	def change_policy(self, *, tenant_id: str, policy_id: str, name: str, actor: str, policy_review_recorded: bool, metadata: dict[str, Any] | None = None) -> DVRLPolicyRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "change_policy",
+			"policy_review_recorded": policy_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = DVRLPolicyRecord(
+			policy_id=self._require_text(policy_id, "policy_id"),
+			tenant_id=tenant_id,
+			name=self._require_text(name, "name"),
+			actor=self._require_text(actor, "actor"),
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			metadata=dict(metadata or {}),
+		)
+		self.policies[self._key(tenant_id, record.policy_id)] = record
+		self._audit(tenant_id, "policy.change_evaluated", record.policy_id, record.actor, decision, context)
+		return record
+
+	def retire_source(self, *, tenant_id: str, source_id: str, actor: str, impact_review_recorded: bool) -> DVRLSourceRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source = self._require_source(tenant_id, source_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_source",
+			"impact_review_recorded": impact_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		source.decision = decision["decision"]
+		source.matched_rules = decision["matched_rules"]
+		if decision["decision"] == "allow":
+			source.status = "retired"
+			source.updated_at = datetime.utcnow()
+		else:
+			source.status = self._status_for_decision(decision["decision"])
+		self._audit(tenant_id, "source.retire_evaluated", source.source_id, self._require_text(actor, "actor"), decision, context)
+		return source
+
+	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		tenant_id = tenant_id or self.tenant_id
+		collections: dict[str, Any] = {
+			"sources": self.sources.values(),
+			"schemas": self.schemas.values(),
+			"virtual_tables": self.virtual_tables.values(),
+			"queries": self.queries.values(),
+			"caches": self.caches.values(),
+			"policies": self.policies.values(),
+			"audit_events": self.audit_events,
+		}
+		if record_type:
+			if record_type not in collections:
+				raise ValueError(f"Unsupported record_type {record_type}")
+			values = collections[record_type]
+		else:
+			values = []
+			for collection in collections.values():
+				values.extend(collection)
+		return [asdict(record) for record in values if getattr(record, "tenant_id", None) == tenant_id]
+
+	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		tenant_id = tenant_id or self.tenant_id
+		return {
+			"tenant_id": tenant_id,
+			"source_count": len(self.list_records(tenant_id, "sources")),
+			"active_source_count": sum(1 for row in self.list_records(tenant_id, "sources") if row["status"] == "active"),
+			"schema_count": len(self.list_records(tenant_id, "schemas")),
+			"virtual_table_count": len(self.list_records(tenant_id, "virtual_tables")),
+			"query_count": len(self.list_records(tenant_id, "queries")),
+			"cache_count": len(self.list_records(tenant_id, "caches")),
+			"review_count": sum(1 for kind in ("sources", "schemas", "queries", "policies") for row in self.list_records(tenant_id, kind) if row["status"] == "pending_review"),
+			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
+		}
+
+	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: dict[str, Any], details: dict[str, Any]) -> None:
+		self.audit_events.append(DVRLAuditEventRecord(
+			event_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject=subject,
+			actor=actor,
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			details=details,
+		))
+
+	def _require_source(self, tenant_id: str, source_id: str) -> DVRLSourceRecord:
+		source_id = self._require_text(source_id, "source_id")
+		record = self.sources.get(self._key(tenant_id, source_id))
+		if record is None:
+			raise KeyError(f"Source {source_id} not found for tenant {tenant_id}")
+		if record.status == "denied":
+			raise ValueError(f"Source {source_id} is denied and cannot continue lifecycle operations")
+		return record
+
+	def _require_query(self, tenant_id: str, query_id: str) -> DVRLQueryRecord:
+		query_id = self._require_text(query_id, "query_id")
+		record = self.queries.get(self._key(tenant_id, query_id))
+		if record is None:
+			raise KeyError(f"Query {query_id} not found for tenant {tenant_id}")
+		return record
+
+	@staticmethod
+	def _status_for_decision(decision: str) -> str:
+		if decision == "require_review":
+			return "pending_review"
+		if decision == "deny":
+			return "denied"
+		return "active"
+
+	@staticmethod
+	def _require_text(value: str, field_name: str) -> str:
+		if not isinstance(value, str) or not value.strip():
+			raise ValueError(f"{field_name} is required")
+		return value.strip()
+
+	@staticmethod
+	def _key(tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
 
 
 class SQLParser:
