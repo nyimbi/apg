@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
-        "display_name": "Employee Data Management - Revolutionary",
+        "display_name": "Employee Data Management",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 12,
+        "rule_count": 57,
+        "streaming_processor": "bytewax",
+        "theme": "employee_data_control"
       }
     },
     "self_test": {
       "capability": "chr_employee_data_management",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

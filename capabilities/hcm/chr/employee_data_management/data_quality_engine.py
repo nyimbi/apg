@@ -1,8 +1,8 @@
 """
 APG Employee Data Management - Intelligent Data Quality & Validation Engine
 
-Revolutionary data quality system with AI-powered anomaly detection,
-automated data correction, and intelligent validation for 10x improvement.
+Governed data quality system with AI-powered anomaly detection,
+automated data correction, and intelligent validation for measurable improvement.
 
 © 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
@@ -109,7 +109,7 @@ class ValidationRule:
 
 
 class IntelligentDataQualityEngine:
-	"""Revolutionary AI-powered data quality and validation engine."""
+	"""Governed AI-powered data quality and validation engine."""
 	
 	def __init__(self, tenant_id: str, ai_config: Optional[Dict[str, Any]] = None):
 		self.tenant_id = tenant_id

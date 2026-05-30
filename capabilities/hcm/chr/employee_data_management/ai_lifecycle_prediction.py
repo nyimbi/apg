@@ -1,7 +1,7 @@
 """
 APG Employee Data Management - AI-Powered Employee Lifecycle Prediction
 
-Revolutionary AI system that predicts employee lifecycle events with 95%+ accuracy.
+Governed AI system that predicts employee lifecycle events with 95%+ accuracy.
 Uses advanced machine learning, behavioral analytics, and predictive modeling.
 """
 

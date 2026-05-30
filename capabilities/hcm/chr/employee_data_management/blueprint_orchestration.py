@@ -224,10 +224,10 @@ class BlueprintOrchestrationEngine:
 		# Employee Data Management Interface
 		self.capability_interfaces[CapabilityType.EMPLOYEE_DATA_MANAGEMENT] = CapabilityInterface(
 			capability_type=CapabilityType.EMPLOYEE_DATA_MANAGEMENT,
-			service_class="RevolutionaryEmployeeDataManagementService",
+			service_class="EmployeeDataManagementService",
 			available_methods=[
-				"create_employee_revolutionary",
-				"update_employee_revolutionary", 
+				"create_employee",
+				"update_employee",
 				"search_employees",
 				"analyze_employee_comprehensive",
 				"generate_ai_insights_report",
@@ -235,7 +235,7 @@ class BlueprintOrchestrationEngine:
 				"sync_global_workforce_data"
 			],
 			input_schemas={
-				"create_employee_revolutionary": {
+				"create_employee": {
 					"type": "object",
 					"properties": {
 						"employee_data": {"type": "object"},
@@ -250,7 +250,7 @@ class BlueprintOrchestrationEngine:
 				}
 			},
 			rate_limits={
-				"create_employee_revolutionary": 100,
+				"create_employee": 100,
 				"analyze_employee_comprehensive": 50
 			}
 		)
@@ -358,7 +358,7 @@ class BlueprintOrchestrationEngine:
 					task_name="Create Employee Record",
 					task_type="data_creation",
 					capability_type=CapabilityType.EMPLOYEE_DATA_MANAGEMENT,
-					service_method="create_employee_revolutionary",
+					service_method="create_employee",
 					input_parameters={
 						"employee_data": "${input.employee_data}",
 						"validation_result": "${employee_validation}"
@@ -730,7 +730,7 @@ class BlueprintOrchestrationEngine:
 		await asyncio.sleep(0.1)  # Simulate async operation
 		
 		# Simulate different method responses
-		if method_name == "create_employee_revolutionary":
+		if method_name == "create_employee":
 			return {
 				"success": True,
 				"employee_id": uuid7str(),

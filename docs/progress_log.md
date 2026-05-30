@@ -16,6 +16,102 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 01:24 EAT
+
+HCM employee data management lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md` for
+  `capabilities/hcm/chr/employee_data_management`, replaced the existing
+  `README.md`, and refreshed `cap_spec.md` with the active Employee Data
+  Management runtime summary.
+- Replaced the generated contract wrapper with explicit department, position,
+  employee profile, personal information, emergency contact, employment history,
+  skill, certification, data-quality, employee-agent, governance, observability,
+  adapter, UI, theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added 57 deterministic guardrails for tenant context, policy attachment,
+  department code/name/owner/cost center, position code/title/department/job
+  level/headcount/compensation review, employee number/name/email/department/
+  position/manager/hire date/type/work mode/status, personal privacy basis,
+  emergency contacts, employment history reason/termination approval, skill
+  level/evidence, certification issuer/date/expiry/status, data-quality domain/
+  severity/owner, employee batch/event Bytewax routing, employee-agent runtime/
+  role, and privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light lifecycle helpers for departments, positions, employees,
+  status changes, personal info, emergency contacts, employment history, skills,
+  certifications, data-quality issues, employee-agent registration, agent-action
+  validation, batch validation, dashboard summaries, API wrappers, screen
+  models, semantic model, component manifest, and package self-test.
+- Preserved service aliases for older package imports while keeping live HRIS,
+  database, identity, payroll, benefits, workflow, audit, notification, and
+  AI-runtime adapters outside the top-level APG surface.
+- Added first-class employee-agent composition metadata for Codex, Claude Code,
+  OpenCode, and Pi runtimes across profile stewardship, data quality,
+  organization design, skills, compliance, and onboarding review roles.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the executable app surface.
+- Replaced the old generated package test with focused contract, rule, service,
+  guardrail, API/view, app, semantic, Bytewax, and agent tests; replaced the
+  legacy comprehensive test with compatibility coverage for the public service
+  aliases.
+- Cleaned stale promotional, generated-baseline, UI attribute, and unsupported
+  broker wording across touched legacy helper modules and documentation.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/hcm/chr/employee_data_management/__init__.py
+  capabilities/hcm/chr/employee_data_management/capability_contract.py
+  capabilities/hcm/chr/employee_data_management/service.py
+  capabilities/hcm/chr/employee_data_management/api.py
+  capabilities/hcm/chr/employee_data_management/views.py
+  capabilities/hcm/chr/employee_data_management/app.py
+  capabilities/hcm/chr/employee_data_management/tests/test_package_contract.py`
+  passed.
+- Syntax-only compile for touched legacy helper modules (`ai_intelligence_engine.py`,
+  `ai_lifecycle_prediction.py`, `analytics_dashboard.py`, `api_gateway.py`,
+  `api_integration.py`, `blockchain_credentials.py`,
+  `blueprint_orchestration.py`, `conversational_assistant.py`,
+  `data_quality_engine.py`, `data_transformation_engine.py`,
+  `global_workforce_engine.py`, `immersive_ui_components.py`,
+  `performance_optimization.py`, `quantum_skills_matching.py`,
+  `realtime_sentiment_analysis.py`, `validation_schemas.py`, and
+  `workflow_automation.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/hcm/chr/employee_data_management/tests/test_package_contract.py
+  capabilities/hcm/chr/employee_data_management/tests/test_comprehensive.py`
+  passed with 8 tests.
+- `./.venv/bin/python
+  capabilities/hcm/chr/employee_data_management/app.py` passed package
+  self-test.
+- `./.venv/bin/apg capabilities inspect chr_employee_data_management --json`
+  confirmed `ok: true`, 12 routes, 57 rules, and `employee_data_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/hcm/chr/employee_data_management --json` confirmed
+  side-effect-free publish planning with Bytewax stream metadata and no
+  warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/hcm/chr/employee_data_management --json` passed with
+  `domain_specific` implementation level and 0 baseline markers.
+- Semantic metadata probe confirmed `bytewax`, `employee_agents`, the agents
+  route, supported-agent runtime guardrail, Bytewax batch guardrail,
+  compensation-band review guardrail, privacy-basis guardrail, and
+  high-severity quality-owner guardrail.
+- Service smoke executed department -> position -> employee -> personal info ->
+  emergency contact -> employment history -> skill -> certification ->
+  data-quality issue -> employee agent and produced 10 audit events.
+- Employee Data Management stale-marker scan returned no matches.
+- `git diff --check -- capabilities/hcm/chr/employee_data_management
+  docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live HRIS,
+  durable employee stores, live identity/payroll/benefits/workflow/audit/
+  notification/privacy adapters, durable Bytewax topology, load/performance
+  checks, migration checks, or failover checks during this battery-conscious
+  slice.
+
 ### 2026-05-31 01:14 EAT
 
 Integration API Management lifecycle/guardrail packet:

@@ -1,8 +1,8 @@
 """
 APG Employee Data Management - AI-Powered Intelligence Engine
 
-Revolutionary AI engine with predictive analytics, skill gap analysis, and
-intelligent automation for 10x improvement over market leaders.
+Governed AI engine with predictive analytics, skill gap analysis, and
+intelligent automation for measurable improvement over market leaders.
 
 © 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
@@ -80,7 +80,7 @@ class EmployeeAnalysisResult:
 
 
 class EmployeeAIIntelligenceEngine:
-	"""Revolutionary AI-powered employee intelligence and analytics engine."""
+	"""Governed AI-powered employee intelligence and analytics engine."""
 	
 	def __init__(self, tenant_id: str, ai_config: Optional[AIModelConfiguration] = None):
 		self.tenant_id = tenant_id

@@ -91,7 +91,7 @@ class TransformationResult:
 
 
 class IntelligentDataTransformationEngine:
-	"""Revolutionary AI-powered data transformation and enrichment engine."""
+	"""Governed AI-powered data transformation and enrichment engine."""
 	
 	def __init__(self, tenant_id: str, config: Optional[Dict[str, Any]] = None):
 		self.tenant_id = tenant_id

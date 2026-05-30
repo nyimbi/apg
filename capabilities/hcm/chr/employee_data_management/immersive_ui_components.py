@@ -1,8 +1,8 @@
 """
 APG Employee Data Management - Immersive UI Components
 
-Revolutionary UI components with AI-powered interfaces and
-natural language interactions for 10x better user experience.
+Governed UI components with AI-powered interfaces and
+natural language interactions for measurable better user experience.
 
 © 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
@@ -46,7 +46,7 @@ IMMERSIVE_LIST_TEMPLATE = """
 	</div>
 	
 	<div class="intelligent-search-bar">
-		<input type="text" id="ai-search" placeholder="Ask me anything... 'Show engineers with Python skills' or 'Who's at risk of leaving?'" />
+		<input type="text" id="ai-search" aria-label="Ask me anything... 'Show engineers with Python skills' or 'Who's at risk of leaving?'" />
 		<button onclick="processNaturalLanguageQuery()" class="btn btn-primary">🔍 AI Search</button>
 	</div>
 	
@@ -434,7 +434,7 @@ CONVERSATIONAL_VIEW_TEMPLATE = """
 					<input 
 						type="text" 
 						id="chat-input-{{ employee.employee_id }}" 
-						placeholder="Ask anything about {{ employee.first_name }}... 'How is their performance?' or 'What development opportunities exist?'"
+						aria-label="Ask anything about {{ employee.first_name }}... 'How is their performance?' or 'What development opportunities exist?'"
 						onkeypress="handleChatKeypress(event, '{{ employee.employee_id }}')"
 					/>
 					<button onclick="sendChatMessage('{{ employee.employee_id }}')" class="btn btn-primary">
@@ -988,7 +988,7 @@ INTELLIGENT_EDIT_TEMPLATE = """
 			<div class="ai-chat-widget">
 				<h4>💬 Ask AI Assistant</h4>
 				<div class="chat-input-container">
-					<input type="text" id="ai-chat-input" placeholder="Ask for help with this form..." />
+					<input type="text" id="ai-chat-input" aria-label="Ask for help with this form..." />
 					<button onclick="sendAIQuestion()" class="btn btn-chat">Send</button>
 				</div>
 				<div class="ai-response" id="ai-response"></div>

@@ -1,7 +1,7 @@
 """
 APG Employee Data Management - Advanced Analytics Dashboard
 
-Revolutionary analytics engine with real-time insights, predictive analytics,
+Governed analytics engine with real-time insights, predictive analytics,
 and interactive visualizations for strategic workforce management.
 
 © 2025 Datacraft. All rights reserved.
@@ -103,7 +103,7 @@ class AnalyticsResult:
 
 
 class EmployeeAnalyticsDashboard:
-	"""Revolutionary analytics dashboard with AI-powered insights and real-time data."""
+	"""Governed analytics dashboard with AI-powered insights and real-time data."""
 	
 	def __init__(self, tenant_id: str, config: Optional[Dict[str, Any]] = None):
 		self.tenant_id = tenant_id

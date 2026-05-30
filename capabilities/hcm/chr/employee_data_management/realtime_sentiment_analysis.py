@@ -1,7 +1,7 @@
 """
 APG Employee Data Management - Real-Time Employee Sentiment Analysis
 
-Revolutionary real-time sentiment analysis system that continuously monitors
+Governed real-time sentiment analysis system that continuously monitors
 employee sentiment through multiple channels with 97%+ accuracy and instant insights.
 """
 

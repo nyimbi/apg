@@ -1,14 +1,14 @@
 -- ============================================================================
--- APG Employee Data Management - Revolutionary Database Schema
+-- APG Employee Data Management - Governed Database Schema
 -- 
 -- High-performance PostgreSQL schema with AI-powered features, multi-tenant
--- partitioning, and 10x optimization for 1M+ employee records per tenant.
+-- partitioning, and measurable optimization for 1M+ employee records per tenant.
 --
 -- © 2025 Datacraft. All rights reserved.
 -- Author: Nyimbi Odero | APG Platform Architect
 -- ============================================================================
 
--- Enable required PostgreSQL extensions for revolutionary features
+-- Enable required PostgreSQL extensions for governed features
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";           -- Fuzzy text search
 CREATE EXTENSION IF NOT EXISTS "btree_gin";         -- GIN indexes for performance
@@ -465,8 +465,8 @@ CREATE INDEX ON mv_hr_edm_retention_risk (tenant_id, retention_risk_score DESC);
 -- AUTOMATED REFRESH PROCEDURES FOR MATERIALIZED VIEWS
 -- ============================================================================
 
--- Function to refresh materialized views
-CREATE OR REPLACE FUNCTION refresh_hr_edm_materialized_views()
+-- Function to refresh reporting views
+CREATE OR REPLACE FUNCTION refresh_hr_edm_reporting_views()
 RETURNS VOID AS $$
 BEGIN
     -- Refresh views concurrently for minimal downtime
@@ -476,7 +476,7 @@ BEGIN
     
     -- Log refresh completion
     INSERT INTO hr_edm_maintenance_log (operation_type, operation_status, completed_at)
-    VALUES ('materialized_view_refresh', 'completed', CURRENT_TIMESTAMP);
+    VALUES ('reporting_view_refresh', 'completed', CURRENT_TIMESTAMP);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -699,7 +699,7 @@ PERFORMANCE OPTIMIZATION GUIDELINES:
    COPY hr_edm_employee FROM 'file.csv' WITH (FORMAT CSV, HEADER);
 
 4. ANALYTICS QUERIES:
-   Use materialized views for aggregations:
+   Use reporting views for aggregations:
    SELECT * FROM mv_hr_edm_employee_summary WHERE tenant_id = 'xxx';
 
 5. TIME-SERIES QUERIES:
@@ -710,7 +710,7 @@ PERFORMANCE OPTIMIZATION GUIDELINES:
 MAINTENANCE COMMANDS:
 
 -- Weekly maintenance
-SELECT refresh_hr_edm_materialized_views();
+SELECT refresh_hr_edm_reporting_views();
 
 -- Monitor performance
 SELECT * FROM analyze_hr_edm_performance();
@@ -762,7 +762,7 @@ BEGIN
         AND relname LIKE 'hr_edm_%' 
         AND idx_scan = 0;
     
-    -- Check materialized view freshness
+    -- Check reporting view freshness
     RETURN QUERY
     SELECT 
         'mv_freshness' as check_name,
@@ -814,4 +814,4 @@ SET autovacuum_vacuum_scale_factor = 0.2;
 
 SELECT 'APG Employee Data Management schema deployment completed successfully!' as deployment_status,
        CURRENT_TIMESTAMP as completion_time,
-       'Ready for 1M+ employee records with 10x performance optimization' as capacity_info;
+       'Ready for 1M+ employee records with measurable performance optimization' as capacity_info;

@@ -19,7 +19,7 @@ import traceback
 
 from .context import get_current_user_id, get_tenant_id_from_request
 from .api_gateway import EmployeeAPIGateway, APIRequest, HTTPMethod
-from .service import RevolutionaryEmployeeDataManagementService
+from .service import EmployeeDataManagementService
 
 
 # Create Flask Blueprint

@@ -1,7 +1,7 @@
 """
 APG Employee Data Management - Blockchain-Based Credential Verification
 
-Revolutionary blockchain-powered credential verification system providing
+Governed blockchain-powered credential verification system providing
 immutable, decentralized, and instantly verifiable employee credentials.
 """
 

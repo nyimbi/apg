@@ -1,463 +1,161 @@
-# APG Employee Data Management Capability
+# Employee Data Management Capability
 
-## 🚀 Revolutionary Employee Data Management Platform
+`chr_employee_data_management` is the APG capability packet for governed employee
+profiles, organization structure, personal information, emergency contacts,
+employment history, skills, certifications, data-quality issues, and employee
+data agents. It keeps the package boundary dependency-light so generated APG
+applications can compose it immediately while production deployments attach
+durable HRIS, identity, payroll, benefits, workflow, audit, notification, and
+Bytewax topology through adapters.
 
-The APG Employee Data Management capability is a comprehensive, AI-powered employee management platform that delivers 10x performance improvements over market leaders like Workday, BambooHR, and ADP Workforce Now.
+## What It Provides
 
-### 🎯 Key Differentiators
+- Tenant-scoped departments with ownership and cost-center controls.
+- Position lifecycle with department linkage, job level, headcount, and
+  compensation-band review.
+- Employee profile lifecycle with employee number, legal name, work email,
+  department, position, manager, employment type, work mode, and hire date.
+- Status transitions for leave, suspension, termination, alumni, and other
+  supported workforce states.
+- Personal-information records with country, effective date, and privacy basis.
+- Emergency contact records.
+- Employment history events with reason and approval guardrails for sensitive
+  events.
+- Skill and certification records with evidence and expiry guardrails.
+- Data-quality issue workflow by domain, severity, owner, and employee.
+- First-class employee data agents for Codex, Claude Code, OpenCode, and Pi
+  review teams.
+- APG UI route metadata, framework-neutral screen models, compact theme tokens,
+  semantic metadata, package manifest, and release evidence.
 
-1. **AI-Powered Employee Intelligence** - Predictive analytics, retention modeling, performance forecasting
-2. **Conversational HR Assistant** - Natural language processing for intuitive employee interactions  
-3. **Global Workforce Management** - Multi-country compliance, currency conversion, localization
-4. **Real-Time Collaboration** - Instant updates, collaborative workflows, team synchronization
-5. **Intelligent Automation** - AI-driven process optimization and workflow orchestration
-6. **Contextual Intelligence** - Smart recommendations based on employee context and patterns
-7. **Immersive Analytics Dashboard** - Interactive visualizations with predictive insights
-8. **Zero-Trust Security** - End-to-end encryption, role-based access, audit trails
-9. **Seamless Integrations** - API-first design with comprehensive third-party connectivity
-10. **Federated Learning** - Privacy-preserving ML models for continuous improvement
+## Package Layout
 
-## 📋 Table of Contents
+- `SPECIFICATION.md` defines records, workflows, rules, UI, events, adapter
+  boundaries, and acceptance criteria.
+- `PLAN.md` records the implementation and review plan for this lifecycle
+  packet.
+- `cap_spec.md` summarizes the current executable runtime contract.
+- `capability_contract.py` exposes the executable APG contract and deterministic
+  rule engine.
+- `service.py` implements the dependency-light lifecycle service.
+- `api.py` exposes composition helpers and legacy endpoint shims.
+- `views.py` exposes framework-neutral screen models and legacy view shims.
+- `app.py` exposes semantic model, component manifest, and self-test.
+- `tests/test_package_contract.py` verifies the package contract, lifecycle,
+  guardrails, API, views, and app surface.
 
-- [Architecture Overview](#architecture-overview)
-- [Quick Start](#quick-start)
-- [Core Features](#core-features)
-- [API Reference](#api-reference)
-- [Configuration](#configuration)
-- [Deployment](#deployment)
-- [Security](#security)
-- [Performance](#performance)
-- [Troubleshooting](#troubleshooting)
+## Runtime Lifecycle
 
-## 🏗️ Architecture Overview
+1. Create departments with owner and cost center.
+2. Create positions under same-tenant departments.
+3. Create employee profiles under same-tenant departments and positions.
+4. Record personal information, emergency contacts, and employment history.
+5. Assign skills and certifications.
+6. Track data-quality issues and route high-severity issues to owners.
+7. Register employee data agents that inspect, prepare, and recommend within
+   explicit human-approval boundaries.
 
-The Employee Data Management capability follows a microservices architecture with:
-
-- **Service Layer**: `service.py` - Core business logic and employee operations
-- **AI Intelligence**: `ai_intelligence_engine.py` - Machine learning and predictive analytics
-- **Analytics Dashboard**: `analytics_dashboard.py` - Real-time metrics and visualizations
-- **API Gateway**: `api_gateway.py` - Request routing, authentication, rate limiting
-- **Global Workforce**: `global_workforce_engine.py` - Multi-country operations
-- **Blueprint Orchestration**: `blueprint_orchestration.py` - Workflow automation
-- **Data Models**: `models.py` - Pydantic v2 models with enhanced validation
-
-### Integration with APG Platform
-
-- **AI Orchestration**: Leverages APG's AI services for intelligent automation
-- **Federated Learning**: Privacy-preserving model training across tenants
-- **Audit Compliance**: Comprehensive logging and regulatory compliance
-- **Real-Time Collaboration**: Instant updates and team synchronization
-
-## 🚀 Quick Start
-
-### 1. Installation
-
-```bash
-# Clone the APG platform
-git clone <apg-repository>
-cd apg/capabilities/core_business_operations/human_capital_management/employee_data_management
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### 2. Configuration
+## Usage
 
 ```python
-# Set environment variables
-export APG_TENANT_ID="your_tenant_id"
-export APG_DATABASE_URL="postgresql://user:pass@localhost/apg_hr"
-export APG_AI_MODEL_CONFIG='{"provider": "openai", "model": "gpt-4"}'
-```
+from capabilities.hcm.chr.employee_data_management import EmployeeDataManagementService
 
-### 3. Initialize the Service
+service = EmployeeDataManagementService()
 
-```python
-from service import RevolutionaryEmployeeDataManagementService
-
-# Initialize service
-employee_service = RevolutionaryEmployeeDataManagementService("your_tenant_id")
-
-# Create employee
-employee_data = {
-    "first_name": "John",
-    "last_name": "Doe", 
-    "work_email": "john.doe@company.com",
-    "hire_date": "2024-01-15",
-    "department_id": "dept_001",
-    "position_id": "pos_001"
-}
-
-result = await employee_service.create_employee_revolutionary(employee_data)
-print(f"Employee created: {result.employee_data['employee_id']}")
-```
-
-### 4. Run Flask API
-
-```python
-from api_integration import employee_api_bp
-from flask import Flask
-
-app = Flask(__name__)
-app.register_blueprint(employee_api_bp)
-app.run(debug=True, port=5000)
-```
-
-## 🌟 Core Features
-
-### AI-Powered Employee Intelligence
-
-```python
-from ai_intelligence_engine import EmployeeAIIntelligenceEngine
-
-ai_engine = EmployeeAIIntelligenceEngine("tenant_id")
-
-# Comprehensive employee analysis
-analysis = await ai_engine.analyze_employee_comprehensive("emp_001")
-print(f"Retention Risk: {analysis.retention_risk_score}")
-print(f"Performance Prediction: {analysis.performance_prediction}")
-
-# Skills gap analysis
-skills_analysis = await ai_engine.get_skills_gap_analysis()
-print(f"Critical Skills Gaps: {skills_analysis.critical_gaps}")
-```
-
-### Global Workforce Management
-
-```python
-from global_workforce_engine import GlobalWorkforceManagementEngine, CountryCode
-
-global_engine = GlobalWorkforceManagementEngine("tenant_id")
-
-# Localize employee data for specific country
-localized_data = await global_engine.get_localized_employee_data(
-    "emp_001", 
-    CountryCode.GB
+department = service.create_department(
+	"department-hr",
+	"tenant-a",
+	"HR",
+	"Human Resources",
+	"hr-owner",
+	"HR-000",
 )
-print(f"Localized salary: {localized_data['compensation']}")
-
-# Compliance checking
-compliance = await global_engine.perform_compliance_check("emp_001")
-print(f"GDPR Compliant: {compliance['overall_compliance']}")
-```
-
-### Analytics Dashboard
-
-```python
-from analytics_dashboard import EmployeeAnalyticsDashboard, AnalyticsTimeframe
-
-dashboard = EmployeeAnalyticsDashboard("tenant_id")
-
-# Get workforce metrics
-metrics = await dashboard.calculate_global_workforce_metrics()
-print(f"Total Workforce: {metrics.total_workforce}")
-print(f"Average Compensation: ${metrics.average_compensation_usd}")
-
-# Create custom dashboard
-dashboard_config = AnalyticsDashboardConfig(
-    dashboard_name="Executive Summary",
-    metrics=[
-        AnalyticsMetric(metric_name="Headcount", metric_type=MetricType.HEADCOUNT),
-        AnalyticsMetric(metric_name="Retention", metric_type=MetricType.RETENTION_RATE)
-    ]
+position = service.create_position(
+	"position-hrbp",
+	"tenant-a",
+	"HRBP",
+	"HR Business Partner",
+	department["id"],
+	"professional",
 )
-dashboard_id = await dashboard.create_dashboard(dashboard_config)
-```
-
-### Workflow Orchestration
-
-```python
-from blueprint_orchestration import BlueprintOrchestrationEngine
-
-orchestration = BlueprintOrchestrationEngine("tenant_id")
-
-# Execute employee onboarding workflow
-execution_id = await orchestration.execute_workflow(
-    "employee_onboarding", 
-    {"employee_data": employee_data}
+employee = service.create_employee(
+	"employee-1",
+	"tenant-a",
+	"EMP-0001",
+	"Amina",
+	"Otieno",
+	"amina.otieno@example.com",
+	department["id"],
+	position["id"],
+	"2026-01-01",
+	"manager-1",
 )
-
-# Monitor workflow status
-status = await orchestration.get_workflow_execution_status(execution_id)
-print(f"Workflow Status: {status['status']}")
+service.record_emergency_contact(
+	"contact-1",
+	"tenant-a",
+	employee["id"],
+	"Sam Otieno",
+	"Spouse",
+	"+254700000000",
+)
+print(service.dashboard_summary("tenant-a"))
 ```
 
-## 🔗 API Reference
-
-### Core Employee Operations
-
-- `GET /api/v1/employees` - List employees with filtering
-- `POST /api/v1/employees` - Create new employee
-- `GET /api/v1/employees/{id}` - Get employee details
-- `PUT /api/v1/employees/{id}` - Update employee
-- `DELETE /api/v1/employees/{id}` - Delete employee
-
-### AI & Analytics
-
-- `POST /api/v1/employees/{id}/analyze` - AI analysis
-- `GET /api/v1/analytics/dashboard` - Dashboard data
-- `GET /api/v1/analytics/metrics` - Workforce metrics
-
-### Global Operations
-
-- `GET /api/v1/global/countries` - Supported countries
-- `POST /api/v1/global/localize` - Localize employee data
-- `GET /api/v1/global/compliance` - Compliance status
-
-### System
-
-- `GET /api/v1/health` - Health check
-- `GET /api/v1/stats` - API statistics
-- `GET /api/v1/docs` - Interactive documentation
-
-### Authentication
-
-All API endpoints require JWT authentication:
-
-```bash
-curl -H "Authorization: Bearer <jwt_token>" \
-     -X GET \
-     "http://localhost:5000/api/v1/employees"
-```
-
-## ⚙️ Configuration
-
-### Database Configuration
+Generated APG applications can use `api.py`:
 
 ```python
-DATABASE_CONFIG = {
-    'url': 'postgresql://user:pass@localhost/apg_hr',
-    'pool_size': 20,
-    'max_overflow': 30,
-    'pool_recycle': 3600,
-    'echo': False
-}
+from capabilities.hcm.chr.employee_data_management import api
+
+status = api.capability_status("tenant-a")
+records = api.list_records("employees", "tenant-a")
 ```
 
-### AI Model Configuration
+## Guardrails
 
-```python
-AI_CONFIG = {
-    'provider': 'openai',  # or 'anthropic', 'ollama'
-    'model': 'gpt-4',
-    'temperature': 0.1,
-    'max_tokens': 2000,
-    'embedding_model': 'text-embedding-ada-002'
-}
-```
+- Tenant context is required.
+- Write operations require policy context.
+- Departments require code, name, owner, and cost center.
+- Positions require code, title, same-tenant department, job level, and
+  nonnegative authorized headcount.
+- Compensation-band positions require review evidence.
+- Employees require employee number, first name, last name, valid work email,
+  same-tenant department, same-tenant position, manager for non-executives, hire
+  date, supported employment type, and supported work mode.
+- Sensitive status changes require review.
+- Personal information requires employee, country, effective date, and privacy
+  basis.
+- Emergency contacts require employee, name, relationship, and phone.
+- Sensitive employment-history events require reason; termination requires
+  approval.
+- Expert and master skills require evidence.
+- Expiring certifications require expiry date and supported status.
+- Data-quality issues require supported domain, severity, and owner for high
+  severity.
+- Employee batches and events require Bytewax metadata.
+- Employee agents must use supported runtimes and roles.
+- Privileged employee-agent actions require recorded human approval.
 
-### Global Workforce Configuration
+## Integration Boundary
 
-```python
-GLOBAL_CONFIG = {
-    'enable_multi_currency': True,
-    'enable_compliance_monitoring': True,
-    'currency_update_frequency': 3600,  # seconds
-    'supported_countries': ['US', 'GB', 'DE', 'CA', 'AU']
-}
-```
+This package does not start a live HRIS or identity workflow by default.
+Production deployments should bind these concerns through adapters:
 
-## 🚀 Deployment
+- identity, authorization, and tenant policy;
+- audit vault and event replication;
+- payroll, benefits, workforce planning, and onboarding systems;
+- document stores for contracts and evidence;
+- privacy policy and data retention engines;
+- notification and workflow routing;
+- durable Bytewax topology and event sinks;
+- AI-agent runtime orchestration.
 
-### Development Environment
+## Focused Verification
 
 ```bash
-# Run with Flask development server
-python run.py
-
-# Or with Gunicorn
-gunicorn --bind 0.0.0.0:5000 --workers 4 run:app
+./.venv/bin/python -m py_compile capabilities/hcm/chr/employee_data_management/__init__.py capabilities/hcm/chr/employee_data_management/capability_contract.py capabilities/hcm/chr/employee_data_management/service.py capabilities/hcm/chr/employee_data_management/api.py capabilities/hcm/chr/employee_data_management/views.py capabilities/hcm/chr/employee_data_management/app.py capabilities/hcm/chr/employee_data_management/tests/test_package_contract.py
+./.venv/bin/pytest -q capabilities/hcm/chr/employee_data_management/tests/test_package_contract.py
+./.venv/bin/python capabilities/hcm/chr/employee_data_management/app.py
+./.venv/bin/apg capabilities inspect chr_employee_data_management --json
+./.venv/bin/apg capabilities publish-plan capabilities/hcm/chr/employee_data_management --json
+./.venv/bin/apg capabilities implementation-audit --root capabilities/hcm/chr/employee_data_management --json
 ```
-
-### Production Deployment
-
-```yaml
-# docker-compose.yml
-version: '3.8'
-services:
-  employee-api:
-    build: .
-    ports:
-      - "5000:5000"
-    environment:
-      - APG_TENANT_ID=production
-      - DATABASE_URL=postgresql://prod_user:pass@db/apg_hr
-    depends_on:
-      - postgres
-      - redis
-  
-  postgres:
-    image: postgres:14
-    environment:
-      POSTGRES_DB: apg_hr
-      POSTGRES_USER: prod_user
-      POSTGRES_PASSWORD: secure_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-```
-
-### Kubernetes Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: employee-api
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: employee-api
-  template:
-    spec:
-      containers:
-      - name: employee-api
-        image: apg/employee-api:latest
-        ports:
-        - containerPort: 5000
-        env:
-        - name: APG_TENANT_ID
-          value: "production"
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: db-secret
-              key: url
-```
-
-## 🔒 Security
-
-### Authentication & Authorization
-
-- **JWT Tokens**: Bearer token authentication
-- **Role-Based Access Control**: Granular permissions
-- **API Rate Limiting**: Prevents abuse
-- **Input Validation**: Comprehensive sanitization
-
-### Data Protection
-
-- **Encryption at Rest**: AES-256 database encryption
-- **Encryption in Transit**: TLS 1.3 for all communications
-- **PII Handling**: Automatic data classification and protection
-- **Audit Logging**: Complete audit trail of all operations
-
-### Compliance
-
-- **GDPR**: EU data protection compliance
-- **CCPA**: California privacy compliance
-- **SOC 2**: Security controls and monitoring
-- **HIPAA**: Healthcare data protection (when applicable)
-
-## ⚡ Performance
-
-### Benchmarks
-
-- **Employee Creation**: <200ms average response time
-- **Search Operations**: <100ms for 1M+ records
-- **AI Analysis**: <500ms for comprehensive insights
-- **Dashboard Loading**: <300ms for complex visualizations
-
-### Optimization Features
-
-- **Database Indexing**: Optimized queries with proper indexes
-- **Caching**: Redis-based caching for frequent operations
-- **Connection Pooling**: Efficient database connections
-- **Async Operations**: Non-blocking I/O for better throughput
-
-### Scaling
-
-- **Horizontal Scaling**: Stateless design supports multiple instances
-- **Database Sharding**: Tenant-based data partitioning
-- **CDN Integration**: Static asset optimization
-- **Load Balancing**: Round-robin and health-check based routing
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-#### Database Connection Errors
-
-```bash
-# Check database connectivity
-pg_isready -h localhost -p 5432
-
-# Verify connection string
-python -c "
-from sqlalchemy import create_engine
-engine = create_engine('postgresql://user:pass@localhost/apg_hr')
-print('Connection successful' if engine.connect() else 'Connection failed')
-"
-```
-
-#### AI Service Timeouts
-
-```python
-# Increase timeout in configuration
-AI_CONFIG = {
-    'timeout': 30,  # seconds
-    'retry_attempts': 3,
-    'exponential_backoff': True
-}
-```
-
-#### Memory Issues
-
-```bash
-# Monitor memory usage
-docker stats employee-api
-
-# Increase memory limits
-docker run -m 2g employee-api
-```
-
-### Logging
-
-```python
-import logging
-
-# Enable debug logging
-logging.basicConfig(level=logging.DEBUG)
-
-# Service-specific logging
-employee_logger = logging.getLogger('EmployeeService')
-employee_logger.setLevel(logging.INFO)
-```
-
-### Health Checks
-
-```bash
-# API health check
-curl http://localhost:5000/api/v1/health
-
-# Database health
-curl http://localhost:5000/api/v1/health/database
-
-# AI services health
-curl http://localhost:5000/api/v1/health/ai
-```
-
-## 📞 Support
-
-### Documentation
-
-- **API Documentation**: `/api/v1/docs` (Swagger UI)
-- **OpenAPI Spec**: `/api/v1/openapi.json`
-- **User Guides**: `/docs/user_guide.md`
-- **Developer Guide**: `/docs/developer_guide.md`
-
-### Contact
-
-- **Website**: [www.datacraft.co.ke](https://www.datacraft.co.ke)
-- **Email**: nyimbi@gmail.com
-- **Repository**: [APG Platform](https://github.com/datacraft/apg)
-
----
-
-© 2025 Datacraft. All rights reserved.  
-Author: Nyimbi Odero | APG Platform Architect

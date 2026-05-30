@@ -1,7 +1,7 @@
 """
 APG Employee Data Management - Quantum-Inspired Skills Matching Algorithm
 
-Revolutionary skills matching system using quantum-inspired algorithms for
+Governed skills matching system using quantum-inspired algorithms for
 optimal employee-role matching with 98%+ accuracy and exponential performance gains.
 """
 

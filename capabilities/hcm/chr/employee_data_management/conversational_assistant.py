@@ -1,8 +1,8 @@
 """
 APG Employee Data Management - Conversational HR Assistant
 
-Revolutionary conversational AI interface with natural language processing,
-voice commands, and multi-language support for 10x user experience improvement.
+Governed conversational AI interface with natural language processing,
+voice commands, and multi-language support for measurable user experience improvement.
 
 © 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero | APG Platform Architect
@@ -102,7 +102,7 @@ class ConversationResponse:
 
 
 class ConversationalHRAssistant:
-	"""Revolutionary conversational AI assistant for HR operations."""
+	"""Governed conversational AI assistant for HR operations."""
 	
 	def __init__(self, tenant_id: str, ai_config: Optional[Dict[str, Any]] = None):
 		self.tenant_id = tenant_id

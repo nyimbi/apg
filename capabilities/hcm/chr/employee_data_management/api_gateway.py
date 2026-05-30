@@ -25,7 +25,7 @@ from ....ai_orchestration.service import AIOrchestrationService
 from ....auth_rbac.service import AuthRBACService
 from ....audit_compliance.service import AuditComplianceService
 from ....real_time_collaboration.service import CollaborationService
-from .service import RevolutionaryEmployeeDataManagementService
+from .service import EmployeeDataManagementService
 from .ai_intelligence_engine import EmployeeAIIntelligenceEngine
 from .analytics_dashboard import EmployeeAnalyticsDashboard
 
@@ -140,7 +140,7 @@ class EmployeeAPIGateway:
 		self.ai_orchestration = AIOrchestrationService(tenant_id)
 		
 		# Core Services
-		self.employee_service = RevolutionaryEmployeeDataManagementService(tenant_id)
+		self.employee_service = EmployeeDataManagementService(tenant_id)
 		self.ai_intelligence = EmployeeAIIntelligenceEngine(tenant_id)
 		self.analytics_dashboard = EmployeeAnalyticsDashboard(tenant_id)
 		
@@ -539,7 +539,7 @@ class EmployeeAPIGateway:
 			employee_data = request.body
 			
 			# Create employee
-			result = await self.employee_service.create_employee_revolutionary(employee_data)
+			result = await self.employee_service.create_employee(employee_data)
 			
 			if not result.success:
 				return APIResponse(
@@ -570,7 +570,7 @@ class EmployeeAPIGateway:
 			update_data = request.body
 			
 			# Update employee
-			result = await self.employee_service.update_employee_revolutionary(
+			result = await self.employee_service.update_employee(
 				employee_id, update_data
 			)
 			

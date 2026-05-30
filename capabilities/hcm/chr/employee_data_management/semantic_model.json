@@ -1,60 +1,218 @@
 {
-  "agents": {},
   "app": {
-    "description": "Employee Data Management - Revolutionary package-backed APG capability",
-    "entity_count": 0,
+    "description": "Employee Data Management package-backed APG capability",
+    "entity_count": 10,
     "name": "chr_employee_data_management",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "chr_employee_data_management": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Chr",
-          "enabled": true,
-          "id": "chr_employee_data_management",
-          "name": "Employee Data Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/hcm/chr/employee_data_management/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "benefits": "adapter",
+          "document_store": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "notification": "adapter",
+          "payroll": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "certifications": {
+          "employee_required": true,
+          "expires_on_required_for_expiring": true,
+          "issued_on_required": true,
+          "issuer_required": true,
+          "name_required": true,
+          "supported_statuses": [
+            "pending",
+            "active",
+            "expired",
+            "revoked"
+          ]
+        },
+        "data_quality": {
+          "domain_required": true,
+          "owner_required_for_high_severity": true,
+          "severity_required": true,
+          "supported_domains": [
+            "identity",
+            "employment",
+            "organization",
+            "skills",
+            "certifications",
+            "contacts",
+            "privacy"
+          ]
+        },
+        "departments": {
+          "code_required": true,
+          "cost_center_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "emergency_contacts": {
+          "employee_required": true,
+          "name_required": true,
+          "phone_required": true,
+          "relationship_required": true
+        },
+        "employee_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "profile_steward",
+            "data_quality_reviewer",
+            "org_design_reviewer",
+            "skills_reviewer",
+            "compliance_reviewer",
+            "onboarding_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "employees": {
+          "department_required": true,
+          "employee_number_required": true,
+          "hire_date_required": true,
+          "legal_name_required": true,
+          "manager_required_for_non_executives": true,
+          "position_required": true,
+          "sensitive_change_review_required": true,
+          "supported_employment_types": [
+            "full_time",
+            "part_time",
+            "contractor",
+            "intern",
+            "temporary"
+          ],
+          "supported_statuses": [
+            "draft",
+            "active",
+            "leave",
+            "suspended",
+            "terminated",
+            "alumni"
+          ],
+          "supported_work_modes": [
+            "onsite",
+            "hybrid",
+            "remote",
+            "field"
+          ],
+          "work_email_required": true
+        },
+        "employment_history": {
+          "approval_required_for_termination": true,
+          "effective_date_required": true,
+          "employee_required": true,
+          "event_type_required": true,
+          "reason_required_for_sensitive_events": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privacy_basis_for_sensitive_data": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_certification_events": true,
+          "emit_data_quality_events": true,
+          "emit_department_events": true,
+          "emit_employee_events": true,
+          "emit_position_events": true,
+          "emit_profile_events": true,
+          "emit_skill_events": true,
+          "event_stream": "apg.hcm.chr.employee.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "personal_info": {
+          "country_required": true,
+          "effective_date_required": true,
+          "employee_required": true,
+          "privacy_basis_required": true
+        },
+        "positions": {
+          "code_required": true,
+          "compensation_band_review_required": true,
+          "department_required": true,
+          "headcount_minimum": 0,
+          "job_level_required": true,
+          "title_required": true
+        },
+        "skills": {
+          "employee_required": true,
+          "evidence_required_for_expert": true,
+          "skill_required": true,
+          "supported_levels": [
+            "awareness",
+            "working",
+            "practitioner",
+            "expert",
+            "master"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "chr_employee_data_management_operations"
+          "default_theme": "employee_data_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_certifications": true,
+          "enable_contacts": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_departments": true,
+          "enable_employees": true,
+          "enable_history": true,
+          "enable_personal_info": true,
+          "enable_positions": true,
+          "enable_quality": true,
+          "enable_settings": true,
+          "enable_skills": true
         }
       },
-      "erp_modules": [
-        "hcm"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Employee Data Management - Revolutionary",
+      "name": "Employee Data Management",
       "provides": [
-        "chr_employee_data_management_operations"
+        "employee_profile_lifecycle",
+        "employee_identity_registry",
+        "department_lifecycle",
+        "position_lifecycle",
+        "employment_history_lifecycle",
+        "employee_skill_lifecycle",
+        "employee_certification_lifecycle",
+        "employee_contact_lifecycle",
+        "employee_data_quality_workflow",
+        "employee_dashboard_service",
+        "employee_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "document_management",
+        "identity_access",
+        "privacy_policy"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Employee Data Management - Revolutionary operations require tenant context.",
+            "description": "Employee data operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +225,737 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Employee Data Management - Revolutionary write operations require policy enforcement.",
+            "description": "Employee data writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "employee_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "code_present": false,
+              "operation": "create_department"
             },
-            "description": "High-risk Employee Data Management - Revolutionary operations require review.",
+            "description": "Departments require code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "department_code_required",
+              "required_action": "set_department_code"
+            },
+            "name": "department_requires_code"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_department"
+            },
+            "description": "Departments require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "department_name_required",
+              "required_action": "set_department_name"
+            },
+            "name": "department_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "create_department",
+              "owner_present": false
+            },
+            "description": "Departments require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "department_owner_required",
+              "required_action": "assign_department_owner"
+            },
+            "name": "department_requires_owner"
+          },
+          {
+            "condition": {
+              "cost_center_present": false,
+              "operation": "create_department"
+            },
+            "description": "Departments require cost center.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cost_center_required",
+              "required_action": "set_cost_center"
+            },
+            "name": "department_requires_cost_center"
+          },
+          {
+            "condition": {
+              "code_present": false,
+              "operation": "create_position"
+            },
+            "description": "Positions require code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "position_code_required",
+              "required_action": "set_position_code"
+            },
+            "name": "position_requires_code"
+          },
+          {
+            "condition": {
+              "operation": "create_position",
+              "title_present": false
+            },
+            "description": "Positions require title.",
+            "effect": {
+              "decision": "deny",
+              "reason": "position_title_required",
+              "required_action": "set_position_title"
+            },
+            "name": "position_requires_title"
+          },
+          {
+            "condition": {
+              "department_present": false,
+              "operation": "create_position"
+            },
+            "description": "Positions require same-tenant department.",
+            "effect": {
+              "decision": "deny",
+              "reason": "department_required",
+              "required_action": "select_department"
+            },
+            "name": "position_requires_department"
+          },
+          {
+            "condition": {
+              "job_level_present": false,
+              "operation": "create_position"
+            },
+            "description": "Positions require job level.",
+            "effect": {
+              "decision": "deny",
+              "reason": "job_level_required",
+              "required_action": "set_job_level"
+            },
+            "name": "position_requires_job_level"
+          },
+          {
+            "condition": {
+              "authorized_headcount_lt": 0,
+              "operation": "create_position"
+            },
+            "description": "Authorized headcount cannot be negative.",
+            "effect": {
+              "decision": "deny",
+              "reason": "authorized_headcount_invalid",
+              "required_action": "set_valid_headcount"
+            },
+            "name": "position_headcount_nonnegative"
+          },
+          {
+            "condition": {
+              "compensation_band_present": true,
+              "operation": "create_position",
+              "review_recorded": false
+            },
+            "description": "Positions with compensation bands require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "compensation_band_review_required",
+              "required_action": "record_compensation_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "compensation_band_requires_review"
+          },
+          {
+            "condition": {
+              "employee_number_present": false,
+              "operation": "create_employee"
+            },
+            "description": "Employees require employee number.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_number_required",
+              "required_action": "set_employee_number"
+            },
+            "name": "employee_requires_number"
+          },
+          {
+            "condition": {
+              "first_name_present": false,
+              "operation": "create_employee"
+            },
+            "description": "Employees require first name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "first_name_required",
+              "required_action": "set_first_name"
+            },
+            "name": "employee_requires_first_name"
+          },
+          {
+            "condition": {
+              "last_name_present": false,
+              "operation": "create_employee"
+            },
+            "description": "Employees require last name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "last_name_required",
+              "required_action": "set_last_name"
+            },
+            "name": "employee_requires_last_name"
+          },
+          {
+            "condition": {
+              "operation": "create_employee",
+              "work_email_present": false
+            },
+            "description": "Employees require work email.",
+            "effect": {
+              "decision": "deny",
+              "reason": "work_email_required",
+              "required_action": "set_work_email"
+            },
+            "name": "employee_requires_email"
+          },
+          {
+            "condition": {
+              "operation": "create_employee",
+              "work_email_valid": false
+            },
+            "description": "Employee work email must be valid.",
+            "effect": {
+              "decision": "deny",
+              "reason": "work_email_invalid",
+              "required_action": "set_valid_work_email"
+            },
+            "name": "employee_email_format"
+          },
+          {
+            "condition": {
+              "department_present": false,
+              "operation": "create_employee"
+            },
+            "description": "Employees require same-tenant department.",
+            "effect": {
+              "decision": "deny",
+              "reason": "department_required",
+              "required_action": "select_department"
+            },
+            "name": "employee_requires_department"
+          },
+          {
+            "condition": {
+              "operation": "create_employee",
+              "position_present": false
+            },
+            "description": "Employees require same-tenant position.",
+            "effect": {
+              "decision": "deny",
+              "reason": "position_required",
+              "required_action": "select_position"
+            },
+            "name": "employee_requires_position"
+          },
+          {
+            "condition": {
+              "executive": false,
+              "manager_present": false,
+              "operation": "create_employee"
+            },
+            "description": "Non-executive employees require manager.",
+            "effect": {
+              "decision": "deny",
+              "reason": "manager_required",
+              "required_action": "assign_manager"
+            },
+            "name": "employee_manager_required_for_non_executives"
+          },
+          {
+            "condition": {
+              "hire_date_present": false,
+              "operation": "create_employee"
+            },
+            "description": "Employees require hire date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "hire_date_required",
+              "required_action": "set_hire_date"
+            },
+            "name": "employee_requires_hire_date"
+          },
+          {
+            "condition": {
+              "employment_type_supported": false,
+              "operation": "create_employee"
+            },
+            "description": "Employment type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employment_type_not_supported",
+              "required_action": "select_supported_employment_type"
+            },
+            "name": "employee_type_supported"
+          },
+          {
+            "condition": {
+              "operation": "create_employee",
+              "work_mode_supported": false
+            },
+            "description": "Work mode must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "work_mode_not_supported",
+              "required_action": "select_supported_work_mode"
+            },
+            "name": "work_mode_supported"
+          },
+          {
+            "condition": {
+              "operation": "change_employee_status",
+              "review_recorded": false,
+              "sensitive_change": true
+            },
+            "description": "Sensitive employee changes require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "sensitive_change_review_required",
+              "required_action": "record_sensitive_change_review"
+            },
+            "name": "sensitive_employee_change_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "change_employee_status",
+              "status_supported": false
+            },
+            "description": "Employee status must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_status_not_supported",
+              "required_action": "select_supported_status"
+            },
+            "name": "employee_status_supported"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "record_personal_info"
+            },
+            "description": "Personal info requires employee.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_required",
+              "required_action": "select_employee"
+            },
+            "name": "personal_info_requires_employee"
+          },
+          {
+            "condition": {
+              "effective_date_present": false,
+              "operation": "record_personal_info"
+            },
+            "description": "Personal info requires effective date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "effective_date_required",
+              "required_action": "set_effective_date"
+            },
+            "name": "personal_info_requires_effective_date"
+          },
+          {
+            "condition": {
+              "country_present": false,
+              "operation": "record_personal_info"
+            },
+            "description": "Personal info requires country.",
+            "effect": {
+              "decision": "deny",
+              "reason": "country_required",
+              "required_action": "set_country"
+            },
+            "name": "personal_info_requires_country"
+          },
+          {
+            "condition": {
+              "operation": "record_personal_info",
+              "privacy_basis_present": false
+            },
+            "description": "Sensitive personal info requires privacy basis.",
+            "effect": {
+              "decision": "deny",
+              "reason": "privacy_basis_required",
+              "required_action": "set_privacy_basis"
+            },
+            "name": "personal_info_requires_privacy_basis"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "record_emergency_contact"
+            },
+            "description": "Emergency contacts require employee.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_required",
+              "required_action": "select_employee"
+            },
+            "name": "emergency_contact_requires_employee"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "record_emergency_contact"
+            },
+            "description": "Emergency contacts require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_name_required",
+              "required_action": "set_contact_name"
+            },
+            "name": "emergency_contact_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "record_emergency_contact",
+              "relationship_present": false
+            },
+            "description": "Emergency contacts require relationship.",
+            "effect": {
+              "decision": "deny",
+              "reason": "relationship_required",
+              "required_action": "set_relationship"
+            },
+            "name": "emergency_contact_requires_relationship"
+          },
+          {
+            "condition": {
+              "operation": "record_emergency_contact",
+              "phone_present": false
+            },
+            "description": "Emergency contacts require phone.",
+            "effect": {
+              "decision": "deny",
+              "reason": "phone_required",
+              "required_action": "set_phone"
+            },
+            "name": "emergency_contact_requires_phone"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "record_employment_history"
+            },
+            "description": "Employment history requires employee.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_required",
+              "required_action": "select_employee"
+            },
+            "name": "history_requires_employee"
+          },
+          {
+            "condition": {
+              "event_type_present": false,
+              "operation": "record_employment_history"
+            },
+            "description": "Employment history requires event type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_type_required",
+              "required_action": "set_event_type"
+            },
+            "name": "history_requires_event_type"
+          },
+          {
+            "condition": {
+              "effective_date_present": false,
+              "operation": "record_employment_history"
+            },
+            "description": "Employment history requires effective date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "effective_date_required",
+              "required_action": "set_effective_date"
+            },
+            "name": "history_requires_effective_date"
+          },
+          {
+            "condition": {
+              "operation": "record_employment_history",
+              "reason_present": false,
+              "sensitive_event": true
+            },
+            "description": "Sensitive employment events require reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "history_reason_required",
+              "required_action": "set_event_reason"
+            },
+            "name": "sensitive_history_requires_reason"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "record_employment_history",
+              "termination_event": true
+            },
+            "description": "Termination history requires approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "termination_approval_required",
+              "required_action": "record_termination_approval"
+            },
+            "name": "termination_requires_approval"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "assign_skill"
+            },
+            "description": "Employee skills require employee.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_required",
+              "required_action": "select_employee"
+            },
+            "name": "skill_requires_employee"
+          },
+          {
+            "condition": {
+              "operation": "assign_skill",
+              "skill_present": false
+            },
+            "description": "Employee skills require skill name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "skill_required",
+              "required_action": "set_skill"
+            },
+            "name": "skill_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "assign_skill",
+              "skill_level_supported": false
+            },
+            "description": "Skill level must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "skill_level_not_supported",
+              "required_action": "select_supported_skill_level"
+            },
+            "name": "skill_level_supported"
+          },
+          {
+            "condition": {
+              "advanced_skill": true,
+              "evidence_present": false,
+              "operation": "assign_skill"
+            },
+            "description": "Expert and master skills require evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "skill_evidence_required",
+              "required_action": "record_skill_evidence"
+            },
+            "name": "expert_skill_requires_evidence"
+          },
+          {
+            "condition": {
+              "employee_present": false,
+              "operation": "assign_certification"
+            },
+            "description": "Certifications require employee.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_required",
+              "required_action": "select_employee"
+            },
+            "name": "certification_requires_employee"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "assign_certification"
+            },
+            "description": "Certifications require name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "certification_name_required",
+              "required_action": "set_certification_name"
+            },
+            "name": "certification_requires_name"
+          },
+          {
+            "condition": {
+              "issuer_present": false,
+              "operation": "assign_certification"
+            },
+            "description": "Certifications require issuer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "issuer_required",
+              "required_action": "set_issuer"
+            },
+            "name": "certification_requires_issuer"
+          },
+          {
+            "condition": {
+              "issued_on_present": false,
+              "operation": "assign_certification"
+            },
+            "description": "Certifications require issued date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "issued_on_required",
+              "required_action": "set_issued_on"
+            },
+            "name": "certification_requires_issued_on"
+          },
+          {
+            "condition": {
+              "expires_on_present": false,
+              "expiring": true,
+              "operation": "assign_certification"
+            },
+            "description": "Expiring certifications require expiry date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "expires_on_required",
+              "required_action": "set_expiry_date"
+            },
+            "name": "expiring_certification_requires_expiry"
+          },
+          {
+            "condition": {
+              "certification_status_supported": false,
+              "operation": "assign_certification"
+            },
+            "description": "Certification status must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "certification_status_not_supported",
+              "required_action": "select_supported_certification_status"
+            },
+            "name": "certification_status_supported"
+          },
+          {
+            "condition": {
+              "domain_present": false,
+              "operation": "record_data_quality_issue"
+            },
+            "description": "Data-quality issues require domain.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_domain_required",
+              "required_action": "set_quality_domain"
+            },
+            "name": "quality_requires_domain"
+          },
+          {
+            "condition": {
+              "domain_supported": false,
+              "operation": "record_data_quality_issue"
+            },
+            "description": "Data-quality domain must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_domain_not_supported",
+              "required_action": "select_supported_quality_domain"
+            },
+            "name": "quality_domain_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_data_quality_issue",
+              "severity_present": false
+            },
+            "description": "Data-quality issues require severity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_severity_required",
+              "required_action": "set_quality_severity"
+            },
+            "name": "quality_requires_severity"
+          },
+          {
+            "condition": {
+              "high_severity": true,
+              "operation": "record_data_quality_issue",
+              "owner_present": false
+            },
+            "description": "High-severity data-quality issues require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_owner_required",
+              "required_action": "assign_quality_owner"
+            },
+            "name": "high_severity_quality_requires_owner"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "employee_batch"
+            },
+            "description": "Employee batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_employee_batch_to_bytewax"
+            },
+            "name": "employee_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "employee_event"
+            },
+            "description": "Employee events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_employee_event_to_bytewax"
+            },
+            "name": "employee_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_employee_agent"
+            },
+            "description": "Employee agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "employee_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_employee_agent"
+            },
+            "description": "Employee agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "employee_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "employee_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "employee_agent_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged employee data actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_employee_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +965,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Employee Data Management - Revolutionary operations require tenant context.",
+          "description": "Employee data operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +978,737 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Employee Data Management - Revolutionary write operations require policy enforcement.",
+          "description": "Employee data writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "employee_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "code_present": false,
+            "operation": "create_department"
           },
-          "description": "High-risk Employee Data Management - Revolutionary operations require review.",
+          "description": "Departments require code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "department_code_required",
+            "required_action": "set_department_code"
+          },
+          "name": "department_requires_code"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_department"
+          },
+          "description": "Departments require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "department_name_required",
+            "required_action": "set_department_name"
+          },
+          "name": "department_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "create_department",
+            "owner_present": false
+          },
+          "description": "Departments require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "department_owner_required",
+            "required_action": "assign_department_owner"
+          },
+          "name": "department_requires_owner"
+        },
+        {
+          "condition": {
+            "cost_center_present": false,
+            "operation": "create_department"
+          },
+          "description": "Departments require cost center.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cost_center_required",
+            "required_action": "set_cost_center"
+          },
+          "name": "department_requires_cost_center"
+        },
+        {
+          "condition": {
+            "code_present": false,
+            "operation": "create_position"
+          },
+          "description": "Positions require code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "position_code_required",
+            "required_action": "set_position_code"
+          },
+          "name": "position_requires_code"
+        },
+        {
+          "condition": {
+            "operation": "create_position",
+            "title_present": false
+          },
+          "description": "Positions require title.",
+          "effect": {
+            "decision": "deny",
+            "reason": "position_title_required",
+            "required_action": "set_position_title"
+          },
+          "name": "position_requires_title"
+        },
+        {
+          "condition": {
+            "department_present": false,
+            "operation": "create_position"
+          },
+          "description": "Positions require same-tenant department.",
+          "effect": {
+            "decision": "deny",
+            "reason": "department_required",
+            "required_action": "select_department"
+          },
+          "name": "position_requires_department"
+        },
+        {
+          "condition": {
+            "job_level_present": false,
+            "operation": "create_position"
+          },
+          "description": "Positions require job level.",
+          "effect": {
+            "decision": "deny",
+            "reason": "job_level_required",
+            "required_action": "set_job_level"
+          },
+          "name": "position_requires_job_level"
+        },
+        {
+          "condition": {
+            "authorized_headcount_lt": 0,
+            "operation": "create_position"
+          },
+          "description": "Authorized headcount cannot be negative.",
+          "effect": {
+            "decision": "deny",
+            "reason": "authorized_headcount_invalid",
+            "required_action": "set_valid_headcount"
+          },
+          "name": "position_headcount_nonnegative"
+        },
+        {
+          "condition": {
+            "compensation_band_present": true,
+            "operation": "create_position",
+            "review_recorded": false
+          },
+          "description": "Positions with compensation bands require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "compensation_band_review_required",
+            "required_action": "record_compensation_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "compensation_band_requires_review"
+        },
+        {
+          "condition": {
+            "employee_number_present": false,
+            "operation": "create_employee"
+          },
+          "description": "Employees require employee number.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_number_required",
+            "required_action": "set_employee_number"
+          },
+          "name": "employee_requires_number"
+        },
+        {
+          "condition": {
+            "first_name_present": false,
+            "operation": "create_employee"
+          },
+          "description": "Employees require first name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "first_name_required",
+            "required_action": "set_first_name"
+          },
+          "name": "employee_requires_first_name"
+        },
+        {
+          "condition": {
+            "last_name_present": false,
+            "operation": "create_employee"
+          },
+          "description": "Employees require last name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "last_name_required",
+            "required_action": "set_last_name"
+          },
+          "name": "employee_requires_last_name"
+        },
+        {
+          "condition": {
+            "operation": "create_employee",
+            "work_email_present": false
+          },
+          "description": "Employees require work email.",
+          "effect": {
+            "decision": "deny",
+            "reason": "work_email_required",
+            "required_action": "set_work_email"
+          },
+          "name": "employee_requires_email"
+        },
+        {
+          "condition": {
+            "operation": "create_employee",
+            "work_email_valid": false
+          },
+          "description": "Employee work email must be valid.",
+          "effect": {
+            "decision": "deny",
+            "reason": "work_email_invalid",
+            "required_action": "set_valid_work_email"
+          },
+          "name": "employee_email_format"
+        },
+        {
+          "condition": {
+            "department_present": false,
+            "operation": "create_employee"
+          },
+          "description": "Employees require same-tenant department.",
+          "effect": {
+            "decision": "deny",
+            "reason": "department_required",
+            "required_action": "select_department"
+          },
+          "name": "employee_requires_department"
+        },
+        {
+          "condition": {
+            "operation": "create_employee",
+            "position_present": false
+          },
+          "description": "Employees require same-tenant position.",
+          "effect": {
+            "decision": "deny",
+            "reason": "position_required",
+            "required_action": "select_position"
+          },
+          "name": "employee_requires_position"
+        },
+        {
+          "condition": {
+            "executive": false,
+            "manager_present": false,
+            "operation": "create_employee"
+          },
+          "description": "Non-executive employees require manager.",
+          "effect": {
+            "decision": "deny",
+            "reason": "manager_required",
+            "required_action": "assign_manager"
+          },
+          "name": "employee_manager_required_for_non_executives"
+        },
+        {
+          "condition": {
+            "hire_date_present": false,
+            "operation": "create_employee"
+          },
+          "description": "Employees require hire date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "hire_date_required",
+            "required_action": "set_hire_date"
+          },
+          "name": "employee_requires_hire_date"
+        },
+        {
+          "condition": {
+            "employment_type_supported": false,
+            "operation": "create_employee"
+          },
+          "description": "Employment type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employment_type_not_supported",
+            "required_action": "select_supported_employment_type"
+          },
+          "name": "employee_type_supported"
+        },
+        {
+          "condition": {
+            "operation": "create_employee",
+            "work_mode_supported": false
+          },
+          "description": "Work mode must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "work_mode_not_supported",
+            "required_action": "select_supported_work_mode"
+          },
+          "name": "work_mode_supported"
+        },
+        {
+          "condition": {
+            "operation": "change_employee_status",
+            "review_recorded": false,
+            "sensitive_change": true
+          },
+          "description": "Sensitive employee changes require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "sensitive_change_review_required",
+            "required_action": "record_sensitive_change_review"
+          },
+          "name": "sensitive_employee_change_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "change_employee_status",
+            "status_supported": false
+          },
+          "description": "Employee status must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_status_not_supported",
+            "required_action": "select_supported_status"
+          },
+          "name": "employee_status_supported"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "record_personal_info"
+          },
+          "description": "Personal info requires employee.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_required",
+            "required_action": "select_employee"
+          },
+          "name": "personal_info_requires_employee"
+        },
+        {
+          "condition": {
+            "effective_date_present": false,
+            "operation": "record_personal_info"
+          },
+          "description": "Personal info requires effective date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "effective_date_required",
+            "required_action": "set_effective_date"
+          },
+          "name": "personal_info_requires_effective_date"
+        },
+        {
+          "condition": {
+            "country_present": false,
+            "operation": "record_personal_info"
+          },
+          "description": "Personal info requires country.",
+          "effect": {
+            "decision": "deny",
+            "reason": "country_required",
+            "required_action": "set_country"
+          },
+          "name": "personal_info_requires_country"
+        },
+        {
+          "condition": {
+            "operation": "record_personal_info",
+            "privacy_basis_present": false
+          },
+          "description": "Sensitive personal info requires privacy basis.",
+          "effect": {
+            "decision": "deny",
+            "reason": "privacy_basis_required",
+            "required_action": "set_privacy_basis"
+          },
+          "name": "personal_info_requires_privacy_basis"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "record_emergency_contact"
+          },
+          "description": "Emergency contacts require employee.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_required",
+            "required_action": "select_employee"
+          },
+          "name": "emergency_contact_requires_employee"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "record_emergency_contact"
+          },
+          "description": "Emergency contacts require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_name_required",
+            "required_action": "set_contact_name"
+          },
+          "name": "emergency_contact_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "record_emergency_contact",
+            "relationship_present": false
+          },
+          "description": "Emergency contacts require relationship.",
+          "effect": {
+            "decision": "deny",
+            "reason": "relationship_required",
+            "required_action": "set_relationship"
+          },
+          "name": "emergency_contact_requires_relationship"
+        },
+        {
+          "condition": {
+            "operation": "record_emergency_contact",
+            "phone_present": false
+          },
+          "description": "Emergency contacts require phone.",
+          "effect": {
+            "decision": "deny",
+            "reason": "phone_required",
+            "required_action": "set_phone"
+          },
+          "name": "emergency_contact_requires_phone"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "record_employment_history"
+          },
+          "description": "Employment history requires employee.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_required",
+            "required_action": "select_employee"
+          },
+          "name": "history_requires_employee"
+        },
+        {
+          "condition": {
+            "event_type_present": false,
+            "operation": "record_employment_history"
+          },
+          "description": "Employment history requires event type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_type_required",
+            "required_action": "set_event_type"
+          },
+          "name": "history_requires_event_type"
+        },
+        {
+          "condition": {
+            "effective_date_present": false,
+            "operation": "record_employment_history"
+          },
+          "description": "Employment history requires effective date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "effective_date_required",
+            "required_action": "set_effective_date"
+          },
+          "name": "history_requires_effective_date"
+        },
+        {
+          "condition": {
+            "operation": "record_employment_history",
+            "reason_present": false,
+            "sensitive_event": true
+          },
+          "description": "Sensitive employment events require reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "history_reason_required",
+            "required_action": "set_event_reason"
+          },
+          "name": "sensitive_history_requires_reason"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "record_employment_history",
+            "termination_event": true
+          },
+          "description": "Termination history requires approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "termination_approval_required",
+            "required_action": "record_termination_approval"
+          },
+          "name": "termination_requires_approval"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "assign_skill"
+          },
+          "description": "Employee skills require employee.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_required",
+            "required_action": "select_employee"
+          },
+          "name": "skill_requires_employee"
+        },
+        {
+          "condition": {
+            "operation": "assign_skill",
+            "skill_present": false
+          },
+          "description": "Employee skills require skill name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "skill_required",
+            "required_action": "set_skill"
+          },
+          "name": "skill_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "assign_skill",
+            "skill_level_supported": false
+          },
+          "description": "Skill level must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "skill_level_not_supported",
+            "required_action": "select_supported_skill_level"
+          },
+          "name": "skill_level_supported"
+        },
+        {
+          "condition": {
+            "advanced_skill": true,
+            "evidence_present": false,
+            "operation": "assign_skill"
+          },
+          "description": "Expert and master skills require evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "skill_evidence_required",
+            "required_action": "record_skill_evidence"
+          },
+          "name": "expert_skill_requires_evidence"
+        },
+        {
+          "condition": {
+            "employee_present": false,
+            "operation": "assign_certification"
+          },
+          "description": "Certifications require employee.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_required",
+            "required_action": "select_employee"
+          },
+          "name": "certification_requires_employee"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "assign_certification"
+          },
+          "description": "Certifications require name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "certification_name_required",
+            "required_action": "set_certification_name"
+          },
+          "name": "certification_requires_name"
+        },
+        {
+          "condition": {
+            "issuer_present": false,
+            "operation": "assign_certification"
+          },
+          "description": "Certifications require issuer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "issuer_required",
+            "required_action": "set_issuer"
+          },
+          "name": "certification_requires_issuer"
+        },
+        {
+          "condition": {
+            "issued_on_present": false,
+            "operation": "assign_certification"
+          },
+          "description": "Certifications require issued date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "issued_on_required",
+            "required_action": "set_issued_on"
+          },
+          "name": "certification_requires_issued_on"
+        },
+        {
+          "condition": {
+            "expires_on_present": false,
+            "expiring": true,
+            "operation": "assign_certification"
+          },
+          "description": "Expiring certifications require expiry date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "expires_on_required",
+            "required_action": "set_expiry_date"
+          },
+          "name": "expiring_certification_requires_expiry"
+        },
+        {
+          "condition": {
+            "certification_status_supported": false,
+            "operation": "assign_certification"
+          },
+          "description": "Certification status must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "certification_status_not_supported",
+            "required_action": "select_supported_certification_status"
+          },
+          "name": "certification_status_supported"
+        },
+        {
+          "condition": {
+            "domain_present": false,
+            "operation": "record_data_quality_issue"
+          },
+          "description": "Data-quality issues require domain.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_domain_required",
+            "required_action": "set_quality_domain"
+          },
+          "name": "quality_requires_domain"
+        },
+        {
+          "condition": {
+            "domain_supported": false,
+            "operation": "record_data_quality_issue"
+          },
+          "description": "Data-quality domain must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_domain_not_supported",
+            "required_action": "select_supported_quality_domain"
+          },
+          "name": "quality_domain_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_data_quality_issue",
+            "severity_present": false
+          },
+          "description": "Data-quality issues require severity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_severity_required",
+            "required_action": "set_quality_severity"
+          },
+          "name": "quality_requires_severity"
+        },
+        {
+          "condition": {
+            "high_severity": true,
+            "operation": "record_data_quality_issue",
+            "owner_present": false
+          },
+          "description": "High-severity data-quality issues require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_owner_required",
+            "required_action": "assign_quality_owner"
+          },
+          "name": "high_severity_quality_requires_owner"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "employee_batch"
+          },
+          "description": "Employee batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_employee_batch_to_bytewax"
+          },
+          "name": "employee_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "employee_event"
+          },
+          "description": "Employee events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_employee_event_to_bytewax"
+          },
+          "name": "employee_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_employee_agent"
+          },
+          "description": "Employee agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "employee_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_employee_agent"
+          },
+          "description": "Employee agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "employee_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "employee_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "employee_agent_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged employee data actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_employee_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,55 +1718,151 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "EmployeeAgentWorkbench",
+          "permission": "chr_employee_data_management:admin",
+          "route": "/hcm/employees/agents"
+        },
+        "certifications": {
+          "component": "EmployeeCertificationWorkbench",
+          "permission": "chr_employee_data_management:manage_certifications",
+          "route": "/hcm/employees/certifications"
+        },
+        "contacts": {
+          "component": "EmergencyContactWorkbench",
+          "permission": "chr_employee_data_management:manage_employees",
+          "route": "/hcm/employees/contacts"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "EmployeeDashboard",
           "permission": "chr_employee_data_management:view",
-          "route": "/chr-employee-data-management/dashboard"
+          "route": "/hcm/employees/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "chr_employee_data_management:operate",
-          "route": "/chr-employee-data-management/operations"
+        "departments": {
+          "component": "DepartmentWorkbench",
+          "permission": "chr_employee_data_management:manage_structure",
+          "route": "/hcm/employees/departments"
         },
-        "rules": {
-          "component": "CapabilityRules",
+        "employees": {
+          "component": "EmployeeRegistryWorkbench",
+          "permission": "chr_employee_data_management:manage_employees",
+          "route": "/hcm/employees"
+        },
+        "history": {
+          "component": "EmploymentHistoryWorkbench",
+          "permission": "chr_employee_data_management:manage_history",
+          "route": "/hcm/employees/history"
+        },
+        "personal_info": {
+          "component": "PersonalInfoWorkbench",
+          "permission": "chr_employee_data_management:manage_sensitive",
+          "route": "/hcm/employees/personal-info"
+        },
+        "positions": {
+          "component": "PositionWorkbench",
+          "permission": "chr_employee_data_management:manage_structure",
+          "route": "/hcm/employees/positions"
+        },
+        "quality": {
+          "component": "EmployeeDataQualityWorkbench",
           "permission": "chr_employee_data_management:govern",
-          "route": "/chr-employee-data-management/rules"
+          "route": "/hcm/employees/data-quality"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "EmployeeSettings",
           "permission": "chr_employee_data_management:admin",
-          "route": "/chr-employee-data-management/settings"
+          "route": "/hcm/employees/settings"
+        },
+        "skills": {
+          "component": "EmployeeSkillWorkbench",
+          "permission": "chr_employee_data_management:manage_skills",
+          "route": "/hcm/employees/skills"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "department_created",
+          "position_created",
+          "employee_created",
+          "employee_status_changed",
+          "personal_info_recorded",
+          "emergency_contact_recorded",
+          "employment_history_recorded",
+          "employee_skill_assigned",
+          "employee_certification_assigned",
+          "data_quality_issue_recorded",
+          "employee_agent_registered"
+        ],
+        "guardrails": [
+          "employee_batch_requires_bytewax",
+          "employee_event_requires_bytewax",
+          "privileged_employee_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "leave",
+          "suspended",
+          "terminated",
+          "alumni",
+          "queued",
+          "blocked"
+        ],
+        "stream": "apg.hcm.chr.employee.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "certifications": {
+            "status_style": "credential-chip",
+            "visual": "credential-ledger"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "contacts": {
+            "status_style": "contact-chip",
+            "visual": "contact-list"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "departments": {
+            "status_style": "department-chip",
+            "visual": "org-tree"
+          },
+          "employees": {
+            "icon": "id-card",
+            "status_indicator": "employee-pill",
+            "visual": "profile-registry"
+          },
+          "history": {
+            "status_style": "event-chip",
+            "visual": "timeline"
+          },
+          "personal_info": {
+            "status_style": "privacy-chip",
+            "visual": "privacy-ledger"
+          },
+          "positions": {
+            "status_style": "position-chip",
+            "visual": "headcount-table"
+          },
+          "quality": {
+            "status_style": "quality-chip",
+            "visual": "quality-board"
+          },
+          "skills": {
+            "status_style": "skill-chip",
+            "visual": "skill-matrix"
           }
         },
-        "name": "chr_employee_data_management_operations",
+        "name": "employee_data_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
-          "color.danger": "#C53030",
+          "color.accent": "#4C6F52",
+          "color.danger": "#B42318",
           "color.primary": "#28536B",
-          "color.success": "#2F855A",
+          "color.success": "#237A57",
           "color.warning": "#B7791F",
           "density": "compact",
           "surface.canvas": "#F7F8FA",
@@ -196,35 +1872,91 @@
         }
       },
       "ui": {
-        "api_prefix": "/chr-employee-data-management/api/v1",
+        "api_prefix": "/hcm/employees/api/v1",
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "EmployeeDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
-            "path": "/chr-employee-data-management/dashboard",
+            "path": "/hcm/employees/dashboard",
             "permission": "chr_employee_data_management:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/chr-employee-data-management/operations",
-            "permission": "chr_employee_data_management:operate"
+            "component": "EmployeeRegistryWorkbench",
+            "name": "employees",
+            "nav_group": "Employees",
+            "path": "/hcm/employees",
+            "permission": "chr_employee_data_management:manage_employees"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "DepartmentWorkbench",
+            "name": "departments",
+            "nav_group": "Organization",
+            "path": "/hcm/employees/departments",
+            "permission": "chr_employee_data_management:manage_structure"
+          },
+          {
+            "component": "PositionWorkbench",
+            "name": "positions",
+            "nav_group": "Organization",
+            "path": "/hcm/employees/positions",
+            "permission": "chr_employee_data_management:manage_structure"
+          },
+          {
+            "component": "PersonalInfoWorkbench",
+            "name": "personal_info",
+            "nav_group": "Profiles",
+            "path": "/hcm/employees/personal-info",
+            "permission": "chr_employee_data_management:manage_sensitive"
+          },
+          {
+            "component": "EmergencyContactWorkbench",
+            "name": "contacts",
+            "nav_group": "Profiles",
+            "path": "/hcm/employees/contacts",
+            "permission": "chr_employee_data_management:manage_employees"
+          },
+          {
+            "component": "EmploymentHistoryWorkbench",
+            "name": "history",
+            "nav_group": "Profiles",
+            "path": "/hcm/employees/history",
+            "permission": "chr_employee_data_management:manage_history"
+          },
+          {
+            "component": "EmployeeSkillWorkbench",
+            "name": "skills",
+            "nav_group": "Talent",
+            "path": "/hcm/employees/skills",
+            "permission": "chr_employee_data_management:manage_skills"
+          },
+          {
+            "component": "EmployeeCertificationWorkbench",
+            "name": "certifications",
+            "nav_group": "Talent",
+            "path": "/hcm/employees/certifications",
+            "permission": "chr_employee_data_management:manage_certifications"
+          },
+          {
+            "component": "EmployeeDataQualityWorkbench",
+            "name": "quality",
             "nav_group": "Governance",
-            "path": "/chr-employee-data-management/rules",
+            "path": "/hcm/employees/data-quality",
             "permission": "chr_employee_data_management:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "EmployeeAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/hcm/employees/agents",
+            "permission": "chr_employee_data_management:admin"
+          },
+          {
+            "component": "EmployeeSettings",
             "name": "settings",
             "nav_group": "Administration",
-            "path": "/chr-employee-data-management/settings",
+            "path": "/hcm/employees/settings",
             "permission": "chr_employee_data_management:admin"
           }
         ],
@@ -234,50 +1966,245 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "employee_data_review": {
+        "roles": [
+          "profile_steward",
+          "data_quality_reviewer",
+          "org_design_reviewer",
+          "skills_reviewer",
+          "compliance_reviewer",
+          "onboarding_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "chr_employee_data_management": []
+      "chr_employee_data_management": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "document_management",
+        "identity_access",
+        "privacy_policy"
+      ]
     }
   },
   "contracts": {
     "chr_employee_data_management": {
       "configuration": {
-        "capability": {
-          "category": "Chr",
-          "enabled": true,
-          "id": "chr_employee_data_management",
-          "name": "Employee Data Management - Revolutionary",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/hcm/chr/employee_data_management/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "benefits": "adapter",
+          "document_store": "adapter",
+          "event_stream": "bytewax",
+          "identity": "adapter",
+          "notification": "adapter",
+          "payroll": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "certifications": {
+          "employee_required": true,
+          "expires_on_required_for_expiring": true,
+          "issued_on_required": true,
+          "issuer_required": true,
+          "name_required": true,
+          "supported_statuses": [
+            "pending",
+            "active",
+            "expired",
+            "revoked"
+          ]
+        },
+        "data_quality": {
+          "domain_required": true,
+          "owner_required_for_high_severity": true,
+          "severity_required": true,
+          "supported_domains": [
+            "identity",
+            "employment",
+            "organization",
+            "skills",
+            "certifications",
+            "contacts",
+            "privacy"
+          ]
+        },
+        "departments": {
+          "code_required": true,
+          "cost_center_required": true,
+          "name_required": true,
+          "owner_required": true
+        },
+        "emergency_contacts": {
+          "employee_required": true,
+          "name_required": true,
+          "phone_required": true,
+          "relationship_required": true
+        },
+        "employee_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "profile_steward",
+            "data_quality_reviewer",
+            "org_design_reviewer",
+            "skills_reviewer",
+            "compliance_reviewer",
+            "onboarding_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "employees": {
+          "department_required": true,
+          "employee_number_required": true,
+          "hire_date_required": true,
+          "legal_name_required": true,
+          "manager_required_for_non_executives": true,
+          "position_required": true,
+          "sensitive_change_review_required": true,
+          "supported_employment_types": [
+            "full_time",
+            "part_time",
+            "contractor",
+            "intern",
+            "temporary"
+          ],
+          "supported_statuses": [
+            "draft",
+            "active",
+            "leave",
+            "suspended",
+            "terminated",
+            "alumni"
+          ],
+          "supported_work_modes": [
+            "onsite",
+            "hybrid",
+            "remote",
+            "field"
+          ],
+          "work_email_required": true
+        },
+        "employment_history": {
+          "approval_required_for_termination": true,
+          "effective_date_required": true,
+          "employee_required": true,
+          "event_type_required": true,
+          "reason_required_for_sensitive_events": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "privacy_basis_for_sensitive_data": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_certification_events": true,
+          "emit_data_quality_events": true,
+          "emit_department_events": true,
+          "emit_employee_events": true,
+          "emit_position_events": true,
+          "emit_profile_events": true,
+          "emit_skill_events": true,
+          "event_stream": "apg.hcm.chr.employee.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "personal_info": {
+          "country_required": true,
+          "effective_date_required": true,
+          "employee_required": true,
+          "privacy_basis_required": true
+        },
+        "positions": {
+          "code_required": true,
+          "compensation_band_review_required": true,
+          "department_required": true,
+          "headcount_minimum": 0,
+          "job_level_required": true,
+          "title_required": true
+        },
+        "skills": {
+          "employee_required": true,
+          "evidence_required_for_expert": true,
+          "skill_required": true,
+          "supported_levels": [
+            "awareness",
+            "working",
+            "practitioner",
+            "expert",
+            "master"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "chr_employee_data_management_operations"
+          "default_theme": "employee_data_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_certifications": true,
+          "enable_contacts": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_departments": true,
+          "enable_employees": true,
+          "enable_history": true,
+          "enable_personal_info": true,
+          "enable_positions": true,
+          "enable_quality": true,
+          "enable_settings": true,
+          "enable_skills": true
         }
       },
       "id": "chr_employee_data_management",
       "provides": [
-        "chr_employee_data_management_operations"
+        "employee_profile_lifecycle",
+        "employee_identity_registry",
+        "department_lifecycle",
+        "position_lifecycle",
+        "employment_history_lifecycle",
+        "employee_skill_lifecycle",
+        "employee_certification_lifecycle",
+        "employee_contact_lifecycle",
+        "employee_data_quality_workflow",
+        "employee_dashboard_service",
+        "employee_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "document_management",
+        "identity_access",
+        "privacy_policy"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +2212,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 9,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "chr_employee_data_management": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Employee Data Management - Revolutionary operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Employee Data Management - Revolutionary write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Employee Data Management - Revolutionary operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.chr_employee_data_management": {
-      "file": "capability_contract.py",
-      "id": "capability.chr_employee_data_management",
-      "kind": "capability",
-      "name": "Employee Data Management - Revolutionary",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }
