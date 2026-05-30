@@ -4,10 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_PLGN_AGENT_ROLES,
+	SUPPORTED_PLGN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+)
 from .models import (
 	MarketplaceListing,
 	PermissionReview,
+	PlgnAgent,
 	PlgnAuditEvent,
 	PluginInstallation,
 	PluginManifest,
@@ -37,6 +44,7 @@ class PlgnService:
 		self._releases: dict[str, PluginRelease] = {}
 		self._installations: dict[str, PluginInstallation] = {}
 		self._audit_events: dict[str, PlgnAuditEvent] = {}
+		self._agents: dict[str, PlgnAgent] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -71,6 +79,9 @@ class PlgnService:
 			"operation": "register_plugin",
 			"plugin_owner_assigned": bool(owner),
 			"signature_verified": bool(signature_verified),
+			"manifest_schema_valid": bool(manifest_schema_valid),
+			"dependency_validation_passed": bool(dependency_validation_passed),
+			"supply_chain_scan_passed": bool(supply_chain_scan_passed),
 			"permissions_requested": bool(scopes),
 			"permission_review_recorded": bool(permission_review_recorded),
 			"external_plugin": bool(external_plugin),
@@ -78,12 +89,6 @@ class PlgnService:
 		})
 		self._raise_if_denied(result)
 		self._raise_if_review_required(result)
-		if not manifest_schema_valid:
-			raise PermissionError("manifest_schema_required")
-		if not dependency_validation_passed:
-			raise PermissionError("dependency_validation_required")
-		if not supply_chain_scan_passed:
-			raise PermissionError("supply_chain_scan_required")
 		plugin = PluginManifest(
 			id=plugin_id,
 			tenant_id=tenant_id,
@@ -103,7 +108,7 @@ class PlgnService:
 			status="registered",
 			metadata=dict(metadata or {}),
 		)
-		self._plugins[plugin.id] = plugin
+		self._plugins[_state_key(tenant_id, plugin.id)] = plugin
 		self._record_audit(tenant_id, plugin.id, "plugin_registered", owner, "allow")
 		return plugin.to_dict()
 
@@ -137,7 +142,7 @@ class PlgnService:
 			secret_access_allowed=bool(secret_access_allowed),
 			notes=notes,
 		)
-		self._permission_reviews[review.id] = review
+		self._permission_reviews[_state_key(tenant_id, review.id)] = review
 		self._record_audit(tenant_id, review.id, "permission_review_recorded", reviewer, "allow")
 		return review.to_dict()
 
@@ -167,7 +172,7 @@ class PlgnService:
 			secret_access=secret_access,
 			tool_allowlist=normalize_scopes(tool_allowlist),
 		)
-		self._sandbox_policies[policy.id] = policy
+		self._sandbox_policies[_state_key(tenant_id, policy.id)] = policy
 		self._record_audit(tenant_id, policy.id, "sandbox_policy_attached", "plgn", "allow")
 		return policy.to_dict()
 
@@ -182,10 +187,13 @@ class PlgnService:
 		install_policy: str = "tenant_allowed",
 	) -> dict[str, Any]:
 		self._require_plugin(plugin_id, tenant_id)
-		if not publisher_verified:
-			raise PermissionError("publisher_verification_required")
-		if not curated:
-			raise PermissionError("curated_listing_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "publish_listing",
+			"publisher_verified": bool(publisher_verified),
+			"curated_listing": bool(curated),
+		})
+		self._raise_if_denied(result)
 		listing = MarketplaceListing(
 			id=listing_id,
 			tenant_id=tenant_id,
@@ -196,7 +204,7 @@ class PlgnService:
 			install_policy=normalize_install_policy(install_policy),
 			status="listed",
 		)
-		self._listings[listing.id] = listing
+		self._listings[_state_key(tenant_id, listing.id)] = listing
 		self._record_audit(tenant_id, listing.id, "marketplace_listing_published", "marketplace", "allow")
 		return listing.to_dict()
 
@@ -208,10 +216,16 @@ class PlgnService:
 		version: str,
 		channel: str,
 		signature_ref: str,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		plugin = self._require_plugin(plugin_id, tenant_id)
-		if not signature_ref:
-			raise PermissionError("release_signature_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_release",
+			"signature_ref_present": bool(signature_ref),
+			"event_stream": event_stream_name(event_stream),
+		})
+		self._raise_if_denied(result)
 		status, issues = release_readiness(
 			plugin.to_dict(),
 			self._permission_review_for_plugin(tenant_id, plugin_id) is not None,
@@ -229,17 +243,21 @@ class PlgnService:
 			signature_ref=signature_ref,
 			status="released",
 		)
-		self._releases[release.id] = release
+		self._releases[_state_key(tenant_id, release.id)] = release
 		plugin.status = "released"
 		plugin.updated_at = utc_now()
-		self._record_audit(tenant_id, release.id, "plugin_released", plugin.owner, "allow")
+		self._record_audit(tenant_id, release.id, "plugin_released", plugin.owner, result["decision"], reasons=self._reasons(result))
 		return release.to_dict()
 
 	def install_plugin(self, installation_id: str, tenant_id: str, plugin_id: str, installed_by: str) -> dict[str, Any]:
 		self._require_plugin(plugin_id, tenant_id)
 		listing = self._listing_for_plugin(tenant_id, plugin_id)
-		if listing is None or listing.install_policy == "blocked":
-			raise PermissionError("tenant_install_policy_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "install_plugin",
+			"tenant_install_policy_present": listing is not None and listing.install_policy != "blocked",
+		})
+		self._raise_if_denied(result)
 		if listing.install_policy == "admin_only" and installed_by != "admin":
 			raise PermissionError("admin_install_required")
 		installation = PluginInstallation(
@@ -249,8 +267,8 @@ class PlgnService:
 			installed_by=installed_by,
 			status="installed",
 		)
-		self._installations[installation.id] = installation
-		self._record_audit(tenant_id, installation.id, "plugin_installed", installed_by, "allow")
+		self._installations[_state_key(tenant_id, installation.id)] = installation
+		self._record_audit(tenant_id, installation.id, "plugin_installed", installed_by, result["decision"])
 		return installation.to_dict()
 
 	def enable_plugin(self, installation_id: str, tenant_id: str, actor: str) -> dict[str, Any]:
@@ -319,6 +337,51 @@ class PlgnService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def register_plgn_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"plgn_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_PLGN_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_PLGN_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+		})
+		self._raise_if_denied(result)
+		agent = PlgnAgent(
+			id=agent_id or f"plgn-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=bool(contribution_disclosed),
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._record_audit(tenant_id, agent.id, "plgn_agent_registered", name, result["decision"], metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def validate_batch_plugin_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_plugin_mutation",
+			"event_stream": event_stream_name(event_stream),
+		})
+
+	def list_plgn_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		plugins = self.list_plugins(tenant_id)
 		return {
@@ -332,7 +395,9 @@ class PlgnService:
 			"marketplace_listing_count": len(self.list_marketplace_listings(tenant_id)),
 			"release_count": len(self.list_releases(tenant_id)),
 			"installation_count": len(self.list_installations(tenant_id)),
+			"plgn_agent_count": len(self.list_plgn_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -340,13 +405,13 @@ class PlgnService:
 		self._raise_if_denied(result)
 
 	def _require_plugin(self, plugin_id: str, tenant_id: str) -> PluginManifest:
-		plugin = self._plugins.get(plugin_id)
+		plugin = self._plugins.get(_state_key(tenant_id, plugin_id))
 		if plugin is None or plugin.tenant_id != tenant_id:
 			raise KeyError("plugin_not_found")
 		return plugin
 
 	def _require_installation(self, installation_id: str, tenant_id: str) -> PluginInstallation:
-		installation = self._installations.get(installation_id)
+		installation = self._installations.get(_state_key(tenant_id, installation_id))
 		if installation is None or installation.tenant_id != tenant_id:
 			raise KeyError("plugin_installation_not_found")
 		return installation
@@ -362,11 +427,11 @@ class PlgnService:
 
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "deny":
-			raise PermissionError(self._reasons(result))
+			raise PermissionError(", ".join(self._reasons(result)) or "plugin_policy_blocked")
 
 	def _raise_if_review_required(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "require_review":
-			raise PermissionError(self._reasons(result))
+			raise PermissionError(", ".join(self._reasons(result)) or "plugin_review_required")
 
 	def _record_audit(
 		self,
@@ -376,16 +441,18 @@ class PlgnService:
 		actor: str,
 		decision: str,
 		reasons: tuple[str, ...] = (),
+		metadata: dict[str, Any] | None = None,
 	) -> None:
 		event_id = stable_id("plgnaudit", tenant_id, event_type, subject_id, len(self._audit_events))
-		self._audit_events[event_id] = PlgnAuditEvent(
+		self._audit_events[_state_key(tenant_id, event_id)] = PlgnAuditEvent(
 			id=event_id,
 			tenant_id=tenant_id,
 			event_type=event_type,
 			subject_id=subject_id,
 			actor=actor,
 			decision=decision,
-			reasons=reasons,
+			reasons=tuple(reason for reason in reasons if reason),
+			metadata=dict(metadata or {}),
 		)
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None) -> list[dict[str, Any]]:
@@ -394,8 +461,16 @@ class PlgnService:
 			values = [item for item in values if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(values, key=lambda item: item.id)]
 
-	def _reasons(self, result: dict[str, Any]) -> str:
-		return ", ".join(
+	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
+		return tuple(
 			action.get("reason", "plugin_policy_blocked")
 			for action in result.get("actions", [])
-		) or "plugin_policy_blocked"
+		)
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"

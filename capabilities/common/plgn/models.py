@@ -194,6 +194,7 @@ class PlgnAuditEvent:
 	actor: str
 	decision: str
 	reasons: tuple[str, ...] = ()
+	metadata: dict[str, Any] = field(default_factory=dict)
 	created_at: datetime = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -205,8 +206,39 @@ class PlgnAuditEvent:
 			"actor": self.actor,
 			"decision": self.decision,
 			"reasons": list(self.reasons),
+			"metadata": dict(self.metadata),
 			"created_at": isoformat(self.created_at),
 		}
 
 
 PlgnRecord = PluginManifest
+
+
+@dataclass
+class PlgnAgent:
+	"""Registered AI plugin governance agent."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	registered: bool = True
+	contribution_disclosed: bool = True
+	status: str = "active"
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"registered": self.registered,
+			"contribution_disclosed": self.contribution_disclosed,
+			"status": self.status,
+			"created_at": isoformat(self.created_at),
+		}

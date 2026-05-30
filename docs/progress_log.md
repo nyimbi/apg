@@ -16,6 +16,77 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 20:16 EAT
+
+Common PLGN plugin and extension lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the PLGN
+  capability, and replaced `cap_spec.md` with a pointer to the active packet
+  specification.
+- Expanded `capability_contract.py` with PLGN-agent, marketplace, manifest,
+  permission, sandbox, release, installation, governance, observability,
+  adapter, UI, theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, plugin owner, signature,
+  manifest schema, dependency validation, supply-chain scan evidence,
+  permission review, sandbox policy, external-plugin review, marketplace
+  publisher verification, curated listings, release signature references,
+  release Bytewax stream use, tenant install policy, PLGN-agent
+  registration/runtime/role/scope/disclosure, audit-backed state changes, and
+  Bytewax batch plugin mutation.
+- Added `PlgnAgent` model support and extended `PlgnService` with PLGN-agent
+  registration, listing, dashboard counts, normalized runtime/role tokens,
+  tenant-local state keys, release stream validation, and batch mutation
+  validation.
+- Extended API helpers and view models with PLGN-agent, audit trail, plugin
+  policy, and Bytewax metadata surfaces.
+- Replaced the package `__init__.py` with dependency-light exports for the
+  contract, service, agent model, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded `test_capability_contract.py` for focused contract, rule, service,
+  API/view, tenant-isolation, agent, Bytewax, app, semantic evidence, and
+  documentation checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/plgn/__init__.py
+  capabilities/common/plgn/capability_contract.py
+  capabilities/common/plgn/models.py capabilities/common/plgn/plugin_runtime.py
+  capabilities/common/plgn/service.py capabilities/common/plgn/api.py
+  capabilities/common/plgn/views.py capabilities/common/plgn/app.py
+  capabilities/common/plgn/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/plgn/test_capability_contract.py`
+  passed with 8 tests and only pre-existing adjacent SQLAlchemy/Pydantic
+  deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.plgn import PlgnService;
+  service=PlgnService(); service.register_plgn_agent('tenant-proof',
+  'Proof agent', 'codex', 'manifest_reviewer', 'review plugin manifest');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  PLGN-agent registration plus Bytewax stream metadata in the lifecycle
+  summary. A basic OpenTelemetry warning was emitted by an adjacent optional
+  monitoring adapter.
+- `jq '.capabilities.plgn.streaming.processor,
+  .capabilities.plgn.configuration.plgn_agents.supported_runtimes,
+  .capabilities.plgn.screens.agents.route,
+  (.capabilities.plgn.rules[] |
+  select(.name=="plgn_agent_runtime_supported") | .effect.reason),
+  (.capabilities.plgn.rules[] |
+  select(.name=="batch_plugin_mutation_requires_bytewax") | .effect.reason)'
+  capabilities/common/plgn/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, `/plgn/agents`,
+  `plgn_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/plgn --json` passed with `plgn` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/plgn --json`
+  passed with `side_effect_free: true` and no warnings.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/plgn docs/progress_log.md` passed.
+- Not run: live plugin marketplace, artifact stores, signing providers,
+  security scanners, remote sandbox runtimes, durable audit sinks, live Bytewax
+  topology, rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 19:07 EAT
 
 Common ENVM environment-management lifecycle/guardrail packet:

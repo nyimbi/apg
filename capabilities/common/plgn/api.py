@@ -12,15 +12,13 @@ SERVICE = PlgnService()
 
 def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 	contract = SERVICE.describe(tenant_id)
-	summary = SERVICE.dashboard_summary(tenant_id)
 	return {
 		"capability": contract["capability"],
 		"display_name": contract["display_name"],
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
-		"plugin_count": summary["plugin_count"],
-		"enabled_plugin_count": summary["enabled_plugin_count"],
+		**SERVICE.dashboard_summary(tenant_id),
 	}
 
 
@@ -92,6 +90,7 @@ def create_release(payload: dict[str, Any]) -> dict[str, Any]:
 		version=str(payload.get("version") or "0.1.0"),
 		channel=str(payload.get("channel") or "stable"),
 		signature_ref=str(payload.get("signature_ref") or ""),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -112,6 +111,22 @@ def enable_plugin(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_plgn_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_plgn_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
+def validate_batch_plugin_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_plugin_mutation(event_stream)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -123,6 +138,14 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_plgn_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_plgn_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

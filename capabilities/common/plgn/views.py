@@ -27,6 +27,7 @@ def dashboard_model(
 		"releases": service.list_releases(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -74,4 +75,34 @@ def governance_model(service: PlgnService, tenant_id: str = "default") -> dict[s
 		"route": "/plgn/settings",
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
+	}
+
+
+def plgn_agent_model(service: PlgnService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/plgn/agents",
+		"plgn_agents": service.list_plgn_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["plgn_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["plgn_agents"]["allowed_roles"],
+		"permissions": ["plgn:view", "plgn:admin"],
+	}
+
+
+def audit_trail_model(service: PlgnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/plgn/audit",
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["plgn:admin"],
+	}
+
+
+def plugin_policy_model(service: PlgnService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/plgn/settings",
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"configuration": contract["configuration"],
+		"sandbox_policies": service.list_sandbox_policies(tenant_id),
 	}

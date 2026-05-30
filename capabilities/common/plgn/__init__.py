@@ -5,12 +5,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_PLGN_AGENT_ROLES,
+	SUPPORTED_PLGN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+	streaming_manifest,
+)
+from .models import PlgnAgent
+from .service import PlgnService
 
 __version__ = "1.0.0"
 __capability_id__ = "plgn"
 __capability_name__ = "Plugin/Extension Framework"
-__apg_dependencies__ = ["auth", "secu", "conf"]
+__apg_dependencies__ = ["auth", "secu", "conf", "audl"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "plgn",
@@ -24,8 +32,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["plugin_registry", "extension_marketplace", "permission_review", "sandbox_policy", "plugin_release_lifecycle"],
-	"permissions": ["plgn:view", "plgn:install", "plgn:publish", "plgn:review", "plgn:admin"]
+	"provides": ["plugin_registry", "extension_marketplace", "permission_review", "sandbox_policy", "plugin_release_lifecycle", "plgn_agents"],
+	"permissions": ["plgn:view", "plgn:install", "plgn:publish", "plgn:review", "plgn:admin"],
 }
 
 
@@ -40,6 +48,8 @@ def register_capability() -> dict[str, Any]:
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
 		"optional_dependencies": ["regy", "agnt", "sbox", "wflo"],
+		"provides": contract["provides"],
+		"requires": contract["requires"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -48,14 +58,26 @@ def register_capability() -> dict[str, Any]:
 			"extension_marketplace": "Manage approved extension listings, installation policy, and release channels",
 			"permission_review": "Review requested scopes, capabilities, and extension trust boundaries",
 			"sandbox_policy": "Bind plugin execution to sandbox and security policy",
+			"plugin_release_lifecycle": "Gate plugin releases, installation, activation, and rollback on policy evidence",
+			"plgn_agents": "Register scoped AI plugin agents for marketplace, manifest, permission, sandbox, release, and compatibility review",
 			"capability_rules": "Evaluate deterministic plugin-governance rules",
-			"visual_theming": "Apply plugin marketplace theme tokens and components"
+			"event_streaming": "Emit plugin lifecycle events through Bytewax",
+			"visual_theming": "Apply plugin marketplace theme tokens and components",
 		},
-		"endpoints": {"plugins": "/plgn/api/v1/plugins", "marketplace": "/plgn/api/v1/marketplace", "permissions": "/plgn/api/v1/permissions", "sandbox": "/plgn/api/v1/sandbox", "releases": "/plgn/api/v1/releases"},
+		"endpoints": {
+			"plugins": "/plgn/api/v1/plugins",
+			"marketplace": "/plgn/api/v1/marketplace",
+			"permissions": "/plgn/api/v1/permissions",
+			"sandbox": "/plgn/api/v1/sandbox",
+			"releases": "/plgn/api/v1/releases",
+			"agents": "/plgn/api/v1/agents",
+			"audit": "/plgn/api/v1/audit",
+		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
-		"permissions": capability_metadata["permissions"]
+		"streaming": contract["streaming"],
+		"permissions": capability_metadata["permissions"],
 	}
 
 
@@ -66,4 +88,19 @@ def get_capability_info() -> dict[str, Any]:
 	return info
 
 
-__all__ = ["capability_metadata", "register_capability", "get_capability_info", "get_capability_contract", "evaluate_capability_rules", "__version__", "__capability_id__", "__capability_name__", "__apg_dependencies__"]
+__all__ = [
+	"PlgnAgent",
+	"PlgnService",
+	"SUPPORTED_PLGN_AGENT_ROLES",
+	"SUPPORTED_PLGN_AGENT_RUNTIMES",
+	"capability_metadata",
+	"evaluate_capability_rules",
+	"get_capability_contract",
+	"get_capability_info",
+	"register_capability",
+	"streaming_manifest",
+	"__apg_dependencies__",
+	"__capability_id__",
+	"__capability_name__",
+	"__version__",
+]
