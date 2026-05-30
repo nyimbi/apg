@@ -38,6 +38,7 @@ class ChatService:
 		visibility: str = "private",
 		external_guests: list[str] | tuple[str, ...] | None = None,
 		guest_policy_attached: bool = True,
+		guest_access_expiry_present: bool = True,
 		access_review_recorded: bool = True,
 	) -> dict[str, Any]:
 		external_guest_list = tuple(str(item) for item in (external_guests or ()))
@@ -47,9 +48,12 @@ class ChatService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_room",
 			"room_owner_assigned": bool(owner),
+			"room_name_present": bool(name),
+			"member_present": bool(member_list or owner),
 			"retention_policy_attached": bool(retention_policy),
 			"external_guest_present": bool(external_guest_list),
 			"guest_policy_attached": bool(guest_policy_attached),
+			"guest_access_expiry_present": bool(guest_access_expiry_present),
 			"member_count": member_count,
 			"access_review_recorded": bool(access_review_recorded),
 		})
@@ -71,14 +75,18 @@ class ChatService:
 			status=status,
 			review_status=review_status,
 		)
-		self._rooms[room_id] = room
+		self._rooms[self._key(tenant_id, room_id)] = room
 		if review_status == "required":
+			review_reason = next(
+				(action.get("reason", "chat_review_required") for action in result["actions"] if action.get("decision") == "require_review"),
+				"chat_review_required",
+			)
 			self._record_moderation(
 				tenant_id=tenant_id,
 				subject_id=room_id,
 				subject_type="room",
 				status="pending",
-				reason="large_room_review_required",
+				reason=review_reason,
 			)
 		self._record_audit(
 			tenant_id=tenant_id,
@@ -91,8 +99,8 @@ class ChatService:
 		)
 		return room.to_dict()
 
-	def approve_room(self, room_id: str, reviewer: str) -> dict[str, Any]:
-		room = self._require_room(room_id)
+	def approve_room(self, room_id: str, reviewer: str, tenant_id: str | None = None) -> dict[str, Any]:
+		room = self._require_room(room_id, tenant_id)
 		if room.status != "pending_review":
 			return room.to_dict()
 		approved = ChatRoom(
@@ -107,7 +115,7 @@ class ChatService:
 			status="active",
 			review_status="approved",
 		)
-		self._rooms[room_id] = approved
+		self._rooms[self._key(approved.tenant_id, room_id)] = approved
 		self._record_audit(
 			tenant_id=approved.tenant_id,
 			subject_id=room_id,
@@ -134,24 +142,44 @@ class ChatService:
 		delivery_receipts: list[str] | tuple[str, ...] | None = None,
 		restricted_content_detected: bool = False,
 		moderation_completed: bool = True,
+		attachment_scan_completed: bool = True,
+		dlp_check_completed: bool = True,
+		ai_agent_participant: bool = False,
+		agent_registered: bool = True,
+		agent_scope_present: bool = True,
+		ai_response_disclosed: bool = True,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		room = self._require_room(room_id, tenant_id)
-		if room.status != "active":
-			raise PermissionError("room_not_active")
 		participants = set(room.members) | set(room.external_guests) | {room.owner}
-		if sender not in participants:
-			raise PermissionError("sender_not_room_member")
 		max_length = int(self.describe(tenant_id)["configuration"]["messaging"]["max_message_length"])
-		if len(body) > max_length:
-			raise PermissionError("message_length_exceeded")
+		attachment_list = tuple(str(item) for item in (attachments or ()))
 		terms = self._engine.restricted_terms(body, self._restricted_terms)
 		restricted = bool(restricted_content_detected or terms)
+		message_key = self._key(tenant_id, message_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "send_message",
+			"room_active": room.status == "active",
+			"sender_authenticated": bool(sender),
+			"sender_is_member": sender in participants,
+			"message_payload_present": bool(body or attachment_list),
+			"message_length_within_limit": len(body) <= max_length,
 			"restricted_content_detected": restricted,
 			"moderation_completed": bool(moderation_completed),
+			"attachment_present": bool(attachment_list),
+			"attachment_scan_completed": bool(attachment_scan_completed),
+			"external_share_requested": bool(room.external_guests),
+			"dlp_check_completed": bool(dlp_check_completed),
+			"delivery_requested": True,
+			"event_bus_present": True,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+			"ai_agent_participant": bool(ai_agent_participant),
+			"agent_registered": bool(agent_registered),
+			"agent_scope_present": bool(agent_scope_present),
+			"ai_response_disclosed": bool(ai_response_disclosed),
+			"duplicate_message_id": message_key in self._messages,
 		})
 		if restricted and result["decision"] == "deny":
 			self._record_moderation(
@@ -169,7 +197,7 @@ class ChatService:
 			"room_id": room_id,
 			"sender": sender,
 			"body": body,
-			"attachments": list(attachments or ()),
+			"attachments": list(attachment_list),
 		}
 		message = ChatMessage(
 			id=message_id,
@@ -179,11 +207,11 @@ class ChatService:
 			body=body,
 			fingerprint=self._engine.message_fingerprint(payload),
 			thread_key=self._engine.thread_key(room_id, sender, body),
-			attachments=tuple(str(item) for item in (attachments or ())),
+			attachments=attachment_list,
 			delivery_receipts=tuple(str(item) for item in (delivery_receipts or ())),
 			moderation_status="approved" if restricted else "clear",
 		)
-		self._messages[message_id] = message
+		self._messages[message_key] = message
 		self._record_audit(
 			tenant_id=tenant_id,
 			subject_id=message_id,
@@ -216,8 +244,14 @@ class ChatService:
 		if room_id:
 			room = self._require_room(room_id, tenant_id)
 			participants = set(room.members) | set(room.external_guests) | {room.owner}
-			if user_id not in participants:
-				raise PermissionError("presence_user_not_room_member")
+			result = self.evaluate({
+				"tenant_context_present": bool(tenant_id),
+				"operation": "update_presence",
+				"user_authenticated": bool(user_id),
+				"user_is_member": user_id in participants,
+				"typing": bool(typing),
+			})
+			self._raise_if_denied(result)
 		presence = ChatPresence(
 			id=f"{tenant_id}:{user_id}:{room_id or 'global'}",
 			tenant_id=tenant_id,
@@ -238,10 +272,19 @@ class ChatService:
 			presence = [item for item in presence if item.room_id == room_id]
 		return [item.to_dict() for item in sorted(presence, key=lambda item: item.id)]
 
-	def review_moderation(self, item_id: str, reviewer: str, decision: str) -> dict[str, Any]:
-		item = self._moderation.get(item_id)
+	def review_moderation(self, item_id: str, reviewer: str, decision: str, tenant_id: str | None = None) -> dict[str, Any]:
+		item = self._moderation.get(self._key(tenant_id, item_id)) if tenant_id else self._find_by_public_id(self._moderation, item_id)
 		if item is None:
 			raise KeyError(f"unknown moderation item: {item_id}")
+		result = self.evaluate({
+			"tenant_context_present": bool(item.tenant_id),
+			"operation": "review_moderation",
+			"moderator_assigned": bool(reviewer),
+			"moderation_decision_present": bool(decision),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
 		reviewed = ModerationItem(
 			id=item.id,
 			tenant_id=item.tenant_id,
@@ -252,7 +295,7 @@ class ChatService:
 			reviewer=reviewer,
 			terms=item.terms,
 		)
-		self._moderation[item_id] = reviewed
+		self._moderation[self._key(item.tenant_id, item_id)] = reviewed
 		self._record_audit(
 			tenant_id=item.tenant_id,
 			subject_id=item.subject_id,
@@ -318,8 +361,8 @@ class ChatService:
 		self._raise_if_denied(result)
 
 	def _require_room(self, room_id: str, tenant_id: str | None = None) -> ChatRoom:
-		room = self._rooms.get(room_id)
-		if room is None or (tenant_id is not None and room.tenant_id != tenant_id):
+		room = self._rooms.get(self._key(tenant_id, room_id)) if tenant_id else self._find_by_public_id(self._rooms, room_id)
+		if room is None:
 			raise KeyError(f"unknown chat room: {room_id}")
 		return room
 
@@ -342,7 +385,7 @@ class ChatService:
 			reason=reason,
 			terms=terms,
 		)
-		self._moderation[item_id] = item
+		self._moderation[self._key(tenant_id, item_id)] = item
 		return item
 
 	def _record_audit(
@@ -366,10 +409,21 @@ class ChatService:
 			reasons=tuple(reason for reason in reasons if reason),
 			metadata=dict(metadata or {}),
 		)
-		self._audit_events[event_id] = event
+		self._audit_events[self._key(tenant_id, event_id)] = event
 		return event
 
 	def _raise_if_denied(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "deny":
 			reasons = ", ".join(action.get("reason", "chat_policy_blocked") for action in result["actions"])
 			raise PermissionError(reasons or "chat_policy_blocked")
+
+	@staticmethod
+	def _key(tenant_id: str | None, record_id: str) -> str:
+		return f"{tenant_id or '*'}:{record_id}"
+
+	@staticmethod
+	def _find_by_public_id(records: dict[str, Any], record_id: str) -> Any:
+		for record in records.values():
+			if record.id == record_id:
+				return record
+		return None

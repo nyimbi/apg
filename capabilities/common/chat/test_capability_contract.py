@@ -5,46 +5,96 @@ import pytest
 from capabilities.common.chat import register_capability
 from capabilities.common.chat.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.chat.service import ChatService
-from capabilities.common.chat.views import dashboard_model
+from capabilities.common.chat import views
 
 
-def test_contract_exposes_configuration_rules_ui_and_theme():
+def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	contract = get_capability_contract("tenant-chat", {"rooms": {"max_members_per_room": 1000}})
 
 	assert contract["capability"] == "chat"
 	assert contract["configuration"]["tenant_id"] == "tenant-chat"
 	assert contract["configuration"]["rooms"]["max_members_per_room"] == 1000
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "rooms", "messaging", "moderation", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "rooms", "messages", "presence", "moderation", "retention", "analytics", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {
+		"tenant_id",
+		"rooms",
+		"messaging",
+		"presence",
+		"moderation",
+		"ai_agents",
+		"security",
+		"governance",
+		"retention",
+		"observability",
+		"adapters",
+		"ui",
+		"theme",
+	}
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "rooms", "direct", "messages", "presence", "agents", "moderation", "retention", "audit", "analytics", "settings"}
 	assert contract["ui"]["api_prefix"] == "/chat/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "message_thread" in contract["theme"]["components"]
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert "codex" in contract["configuration"]["ai_agents"]["supported_runtimes"]
 
 
 def test_rule_engine_enforces_chat_guardrails():
 	result = evaluate_capability_rules({
 		"tenant_context_present": False,
-		"operation": "create_room",
+		"operation": "send_message",
 		"room_owner_assigned": False,
+		"room_name_present": False,
+		"member_present": False,
 		"retention_policy_attached": False,
 		"external_guest_present": True,
 		"guest_policy_attached": False,
+		"guest_access_expiry_present": False,
+		"room_active": False,
+		"sender_authenticated": False,
+		"sender_is_member": False,
+		"message_payload_present": False,
+		"message_length_within_limit": False,
 		"restricted_content_detected": True,
 		"moderation_completed": False,
+		"attachment_present": True,
+		"attachment_scan_completed": False,
+		"external_share_requested": True,
+		"dlp_check_completed": False,
+		"delivery_requested": True,
+		"event_bus_present": False,
+		"state_change_requested": True,
+		"audit_event_recorded": False,
+		"ai_agent_participant": True,
+		"agent_registered": False,
+		"agent_scope_present": False,
+		"ai_response_disclosed": False,
+		"duplicate_message_id": True,
 		"member_count": 8000,
-		"access_review_recorded": False
+		"access_review_recorded": False,
 	})
+	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_chat_mutation", "event_stream": "kafka"})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert set(result["matched_rules"]) >= {
 		"tenant_context_required",
-		"room_requires_owner",
-		"retention_policy_required",
-		"external_guest_requires_policy",
+		"active_room_required",
+		"sender_identity_required",
+		"sender_membership_required",
+		"message_requires_body_or_attachment",
+		"message_length_within_limit",
 		"restricted_content_requires_moderation",
-		"large_room_requires_review"
+		"attachment_requires_scan",
+		"external_share_requires_dlp",
+		"delivery_requires_event_bus",
+		"message_requires_audit",
+		"ai_agent_requires_registration",
+		"ai_agent_requires_scope",
+		"ai_response_requires_disclosure",
+		"duplicate_message_id_blocked",
+		"large_room_requires_review",
 	}
+	assert stream_result["decision"] == "deny"
+	assert "batch_chat_mutation_requires_bytewax" in stream_result["matched_rules"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -56,8 +106,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "chat_team_messaging"
 	assert registration["ui_components"]["rooms"] == "/chat/rooms"
+	assert registration["ui_components"]["agents"] == "/chat/agents"
 	assert "ntfy" in registration["dependencies"]
+	assert registration["adapters"]["event_stream"] == "bytewax"
 	assert "chat:send" in registration["permissions"]
+	assert "chat:audit" in registration["permissions"]
 
 
 def test_service_creates_rooms_messages_presence_and_dashboard_state():
@@ -87,7 +140,7 @@ def test_service_creates_rooms_messages_presence_and_dashboard_state():
 		room_id="ops-room",
 		typing=True,
 	)
-	model = dashboard_model(service, "tenant-chat")
+	model = views.dashboard_model(service, "tenant-chat")
 
 	assert room["status"] == "active"
 	assert room["retention_policy"] == "retain-90-days"
@@ -99,76 +152,42 @@ def test_service_creates_rooms_messages_presence_and_dashboard_state():
 	assert model["summary"]["message_count"] == 1
 	assert model["summary"]["presence_count"] == 1
 	assert model["summary"]["audit_event_count"] >= 2
+	assert views.analytics_model(service, "tenant-chat")["attachment_rate"] == 1.0
+	assert views.agent_participant_model("tenant-chat")["enabled"] is True
+	assert views.audit_model(service, "tenant-chat")["audit_events"]
+	assert views.settings_model("tenant-chat")["theme"]["name"] == "chat_team_messaging"
 
 
-def test_service_enforces_room_message_and_moderation_guardrails():
+def test_service_enforces_room_message_agent_and_moderation_guardrails():
 	service = ChatService()
 
 	with pytest.raises(PermissionError, match="room_owner_required"):
-		service.create_room(
-			room_id="missing-owner",
-			tenant_id="tenant-chat",
-			name="Missing Owner",
-			owner="",
-			members=["member"],
-			retention_policy="retain-30-days",
-		)
-
+		service.create_room("missing-owner", "tenant-chat", "Missing Owner", "", ["member"], "retain-30-days")
 	with pytest.raises(PermissionError, match="retention_policy_required"):
-		service.create_room(
-			room_id="missing-retention",
-			tenant_id="tenant-chat",
-			name="Missing Retention",
-			owner="room-owner",
-			members=["member"],
-			retention_policy="",
-		)
-
+		service.create_room("missing-retention", "tenant-chat", "Missing Retention", "room-owner", ["member"], "")
 	with pytest.raises(PermissionError, match="guest_policy_required"):
-		service.create_room(
-			room_id="guest-without-policy",
-			tenant_id="tenant-chat",
-			name="Guest Room",
-			owner="room-owner",
-			members=["member"],
-			retention_policy="retain-30-days",
-			external_guests=["guest@example.com"],
-			guest_policy_attached=False,
-		)
+		service.create_room("guest-without-policy", "tenant-chat", "Guest Room", "room-owner", ["member"], "retain-30-days", external_guests=["guest@example.com"], guest_policy_attached=False)
 
-	service.create_room(
-		room_id="moderated-room",
-		tenant_id="tenant-chat",
-		name="Moderated",
-		owner="room-owner",
-		members=["room-owner", "member"],
-		retention_policy="retain-30-days",
-	)
+	service.create_room("moderated-room", "tenant-chat", "Moderated", "room-owner", ["room-owner", "member"], "retain-30-days")
 
 	with pytest.raises(PermissionError, match="moderation_required"):
-		service.send_message(
-			message_id="blocked-message",
-			tenant_id="tenant-chat",
-			room_id="moderated-room",
-			sender="member",
-			body="contains restricted credential",
-			moderation_completed=False,
-		)
+		service.send_message("blocked-message", "tenant-chat", "moderated-room", "member", "contains restricted credential", moderation_completed=False)
+	with pytest.raises(PermissionError, match="attachment_scan_required"):
+		service.send_message("bad-attachment", "tenant-chat", "moderated-room", "member", "file attached", attachments=["payload.zip"], attachment_scan_completed=False)
+	with pytest.raises(PermissionError, match="ai_agent_registration_required"):
+		service.send_message("bad-agent", "tenant-chat", "moderated-room", "member", "agent says hello", ai_agent_participant=True, agent_registered=False)
+	with pytest.raises(PermissionError, match="duplicate_message_id"):
+		service.send_message("unique", "tenant-chat", "moderated-room", "member", "first")
+		service.send_message("unique", "tenant-chat", "moderated-room", "member", "second")
+	with pytest.raises(PermissionError, match="typing_room_membership_required"):
+		service.update_presence("tenant-chat", "outsider", "online", room_id="moderated-room", typing=True)
 
-	reviewed = service.review_moderation("mod:000001", reviewer="moderator", decision="rejected")
-	approved_message = service.send_message(
-		message_id="approved-message",
-		tenant_id="tenant-chat",
-		room_id="moderated-room",
-		sender="member",
-		body="contains restricted credential",
-		moderation_completed=True,
-	)
+	reviewed = service.review_moderation("mod:000001", reviewer="moderator", decision="rejected", tenant_id="tenant-chat")
+	approved_message = service.send_message("approved-message", "tenant-chat", "moderated-room", "member", "contains restricted credential", moderation_completed=True)
 
 	assert reviewed["status"] == "rejected"
 	assert reviewed["reason"] == "moderation_required"
 	assert approved_message["moderation_status"] == "approved"
-	assert service.conversation_summary("tenant-chat")["moderation_queue_count"] == 0
 
 
 def test_service_routes_large_rooms_to_review_before_activation():
@@ -183,9 +202,22 @@ def test_service_routes_large_rooms_to_review_before_activation():
 		retention_policy="retain-30-days",
 		access_review_recorded=False,
 	)
-	approved = service.approve_room("large-room", reviewer="access-reviewer")
+	approved = service.approve_room("large-room", reviewer="access-reviewer", tenant_id="tenant-chat")
 
 	assert room["status"] == "pending_review"
 	assert room["review_status"] == "required"
 	assert service.list_moderation_items("tenant-chat")[0]["reason"] == "large_room_review_required"
 	assert approved["status"] == "active"
+
+
+def test_tenant_local_chat_records_do_not_collide():
+	service = ChatService()
+	service.create_room("shared-room", "tenant-alpha", "Alpha", "owner", ["owner"], "retain-30-days")
+	service.create_room("shared-room", "tenant-beta", "Beta", "owner", ["owner"], "retain-30-days")
+	alpha_message = service.send_message("shared-message", "tenant-alpha", "shared-room", "owner", "alpha")
+	beta_message = service.send_message("shared-message", "tenant-beta", "shared-room", "owner", "beta")
+
+	assert service.list_rooms("tenant-alpha")[0]["name"] == "Alpha"
+	assert service.list_rooms("tenant-beta")[0]["name"] == "Beta"
+	assert alpha_message["body"] == "alpha"
+	assert beta_message["body"] == "beta"

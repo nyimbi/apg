@@ -3,8 +3,11 @@
   "display_name": "Chat and Messaging",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
+    "README.md",
+    "SPECIFICATION.md",
+    "PLAN.md",
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",

@@ -17,7 +17,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "chat",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware direct messaging, rooms, moderation, retention, realtime delivery, and collaboration hooks",
+	"description": "Tenant-aware direct messaging, rooms, moderation, retention, AI-agent participation, realtime delivery, and collaboration hooks",
 	"category": "collaboration_communication",
 	"subcategory": "chat",
 	"vendor": "Datacraft",
@@ -25,8 +25,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["direct_messages", "team_rooms", "message_moderation", "presence", "message_retention"],
-	"permissions": ["chat:view", "chat:send", "chat:manage_rooms", "chat:moderate", "chat:admin"]
+	"provides": ["direct_messages", "team_rooms", "message_moderation", "presence", "message_retention", "agent_participants", "delivery_audit"],
+	"permissions": ["chat:view", "chat:send", "chat:manage_rooms", "chat:moderate", "chat:audit", "chat:admin"]
 }
 
 
@@ -40,7 +40,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "nlpc", "colb", "mten"],
+		"optional_dependencies": ["audl", "nlpc", "colb", "mten", "secu", "cach"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -49,6 +49,8 @@ def register_capability() -> dict[str, Any]:
 			"team_rooms": "Manage channels, rooms, membership, and presence",
 			"message_moderation": "Moderate content, attachments, retention, and policy actions",
 			"presence": "Track online, typing, receipt, and availability state",
+			"agent_participants": "Register scoped AI agents as disclosed chat participants",
+			"delivery_audit": "Audit rooms, messages, moderation decisions, and state changes",
 			"capability_rules": "Evaluate deterministic chat-governance rules",
 			"visual_theming": "Apply team-chat theme tokens and components"
 		},
@@ -57,11 +59,14 @@ def register_capability() -> dict[str, Any]:
 			"messages": "/chat/api/v1/messages",
 			"presence": "/chat/api/v1/presence",
 			"moderation": "/chat/api/v1/moderation",
-			"retention": "/chat/api/v1/retention"
+			"retention": "/chat/api/v1/retention",
+			"agents": "/chat/api/v1/agents",
+			"audit": "/chat/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"adapters": contract["configuration"]["adapters"],
 		"permissions": capability_metadata["permissions"]
 	}
 

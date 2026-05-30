@@ -74,3 +74,59 @@ def moderation_queue_model(
 		"pending": [item for item in items if item["status"] == "pending"],
 		"reviewed": [item for item in items if item["status"] != "pending"],
 	}
+
+
+def agent_participant_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"enabled": contract["configuration"]["ai_agents"]["agent_participants_enabled"],
+		"supported_runtimes": contract["configuration"]["ai_agents"]["supported_runtimes"],
+		"required_controls": [
+			"agent_registration_required",
+			"agent_scope_required",
+			"agent_response_disclosure_required",
+		],
+		"theme": contract["theme"]["components"]["agent_panel"],
+	}
+
+
+def audit_model(
+	service: ChatService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ChatService()
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"moderation_events": [
+			item for item in service.list_audit_events(tenant_id)
+			if item["event_type"] == "moderation_reviewed"
+		],
+	}
+
+
+def analytics_model(
+	service: ChatService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ChatService()
+	summary = service.conversation_summary(tenant_id)
+	message_count = summary["message_count"]
+	return {
+		"tenant_id": tenant_id,
+		"summary": summary,
+		"attachment_rate": summary["attachment_count"] / message_count if message_count else 0.0,
+		"active_room_rate": summary["active_room_count"] / summary["room_count"] if summary["room_count"] else 0.0,
+		"moderation_queue_count": summary["moderation_queue_count"],
+	}
+
+
+def settings_model(tenant_id: str = "default") -> dict[str, object]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"configuration": contract["configuration"],
+		"rules": contract["rule_engine"]["rules"],
+		"theme": contract["theme"],
+	}

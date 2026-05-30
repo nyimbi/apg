@@ -8,33 +8,141 @@
   },
   "capabilities": {
     "chat": {
-      "approvals": {},
+      "adapters": {
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "authentication": "auth",
+        "cache": "cach",
+        "collaboration": "colb",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.ChatService",
+        "helper_runtime": "service.py",
+        "message_bus": "mqeb",
+        "multi_tenancy": "mten",
+        "nlp": "nlpc",
+        "notification": "ntfy",
+        "security": "secu",
+        "view_models": "views.py"
+      },
+      "agent_participation": {
+        "agent_participants_enabled": true,
+        "agent_registration_required": true,
+        "agent_response_disclosure_required": true,
+        "agent_scope_required": true,
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "large_room_review": "RoomAccessReview",
+        "moderation_review": "ModerationReview",
+        "retention_export": "RetentionExportApproval"
+      },
       "business_rules": [],
+      "chat_lifecycle": {
+        "audit": "ChatAuditEvent",
+        "message": "ChatMessage",
+        "moderation": "ModerationItem",
+        "presence": "ChatPresence",
+        "room": "ChatRoom"
+      },
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "collaboration": "colb",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.ChatService",
+          "helper_runtime": "service.py",
+          "message_bus": "mqeb",
+          "multi_tenancy": "mten",
+          "nlp": "nlpc",
+          "notification": "ntfy",
+          "security": "secu",
+          "view_models": "views.py"
+        },
+        "ai_agents": {
+          "agent_participants_enabled": true,
+          "agent_registration_required": true,
+          "agent_response_disclosure_required": true,
+          "agent_scope_required": true,
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "governance": {
           "audit_moderation_actions": true,
           "external_guest_policy_required": true,
+          "large_room_review_threshold": 5000,
           "require_tenant_context": true,
           "retention_policy_required": true
         },
         "messaging": {
           "attachments_enabled": true,
+          "deletions_require_audit": true,
           "delivery_receipts_enabled": true,
+          "edits_enabled": true,
           "event_bus_required": true,
-          "max_message_length": 8000
+          "event_stream": "bytewax",
+          "max_message_length": 8000,
+          "reactions_enabled": true,
+          "threading_enabled": true
         },
         "moderation": {
+          "attachment_scan_required": true,
           "moderation_policy_required": true,
           "moderator_review_supported": true,
-          "nlp_assisted_moderation": true,
-          "restricted_content_filtering": true
+          "nlpc_assisted_moderation": true,
+          "restricted_content_filtering": true,
+          "restricted_terms": [
+            "secret",
+            "credential",
+            "restricted"
+          ]
+        },
+        "observability": {
+          "audit_required": true,
+          "delivery_metrics_required": true,
+          "event_stream": "bytewax",
+          "moderation_metrics_required": true,
+          "presence_metrics_required": true
+        },
+        "presence": {
+          "availability_status_enabled": true,
+          "presence_ttl_seconds": 90,
+          "room_presence_enabled": true,
+          "typing_indicators_enabled": true
+        },
+        "retention": {
+          "default_policy": "retain-90-days",
+          "delete_requires_audit": true,
+          "export_requires_approval": true,
+          "legal_hold_supported": true
         },
         "rooms": {
+          "direct_rooms_enabled": true,
+          "external_guest_policy_required": true,
           "max_members_per_room": 5000,
           "private_rooms_enabled": true,
           "public_rooms_enabled": true,
+          "retention_policy_required": true,
           "room_owner_required": true
+        },
+        "security": {
+          "audit_message_delivery": true,
+          "authenticated_sender_required": true,
+          "dlp_for_external_sharing": true,
+          "secret_redaction_required": true,
+          "tenant_isolation_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -42,10 +150,16 @@
           "default_theme": "chat_team_messaging"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_chat_console": true,
+          "enable_direct_messages": true,
           "enable_moderation_queue": true,
           "enable_presence_panel": true,
-          "enable_room_manager": true
+          "enable_retention_console": true,
+          "enable_room_manager": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -57,7 +171,11 @@
       "provides": [
         "chat_operations"
       ],
-      "requires": [],
+      "requires": [
+        "ntfy",
+        "mqeb",
+        "auth"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +205,33 @@
           },
           {
             "condition": {
+              "operation": "create_room",
+              "room_name_present": false
+            },
+            "description": "Rooms require a readable name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "room_name_required",
+              "required_action": "name_room"
+            },
+            "name": "room_requires_name"
+          },
+          {
+            "condition": {
+              "member_present": false,
+              "operation": "create_room"
+            },
+            "description": "Rooms require at least one member or owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "room_member_required",
+              "required_action": "add_room_member"
+            },
+            "name": "room_requires_member"
+          },
+          {
+            "condition": {
+              "operation": "create_room",
               "retention_policy_attached": false
             },
             "description": "Message rooms require a retention policy.",
@@ -112,16 +257,16 @@
           },
           {
             "condition": {
-              "moderation_completed": false,
-              "restricted_content_detected": true
+              "external_guest_present": true,
+              "guest_access_expiry_present": false
             },
-            "description": "Restricted content requires moderation before release.",
+            "description": "External guest rooms require an access expiry.",
             "effect": {
-              "decision": "deny",
-              "reason": "moderation_required",
-              "required_action": "complete_moderation"
+              "decision": "require_review",
+              "reason": "guest_expiry_required",
+              "required_action": "set_guest_access_expiry"
             },
-            "name": "restricted_content_requires_moderation"
+            "name": "external_guest_requires_expiry"
           },
           {
             "condition": {
@@ -135,6 +280,331 @@
               "required_action": "review_room_access"
             },
             "name": "large_room_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "send_message",
+              "room_active": false
+            },
+            "description": "Messages require an active room.",
+            "effect": {
+              "decision": "deny",
+              "reason": "room_not_active",
+              "required_action": "activate_room"
+            },
+            "name": "active_room_required"
+          },
+          {
+            "condition": {
+              "operation": "send_message",
+              "sender_authenticated": false
+            },
+            "description": "Messages require an authenticated sender.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sender_identity_required",
+              "required_action": "authenticate_sender"
+            },
+            "name": "sender_identity_required"
+          },
+          {
+            "condition": {
+              "operation": "send_message",
+              "sender_is_member": false
+            },
+            "description": "Senders must belong to the target room.",
+            "effect": {
+              "decision": "deny",
+              "reason": "sender_not_room_member",
+              "required_action": "join_room_or_change_sender"
+            },
+            "name": "sender_membership_required"
+          },
+          {
+            "condition": {
+              "message_payload_present": false,
+              "operation": "send_message"
+            },
+            "description": "Messages require text or an attachment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "message_payload_required",
+              "required_action": "enter_message_or_attachment"
+            },
+            "name": "message_requires_body_or_attachment"
+          },
+          {
+            "condition": {
+              "message_length_within_limit": false,
+              "operation": "send_message"
+            },
+            "description": "Messages must stay within configured length limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "message_length_exceeded",
+              "required_action": "shorten_message"
+            },
+            "name": "message_length_within_limit"
+          },
+          {
+            "condition": {
+              "moderation_completed": false,
+              "restricted_content_detected": true
+            },
+            "description": "Restricted content requires moderation before release.",
+            "effect": {
+              "decision": "deny",
+              "reason": "moderation_required",
+              "required_action": "complete_moderation"
+            },
+            "name": "restricted_content_requires_moderation"
+          },
+          {
+            "condition": {
+              "attachment_present": true,
+              "attachment_scan_completed": false
+            },
+            "description": "Attachments require scan evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "attachment_scan_required",
+              "required_action": "scan_attachment"
+            },
+            "name": "attachment_requires_scan"
+          },
+          {
+            "condition": {
+              "dlp_check_completed": false,
+              "external_share_requested": true
+            },
+            "description": "Messages shared externally require DLP review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_check_required",
+              "required_action": "run_dlp_check"
+            },
+            "name": "external_share_requires_dlp"
+          },
+          {
+            "condition": {
+              "delivery_requested": true,
+              "event_bus_present": false
+            },
+            "description": "Message delivery requires event bus evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "event_bus_required",
+              "required_action": "attach_event_bus"
+            },
+            "name": "delivery_requires_event_bus"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Message state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "chat_audit_event_required",
+              "required_action": "record_chat_audit"
+            },
+            "name": "message_requires_audit"
+          },
+          {
+            "condition": {
+              "operation": "reply_to_thread",
+              "root_message_present": false
+            },
+            "description": "Thread replies require a root message.",
+            "effect": {
+              "decision": "deny",
+              "reason": "thread_root_required",
+              "required_action": "select_thread_root"
+            },
+            "name": "thread_requires_root_message"
+          },
+          {
+            "condition": {
+              "message_present": false,
+              "operation": "react_to_message"
+            },
+            "description": "Reactions require a target message.",
+            "effect": {
+              "decision": "deny",
+              "reason": "reaction_message_required",
+              "required_action": "select_message"
+            },
+            "name": "reaction_requires_message"
+          },
+          {
+            "condition": {
+              "author_or_moderator": false,
+              "operation": "edit_message"
+            },
+            "description": "Message edits require author or moderator rights.",
+            "effect": {
+              "decision": "deny",
+              "reason": "edit_authorization_required",
+              "required_action": "use_author_or_moderator"
+            },
+            "name": "edit_requires_author_or_moderator"
+          },
+          {
+            "condition": {
+              "author_or_moderator": false,
+              "operation": "delete_message"
+            },
+            "description": "Message deletes require author or moderator rights.",
+            "effect": {
+              "decision": "deny",
+              "reason": "delete_authorization_required",
+              "required_action": "use_author_or_moderator"
+            },
+            "name": "delete_requires_author_or_moderator"
+          },
+          {
+            "condition": {
+              "operation": "update_presence",
+              "user_authenticated": false
+            },
+            "description": "Presence updates require authenticated users.",
+            "effect": {
+              "decision": "deny",
+              "reason": "presence_identity_required",
+              "required_action": "authenticate_user"
+            },
+            "name": "presence_requires_authenticated_user"
+          },
+          {
+            "condition": {
+              "operation": "update_presence",
+              "typing": true,
+              "user_is_member": false
+            },
+            "description": "Typing indicators require room membership.",
+            "effect": {
+              "decision": "deny",
+              "reason": "typing_room_membership_required",
+              "required_action": "join_room_or_disable_typing"
+            },
+            "name": "typing_requires_room_membership"
+          },
+          {
+            "condition": {
+              "moderator_assigned": false,
+              "operation": "review_moderation"
+            },
+            "description": "Moderation decisions require a reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "moderator_required",
+              "required_action": "assign_moderator"
+            },
+            "name": "moderation_requires_reviewer"
+          },
+          {
+            "condition": {
+              "moderation_decision_present": false,
+              "operation": "review_moderation"
+            },
+            "description": "Moderation reviews require an explicit decision.",
+            "effect": {
+              "decision": "deny",
+              "reason": "moderation_decision_required",
+              "required_action": "record_moderation_decision"
+            },
+            "name": "moderation_decision_required"
+          },
+          {
+            "condition": {
+              "export_approved": false,
+              "operation": "export_retention"
+            },
+            "description": "Retention exports require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "retention_export_approval_required",
+              "required_action": "approve_retention_export"
+            },
+            "name": "retention_export_requires_approval"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "ai_agent_participant": true
+            },
+            "description": "AI chat participants must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_agent_registration_required",
+              "required_action": "register_ai_agent"
+            },
+            "name": "ai_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "ai_agent_participant": true
+            },
+            "description": "AI chat participants require explicit room scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_agent_scope_required",
+              "required_action": "set_agent_scope"
+            },
+            "name": "ai_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "ai_agent_participant": true,
+              "ai_response_disclosed": false
+            },
+            "description": "AI responses require visible disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_response_disclosure_required",
+              "required_action": "disclose_ai_response"
+            },
+            "name": "ai_response_requires_disclosure"
+          },
+          {
+            "condition": {
+              "duplicate_message_id": true,
+              "operation": "send_message"
+            },
+            "description": "Duplicate message IDs are blocked within a tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "duplicate_message_id",
+              "required_action": "reuse_existing_message"
+            },
+            "name": "duplicate_message_id_blocked"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Chat records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_chat_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_chat_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_chat_mutation"
+            },
+            "description": "Batch chat mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_chat_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -167,6 +637,33 @@
         },
         {
           "condition": {
+            "operation": "create_room",
+            "room_name_present": false
+          },
+          "description": "Rooms require a readable name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "room_name_required",
+            "required_action": "name_room"
+          },
+          "name": "room_requires_name"
+        },
+        {
+          "condition": {
+            "member_present": false,
+            "operation": "create_room"
+          },
+          "description": "Rooms require at least one member or owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "room_member_required",
+            "required_action": "add_room_member"
+          },
+          "name": "room_requires_member"
+        },
+        {
+          "condition": {
+            "operation": "create_room",
             "retention_policy_attached": false
           },
           "description": "Message rooms require a retention policy.",
@@ -192,16 +689,16 @@
         },
         {
           "condition": {
-            "moderation_completed": false,
-            "restricted_content_detected": true
+            "external_guest_present": true,
+            "guest_access_expiry_present": false
           },
-          "description": "Restricted content requires moderation before release.",
+          "description": "External guest rooms require an access expiry.",
           "effect": {
-            "decision": "deny",
-            "reason": "moderation_required",
-            "required_action": "complete_moderation"
+            "decision": "require_review",
+            "reason": "guest_expiry_required",
+            "required_action": "set_guest_access_expiry"
           },
-          "name": "restricted_content_requires_moderation"
+          "name": "external_guest_requires_expiry"
         },
         {
           "condition": {
@@ -215,24 +712,365 @@
             "required_action": "review_room_access"
           },
           "name": "large_room_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "send_message",
+            "room_active": false
+          },
+          "description": "Messages require an active room.",
+          "effect": {
+            "decision": "deny",
+            "reason": "room_not_active",
+            "required_action": "activate_room"
+          },
+          "name": "active_room_required"
+        },
+        {
+          "condition": {
+            "operation": "send_message",
+            "sender_authenticated": false
+          },
+          "description": "Messages require an authenticated sender.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sender_identity_required",
+            "required_action": "authenticate_sender"
+          },
+          "name": "sender_identity_required"
+        },
+        {
+          "condition": {
+            "operation": "send_message",
+            "sender_is_member": false
+          },
+          "description": "Senders must belong to the target room.",
+          "effect": {
+            "decision": "deny",
+            "reason": "sender_not_room_member",
+            "required_action": "join_room_or_change_sender"
+          },
+          "name": "sender_membership_required"
+        },
+        {
+          "condition": {
+            "message_payload_present": false,
+            "operation": "send_message"
+          },
+          "description": "Messages require text or an attachment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "message_payload_required",
+            "required_action": "enter_message_or_attachment"
+          },
+          "name": "message_requires_body_or_attachment"
+        },
+        {
+          "condition": {
+            "message_length_within_limit": false,
+            "operation": "send_message"
+          },
+          "description": "Messages must stay within configured length limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "message_length_exceeded",
+            "required_action": "shorten_message"
+          },
+          "name": "message_length_within_limit"
+        },
+        {
+          "condition": {
+            "moderation_completed": false,
+            "restricted_content_detected": true
+          },
+          "description": "Restricted content requires moderation before release.",
+          "effect": {
+            "decision": "deny",
+            "reason": "moderation_required",
+            "required_action": "complete_moderation"
+          },
+          "name": "restricted_content_requires_moderation"
+        },
+        {
+          "condition": {
+            "attachment_present": true,
+            "attachment_scan_completed": false
+          },
+          "description": "Attachments require scan evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "attachment_scan_required",
+            "required_action": "scan_attachment"
+          },
+          "name": "attachment_requires_scan"
+        },
+        {
+          "condition": {
+            "dlp_check_completed": false,
+            "external_share_requested": true
+          },
+          "description": "Messages shared externally require DLP review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_check_required",
+            "required_action": "run_dlp_check"
+          },
+          "name": "external_share_requires_dlp"
+        },
+        {
+          "condition": {
+            "delivery_requested": true,
+            "event_bus_present": false
+          },
+          "description": "Message delivery requires event bus evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "event_bus_required",
+            "required_action": "attach_event_bus"
+          },
+          "name": "delivery_requires_event_bus"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Message state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "chat_audit_event_required",
+            "required_action": "record_chat_audit"
+          },
+          "name": "message_requires_audit"
+        },
+        {
+          "condition": {
+            "operation": "reply_to_thread",
+            "root_message_present": false
+          },
+          "description": "Thread replies require a root message.",
+          "effect": {
+            "decision": "deny",
+            "reason": "thread_root_required",
+            "required_action": "select_thread_root"
+          },
+          "name": "thread_requires_root_message"
+        },
+        {
+          "condition": {
+            "message_present": false,
+            "operation": "react_to_message"
+          },
+          "description": "Reactions require a target message.",
+          "effect": {
+            "decision": "deny",
+            "reason": "reaction_message_required",
+            "required_action": "select_message"
+          },
+          "name": "reaction_requires_message"
+        },
+        {
+          "condition": {
+            "author_or_moderator": false,
+            "operation": "edit_message"
+          },
+          "description": "Message edits require author or moderator rights.",
+          "effect": {
+            "decision": "deny",
+            "reason": "edit_authorization_required",
+            "required_action": "use_author_or_moderator"
+          },
+          "name": "edit_requires_author_or_moderator"
+        },
+        {
+          "condition": {
+            "author_or_moderator": false,
+            "operation": "delete_message"
+          },
+          "description": "Message deletes require author or moderator rights.",
+          "effect": {
+            "decision": "deny",
+            "reason": "delete_authorization_required",
+            "required_action": "use_author_or_moderator"
+          },
+          "name": "delete_requires_author_or_moderator"
+        },
+        {
+          "condition": {
+            "operation": "update_presence",
+            "user_authenticated": false
+          },
+          "description": "Presence updates require authenticated users.",
+          "effect": {
+            "decision": "deny",
+            "reason": "presence_identity_required",
+            "required_action": "authenticate_user"
+          },
+          "name": "presence_requires_authenticated_user"
+        },
+        {
+          "condition": {
+            "operation": "update_presence",
+            "typing": true,
+            "user_is_member": false
+          },
+          "description": "Typing indicators require room membership.",
+          "effect": {
+            "decision": "deny",
+            "reason": "typing_room_membership_required",
+            "required_action": "join_room_or_disable_typing"
+          },
+          "name": "typing_requires_room_membership"
+        },
+        {
+          "condition": {
+            "moderator_assigned": false,
+            "operation": "review_moderation"
+          },
+          "description": "Moderation decisions require a reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "moderator_required",
+            "required_action": "assign_moderator"
+          },
+          "name": "moderation_requires_reviewer"
+        },
+        {
+          "condition": {
+            "moderation_decision_present": false,
+            "operation": "review_moderation"
+          },
+          "description": "Moderation reviews require an explicit decision.",
+          "effect": {
+            "decision": "deny",
+            "reason": "moderation_decision_required",
+            "required_action": "record_moderation_decision"
+          },
+          "name": "moderation_decision_required"
+        },
+        {
+          "condition": {
+            "export_approved": false,
+            "operation": "export_retention"
+          },
+          "description": "Retention exports require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "retention_export_approval_required",
+            "required_action": "approve_retention_export"
+          },
+          "name": "retention_export_requires_approval"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "ai_agent_participant": true
+          },
+          "description": "AI chat participants must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_agent_registration_required",
+            "required_action": "register_ai_agent"
+          },
+          "name": "ai_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "ai_agent_participant": true
+          },
+          "description": "AI chat participants require explicit room scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_agent_scope_required",
+            "required_action": "set_agent_scope"
+          },
+          "name": "ai_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "ai_agent_participant": true,
+            "ai_response_disclosed": false
+          },
+          "description": "AI responses require visible disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_response_disclosure_required",
+            "required_action": "disclose_ai_response"
+          },
+          "name": "ai_response_requires_disclosure"
+        },
+        {
+          "condition": {
+            "duplicate_message_id": true,
+            "operation": "send_message"
+          },
+          "description": "Duplicate message IDs are blocked within a tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "duplicate_message_id",
+            "required_action": "reuse_existing_message"
+          },
+          "name": "duplicate_message_id_blocked"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Chat records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_chat_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_chat_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_chat_mutation"
+          },
+          "description": "Batch chat mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_chat_mutation_requires_bytewax"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "service.py",
+        "service": "service.ChatService",
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "AgentParticipants",
+          "permission": "chat:manage_rooms",
+          "route": "/chat/agents"
+        },
         "analytics": {
           "component": "ChatAnalytics",
           "permission": "chat:view",
           "route": "/chat/analytics"
         },
+        "audit": {
+          "component": "ChatAuditTrail",
+          "permission": "chat:audit",
+          "route": "/chat/audit"
+        },
         "dashboard": {
           "component": "CHATDashboard",
           "permission": "chat:view",
           "route": "/chat/dashboard"
+        },
+        "direct": {
+          "component": "DirectMessages",
+          "permission": "chat:send",
+          "route": "/chat/direct"
         },
         "messages": {
           "component": "MessageConsole",
@@ -265,9 +1103,23 @@
           "route": "/chat/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "delivery-chip",
+            "visual": "event-timeline"
+          },
+          "direct_messages": {
+            "status_style": "receipt-chip",
+            "visual": "conversation-list"
+          },
           "message_thread": {
             "highlight": "receipt-chip",
             "visual": "threaded-list"
@@ -320,6 +1172,13 @@
             "permission": "chat:manage_rooms"
           },
           {
+            "component": "DirectMessages",
+            "name": "direct",
+            "nav_group": "Messaging",
+            "path": "/chat/direct",
+            "permission": "chat:send"
+          },
+          {
             "component": "MessageConsole",
             "name": "messages",
             "nav_group": "Messaging",
@@ -334,6 +1193,13 @@
             "permission": "chat:view"
           },
           {
+            "component": "AgentParticipants",
+            "name": "agents",
+            "nav_group": "Messaging",
+            "path": "/chat/agents",
+            "permission": "chat:manage_rooms"
+          },
+          {
             "component": "ModerationQueue",
             "name": "moderation",
             "nav_group": "Governance",
@@ -346,6 +1212,13 @@
             "nav_group": "Governance",
             "path": "/chat/retention",
             "permission": "chat:admin"
+          },
+          {
+            "component": "ChatAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/chat/audit",
+            "permission": "chat:audit"
           },
           {
             "component": "ChatAnalytics",
@@ -375,35 +1248,108 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "chat": []
+      "chat": [
+        "ntfy",
+        "mqeb",
+        "auth"
+      ]
     }
   },
   "contracts": {
     "chat": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "collaboration": "colb",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.ChatService",
+          "helper_runtime": "service.py",
+          "message_bus": "mqeb",
+          "multi_tenancy": "mten",
+          "nlp": "nlpc",
+          "notification": "ntfy",
+          "security": "secu",
+          "view_models": "views.py"
+        },
+        "ai_agents": {
+          "agent_participants_enabled": true,
+          "agent_registration_required": true,
+          "agent_response_disclosure_required": true,
+          "agent_scope_required": true,
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "governance": {
           "audit_moderation_actions": true,
           "external_guest_policy_required": true,
+          "large_room_review_threshold": 5000,
           "require_tenant_context": true,
           "retention_policy_required": true
         },
         "messaging": {
           "attachments_enabled": true,
+          "deletions_require_audit": true,
           "delivery_receipts_enabled": true,
+          "edits_enabled": true,
           "event_bus_required": true,
-          "max_message_length": 8000
+          "event_stream": "bytewax",
+          "max_message_length": 8000,
+          "reactions_enabled": true,
+          "threading_enabled": true
         },
         "moderation": {
+          "attachment_scan_required": true,
           "moderation_policy_required": true,
           "moderator_review_supported": true,
-          "nlp_assisted_moderation": true,
-          "restricted_content_filtering": true
+          "nlpc_assisted_moderation": true,
+          "restricted_content_filtering": true,
+          "restricted_terms": [
+            "secret",
+            "credential",
+            "restricted"
+          ]
+        },
+        "observability": {
+          "audit_required": true,
+          "delivery_metrics_required": true,
+          "event_stream": "bytewax",
+          "moderation_metrics_required": true,
+          "presence_metrics_required": true
+        },
+        "presence": {
+          "availability_status_enabled": true,
+          "presence_ttl_seconds": 90,
+          "room_presence_enabled": true,
+          "typing_indicators_enabled": true
+        },
+        "retention": {
+          "default_policy": "retain-90-days",
+          "delete_requires_audit": true,
+          "export_requires_approval": true,
+          "legal_hold_supported": true
         },
         "rooms": {
+          "direct_rooms_enabled": true,
+          "external_guest_policy_required": true,
           "max_members_per_room": 5000,
           "private_rooms_enabled": true,
           "public_rooms_enabled": true,
+          "retention_policy_required": true,
           "room_owner_required": true
+        },
+        "security": {
+          "audit_message_delivery": true,
+          "authenticated_sender_required": true,
+          "dlp_for_external_sharing": true,
+          "secret_redaction_required": true,
+          "tenant_isolation_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -411,17 +1357,27 @@
           "default_theme": "chat_team_messaging"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_chat_console": true,
+          "enable_direct_messages": true,
           "enable_moderation_queue": true,
           "enable_presence_panel": true,
-          "enable_room_manager": true
+          "enable_retention_console": true,
+          "enable_room_manager": true,
+          "enable_settings": true
         }
       },
       "id": "chat",
       "provides": [
         "chat_operations"
       ],
-      "requires": []
+      "requires": [
+        "ntfy",
+        "mqeb",
+        "auth"
+      ]
     }
   },
   "deployment": {
@@ -433,7 +1389,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -454,6 +1410,161 @@
   },
   "roles": {},
   "rules": {
+    "active_room_required": {
+      "condition": {
+        "operation": "send_message",
+        "room_active": false
+      },
+      "description": "Messages require an active room.",
+      "effect": {
+        "decision": "deny",
+        "reason": "room_not_active",
+        "required_action": "activate_room"
+      },
+      "name": "active_room_required"
+    },
+    "ai_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "ai_agent_participant": true
+      },
+      "description": "AI chat participants must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_agent_registration_required",
+        "required_action": "register_ai_agent"
+      },
+      "name": "ai_agent_requires_registration"
+    },
+    "ai_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "ai_agent_participant": true
+      },
+      "description": "AI chat participants require explicit room scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_agent_scope_required",
+        "required_action": "set_agent_scope"
+      },
+      "name": "ai_agent_requires_scope"
+    },
+    "ai_response_requires_disclosure": {
+      "condition": {
+        "ai_agent_participant": true,
+        "ai_response_disclosed": false
+      },
+      "description": "AI responses require visible disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_response_disclosure_required",
+        "required_action": "disclose_ai_response"
+      },
+      "name": "ai_response_requires_disclosure"
+    },
+    "attachment_requires_scan": {
+      "condition": {
+        "attachment_present": true,
+        "attachment_scan_completed": false
+      },
+      "description": "Attachments require scan evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "attachment_scan_required",
+        "required_action": "scan_attachment"
+      },
+      "name": "attachment_requires_scan"
+    },
+    "batch_chat_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_chat_mutation"
+      },
+      "description": "Batch chat mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_chat_mutation_requires_bytewax"
+    },
+    "cross_tenant_chat_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Chat records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_chat_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_chat_access_denied"
+    },
+    "delete_requires_author_or_moderator": {
+      "condition": {
+        "author_or_moderator": false,
+        "operation": "delete_message"
+      },
+      "description": "Message deletes require author or moderator rights.",
+      "effect": {
+        "decision": "deny",
+        "reason": "delete_authorization_required",
+        "required_action": "use_author_or_moderator"
+      },
+      "name": "delete_requires_author_or_moderator"
+    },
+    "delivery_requires_event_bus": {
+      "condition": {
+        "delivery_requested": true,
+        "event_bus_present": false
+      },
+      "description": "Message delivery requires event bus evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "event_bus_required",
+        "required_action": "attach_event_bus"
+      },
+      "name": "delivery_requires_event_bus"
+    },
+    "duplicate_message_id_blocked": {
+      "condition": {
+        "duplicate_message_id": true,
+        "operation": "send_message"
+      },
+      "description": "Duplicate message IDs are blocked within a tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "duplicate_message_id",
+        "required_action": "reuse_existing_message"
+      },
+      "name": "duplicate_message_id_blocked"
+    },
+    "edit_requires_author_or_moderator": {
+      "condition": {
+        "author_or_moderator": false,
+        "operation": "edit_message"
+      },
+      "description": "Message edits require author or moderator rights.",
+      "effect": {
+        "decision": "deny",
+        "reason": "edit_authorization_required",
+        "required_action": "use_author_or_moderator"
+      },
+      "name": "edit_requires_author_or_moderator"
+    },
+    "external_guest_requires_expiry": {
+      "condition": {
+        "external_guest_present": true,
+        "guest_access_expiry_present": false
+      },
+      "description": "External guest rooms require an access expiry.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "guest_expiry_required",
+        "required_action": "set_guest_access_expiry"
+      },
+      "name": "external_guest_requires_expiry"
+    },
     "external_guest_requires_policy": {
       "condition": {
         "external_guest_present": true,
@@ -466,6 +1577,19 @@
         "required_action": "attach_guest_policy"
       },
       "name": "external_guest_requires_policy"
+    },
+    "external_share_requires_dlp": {
+      "condition": {
+        "dlp_check_completed": false,
+        "external_share_requested": true
+      },
+      "description": "Messages shared externally require DLP review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_check_required",
+        "required_action": "run_dlp_check"
+      },
+      "name": "external_share_requires_dlp"
     },
     "large_room_requires_review": {
       "condition": {
@@ -480,6 +1604,97 @@
       },
       "name": "large_room_requires_review"
     },
+    "message_length_within_limit": {
+      "condition": {
+        "message_length_within_limit": false,
+        "operation": "send_message"
+      },
+      "description": "Messages must stay within configured length limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "message_length_exceeded",
+        "required_action": "shorten_message"
+      },
+      "name": "message_length_within_limit"
+    },
+    "message_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Message state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "chat_audit_event_required",
+        "required_action": "record_chat_audit"
+      },
+      "name": "message_requires_audit"
+    },
+    "message_requires_body_or_attachment": {
+      "condition": {
+        "message_payload_present": false,
+        "operation": "send_message"
+      },
+      "description": "Messages require text or an attachment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "message_payload_required",
+        "required_action": "enter_message_or_attachment"
+      },
+      "name": "message_requires_body_or_attachment"
+    },
+    "moderation_decision_required": {
+      "condition": {
+        "moderation_decision_present": false,
+        "operation": "review_moderation"
+      },
+      "description": "Moderation reviews require an explicit decision.",
+      "effect": {
+        "decision": "deny",
+        "reason": "moderation_decision_required",
+        "required_action": "record_moderation_decision"
+      },
+      "name": "moderation_decision_required"
+    },
+    "moderation_requires_reviewer": {
+      "condition": {
+        "moderator_assigned": false,
+        "operation": "review_moderation"
+      },
+      "description": "Moderation decisions require a reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "moderator_required",
+        "required_action": "assign_moderator"
+      },
+      "name": "moderation_requires_reviewer"
+    },
+    "presence_requires_authenticated_user": {
+      "condition": {
+        "operation": "update_presence",
+        "user_authenticated": false
+      },
+      "description": "Presence updates require authenticated users.",
+      "effect": {
+        "decision": "deny",
+        "reason": "presence_identity_required",
+        "required_action": "authenticate_user"
+      },
+      "name": "presence_requires_authenticated_user"
+    },
+    "reaction_requires_message": {
+      "condition": {
+        "message_present": false,
+        "operation": "react_to_message"
+      },
+      "description": "Reactions require a target message.",
+      "effect": {
+        "decision": "deny",
+        "reason": "reaction_message_required",
+        "required_action": "select_message"
+      },
+      "name": "reaction_requires_message"
+    },
     "restricted_content_requires_moderation": {
       "condition": {
         "moderation_completed": false,
@@ -493,8 +1708,22 @@
       },
       "name": "restricted_content_requires_moderation"
     },
+    "retention_export_requires_approval": {
+      "condition": {
+        "export_approved": false,
+        "operation": "export_retention"
+      },
+      "description": "Retention exports require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "retention_export_approval_required",
+        "required_action": "approve_retention_export"
+      },
+      "name": "retention_export_requires_approval"
+    },
     "retention_policy_required": {
       "condition": {
+        "operation": "create_room",
         "retention_policy_attached": false
       },
       "description": "Message rooms require a retention policy.",
@@ -504,6 +1733,32 @@
         "required_action": "attach_retention_policy"
       },
       "name": "retention_policy_required"
+    },
+    "room_requires_member": {
+      "condition": {
+        "member_present": false,
+        "operation": "create_room"
+      },
+      "description": "Rooms require at least one member or owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "room_member_required",
+        "required_action": "add_room_member"
+      },
+      "name": "room_requires_member"
+    },
+    "room_requires_name": {
+      "condition": {
+        "operation": "create_room",
+        "room_name_present": false
+      },
+      "description": "Rooms require a readable name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "room_name_required",
+        "required_action": "name_room"
+      },
+      "name": "room_requires_name"
     },
     "room_requires_owner": {
       "condition": {
@@ -518,6 +1773,32 @@
       },
       "name": "room_requires_owner"
     },
+    "sender_identity_required": {
+      "condition": {
+        "operation": "send_message",
+        "sender_authenticated": false
+      },
+      "description": "Messages require an authenticated sender.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sender_identity_required",
+        "required_action": "authenticate_sender"
+      },
+      "name": "sender_identity_required"
+    },
+    "sender_membership_required": {
+      "condition": {
+        "operation": "send_message",
+        "sender_is_member": false
+      },
+      "description": "Senders must belong to the target room.",
+      "effect": {
+        "decision": "deny",
+        "reason": "sender_not_room_member",
+        "required_action": "join_room_or_change_sender"
+      },
+      "name": "sender_membership_required"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -529,11 +1810,42 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "thread_requires_root_message": {
+      "condition": {
+        "operation": "reply_to_thread",
+        "root_message_present": false
+      },
+      "description": "Thread replies require a root message.",
+      "effect": {
+        "decision": "deny",
+        "reason": "thread_root_required",
+        "required_action": "select_thread_root"
+      },
+      "name": "thread_requires_root_message"
+    },
+    "typing_requires_room_membership": {
+      "condition": {
+        "operation": "update_presence",
+        "typing": true,
+        "user_is_member": false
+      },
+      "description": "Typing indicators require room membership.",
+      "effect": {
+        "decision": "deny",
+        "reason": "typing_room_membership_required",
+        "required_action": "join_room_or_disable_typing"
+      },
+      "name": "typing_requires_room_membership"
     }
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.chat": {

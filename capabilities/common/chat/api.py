@@ -33,6 +33,7 @@ def create_room(payload: dict[str, Any]) -> dict[str, Any]:
 		visibility=str(payload.get("visibility") or "private"),
 		external_guests=[str(item) for item in payload.get("external_guests", [])],
 		guest_policy_attached=bool(payload.get("guest_policy_attached", True)),
+		guest_access_expiry_present=bool(payload.get("guest_access_expiry_present", True)),
 		access_review_recorded=bool(payload.get("access_review_recorded", True)),
 	)
 
@@ -41,6 +42,7 @@ def approve_room(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.approve_room(
 		room_id=str(payload["id"]),
 		reviewer=str(payload.get("reviewer") or "reviewer"),
+		tenant_id=str(payload["tenant_id"]) if payload.get("tenant_id") else None,
 	)
 
 
@@ -55,6 +57,12 @@ def send_message(payload: dict[str, Any]) -> dict[str, Any]:
 		delivery_receipts=[str(item) for item in payload.get("delivery_receipts", [])],
 		restricted_content_detected=bool(payload.get("restricted_content_detected", False)),
 		moderation_completed=bool(payload.get("moderation_completed", True)),
+		attachment_scan_completed=bool(payload.get("attachment_scan_completed", True)),
+		dlp_check_completed=bool(payload.get("dlp_check_completed", True)),
+		ai_agent_participant=bool(payload.get("ai_agent_participant", False)),
+		agent_registered=bool(payload.get("agent_registered", True)),
+		agent_scope_present=bool(payload.get("agent_scope_present", True)),
+		ai_response_disclosed=bool(payload.get("ai_response_disclosed", True)),
 	)
 
 
@@ -74,6 +82,7 @@ def review_moderation(payload: dict[str, Any]) -> dict[str, Any]:
 		item_id=str(payload["id"]),
 		reviewer=str(payload.get("reviewer") or "moderator"),
 		decision=str(payload.get("decision") or "approved"),
+		tenant_id=str(payload["tenant_id"]) if payload.get("tenant_id") else None,
 	)
 
 
