@@ -5,13 +5,122 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Identity Federation package-backed APG capability", "entity_count": 0, "name": "idfd", "version": "1.0.0"}, "capabilities": {"idfd": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"governance": {"audit_federation_events": true, "certificate_rotation_days": 90, "claim_mapping_review_required": true, "require_tenant_context": true}, "protocols": {"oidc_redirect_allowlist_required": true, "pkce_required": true, "saml_assertion_encryption_required": true, "scim_group_sync_enabled": true}, "providers": {"enabled_provider_types": ["saml", "oidc", "ldap", "scim"], "metadata_refresh_hours": 24, "provider_owner_required": true, "signing_key_required": true}, "sessions": {"max_session_hours": 12, "privileged_mfa_required": true, "risk_based_reauth_enabled": true, "session_revocation_supported": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "idfd_federation_console"}, "ui": {"enable_certificate_center": true, "enable_protocol_workbench": true, "enable_provider_console": true, "enable_session_monitor": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Identity Federation", "provides": ["idfd_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All federation operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "register_provider", "signing_key_present": false}, "description": "Federation providers require a signing key.", "effect": {"decision": "deny", "reason": "signing_key_required", "required_action": "attach_signing_key"}, "name": "provider_requires_signing_key"}, {"condition": {"assertion_encrypted": false, "protocol": "saml"}, "description": "SAML assertions require encryption.", "effect": {"decision": "deny", "reason": "saml_assertion_encryption_required", "required_action": "enable_assertion_encryption"}, "name": "saml_assertion_requires_encryption"}, {"condition": {"protocol": "oidc", "redirect_allowlist_configured": false}, "description": "OIDC clients require redirect URI allowlists.", "effect": {"decision": "deny", "reason": "redirect_allowlist_required", "required_action": "configure_redirect_allowlist"}, "name": "oidc_client_requires_redirect_allowlist"}, {"condition": {"mfa_completed": false, "session_privilege": "privileged"}, "description": "Privileged federation sessions require MFA.", "effect": {"decision": "deny", "reason": "privileged_mfa_required", "required_action": "complete_mfa"}, "name": "privileged_federation_requires_mfa"}, {"condition": {"metadata_age_hours_gt": 24, "metadata_refresh_completed": false}, "description": "Stale provider metadata requires refresh or review.", "effect": {"decision": "require_review", "reason": "metadata_refresh_required", "required_action": "refresh_provider_metadata"}, "name": "stale_metadata_requires_refresh"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All federation operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"operation": "register_provider", "signing_key_present": false}, "description": "Federation providers require a signing key.", "effect": {"decision": "deny", "reason": "signing_key_required", "required_action": "attach_signing_key"}, "name": "provider_requires_signing_key"}, {"condition": {"assertion_encrypted": false, "protocol": "saml"}, "description": "SAML assertions require encryption.", "effect": {"decision": "deny", "reason": "saml_assertion_encryption_required", "required_action": "enable_assertion_encryption"}, "name": "saml_assertion_requires_encryption"}, {"condition": {"protocol": "oidc", "redirect_allowlist_configured": false}, "description": "OIDC clients require redirect URI allowlists.", "effect": {"decision": "deny", "reason": "redirect_allowlist_required", "required_action": "configure_redirect_allowlist"}, "name": "oidc_client_requires_redirect_allowlist"}, {"condition": {"mfa_completed": false, "session_privilege": "privileged"}, "description": "Privileged federation sessions require MFA.", "effect": {"decision": "deny", "reason": "privileged_mfa_required", "required_action": "complete_mfa"}, "name": "privileged_federation_requires_mfa"}, {"condition": {"metadata_age_hours_gt": 24, "metadata_refresh_completed": false}, "description": "Stale provider metadata requires refresh or review.", "effect": {"decision": "require_review", "reason": "metadata_refresh_required", "required_action": "refresh_provider_metadata"}, "name": "stale_metadata_requires_refresh"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"audit": {"component": "FederationAudit", "permission": "idfd:view", "route": "/idfd/audit"}, "certificates": {"component": "CertificateCenter", "permission": "idfd:rotate_keys", "route": "/idfd/certificates"}, "dashboard": {"component": "IDFDDashboard", "permission": "idfd:view", "route": "/idfd/dashboard"}, "mappings": {"component": "IdentityMappings", "permission": "idfd:manage_mappings", "route": "/idfd/mappings"}, "protocols": {"component": "ProtocolWorkbench", "permission": "idfd:manage_providers", "route": "/idfd/protocols"}, "providers": {"component": "FederationProviders", "permission": "idfd:manage_providers", "route": "/idfd/providers"}, "sessions": {"component": "FederatedSessions", "permission": "idfd:view", "route": "/idfd/sessions"}, "settings": {"component": "IDFDSettings", "permission": "idfd:admin", "route": "/idfd/settings"}}, "streaming": {}, "theme": {"components": {"certificate_timeline": {"status_style": "expiry-chip", "visual": "rotation-timeline"}, "mapping_table": {"status_style": "review-chip", "visual": "claim-map"}, "protocol_panel": {"highlight": "crypto-chip", "visual": "protocol-tabs"}, "provider_grid": {"icon": "network", "risk_style": "metadata-band", "status_indicator": "provider-pill"}}, "name": "idfd_federation_console", "tokens": {"border.radius": "8px", "color.accent": "#9F7AEA", "color.danger": "#C53030", "color.primary": "#2A4365", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/idfd/api/v1", "requires_theme": true, "routes": [{"component": "IDFDDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/idfd/dashboard", "permission": "idfd:view"}, {"component": "FederationProviders", "name": "providers", "nav_group": "Providers", "path": "/idfd/providers", "permission": "idfd:manage_providers"}, {"component": "ProtocolWorkbench", "name": "protocols", "nav_group": "Providers", "path": "/idfd/protocols", "permission": "idfd:manage_providers"}, {"component": "IdentityMappings", "name": "mappings", "nav_group": "Mappings", "path": "/idfd/mappings", "permission": "idfd:manage_mappings"}, {"component": "FederatedSessions", "name": "sessions", "nav_group": "Operations", "path": "/idfd/sessions", "permission": "idfd:view"}, {"component": "CertificateCenter", "name": "certificates", "nav_group": "Security", "path": "/idfd/certificates", "permission": "idfd:rotate_keys"}, {"component": "FederationAudit", "name": "audit", "nav_group": "Governance", "path": "/idfd/audit", "permission": "idfd:view"}, {"component": "IDFDSettings", "name": "settings", "nav_group": "Administration", "path": "/idfd/settings", "permission": "idfd:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "views.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"idfd": []}}, "contracts": {"idfd": {"configuration": {"governance": {"audit_federation_events": true, "certificate_rotation_days": 90, "claim_mapping_review_required": true, "require_tenant_context": true}, "protocols": {"oidc_redirect_allowlist_required": true, "pkce_required": true, "saml_assertion_encryption_required": true, "scim_group_sync_enabled": true}, "providers": {"enabled_provider_types": ["saml", "oidc", "ldap", "scim"], "metadata_refresh_hours": 24, "provider_owner_required": true, "signing_key_required": true}, "sessions": {"max_session_hours": 12, "privileged_mfa_required": true, "risk_based_reauth_enabled": true, "session_revocation_supported": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "idfd_federation_console"}, "ui": {"enable_certificate_center": true, "enable_protocol_workbench": true, "enable_provider_console": true, "enable_session_monitor": true}}, "id": "idfd", "provides": ["idfd_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"idfd": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"oidc_client_requires_redirect_allowlist": {"condition": {"protocol": "oidc", "redirect_allowlist_configured": false}, "description": "OIDC clients require redirect URI allowlists.", "effect": {"decision": "deny", "reason": "redirect_allowlist_required", "required_action": "configure_redirect_allowlist"}, "name": "oidc_client_requires_redirect_allowlist"}, "privileged_federation_requires_mfa": {"condition": {"mfa_completed": false, "session_privilege": "privileged"}, "description": "Privileged federation sessions require MFA.", "effect": {"decision": "deny", "reason": "privileged_mfa_required", "required_action": "complete_mfa"}, "name": "privileged_federation_requires_mfa"}, "provider_requires_signing_key": {"condition": {"operation": "register_provider", "signing_key_present": false}, "description": "Federation providers require a signing key.", "effect": {"decision": "deny", "reason": "signing_key_required", "required_action": "attach_signing_key"}, "name": "provider_requires_signing_key"}, "saml_assertion_requires_encryption": {"condition": {"assertion_encrypted": false, "protocol": "saml"}, "description": "SAML assertions require encryption.", "effect": {"decision": "deny", "reason": "saml_assertion_encryption_required", "required_action": "enable_assertion_encryption"}, "name": "saml_assertion_requires_encryption"}, "stale_metadata_requires_refresh": {"condition": {"metadata_age_hours_gt": 24, "metadata_refresh_completed": false}, "description": "Stale provider metadata requires refresh or review.", "effect": {"decision": "require_review", "reason": "metadata_refresh_required", "required_action": "refresh_provider_metadata"}, "name": "stale_metadata_requires_refresh"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All federation operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.idfd": {"file": "capability_contract.py", "id": "capability.idfd", "kind": "capability", "name": "Identity Federation", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("idfd_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "idfd",
+			"version": "1.0.0",
+			"description": "Identity Federation package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"idfd": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"idfd": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["idfd_operations"],
+				"requires": ["auth", "mfau", "encr"],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"api_helpers": contract["configuration"]["adapters"]["api_helpers"],
+					"views": contract["configuration"]["adapters"]["view_models"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"stale_metadata": "FederationReview",
+					"sensitive_claim_mapping": "FederationReview",
+					"high_risk_session": "FederationReview",
+					"certificate_rotation": "FederationReview",
+				},
+				"federation_lifecycle": {
+					"provider": "FederationProvider",
+					"protocol": "ProviderProtocol",
+					"claim_mapping": "ClaimMapping",
+					"session": "FederatedSession",
+					"certificate": "CertificateRecord",
+					"health": "FederationHealthReport",
+					"audit": "FederationAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"idfd": {
+				"id": "idfd",
+				"configuration": contract["configuration"],
+				"provides": ["idfd_operations"],
+				"requires": ["auth", "mfau", "encr"],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"idfd": ["auth", "mfau", "encr"]}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 3},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "models.py", "federation_runtime.py", "service.py", "api.py", "views.py", "app.py"],
+		"symbols": {
+			"capability.idfd": {
+				"id": "capability.idfd",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +145,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("idfd", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "idfd" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 10:
+		errors.append("IDFD semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("IDFD semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("IDFD adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.IdfdService":
+		errors.append("IDFD generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

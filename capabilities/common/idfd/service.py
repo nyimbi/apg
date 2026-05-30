@@ -27,16 +27,19 @@ from .models import (
 )
 
 
+StoreKey = tuple[str, str]
+
+
 class IdfdService:
 	"""Tenant-aware federation provider, mapping, session, certificate, and audit runtime."""
 
 	def __init__(self) -> None:
-		self._providers: dict[str, FederationProvider] = {}
-		self._mappings: dict[str, ClaimMapping] = {}
-		self._sessions: dict[str, FederatedSession] = {}
-		self._certificates: dict[str, CertificateRecord] = {}
-		self._audit_events: dict[str, FederationAuditEvent] = {}
-		self._health_reports: dict[str, FederationHealthReport] = {}
+		self._providers: dict[StoreKey, FederationProvider] = {}
+		self._mappings: dict[StoreKey, ClaimMapping] = {}
+		self._sessions: dict[StoreKey, FederatedSession] = {}
+		self._certificates: dict[StoreKey, CertificateRecord] = {}
+		self._audit_events: dict[StoreKey, FederationAuditEvent] = {}
+		self._health_reports: dict[StoreKey, FederationHealthReport] = {}
 		self._counter = count(1)
 		self._metadata = MetadataFreshnessInspector()
 		self._session_issuer = FederationSessionIssuer()
@@ -60,10 +63,14 @@ class IdfdService:
 		assertion_encrypted: bool = True,
 		redirect_allowlist: list[str] | None = None,
 		pkce_required: bool = True,
+		metadata_signed: bool = True,
+		response_signature_validated: bool = True,
+		tls_enabled: bool = True,
 		metadata_refresh_completed: bool = True,
 		metadata_age_hours: int | float = 0,
 		status: str = ProviderStatus.ACTIVE.value,
 	) -> dict[str, Any]:
+		self._ensure_new(self._providers, tenant_id, provider_id)
 		protocol_value = ProviderProtocol(protocol)
 		config = DEFAULT_CONFIGURATION
 		enabled = set(config["providers"]["enabled_provider_types"])
@@ -74,10 +81,17 @@ class IdfdService:
 		self._enforce_federation_policy(
 			tenant_id=tenant_id,
 			operation="register_provider",
+			owner_present=bool(owner_id),
 			signing_key_present=bool(signing_key_id),
 			protocol=protocol_value.value,
+			protocol_enabled=protocol_value.value in enabled,
+			metadata_present=bool(metadata_url),
+			metadata_signed=metadata_signed,
 			assertion_encrypted=assertion_encrypted,
 			redirect_allowlist_configured=bool(redirect_allowlist),
+			pkce_required=pkce_required,
+			response_signature_validated=response_signature_validated,
+			tls_enabled=tls_enabled,
 			metadata_age_hours=float(metadata_age_hours),
 			metadata_refresh_completed=metadata_refresh_completed,
 		)
@@ -95,7 +109,7 @@ class IdfdService:
 			metadata_refreshed_at=iso_hours_ago(metadata_age_hours),
 			status=ProviderStatus(status),
 		)
-		self._providers[provider_id] = provider
+		self._providers[self._key(tenant_id, provider_id)] = provider
 		self._audit(tenant_id, "provider_registered", provider_id=provider_id, reason=protocol_value.value)
 		return provider.to_dict()
 
@@ -123,9 +137,17 @@ class IdfdService:
 		transform: str = "copy",
 		reviewed: bool = True,
 	) -> dict[str, Any]:
+		self._ensure_new(self._mappings, tenant_id, mapping_id)
 		self._require_provider(provider_id, tenant_id)
-		if DEFAULT_CONFIGURATION["governance"]["claim_mapping_review_required"] and not reviewed:
-			raise PermissionError("claim_mapping_review_required")
+		self._enforce_federation_policy(
+			tenant_id=tenant_id,
+			operation="add_claim_mapping",
+			source_claim_present=bool(source_claim),
+			target_claim_present=bool(target_claim),
+			claim_mapping_reviewed=reviewed,
+			sensitive_claim=target_claim.lower() in {"role", "roles", "groups", "entitlements", "department"},
+			privacy_review_recorded=reviewed,
+		)
 		mapping = ClaimMapping(
 			id=mapping_id,
 			tenant_id=tenant_id,
@@ -135,7 +157,7 @@ class IdfdService:
 			transform=transform,
 			reviewed=reviewed,
 		)
-		self._mappings[mapping_id] = mapping
+		self._mappings[self._key(tenant_id, mapping_id)] = mapping
 		self._audit(tenant_id, "claim_mapping_added", provider_id=provider_id, reason=f"{source_claim}->{target_claim}")
 		return mapping.to_dict()
 
@@ -149,20 +171,24 @@ class IdfdService:
 		mfa_completed: bool = True,
 		risk_score: float = 0.0,
 		max_session_hours: int | None = None,
+		reauth_completed: bool = True,
 	) -> dict[str, Any]:
+		self._ensure_new(self._sessions, tenant_id, session_id)
 		provider = self._require_provider(provider_id, tenant_id)
-		if provider.status != ProviderStatus.ACTIVE:
-			raise PermissionError("provider_not_active")
+		hours = max_session_hours or int(DEFAULT_CONFIGURATION["sessions"]["max_session_hours"])
 		self._enforce_federation_policy(
 			tenant_id=tenant_id,
 			operation="issue_session",
+			provider_active=provider.status == ProviderStatus.ACTIVE,
 			protocol=provider.protocol.value,
 			assertion_encrypted=provider.assertion_encrypted,
 			redirect_allowlist_configured=bool(provider.redirect_allowlist),
 			session_privilege=session_privilege,
 			mfa_completed=mfa_completed,
+			session_hours=hours,
+			risk_score=float(risk_score),
+			reauth_completed=reauth_completed,
 		)
-		hours = max_session_hours or int(DEFAULT_CONFIGURATION["sessions"]["max_session_hours"])
 		session = self._session_issuer.issue(
 			session_id=session_id,
 			tenant_id=tenant_id,
@@ -173,12 +199,13 @@ class IdfdService:
 			max_session_hours=hours,
 			risk_score=risk_score,
 		)
-		self._sessions[session_id] = session
+		self._sessions[self._key(tenant_id, session_id)] = session
 		self._audit(tenant_id, "session_issued", provider_id=provider_id, subject_id=subject_id)
 		return session.to_dict()
 
 	def revoke_session(self, session_id: str, tenant_id: str, reason: str = "manual") -> dict[str, Any]:
 		session = self._require_session(session_id, tenant_id)
+		self._enforce_federation_policy(tenant_id=tenant_id, operation="revoke_session", reason_present=bool(reason))
 		session.status = SessionStatus.REVOKED
 		session.revoked_at = utc_now_iso()
 		session.revocation_reason = reason
@@ -195,7 +222,14 @@ class IdfdService:
 		active: bool = True,
 		rotated_at: str | None = None,
 	) -> dict[str, Any]:
+		self._ensure_new(self._certificates, tenant_id, certificate_id)
 		self._require_provider(provider_id, tenant_id)
+		self._enforce_federation_policy(
+			tenant_id=tenant_id,
+			operation="register_certificate",
+			provider_present=bool(provider_id),
+			key_present=bool(key_id),
+		)
 		certificate = CertificateRecord(
 			id=certificate_id,
 			tenant_id=tenant_id,
@@ -205,7 +239,7 @@ class IdfdService:
 			active=active,
 			rotated_at=rotated_at,
 		)
-		self._certificates[certificate_id] = certificate
+		self._certificates[self._key(tenant_id, certificate_id)] = certificate
 		self._audit(tenant_id, "certificate_registered", provider_id=provider_id, reason=key_id)
 		return certificate.to_dict()
 
@@ -220,7 +254,7 @@ class IdfdService:
 			certificate_rotation_days=int(config["governance"]["certificate_rotation_days"]),
 		)
 		report = FederationHealthReport(id=report_id, tenant_id=tenant_id, **summary)
-		self._health_reports[report_id] = report
+		self._health_reports[self._key(tenant_id, report_id)] = report
 		self._audit(tenant_id, "health_report_generated", reason=report_id)
 		return report.to_dict()
 
@@ -242,7 +276,7 @@ class IdfdService:
 			protocol=protocol,
 			owner_id=str(data.get("owner_id") or "system"),
 			signing_key_id=str(data.get("signing_key_id") or "signing-key"),
-			metadata_url=str(data.get("metadata_url") or ""),
+			metadata_url=str(data.get("metadata_url") or "https://idp.example.test/metadata"),
 			assertion_encrypted=bool(data.get("assertion_encrypted", True)),
 			redirect_allowlist=redirect_allowlist,
 			pkce_required=bool(data.get("pkce_required", True)),
@@ -306,14 +340,16 @@ class IdfdService:
 			raise PermissionError(reasons or "federation_policy_blocked")
 
 	def _require_provider(self, provider_id: str, tenant_id: str) -> FederationProvider:
-		provider = self._providers.get(provider_id)
-		if provider is None or provider.tenant_id != tenant_id:
+		provider = self._providers.get(self._key(tenant_id, provider_id))
+		if provider is None:
+			self._raise_cross_tenant_if_present(self._providers, provider_id, tenant_id)
 			raise KeyError("provider_missing")
 		return provider
 
 	def _require_session(self, session_id: str, tenant_id: str) -> FederatedSession:
-		session = self._sessions.get(session_id)
-		if session is None or session.tenant_id != tenant_id:
+		session = self._sessions.get(self._key(tenant_id, session_id))
+		if session is None:
+			self._raise_cross_tenant_if_present(self._sessions, session_id, tenant_id)
 			raise KeyError("session_missing")
 		return session
 
@@ -329,7 +365,7 @@ class IdfdService:
 		if not DEFAULT_CONFIGURATION["governance"]["audit_federation_events"]:
 			return
 		event_id = f"audit-{next(self._counter)}"
-		self._audit_events[event_id] = FederationAuditEvent(
+		self._audit_events[self._key(tenant_id, event_id)] = FederationAuditEvent(
 			id=event_id,
 			tenant_id=tenant_id,
 			event_type=event_type,
@@ -339,11 +375,26 @@ class IdfdService:
 			reason=reason,
 		)
 
-	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
+	def _list(self, records: dict[StoreKey, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		values = list(records.values())
 		if tenant_id is not None:
 			values = [record for record in values if record.tenant_id == tenant_id]
 		return [record.to_dict() for record in sorted(values, key=lambda item: item.id)]
+
+	def _ensure_new(self, records: dict[StoreKey, Any], tenant_id: str, record_id: str) -> None:
+		if not record_id:
+			raise ValueError("federation_record_id_required")
+		if self._key(tenant_id, record_id) in records:
+			raise ValueError(f"federation_record_already_exists:{record_id}")
+
+	def _raise_cross_tenant_if_present(self, records: dict[StoreKey, Any], record_id: str, tenant_id: str) -> None:
+		if any(record.id == record_id and record.tenant_id != tenant_id for record in records.values()):
+			result = self.evaluate({"tenant_context_present": bool(tenant_id), "cross_tenant_access": True})
+			reasons = ", ".join(action.get("reason", "cross_tenant_federation_access_denied") for action in result["actions"])
+			raise PermissionError(reasons or "cross_tenant_federation_access_denied")
+
+	def _key(self, tenant_id: str, record_id: str) -> StoreKey:
+		return (tenant_id, record_id)
 
 
 def expires_in_days(days: int) -> str:

@@ -8,17 +8,77 @@
   },
   "capabilities": {
     "idfd": {
-      "approvals": {},
+      "adapters": {
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "authentication": "auth",
+        "cache": "cach",
+        "encryption": "encr",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.IdfdService",
+        "helper_runtime": "federation_runtime.py",
+        "key_management": "keym",
+        "mfa_provider": "mfau",
+        "monitoring": "moni",
+        "production_api": "api.py",
+        "production_runtime": "service.py",
+        "production_views": "views.py",
+        "security_framework": "secu",
+        "view_models": "views.py"
+      },
+      "approvals": {
+        "certificate_rotation": "FederationReview",
+        "high_risk_session": "FederationReview",
+        "sensitive_claim_mapping": "FederationReview",
+        "stale_metadata": "FederationReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.IdfdService",
+          "helper_runtime": "federation_runtime.py",
+          "key_management": "keym",
+          "mfa_provider": "mfau",
+          "monitoring": "moni",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "security_framework": "secu",
+          "view_models": "views.py"
+        },
+        "certificates": {
+          "active_certificate_required": true,
+          "expiry_review_days": 30,
+          "revocation_supported": true,
+          "rotation_days": 90
+        },
+        "claims": {
+          "claim_mapping_review_required": true,
+          "sensitive_claim_review_required": true,
+          "source_claim_required": true,
+          "target_claim_required": true
+        },
         "governance": {
           "audit_federation_events": true,
           "certificate_rotation_days": 90,
           "claim_mapping_review_required": true,
           "require_tenant_context": true
         },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
         "protocols": {
+          "ldap_tls_required": true,
           "oidc_redirect_allowlist_required": true,
           "pkce_required": true,
           "saml_assertion_encryption_required": true,
@@ -32,10 +92,28 @@
             "scim"
           ],
           "metadata_refresh_hours": 24,
+          "provider_disable_supported": true,
           "provider_owner_required": true,
           "signing_key_required": true
         },
+        "reviews": {
+          "duplicate_pending_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true
+        },
+        "scim": {
+          "deprovisioning_required": true,
+          "external_id_required": true,
+          "group_sync_enabled": true
+        },
+        "security": {
+          "deny_unencrypted_saml": true,
+          "deny_unlisted_oidc_redirects": true,
+          "signed_metadata_required": true,
+          "tenant_isolation_required": true
+        },
         "sessions": {
+          "high_risk_reauth_threshold": 0.7,
           "max_session_hours": 12,
           "privileged_mfa_required": true,
           "risk_based_reauth_enabled": true,
@@ -47,22 +125,42 @@
           "default_theme": "idfd_federation_console"
         },
         "ui": {
+          "enable_audit": true,
           "enable_certificate_center": true,
+          "enable_claim_mapping": true,
+          "enable_dashboard": true,
           "enable_protocol_workbench": true,
           "enable_provider_console": true,
-          "enable_session_monitor": true
+          "enable_review_queue": true,
+          "enable_risk_console": true,
+          "enable_scim_directory": true,
+          "enable_session_monitor": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
         "common"
       ],
+      "federation_lifecycle": {
+        "audit": "FederationAuditEvent",
+        "certificate": "CertificateRecord",
+        "claim_mapping": "ClaimMapping",
+        "health": "FederationHealthReport",
+        "protocol": "ProviderProtocol",
+        "provider": "FederationProvider",
+        "session": "FederatedSession"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Identity Federation",
       "provides": [
         "idfd_operations"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "mfau",
+        "encr"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -80,6 +178,19 @@
           {
             "condition": {
               "operation": "register_provider",
+              "owner_present": false
+            },
+            "description": "Federation providers require an owning identity team or service.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_owner_required",
+              "required_action": "assign_provider_owner"
+            },
+            "name": "provider_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_provider",
               "signing_key_present": false
             },
             "description": "Federation providers require a signing key.",
@@ -89,6 +200,45 @@
               "required_action": "attach_signing_key"
             },
             "name": "provider_requires_signing_key"
+          },
+          {
+            "condition": {
+              "operation": "register_provider",
+              "protocol_enabled": false
+            },
+            "description": "Provider protocol must be enabled for the tenant.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_protocol_not_enabled",
+              "required_action": "enable_provider_protocol"
+            },
+            "name": "provider_protocol_must_be_enabled"
+          },
+          {
+            "condition": {
+              "metadata_present": false,
+              "operation": "register_provider"
+            },
+            "description": "Federation providers require metadata location or metadata payload evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "provider_metadata_required",
+              "required_action": "attach_metadata"
+            },
+            "name": "provider_metadata_url_required"
+          },
+          {
+            "condition": {
+              "metadata_signed": false,
+              "operation": "register_provider"
+            },
+            "description": "Provider metadata must be signed or independently verified.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "metadata_signature_required",
+              "required_action": "verify_metadata_signature"
+            },
+            "name": "provider_metadata_signature_required"
           },
           {
             "condition": {
@@ -105,6 +255,19 @@
           },
           {
             "condition": {
+              "protocol": "saml",
+              "response_signature_validated": false
+            },
+            "description": "SAML responses require signature validation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "saml_response_signature_required",
+              "required_action": "validate_saml_response_signature"
+            },
+            "name": "saml_requires_signed_response"
+          },
+          {
+            "condition": {
               "protocol": "oidc",
               "redirect_allowlist_configured": false
             },
@@ -115,6 +278,111 @@
               "required_action": "configure_redirect_allowlist"
             },
             "name": "oidc_client_requires_redirect_allowlist"
+          },
+          {
+            "condition": {
+              "pkce_required": false,
+              "protocol": "oidc"
+            },
+            "description": "OIDC public clients require PKCE.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pkce_required",
+              "required_action": "enable_pkce"
+            },
+            "name": "oidc_requires_pkce"
+          },
+          {
+            "condition": {
+              "protocol": "ldap",
+              "tls_enabled": false
+            },
+            "description": "LDAP federation requires TLS.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ldap_tls_required",
+              "required_action": "enable_ldap_tls"
+            },
+            "name": "ldap_requires_tls"
+          },
+          {
+            "condition": {
+              "external_id_present": false,
+              "operation": "scim_sync"
+            },
+            "description": "SCIM identities require stable external IDs.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scim_external_id_required",
+              "required_action": "attach_external_id"
+            },
+            "name": "scim_requires_external_id"
+          },
+          {
+            "condition": {
+              "deprovisioning_completed": false,
+              "operation": "scim_deprovision"
+            },
+            "description": "SCIM user removal must deprovision sessions and mappings.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scim_deprovisioning_required",
+              "required_action": "complete_deprovisioning"
+            },
+            "name": "scim_deprovisioning_required"
+          },
+          {
+            "condition": {
+              "operation": "add_claim_mapping",
+              "source_claim_present": false
+            },
+            "description": "Claim mappings require a source claim.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_claim_required",
+              "required_action": "set_source_claim"
+            },
+            "name": "claim_mapping_requires_source"
+          },
+          {
+            "condition": {
+              "operation": "add_claim_mapping",
+              "target_claim_present": false
+            },
+            "description": "Claim mappings require a target claim.",
+            "effect": {
+              "decision": "deny",
+              "reason": "target_claim_required",
+              "required_action": "set_target_claim"
+            },
+            "name": "claim_mapping_requires_target"
+          },
+          {
+            "condition": {
+              "claim_mapping_reviewed": false,
+              "operation": "add_claim_mapping"
+            },
+            "description": "Claim mappings require review before activation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "claim_mapping_review_required",
+              "required_action": "review_claim_mapping"
+            },
+            "name": "claim_mapping_review_required"
+          },
+          {
+            "condition": {
+              "operation": "add_claim_mapping",
+              "privacy_review_recorded": false,
+              "sensitive_claim": true
+            },
+            "description": "Sensitive claims require privacy review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "sensitive_claim_privacy_review_required",
+              "required_action": "record_privacy_review"
+            },
+            "name": "sensitive_claim_mapping_requires_privacy_review"
           },
           {
             "condition": {
@@ -131,6 +399,112 @@
           },
           {
             "condition": {
+              "operation": "issue_session",
+              "provider_active": false
+            },
+            "description": "Sessions require an active provider.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_not_active",
+              "required_action": "activate_provider"
+            },
+            "name": "session_requires_active_provider"
+          },
+          {
+            "condition": {
+              "operation": "issue_session",
+              "session_hours_gt": 12
+            },
+            "description": "Federated sessions must stay within tenant duration limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "session_duration_exceeds_limit",
+              "required_action": "reduce_session_duration"
+            },
+            "name": "session_duration_within_limit"
+          },
+          {
+            "condition": {
+              "operation": "issue_session",
+              "reauth_completed": false,
+              "risk_score_gt": 0.7
+            },
+            "description": "High-risk federation sessions require reauthentication.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "high_risk_reauth_required",
+              "required_action": "complete_reauth"
+            },
+            "name": "high_risk_session_requires_reauth"
+          },
+          {
+            "condition": {
+              "operation": "revoke_session",
+              "reason_present": false
+            },
+            "description": "Session revocation requires a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "session_revocation_reason_required",
+              "required_action": "record_revocation_reason"
+            },
+            "name": "session_revocation_requires_reason"
+          },
+          {
+            "condition": {
+              "operation": "register_certificate",
+              "provider_present": false
+            },
+            "description": "Certificates require a tenant-local provider.",
+            "effect": {
+              "decision": "deny",
+              "reason": "certificate_provider_required",
+              "required_action": "select_provider"
+            },
+            "name": "certificate_requires_provider"
+          },
+          {
+            "condition": {
+              "key_present": false,
+              "operation": "register_certificate"
+            },
+            "description": "Certificates require a key identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "certificate_key_required",
+              "required_action": "attach_key"
+            },
+            "name": "certificate_requires_key"
+          },
+          {
+            "condition": {
+              "expiring_certificate_count_gt": 0,
+              "operation": "health_report",
+              "rotation_review_recorded": false
+            },
+            "description": "Expiring certificates require rotation review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "certificate_rotation_review_required",
+              "required_action": "review_certificate_rotation"
+            },
+            "name": "certificate_expiry_requires_review"
+          },
+          {
+            "condition": {
+              "new_key_present": false,
+              "operation": "rotate_certificate"
+            },
+            "description": "Certificate rotation requires a new key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "new_certificate_key_required",
+              "required_action": "attach_new_key"
+            },
+            "name": "certificate_rotation_requires_new_key"
+          },
+          {
+            "condition": {
               "metadata_age_hours_gt": 24,
               "metadata_refresh_completed": false
             },
@@ -141,6 +515,109 @@
               "required_action": "refresh_provider_metadata"
             },
             "name": "stale_metadata_requires_refresh"
+          },
+          {
+            "condition": {
+              "operation": "disable_provider",
+              "reason_present": false
+            },
+            "description": "Provider disablement requires a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_disable_reason_required",
+              "required_action": "record_disable_reason"
+            },
+            "name": "provider_disable_requires_reason"
+          },
+          {
+            "condition": {
+              "active_sessions_revoked": false,
+              "operation": "disable_provider"
+            },
+            "description": "Provider disablement requires active sessions to be revoked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_sessions_must_be_revoked",
+              "required_action": "revoke_provider_sessions"
+            },
+            "name": "provider_disable_revokes_sessions"
+          },
+          {
+            "condition": {
+              "operation": "decide_review",
+              "reviewer_same_as_requester": true
+            },
+            "description": "Federation reviews require an independent reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "independent_federation_review_required",
+              "required_action": "route_to_independent_reviewer"
+            },
+            "name": "review_requires_independent_reviewer"
+          },
+          {
+            "condition": {
+              "notes_present": false,
+              "operation": "decide_review"
+            },
+            "description": "Federation review decisions require notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "federation_review_notes_required",
+              "required_action": "record_review_notes"
+            },
+            "name": "review_decision_requires_notes"
+          },
+          {
+            "condition": {
+              "operation": "request_review",
+              "pending_review_exists": true
+            },
+            "description": "Duplicate pending federation reviews are blocked.",
+            "effect": {
+              "decision": "deny",
+              "reason": "federation_review_already_pending",
+              "required_action": "complete_existing_review"
+            },
+            "name": "duplicate_pending_review_blocked"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_federation_mutation"
+            },
+            "description": "Batch federation mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_federation_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Federation records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_federation_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_federation_access_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Federation state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "federation_audit_event_required",
+              "required_action": "record_federation_audit_event"
+            },
+            "name": "federation_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -161,6 +638,19 @@
         {
           "condition": {
             "operation": "register_provider",
+            "owner_present": false
+          },
+          "description": "Federation providers require an owning identity team or service.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_owner_required",
+            "required_action": "assign_provider_owner"
+          },
+          "name": "provider_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_provider",
             "signing_key_present": false
           },
           "description": "Federation providers require a signing key.",
@@ -170,6 +660,45 @@
             "required_action": "attach_signing_key"
           },
           "name": "provider_requires_signing_key"
+        },
+        {
+          "condition": {
+            "operation": "register_provider",
+            "protocol_enabled": false
+          },
+          "description": "Provider protocol must be enabled for the tenant.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_protocol_not_enabled",
+            "required_action": "enable_provider_protocol"
+          },
+          "name": "provider_protocol_must_be_enabled"
+        },
+        {
+          "condition": {
+            "metadata_present": false,
+            "operation": "register_provider"
+          },
+          "description": "Federation providers require metadata location or metadata payload evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "provider_metadata_required",
+            "required_action": "attach_metadata"
+          },
+          "name": "provider_metadata_url_required"
+        },
+        {
+          "condition": {
+            "metadata_signed": false,
+            "operation": "register_provider"
+          },
+          "description": "Provider metadata must be signed or independently verified.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "metadata_signature_required",
+            "required_action": "verify_metadata_signature"
+          },
+          "name": "provider_metadata_signature_required"
         },
         {
           "condition": {
@@ -186,6 +715,19 @@
         },
         {
           "condition": {
+            "protocol": "saml",
+            "response_signature_validated": false
+          },
+          "description": "SAML responses require signature validation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "saml_response_signature_required",
+            "required_action": "validate_saml_response_signature"
+          },
+          "name": "saml_requires_signed_response"
+        },
+        {
+          "condition": {
             "protocol": "oidc",
             "redirect_allowlist_configured": false
           },
@@ -196,6 +738,111 @@
             "required_action": "configure_redirect_allowlist"
           },
           "name": "oidc_client_requires_redirect_allowlist"
+        },
+        {
+          "condition": {
+            "pkce_required": false,
+            "protocol": "oidc"
+          },
+          "description": "OIDC public clients require PKCE.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pkce_required",
+            "required_action": "enable_pkce"
+          },
+          "name": "oidc_requires_pkce"
+        },
+        {
+          "condition": {
+            "protocol": "ldap",
+            "tls_enabled": false
+          },
+          "description": "LDAP federation requires TLS.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ldap_tls_required",
+            "required_action": "enable_ldap_tls"
+          },
+          "name": "ldap_requires_tls"
+        },
+        {
+          "condition": {
+            "external_id_present": false,
+            "operation": "scim_sync"
+          },
+          "description": "SCIM identities require stable external IDs.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scim_external_id_required",
+            "required_action": "attach_external_id"
+          },
+          "name": "scim_requires_external_id"
+        },
+        {
+          "condition": {
+            "deprovisioning_completed": false,
+            "operation": "scim_deprovision"
+          },
+          "description": "SCIM user removal must deprovision sessions and mappings.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scim_deprovisioning_required",
+            "required_action": "complete_deprovisioning"
+          },
+          "name": "scim_deprovisioning_required"
+        },
+        {
+          "condition": {
+            "operation": "add_claim_mapping",
+            "source_claim_present": false
+          },
+          "description": "Claim mappings require a source claim.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_claim_required",
+            "required_action": "set_source_claim"
+          },
+          "name": "claim_mapping_requires_source"
+        },
+        {
+          "condition": {
+            "operation": "add_claim_mapping",
+            "target_claim_present": false
+          },
+          "description": "Claim mappings require a target claim.",
+          "effect": {
+            "decision": "deny",
+            "reason": "target_claim_required",
+            "required_action": "set_target_claim"
+          },
+          "name": "claim_mapping_requires_target"
+        },
+        {
+          "condition": {
+            "claim_mapping_reviewed": false,
+            "operation": "add_claim_mapping"
+          },
+          "description": "Claim mappings require review before activation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "claim_mapping_review_required",
+            "required_action": "review_claim_mapping"
+          },
+          "name": "claim_mapping_review_required"
+        },
+        {
+          "condition": {
+            "operation": "add_claim_mapping",
+            "privacy_review_recorded": false,
+            "sensitive_claim": true
+          },
+          "description": "Sensitive claims require privacy review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "sensitive_claim_privacy_review_required",
+            "required_action": "record_privacy_review"
+          },
+          "name": "sensitive_claim_mapping_requires_privacy_review"
         },
         {
           "condition": {
@@ -212,6 +859,112 @@
         },
         {
           "condition": {
+            "operation": "issue_session",
+            "provider_active": false
+          },
+          "description": "Sessions require an active provider.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_not_active",
+            "required_action": "activate_provider"
+          },
+          "name": "session_requires_active_provider"
+        },
+        {
+          "condition": {
+            "operation": "issue_session",
+            "session_hours_gt": 12
+          },
+          "description": "Federated sessions must stay within tenant duration limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "session_duration_exceeds_limit",
+            "required_action": "reduce_session_duration"
+          },
+          "name": "session_duration_within_limit"
+        },
+        {
+          "condition": {
+            "operation": "issue_session",
+            "reauth_completed": false,
+            "risk_score_gt": 0.7
+          },
+          "description": "High-risk federation sessions require reauthentication.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "high_risk_reauth_required",
+            "required_action": "complete_reauth"
+          },
+          "name": "high_risk_session_requires_reauth"
+        },
+        {
+          "condition": {
+            "operation": "revoke_session",
+            "reason_present": false
+          },
+          "description": "Session revocation requires a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "session_revocation_reason_required",
+            "required_action": "record_revocation_reason"
+          },
+          "name": "session_revocation_requires_reason"
+        },
+        {
+          "condition": {
+            "operation": "register_certificate",
+            "provider_present": false
+          },
+          "description": "Certificates require a tenant-local provider.",
+          "effect": {
+            "decision": "deny",
+            "reason": "certificate_provider_required",
+            "required_action": "select_provider"
+          },
+          "name": "certificate_requires_provider"
+        },
+        {
+          "condition": {
+            "key_present": false,
+            "operation": "register_certificate"
+          },
+          "description": "Certificates require a key identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "certificate_key_required",
+            "required_action": "attach_key"
+          },
+          "name": "certificate_requires_key"
+        },
+        {
+          "condition": {
+            "expiring_certificate_count_gt": 0,
+            "operation": "health_report",
+            "rotation_review_recorded": false
+          },
+          "description": "Expiring certificates require rotation review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "certificate_rotation_review_required",
+            "required_action": "review_certificate_rotation"
+          },
+          "name": "certificate_expiry_requires_review"
+        },
+        {
+          "condition": {
+            "new_key_present": false,
+            "operation": "rotate_certificate"
+          },
+          "description": "Certificate rotation requires a new key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "new_certificate_key_required",
+            "required_action": "attach_new_key"
+          },
+          "name": "certificate_rotation_requires_new_key"
+        },
+        {
+          "condition": {
             "metadata_age_hours_gt": 24,
             "metadata_refresh_completed": false
           },
@@ -222,12 +975,116 @@
             "required_action": "refresh_provider_metadata"
           },
           "name": "stale_metadata_requires_refresh"
+        },
+        {
+          "condition": {
+            "operation": "disable_provider",
+            "reason_present": false
+          },
+          "description": "Provider disablement requires a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_disable_reason_required",
+            "required_action": "record_disable_reason"
+          },
+          "name": "provider_disable_requires_reason"
+        },
+        {
+          "condition": {
+            "active_sessions_revoked": false,
+            "operation": "disable_provider"
+          },
+          "description": "Provider disablement requires active sessions to be revoked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_sessions_must_be_revoked",
+            "required_action": "revoke_provider_sessions"
+          },
+          "name": "provider_disable_revokes_sessions"
+        },
+        {
+          "condition": {
+            "operation": "decide_review",
+            "reviewer_same_as_requester": true
+          },
+          "description": "Federation reviews require an independent reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "independent_federation_review_required",
+            "required_action": "route_to_independent_reviewer"
+          },
+          "name": "review_requires_independent_reviewer"
+        },
+        {
+          "condition": {
+            "notes_present": false,
+            "operation": "decide_review"
+          },
+          "description": "Federation review decisions require notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "federation_review_notes_required",
+            "required_action": "record_review_notes"
+          },
+          "name": "review_decision_requires_notes"
+        },
+        {
+          "condition": {
+            "operation": "request_review",
+            "pending_review_exists": true
+          },
+          "description": "Duplicate pending federation reviews are blocked.",
+          "effect": {
+            "decision": "deny",
+            "reason": "federation_review_already_pending",
+            "required_action": "complete_existing_review"
+          },
+          "name": "duplicate_pending_review_blocked"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_federation_mutation"
+          },
+          "description": "Batch federation mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_federation_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Federation records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_federation_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_federation_access_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Federation state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "federation_audit_event_required",
+            "required_action": "record_federation_audit_event"
+          },
+          "name": "federation_state_change_requires_audit"
         }
       ],
       "runtime": {
-        "api": "api.py",
+        "api_helpers": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "federation_runtime.py",
+        "service": "service.IdfdService",
         "views": "views.py"
       },
       "screens": {
@@ -261,6 +1118,21 @@
           "permission": "idfd:manage_providers",
           "route": "/idfd/providers"
         },
+        "reviews": {
+          "component": "FederationReviewQueue",
+          "permission": "idfd:review",
+          "route": "/idfd/reviews"
+        },
+        "risk": {
+          "component": "FederationRiskConsole",
+          "permission": "idfd:view",
+          "route": "/idfd/risk"
+        },
+        "scim": {
+          "component": "SCIMDirectory",
+          "permission": "idfd:manage_providers",
+          "route": "/idfd/scim"
+        },
         "sessions": {
           "component": "FederatedSessions",
           "permission": "idfd:view",
@@ -272,9 +1144,15 @@
           "route": "/idfd/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "identity-chip",
+            "visual": "event-timeline"
+          },
           "certificate_timeline": {
             "status_style": "expiry-chip",
             "visual": "rotation-timeline"
@@ -291,6 +1169,22 @@
             "icon": "network",
             "risk_style": "metadata-band",
             "status_indicator": "provider-pill"
+          },
+          "review_queue": {
+            "status_style": "review-chip",
+            "visual": "decision-lane"
+          },
+          "risk_console": {
+            "status_style": "reauth-chip",
+            "visual": "risk-lanes"
+          },
+          "scim_directory": {
+            "status_style": "sync-chip",
+            "visual": "directory-tree"
+          },
+          "session_monitor": {
+            "status_style": "risk-chip",
+            "visual": "session-list"
           }
         },
         "name": "idfd_federation_console",
@@ -355,6 +1249,27 @@
             "permission": "idfd:rotate_keys"
           },
           {
+            "component": "SCIMDirectory",
+            "name": "scim",
+            "nav_group": "Directory",
+            "path": "/idfd/scim",
+            "permission": "idfd:manage_providers"
+          },
+          {
+            "component": "FederationRiskConsole",
+            "name": "risk",
+            "nav_group": "Operations",
+            "path": "/idfd/risk",
+            "permission": "idfd:view"
+          },
+          {
+            "component": "FederationReviewQueue",
+            "name": "reviews",
+            "nav_group": "Governance",
+            "path": "/idfd/reviews",
+            "permission": "idfd:review"
+          },
+          {
             "component": "FederationAudit",
             "name": "audit",
             "nav_group": "Governance",
@@ -382,19 +1297,60 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "idfd": []
+      "idfd": [
+        "auth",
+        "mfau",
+        "encr"
+      ]
     }
   },
   "contracts": {
     "idfd": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "authentication": "auth",
+          "cache": "cach",
+          "encryption": "encr",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.IdfdService",
+          "helper_runtime": "federation_runtime.py",
+          "key_management": "keym",
+          "mfa_provider": "mfau",
+          "monitoring": "moni",
+          "production_api": "api.py",
+          "production_runtime": "service.py",
+          "production_views": "views.py",
+          "security_framework": "secu",
+          "view_models": "views.py"
+        },
+        "certificates": {
+          "active_certificate_required": true,
+          "expiry_review_days": 30,
+          "revocation_supported": true,
+          "rotation_days": 90
+        },
+        "claims": {
+          "claim_mapping_review_required": true,
+          "sensitive_claim_review_required": true,
+          "source_claim_required": true,
+          "target_claim_required": true
+        },
         "governance": {
           "audit_federation_events": true,
           "certificate_rotation_days": 90,
           "claim_mapping_review_required": true,
           "require_tenant_context": true
         },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
         "protocols": {
+          "ldap_tls_required": true,
           "oidc_redirect_allowlist_required": true,
           "pkce_required": true,
           "saml_assertion_encryption_required": true,
@@ -408,10 +1364,28 @@
             "scim"
           ],
           "metadata_refresh_hours": 24,
+          "provider_disable_supported": true,
           "provider_owner_required": true,
           "signing_key_required": true
         },
+        "reviews": {
+          "duplicate_pending_review_blocked": true,
+          "independent_reviewer_required": true,
+          "review_notes_required": true
+        },
+        "scim": {
+          "deprovisioning_required": true,
+          "external_id_required": true,
+          "group_sync_enabled": true
+        },
+        "security": {
+          "deny_unencrypted_saml": true,
+          "deny_unlisted_oidc_redirects": true,
+          "signed_metadata_required": true,
+          "tenant_isolation_required": true
+        },
         "sessions": {
+          "high_risk_reauth_threshold": 0.7,
           "max_session_hours": 12,
           "privileged_mfa_required": true,
           "risk_based_reauth_enabled": true,
@@ -423,17 +1397,28 @@
           "default_theme": "idfd_federation_console"
         },
         "ui": {
+          "enable_audit": true,
           "enable_certificate_center": true,
+          "enable_claim_mapping": true,
+          "enable_dashboard": true,
           "enable_protocol_workbench": true,
           "enable_provider_console": true,
-          "enable_session_monitor": true
+          "enable_review_queue": true,
+          "enable_risk_console": true,
+          "enable_scim_directory": true,
+          "enable_session_monitor": true,
+          "enable_settings": true
         }
       },
       "id": "idfd",
       "provides": [
         "idfd_operations"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "mfau",
+        "encr"
+      ]
     }
   },
   "deployment": {
@@ -445,7 +1430,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -466,6 +1451,176 @@
   },
   "roles": {},
   "rules": {
+    "batch_federation_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_federation_mutation"
+      },
+      "description": "Batch federation mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_federation_mutation_requires_bytewax"
+    },
+    "certificate_expiry_requires_review": {
+      "condition": {
+        "expiring_certificate_count_gt": 0,
+        "operation": "health_report",
+        "rotation_review_recorded": false
+      },
+      "description": "Expiring certificates require rotation review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "certificate_rotation_review_required",
+        "required_action": "review_certificate_rotation"
+      },
+      "name": "certificate_expiry_requires_review"
+    },
+    "certificate_requires_key": {
+      "condition": {
+        "key_present": false,
+        "operation": "register_certificate"
+      },
+      "description": "Certificates require a key identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "certificate_key_required",
+        "required_action": "attach_key"
+      },
+      "name": "certificate_requires_key"
+    },
+    "certificate_requires_provider": {
+      "condition": {
+        "operation": "register_certificate",
+        "provider_present": false
+      },
+      "description": "Certificates require a tenant-local provider.",
+      "effect": {
+        "decision": "deny",
+        "reason": "certificate_provider_required",
+        "required_action": "select_provider"
+      },
+      "name": "certificate_requires_provider"
+    },
+    "certificate_rotation_requires_new_key": {
+      "condition": {
+        "new_key_present": false,
+        "operation": "rotate_certificate"
+      },
+      "description": "Certificate rotation requires a new key.",
+      "effect": {
+        "decision": "deny",
+        "reason": "new_certificate_key_required",
+        "required_action": "attach_new_key"
+      },
+      "name": "certificate_rotation_requires_new_key"
+    },
+    "claim_mapping_requires_source": {
+      "condition": {
+        "operation": "add_claim_mapping",
+        "source_claim_present": false
+      },
+      "description": "Claim mappings require a source claim.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_claim_required",
+        "required_action": "set_source_claim"
+      },
+      "name": "claim_mapping_requires_source"
+    },
+    "claim_mapping_requires_target": {
+      "condition": {
+        "operation": "add_claim_mapping",
+        "target_claim_present": false
+      },
+      "description": "Claim mappings require a target claim.",
+      "effect": {
+        "decision": "deny",
+        "reason": "target_claim_required",
+        "required_action": "set_target_claim"
+      },
+      "name": "claim_mapping_requires_target"
+    },
+    "claim_mapping_review_required": {
+      "condition": {
+        "claim_mapping_reviewed": false,
+        "operation": "add_claim_mapping"
+      },
+      "description": "Claim mappings require review before activation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "claim_mapping_review_required",
+        "required_action": "review_claim_mapping"
+      },
+      "name": "claim_mapping_review_required"
+    },
+    "cross_tenant_federation_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Federation records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_federation_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_federation_access_denied"
+    },
+    "duplicate_pending_review_blocked": {
+      "condition": {
+        "operation": "request_review",
+        "pending_review_exists": true
+      },
+      "description": "Duplicate pending federation reviews are blocked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "federation_review_already_pending",
+        "required_action": "complete_existing_review"
+      },
+      "name": "duplicate_pending_review_blocked"
+    },
+    "federation_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Federation state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "federation_audit_event_required",
+        "required_action": "record_federation_audit_event"
+      },
+      "name": "federation_state_change_requires_audit"
+    },
+    "high_risk_session_requires_reauth": {
+      "condition": {
+        "operation": "issue_session",
+        "reauth_completed": false,
+        "risk_score_gt": 0.7
+      },
+      "description": "High-risk federation sessions require reauthentication.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "high_risk_reauth_required",
+        "required_action": "complete_reauth"
+      },
+      "name": "high_risk_session_requires_reauth"
+    },
+    "ldap_requires_tls": {
+      "condition": {
+        "protocol": "ldap",
+        "tls_enabled": false
+      },
+      "description": "LDAP federation requires TLS.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ldap_tls_required",
+        "required_action": "enable_ldap_tls"
+      },
+      "name": "ldap_requires_tls"
+    },
     "oidc_client_requires_redirect_allowlist": {
       "condition": {
         "protocol": "oidc",
@@ -478,6 +1633,19 @@
         "required_action": "configure_redirect_allowlist"
       },
       "name": "oidc_client_requires_redirect_allowlist"
+    },
+    "oidc_requires_pkce": {
+      "condition": {
+        "pkce_required": false,
+        "protocol": "oidc"
+      },
+      "description": "OIDC public clients require PKCE.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pkce_required",
+        "required_action": "enable_pkce"
+      },
+      "name": "oidc_requires_pkce"
     },
     "privileged_federation_requires_mfa": {
       "condition": {
@@ -492,6 +1660,84 @@
       },
       "name": "privileged_federation_requires_mfa"
     },
+    "provider_disable_requires_reason": {
+      "condition": {
+        "operation": "disable_provider",
+        "reason_present": false
+      },
+      "description": "Provider disablement requires a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_disable_reason_required",
+        "required_action": "record_disable_reason"
+      },
+      "name": "provider_disable_requires_reason"
+    },
+    "provider_disable_revokes_sessions": {
+      "condition": {
+        "active_sessions_revoked": false,
+        "operation": "disable_provider"
+      },
+      "description": "Provider disablement requires active sessions to be revoked.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_sessions_must_be_revoked",
+        "required_action": "revoke_provider_sessions"
+      },
+      "name": "provider_disable_revokes_sessions"
+    },
+    "provider_metadata_signature_required": {
+      "condition": {
+        "metadata_signed": false,
+        "operation": "register_provider"
+      },
+      "description": "Provider metadata must be signed or independently verified.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "metadata_signature_required",
+        "required_action": "verify_metadata_signature"
+      },
+      "name": "provider_metadata_signature_required"
+    },
+    "provider_metadata_url_required": {
+      "condition": {
+        "metadata_present": false,
+        "operation": "register_provider"
+      },
+      "description": "Federation providers require metadata location or metadata payload evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "provider_metadata_required",
+        "required_action": "attach_metadata"
+      },
+      "name": "provider_metadata_url_required"
+    },
+    "provider_protocol_must_be_enabled": {
+      "condition": {
+        "operation": "register_provider",
+        "protocol_enabled": false
+      },
+      "description": "Provider protocol must be enabled for the tenant.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_protocol_not_enabled",
+        "required_action": "enable_provider_protocol"
+      },
+      "name": "provider_protocol_must_be_enabled"
+    },
+    "provider_requires_owner": {
+      "condition": {
+        "operation": "register_provider",
+        "owner_present": false
+      },
+      "description": "Federation providers require an owning identity team or service.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_owner_required",
+        "required_action": "assign_provider_owner"
+      },
+      "name": "provider_requires_owner"
+    },
     "provider_requires_signing_key": {
       "condition": {
         "operation": "register_provider",
@@ -505,6 +1751,32 @@
       },
       "name": "provider_requires_signing_key"
     },
+    "review_decision_requires_notes": {
+      "condition": {
+        "notes_present": false,
+        "operation": "decide_review"
+      },
+      "description": "Federation review decisions require notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "federation_review_notes_required",
+        "required_action": "record_review_notes"
+      },
+      "name": "review_decision_requires_notes"
+    },
+    "review_requires_independent_reviewer": {
+      "condition": {
+        "operation": "decide_review",
+        "reviewer_same_as_requester": true
+      },
+      "description": "Federation reviews require an independent reviewer.",
+      "effect": {
+        "decision": "deny",
+        "reason": "independent_federation_review_required",
+        "required_action": "route_to_independent_reviewer"
+      },
+      "name": "review_requires_independent_reviewer"
+    },
     "saml_assertion_requires_encryption": {
       "condition": {
         "assertion_encrypted": false,
@@ -517,6 +1789,98 @@
         "required_action": "enable_assertion_encryption"
       },
       "name": "saml_assertion_requires_encryption"
+    },
+    "saml_requires_signed_response": {
+      "condition": {
+        "protocol": "saml",
+        "response_signature_validated": false
+      },
+      "description": "SAML responses require signature validation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "saml_response_signature_required",
+        "required_action": "validate_saml_response_signature"
+      },
+      "name": "saml_requires_signed_response"
+    },
+    "scim_deprovisioning_required": {
+      "condition": {
+        "deprovisioning_completed": false,
+        "operation": "scim_deprovision"
+      },
+      "description": "SCIM user removal must deprovision sessions and mappings.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scim_deprovisioning_required",
+        "required_action": "complete_deprovisioning"
+      },
+      "name": "scim_deprovisioning_required"
+    },
+    "scim_requires_external_id": {
+      "condition": {
+        "external_id_present": false,
+        "operation": "scim_sync"
+      },
+      "description": "SCIM identities require stable external IDs.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scim_external_id_required",
+        "required_action": "attach_external_id"
+      },
+      "name": "scim_requires_external_id"
+    },
+    "sensitive_claim_mapping_requires_privacy_review": {
+      "condition": {
+        "operation": "add_claim_mapping",
+        "privacy_review_recorded": false,
+        "sensitive_claim": true
+      },
+      "description": "Sensitive claims require privacy review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "sensitive_claim_privacy_review_required",
+        "required_action": "record_privacy_review"
+      },
+      "name": "sensitive_claim_mapping_requires_privacy_review"
+    },
+    "session_duration_within_limit": {
+      "condition": {
+        "operation": "issue_session",
+        "session_hours_gt": 12
+      },
+      "description": "Federated sessions must stay within tenant duration limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_duration_exceeds_limit",
+        "required_action": "reduce_session_duration"
+      },
+      "name": "session_duration_within_limit"
+    },
+    "session_requires_active_provider": {
+      "condition": {
+        "operation": "issue_session",
+        "provider_active": false
+      },
+      "description": "Sessions require an active provider.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_not_active",
+        "required_action": "activate_provider"
+      },
+      "name": "session_requires_active_provider"
+    },
+    "session_revocation_requires_reason": {
+      "condition": {
+        "operation": "revoke_session",
+        "reason_present": false
+      },
+      "description": "Session revocation requires a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "session_revocation_reason_required",
+        "required_action": "record_revocation_reason"
+      },
+      "name": "session_revocation_requires_reason"
     },
     "stale_metadata_requires_refresh": {
       "condition": {
@@ -546,7 +1910,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "federation_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.idfd": {

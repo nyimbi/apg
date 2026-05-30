@@ -14848,3 +14848,60 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Load, latency, match-quality, liveness-quality, privacy, authorization,
   accuracy, bias, and throughput benchmarks.
+
+### 2026-05-30 12:21 EAT
+
+IDFD lifecycle and guardrail packet:
+
+- Selected `capabilities/common/idfd` as the next common capability after FREC
+  in the development order.
+- Added root `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a pointer to the active specification.
+- Expanded the IDFD contract to cover providers, protocols, claims, sessions,
+  SCIM, certificates, reviews, security, governance, observability, adapters,
+  UI routes, and visual theme tokens.
+- Expanded deterministic guardrails to 35 rules covering tenant context,
+  provider ownership, signing keys, enabled protocols, metadata evidence,
+  metadata signatures, SAML encryption, SAML response signatures, OIDC redirect
+  allowlists, OIDC PKCE, LDAP TLS, SCIM external IDs, SCIM deprovisioning,
+  claim mapping, sensitive claims, privileged MFA, active providers, session
+  duration, high-risk reauthentication, session revocation reasons,
+  certificates, certificate rotation, stale metadata, provider disablement,
+  review requirements, Bytewax batch mutation, tenant isolation, and audit
+  requirements.
+- Hardened `IdfdService` to key providers, mappings, sessions, certificates,
+  health reports, and audit events by tenant and record ID.
+- Added cross-tenant access denial for tenant-local provider/session lookups.
+- Expanded view helpers for SCIM directory, risk console, review queue, audit,
+  and settings payloads.
+- Replaced static `app.py` evidence with a contract-derived semantic model and
+  self-test that checks rule count, route count, Bytewax event streaming, and
+  generated runtime metadata.
+- Updated capability registration with richer provides, permissions, endpoints,
+  optional dependencies, and adapter evidence.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Renamed the focused package test away from stale materialized terminology.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/idfd/__init__.py capabilities/common/idfd/capability_contract.py capabilities/common/idfd/federation_runtime.py capabilities/common/idfd/models.py capabilities/common/idfd/service.py capabilities/common/idfd/api.py capabilities/common/idfd/views.py capabilities/common/idfd/app.py capabilities/common/idfd/test_capability_contract.py capabilities/common/idfd/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/idfd/test_capability_contract.py capabilities/common/idfd/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and IDFD capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/idfd --json` passed with `ok: true`; IDFD remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/idfd --json` passed with 11 UI routes, 35 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/idfd/README.md capabilities/common/idfd/SPECIFICATION.md capabilities/common/idfd/PLAN.md capabilities/common/idfd/cap_spec.md capabilities/common/idfd/__init__.py capabilities/common/idfd/capability_contract.py capabilities/common/idfd/federation_runtime.py capabilities/common/idfd/models.py capabilities/common/idfd/service.py capabilities/common/idfd/api.py capabilities/common/idfd/views.py capabilities/common/idfd/app.py capabilities/common/idfd/test_capability_contract.py capabilities/common/idfd/tests/test_package_contract.py capabilities/common/idfd/package_manifest.json capabilities/common/idfd/release_report.json capabilities/common/idfd/semantic_model.json` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/idfd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live SAML/OIDC/LDAP/SCIM provider handshakes, conformance suites, or IdP
+  interoperability tests.
+- Browser-rendered UI behavior.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, MFAU, ENCR, AUDL, SECU, KEYM, MONI, CACH, ZTNA, or MTEN
+  adapters.
+- Security certification, federation interoperability, load, latency,
+  authorization, replay, and throughput benchmarks.

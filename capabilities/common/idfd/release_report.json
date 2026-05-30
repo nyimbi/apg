@@ -4,13 +4,25 @@
       "capability_contract": {
         "display_name": "Identity Federation",
         "errors": [],
-        "route_count": 8,
-        "rule_count": 6
+        "route_count": 11,
+        "rule_count": 35
       }
+    },
+    "runtime": {
+      "event_stream": "bytewax",
+      "generated_app_runtime": "service.IdfdService",
+      "helper_runtime": "federation_runtime.py"
     },
     "self_test": {
       "capability": "idfd",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

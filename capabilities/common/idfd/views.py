@@ -71,9 +71,47 @@ def certificate_center_model(service: IdfdService, tenant_id: str = "default") -
 	}
 
 
+def scim_directory_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/idfd/scim",
+		"providers": [provider for provider in service.list_providers(tenant_id) if provider["protocol"] == "scim"],
+		"guardrails": ["scim_requires_external_id", "scim_deprovisioning_required"],
+		"theme_component": "scim_directory",
+	}
+
+
+def risk_console_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
+	sessions = service.list_sessions(tenant_id)
+	return {
+		"route": "/idfd/risk",
+		"high_risk_sessions": [session for session in sessions if session["risk_score"] > 0.7],
+		"session_count": len(sessions),
+		"theme_component": "risk_console",
+	}
+
+
+def review_queue_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/idfd/reviews",
+		"review_rules": [rule for rule in contract["rule_engine"]["rules"] if rule["effect"]["decision"] == "require_review"],
+		"health_reports": service.list_health_reports(tenant_id),
+		"theme_component": "review_queue",
+	}
+
+
 def audit_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
 	return {
 		"route": "/idfd/audit",
 		"events": service.list_audit_events(tenant_id),
 		"health_reports": service.list_health_reports(tenant_id),
+		"theme_component": "audit_timeline",
+	}
+
+
+def settings_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/idfd/settings",
+		"configuration": service.describe(tenant_id)["configuration"],
+		"theme": service.describe(tenant_id)["theme"],
 	}
