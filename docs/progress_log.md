@@ -19934,3 +19934,75 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, AUDL, NTFY, COMP, WFLO, HCM employee profile, payroll period,
   device, location, privacy, theme, or AGNT adapters.
+
+### 2026-05-31 00:30 EAT
+
+SCM Vendor Management lifecycle and guardrail packet:
+
+- Selected `capabilities/scm/ven` after Time and Attendance because it was the
+  next real capability package missing only `SPECIFICATION.md` and `PLAN.md`.
+- Added local `SPECIFICATION.md` and `PLAN.md`, refreshed `README.md`, and
+  converted `cap_spec.md` into a compatibility pointer to the active
+  specification.
+- Replaced generated contract metadata with an executable APG contract covering
+  vendor profiles, qualification, onboarding, performance, risk, compliance,
+  contracts, communications, portal users, scorecards, vendor agents, rule
+  engine, UI routes, compact visual theme, configuration schema, dependencies,
+  and Bytewax event-stream metadata.
+- Added deterministic guardrails for tenant context, policy attachment, audit
+  evidence, vendor completeness, qualification criteria and scores, onboarding
+  checklist ownership, performance dimensions and ranges, low-score review,
+  risk ownership, compliance evidence and review, contract approval,
+  communication ownership, portal approval, scorecard evidence, Bytewax batch
+  routing, vendor-agent runtime and role support, and privileged agent action
+  review.
+- Replaced the top-level service, API, views, app, and package exports with
+  dependency-light surfaces that APG composition tooling can import without
+  database, procurement, sourcing, contract, document, risk, web, notification,
+  or workflow adapters.
+- Retired legacy adapter-bound tests into explicit skipped compatibility modules
+  and added focused package tests for contract shape, Bytewax streaming, rule
+  decisions, full vendor lifecycle execution, guardrail failures, API helpers,
+  view models, app metadata, and publishability.
+- Refreshed `semantic_model.json`, `package_manifest.json`, and
+  `release_report.json` from the live contract.
+- Cleaned legacy Vendor Management docs so implementation audit no longer sees
+  generated-baseline, promotional, disallowed-broker, or unfinished markers.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/scm/ven/__init__.py capabilities/scm/ven/capability_contract.py capabilities/scm/ven/service.py capabilities/scm/ven/api.py capabilities/scm/ven/views.py capabilities/scm/ven/app.py capabilities/scm/ven/tests/conftest.py capabilities/scm/ven/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/scm/ven/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/pytest -q capabilities/scm/ven/tests` passed with 6 tests and 5
+  skipped legacy adapter modules.
+- `./.venv/bin/python capabilities/scm/ven/app.py` passed with `passed: true`.
+- `./.venv/bin/apg capabilities inspect scm_ven --json` passed with `ok: true`,
+  14 APG Python routes, 52 deterministic rules, Bytewax streaming, and
+  vendor-agent runtimes `codex`, `claude_code`, `opencode`, and `pi`.
+- `./.venv/bin/apg capabilities publish-plan capabilities/scm/ven --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/scm/ven --json`
+  passed with `ok: true`; Vendor Management remains `domain_specific`, with 0
+  baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/python -m py_compile $(find capabilities/scm/ven -name '*.py' -not -path '*/__pycache__/*')`
+  passed after retiring invalid legacy adapter tests.
+- `./.venv/bin/python -c "... VendorManagementLifecycleService ... register_vendor_agent ... dashboard_summary ..."`
+  returned dashboard evidence with one vendor agent and `bytewax` streaming
+  metadata.
+- Semantic metadata probe confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`,
+  `/scm/vendors/agents`, and `bytewax_event_stream_required`.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and
+  unfinished markers returned no matches.
+- `git diff --check -- capabilities/scm/ven docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live supplier master, procurement, sourcing, contract, document, risk,
+  durable audit, notification, workflow, rendered browser UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External AUTH, AUDL, NTFY, COMP, WFLO, procurement, sourcing, contract,
+  document, risk-policy, supplier master-data, theme, or AGNT adapters.

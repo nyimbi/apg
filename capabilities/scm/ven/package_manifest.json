@@ -4,7 +4,7 @@
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,40 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 14,
+  "rule_count": 52,
+  "streaming": {
+    "events": [
+      "vendor_created",
+      "vendor_qualified",
+      "vendor_onboarded",
+      "vendor_performance_recorded",
+      "vendor_risk_recorded",
+      "vendor_compliance_recorded",
+      "vendor_contract_created",
+      "vendor_communication_recorded",
+      "vendor_portal_user_created",
+      "vendor_scorecard_created",
+      "vendor_agent_registered"
+    ],
+    "guardrails": [
+      "vendor_batch_requires_bytewax",
+      "vendor_risk_owner_required",
+      "vendor_agent_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "prospect",
+      "onboarding",
+      "qualified",
+      "active",
+      "suspended",
+      "offboarding",
+      "archived",
+      "blocked"
+    ],
+    "stream": "apg.scm.ven.lifecycle"
+  },
+  "version": "2.1.0"
 }

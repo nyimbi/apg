@@ -1,60 +1,202 @@
 {
-  "agents": {},
   "app": {
     "description": "Vendor Management package-backed APG capability",
-    "entity_count": 0,
+    "entity_count": 11,
     "name": "scm_ven",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "scm_ven": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Scm",
-          "enabled": true,
-          "id": "scm_ven",
-          "name": "Vendor Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/scm/ven/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "contracts": "adapter",
+          "documents": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "procurement": "adapter",
+          "risk_policy": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "communications": {
+          "channel_required": true,
+          "owner_required_for_negative_sentiment": true,
+          "subject_required": true
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required_for_noncompliance": true,
+          "supported_statuses": [
+            "pending",
+            "compliant",
+            "review_required",
+            "non_compliant",
+            "expired"
+          ]
+        },
+        "contracts": {
+          "approval_required": true,
+          "currency_required": true,
+          "date_range_required": true,
+          "value_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_compliance_events": true,
+          "emit_contract_events": true,
+          "emit_performance_events": true,
+          "emit_risk_events": true,
+          "emit_vendor_events": true,
+          "event_stream": "apg.scm.ven.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "onboarding": {
+          "checklist_required": true,
+          "owner_required": true,
+          "vendor_required": true
+        },
+        "performance": {
+          "period_required": true,
+          "review_required_below": 60,
+          "score_range": [
+            0,
+            100
+          ],
+          "supported_dimensions": [
+            "quality",
+            "delivery",
+            "cost",
+            "service",
+            "sustainability",
+            "innovation"
+          ]
+        },
+        "portal": {
+          "approval_required": true,
+          "email_required": true,
+          "role_required": true
+        },
+        "qualification": {
+          "criteria_required": true,
+          "minimum_score": 70,
+          "qualified_by_required": true
+        },
+        "risk": {
+          "owner_required_for_high_or_critical": true,
+          "supported_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "scorecards": {
+          "generator_required": true,
+          "performance_required": true,
+          "risk_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "scm_ven_operations"
+          "default_theme": "vendor_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_compliance": true,
+          "enable_contracts": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_onboarding": true,
+          "enable_performance": true,
+          "enable_portal": true,
+          "enable_qualification": true,
+          "enable_risk": true,
+          "enable_scorecards": true,
+          "enable_settings": true,
+          "enable_vendors": true
+        },
+        "vendor_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "vendor_onboarding_reviewer",
+            "risk_reviewer",
+            "performance_reviewer",
+            "compliance_reviewer",
+            "contract_reviewer",
+            "supplier_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "vendors": {
+          "category_required": true,
+          "code_required": true,
+          "country_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "manufacturer",
+            "distributor",
+            "service_provider",
+            "contractor",
+            "consultant",
+            "logistics",
+            "technology",
+            "financial",
+            "public_sector",
+            "nonprofit"
+          ]
         }
       },
-      "erp_modules": [
-        "scm"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Vendor Management",
       "provides": [
-        "scm_ven_operations"
+        "vendor_profile_lifecycle",
+        "vendor_onboarding_workflow",
+        "vendor_qualification_lifecycle",
+        "vendor_performance_lifecycle",
+        "vendor_risk_lifecycle",
+        "vendor_contract_lifecycle",
+        "vendor_compliance_lifecycle",
+        "vendor_communication_lifecycle",
+        "vendor_portal_lifecycle",
+        "vendor_scorecard_service",
+        "vendor_sourcing_integration",
+        "vendor_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "procurement_requisition_lifecycle",
+        "sourcing_event_lifecycle",
+        "contract_lifecycle",
+        "document_management",
+        "risk_policy",
+        "supplier_master_data"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Vendor Management operations require tenant context.",
+            "description": "Vendor operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,7 +209,7 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Vendor Management write operations require policy enforcement.",
+            "description": "Vendor write operations require policy enforcement.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
@@ -77,16 +219,659 @@
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "code_present": false,
+              "operation": "create_vendor"
             },
-            "description": "High-risk Vendor Management operations require review.",
+            "description": "Vendors require a code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_code_required",
+              "required_action": "provide_vendor_code"
+            },
+            "name": "vendor_code_required"
+          },
+          {
+            "condition": {
+              "name_present": false,
+              "operation": "create_vendor"
+            },
+            "description": "Vendors require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_name_required",
+              "required_action": "provide_vendor_name"
+            },
+            "name": "vendor_name_required"
+          },
+          {
+            "condition": {
+              "operation": "create_vendor",
+              "vendor_type_supported": false
+            },
+            "description": "Vendors must use a supported type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_type_not_supported",
+              "required_action": "choose_supported_vendor_type"
+            },
+            "name": "vendor_type_supported"
+          },
+          {
+            "condition": {
+              "category_present": false,
+              "operation": "create_vendor"
+            },
+            "description": "Vendors require a category.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_category_required",
+              "required_action": "provide_category"
+            },
+            "name": "vendor_category_required"
+          },
+          {
+            "condition": {
+              "country_present": false,
+              "operation": "create_vendor"
+            },
+            "description": "Vendors require a country.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_country_required",
+              "required_action": "provide_country"
+            },
+            "name": "vendor_country_required"
+          },
+          {
+            "condition": {
+              "operation": "create_vendor",
+              "owner_present": false
+            },
+            "description": "Vendors require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "vendor_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "qualify_vendor",
+              "vendor_present": false
+            },
+            "description": "Qualification requires an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "qualification_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "qualification_vendor_required"
+          },
+          {
+            "condition": {
+              "criteria_present": false,
+              "operation": "qualify_vendor"
+            },
+            "description": "Qualification requires criteria.",
+            "effect": {
+              "decision": "deny",
+              "reason": "qualification_criteria_required",
+              "required_action": "attach_criteria"
+            },
+            "name": "qualification_criteria_required"
+          },
+          {
+            "condition": {
+              "operation": "qualify_vendor",
+              "qualified_by_present": false
+            },
+            "description": "Qualification requires a reviewer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "qualification_reviewer_required",
+              "required_action": "record_reviewer"
+            },
+            "name": "qualification_actor_required"
+          },
+          {
+            "condition": {
+              "operation": "qualify_vendor",
+              "score_present": false
+            },
+            "description": "Qualification requires a score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "qualification_score_required",
+              "required_action": "provide_score"
+            },
+            "name": "qualification_score_required"
+          },
+          {
+            "condition": {
+              "operation": "qualify_vendor",
+              "review_recorded": false,
+              "score_below_threshold": true
+            },
+            "description": "Low qualification scores require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "qualification_review_required",
+              "required_action": "record_qualification_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "qualification_score_threshold"
+          },
+          {
+            "condition": {
+              "operation": "onboard_vendor",
+              "vendor_present": false
+            },
+            "description": "Onboarding requires an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "onboarding_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "onboarding_vendor_required"
+          },
+          {
+            "condition": {
+              "checklist_present": false,
+              "operation": "onboard_vendor"
+            },
+            "description": "Onboarding requires checklist evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "onboarding_checklist_required",
+              "required_action": "attach_checklist"
+            },
+            "name": "onboarding_checklist_required"
+          },
+          {
+            "condition": {
+              "operation": "onboard_vendor",
+              "owner_present": false
+            },
+            "description": "Onboarding requires an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "onboarding_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "onboarding_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "record_performance",
+              "vendor_present": false
+            },
+            "description": "Performance records require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "performance_vendor_required"
+          },
+          {
+            "condition": {
+              "operation": "record_performance",
+              "period_present": false
+            },
+            "description": "Performance records require a period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_period_required",
+              "required_action": "provide_period"
+            },
+            "name": "performance_period_required"
+          },
+          {
+            "condition": {
+              "dimensions_supported": false,
+              "operation": "record_performance"
+            },
+            "description": "Performance dimensions must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_dimension_not_supported",
+              "required_action": "choose_supported_dimensions"
+            },
+            "name": "performance_dimensions_supported"
+          },
+          {
+            "condition": {
+              "operation": "record_performance",
+              "scores_in_range": false
+            },
+            "description": "Performance scores must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "performance_score_out_of_range",
+              "required_action": "correct_scores"
+            },
+            "name": "performance_scores_in_range"
+          },
+          {
+            "condition": {
+              "low_score": true,
+              "operation": "record_performance",
+              "review_recorded": false
+            },
+            "description": "Low performance scores require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "performance_review_required",
+              "required_action": "record_performance_review"
+            },
+            "name": "performance_low_score_review"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "vendor_present": false
+            },
+            "description": "Risk records require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "risk_vendor_required"
+          },
+          {
+            "condition": {
+              "operation": "record_risk",
+              "risk_tier_supported": false
+            },
+            "description": "Risk tier must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_tier_not_supported",
+              "required_action": "choose_supported_risk_tier"
+            },
+            "name": "risk_tier_supported"
+          },
+          {
+            "condition": {
+              "description_present": false,
+              "operation": "record_risk"
+            },
+            "description": "Risk records require description.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_description_required",
+              "required_action": "provide_description"
+            },
+            "name": "risk_description_required"
+          },
+          {
+            "condition": {
+              "high_or_critical": true,
+              "operation": "record_risk",
+              "owner_present": false
+            },
+            "description": "High or critical risks require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "risk_owner_required",
+              "required_action": "assign_risk_owner"
+            },
+            "name": "risk_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance",
+              "vendor_present": false
+            },
+            "description": "Compliance records require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "compliance_vendor_required"
+          },
+          {
+            "condition": {
+              "framework_present": false,
+              "operation": "record_compliance"
+            },
+            "description": "Compliance records require framework.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_framework_required",
+              "required_action": "provide_framework"
+            },
+            "name": "compliance_framework_required"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance",
+              "status_supported": false
+            },
+            "description": "Compliance status must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_status_not_supported",
+              "required_action": "choose_supported_status"
+            },
+            "name": "compliance_status_supported"
+          },
+          {
+            "condition": {
+              "evidence_present": false,
+              "operation": "record_compliance"
+            },
+            "description": "Compliance records require evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_evidence_required",
+              "required_action": "attach_evidence"
+            },
+            "name": "compliance_evidence_required"
+          },
+          {
+            "condition": {
+              "operation": "record_compliance",
+              "review_recorded": false,
+              "review_required": true
+            },
+            "description": "Noncompliant or expired compliance requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "compliance_review_required",
+              "required_action": "record_compliance_review"
+            },
+            "name": "compliance_review_required"
+          },
+          {
+            "condition": {
+              "operation": "create_contract",
+              "vendor_present": false
+            },
+            "description": "Vendor contracts require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "contract_vendor_required"
+          },
+          {
+            "condition": {
+              "operation": "create_contract",
+              "value_present": false
+            },
+            "description": "Vendor contracts require value.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_value_required",
+              "required_action": "provide_value"
+            },
+            "name": "contract_value_required"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "create_contract"
+            },
+            "description": "Vendor contracts require currency.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_currency_required",
+              "required_action": "provide_currency"
+            },
+            "name": "contract_currency_required"
+          },
+          {
+            "condition": {
+              "date_range_present": false,
+              "operation": "create_contract"
+            },
+            "description": "Vendor contracts require start and end dates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_date_range_required",
+              "required_action": "provide_dates"
+            },
+            "name": "contract_dates_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_contract"
+            },
+            "description": "Vendor contracts require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contract_approval_required",
+              "required_action": "record_contract_approval"
+            },
+            "name": "contract_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "record_communication",
+              "vendor_present": false
+            },
+            "description": "Communications require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "communication_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "communication_vendor_required"
+          },
+          {
+            "condition": {
+              "channel_present": false,
+              "operation": "record_communication"
+            },
+            "description": "Communications require channel.",
+            "effect": {
+              "decision": "deny",
+              "reason": "communication_channel_required",
+              "required_action": "provide_channel"
+            },
+            "name": "communication_channel_required"
+          },
+          {
+            "condition": {
+              "operation": "record_communication",
+              "subject_present": false
+            },
+            "description": "Communications require subject.",
+            "effect": {
+              "decision": "deny",
+              "reason": "communication_subject_required",
+              "required_action": "provide_subject"
+            },
+            "name": "communication_subject_required"
+          },
+          {
+            "condition": {
+              "negative_sentiment": true,
+              "operation": "record_communication",
+              "owner_present": false
+            },
+            "description": "Negative communication sentiment requires an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "communication_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "negative_sentiment_owner_required"
+          },
+          {
+            "condition": {
+              "operation": "create_portal_user",
+              "vendor_present": false
+            },
+            "description": "Portal users require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "portal_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "portal_vendor_required"
+          },
+          {
+            "condition": {
+              "email_present": false,
+              "operation": "create_portal_user"
+            },
+            "description": "Portal users require email.",
+            "effect": {
+              "decision": "deny",
+              "reason": "portal_email_required",
+              "required_action": "provide_email"
+            },
+            "name": "portal_email_required"
+          },
+          {
+            "condition": {
+              "operation": "create_portal_user",
+              "role_present": false
+            },
+            "description": "Portal users require role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "portal_role_required",
+              "required_action": "provide_role"
+            },
+            "name": "portal_role_required"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_portal_user"
+            },
+            "description": "Portal users require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "portal_approval_required",
+              "required_action": "record_approval"
+            },
+            "name": "portal_approval_required"
+          },
+          {
+            "condition": {
+              "operation": "create_scorecard",
+              "vendor_present": false
+            },
+            "description": "Scorecards require an existing vendor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scorecard_vendor_required",
+              "required_action": "select_vendor"
+            },
+            "name": "scorecard_vendor_required"
+          },
+          {
+            "condition": {
+              "operation": "create_scorecard",
+              "performance_present": false
+            },
+            "description": "Scorecards require performance records.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scorecard_performance_required",
+              "required_action": "attach_performance"
+            },
+            "name": "scorecard_performance_required"
+          },
+          {
+            "condition": {
+              "operation": "create_scorecard",
+              "risk_present": false
+            },
+            "description": "Scorecards require risk records.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scorecard_risk_required",
+              "required_action": "attach_risk"
+            },
+            "name": "scorecard_risk_required"
+          },
+          {
+            "condition": {
+              "generator_present": false,
+              "operation": "create_scorecard"
+            },
+            "description": "Scorecards require a generator.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scorecard_generator_required",
+              "required_action": "record_generator"
+            },
+            "name": "scorecard_generator_required"
+          },
+          {
+            "condition": {
+              "event_stream": "queue",
+              "operation": "vendor_batch"
+            },
+            "description": "Vendor batches must use Bytewax event stream metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_to_bytewax_stream"
+            },
+            "name": "bytewax_event_stream_required"
+          },
+          {
+            "condition": {
+              "operation": "register_vendor_agent",
+              "runtime_supported": false
+            },
+            "description": "Vendor agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_agent_runtime_not_supported",
+              "required_action": "choose_supported_runtime"
+            },
+            "name": "agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_vendor_agent",
+              "role_supported": false
+            },
+            "description": "Vendor agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_agent_role_not_supported",
+              "required_action": "choose_supported_role"
+            },
+            "name": "agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approved": false,
+              "operation": "agent_action",
+              "privileged_action": true
+            },
+            "description": "Vendor agents cannot autonomously post privileged state changes.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "vendor_agent_human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "agent_scope_limited"
+          },
+          {
+            "condition": {
+              "audit_enabled": false,
+              "operation_type": "write"
+            },
+            "description": "Vendor state changes must be auditable.",
+            "effect": {
+              "decision": "deny",
+              "reason": "vendor_audit_required",
+              "required_action": "enable_audit"
+            },
+            "name": "audit_required_for_state_change"
           }
         ],
         "type": "deterministic"
@@ -96,7 +881,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Vendor Management operations require tenant context.",
+          "description": "Vendor operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,7 +894,7 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Vendor Management write operations require policy enforcement.",
+          "description": "Vendor write operations require policy enforcement.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
@@ -119,16 +904,659 @@
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "code_present": false,
+            "operation": "create_vendor"
           },
-          "description": "High-risk Vendor Management operations require review.",
+          "description": "Vendors require a code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_code_required",
+            "required_action": "provide_vendor_code"
+          },
+          "name": "vendor_code_required"
+        },
+        {
+          "condition": {
+            "name_present": false,
+            "operation": "create_vendor"
+          },
+          "description": "Vendors require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_name_required",
+            "required_action": "provide_vendor_name"
+          },
+          "name": "vendor_name_required"
+        },
+        {
+          "condition": {
+            "operation": "create_vendor",
+            "vendor_type_supported": false
+          },
+          "description": "Vendors must use a supported type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_type_not_supported",
+            "required_action": "choose_supported_vendor_type"
+          },
+          "name": "vendor_type_supported"
+        },
+        {
+          "condition": {
+            "category_present": false,
+            "operation": "create_vendor"
+          },
+          "description": "Vendors require a category.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_category_required",
+            "required_action": "provide_category"
+          },
+          "name": "vendor_category_required"
+        },
+        {
+          "condition": {
+            "country_present": false,
+            "operation": "create_vendor"
+          },
+          "description": "Vendors require a country.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_country_required",
+            "required_action": "provide_country"
+          },
+          "name": "vendor_country_required"
+        },
+        {
+          "condition": {
+            "operation": "create_vendor",
+            "owner_present": false
+          },
+          "description": "Vendors require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "vendor_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "qualify_vendor",
+            "vendor_present": false
+          },
+          "description": "Qualification requires an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "qualification_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "qualification_vendor_required"
+        },
+        {
+          "condition": {
+            "criteria_present": false,
+            "operation": "qualify_vendor"
+          },
+          "description": "Qualification requires criteria.",
+          "effect": {
+            "decision": "deny",
+            "reason": "qualification_criteria_required",
+            "required_action": "attach_criteria"
+          },
+          "name": "qualification_criteria_required"
+        },
+        {
+          "condition": {
+            "operation": "qualify_vendor",
+            "qualified_by_present": false
+          },
+          "description": "Qualification requires a reviewer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "qualification_reviewer_required",
+            "required_action": "record_reviewer"
+          },
+          "name": "qualification_actor_required"
+        },
+        {
+          "condition": {
+            "operation": "qualify_vendor",
+            "score_present": false
+          },
+          "description": "Qualification requires a score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "qualification_score_required",
+            "required_action": "provide_score"
+          },
+          "name": "qualification_score_required"
+        },
+        {
+          "condition": {
+            "operation": "qualify_vendor",
+            "review_recorded": false,
+            "score_below_threshold": true
+          },
+          "description": "Low qualification scores require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "qualification_review_required",
+            "required_action": "record_qualification_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "qualification_score_threshold"
+        },
+        {
+          "condition": {
+            "operation": "onboard_vendor",
+            "vendor_present": false
+          },
+          "description": "Onboarding requires an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "onboarding_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "onboarding_vendor_required"
+        },
+        {
+          "condition": {
+            "checklist_present": false,
+            "operation": "onboard_vendor"
+          },
+          "description": "Onboarding requires checklist evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "onboarding_checklist_required",
+            "required_action": "attach_checklist"
+          },
+          "name": "onboarding_checklist_required"
+        },
+        {
+          "condition": {
+            "operation": "onboard_vendor",
+            "owner_present": false
+          },
+          "description": "Onboarding requires an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "onboarding_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "onboarding_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "record_performance",
+            "vendor_present": false
+          },
+          "description": "Performance records require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "performance_vendor_required"
+        },
+        {
+          "condition": {
+            "operation": "record_performance",
+            "period_present": false
+          },
+          "description": "Performance records require a period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_period_required",
+            "required_action": "provide_period"
+          },
+          "name": "performance_period_required"
+        },
+        {
+          "condition": {
+            "dimensions_supported": false,
+            "operation": "record_performance"
+          },
+          "description": "Performance dimensions must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_dimension_not_supported",
+            "required_action": "choose_supported_dimensions"
+          },
+          "name": "performance_dimensions_supported"
+        },
+        {
+          "condition": {
+            "operation": "record_performance",
+            "scores_in_range": false
+          },
+          "description": "Performance scores must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "performance_score_out_of_range",
+            "required_action": "correct_scores"
+          },
+          "name": "performance_scores_in_range"
+        },
+        {
+          "condition": {
+            "low_score": true,
+            "operation": "record_performance",
+            "review_recorded": false
+          },
+          "description": "Low performance scores require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "performance_review_required",
+            "required_action": "record_performance_review"
+          },
+          "name": "performance_low_score_review"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "vendor_present": false
+          },
+          "description": "Risk records require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "risk_vendor_required"
+        },
+        {
+          "condition": {
+            "operation": "record_risk",
+            "risk_tier_supported": false
+          },
+          "description": "Risk tier must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_tier_not_supported",
+            "required_action": "choose_supported_risk_tier"
+          },
+          "name": "risk_tier_supported"
+        },
+        {
+          "condition": {
+            "description_present": false,
+            "operation": "record_risk"
+          },
+          "description": "Risk records require description.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_description_required",
+            "required_action": "provide_description"
+          },
+          "name": "risk_description_required"
+        },
+        {
+          "condition": {
+            "high_or_critical": true,
+            "operation": "record_risk",
+            "owner_present": false
+          },
+          "description": "High or critical risks require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "risk_owner_required",
+            "required_action": "assign_risk_owner"
+          },
+          "name": "risk_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance",
+            "vendor_present": false
+          },
+          "description": "Compliance records require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "compliance_vendor_required"
+        },
+        {
+          "condition": {
+            "framework_present": false,
+            "operation": "record_compliance"
+          },
+          "description": "Compliance records require framework.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_framework_required",
+            "required_action": "provide_framework"
+          },
+          "name": "compliance_framework_required"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance",
+            "status_supported": false
+          },
+          "description": "Compliance status must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_status_not_supported",
+            "required_action": "choose_supported_status"
+          },
+          "name": "compliance_status_supported"
+        },
+        {
+          "condition": {
+            "evidence_present": false,
+            "operation": "record_compliance"
+          },
+          "description": "Compliance records require evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_evidence_required",
+            "required_action": "attach_evidence"
+          },
+          "name": "compliance_evidence_required"
+        },
+        {
+          "condition": {
+            "operation": "record_compliance",
+            "review_recorded": false,
+            "review_required": true
+          },
+          "description": "Noncompliant or expired compliance requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "compliance_review_required",
+            "required_action": "record_compliance_review"
+          },
+          "name": "compliance_review_required"
+        },
+        {
+          "condition": {
+            "operation": "create_contract",
+            "vendor_present": false
+          },
+          "description": "Vendor contracts require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "contract_vendor_required"
+        },
+        {
+          "condition": {
+            "operation": "create_contract",
+            "value_present": false
+          },
+          "description": "Vendor contracts require value.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_value_required",
+            "required_action": "provide_value"
+          },
+          "name": "contract_value_required"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "create_contract"
+          },
+          "description": "Vendor contracts require currency.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_currency_required",
+            "required_action": "provide_currency"
+          },
+          "name": "contract_currency_required"
+        },
+        {
+          "condition": {
+            "date_range_present": false,
+            "operation": "create_contract"
+          },
+          "description": "Vendor contracts require start and end dates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_date_range_required",
+            "required_action": "provide_dates"
+          },
+          "name": "contract_dates_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_contract"
+          },
+          "description": "Vendor contracts require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contract_approval_required",
+            "required_action": "record_contract_approval"
+          },
+          "name": "contract_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "record_communication",
+            "vendor_present": false
+          },
+          "description": "Communications require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "communication_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "communication_vendor_required"
+        },
+        {
+          "condition": {
+            "channel_present": false,
+            "operation": "record_communication"
+          },
+          "description": "Communications require channel.",
+          "effect": {
+            "decision": "deny",
+            "reason": "communication_channel_required",
+            "required_action": "provide_channel"
+          },
+          "name": "communication_channel_required"
+        },
+        {
+          "condition": {
+            "operation": "record_communication",
+            "subject_present": false
+          },
+          "description": "Communications require subject.",
+          "effect": {
+            "decision": "deny",
+            "reason": "communication_subject_required",
+            "required_action": "provide_subject"
+          },
+          "name": "communication_subject_required"
+        },
+        {
+          "condition": {
+            "negative_sentiment": true,
+            "operation": "record_communication",
+            "owner_present": false
+          },
+          "description": "Negative communication sentiment requires an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "communication_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "negative_sentiment_owner_required"
+        },
+        {
+          "condition": {
+            "operation": "create_portal_user",
+            "vendor_present": false
+          },
+          "description": "Portal users require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "portal_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "portal_vendor_required"
+        },
+        {
+          "condition": {
+            "email_present": false,
+            "operation": "create_portal_user"
+          },
+          "description": "Portal users require email.",
+          "effect": {
+            "decision": "deny",
+            "reason": "portal_email_required",
+            "required_action": "provide_email"
+          },
+          "name": "portal_email_required"
+        },
+        {
+          "condition": {
+            "operation": "create_portal_user",
+            "role_present": false
+          },
+          "description": "Portal users require role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "portal_role_required",
+            "required_action": "provide_role"
+          },
+          "name": "portal_role_required"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_portal_user"
+          },
+          "description": "Portal users require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "portal_approval_required",
+            "required_action": "record_approval"
+          },
+          "name": "portal_approval_required"
+        },
+        {
+          "condition": {
+            "operation": "create_scorecard",
+            "vendor_present": false
+          },
+          "description": "Scorecards require an existing vendor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scorecard_vendor_required",
+            "required_action": "select_vendor"
+          },
+          "name": "scorecard_vendor_required"
+        },
+        {
+          "condition": {
+            "operation": "create_scorecard",
+            "performance_present": false
+          },
+          "description": "Scorecards require performance records.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scorecard_performance_required",
+            "required_action": "attach_performance"
+          },
+          "name": "scorecard_performance_required"
+        },
+        {
+          "condition": {
+            "operation": "create_scorecard",
+            "risk_present": false
+          },
+          "description": "Scorecards require risk records.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scorecard_risk_required",
+            "required_action": "attach_risk"
+          },
+          "name": "scorecard_risk_required"
+        },
+        {
+          "condition": {
+            "generator_present": false,
+            "operation": "create_scorecard"
+          },
+          "description": "Scorecards require a generator.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scorecard_generator_required",
+            "required_action": "record_generator"
+          },
+          "name": "scorecard_generator_required"
+        },
+        {
+          "condition": {
+            "event_stream": "queue",
+            "operation": "vendor_batch"
+          },
+          "description": "Vendor batches must use Bytewax event stream metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_to_bytewax_stream"
+          },
+          "name": "bytewax_event_stream_required"
+        },
+        {
+          "condition": {
+            "operation": "register_vendor_agent",
+            "runtime_supported": false
+          },
+          "description": "Vendor agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_agent_runtime_not_supported",
+            "required_action": "choose_supported_runtime"
+          },
+          "name": "agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_vendor_agent",
+            "role_supported": false
+          },
+          "description": "Vendor agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_agent_role_not_supported",
+            "required_action": "choose_supported_role"
+          },
+          "name": "agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approved": false,
+            "operation": "agent_action",
+            "privileged_action": true
+          },
+          "description": "Vendor agents cannot autonomously post privileged state changes.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "vendor_agent_human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "agent_scope_limited"
+        },
+        {
+          "condition": {
+            "audit_enabled": false,
+            "operation_type": "write"
+          },
+          "description": "Vendor state changes must be auditable.",
+          "effect": {
+            "decision": "deny",
+            "reason": "vendor_audit_required",
+            "required_action": "enable_audit"
+          },
+          "name": "audit_required_for_state_change"
         }
       ],
       "runtime": {
@@ -138,54 +1566,175 @@
         "views": "views.py"
       },
       "screens": {
-        "dashboard": {
-          "component": "CapabilityDashboard",
-          "permission": "scm_ven:view",
-          "route": "/scm-ven/dashboard"
+        "agents": {
+          "component": "VendorAgentWorkbench",
+          "permission": "scm_ven:agent_manage",
+          "route": "/scm/vendors/agents"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "scm_ven:operate",
-          "route": "/scm-ven/operations"
+        "communications": {
+          "component": "VendorCommunicationLog",
+          "permission": "scm_ven:communicate",
+          "route": "/scm/vendors/communications"
+        },
+        "compliance": {
+          "component": "VendorComplianceDesk",
+          "permission": "scm_ven:govern",
+          "route": "/scm/vendors/compliance"
+        },
+        "contracts": {
+          "component": "VendorContractDesk",
+          "permission": "scm_ven:contract",
+          "route": "/scm/vendors/contracts"
+        },
+        "dashboard": {
+          "component": "VendorDashboard",
+          "permission": "scm_ven:view",
+          "route": "/scm/vendors/dashboard"
+        },
+        "onboarding": {
+          "component": "VendorOnboardingBoard",
+          "permission": "scm_ven:onboard",
+          "route": "/scm/vendors/onboarding"
+        },
+        "performance": {
+          "component": "VendorPerformanceWorkbench",
+          "permission": "scm_ven:score",
+          "route": "/scm/vendors/performance"
+        },
+        "portal": {
+          "component": "VendorPortalAdmin",
+          "permission": "scm_ven:portal",
+          "route": "/scm/vendors/portal"
+        },
+        "qualification": {
+          "component": "VendorQualificationDesk",
+          "permission": "scm_ven:qualify",
+          "route": "/scm/vendors/qualification"
+        },
+        "risk": {
+          "component": "VendorRiskCenter",
+          "permission": "scm_ven:govern",
+          "route": "/scm/vendors/risk"
         },
         "rules": {
-          "component": "CapabilityRules",
+          "component": "VendorRules",
           "permission": "scm_ven:govern",
-          "route": "/scm-ven/rules"
+          "route": "/scm/vendors/rules"
+        },
+        "scorecards": {
+          "component": "VendorScorecardDesk",
+          "permission": "scm_ven:score",
+          "route": "/scm/vendors/scorecards"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "VendorSettings",
           "permission": "scm_ven:admin",
-          "route": "/scm-ven/settings"
+          "route": "/scm/vendors/settings"
+        },
+        "vendors": {
+          "component": "VendorWorkbench",
+          "permission": "scm_ven:manage_vendors",
+          "route": "/scm/vendors"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "delivery": "at_least_once",
+        "event_stream": "apg.scm.ven.lifecycle",
+        "events": [
+          "vendor_created",
+          "vendor_qualified",
+          "vendor_onboarded",
+          "vendor_performance_recorded",
+          "vendor_risk_recorded",
+          "vendor_compliance_recorded",
+          "vendor_contract_created",
+          "vendor_communication_recorded",
+          "vendor_portal_user_created",
+          "vendor_scorecard_created",
+          "vendor_agent_registered"
+        ],
+        "ordering_key": "tenant_id",
+        "processor": "bytewax"
+      },
       "theme": {
         "components": {
+          "agents": {
+            "icon": "bot",
+            "status_style": "agent-chip",
+            "visual": "agent-roster"
+          },
+          "communications": {
+            "icon": "message-square",
+            "status_style": "sentiment-chip",
+            "visual": "communication-log"
+          },
+          "compliance": {
+            "icon": "clipboard-check",
+            "status_style": "compliance-chip",
+            "visual": "evidence-ledger"
+          },
+          "contracts": {
+            "icon": "file-signature",
+            "status_style": "contract-chip",
+            "visual": "contract-list"
+          },
           "dashboard": {
             "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+            "status_indicator": "health-pill",
+            "visual": "supplier-grid"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "onboarding": {
+            "icon": "route",
+            "status_style": "stage-chip",
+            "visual": "onboarding-board"
+          },
+          "performance": {
+            "icon": "activity",
+            "status_style": "score-chip",
+            "visual": "score-table"
+          },
+          "portal": {
+            "icon": "door-open",
+            "status_style": "portal-chip",
+            "visual": "portal-users"
+          },
+          "qualification": {
+            "icon": "badge-check",
+            "status_style": "qualification-chip",
+            "visual": "criteria-list"
+          },
+          "risk": {
+            "icon": "shield-alert",
+            "status_style": "risk-chip",
+            "visual": "risk-register"
           },
           "rules": {
+            "icon": "list-checks",
             "status_style": "decision-chip",
             "visual": "rule-list"
           },
+          "scorecards": {
+            "icon": "gauge",
+            "status_style": "scorecard-chip",
+            "visual": "scorecard-list"
+          },
           "settings": {
             "density": "compact",
+            "icon": "settings",
             "visual": "settings-panel"
+          },
+          "vendors": {
+            "icon": "building-2",
+            "status_style": "vendor-chip",
+            "visual": "vendor-table"
           }
         },
-        "name": "scm_ven_operations",
+        "name": "vendor_control",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#C44536",
+          "color.accent": "#8A5A20",
           "color.danger": "#C53030",
-          "color.primary": "#28536B",
+          "color.primary": "#234E52",
           "color.success": "#2F855A",
           "color.warning": "#B7791F",
           "density": "compact",
@@ -196,35 +1745,105 @@
         }
       },
       "ui": {
-        "api_prefix": "/scm-ven/api/v1",
+        "api_prefix": "/scm/vendors/api/v1",
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "VendorDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
-            "path": "/scm-ven/dashboard",
+            "path": "/scm/vendors/dashboard",
             "permission": "scm_ven:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/scm-ven/operations",
-            "permission": "scm_ven:operate"
+            "component": "VendorWorkbench",
+            "name": "vendors",
+            "nav_group": "Master Data",
+            "path": "/scm/vendors",
+            "permission": "scm_ven:manage_vendors"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
+            "component": "VendorQualificationDesk",
+            "name": "qualification",
+            "nav_group": "Lifecycle",
+            "path": "/scm/vendors/qualification",
+            "permission": "scm_ven:qualify"
+          },
+          {
+            "component": "VendorOnboardingBoard",
+            "name": "onboarding",
+            "nav_group": "Lifecycle",
+            "path": "/scm/vendors/onboarding",
+            "permission": "scm_ven:onboard"
+          },
+          {
+            "component": "VendorPerformanceWorkbench",
+            "name": "performance",
+            "nav_group": "Performance",
+            "path": "/scm/vendors/performance",
+            "permission": "scm_ven:score"
+          },
+          {
+            "component": "VendorRiskCenter",
+            "name": "risk",
             "nav_group": "Governance",
-            "path": "/scm-ven/rules",
+            "path": "/scm/vendors/risk",
             "permission": "scm_ven:govern"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "VendorComplianceDesk",
+            "name": "compliance",
+            "nav_group": "Governance",
+            "path": "/scm/vendors/compliance",
+            "permission": "scm_ven:govern"
+          },
+          {
+            "component": "VendorContractDesk",
+            "name": "contracts",
+            "nav_group": "Commercial",
+            "path": "/scm/vendors/contracts",
+            "permission": "scm_ven:contract"
+          },
+          {
+            "component": "VendorCommunicationLog",
+            "name": "communications",
+            "nav_group": "Engagement",
+            "path": "/scm/vendors/communications",
+            "permission": "scm_ven:communicate"
+          },
+          {
+            "component": "VendorPortalAdmin",
+            "name": "portal",
+            "nav_group": "Engagement",
+            "path": "/scm/vendors/portal",
+            "permission": "scm_ven:portal"
+          },
+          {
+            "component": "VendorScorecardDesk",
+            "name": "scorecards",
+            "nav_group": "Performance",
+            "path": "/scm/vendors/scorecards",
+            "permission": "scm_ven:score"
+          },
+          {
+            "component": "VendorAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/scm/vendors/agents",
+            "permission": "scm_ven:agent_manage"
+          },
+          {
+            "component": "VendorRules",
+            "name": "rules",
+            "nav_group": "Governance",
+            "path": "/scm/vendors/rules",
+            "permission": "scm_ven:govern"
+          },
+          {
+            "component": "VendorSettings",
             "name": "settings",
             "nav_group": "Administration",
-            "path": "/scm-ven/settings",
+            "path": "/scm/vendors/settings",
             "permission": "scm_ven:admin"
           }
         ],
@@ -234,50 +1853,232 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "vendor_review": {
+        "roles": [
+          "vendor_onboarding_reviewer",
+          "risk_reviewer",
+          "performance_reviewer",
+          "compliance_reviewer",
+          "contract_reviewer",
+          "supplier_query_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "scm_ven": []
+      "scm_ven": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "procurement_requisition_lifecycle",
+        "sourcing_event_lifecycle",
+        "contract_lifecycle",
+        "document_management",
+        "risk_policy",
+        "supplier_master_data"
+      ]
     }
   },
   "contracts": {
     "scm_ven": {
       "configuration": {
-        "capability": {
-          "category": "Scm",
-          "enabled": true,
-          "id": "scm_ven",
-          "name": "Vendor Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/scm/ven/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "contracts": "adapter",
+          "documents": "adapter",
+          "event_stream": "bytewax",
+          "notification": "adapter",
+          "procurement": "adapter",
+          "risk_policy": "adapter",
+          "theme": "adapter",
+          "workflow": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "communications": {
+          "channel_required": true,
+          "owner_required_for_negative_sentiment": true,
+          "subject_required": true
+        },
+        "compliance": {
+          "evidence_required": true,
+          "review_required_for_noncompliance": true,
+          "supported_statuses": [
+            "pending",
+            "compliant",
+            "review_required",
+            "non_compliant",
+            "expired"
+          ]
+        },
+        "contracts": {
+          "approval_required": true,
+          "currency_required": true,
+          "date_range_required": true,
+          "value_required": true
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_compliance_events": true,
+          "emit_contract_events": true,
+          "emit_performance_events": true,
+          "emit_risk_events": true,
+          "emit_vendor_events": true,
+          "event_stream": "apg.scm.ven.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "onboarding": {
+          "checklist_required": true,
+          "owner_required": true,
+          "vendor_required": true
+        },
+        "performance": {
+          "period_required": true,
+          "review_required_below": 60,
+          "score_range": [
+            0,
+            100
+          ],
+          "supported_dimensions": [
+            "quality",
+            "delivery",
+            "cost",
+            "service",
+            "sustainability",
+            "innovation"
+          ]
+        },
+        "portal": {
+          "approval_required": true,
+          "email_required": true,
+          "role_required": true
+        },
+        "qualification": {
+          "criteria_required": true,
+          "minimum_score": 70,
+          "qualified_by_required": true
+        },
+        "risk": {
+          "owner_required_for_high_or_critical": true,
+          "supported_tiers": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "scorecards": {
+          "generator_required": true,
+          "performance_required": true,
+          "risk_required": true
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "scm_ven_operations"
+          "default_theme": "vendor_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_compliance": true,
+          "enable_contracts": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_onboarding": true,
+          "enable_performance": true,
+          "enable_portal": true,
+          "enable_qualification": true,
+          "enable_risk": true,
+          "enable_scorecards": true,
+          "enable_settings": true,
+          "enable_vendors": true
+        },
+        "vendor_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "inspect_prepare_and_recommend",
+          "supported_roles": [
+            "vendor_onboarding_reviewer",
+            "risk_reviewer",
+            "performance_reviewer",
+            "compliance_reviewer",
+            "contract_reviewer",
+            "supplier_query_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "vendors": {
+          "category_required": true,
+          "code_required": true,
+          "country_required": true,
+          "name_required": true,
+          "owner_required": true,
+          "supported_types": [
+            "manufacturer",
+            "distributor",
+            "service_provider",
+            "contractor",
+            "consultant",
+            "logistics",
+            "technology",
+            "financial",
+            "public_sector",
+            "nonprofit"
+          ]
         }
       },
       "id": "scm_ven",
       "provides": [
-        "scm_ven_operations"
+        "vendor_profile_lifecycle",
+        "vendor_onboarding_workflow",
+        "vendor_qualification_lifecycle",
+        "vendor_performance_lifecycle",
+        "vendor_risk_lifecycle",
+        "vendor_contract_lifecycle",
+        "vendor_compliance_lifecycle",
+        "vendor_communication_lifecycle",
+        "vendor_portal_lifecycle",
+        "vendor_scorecard_service",
+        "vendor_sourcing_integration",
+        "vendor_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "workflow",
+        "procurement_requisition_lifecycle",
+        "sourcing_event_lifecycle",
+        "contract_lifecycle",
+        "document_management",
+        "risk_policy",
+        "supplier_master_data"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +2086,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 12,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "scm_ven": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Vendor Management operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Vendor Management write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Vendor Management operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.scm_ven": {
-      "file": "capability_contract.py",
-      "id": "capability.scm_ven",
-      "kind": "capability",
-      "name": "Vendor Management",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

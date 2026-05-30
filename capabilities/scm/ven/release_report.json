@@ -4,13 +4,22 @@
       "capability_contract": {
         "display_name": "Vendor Management",
         "errors": [],
-        "route_count": 4,
-        "rule_count": 3
+        "route_count": 14,
+        "rule_count": 52,
+        "streaming_processor": "bytewax",
+        "theme": "vendor_control"
       }
     },
     "self_test": {
       "capability": "scm_ven",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {
