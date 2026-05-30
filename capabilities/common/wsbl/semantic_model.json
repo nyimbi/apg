@@ -12,28 +12,47 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "accessibility": "adapter",
+          "analytics": "adapter",
+          "authorization": "adapter",
+          "consent": "adapter",
+          "event_stream": "bytewax",
+          "theme": "adapter"
+        },
         "governance": {
           "audit_publication_changes": true,
           "component_policy_required": true,
           "public_site_controls_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
+        },
+        "observability": {
+          "emit_page_events": true,
+          "emit_publish_events": true,
+          "emit_site_events": true,
+          "event_stream": "apg.wsbl.lifecycle",
+          "stream_processor": "bytewax"
         },
         "pages": {
           "content_versioning_enabled": true,
           "custom_component_review_required": true,
           "draft_autosave_enabled": true,
+          "page_review_required": true,
           "structured_sections_required": true
         },
         "publishing": {
           "accessibility_pass_required": true,
           "approval_required": true,
           "privacy_banner_policy_required": true,
+          "publish_stream_required": true,
           "rollback_supported": true
         },
         "sites": {
           "domain_validation_required": true,
           "environment_preview_enabled": true,
           "multi_locale_enabled": true,
+          "preview_evidence_required": true,
           "site_owner_required": true
         },
         "tenant_id": "default",
@@ -42,10 +61,32 @@
           "default_theme": "wsbl_site_builder"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_component_library": true,
           "enable_page_editor": true,
+          "enable_policy_center": true,
           "enable_publish_queue": true,
           "enable_site_console": true
+        },
+        "wsbl_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "site_reviewer",
+            "component_reviewer",
+            "accessibility_reviewer",
+            "privacy_reviewer",
+            "publish_reviewer",
+            "seo_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         }
       },
       "erp_modules": [
@@ -55,9 +96,21 @@
       "master_data": {},
       "name": "Website Builder",
       "provides": [
-        "wsbl_operations"
+        "site_management",
+        "page_composition",
+        "component_library",
+        "publishing_workflows",
+        "site_theming",
+        "website_governance",
+        "wsbl_agents"
       ],
-      "requires": [],
+      "requires": [
+        "them",
+        "auth",
+        "ncod",
+        "accs",
+        "cons"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +140,45 @@
           },
           {
             "condition": {
+              "domain_validation_complete": false,
+              "operation": "publish_site"
+            },
+            "description": "Publishing requires validated site domains.",
+            "effect": {
+              "decision": "deny",
+              "reason": "domain_validation_required",
+              "required_action": "validate_site_domains"
+            },
+            "name": "domain_requires_validation_before_publish"
+          },
+          {
+            "condition": {
+              "operation": "publish_site",
+              "structured_sections_present": false
+            },
+            "description": "Publishing requires at least one structured page section.",
+            "effect": {
+              "decision": "deny",
+              "reason": "structured_sections_required",
+              "required_action": "add_structured_page_sections"
+            },
+            "name": "page_requires_structured_sections"
+          },
+          {
+            "condition": {
+              "operation": "publish_site",
+              "preview_evidence_present": false
+            },
+            "description": "Publishing requires preview evidence for the target environment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "preview_evidence_required",
+              "required_action": "attach_environment_preview"
+            },
+            "name": "preview_requires_evidence"
+          },
+          {
+            "condition": {
               "approval_recorded": false,
               "operation": "publish_site"
             },
@@ -100,8 +192,22 @@
           },
           {
             "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "publish_site"
+            },
+            "description": "Site publishing lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_publish_lifecycle_to_bytewax"
+            },
+            "name": "publish_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "component_review_recorded": false,
-              "custom_component_present": true
+              "custom_component_present": true,
+              "operation": "add_page_section"
             },
             "description": "Custom components require review before use.",
             "effect": {
@@ -113,7 +219,22 @@
           },
           {
             "condition": {
+              "component_policy_attached": false,
+              "custom_component_present": true,
+              "operation": "review_component"
+            },
+            "description": "Custom components require component policy attribution.",
+            "effect": {
+              "decision": "deny",
+              "reason": "component_policy_required",
+              "required_action": "attach_component_policy"
+            },
+            "name": "custom_component_requires_policy"
+          },
+          {
+            "condition": {
               "accessibility_passed": false,
+              "operation": "publish_site",
               "public_site": true
             },
             "description": "Public sites require an accessibility pass.",
@@ -127,6 +248,7 @@
           {
             "condition": {
               "consent_policy_attached": false,
+              "operation": "publish_site",
               "privacy_banner_required": true
             },
             "description": "Privacy banners require an attached consent policy.",
@@ -136,6 +258,72 @@
               "required_action": "attach_consent_policy"
             },
             "name": "privacy_banner_requires_consent_policy"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "rollback_site"
+            },
+            "description": "Rollback lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_rollback_lifecycle_to_bytewax"
+            },
+            "name": "rollback_requires_bytewax_stream"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_publish"
+            },
+            "description": "Batch site publishing requires Bytewax stream coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_batch_publish_to_bytewax"
+            },
+            "name": "batch_publish_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_wsbl_agent"
+            },
+            "description": "Website builder agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wsbl_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "wsbl_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_wsbl_agent"
+            },
+            "description": "Website builder agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "wsbl_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "wsbl_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_publish_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged publishing actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_publish_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -168,6 +356,45 @@
         },
         {
           "condition": {
+            "domain_validation_complete": false,
+            "operation": "publish_site"
+          },
+          "description": "Publishing requires validated site domains.",
+          "effect": {
+            "decision": "deny",
+            "reason": "domain_validation_required",
+            "required_action": "validate_site_domains"
+          },
+          "name": "domain_requires_validation_before_publish"
+        },
+        {
+          "condition": {
+            "operation": "publish_site",
+            "structured_sections_present": false
+          },
+          "description": "Publishing requires at least one structured page section.",
+          "effect": {
+            "decision": "deny",
+            "reason": "structured_sections_required",
+            "required_action": "add_structured_page_sections"
+          },
+          "name": "page_requires_structured_sections"
+        },
+        {
+          "condition": {
+            "operation": "publish_site",
+            "preview_evidence_present": false
+          },
+          "description": "Publishing requires preview evidence for the target environment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "preview_evidence_required",
+            "required_action": "attach_environment_preview"
+          },
+          "name": "preview_requires_evidence"
+        },
+        {
+          "condition": {
             "approval_recorded": false,
             "operation": "publish_site"
           },
@@ -181,8 +408,22 @@
         },
         {
           "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "publish_site"
+          },
+          "description": "Site publishing lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_publish_lifecycle_to_bytewax"
+          },
+          "name": "publish_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "component_review_recorded": false,
-            "custom_component_present": true
+            "custom_component_present": true,
+            "operation": "add_page_section"
           },
           "description": "Custom components require review before use.",
           "effect": {
@@ -194,7 +435,22 @@
         },
         {
           "condition": {
+            "component_policy_attached": false,
+            "custom_component_present": true,
+            "operation": "review_component"
+          },
+          "description": "Custom components require component policy attribution.",
+          "effect": {
+            "decision": "deny",
+            "reason": "component_policy_required",
+            "required_action": "attach_component_policy"
+          },
+          "name": "custom_component_requires_policy"
+        },
+        {
+          "condition": {
             "accessibility_passed": false,
+            "operation": "publish_site",
             "public_site": true
           },
           "description": "Public sites require an accessibility pass.",
@@ -208,6 +464,7 @@
         {
           "condition": {
             "consent_policy_attached": false,
+            "operation": "publish_site",
             "privacy_banner_required": true
           },
           "description": "Privacy banners require an attached consent policy.",
@@ -217,6 +474,72 @@
             "required_action": "attach_consent_policy"
           },
           "name": "privacy_banner_requires_consent_policy"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "rollback_site"
+          },
+          "description": "Rollback lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_rollback_lifecycle_to_bytewax"
+          },
+          "name": "rollback_requires_bytewax_stream"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_publish"
+          },
+          "description": "Batch site publishing requires Bytewax stream coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_batch_publish_to_bytewax"
+          },
+          "name": "batch_publish_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_wsbl_agent"
+          },
+          "description": "Website builder agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wsbl_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "wsbl_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_wsbl_agent"
+          },
+          "description": "Website builder agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "wsbl_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "wsbl_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_publish_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged publishing actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_publish_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -226,6 +549,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "WSBLAgentWorkbench",
+          "permission": "wsbl:admin",
+          "route": "/wsbl/agents"
+        },
         "analytics": {
           "component": "SiteAnalytics",
           "permission": "wsbl:view",
@@ -251,6 +579,11 @@
           "permission": "wsbl:build",
           "route": "/wsbl/pages"
         },
+        "policy": {
+          "component": "WSBLPolicyCenter",
+          "permission": "wsbl:admin",
+          "route": "/wsbl/policy"
+        },
         "publishing": {
           "component": "PublishQueue",
           "permission": "wsbl:publish",
@@ -267,9 +600,46 @@
           "route": "/wsbl/sites"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "site_created",
+          "domain_registered",
+          "domain_validated",
+          "component_created",
+          "component_reviewed",
+          "page_created",
+          "page_section_added",
+          "publish_request_created",
+          "site_published",
+          "site_rolled_back",
+          "wsbl_agent_registered"
+        ],
+        "guardrails": [
+          "publish_requires_bytewax_stream",
+          "rollback_requires_bytewax_stream",
+          "batch_publish_requires_bytewax",
+          "privileged_agent_publish_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "domain_pending",
+          "ready",
+          "review_required",
+          "approved",
+          "published",
+          "rolled_back",
+          "blocked"
+        ],
+        "stream": "apg.wsbl.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
+          },
           "analytics_panel": {
             "status_style": "trend-chip",
             "visual": "traffic-grid"
@@ -277,6 +647,10 @@
           "page_editor": {
             "highlight": "component-chip",
             "visual": "section-builder"
+          },
+          "policy_center": {
+            "status_style": "guardrail-chip",
+            "visual": "rule-grid"
           },
           "publish_queue": {
             "status_style": "approval-chip",
@@ -357,6 +731,20 @@
             "permission": "wsbl:view"
           },
           {
+            "component": "WSBLAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/wsbl/agents",
+            "permission": "wsbl:admin"
+          },
+          {
+            "component": "WSBLPolicyCenter",
+            "name": "policy",
+            "nav_group": "Governance",
+            "path": "/wsbl/policy",
+            "permission": "wsbl:admin"
+          },
+          {
             "component": "WSBLSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -377,34 +765,59 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "wsbl": []
+      "wsbl": [
+        "them",
+        "auth",
+        "ncod",
+        "accs",
+        "cons"
+      ]
     }
   },
   "contracts": {
     "wsbl": {
       "configuration": {
+        "adapters": {
+          "accessibility": "adapter",
+          "analytics": "adapter",
+          "authorization": "adapter",
+          "consent": "adapter",
+          "event_stream": "bytewax",
+          "theme": "adapter"
+        },
         "governance": {
           "audit_publication_changes": true,
           "component_policy_required": true,
           "public_site_controls_required": true,
-          "require_tenant_context": true
+          "require_tenant_context": true,
+          "state_change_audit_required": true
+        },
+        "observability": {
+          "emit_page_events": true,
+          "emit_publish_events": true,
+          "emit_site_events": true,
+          "event_stream": "apg.wsbl.lifecycle",
+          "stream_processor": "bytewax"
         },
         "pages": {
           "content_versioning_enabled": true,
           "custom_component_review_required": true,
           "draft_autosave_enabled": true,
+          "page_review_required": true,
           "structured_sections_required": true
         },
         "publishing": {
           "accessibility_pass_required": true,
           "approval_required": true,
           "privacy_banner_policy_required": true,
+          "publish_stream_required": true,
           "rollback_supported": true
         },
         "sites": {
           "domain_validation_required": true,
           "environment_preview_enabled": true,
           "multi_locale_enabled": true,
+          "preview_evidence_required": true,
           "site_owner_required": true
         },
         "tenant_id": "default",
@@ -413,17 +826,51 @@
           "default_theme": "wsbl_site_builder"
         },
         "ui": {
+          "enable_agent_workbench": true,
           "enable_component_library": true,
           "enable_page_editor": true,
+          "enable_policy_center": true,
           "enable_publish_queue": true,
           "enable_site_console": true
+        },
+        "wsbl_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "non_privileged",
+          "supported_roles": [
+            "site_reviewer",
+            "component_reviewer",
+            "accessibility_reviewer",
+            "privacy_reviewer",
+            "publish_reviewer",
+            "seo_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         }
       },
       "id": "wsbl",
       "provides": [
-        "wsbl_operations"
+        "site_management",
+        "page_composition",
+        "component_library",
+        "publishing_workflows",
+        "site_theming",
+        "website_governance",
+        "wsbl_agents"
       ],
-      "requires": []
+      "requires": [
+        "them",
+        "auth",
+        "ncod",
+        "accs",
+        "cons"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +882,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,10 +903,38 @@
   },
   "roles": {},
   "rules": {
+    "batch_publish_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_publish"
+      },
+      "description": "Batch site publishing requires Bytewax stream coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_batch_publish_to_bytewax"
+      },
+      "name": "batch_publish_requires_bytewax"
+    },
+    "custom_component_requires_policy": {
+      "condition": {
+        "component_policy_attached": false,
+        "custom_component_present": true,
+        "operation": "review_component"
+      },
+      "description": "Custom components require component policy attribution.",
+      "effect": {
+        "decision": "deny",
+        "reason": "component_policy_required",
+        "required_action": "attach_component_policy"
+      },
+      "name": "custom_component_requires_policy"
+    },
     "custom_component_requires_review": {
       "condition": {
         "component_review_recorded": false,
-        "custom_component_present": true
+        "custom_component_present": true,
+        "operation": "add_page_section"
       },
       "description": "Custom components require review before use.",
       "effect": {
@@ -469,9 +944,49 @@
       },
       "name": "custom_component_requires_review"
     },
+    "domain_requires_validation_before_publish": {
+      "condition": {
+        "domain_validation_complete": false,
+        "operation": "publish_site"
+      },
+      "description": "Publishing requires validated site domains.",
+      "effect": {
+        "decision": "deny",
+        "reason": "domain_validation_required",
+        "required_action": "validate_site_domains"
+      },
+      "name": "domain_requires_validation_before_publish"
+    },
+    "page_requires_structured_sections": {
+      "condition": {
+        "operation": "publish_site",
+        "structured_sections_present": false
+      },
+      "description": "Publishing requires at least one structured page section.",
+      "effect": {
+        "decision": "deny",
+        "reason": "structured_sections_required",
+        "required_action": "add_structured_page_sections"
+      },
+      "name": "page_requires_structured_sections"
+    },
+    "preview_requires_evidence": {
+      "condition": {
+        "operation": "publish_site",
+        "preview_evidence_present": false
+      },
+      "description": "Publishing requires preview evidence for the target environment.",
+      "effect": {
+        "decision": "deny",
+        "reason": "preview_evidence_required",
+        "required_action": "attach_environment_preview"
+      },
+      "name": "preview_requires_evidence"
+    },
     "privacy_banner_requires_consent_policy": {
       "condition": {
         "consent_policy_attached": false,
+        "operation": "publish_site",
         "privacy_banner_required": true
       },
       "description": "Privacy banners require an attached consent policy.",
@@ -482,9 +997,24 @@
       },
       "name": "privacy_banner_requires_consent_policy"
     },
+    "privileged_agent_publish_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_publish_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged publishing actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_publish_action_requires_human_approval"
+    },
     "public_site_requires_accessibility_pass": {
       "condition": {
         "accessibility_passed": false,
+        "operation": "publish_site",
         "public_site": true
       },
       "description": "Public sites require an accessibility pass.",
@@ -507,6 +1037,32 @@
         "required_action": "record_publish_approval"
       },
       "name": "publish_requires_approval"
+    },
+    "publish_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "publish_site"
+      },
+      "description": "Site publishing lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_publish_lifecycle_to_bytewax"
+      },
+      "name": "publish_requires_bytewax_stream"
+    },
+    "rollback_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "rollback_site"
+      },
+      "description": "Rollback lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_rollback_lifecycle_to_bytewax"
+      },
+      "name": "rollback_requires_bytewax_stream"
     },
     "site_requires_owner": {
       "condition": {
@@ -532,6 +1088,32 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "wsbl_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_wsbl_agent"
+      },
+      "description": "Website builder agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "wsbl_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "wsbl_agent_role_supported"
+    },
+    "wsbl_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_wsbl_agent"
+      },
+      "description": "Website builder agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "wsbl_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "wsbl_agent_runtime_supported"
     }
   },
   "security": {},

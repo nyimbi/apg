@@ -16,6 +16,80 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 21:46 EAT
+
+Common WSBL website-builder lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the WSBL
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with WSBL-agent, site, page, component,
+  publishing, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, site owner, domain
+  validation before publish, structured sections, preview evidence, publish
+  approval, publish Bytewax streams, custom component review, custom component
+  policy attribution, public-site accessibility, privacy-banner consent policy,
+  rollback Bytewax streams, batch publish Bytewax streams, WSBL-agent
+  runtime/role, and privileged agent-action approval.
+- Added `WebsiteAgentRecord`, then extended `WsblService` with agent
+  registration, privileged agent-action validation, batch publish validation,
+  Bytewax stream metadata, and stronger component/publish/rollback guardrails.
+- Extended API helpers and view models with WSBL-agent, policy center,
+  dashboard, publishing, analytics, settings, and Bytewax metadata surfaces.
+- Updated package registration to expose WSBL agents, policy endpoints,
+  required dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, batch publish, component policy, domain validation, preview,
+  and publishing guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/wsbl/__init__.py
+  capabilities/common/wsbl/capability_contract.py
+  capabilities/common/wsbl/models.py capabilities/common/wsbl/website_runtime.py
+  capabilities/common/wsbl/service.py capabilities/common/wsbl/api.py
+  capabilities/common/wsbl/views.py capabilities/common/wsbl/app.py
+  capabilities/common/wsbl/test_capability_contract.py
+  capabilities/common/wsbl/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/wsbl/test_capability_contract.py
+  capabilities/common/wsbl/tests/test_package_contract.py` passed with 14 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.wsbl import WsblService;
+  service=WsblService(); service.register_wsbl_agent('tenant-proof',
+  'Proof agent', 'codex', 'publish_reviewer', 'review publish gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  WSBL-agent registration, audit event emission, and Bytewax stream metadata.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.wsbl.streaming.processor,
+  .capabilities.wsbl.provides, .capabilities.wsbl.requires,
+  .capabilities.wsbl.screens.agents.route,
+  (.capabilities.wsbl.rules[] |
+  select(.name=="wsbl_agent_runtime_supported") | .effect.reason),
+  (.capabilities.wsbl.rules[] |
+  select(.name=="publish_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/wsbl/semantic_model.json` confirmed `bytewax`, WSBL-agent
+  provides, required services, `/wsbl/agents`,
+  `wsbl_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/wsbl --json` passed with `wsbl` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wsbl --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `wsbl`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/wsbl docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: visual editors, asset stores, preview renderers, accessibility
+  scanners, consent platforms, analytics collectors, CDN/static-host
+  deployment, search/sitemap systems, audit sinks, live Bytewax topology,
+  rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 21:35 EAT
 
 Common WALT wallet and payment lifecycle/guardrail packet:

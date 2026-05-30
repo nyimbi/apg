@@ -25,6 +25,7 @@ def dashboard_model(
 		"recent_audit_events": service.list_audit_events(tenant_id)[-10:],
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -84,6 +85,7 @@ def publish_queue_model(service: WsblService | None = None, tenant_id: str = "de
 		"publish_requests": requests,
 		"review_required": [request for request in requests if request["status"] == "review_required"],
 		"actions": ["request_publish", "publish_site", "rollback_site"],
+		"streaming": service.describe(tenant_id)["streaming"],
 	}
 
 
@@ -98,6 +100,37 @@ def analytics_model(service: WsblService | None = None, tenant_id: str = "defaul
 			"published_site_ratio": _ratio(summary["published_site_count"], summary["site_count"]),
 			"custom_component_ratio": _ratio(summary["custom_component_count"], summary["component_count"]),
 		},
+		"streaming": service.describe(tenant_id)["streaming"],
+	}
+
+
+def agent_workbench_model(service: WsblService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or WsblService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/wsbl/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_wsbl_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["wsbl_agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["wsbl_agents"]["supported_roles"],
+		"human_approval_required": contract["configuration"]["wsbl_agents"]["human_approval_required"],
+	}
+
+
+def policy_center_model(service: WsblService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or WsblService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/wsbl/policy",
+		"tenant_id": tenant_id,
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"publish_requests": service.list_publish_requests(tenant_id),
+		"pending_components": [
+			component
+			for component in service.list_components(tenant_id)
+			if component["status"] == "review_required"
+		],
 	}
 
 
@@ -108,6 +141,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": [route["permission"] for route in contract["ui"]["routes"]],
 	}
 

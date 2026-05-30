@@ -12,6 +12,7 @@ SITE_STATUSES = {"draft", "domain_pending", "ready", "published", "archived"}
 PAGE_STATUSES = {"draft", "review_ready", "published", "archived"}
 COMPONENT_STATUSES = {"available", "review_required", "approved", "retired"}
 PUBLISH_STATUSES = {"approved", "review_required", "published", "rolled_back"}
+AGENT_STATUSES = {"active", "disabled"}
 
 
 def utc_now() -> str:
@@ -215,5 +216,35 @@ class WebsiteAuditEventRecord:
 			"subject_id": self.subject_id,
 			"actor_id": self.actor_id,
 			"details": dict(self.details),
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class WebsiteAgentRecord:
+	"""Governed website-builder agent for review and publishing assistance."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	status: str = "active"
+	human_approval_required: bool = True
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"status": self.status,
+			"human_approval_required": self.human_approval_required,
 			"created_at": self.created_at,
 		}

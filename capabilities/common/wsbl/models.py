@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .website_runtime import (
+	WebsiteAgentRecord,
 	WebsiteAuditEventRecord,
 	WebsiteComponentRecord,
 	WebsiteDomainRecord,
@@ -17,6 +18,7 @@ WsblRecord = WebsiteSiteRecord
 
 __all__ = [
 	"WebsiteAuditEventRecord",
+	"WebsiteAgentRecord",
 	"WebsiteComponentRecord",
 	"WebsiteDomainRecord",
 	"WebsitePageRecord",

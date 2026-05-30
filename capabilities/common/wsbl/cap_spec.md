@@ -1,173 +1,119 @@
-# Website Builder Capability Specification
+# Website Builder Capability Packet
 
-- **Capability Name**: Website Builder
-- **Capability ID**: `wsbl`
-- **Category**: common
-- **Version**: 1.0.0
+- Capability Name: Website Builder
+- Capability ID: `wsbl`
+- Category: common
+- Version: 1.0.0
 
 ## Purpose
 
-`wsbl` provides an executable website-builder runtime for APG applications. It
-owns tenant sites, domain validation state, page composition, governed component
-reuse, publication requests, rollback, audit events, UI route metadata, theme
-metadata, and publish-plan evidence.
+WSBL provides executable APG website-builder behavior for tenant sites, domains,
+pages, components, publishing, rollback, privacy, accessibility, agent review,
+audit, visual theming, and Bytewax lifecycle streams. It lets generated
+applications compose public or internal sites from governed sections while
+keeping publication controls explicit.
 
-The package is dependency-light and deterministic. Live CMS stores, CDN
-publishing, asset pipelines, visual editors, analytics collectors, consent
-management systems, and public-hosting providers are adapter boundaries around
-the local runtime, not prerequisites for package proof.
-
-## Provided Services
+## Provides
 
 - `site_management`
 - `page_composition`
 - `component_library`
 - `publishing_workflows`
 - `site_theming`
-- `wsbl_operations`
+- `website_governance`
+- `wsbl_agents`
 
-## Required Services
+## Requires
 
-- `tenant_context`
-- `them` for visual theme alignment
-- `auth` for permissions and actor identity
-- `ncod` for governed no-code component composition
+- `them`
+- `auth`
+- `ncod`
+- `accs`
+- `cons`
 
-Optional adapters may integrate `i18n`, `accs`, `mchn`, and `cons` when a
-capacity requires localization, accessibility scanning, machine/analytics
-signals, or consent policy management.
+## Configuration Areas
 
-## Runtime Behavior
+WSBL configuration is defined by `capability_contract.py` and covers:
 
-The current package runtime is implemented in `website_runtime.py`,
-`service.py`, `api.py`, and `views.py`.
+- tenant context;
+- site ownership, domain validation, locales, and preview evidence;
+- page sections, custom component review, autosave, and versioning;
+- publishing approval, accessibility pass, privacy consent policy, rollback, and stream routing;
+- first-class website-builder agent runtimes, roles, and human approval;
+- audit, component policy, and public-site governance;
+- Bytewax lifecycle-stream observability;
+- adapter boundaries for theming, authorization, consent, accessibility, analytics, and event streaming;
+- UI route toggles and theme tokens.
 
-Executable lifecycles:
+## Lifecycle
 
-- create tenant-owned sites with owner, locale, public-site, privacy-banner,
-  domain, status, and required-action metadata;
-- register and validate domains, marking sites `domain_pending` until the
-  domain proof lands;
-- create standard and custom components, forcing custom components through
-  review before page use;
-- create pages and add structured sections from approved components;
-- create governed publish requests with approval, accessibility, and privacy
-  consent-policy checks;
-- publish approved requests and mark pages/sites published;
-- rollback a published site to a previous version;
-- expose dashboard, site console, page library, page editor, component library,
-  publish queue, analytics, and settings view models;
-- append audit events for site, domain, component, page, publishing, and
-  rollback actions.
+WSBL supports the following lifecycle:
 
-Compatibility helpers `create_record()` and `list_records()` remain available
-for generic package tooling, but they delegate to site creation/listing rather
-than storing generic records.
+1. Create a tenant site with owner, locale, public-site controls, privacy banner state, and optional domain.
+2. Register and validate domains.
+3. Create governed standard or custom components.
+4. Review custom components with policy attribution.
+5. Create pages and add structured sections.
+6. Request publication with approval, validated domains, structured sections, preview evidence, accessibility pass, consent policy, and Bytewax stream metadata.
+7. Publish approved requests and version the site/pages.
+8. Roll back through Bytewax-governed lifecycle metadata.
+9. Register governed AI agents that review sites, components, accessibility, privacy, publishing, and SEO evidence.
 
-## Configuration
-
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`.
-
-Required configuration sections:
-
-- `tenant_id`
-- `sites`
-- `pages`
-- `publishing`
-- `governance`
-- `ui`
-- `theme`
-
-Important default controls:
-
-- site owner required;
-- domain validation required;
-- multi-locale and environment preview enabled;
-- structured sections required;
-- custom component review required;
-- publishing approval required;
-- accessibility pass required;
-- privacy banner consent policy required;
-- tenant context and publication audit required.
-
-## Rules
-
-The deterministic rule engine exposes these rule IDs:
+## Deterministic Rules
 
 - `tenant_context_required`
 - `site_requires_owner`
+- `domain_requires_validation_before_publish`
+- `page_requires_structured_sections`
+- `preview_requires_evidence`
 - `publish_requires_approval`
+- `publish_requires_bytewax_stream`
 - `custom_component_requires_review`
+- `custom_component_requires_policy`
 - `public_site_requires_accessibility_pass`
 - `privacy_banner_requires_consent_policy`
-
-Service guardrails enforce the same decisions:
-
-- creating a site without tenant context raises `tenant_context_required`;
-- creating a site without an owner raises `site_owner_required`;
-- using an unreviewed custom component in a page raises
-  `component_review_required`;
-- publishing without approval raises `site_publish_approval_required`;
-- publishing a public site without accessibility evidence raises
-  `accessibility_pass_required`;
-- publishing with a privacy banner but without consent policy evidence creates
-  a `review_required` publication request with required action
-  `attach_consent_policy`.
+- `rollback_requires_bytewax_stream`
+- `batch_publish_requires_bytewax`
+- `wsbl_agent_runtime_supported`
+- `wsbl_agent_role_supported`
+- `privileged_agent_publish_action_requires_human_approval`
 
 ## UI
 
-The package exposes eight APG Python UI routes:
-
-- `/wsbl/dashboard` via `WSBLDashboard`
-- `/wsbl/sites` via `SiteConsole`
-- `/wsbl/pages` via `PageLibrary`
-- `/wsbl/editor` via `PageEditor`
-- `/wsbl/components` via `ComponentLibrary`
-- `/wsbl/publishing` via `PublishQueue`
-- `/wsbl/analytics` via `SiteAnalytics`
-- `/wsbl/settings` via `WSBLSettings`
-
-`views.py` returns dependency-light view models for these routes. The view
-models include route names, tenant context, relevant records, available
-actions, summary counts, and theme/configuration metadata.
+WSBL exposes APG Python view models for dashboard, site console, page library,
+page editor, component library, publish queue, analytics, agent workbench,
+policy center, and settings.
 
 ## Theme
 
-The package uses the `wsbl_site_builder` APG theme contract. Current component
-theme metadata covers site cards, page editor sections, publish queue states,
-and analytics panels.
+WSBL uses the `wsbl_site_builder` theme with compact density, site cards,
+publish bands, section builders, component chips, release checklists, approval
+chips, traffic grids, trend chips, review lanes, and guardrail chips.
+
+## Streaming
+
+WSBL lifecycle events are described by the Bytewax stream manifest:
+
+- processor: `bytewax`
+- stream: `apg.wsbl.lifecycle`
+- key: `tenant_id`
+- events: `site_created`, `domain_registered`, `domain_validated`,
+  `component_created`, `component_reviewed`, `page_created`,
+  `page_section_added`, `publish_request_created`, `site_published`,
+  `site_rolled_back`, `wsbl_agent_registered`
 
 ## Adapter Boundaries
 
-Keep these integrations behind APG composition adapters:
-
-- public CDN or static-host deployment;
-- visual drag-and-drop editors;
-- asset storage and image transformation;
-- accessibility scanner engines;
-- consent-management platforms;
-- traffic analytics collectors;
-- search indexing and sitemap generation;
-- external CMS import/export;
-- localized content translation.
-
-Local package proof must remain deterministic without those providers.
+The in-package service is dependency-light and stores records in memory for
+generated apps, tests, and publish-plan probes. Production deployments should
+bind visual editors, asset stores, preview renderers, accessibility scanners,
+consent platforms, analytics collectors, CDN or static-host deployment,
+search/sitemap systems, audit sinks, and Bytewax workers through APG adapters
+without weakening the deterministic contract.
 
 ## Focused Verification
 
-Use these battery-conscious commands after WSBL package changes:
-
-```bash
-./.venv/bin/python -m py_compile capabilities/common/wsbl/__init__.py capabilities/common/wsbl/models.py capabilities/common/wsbl/website_runtime.py capabilities/common/wsbl/service.py capabilities/common/wsbl/api.py capabilities/common/wsbl/views.py capabilities/common/wsbl/capability_contract.py capabilities/common/wsbl/app.py capabilities/common/wsbl/test_capability_contract.py capabilities/common/wsbl/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/wsbl/test_capability_contract.py capabilities/common/wsbl/tests/test_package_contract.py
-./.venv/bin/apg capabilities implementation-audit --root capabilities/common/wsbl --json
-./.venv/bin/apg capabilities publish-plan capabilities/common/wsbl --json
-```
-
-When global readiness changes, also run:
-
-```bash
-./.venv/bin/apg capabilities implementation-audit --json
-./.venv/bin/apg capabilities audit --strict-package-artifacts --json
-```
+- `./.venv/bin/python -m py_compile capabilities/common/wsbl/__init__.py capabilities/common/wsbl/models.py capabilities/common/wsbl/website_runtime.py capabilities/common/wsbl/service.py capabilities/common/wsbl/api.py capabilities/common/wsbl/views.py capabilities/common/wsbl/capability_contract.py capabilities/common/wsbl/app.py capabilities/common/wsbl/test_capability_contract.py capabilities/common/wsbl/tests/test_package_contract.py`
+- `./.venv/bin/pytest -q capabilities/common/wsbl/test_capability_contract.py capabilities/common/wsbl/tests/test_package_contract.py`
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/wsbl --json`
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wsbl --json`

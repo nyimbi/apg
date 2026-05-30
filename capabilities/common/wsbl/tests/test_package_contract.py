@@ -63,6 +63,8 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	assert contract["capability"] == "wsbl"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "wsbl_agents" in contract["provides"]
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert model["format"] == "apg.semantic-model.v1"
@@ -85,6 +87,7 @@ def test_site_page_component_publish_lifecycle_executes():
 	assert component["status"] == "approved"
 	assert page["status"] == "review_ready"
 	assert summary["site_count"] == 1
+	assert summary["streaming"]["processor"] == "bytewax"
 	assert request["status"] == "approved"
 	assert published["site"]["status"] == "published"
 	assert published["site"]["published_version"] == 1
@@ -131,6 +134,9 @@ def test_custom_components_require_review_before_page_use():
 	with pytest.raises(PermissionError, match="component_review_required"):
 		service.add_page_section(page["id"], component["id"], {"links": []}, actor_id="editor-1")
 
+	with pytest.raises(PermissionError, match="component_policy_required"):
+		service.review_component(component["id"], reviewer_id="reviewer-1")
+
 	reviewed = service.review_component(component["id"], reviewer_id="reviewer-1", policy_id="component-policy")
 	updated_page = service.add_page_section(page["id"], component["id"], {"links": []}, actor_id="editor-1")
 
@@ -146,6 +152,10 @@ def test_publish_requires_approval_accessibility_and_consent_policy():
 		service.create_publish_request(site["id"], "publisher-1", accessibility_passed=True, consent_policy_attached=True)
 	with pytest.raises(PermissionError, match="accessibility_pass_required"):
 		service.create_publish_request(site["id"], "publisher-1", approval_recorded=True, consent_policy_attached=True)
+	with pytest.raises(PermissionError, match="preview_evidence_required"):
+		service.create_publish_request(site["id"], "publisher-1", approval_recorded=True, accessibility_passed=True, consent_policy_attached=True, preview_evidence_present=False)
+	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
+		service.create_publish_request(site["id"], "publisher-1", approval_recorded=True, accessibility_passed=True, consent_policy_attached=True, event_stream="local")
 
 	review = service.create_publish_request(
 		site["id"],
@@ -159,6 +169,63 @@ def test_publish_requires_approval_accessibility_and_consent_policy():
 	assert review["required_actions"] == ["attach_consent_policy"]
 	with pytest.raises(PermissionError, match="publish_request_not_approved"):
 		service.publish_site(review["id"], actor_id="publisher-1")
+
+
+def test_publish_requires_validated_domain_and_structured_sections():
+	service = WsblService()
+	site = service.create_site(
+		site_key="campaign",
+		tenant_id="tenant-wsbl",
+		name="Campaign",
+		owner_id="owner-1",
+		primary_domain="campaign.example.test",
+		domain_validated=False,
+	)
+
+	with pytest.raises(PermissionError, match="domain_validation_required"):
+		service.create_publish_request(site["id"], "publisher-1", approval_recorded=True, accessibility_passed=True, consent_policy_attached=True)
+
+	domain = service.list_domains("tenant-wsbl")[0]
+	service.validate_domain(domain["id"], actor_id="owner-1")
+
+	with pytest.raises(PermissionError, match="structured_sections_required"):
+		service.create_publish_request(site["id"], "publisher-1", approval_recorded=True, accessibility_passed=True, consent_policy_attached=True)
+
+
+def test_wsbl_agents_and_batch_publish_guardrails_execute():
+	service = WsblService()
+
+	agent = service.register_wsbl_agent(
+		tenant_id="tenant-wsbl",
+		name="Publish reviewer",
+		runtime="codex",
+		role="publish_reviewer",
+		scope="review site publish evidence",
+	)
+	privileged = service.validate_agent_publish_action(
+		tenant_id="tenant-wsbl",
+		agent_id=agent["id"],
+		action="publish_site",
+		privileged_scope=True,
+	)
+	approved = service.validate_agent_publish_action(
+		tenant_id="tenant-wsbl",
+		agent_id=agent["id"],
+		action="publish_site",
+		privileged_scope=True,
+		human_approval_ref="approval://agent/publish",
+	)
+	batch_block = service.validate_batch_publish("tenant-wsbl", 3, event_stream="local")
+
+	assert agent["runtime"] == "codex"
+	assert privileged["decision"] == "deny"
+	assert privileged["matched_rules"] == ["privileged_agent_publish_action_requires_human_approval"]
+	assert approved["decision"] == "allow"
+	assert batch_block["decision"] == "deny"
+	assert batch_block["matched_rules"] == ["batch_publish_requires_bytewax"]
+
+	with pytest.raises(PermissionError, match="wsbl_agent_runtime_not_supported"):
+		service.register_wsbl_agent("tenant-wsbl", "Unsupported", "unknown", "publish_reviewer", "review")
 
 
 def test_api_helpers_expose_website_builder_lifecycle():
@@ -179,13 +246,22 @@ def test_api_helpers_expose_website_builder_lifecycle():
 	})
 	page = api.create_page({"site_id": site["id"], "tenant_id": "tenant-api", "slug": "products", "title": "Products"})
 	page = api.add_page_section({"page_id": page["id"], "component_id": component["id"], "content": {"count": 3}})
+	agent = api.register_wsbl_agent({
+		"tenant_id": "tenant-api",
+		"name": "Accessibility reviewer",
+		"runtime": "claude_code",
+		"role": "accessibility_reviewer",
+		"scope": "review accessibility evidence",
+	})
 	status = api.capability_status("tenant-api")
 	listing = api.list_website_builder("tenant-api")
 
 	assert page["status"] == "review_ready"
 	assert status["site_count"] == 1
+	assert status["wsbl_agent_count"] == 1
 	assert status["page_count"] == 1
 	assert listing["components"][0]["name"] == "Product List"
+	assert listing["wsbl_agents"][0]["id"] == agent["id"]
 
 
 def test_view_models_match_routes_theme_and_builder_state():
@@ -198,6 +274,8 @@ def test_view_models_match_routes_theme_and_builder_state():
 	components = views.component_library_model(service, "tenant-wsbl")
 	publishing = views.publish_queue_model(service, "tenant-wsbl")
 	analytics = views.analytics_model(service, "tenant-wsbl")
+	agents = views.agent_workbench_model(service, "tenant-wsbl")
+	policy = views.policy_center_model(service, "tenant-wsbl")
 	settings = views.settings_model("tenant-wsbl")
 
 	assert dashboard["summary"]["site_count"] == 1
@@ -206,4 +284,7 @@ def test_view_models_match_routes_theme_and_builder_state():
 	assert components["pending_review"] == []
 	assert publishing["publish_requests"][0]["id"] == request["id"]
 	assert analytics["signals"]["published_site_ratio"] == 0.0
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert policy["streaming"]["processor"] == "bytewax"
 	assert settings["theme"]["name"] == "wsbl_site_builder"
+	assert settings["streaming"]["processor"] == "bytewax"

@@ -4,8 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_WSBL_AGENT_ROLES,
+	SUPPORTED_WSBL_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .website_runtime import (
+	WebsiteAgentRecord,
 	WebsiteAuditEventRecord,
 	WebsiteComponentRecord,
 	WebsiteDomainRecord,
@@ -26,6 +34,7 @@ class WsblService:
 		self._components: dict[str, WebsiteComponentRecord] = {}
 		self._pages: dict[str, WebsitePageRecord] = {}
 		self._publish_requests: dict[str, WebsitePublishRequestRecord] = {}
+		self._agents: dict[str, WebsiteAgentRecord] = {}
 		self._audit_events: list[WebsiteAuditEventRecord] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -153,6 +162,12 @@ class WsblService:
 
 	def review_component(self, component_id: str, reviewer_id: str, policy_id: str | None = None) -> dict[str, Any]:
 		component = self._get_component(component_id)
+		self._enforce_context({
+			"tenant_context_present": bool(component.tenant_id),
+			"operation": "review_component",
+			"custom_component_present": bool(component.custom),
+			"component_policy_attached": bool(policy_id or component.policy_id),
+		})
 		component.status = "approved"
 		component.reviewed_by = reviewer_id
 		component.reviewed_at = utc_now()
@@ -199,6 +214,7 @@ class WsblService:
 		if component.custom and component.status != "approved":
 			self._enforce_context({
 				"tenant_context_present": True,
+				"operation": "add_page_section",
 				"custom_component_present": True,
 				"component_review_recorded": False,
 			})
@@ -224,12 +240,28 @@ class WsblService:
 		approval_recorded: bool = False,
 		accessibility_passed: bool = False,
 		consent_policy_attached: bool = False,
+		preview_evidence_present: bool = True,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		site = self._get_site(site_id)
+		domain_validation_complete = all(
+			domain.validated
+			for domain in self._domains.values()
+			if domain.tenant_id == site.tenant_id and domain.site_id == site.id
+		)
+		structured_sections_present = any(
+			page.sections
+			for page in self._pages.values()
+			if page.tenant_id == site.tenant_id and page.site_id == site.id
+		)
 		result = self.evaluate({
 			"tenant_context_present": bool(site.tenant_id),
 			"operation": "publish_site",
+			"domain_validation_complete": domain_validation_complete,
+			"structured_sections_present": structured_sections_present,
+			"preview_evidence_present": bool(preview_evidence_present),
 			"approval_recorded": approval_recorded,
+			"event_stream": self._normalize_token(event_stream),
 			"public_site": site.public_site,
 			"accessibility_passed": accessibility_passed,
 			"privacy_banner_required": site.privacy_banner_required,
@@ -254,7 +286,13 @@ class WsblService:
 			required_actions=required_actions,
 		)
 		self._publish_requests[request_id] = record
-		self._audit(site.tenant_id, "publish_request_created", request_id, requested_by, {"status": status, "required_actions": required_actions})
+		self._audit(
+			site.tenant_id,
+			"publish_request_created",
+			request_id,
+			requested_by,
+			{"status": status, "required_actions": required_actions, "event_stream": self._normalize_token(event_stream)},
+		)
 		return record.to_dict()
 
 	def publish_site(self, publish_request_id: str, actor_id: str) -> dict[str, Any]:
@@ -275,15 +313,98 @@ class WsblService:
 		self._audit(site.tenant_id, "site_published", site.id, actor_id, {"publish_request_id": request.id, "version": site.published_version})
 		return {"site": site.to_dict(), "publish_request": request.to_dict()}
 
-	def rollback_site(self, site_id: str, version: int, actor_id: str) -> dict[str, Any]:
+	def rollback_site(self, site_id: str, version: int, actor_id: str, event_stream: str = "bytewax") -> dict[str, Any]:
 		site = self._get_site(site_id)
+		self._enforce_context({
+			"tenant_context_present": bool(site.tenant_id),
+			"operation": "rollback_site",
+			"event_stream": self._normalize_token(event_stream),
+		})
 		if version < 0 or version > site.published_version:
 			raise ValueError("invalid_rollback_version")
 		site.published_version = version
 		site.status = "published" if version else "ready"
 		site.updated_at = utc_now()
-		self._audit(site.tenant_id, "site_rolled_back", site.id, actor_id, {"version": version})
+		self._audit(site.tenant_id, "site_rolled_back", site.id, actor_id, {"version": version, "event_stream": self._normalize_token(event_stream)})
 		return site.to_dict()
+
+	def register_wsbl_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str = "platform",
+		human_approval_required: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_wsbl_agent",
+			"agent_runtime_supported": runtime_value in SUPPORTED_WSBL_AGENT_RUNTIMES,
+			"agent_role_supported": role_value in SUPPORTED_WSBL_AGENT_ROLES,
+		}
+		self._enforce_context(context)
+		record = WebsiteAgentRecord(
+			id=stable_id("agent", tenant_id, name, runtime_value, role_value),
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=scope,
+			owner=owner,
+			human_approval_required=bool(human_approval_required),
+		)
+		self._agents[record.id] = record
+		self._audit(
+			tenant_id,
+			"wsbl_agent_registered",
+			record.id,
+			owner,
+			{"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
+		)
+		return record.to_dict()
+
+	def validate_agent_publish_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		action: str,
+		privileged_scope: bool = False,
+		human_approval_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent = self._agents.get(agent_id)
+		if agent is None or agent.tenant_id != tenant_id:
+			raise KeyError(f"wsbl_agent_not_found:{agent_id}")
+		context = {
+			"tenant_context_present": True,
+			"operation": "agent_publish_action",
+			"agent_id": agent_id,
+			"agent_role": agent.role,
+			"action": action,
+			"privileged_scope": bool(privileged_scope),
+			"human_approval_recorded": bool(str(human_approval_ref or "").strip()),
+		}
+		return self.evaluate(context)
+
+	def validate_batch_publish(
+		self,
+		tenant_id: str,
+		site_count: int,
+		event_stream: str = "bytewax",
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		context = {
+			"tenant_context_present": True,
+			"operation": "batch_publish",
+			"site_count": int(site_count),
+			"event_stream": self._normalize_token(event_stream),
+		}
+		return self.evaluate(context)
 
 	def list_sites(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [site.to_dict() for site in sorted(self._filter(self._sites.values(), tenant_id), key=lambda item: item.name)]
@@ -307,6 +428,9 @@ class WsblService:
 		events = self._filter(self._audit_events, tenant_id)
 		return [event.to_dict() for event in sorted(events, key=lambda item: item.created_at)]
 
+	def list_wsbl_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return [agent.to_dict() for agent in sorted(self._filter(self._agents.values(), tenant_id), key=lambda item: item.name)]
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		sites = self.list_sites(tenant_id)
 		pages = self.list_pages(tenant_id)
@@ -322,6 +446,9 @@ class WsblService:
 			"pending_component_review_count": sum(1 for component in components if component["status"] == "review_required"),
 			"publish_request_count": len(requests),
 			"publish_review_count": sum(1 for request in requests if request["status"] == "review_required"),
+			"wsbl_agent_count": len(self.list_wsbl_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
 		}
 
 	def create_record(
@@ -400,3 +527,7 @@ class WsblService:
 		if tenant_id is None:
 			return items
 		return [record for record in items if record.tenant_id == tenant_id]
+
+	@staticmethod
+	def _normalize_token(value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
