@@ -5,29 +5,202 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+
+SUPPORTED_THEM_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_THEM_AGENT_ROLES = [
+	"design_token_reviewer",
+	"accessibility_reviewer",
+	"brand_reviewer",
+	"preview_reviewer",
+	"rollout_reviewer",
+	"localization_reviewer",
+]
+THEM_EVENT_STREAM = "apg.them.lifecycle"
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
-	"themes": {"theme_owner_required": True, "default_theme": "them_brand_system", "multi_brand_enabled": True, "preview_required": True},
-	"tokens": {"governed_tokens": ["color", "typography", "spacing", "density"], "contrast_validation_required": True, "token_versioning_enabled": True},
-	"branding": {"license_verification_required": True, "asset_approval_required": True, "brand_guidelines_required": True, "fallback_brand_enabled": True},
-	"governance": {"require_tenant_context": True, "publish_approval_required": True, "large_rollout_review_threshold": 5, "audit_theme_changes": True},
-	"ui": {"enable_theme_console": True, "enable_token_editor": True, "enable_brand_asset_manager": True, "enable_live_preview": True},
-	"theme": {"default_theme": "them_brand_system", "allow_tenant_overrides": True}
+	"themes": {
+		"theme_owner_required": True,
+		"default_theme": "them_brand_system",
+		"multi_brand_enabled": True,
+		"preview_required": True,
+		"guidelines_required": True,
+	},
+	"tokens": {
+		"governed_tokens": ["color", "typography", "spacing", "density", "component"],
+		"contrast_validation_required": True,
+		"token_versioning_enabled": True,
+		"token_review_required": True,
+	},
+	"branding": {
+		"license_verification_required": True,
+		"asset_approval_required": True,
+		"brand_guidelines_required": True,
+		"fallback_brand_enabled": True,
+	},
+	"them_agents": {
+		"enabled": True,
+		"supported_runtimes": SUPPORTED_THEM_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_THEM_AGENT_ROLES,
+		"human_approval_required": True,
+		"max_autonomous_scope": "non_privileged",
+		"disclose_agent_recommendations": True,
+	},
+	"governance": {
+		"require_tenant_context": True,
+		"publish_approval_required": True,
+		"large_rollout_review_threshold": 5,
+		"audit_theme_changes": True,
+		"state_change_audit_required": True,
+	},
+	"observability": {
+		"event_stream": THEM_EVENT_STREAM,
+		"stream_processor": "bytewax",
+		"emit_theme_events": True,
+		"emit_token_events": True,
+		"emit_publication_events": True,
+	},
+	"adapters": {
+		"identity": "adapter",
+		"audit": "adapter",
+		"asset_store": "adapter",
+		"preview_renderer": "adapter",
+		"accessibility": "adapter",
+		"event_stream": "bytewax",
+	},
+	"ui": {
+		"enable_theme_console": True,
+		"enable_token_editor": True,
+		"enable_brand_asset_manager": True,
+		"enable_live_preview": True,
+		"enable_agent_workbench": True,
+		"enable_policy_center": True,
+	},
+	"theme": {"default_theme": "them_brand_system", "allow_tenant_overrides": True},
 }
 
 CONFIGURATION_SCHEMA: dict[str, Any] = {
 	"type": "object",
-	"required": ["tenant_id", "themes", "tokens", "branding", "governance", "ui", "theme"],
-	"properties": {key: {"type": "object"} for key in ["themes", "tokens", "branding", "governance", "ui", "theme"]} | {"tenant_id": {"type": "string", "minLength": 1}}
+	"required": [
+		"tenant_id",
+		"themes",
+		"tokens",
+		"branding",
+		"them_agents",
+		"governance",
+		"observability",
+		"adapters",
+		"ui",
+		"theme",
+	],
+	"properties": {
+		key: {"type": "object"}
+		for key in [
+			"themes",
+			"tokens",
+			"branding",
+			"them_agents",
+			"governance",
+			"observability",
+			"adapters",
+			"ui",
+			"theme",
+		]
+	} | {"tenant_id": {"type": "string", "minLength": 1}},
 }
 
 RULES: list[dict[str, Any]] = [
-	{"name": "tenant_context_required", "description": "All theme operations require tenant context.", "condition": {"tenant_context_present": False}, "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}},
-	{"name": "theme_requires_owner", "description": "Themes require an accountable owner.", "condition": {"operation": "create_theme", "theme_owner_assigned": False}, "effect": {"decision": "deny", "reason": "theme_owner_required", "required_action": "assign_theme_owner"}},
-	{"name": "publish_requires_approval", "description": "Theme publishing requires approval.", "condition": {"operation": "publish_theme", "approval_recorded": False}, "effect": {"decision": "deny", "reason": "theme_publish_approval_required", "required_action": "record_publish_approval"}},
-	{"name": "brand_asset_requires_license", "description": "Brand assets require license verification.", "condition": {"brand_asset_present": True, "license_verified": False}, "effect": {"decision": "deny", "reason": "brand_asset_license_required", "required_action": "verify_brand_license"}},
-	{"name": "accessible_contrast_required", "description": "Published themes require contrast validation.", "condition": {"operation": "publish_theme", "accessibility_contrast_passed": False}, "effect": {"decision": "deny", "reason": "contrast_validation_required", "required_action": "validate_theme_contrast"}},
-	{"name": "large_rollout_requires_review", "description": "Broad theme rollouts require review.", "condition": {"target_tenant_count_gt": 5, "rollout_review_recorded": False}, "effect": {"decision": "require_review", "reason": "large_rollout_review_required", "required_action": "review_theme_rollout"}}
+	{
+		"name": "tenant_context_required",
+		"description": "All theme operations require tenant context.",
+		"condition": {"tenant_context_present": False},
+		"effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"},
+	},
+	{
+		"name": "theme_requires_owner",
+		"description": "Themes require an accountable owner.",
+		"condition": {"operation": "create_theme", "theme_owner_assigned": False},
+		"effect": {"decision": "deny", "reason": "theme_owner_required", "required_action": "assign_theme_owner"},
+	},
+	{
+		"name": "theme_requires_guidelines",
+		"description": "Themes require brand guideline evidence.",
+		"condition": {"operation": "create_theme", "brand_guidelines_present": False},
+		"effect": {"decision": "deny", "reason": "brand_guidelines_required", "required_action": "attach_brand_guidelines"},
+	},
+	{
+		"name": "token_update_requires_reviewer",
+		"description": "Governed token updates require reviewer attribution.",
+		"condition": {"operation": "update_tokens", "token_reviewer_present": False},
+		"effect": {"decision": "deny", "reason": "token_reviewer_required", "required_action": "assign_token_reviewer"},
+	},
+	{
+		"name": "brand_asset_requires_license",
+		"description": "Brand assets require license verification.",
+		"condition": {"operation": "add_brand_asset", "brand_asset_present": True, "license_verified": False},
+		"effect": {"decision": "deny", "reason": "brand_asset_license_required", "required_action": "verify_brand_license"},
+	},
+	{
+		"name": "brand_asset_requires_approval",
+		"description": "Brand assets require approval before use.",
+		"condition": {"operation": "add_brand_asset", "asset_approval_recorded": False},
+		"effect": {"decision": "deny", "reason": "brand_asset_approval_required", "required_action": "approve_brand_asset"},
+	},
+	{
+		"name": "preview_requires_artifact",
+		"description": "Theme previews require a renderable preview artifact.",
+		"condition": {"operation": "create_preview", "preview_artifact_present": False},
+		"effect": {"decision": "deny", "reason": "theme_preview_required", "required_action": "attach_theme_preview"},
+	},
+	{
+		"name": "publish_requires_approval",
+		"description": "Theme publishing requires approval.",
+		"condition": {"operation": "publish_theme", "approval_recorded": False},
+		"effect": {"decision": "deny", "reason": "theme_publish_approval_required", "required_action": "record_publish_approval"},
+	},
+	{
+		"name": "accessible_contrast_required",
+		"description": "Published themes require contrast validation.",
+		"condition": {"operation": "publish_theme", "accessibility_contrast_passed": False},
+		"effect": {"decision": "deny", "reason": "contrast_validation_required", "required_action": "validate_theme_contrast"},
+	},
+	{
+		"name": "publish_requires_bytewax_stream",
+		"description": "Theme publication lifecycle events must be emitted through Bytewax.",
+		"condition": {"operation": "publish_theme", "event_stream_ne": "bytewax"},
+		"effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "route_theme_publication_to_bytewax"},
+	},
+	{
+		"name": "large_rollout_requires_review",
+		"description": "Broad theme rollouts require review.",
+		"condition": {"target_tenant_count_gt": 5, "rollout_review_recorded": False},
+		"effect": {"decision": "require_review", "reason": "large_rollout_review_required", "required_action": "review_theme_rollout"},
+	},
+	{
+		"name": "them_agent_runtime_supported",
+		"description": "Theme agents must use an approved runtime.",
+		"condition": {"operation": "register_them_agent", "agent_runtime_supported": False},
+		"effect": {"decision": "deny", "reason": "them_agent_runtime_not_supported", "required_action": "select_supported_agent_runtime"},
+	},
+	{
+		"name": "them_agent_role_supported",
+		"description": "Theme agents must use an approved role.",
+		"condition": {"operation": "register_them_agent", "agent_role_supported": False},
+		"effect": {"decision": "deny", "reason": "them_agent_role_not_supported", "required_action": "select_supported_agent_role"},
+	},
+	{
+		"name": "privileged_agent_theme_action_requires_human_approval",
+		"description": "Privileged theme actions proposed by agents require human approval.",
+		"condition": {"operation": "agent_theme_action", "privileged_scope": True, "human_approval_recorded": False},
+		"effect": {"decision": "deny", "reason": "human_approval_required", "required_action": "record_human_approval"},
+	},
+	{
+		"name": "batch_theme_rollout_requires_bytewax",
+		"description": "Batch theme rollout requires Bytewax stream coordination.",
+		"condition": {"operation": "batch_theme_rollout", "event_stream_ne": "bytewax"},
+		"effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "route_batch_theme_rollout_to_bytewax"},
+	},
 ]
 
 UI_ROUTES: list[dict[str, str]] = [
@@ -37,14 +210,34 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "branding", "path": "/them/branding", "component": "BrandGuidelines", "permission": "them:manage_brand", "nav_group": "Brand"},
 	{"name": "assets", "path": "/them/assets", "component": "BrandAssetManager", "permission": "them:manage_brand", "nav_group": "Brand"},
 	{"name": "preview", "path": "/them/preview", "component": "ThemePreview", "permission": "them:view", "nav_group": "Review"},
+	{"name": "agents", "path": "/them/agents", "component": "THEMAgentWorkbench", "permission": "them:admin", "nav_group": "Automation"},
 	{"name": "policies", "path": "/them/policies", "component": "ThemePolicies", "permission": "them:admin", "nav_group": "Governance"},
-	{"name": "settings", "path": "/them/settings", "component": "THEMSettings", "permission": "them:admin", "nav_group": "Administration"}
+	{"name": "settings", "path": "/them/settings", "component": "THEMSettings", "permission": "them:admin", "nav_group": "Administration"},
 ]
 
 THEME: dict[str, Any] = {
 	"name": "them_brand_system",
-	"tokens": {"color.primary": "#1F4E5F", "color.accent": "#D69E2E", "color.success": "#2F855A", "color.warning": "#B7791F", "color.danger": "#C53030", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D", "border.radius": "8px", "density": "compact"},
-	"components": {"theme_card": {"icon": "palette", "status_indicator": "theme-pill", "risk_style": "contrast-band"}, "token_editor": {"visual": "token-table", "highlight": "changed-token-chip"}, "asset_library": {"visual": "asset-grid", "status_style": "license-chip"}, "preview_shell": {"visual": "responsive-preview", "status_style": "approval-chip"}}
+	"tokens": {
+		"color.primary": "#1F4E5F",
+		"color.accent": "#D69E2E",
+		"color.success": "#2F855A",
+		"color.warning": "#B7791F",
+		"color.danger": "#C53030",
+		"surface.canvas": "#F7F8FA",
+		"surface.panel": "#FFFFFF",
+		"text.primary": "#172033",
+		"text.secondary": "#52606D",
+		"border.radius": "8px",
+		"density": "compact",
+	},
+	"components": {
+		"theme_card": {"icon": "palette", "status_indicator": "theme-pill", "risk_style": "contrast-band"},
+		"token_editor": {"visual": "token-table", "highlight": "changed-token-chip"},
+		"asset_library": {"visual": "asset-grid", "status_style": "license-chip"},
+		"preview_shell": {"visual": "responsive-preview", "status_style": "approval-chip"},
+		"agent_workbench": {"visual": "review-lane", "status_style": "approval-chip"},
+		"policy_center": {"visual": "rule-grid", "status_style": "guardrail-chip"},
+	},
 }
 
 
@@ -53,7 +246,59 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	config["tenant_id"] = tenant_id
 	if overrides:
 		_deep_merge(config, overrides)
-	return {"capability": "them", "display_name": "UI/UX Theming and Branding", "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "view_module": "views.py", "api_prefix": "/them/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME)}
+	return {
+		"capability": "them",
+		"display_name": "UI/UX Theming and Branding",
+		"provides": [
+			"theme_tokens",
+			"brand_governance",
+			"asset_libraries",
+			"preview_workflows",
+			"theme_publication_governance",
+			"visual_theming",
+			"them_agents",
+		],
+		"requires": ["conf", "auth", "i18n", "audl", "accs"],
+		"configuration": config,
+		"configuration_schema": CONFIGURATION_SCHEMA,
+		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
+		"ui": {
+			"shell": "apg_python",
+			"view_module": "views.py",
+			"api_prefix": "/them/api/v1",
+			"routes": deepcopy(UI_ROUTES),
+			"template_roots": ["templates/", "static/"],
+			"requires_theme": True,
+		},
+		"theme": deepcopy(THEME),
+		"streaming": streaming_manifest(),
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	return {
+		"processor": "bytewax",
+		"stream": THEM_EVENT_STREAM,
+		"key": "tenant_id",
+		"events": [
+			"theme_created",
+			"tokens_updated",
+			"brand_asset_added",
+			"theme_preview_created",
+			"theme_published",
+			"them_agent_registered",
+		],
+		"states": ["draft", "preview_ready", "approved", "published", "review_required", "blocked"],
+		"guardrails": [
+			"publish_requires_bytewax_stream",
+			"batch_theme_rollout_requires_bytewax",
+			"privileged_agent_theme_action_requires_human_approval",
+		],
+	}
+
+
+def event_stream_name() -> str:
+	return THEM_EVENT_STREAM
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
@@ -74,11 +319,20 @@ def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
 
 def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 	for key, expected in condition.items():
-		if key.endswith("_lt"):
+		if key.endswith("_lte"):
+			if not context.get(key[:-4], 0) <= expected:
+				return False
+		elif key.endswith("_lt"):
 			if not context.get(key[:-3], 0) < expected:
+				return False
+		elif key.endswith("_gte"):
+			if not context.get(key[:-4], 0) >= expected:
 				return False
 		elif key.endswith("_gt"):
 			if not context.get(key[:-3], 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

@@ -23,6 +23,9 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"published_theme_count": summary["published_theme_count"],
 		"review_required_theme_count": summary["review_required_theme_count"],
 		"approved_asset_count": summary["approved_asset_count"],
+		"them_agent_count": summary["them_agent_count"],
+		"audit_event_count": summary["audit_event_count"],
+		"streaming": summary["streaming"],
 	}
 
 
@@ -45,6 +48,7 @@ def update_tokens(payload: dict[str, Any]) -> dict[str, Any]:
 		tokens=dict(payload.get("tokens") or {}),
 		updated_by=str(payload.get("updated_by") or ""),
 		contrast_validated=bool(payload.get("contrast_validated", False)),
+		reviewer=payload.get("reviewer"),
 	)
 
 
@@ -79,6 +83,38 @@ def publish_theme(payload: dict[str, Any]) -> dict[str, Any]:
 		approval_ref=str(payload.get("approval_ref") or ""),
 		target_tenant_count=int(payload.get("target_tenant_count", 1)),
 		rollout_review_recorded=bool(payload.get("rollout_review_recorded", False)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+	)
+
+
+def register_them_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_them_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or "platform"),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+	)
+
+
+def validate_agent_theme_action(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_agent_theme_action(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["agent_id"]),
+		action=str(payload.get("action") or "review"),
+		privileged_scope=bool(payload.get("privileged_scope", False)),
+		human_approval_ref=payload.get("human_approval_ref"),
+	)
+
+
+def validate_batch_theme_rollout(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_batch_theme_rollout(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		target_tenant_count=int(payload.get("target_tenant_count", 1)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		rollout_review_recorded=bool(payload.get("rollout_review_recorded", False)),
 	)
 
 
@@ -102,6 +138,7 @@ def list_theme_system(tenant_id: str = "default") -> dict[str, Any]:
 		"assets": SERVICE.list_assets(tenant_id),
 		"previews": SERVICE.list_previews(tenant_id),
 		"publications": SERVICE.list_publications(tenant_id),
+		"them_agents": SERVICE.list_them_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

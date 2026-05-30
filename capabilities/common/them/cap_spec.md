@@ -1,86 +1,109 @@
-# UI/UX Theming and Branding Capability Specification
+# UI/UX Theming and Branding Capability Packet
 
-- **Capability Name**: UI/UX Theming and Branding
-- **Capability ID**: `them`
-- **Category**: common
-- **Version**: 1.0.0
+- Capability Name: UI/UX Theming and Branding
+- Capability ID: `them`
+- Category: common
+- Version: 1.0.0
 
 ## Purpose
 
-This package provides the executable APG runtime for `them`.
-It gives composed applications a deterministic theme and brand-governance
-surface for theme creation, token versioning, licensed brand assets, live
-preview evidence, accessibility contrast gates, governed publishing, large
-rollout review, UI route metadata, semantic-model publication, and publish-plan
-evidence.
+THEM provides executable APG theme, token, brand, preview, publication, and
+visual-governance behavior. It lets generated applications compose tenant theme
+systems, governed design tokens, licensed brand assets, preview evidence,
+accessibility contrast gates, AI-assisted review lanes, audit trails, and
+Bytewax lifecycle events.
 
-## Provided Services
+## Provides
 
-- `theme_registry`
-- `token_versioning`
-- `brand_asset_governance`
-- `theme_preview_workflow`
+- `theme_tokens`
+- `brand_governance`
+- `asset_libraries`
+- `preview_workflows`
 - `theme_publication_governance`
-- `theme_audit_events`
+- `visual_theming`
+- `them_agents`
 
-## Required Services
+## Requires
 
-- `tenant_context`
-- `identity_authorization`
-- `accessibility_contrast_validation`
-- `brand_asset_store`
-- `audit_sink`
+- `conf`
+- `auth`
+- `i18n`
+- `audl`
+- `accs`
 
-## Configuration
+## Configuration Areas
 
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations.
+THEM configuration is defined by `capability_contract.py` and covers:
 
-## Rules
+- tenant context;
+- theme ownership, fallback, preview, and guideline policy;
+- governed token groups, versioning, contrast validation, and token review;
+- brand asset license and approval rules;
+- first-class theme-agent runtimes, roles, and human approval;
+- publication governance and large-rollout review thresholds;
+- Bytewax lifecycle-stream observability;
+- adapter boundaries for identity, audit, assets, preview rendering, accessibility, and event streaming;
+- UI route toggles and theme tokens.
+
+## Lifecycle
+
+THEM supports the following lifecycle:
+
+1. Create a tenant theme with owner, brand, and guideline evidence.
+2. Update governed design tokens with reviewer attribution and versioning.
+3. Add licensed and approved brand assets.
+4. Create surface and viewport preview evidence with contrast status.
+5. Publish the theme through approval, contrast, rollout review, and Bytewax stream gates.
+6. Register and govern AI agents that review tokens, brand assets, previews, accessibility, localization, and rollouts.
+7. Record audit events for theme, token, asset, preview, publication, and agent activity.
+
+## Deterministic Rules
 
 - `tenant_context_required`
 - `theme_requires_owner`
-- `publish_requires_approval`
+- `theme_requires_guidelines`
+- `token_update_requires_reviewer`
 - `brand_asset_requires_license`
+- `brand_asset_requires_approval`
+- `preview_requires_artifact`
+- `publish_requires_approval`
 - `accessible_contrast_required`
+- `publish_requires_bytewax_stream`
 - `large_rollout_requires_review`
+- `them_agent_runtime_supported`
+- `them_agent_role_supported`
+- `privileged_agent_theme_action_requires_human_approval`
+- `batch_theme_rollout_requires_bytewax`
 
 ## UI
 
-The package exposes 8 APG Python UI route contract(s) through
-`views.py` and the package semantic model.
-
-The view helpers provide dashboard, theme console, token editor, brand
-guidelines, brand asset manager, live preview, publishing policies, and settings
-models.
+THEM exposes APG Python view models for dashboard, theme console, token editor,
+brand guidelines, brand asset manager, preview, agent workbench, policies, and
+settings.
 
 ## Theme
 
-The package uses the `them_brand_system` APG theme contract.
+THEM uses the `them_brand_system` theme with compact density, theme cards,
+token tables, asset grids, preview shells, agent review lanes, and policy-rule
+grids.
 
-## Runtime Behavior
+## Streaming
 
-`ThemService` is intentionally dependency-light so it can run inside generated
-applications, tests, and publish-plan probes without external infrastructure.
-It supports:
+THEM lifecycle events are described by the Bytewax stream manifest:
 
-- `create_theme()` for tenant-scoped design systems with owner, brand name,
-  guidelines, and fallback theme metadata.
-- `update_tokens()` for governed token groups with versioning and contrast
-  validation evidence.
-- `add_brand_asset()` for license-verified, approved brand assets.
-- `create_preview()` for viewport/surface preview evidence and contrast status.
-- `publish_theme()` for approval, contrast, and large-rollout review gates.
-- `dashboard_summary()` and list helpers for API and UI composition.
+- processor: `bytewax`
+- stream: `apg.them.lifecycle`
+- key: `tenant_id`
+- events: `theme_created`, `tokens_updated`, `brand_asset_added`,
+  `theme_preview_created`, `theme_published`, `them_agent_registered`
 
 ## Adapter Boundaries
 
-The in-package runtime stores records in memory by design. Production adapters
-are expected to bind identity/authorization, durable asset storage,
-accessibility validation engines, generated preview renderers, rollout
-orchestration, and audit sinks at the APG composition layer without changing the
-deterministic package contract.
+The in-package service is dependency-light and stores records in memory for
+generated apps, tests, and publish-plan probes. Production deployments should
+bind identity providers, audit sinks, asset stores, preview renderers,
+accessibility engines, rollout orchestrators, and Bytewax workers through APG
+adapters without weakening the deterministic contract.
 
 ## Focused Verification
 

@@ -24,6 +24,7 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -107,6 +108,28 @@ def policies_model(
 			for publication in service.list_publications(tenant_id)
 			if publication["status"] == "review_required"
 		],
+		"streaming": service.describe(tenant_id)["streaming"],
+		"agent_guardrails": [
+			rule
+			for rule in service.describe(tenant_id)["rule_engine"]["rules"]
+			if "agent" in rule["name"] or "bytewax" in rule["name"]
+		],
+	}
+
+
+def agent_workbench_model(
+	service: ThemService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or ThemService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/them/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_them_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["them_agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["them_agents"]["supported_roles"],
+		"human_approval_required": contract["configuration"]["them_agents"]["human_approval_required"],
 	}
 
 
@@ -117,4 +140,5 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}

@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_THEM_AGENT_ROLES,
+	SUPPORTED_THEM_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .theme_runtime import (
 	BrandAssetRecord,
+	ThemAgentRecord,
 	ThemeAuditEventRecord,
 	ThemePreviewRecord,
 	ThemePublicationRecord,
@@ -28,6 +36,7 @@ class ThemService:
 		self.assets: dict[str, BrandAssetRecord] = {}
 		self.previews: dict[str, ThemePreviewRecord] = {}
 		self.publications: dict[str, ThemePublicationRecord] = {}
+		self.them_agents: dict[str, ThemAgentRecord] = {}
 		self.audit_events: dict[str, ThemeAuditEventRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -50,12 +59,11 @@ class ThemService:
 			raise ValueError("theme_name_required")
 		if not str(brand_name or "").strip():
 			raise ValueError("brand_name_required")
-		if not str(guidelines_ref or "").strip():
-			raise PermissionError("brand_guidelines_required")
 		context = {
 			"tenant_context_present": True,
 			"operation": "create_theme",
 			"theme_owner_assigned": bool(str(owner or "").strip()),
+			"brand_guidelines_present": bool(str(guidelines_ref or "").strip()),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -81,11 +89,21 @@ class ThemService:
 		tokens: dict[str, str],
 		updated_by: str,
 		contrast_validated: bool = False,
+		reviewer: str | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		theme = self._get_theme(tenant_id, theme_id)
 		if not tokens:
 			raise ValueError("theme_tokens_required")
+		reviewer_value = reviewer or updated_by
+		context = {
+			"tenant_context_present": True,
+			"operation": "update_tokens",
+			"token_reviewer_present": bool(str(reviewer_value or "").strip()),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		version = theme.token_version + 1
 		record = ThemeTokenRecord(
 			id=stable_id("them_tokens", tenant_id, theme.id, group, version),
@@ -95,7 +113,7 @@ class ThemService:
 			tokens={str(key): str(value) for key, value in tokens.items()},
 			version=version,
 			contrast_validated=bool(contrast_validated),
-			updated_by=updated_by,
+			updated_by=reviewer_value,
 		)
 		self.tokens[record.id] = record
 		theme.token_version = version
@@ -118,14 +136,14 @@ class ThemService:
 			raise ValueError("brand_asset_name_required")
 		context = {
 			"tenant_context_present": True,
+			"operation": "add_brand_asset",
 			"brand_asset_present": True,
 			"license_verified": bool(str(license_ref or "").strip()),
+			"asset_approval_recorded": bool(str(approved_by or "").strip()),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if not str(approved_by or "").strip():
-			raise PermissionError("brand_asset_approval_required")
 		record = BrandAssetRecord(
 			id=stable_id("them_asset", tenant_id, theme.id, asset_name),
 			tenant_id=tenant_id,
@@ -153,7 +171,12 @@ class ThemService:
 		self._require_tenant(tenant_id)
 		theme = self._get_theme(tenant_id, theme_id)
 		if not str(preview_ref or "").strip():
-			raise PermissionError("theme_preview_required")
+			result = self.evaluate({
+				"tenant_context_present": True,
+				"operation": "create_preview",
+				"preview_artifact_present": False,
+			})
+			self._raise_policy(result)
 		record = ThemePreviewRecord(
 			id=stable_id("them_preview", tenant_id, theme.id, surface, viewport),
 			tenant_id=tenant_id,
@@ -178,6 +201,7 @@ class ThemService:
 		approval_ref: str,
 		target_tenant_count: int = 1,
 		rollout_review_recorded: bool = False,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		theme = self._get_theme(tenant_id, theme_id)
@@ -193,6 +217,7 @@ class ThemService:
 			"accessibility_contrast_passed": bool(latest_preview.contrast_passed),
 			"target_tenant_count": int(target_tenant_count),
 			"rollout_review_recorded": bool(rollout_review_recorded),
+			"event_stream": self._normalize_token(event_stream),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -212,8 +237,98 @@ class ThemService:
 		self.publications[record.id] = record
 		theme.status = status
 		theme.updated_at = utc_now()
-		self._record_event(tenant_id, "theme_published", record.id, f"Theme publication {status}: {theme.name}", published_by)
+		self._record_event(
+			tenant_id,
+			"theme_published",
+			record.id,
+			f"Theme publication {status}: {theme.name}",
+			published_by,
+			metadata={"event_stream": self._normalize_token(event_stream)},
+		)
 		return record.to_dict()
+
+	def register_them_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str = "platform",
+		human_approval_required: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_them_agent",
+			"agent_runtime_supported": runtime_value in SUPPORTED_THEM_AGENT_RUNTIMES,
+			"agent_role_supported": role_value in SUPPORTED_THEM_AGENT_ROLES,
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		record = ThemAgentRecord(
+			id=stable_id("them_agent", tenant_id, name, runtime_value, role_value),
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=scope,
+			owner=owner,
+			human_approval_required=bool(human_approval_required),
+		)
+		self.them_agents[record.id] = record
+		self._record_event(
+			tenant_id,
+			"them_agent_registered",
+			record.id,
+			f"Theme agent registered: {name}",
+			owner,
+			metadata={"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
+		)
+		return record.to_dict()
+
+	def validate_agent_theme_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		action: str,
+		privileged_scope: bool = False,
+		human_approval_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent = self.them_agents.get(agent_id)
+		if agent is None or agent.tenant_id != tenant_id:
+			raise KeyError(f"them_agent_not_found:{agent_id}")
+		context = {
+			"tenant_context_present": True,
+			"operation": "agent_theme_action",
+			"agent_id": agent_id,
+			"agent_role": agent.role,
+			"action": action,
+			"privileged_scope": bool(privileged_scope),
+			"human_approval_recorded": bool(str(human_approval_ref or "").strip()),
+		}
+		return self.evaluate(context)
+
+	def validate_batch_theme_rollout(
+		self,
+		tenant_id: str,
+		target_tenant_count: int,
+		event_stream: str = "bytewax",
+		rollout_review_recorded: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		context = {
+			"tenant_context_present": True,
+			"operation": "batch_theme_rollout",
+			"target_tenant_count": int(target_tenant_count),
+			"event_stream": self._normalize_token(event_stream),
+			"rollout_review_recorded": bool(rollout_review_recorded),
+		}
+		return self.evaluate(context)
 
 	def create_record(
 		self,
@@ -250,6 +365,9 @@ class ThemService:
 	def list_publications(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.publications, tenant_id)
 
+	def list_them_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.them_agents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -264,6 +382,9 @@ class ThemService:
 			"approved_asset_count": len([item for item in self.list_assets(tenant_id) if item["status"] == "approved"]),
 			"preview_count": len(self.list_previews(tenant_id)),
 			"publication_count": len(self.list_publications(tenant_id)),
+			"them_agent_count": len(self.list_them_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": streaming_manifest(),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -301,6 +422,7 @@ class ThemService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		record = ThemeAuditEventRecord(
 			id=stable_id("them_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -310,6 +432,7 @@ class ThemService:
 			message=message,
 			actor=actor,
 			severity=severity,
+			metadata=dict(metadata or {}),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -319,3 +442,6 @@ class ThemService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

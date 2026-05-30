@@ -16,6 +16,71 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 21:18 EAT
+
+Common THEM UI/UX theming and branding lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the THEM
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with theme-agent, token, brand asset,
+  preview, publication, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, theme owner, brand
+  guidelines, token reviewer attribution, brand asset license, brand asset
+  approval, preview artifacts, publication approval, accessibility contrast,
+  publication Bytewax streams, large rollout review, THEM-agent runtime/role,
+  privileged agent-action approval, and Bytewax batch theme rollout.
+- Added `ThemAgentRecord` and metadata-rich audit event support, then extended
+  `ThemService` with agent registration, privileged agent-action validation,
+  batch theme rollout validation, audit counts, Bytewax stream metadata, and
+  stronger theme/token/brand/preview/publication guardrails.
+- Extended API helpers and view models with THEM-agent, policy, dashboard,
+  settings, and Bytewax metadata surfaces.
+- Updated package registration to expose THEM agents, policy endpoints,
+  required dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, batch rollout, asset approval, and publication guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/them/__init__.py
+  capabilities/common/them/capability_contract.py
+  capabilities/common/them/models.py capabilities/common/them/theme_runtime.py
+  capabilities/common/them/service.py capabilities/common/them/api.py
+  capabilities/common/them/views.py capabilities/common/them/app.py
+  capabilities/common/them/test_capability_contract.py
+  capabilities/common/them/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/them/test_capability_contract.py
+  capabilities/common/them/tests/test_package_contract.py` passed with 10 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `jq '.capabilities.them.streaming.processor,
+  .capabilities.them.provides, .capabilities.them.requires,
+  .capabilities.them.screens.agents.route,
+  (.capabilities.them.rules[] |
+  select(.name=="them_agent_runtime_supported") | .effect.reason),
+  (.capabilities.them.rules[] |
+  select(.name=="publish_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/them/semantic_model.json` confirmed `bytewax`, THEM-agent
+  provides, required services, `/them/agents`,
+  `them_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/them --json` passed with `them` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/them --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `them`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/them docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: live identity providers, audit sinks, asset stores, preview
+  renderers, accessibility engines, rollout orchestrators, live Bytewax
+  topology, rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 21:08 EAT
 
 Common TENS legacy-tenant lifecycle/guardrail packet:

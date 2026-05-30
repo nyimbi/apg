@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .theme_runtime import (
 	BrandAssetRecord,
+	ThemAgentRecord,
 	ThemeAuditEventRecord,
 	ThemePreviewRecord,
 	ThemePublicationRecord,
@@ -17,6 +18,7 @@ ThemRecord = ThemeRecord
 
 __all__ = [
 	"BrandAssetRecord",
+	"ThemAgentRecord",
 	"ThemRecord",
 	"ThemeAuditEventRecord",
 	"ThemePreviewRecord",

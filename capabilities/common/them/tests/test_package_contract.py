@@ -25,17 +25,19 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_them", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_them", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "them"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "them_agents" in contract["provides"]
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_them", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_them", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -100,6 +102,7 @@ def test_theme_design_asset_preview_and_publish_lifecycle_executes():
 	assert summary["theme_count"] == 1
 	assert summary["published_theme_count"] == 1
 	assert summary["approved_asset_count"] == 1
+	assert summary["streaming"]["processor"] == "bytewax"
 
 
 def test_theme_guardrails_require_tenant_owner_license_preview_contrast_and_approval():
@@ -129,6 +132,13 @@ def test_theme_guardrails_require_tenant_owner_license_preview_contrast_and_appr
 		raise AssertionError("unlicensed brand asset was accepted")
 
 	try:
+		service.add_brand_asset("tenant-a", theme["id"], "logo", "logo", "license://logo", "")
+	except PermissionError as exc:
+		assert str(exc) == "brand_asset_approval_required"
+	else:
+		raise AssertionError("unapproved brand asset was accepted")
+
+	try:
 		service.publish_theme("tenant-a", theme["id"], "publisher", "approval://theme")
 	except PermissionError as exc:
 		assert str(exc) == "theme_preview_required"
@@ -153,9 +163,56 @@ def test_theme_guardrails_require_tenant_owner_license_preview_contrast_and_appr
 	else:
 		raise AssertionError("theme without approval was published")
 
+	try:
+		service.publish_theme("tenant-a", theme["id"], "publisher", "approval://theme", event_stream="local")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("theme publication without Bytewax was accepted")
+
 	publication = service.publish_theme("tenant-a", theme["id"], "publisher", "approval://theme", target_tenant_count=8)
 	assert publication["status"] == "review_required"
 	assert publication["required_actions"] == ["review_theme_rollout"]
+
+
+def test_theme_agents_and_batch_rollout_guardrails_execute():
+	service = ThemService()
+
+	agent = service.register_them_agent(
+		tenant_id="tenant-a",
+		name="Design reviewer",
+		runtime="codex",
+		role="design_token_reviewer",
+		scope="review token, contrast, and rollout evidence",
+	)
+	privileged = service.validate_agent_theme_action(
+		tenant_id="tenant-a",
+		agent_id=agent["id"],
+		action="publish_theme",
+		privileged_scope=True,
+	)
+	approved = service.validate_agent_theme_action(
+		tenant_id="tenant-a",
+		agent_id=agent["id"],
+		action="publish_theme",
+		privileged_scope=True,
+		human_approval_ref="approval://agent/theme",
+	)
+	batch_block = service.validate_batch_theme_rollout("tenant-a", 12, event_stream="local")
+
+	assert agent["runtime"] == "codex"
+	assert privileged["decision"] == "deny"
+	assert privileged["matched_rules"] == ["privileged_agent_theme_action_requires_human_approval"]
+	assert approved["decision"] == "allow"
+	assert batch_block["decision"] == "deny"
+	assert "batch_theme_rollout_requires_bytewax" in batch_block["matched_rules"]
+
+	try:
+		service.register_them_agent("tenant-a", "Unsupported", "unknown", "design_token_reviewer", "review")
+	except PermissionError as exc:
+		assert str(exc) == "them_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported theme agent runtime was accepted")
 
 
 def test_api_and_view_models_expose_theme_system_surfaces():
@@ -201,6 +258,13 @@ def test_api_and_view_models_expose_theme_system_surfaces():
 		"approval_ref": "approval://ops",
 		"target_tenant_count": 1,
 	})
+	agent = api.register_them_agent({
+		"tenant_id": "tenant-b",
+		"name": "Brand reviewer",
+		"runtime": "claude_code",
+		"role": "brand_reviewer",
+		"scope": "review brand assets",
+	})
 
 	status = api.capability_status("tenant-b")
 	system = api.list_theme_system("tenant-b")
@@ -211,10 +275,13 @@ def test_api_and_view_models_expose_theme_system_surfaces():
 	assets = views.brand_asset_manager_model(local_service, "tenant-b")
 	preview = views.preview_model(local_service, "tenant-b")
 	policies = views.policies_model(local_service, "tenant-b")
+	agents = views.agent_workbench_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["published_theme_count"] == 1
+	assert status["them_agent_count"] == 1
 	assert system["summary"]["approved_asset_count"] == 1
+	assert system["them_agents"][0]["id"] == agent["id"]
 	assert dashboard["summary"]["publication_count"] == 1
 	assert console["route"] == "/them/themes"
 	assert tokens["contrast_validation_required"] is True
@@ -222,4 +289,6 @@ def test_api_and_view_models_expose_theme_system_surfaces():
 	assert assets["license_required"] is True
 	assert preview["viewports"] == ["mobile", "tablet", "desktop"]
 	assert policies["review_required"] == []
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert settings["theme"]["name"] == "them_brand_system"
+	assert settings["streaming"]["processor"] == "bytewax"
