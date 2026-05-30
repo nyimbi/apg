@@ -29,8 +29,16 @@ def create_sandbox(service: ScptService, **payload: Any) -> dict[str, Any]:
 	return service.create_sandbox(**payload)
 
 
+def change_sandbox_state(service: ScptService, **payload: Any) -> dict[str, Any]:
+	return service.change_sandbox_state(**payload)
+
+
 def create_script(service: ScptService, **payload: Any) -> dict[str, Any]:
 	return service.create_script(**payload)
+
+
+def request_script_review(service: ScptService, **payload: Any) -> dict[str, Any]:
+	return service.request_script_review(**payload)
 
 
 def approve_script(service: ScptService, **payload: Any) -> dict[str, Any]:
@@ -53,6 +61,22 @@ def complete_execution(service: ScptService, **payload: Any) -> dict[str, Any]:
 	return service.complete_execution(**payload)
 
 
+def cancel_execution(service: ScptService, **payload: Any) -> dict[str, Any]:
+	return service.cancel_execution(**payload)
+
+
+def retire_script(service: ScptService, **payload: Any) -> dict[str, Any]:
+	return service.retire_script(**payload)
+
+
+def register_scripting_agent(service: ScptService, **payload: Any) -> dict[str, Any]:
+	return service.register_scripting_agent(**payload)
+
+
+def validate_batch_mutation(service: ScptService, event_stream: str) -> dict[str, Any]:
+	return service.validate_batch_mutation(event_stream)
+
+
 def create_record(service: ScptService, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
 	return service.create_record(record_id, tenant_id, metadata, status)
 
@@ -67,3 +91,11 @@ def list_scripts(service: ScptService, tenant_id: str | None = None) -> list[dic
 
 def list_executions(service: ScptService, tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return service.list_executions(tenant_id)
+
+
+def list_agents(service: ScptService, tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return service.list_agents(tenant_id)
+
+
+def audit_events(service: ScptService, tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return service.audit_events(tenant_id)

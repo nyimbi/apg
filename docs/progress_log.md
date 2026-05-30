@@ -15537,3 +15537,65 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External WFLO, MQEB, MONI, AUDL, NTFY, CACH, COMP, or THEM adapters.
+
+### 2026-05-30 15:07 EAT
+
+SCPT lifecycle and guardrail packet:
+
+- Selected `capabilities/common/scpt` as the next common capability after
+  SCHD.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable SCPT contract to cover scripts, sandboxes, package
+  policies, executions, scripting agents, governance, observability, APG
+  adapters, UI routes, visual theme tokens, and Bytewax event streaming.
+- Expanded deterministic guardrails to cover tenant context, script owner,
+  script name, source, package policy, sandbox policy, blocked imports,
+  sandbox owner, positive sandbox limits, sandbox health evidence, sandbox
+  block/retirement reasons, package policy owner, package allowlists,
+  secret/filesystem/network access policy, dangerous permission approval,
+  high-resource review, publication review, workflow-binding policy, published
+  scripts, ready sandboxes, requesting actor, Bytewax execution streams,
+  execution completion evidence, execution metrics, cancellation reason, script
+  retirement reason, scripting agent registration/runtime/scope/disclosure,
+  audit evidence, tenant isolation, and Bytewax batch mutation.
+- Added runtime fields for package policy state/evidence, sandbox runtime and
+  isolation metadata, sandbox health/state reasons, script source checksums,
+  review/publication/retirement evidence, execution stream/cancellation/
+  completion evidence, timeout status, and scripting-agent records.
+- Hardened `ScptService` with package policy checks, sandbox state changes,
+  script review, publication, retirement, Bytewax execution enforcement,
+  execution evidence, cancellation, scripting-agent registration with
+  tenant-local scope, and batch-mutation validation.
+- Added API helper coverage for review, sandbox state, execution cancellation,
+  script retirement, scripting-agent registration, audit events, and batch
+  mutation validation.
+- Added agent-panel, audit, and analytics view models, plus richer dashboard,
+  workbench, script registry, execution, sandbox, package policy, approvals,
+  and settings metadata.
+- Refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle execution, review/publish guardrails,
+  execution guardrails, scripting agents, Bytewax policy, view models, and
+  publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/scpt/__init__.py capabilities/common/scpt/models.py capabilities/common/scpt/script_runtime.py capabilities/common/scpt/service.py capabilities/common/scpt/api.py capabilities/common/scpt/views.py capabilities/common/scpt/capability_contract.py capabilities/common/scpt/app.py capabilities/common/scpt/test_capability_contract.py capabilities/common/scpt/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/scpt/test_capability_contract.py capabilities/common/scpt/tests/test_package_contract.py` passed with 8 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and SCPT capability evidence.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/scpt --json` passed with `ok: true`; SCPT remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/scpt --json` passed with 11 UI routes, 38 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker, and placeholder markers returned no matches.
+- `git diff --check -- capabilities/common/scpt docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Python, JavaScript, APG, WASM, or container execution; package
+  installation; vulnerability scanning; production security engines; external
+  AI-agent CLIs; durable execution databases; browser-rendered scripting UI;
+  and performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External WFLO, SECU, AUTH, AUDL, SCHD, NCOD, AICR, MONI, or THEM adapters.

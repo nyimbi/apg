@@ -14,12 +14,17 @@ SANDBOX_STATES = {"ready", "running", "blocked", "retired"}
 EXECUTION_STATUSES = {"queued", "running", "succeeded", "failed", "blocked", "cancelled"}
 DANGEROUS_PERMISSIONS = {"network", "filesystem", "secrets", "subprocess", "system"}
 DANGEROUS_IMPORTS = {"os", "subprocess", "socket", "requests", "urllib", "pathlib", "shutil"}
+ISOLATION_MODES = {"process", "container", "wasm"}
 
 
 def stable_id(prefix: str, *parts: object) -> str:
 	"""Build a deterministic short ID for local package runtime objects."""
 	digest = sha256("|".join(str(part) for part in parts).encode("utf-8")).hexdigest()[:12]
 	return f"{prefix}_{digest}"
+
+
+def source_checksum(source: str) -> str:
+	return sha256((source or "").encode("utf-8")).hexdigest()
 
 
 def utc_now() -> datetime:
@@ -45,6 +50,20 @@ def normalize_script_state(state: str) -> str:
 	value = state.strip().lower()
 	if value not in SCRIPT_STATES:
 		raise ValueError(f"unsupported_script_state:{state}")
+	return value
+
+
+def normalize_sandbox_state(state: str) -> str:
+	value = state.strip().lower()
+	if value not in SANDBOX_STATES:
+		raise ValueError(f"unsupported_sandbox_state:{state}")
+	return value
+
+
+def normalize_isolation_mode(mode: str) -> str:
+	value = mode.strip().lower()
+	if value not in ISOLATION_MODES:
+		raise ValueError(f"unsupported_isolation_mode:{mode}")
 	return value
 
 
