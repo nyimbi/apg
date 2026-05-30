@@ -1,122 +1,101 @@
 # AICR Capability Specification
 
-## Identity
-
-- Capability ID: `aicr`
-- Display name: AI Core Framework
-- Category: `common`
-- Owner: APG Platform Team
-- Runtime shell: `apg_python`
-- Theme: `aicr_ai_control_console`
-
 ## Purpose
 
-AICR is the shared AI control plane for APG applications. It registers
-tenant-owned AI services, governs inference requests, exposes model and
-workflow surfaces, records AI audit evidence, and keeps high-risk AI work behind
-explicit policy and human review.
+AICR is the APG AI control plane. It gives generated applications a provider
+and model registry, governed inference envelope, workflow and agent-runtime
+composition surface, and audit-ready AI governance records.
 
-The package must remain usable without live model providers, GPU services,
-network brokers, or vendor credentials. Real inference engines, model stores,
-agent runtimes, and monitoring systems remain adapter boundaries. Local package
-proof focuses on deterministic governance and composition behavior.
+The current packet is provider-neutral. It does not require live model
+providers, GPUs, cloud credentials, broker services, or network access.
 
-## Users And Outcomes
+## Scope
 
-- Platform teams can register AI services with owners, health state, and model
-  policy.
-- Application builders can request governed inference against registered
-  services.
-- Reviewers can approve high-risk or large-context inference requests before
-  execution.
-- Operators can inspect AI service, inference, approval, and audit-event state
-  through APG view models.
-- Generated APG applications can compose AICR with AGNT, NLPC, RAGN, GRAG,
-  MLCM, MONI, AUDL, and AUTH without coupling to one model provider.
+The executable packet covers:
 
-## Domain Model
+- AI service registration.
+- AI provider registration with credential-vault and egress-policy controls.
+- Model registration with policy, provider linkage, modality, evaluation, and
+  promotion state.
+- Governed inference requests and approval lifecycle.
+- Workflow registration over registered services.
+- Agent runtime registration for Codex, Claude Code, OpenCode, Pi, Ollama, and
+  custom HTTP runtimes.
+- Governance event emission.
+- Generated-app API helpers and UI view models.
+- Dynamic semantic package evidence.
 
-AICR owns these package-level records:
+Out of scope for this packet:
 
-- `AICRServiceRecord`: tenant-scoped AI service registration with owner,
-  service type, endpoint, health, and model policy.
-- `AICRInferenceApproval`: governed request for high-risk or large-context
-  inference.
-- `AICRGovernanceEvent`: tenant-scoped evidence event for service,
-  inference, approval, and routing lifecycle changes.
-
-The older model, pipeline, and inference models remain available for the
-broader AICR runtime and tests.
+- Physical model inference execution.
+- Live third-party provider calls.
+- Live agent CLI invocation.
+- Live Bytewax, MQEB, MONI, AUDL, KEYM, or AUTH adapter calls.
+- Browser-rendered UI verification.
 
 ## Lifecycle
 
-The focused governance lifecycle is:
+1. Register an AI provider.
+2. Register a tenant-owned AI service.
+3. Register a model against the provider.
+4. Record model evaluation and promote the model when ready.
+5. Register workflows and agent runtimes.
+6. Request inference.
+7. Require review for high-risk or large-context requests.
+8. Approve or reject the request.
+9. Run approved inference through a deterministic local envelope.
+10. Record governance and audit events.
 
-1. Register a tenant-owned AI service with model policy and health metadata.
-2. Request inference with context size, risk, prompt summary, and caller.
-3. Allow normal inference when policy and service health pass.
-4. Require approval for high-risk or large-context inference.
-5. Approve or reject the inference request with reviewer notes.
-6. Execute approved inference through a deterministic local envelope.
-7. Block routing to unhealthy services.
-8. Emit audit events for registration, approval, inference, and blocking.
+## Configuration
 
-## Rules And Guardrails
+The contract defines tenant configuration for services, providers, models,
+inference, workflows, agent runtimes, governance, observability, adapters, UI,
+and theme.
 
-The contract rules are executable guardrails:
+Important adapters:
 
-- `tenant_context_required`: operations require tenant context.
-- `service_registration_requires_owner`: AI services require owners.
-- `inference_requires_model_policy`: inference requires model policy.
-- `high_risk_workflow_requires_approval`: high-risk AI workflows require
-  approval.
-- `unhealthy_service_blocks_routing`: unhealthy services cannot receive routed
-  work.
-- `large_context_requires_review`: large context windows require cost/safety
-  review.
+- Generated-app runtime: `service.AicrService`
+- Production runtime: `service.AICoreService`
+- Event stream: `bytewax`
+- Model lifecycle: `mlcm`
+- Agent composition: `agnt`
 
-Service methods must enforce these rules and expose the same decisions through
-view models and the dependency-light `api_helpers.py` surface. The existing
-Flask API module remains a web adapter and must not be required for package
-contract proof.
+## Rules
 
-## UI And Theme
+The deterministic rule engine includes guardrails for tenant context, service
+owners and endpoints, supported provider types, provider credentials, egress
+policy, model ownership, registered providers, model policy, supported
+modalities, evaluation before promotion, retirement impact review, model policy
+for inference, health-gated routing, large-context review, high-risk approval,
+PII redaction, tool allowlists, cross-tenant denial, cost review, workflow
+ownership and service binding, supported agent runtimes, agent tool policy,
+external agent action approval, completion audit evidence, streaming trace
+capture, and model drift review.
 
-AICR exposes route and view-model surfaces for:
+## UI Surfaces
 
-- dashboard summary;
-- service registry;
-- inference console;
-- model catalog;
-- workflow designer;
-- governance center;
-- metrics;
-- settings.
+AICR exposes 12 generated-app UI routes:
 
-The `aicr_ai_control_console` theme must provide semantic tokens and component
-metadata for service health, inference traces, workflow graphs, and governance
-rule decisions.
+- Dashboard
+- Services
+- Providers
+- Models
+- Inference
+- Workflows
+- Agents
+- Governance
+- Evaluations
+- Metrics
+- Audit
+- Settings
 
-## Adapter Boundaries
+## Acceptance Criteria
 
-These integrations remain replaceable:
-
-- external model providers and local model servers;
-- GPU, TPU, edge, neuromorphic, or cloud runtimes;
-- model artifact stores and model registries;
-- prompt and inference monitoring systems;
-- audit/SIEM exporters;
-- approval workflow engines.
-
-Local package tests must not require those systems.
-
-## Acceptance Gates
-
-Focused AICR proof:
-
-```bash
-./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py
-./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json
-./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json
-git diff --check -- capabilities/common/aicr
-```
+- Contract validates through the APG capability audit.
+- Package publish plan reports no warnings.
+- Runtime can register providers, services, models, workflows, and agent
+  runtimes.
+- Runtime blocks unsafe missing-evidence paths.
+- High-risk and large-context inference requires approval before execution.
+- Package evidence is generated from the live contract.
+- Primary docs do not contain stale baseline or marketing claims.

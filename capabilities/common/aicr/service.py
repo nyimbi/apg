@@ -866,7 +866,7 @@ class ImportExportService:
 				"last_health_check": datetime.now(timezone.utc)
 			}
 
-			# Initialize workflow engine (placeholder)
+			# Initialize the lightweight workflow engine state used by local tests.
 			self._workflow_engine = {"initialized": True, "active_workflows": {}}
 
 			self._initialized = True
@@ -1681,6 +1681,10 @@ class AicrService:
 
 	def __init__(self) -> None:
 		self._services: dict[tuple[str, str], AICRServiceRecord] = {}
+		self._providers: dict[tuple[str, str], dict[str, Any]] = {}
+		self._models: dict[tuple[str, str], dict[str, Any]] = {}
+		self._workflows: dict[tuple[str, str], dict[str, Any]] = {}
+		self._agent_runtimes: dict[tuple[str, str], dict[str, Any]] = {}
 		self._approvals: dict[tuple[str, str], AICRInferenceApproval] = {}
 		self._events: list[AICRGovernanceEvent] = []
 		self._inference_results: dict[tuple[str, str], dict[str, Any]] = {}
@@ -1706,6 +1710,7 @@ class AicrService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "register_service",
 			"owner_assigned": bool(owner),
+			"endpoint_present": bool(endpoint),
 		})
 		_raise_if_blocked(result)
 		if not name:
@@ -1732,6 +1737,151 @@ class AicrService:
 
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self.list_ai_services(tenant_id)
+
+	def register_provider(
+		self,
+		provider_id: str,
+		tenant_id: str,
+		name: str,
+		provider_type: str,
+		owner: str,
+		external: bool = True,
+		credential_vault_ref: str = "",
+		egress_policy_ref: str = "",
+	) -> dict[str, Any]:
+		config = get_capability_contract(tenant_id)["configuration"]
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_provider",
+			"provider_type_supported": provider_type in config["providers"]["supported_provider_types"],
+			"owner_assigned": bool(owner),
+			"external_provider": external,
+			"credential_vault_ref_present": bool(credential_vault_ref),
+			"egress_policy_attached": bool(egress_policy_ref),
+		})
+		_raise_if_blocked(result)
+		record = {
+			"id": provider_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"provider_type": provider_type,
+			"owner": owner,
+			"external": external,
+			"credential_vault_ref": credential_vault_ref,
+			"egress_policy_ref": egress_policy_ref,
+			"status": "registered",
+		}
+		self._providers[self._tenant_key(tenant_id, provider_id)] = record
+		self._record_event(tenant_id, "provider_registered", provider_id, f"Registered AI provider {name}.", {"provider_type": provider_type})
+		return dict(record)
+
+	def register_model(
+		self,
+		model_id: str,
+		tenant_id: str,
+		name: str,
+		provider_id: str,
+		owner: str,
+		modality: str,
+		model_policy: dict[str, Any] | None = None,
+		risk_profile: str = "standard",
+	) -> dict[str, Any]:
+		config = get_capability_contract(tenant_id)["configuration"]
+		provider_registered = self._tenant_key(tenant_id, provider_id) in self._providers
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_model",
+			"owner_assigned": bool(owner),
+			"provider_registered": provider_registered,
+			"model_policy_attached": bool(model_policy),
+			"modality_supported": modality in config["models"]["supported_modalities"],
+		})
+		_raise_if_blocked(result)
+		record = {
+			"id": model_id,
+			"tenant_id": tenant_id,
+			"name": name,
+			"provider_id": provider_id,
+			"owner": owner,
+			"modality": modality,
+			"model_policy": dict(model_policy or {}),
+			"risk_profile": risk_profile,
+			"status": "registered",
+			"evaluation_recorded": False,
+		}
+		self._models[self._tenant_key(tenant_id, model_id)] = record
+		self._record_event(tenant_id, "model_registered", model_id, f"Registered AI model {name}.", {"provider_id": provider_id, "modality": modality})
+		return dict(record)
+
+	def record_model_evaluation(self, tenant_id: str, model_id: str, score: float, evaluator: str) -> dict[str, Any]:
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		record = dict(model)
+		record.update({"evaluation_recorded": True, "evaluation_score": score, "evaluator": evaluator})
+		self._models[self._tenant_key(tenant_id, model_id)] = record
+		self._record_event(tenant_id, "model_evaluation_recorded", model_id, f"Recorded evaluation for {model_id}.", {"score": score, "evaluator": evaluator})
+		return dict(record)
+
+	def promote_model(self, tenant_id: str, model_id: str, evaluation_recorded: bool | None = None) -> dict[str, Any]:
+		model = self._models.get(self._tenant_key(tenant_id, model_id))
+		if model is None:
+			raise KeyError(f"unknown model for tenant: {model_id}")
+		evidence = model.get("evaluation_recorded", False) if evaluation_recorded is None else evaluation_recorded
+		result = self.evaluate({"tenant_context_present": bool(tenant_id), "operation": "promote_model", "evaluation_recorded": evidence})
+		_raise_if_blocked(result)
+		record = dict(model)
+		record["status"] = "promoted"
+		self._models[self._tenant_key(tenant_id, model_id)] = record
+		self._record_event(tenant_id, "model_promoted", model_id, f"Promoted model {model_id}.", {})
+		return dict(record)
+
+	def create_workflow(
+		self,
+		workflow_id: str,
+		tenant_id: str,
+		name: str,
+		owner: str,
+		service_ids: list[str],
+		risk: str = "normal",
+	) -> dict[str, Any]:
+		services_registered = all(self._tenant_key(tenant_id, service_id) in self._services for service_id in service_ids)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_workflow",
+			"owner_assigned": bool(owner),
+			"steps_present": bool(service_ids),
+			"services_registered": services_registered,
+		})
+		_raise_if_blocked(result)
+		record = {"id": workflow_id, "tenant_id": tenant_id, "name": name, "owner": owner, "service_ids": list(service_ids), "risk": risk, "status": "draft"}
+		self._workflows[self._tenant_key(tenant_id, workflow_id)] = record
+		self._record_event(tenant_id, "workflow_created", workflow_id, f"Created AI workflow {name}.", {"risk": risk})
+		return dict(record)
+
+	def register_agent_runtime(
+		self,
+		runtime_id: str,
+		tenant_id: str,
+		name: str,
+		runtime_type: str,
+		owner: str,
+		tool_policy_ref: str = "",
+	) -> dict[str, Any]:
+		config = get_capability_contract(tenant_id)["configuration"]
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_agent_runtime",
+			"agent_runtime_supported": runtime_type in config["agent_runtimes"]["supported_runtimes"],
+			"tool_policy_attached": bool(tool_policy_ref),
+		})
+		_raise_if_blocked(result)
+		if not owner:
+			raise PermissionError("agent_runtime_owner_required")
+		record = {"id": runtime_id, "tenant_id": tenant_id, "name": name, "runtime_type": runtime_type, "owner": owner, "tool_policy_ref": tool_policy_ref, "status": "registered"}
+		self._agent_runtimes[self._tenant_key(tenant_id, runtime_id)] = record
+		self._record_event(tenant_id, "agent_runtime_registered", runtime_id, f"Registered agent runtime {name}.", {"runtime_type": runtime_type})
+		return dict(record)
 
 	def create_record(
 		self,
@@ -1760,6 +1910,30 @@ class AicrService:
 			records = [record for record in records if record.tenant_id == tenant_id]
 		return [record.model_dump(mode="json") for record in sorted(records, key=lambda item: item.id)]
 
+	def list_providers(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._providers.values())
+		if tenant_id is not None:
+			records = [record for record in records if record["tenant_id"] == tenant_id]
+		return [dict(record) for record in sorted(records, key=lambda item: item["id"])]
+
+	def list_models(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._models.values())
+		if tenant_id is not None:
+			records = [record for record in records if record["tenant_id"] == tenant_id]
+		return [dict(record) for record in sorted(records, key=lambda item: item["id"])]
+
+	def list_workflows(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._workflows.values())
+		if tenant_id is not None:
+			records = [record for record in records if record["tenant_id"] == tenant_id]
+		return [dict(record) for record in sorted(records, key=lambda item: item["id"])]
+
+	def list_agent_runtimes(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		records = list(self._agent_runtimes.values())
+		if tenant_id is not None:
+			records = [record for record in records if record["tenant_id"] == tenant_id]
+		return [dict(record) for record in sorted(records, key=lambda item: item["id"])]
+
 	def request_inference(
 		self,
 		request_id: str,
@@ -1778,9 +1952,14 @@ class AicrService:
 			"model_policy_attached": model_policy_attached and bool(service.model_policy),
 			"service_health": service.health,
 			"routing_requested": True,
+			"context_tokens": context_tokens,
+			"review_recorded": False,
+			"workflow_risk": workflow_risk,
+			"approval_recorded": False,
 		})
-		_raise_if_blocked(result)
-		needs_review = workflow_risk == "high" or context_tokens > 128000
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		needs_review = result["decision"] == "require_review"
 		if needs_review:
 			approval = AICRInferenceApproval(
 				id=request_id,
@@ -1890,6 +2069,10 @@ class AicrService:
 		return {
 			"tenant_id": tenant_id,
 			"service_count": len(services),
+			"provider_count": len(self.list_providers(tenant_id)),
+			"model_count": len(self.list_models(tenant_id)),
+			"workflow_count": len(self.list_workflows(tenant_id)),
+			"agent_runtime_count": len(self.list_agent_runtimes(tenant_id)),
 			"healthy_service_count": len([service for service in services if service["health"] == "healthy"]),
 			"inference_approval_count": len(approvals),
 			"pending_approval_count": len([approval for approval in approvals if approval["decision"] == "pending"]),

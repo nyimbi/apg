@@ -62,6 +62,74 @@ def list_ai_services(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_ai_services(tenant_id)
 
 
+def register_provider(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Register an AI provider from an API-shaped payload."""
+	return SERVICE.register_provider(
+		provider_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		provider_type=str(payload.get("provider_type") or "local"),
+		owner=str(payload.get("owner") or ""),
+		external=bool(payload.get("external", True)),
+		credential_vault_ref=str(payload.get("credential_vault_ref") or ""),
+		egress_policy_ref=str(payload.get("egress_policy_ref") or ""),
+	)
+
+
+def register_model(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Register an AI model from an API-shaped payload."""
+	return SERVICE.register_model(
+		model_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		provider_id=str(payload["provider_id"]),
+		owner=str(payload.get("owner") or ""),
+		modality=str(payload.get("modality") or "text"),
+		model_policy=dict(payload.get("model_policy") or {}),
+		risk_profile=str(payload.get("risk_profile") or "standard"),
+	)
+
+
+def create_workflow(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Create an AI workflow from an API-shaped payload."""
+	return SERVICE.create_workflow(
+		workflow_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload.get("owner") or ""),
+		service_ids=list(payload.get("service_ids") or []),
+		risk=str(payload.get("risk") or "normal"),
+	)
+
+
+def register_agent_runtime(payload: dict[str, Any]) -> dict[str, Any]:
+	"""Register an AI agent runtime from an API-shaped payload."""
+	return SERVICE.register_agent_runtime(
+		runtime_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime_type=str(payload.get("runtime_type") or "codex"),
+		owner=str(payload.get("owner") or ""),
+		tool_policy_ref=str(payload.get("tool_policy_ref") or ""),
+	)
+
+
+def list_providers(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_providers(tenant_id)
+
+
+def list_models(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_models(tenant_id)
+
+
+def list_workflows(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_workflows(tenant_id)
+
+
+def list_agent_runtimes(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_agent_runtimes(tenant_id)
+
+
 def list_inference_approvals(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	"""List inference approvals for the optional tenant."""
 	return SERVICE.list_inference_approvals(tenant_id)
@@ -79,6 +147,14 @@ __all__ = [
 	"decide_inference_approval",
 	"run_approved_inference",
 	"list_ai_services",
+	"register_provider",
+	"register_model",
+	"create_workflow",
+	"register_agent_runtime",
+	"list_providers",
+	"list_models",
+	"list_workflows",
+	"list_agent_runtimes",
 	"list_inference_approvals",
 	"list_audit_events",
 ]

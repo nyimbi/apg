@@ -28,7 +28,9 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "aicr"
-	assert contract["ui"]["routes"]
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -44,3 +46,5 @@ def test_package_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "aicr" in model["capabilities"]
+	assert model["capabilities"]["aicr"]["runtime"]["service"] == "service.AicrService"
+	assert model["capabilities"]["aicr"]["streaming"]["engine"] == "bytewax"

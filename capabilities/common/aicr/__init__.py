@@ -73,9 +73,9 @@ class CapabilityMetadata(BaseModel):
 	id: str = "aicr"
 	name: str = "AI Core Framework"
 	version: str = "1.0.0"
-	description: str = "Foundational AI infrastructure providing intelligent automation, ML orchestration, and AI service management across the APG platform ecosystem"
+	description: str = "AI control plane for provider registration, model governance, workflows, agent runtimes, and governed inference"
 	category: str = "ai-infrastructure"
-	dependencies: List[str] = ["conf", "auth", "mqeb", "moni"]
+	dependencies: List[str] = ["conf", "auth", "mqeb", "moni", "audl", "keym"]
 	provides: List[str] = [
 		"ai-service-registry", "inference-engine", "model-lifecycle",
 		"ai-orchestration", "neuromorphic-processing", "quantum-safe-ai",
@@ -825,9 +825,11 @@ def register_capability() -> Dict[str, Any]:
 		"rule_engine": contract["rule_engine"],
 		"capabilities": {
 			"ai_service_registry": "Register, discover, and govern tenant-scoped AI services",
+			"ai_provider_registry": "Register local and external AI providers with credential and egress policy controls",
 			"inference_engine": "Route governed inference work across registered AI providers",
 			"inference_approval_governance": "Require approval for high-risk and large-context inference",
-			"model_catalog": "Expose shared AI model metadata to downstream capabilities",
+			"model_catalog": "Register model metadata, policy, modality, evaluation, and lifecycle state",
+			"agent_runtime_registry": "Register Codex, Claude Code, OpenCode, Pi, Ollama, and custom agent runtimes as governed services",
 			"workflow_orchestration": "Compose AI workflows with human approval and monitoring",
 			"capability_rules": "Evaluate deterministic AI infrastructure governance rules",
 			"visual_theming": "Apply AI control-console theme tokens and components"
@@ -836,8 +838,10 @@ def register_capability() -> Dict[str, Any]:
 			"services": "/aicr/api/v1/services",
 			"inference": "/aicr/api/v1/inference",
 			"inference_approvals": "/aicr/api/v1/inference-approvals",
+			"providers": "/aicr/api/v1/providers",
 			"models": "/aicr/api/v1/models",
 			"workflows": "/aicr/api/v1/workflows",
+			"agents": "/aicr/api/v1/agents",
 			"metrics": "/aicr/api/v1/metrics"
 		},
 		"ui_components": {
@@ -852,6 +856,7 @@ def register_capability() -> Dict[str, Any]:
 			"aicr:run_inference",
 			"aicr:view_models",
 			"aicr:manage_workflows",
+			"aicr:manage_agents",
 			"aicr:govern",
 			"aicr:view_metrics",
 			"aicr:admin"

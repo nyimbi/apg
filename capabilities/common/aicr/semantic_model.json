@@ -8,29 +8,118 @@
   },
   "capabilities": {
     "aicr": {
-      "approvals": {},
+      "adapters": {
+        "agent_composition": "agnt",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "credential_vault": "keym",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.AicrService",
+        "http_api": "api.app",
+        "metrics_sink": "moni",
+        "model_lifecycle": "mlcm",
+        "production_runtime": "service.AICoreService"
+      },
+      "ai_control_lifecycle": {
+        "agent_runtime": "agent runtime record",
+        "governance_event": "AICRGovernanceEvent",
+        "inference_approval": "AICRInferenceApproval",
+        "model": "model record",
+        "provider": "provider record",
+        "service": "AICRServiceRecord",
+        "workflow": "workflow record"
+      },
+      "approvals": {
+        "agent_action": "AICRGovernanceEvent",
+        "context": "AICRInferenceApproval",
+        "cost": "AICRInferenceApproval",
+        "drift": "AICRGovernanceEvent",
+        "inference": "AICRInferenceApproval"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "agent_composition": "agnt",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "credential_vault": "keym",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AicrService",
+          "http_api": "api.app",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.AICoreService"
+        },
+        "agent_runtimes": {
+          "first_class_agents_enabled": true,
+          "handoff_audit_required": true,
+          "human_approval_for_external_actions": true,
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi",
+            "ollama",
+            "custom_http"
+          ],
+          "tool_policy_required": true
+        },
         "governance": {
           "ai_audit_events_required": true,
           "auth_required": true,
+          "cross_tenant_routing_allowed": false,
           "monitoring_required": true,
           "require_tenant_context": true
         },
         "inference": {
           "default_timeout_seconds": 60,
           "max_concurrent_requests": 10000,
+          "max_context_tokens_without_review": 128000,
           "model_policy_required": true,
-          "prompt_audit_enabled": true
+          "pii_redaction_required": true,
+          "prompt_audit_enabled": true,
+          "tool_allowlist_required": true
         },
-        "orchestration": {
-          "edge_cloud_mesh_enabled": true,
-          "human_approval_for_high_risk": true,
-          "multi_modal_fusion_enabled": true,
-          "workflow_orchestration_enabled": true
+        "models": {
+          "evaluation_required_before_promotion": true,
+          "model_owner_required": true,
+          "model_policy_required": true,
+          "retirement_impact_review_required": true,
+          "supported_modalities": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "tabular",
+            "multimodal"
+          ]
+        },
+        "observability": {
+          "cost_tracking_required": true,
+          "drift_monitoring_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "providers": {
+          "credential_vault_required": true,
+          "egress_policy_required": true,
+          "provider_policy_required": true,
+          "supported_provider_types": [
+            "local",
+            "ollama",
+            "openai",
+            "anthropic",
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi",
+            "http"
+          ]
         },
         "services": {
+          "credential_vault_required": true,
           "endpoint_health_required": true,
           "max_services_per_tenant": 100,
           "registry_enabled": true,
@@ -42,10 +131,25 @@
           "default_theme": "aicr_ai_control_console"
         },
         "ui": {
+          "enable_agent_runtime_console": true,
+          "enable_audit_timeline": true,
+          "enable_cost_and_metrics": true,
+          "enable_dashboard": true,
+          "enable_evaluation_console": true,
           "enable_governance_center": true,
           "enable_inference_console": true,
+          "enable_model_catalog": true,
+          "enable_provider_registry": true,
           "enable_service_registry": true,
+          "enable_settings": true,
           "enable_workflow_designer": true
+        },
+        "workflows": {
+          "human_approval_for_high_risk": true,
+          "minimum_steps": 1,
+          "multi_modal_fusion_enabled": true,
+          "owner_required": true,
+          "workflow_orchestration_enabled": true
         }
       },
       "erp_modules": [
@@ -87,6 +191,151 @@
           },
           {
             "condition": {
+              "endpoint_present": false,
+              "operation": "register_service"
+            },
+            "description": "AI service registration requires a routeable endpoint.",
+            "effect": {
+              "decision": "deny",
+              "reason": "service_endpoint_required",
+              "required_action": "attach_service_endpoint"
+            },
+            "name": "service_registration_requires_endpoint"
+          },
+          {
+            "condition": {
+              "operation": "register_provider",
+              "provider_type_supported": false
+            },
+            "description": "AI providers require a supported provider type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_provider_type",
+              "required_action": "choose_supported_provider_type"
+            },
+            "name": "provider_type_must_be_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_provider",
+              "owner_assigned": false
+            },
+            "description": "AI providers require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_owner_required",
+              "required_action": "assign_provider_owner"
+            },
+            "name": "provider_requires_owner"
+          },
+          {
+            "condition": {
+              "credential_vault_ref_present": false,
+              "external_provider": true,
+              "operation": "register_provider"
+            },
+            "description": "External AI providers require credential vault references.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_credential_vault_required",
+              "required_action": "store_provider_credentials"
+            },
+            "name": "provider_requires_credential_vault"
+          },
+          {
+            "condition": {
+              "egress_policy_attached": false,
+              "external_provider": true,
+              "operation": "register_provider"
+            },
+            "description": "External AI providers require egress policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_egress_policy_required",
+              "required_action": "attach_egress_policy"
+            },
+            "name": "provider_requires_egress_policy"
+          },
+          {
+            "condition": {
+              "operation": "register_model",
+              "owner_assigned": false
+            },
+            "description": "Model registrations require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_owner_required",
+              "required_action": "assign_model_owner"
+            },
+            "name": "model_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_model",
+              "provider_registered": false
+            },
+            "description": "Models require a registered provider.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_provider_required",
+              "required_action": "register_provider"
+            },
+            "name": "model_requires_registered_provider"
+          },
+          {
+            "condition": {
+              "model_policy_attached": false,
+              "operation": "register_model"
+            },
+            "description": "Models require policy metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_policy_required",
+              "required_action": "attach_model_policy"
+            },
+            "name": "model_requires_policy"
+          },
+          {
+            "condition": {
+              "modality_supported": false,
+              "operation": "register_model"
+            },
+            "description": "Models require supported modality metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_model_modality",
+              "required_action": "choose_supported_modality"
+            },
+            "name": "model_requires_supported_modality"
+          },
+          {
+            "condition": {
+              "evaluation_recorded": false,
+              "operation": "promote_model"
+            },
+            "description": "Model promotion requires evaluation evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_evaluation_required",
+              "required_action": "record_model_evaluation"
+            },
+            "name": "model_promotion_requires_evaluation"
+          },
+          {
+            "condition": {
+              "impact_review_recorded": false,
+              "operation": "retire_model"
+            },
+            "description": "Model retirement requires impact review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_retirement_review_required",
+              "required_action": "record_retirement_impact"
+            },
+            "name": "model_retirement_requires_impact_review"
+          },
+          {
+            "condition": {
               "model_policy_attached": false,
               "operation": "run_inference"
             },
@@ -100,19 +349,7 @@
           },
           {
             "condition": {
-              "approval_recorded": false,
-              "workflow_risk": "high"
-            },
-            "description": "High-risk AI workflows require approval.",
-            "effect": {
-              "decision": "deny",
-              "reason": "workflow_approval_required",
-              "required_action": "record_human_approval"
-            },
-            "name": "high_risk_workflow_requires_approval"
-          },
-          {
-            "condition": {
+              "operation": "run_inference",
               "routing_requested": true,
               "service_health": "unhealthy"
             },
@@ -127,6 +364,7 @@
           {
             "condition": {
               "context_tokens_gt": 128000,
+              "operation": "run_inference",
               "review_recorded": false
             },
             "description": "Large context windows require cost and safety review.",
@@ -136,6 +374,194 @@
               "required_action": "record_context_review"
             },
             "name": "large_context_requires_review"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "run_inference",
+              "workflow_risk": "high"
+            },
+            "description": "High-risk AI workflows require approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "workflow_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "high_risk_workflow_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "run_inference",
+              "pii_detected": true,
+              "pii_redaction_enabled": false
+            },
+            "description": "PII-bearing inference requires redaction policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "pii_redaction_required",
+              "required_action": "enable_pii_redaction"
+            },
+            "name": "pii_inference_requires_redaction"
+          },
+          {
+            "condition": {
+              "operation": "run_inference",
+              "tool_allowlist_attached": false,
+              "tool_call_requested": true
+            },
+            "description": "Tool-using inference requires tool allowlist.",
+            "effect": {
+              "decision": "deny",
+              "reason": "tool_allowlist_required",
+              "required_action": "attach_tool_allowlist"
+            },
+            "name": "tool_call_requires_allowlist"
+          },
+          {
+            "condition": {
+              "cross_tenant_route": true,
+              "operation": "run_inference"
+            },
+            "description": "Cross-tenant AI routing is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_routing_denied",
+              "required_action": "use_tenant_scoped_service"
+            },
+            "name": "cross_tenant_routing_denied"
+          },
+          {
+            "condition": {
+              "cost_review_recorded": false,
+              "estimated_cost_gt": 100.0,
+              "operation": "run_inference"
+            },
+            "description": "Inference above cost limit requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "cost_review_required",
+              "required_action": "record_cost_review"
+            },
+            "name": "cost_limit_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "create_workflow",
+              "owner_assigned": false
+            },
+            "description": "AI workflows require an owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_owner_required",
+              "required_action": "assign_workflow_owner"
+            },
+            "name": "workflow_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "create_workflow",
+              "steps_present": false
+            },
+            "description": "AI workflows require at least one step.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_steps_required",
+              "required_action": "define_workflow_steps"
+            },
+            "name": "workflow_requires_steps"
+          },
+          {
+            "condition": {
+              "operation": "create_workflow",
+              "services_registered": false
+            },
+            "description": "AI workflows require registered service bindings.",
+            "effect": {
+              "decision": "deny",
+              "reason": "workflow_service_bindings_required",
+              "required_action": "bind_registered_services"
+            },
+            "name": "workflow_requires_registered_services"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_agent_runtime"
+            },
+            "description": "AI agent runtime must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_agent_runtime",
+              "required_action": "choose_supported_agent_runtime"
+            },
+            "name": "agent_runtime_must_be_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_agent_runtime",
+              "tool_policy_attached": false
+            },
+            "description": "AI agent runtime requires tool policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_tool_policy_required",
+              "required_action": "attach_tool_policy"
+            },
+            "name": "agent_runtime_requires_tool_policy"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "external_action": true,
+              "operation": "run_agent_action"
+            },
+            "description": "External AI agent actions require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "external_agent_action_approval_required",
+              "required_action": "record_agent_action_approval"
+            },
+            "name": "external_agent_action_requires_approval"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "operation": "complete_inference"
+            },
+            "description": "AI completions require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_audit_event_required",
+              "required_action": "record_ai_audit_event"
+            },
+            "name": "completion_requires_audit_event"
+          },
+          {
+            "condition": {
+              "operation": "stream_inference",
+              "trace_enabled": false
+            },
+            "description": "Streaming AI output requires trace capture.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ai_trace_required",
+              "required_action": "enable_trace_capture"
+            },
+            "name": "streaming_requires_trace"
+          },
+          {
+            "condition": {
+              "drift_review_recorded": false,
+              "drift_score_gt": 0.2,
+              "operation": "record_model_metric"
+            },
+            "description": "Model drift above threshold requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "drift_review_required",
+              "required_action": "record_drift_review"
+            },
+            "name": "drift_review_required"
           }
         ],
         "type": "deterministic"
@@ -168,6 +594,151 @@
         },
         {
           "condition": {
+            "endpoint_present": false,
+            "operation": "register_service"
+          },
+          "description": "AI service registration requires a routeable endpoint.",
+          "effect": {
+            "decision": "deny",
+            "reason": "service_endpoint_required",
+            "required_action": "attach_service_endpoint"
+          },
+          "name": "service_registration_requires_endpoint"
+        },
+        {
+          "condition": {
+            "operation": "register_provider",
+            "provider_type_supported": false
+          },
+          "description": "AI providers require a supported provider type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_provider_type",
+            "required_action": "choose_supported_provider_type"
+          },
+          "name": "provider_type_must_be_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_provider",
+            "owner_assigned": false
+          },
+          "description": "AI providers require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_owner_required",
+            "required_action": "assign_provider_owner"
+          },
+          "name": "provider_requires_owner"
+        },
+        {
+          "condition": {
+            "credential_vault_ref_present": false,
+            "external_provider": true,
+            "operation": "register_provider"
+          },
+          "description": "External AI providers require credential vault references.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_credential_vault_required",
+            "required_action": "store_provider_credentials"
+          },
+          "name": "provider_requires_credential_vault"
+        },
+        {
+          "condition": {
+            "egress_policy_attached": false,
+            "external_provider": true,
+            "operation": "register_provider"
+          },
+          "description": "External AI providers require egress policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_egress_policy_required",
+            "required_action": "attach_egress_policy"
+          },
+          "name": "provider_requires_egress_policy"
+        },
+        {
+          "condition": {
+            "operation": "register_model",
+            "owner_assigned": false
+          },
+          "description": "Model registrations require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_owner_required",
+            "required_action": "assign_model_owner"
+          },
+          "name": "model_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_model",
+            "provider_registered": false
+          },
+          "description": "Models require a registered provider.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_provider_required",
+            "required_action": "register_provider"
+          },
+          "name": "model_requires_registered_provider"
+        },
+        {
+          "condition": {
+            "model_policy_attached": false,
+            "operation": "register_model"
+          },
+          "description": "Models require policy metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_policy_required",
+            "required_action": "attach_model_policy"
+          },
+          "name": "model_requires_policy"
+        },
+        {
+          "condition": {
+            "modality_supported": false,
+            "operation": "register_model"
+          },
+          "description": "Models require supported modality metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_model_modality",
+            "required_action": "choose_supported_modality"
+          },
+          "name": "model_requires_supported_modality"
+        },
+        {
+          "condition": {
+            "evaluation_recorded": false,
+            "operation": "promote_model"
+          },
+          "description": "Model promotion requires evaluation evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_evaluation_required",
+            "required_action": "record_model_evaluation"
+          },
+          "name": "model_promotion_requires_evaluation"
+        },
+        {
+          "condition": {
+            "impact_review_recorded": false,
+            "operation": "retire_model"
+          },
+          "description": "Model retirement requires impact review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_retirement_review_required",
+            "required_action": "record_retirement_impact"
+          },
+          "name": "model_retirement_requires_impact_review"
+        },
+        {
+          "condition": {
             "model_policy_attached": false,
             "operation": "run_inference"
           },
@@ -181,19 +752,7 @@
         },
         {
           "condition": {
-            "approval_recorded": false,
-            "workflow_risk": "high"
-          },
-          "description": "High-risk AI workflows require approval.",
-          "effect": {
-            "decision": "deny",
-            "reason": "workflow_approval_required",
-            "required_action": "record_human_approval"
-          },
-          "name": "high_risk_workflow_requires_approval"
-        },
-        {
-          "condition": {
+            "operation": "run_inference",
             "routing_requested": true,
             "service_health": "unhealthy"
           },
@@ -208,6 +767,7 @@
         {
           "condition": {
             "context_tokens_gt": 128000,
+            "operation": "run_inference",
             "review_recorded": false
           },
           "description": "Large context windows require cost and safety review.",
@@ -217,19 +777,222 @@
             "required_action": "record_context_review"
           },
           "name": "large_context_requires_review"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "run_inference",
+            "workflow_risk": "high"
+          },
+          "description": "High-risk AI workflows require approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "workflow_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "high_risk_workflow_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "run_inference",
+            "pii_detected": true,
+            "pii_redaction_enabled": false
+          },
+          "description": "PII-bearing inference requires redaction policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "pii_redaction_required",
+            "required_action": "enable_pii_redaction"
+          },
+          "name": "pii_inference_requires_redaction"
+        },
+        {
+          "condition": {
+            "operation": "run_inference",
+            "tool_allowlist_attached": false,
+            "tool_call_requested": true
+          },
+          "description": "Tool-using inference requires tool allowlist.",
+          "effect": {
+            "decision": "deny",
+            "reason": "tool_allowlist_required",
+            "required_action": "attach_tool_allowlist"
+          },
+          "name": "tool_call_requires_allowlist"
+        },
+        {
+          "condition": {
+            "cross_tenant_route": true,
+            "operation": "run_inference"
+          },
+          "description": "Cross-tenant AI routing is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_routing_denied",
+            "required_action": "use_tenant_scoped_service"
+          },
+          "name": "cross_tenant_routing_denied"
+        },
+        {
+          "condition": {
+            "cost_review_recorded": false,
+            "estimated_cost_gt": 100.0,
+            "operation": "run_inference"
+          },
+          "description": "Inference above cost limit requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "cost_review_required",
+            "required_action": "record_cost_review"
+          },
+          "name": "cost_limit_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "create_workflow",
+            "owner_assigned": false
+          },
+          "description": "AI workflows require an owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_owner_required",
+            "required_action": "assign_workflow_owner"
+          },
+          "name": "workflow_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "create_workflow",
+            "steps_present": false
+          },
+          "description": "AI workflows require at least one step.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_steps_required",
+            "required_action": "define_workflow_steps"
+          },
+          "name": "workflow_requires_steps"
+        },
+        {
+          "condition": {
+            "operation": "create_workflow",
+            "services_registered": false
+          },
+          "description": "AI workflows require registered service bindings.",
+          "effect": {
+            "decision": "deny",
+            "reason": "workflow_service_bindings_required",
+            "required_action": "bind_registered_services"
+          },
+          "name": "workflow_requires_registered_services"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_agent_runtime"
+          },
+          "description": "AI agent runtime must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_agent_runtime",
+            "required_action": "choose_supported_agent_runtime"
+          },
+          "name": "agent_runtime_must_be_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_agent_runtime",
+            "tool_policy_attached": false
+          },
+          "description": "AI agent runtime requires tool policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_tool_policy_required",
+            "required_action": "attach_tool_policy"
+          },
+          "name": "agent_runtime_requires_tool_policy"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "external_action": true,
+            "operation": "run_agent_action"
+          },
+          "description": "External AI agent actions require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "external_agent_action_approval_required",
+            "required_action": "record_agent_action_approval"
+          },
+          "name": "external_agent_action_requires_approval"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "operation": "complete_inference"
+          },
+          "description": "AI completions require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_audit_event_required",
+            "required_action": "record_ai_audit_event"
+          },
+          "name": "completion_requires_audit_event"
+        },
+        {
+          "condition": {
+            "operation": "stream_inference",
+            "trace_enabled": false
+          },
+          "description": "Streaming AI output requires trace capture.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ai_trace_required",
+            "required_action": "enable_trace_capture"
+          },
+          "name": "streaming_requires_trace"
+        },
+        {
+          "condition": {
+            "drift_review_recorded": false,
+            "drift_score_gt": 0.2,
+            "operation": "record_model_metric"
+          },
+          "description": "Model drift above threshold requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "drift_review_required",
+            "required_action": "record_drift_review"
+          },
+          "name": "drift_review_required"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "service": "service.AicrService",
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "AgentRuntimeConsole",
+          "permission": "aicr:manage_agents",
+          "route": "/aicr/agents"
+        },
+        "audit": {
+          "component": "AICRAuditTimeline",
+          "permission": "aicr:view",
+          "route": "/aicr/audit"
+        },
         "dashboard": {
           "component": "AICRDashboard",
           "permission": "aicr:view",
           "route": "/aicr/dashboard"
+        },
+        "evaluations": {
+          "component": "ModelEvaluationConsole",
+          "permission": "aicr:govern",
+          "route": "/aicr/evaluations"
         },
         "governance": {
           "component": "AIGovernanceCenter",
@@ -251,6 +1014,11 @@
           "permission": "aicr:view_models",
           "route": "/aicr/models"
         },
+        "providers": {
+          "component": "AIProviderRegistry",
+          "permission": "aicr:manage_services",
+          "route": "/aicr/providers"
+        },
         "services": {
           "component": "AIServiceRegistry",
           "permission": "aicr:manage_services",
@@ -267,13 +1035,28 @@
           "route": "/aicr/workflows"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "agent_runtime_card": {
+            "icon": "bot",
+            "risk_style": "tool-policy-band",
+            "status_indicator": "runtime-chip"
+          },
           "ai_service_card": {
             "icon": "brain-circuit",
             "risk_style": "policy-band",
             "status_indicator": "health-pill"
+          },
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
+          "evaluation_console": {
+            "highlight": "drift-chip",
+            "visual": "score-grid"
           },
           "governance_rule_stack": {
             "status_style": "decision-chip",
@@ -283,6 +1066,16 @@
             "highlight": "latency-chip",
             "visual": "request-timeline"
           },
+          "model_catalog_row": {
+            "icon": "box",
+            "risk_style": "evaluation-band",
+            "status_indicator": "lifecycle-pill"
+          },
+          "provider_registry_row": {
+            "icon": "server-cog",
+            "risk_style": "egress-band",
+            "status_indicator": "provider-chip"
+          },
           "workflow_graph": {
             "edge_style": "handoff-line",
             "visual": "directed-agent-graph"
@@ -291,7 +1084,7 @@
         "name": "aicr_ai_control_console",
         "tokens": {
           "border.radius": "8px",
-          "color.accent": "#7C3AED",
+          "color.accent": "#C86F2D",
           "color.danger": "#C53030",
           "color.primary": "#243B6B",
           "color.success": "#2F855A",
@@ -322,11 +1115,11 @@
             "permission": "aicr:manage_services"
           },
           {
-            "component": "InferenceConsole",
-            "name": "inference",
-            "nav_group": "Runtime",
-            "path": "/aicr/inference",
-            "permission": "aicr:run_inference"
+            "component": "AIProviderRegistry",
+            "name": "providers",
+            "nav_group": "Services",
+            "path": "/aicr/providers",
+            "permission": "aicr:manage_services"
           },
           {
             "component": "ModelCatalog",
@@ -336,11 +1129,25 @@
             "permission": "aicr:view_models"
           },
           {
+            "component": "InferenceConsole",
+            "name": "inference",
+            "nav_group": "Runtime",
+            "path": "/aicr/inference",
+            "permission": "aicr:run_inference"
+          },
+          {
             "component": "AIWorkflowDesigner",
             "name": "workflows",
             "nav_group": "Orchestration",
             "path": "/aicr/workflows",
             "permission": "aicr:manage_workflows"
+          },
+          {
+            "component": "AgentRuntimeConsole",
+            "name": "agents",
+            "nav_group": "Orchestration",
+            "path": "/aicr/agents",
+            "permission": "aicr:manage_agents"
           },
           {
             "component": "AIGovernanceCenter",
@@ -350,11 +1157,25 @@
             "permission": "aicr:govern"
           },
           {
+            "component": "ModelEvaluationConsole",
+            "name": "evaluations",
+            "nav_group": "Governance",
+            "path": "/aicr/evaluations",
+            "permission": "aicr:govern"
+          },
+          {
             "component": "AICRMetrics",
             "name": "metrics",
             "nav_group": "Operations",
             "path": "/aicr/metrics",
             "permission": "aicr:view_metrics"
+          },
+          {
+            "component": "AICRAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/aicr/audit",
+            "permission": "aicr:view"
           },
           {
             "component": "AICRSettings",
@@ -369,7 +1190,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "dashboard.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -383,25 +1204,87 @@
   "contracts": {
     "aicr": {
       "configuration": {
+        "adapters": {
+          "agent_composition": "agnt",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "credential_vault": "keym",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.AicrService",
+          "http_api": "api.app",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.AICoreService"
+        },
+        "agent_runtimes": {
+          "first_class_agents_enabled": true,
+          "handoff_audit_required": true,
+          "human_approval_for_external_actions": true,
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi",
+            "ollama",
+            "custom_http"
+          ],
+          "tool_policy_required": true
+        },
         "governance": {
           "ai_audit_events_required": true,
           "auth_required": true,
+          "cross_tenant_routing_allowed": false,
           "monitoring_required": true,
           "require_tenant_context": true
         },
         "inference": {
           "default_timeout_seconds": 60,
           "max_concurrent_requests": 10000,
+          "max_context_tokens_without_review": 128000,
           "model_policy_required": true,
-          "prompt_audit_enabled": true
+          "pii_redaction_required": true,
+          "prompt_audit_enabled": true,
+          "tool_allowlist_required": true
         },
-        "orchestration": {
-          "edge_cloud_mesh_enabled": true,
-          "human_approval_for_high_risk": true,
-          "multi_modal_fusion_enabled": true,
-          "workflow_orchestration_enabled": true
+        "models": {
+          "evaluation_required_before_promotion": true,
+          "model_owner_required": true,
+          "model_policy_required": true,
+          "retirement_impact_review_required": true,
+          "supported_modalities": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "tabular",
+            "multimodal"
+          ]
+        },
+        "observability": {
+          "cost_tracking_required": true,
+          "drift_monitoring_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "trace_required": true
+        },
+        "providers": {
+          "credential_vault_required": true,
+          "egress_policy_required": true,
+          "provider_policy_required": true,
+          "supported_provider_types": [
+            "local",
+            "ollama",
+            "openai",
+            "anthropic",
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi",
+            "http"
+          ]
         },
         "services": {
+          "credential_vault_required": true,
           "endpoint_health_required": true,
           "max_services_per_tenant": 100,
           "registry_enabled": true,
@@ -413,10 +1296,25 @@
           "default_theme": "aicr_ai_control_console"
         },
         "ui": {
+          "enable_agent_runtime_console": true,
+          "enable_audit_timeline": true,
+          "enable_cost_and_metrics": true,
+          "enable_dashboard": true,
+          "enable_evaluation_console": true,
           "enable_governance_center": true,
           "enable_inference_console": true,
+          "enable_model_catalog": true,
+          "enable_provider_registry": true,
           "enable_service_registry": true,
+          "enable_settings": true,
           "enable_workflow_designer": true
+        },
+        "workflows": {
+          "human_approval_for_high_risk": true,
+          "minimum_steps": 1,
+          "multi_modal_fusion_enabled": true,
+          "owner_required": true,
+          "workflow_orchestration_enabled": true
         }
       },
       "id": "aicr",
@@ -456,14 +1354,109 @@
   },
   "roles": {},
   "rules": {
+    "agent_runtime_must_be_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_agent_runtime"
+      },
+      "description": "AI agent runtime must be supported.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_agent_runtime",
+        "required_action": "choose_supported_agent_runtime"
+      },
+      "name": "agent_runtime_must_be_supported"
+    },
+    "agent_runtime_requires_tool_policy": {
+      "condition": {
+        "operation": "register_agent_runtime",
+        "tool_policy_attached": false
+      },
+      "description": "AI agent runtime requires tool policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_tool_policy_required",
+        "required_action": "attach_tool_policy"
+      },
+      "name": "agent_runtime_requires_tool_policy"
+    },
+    "completion_requires_audit_event": {
+      "condition": {
+        "audit_event_recorded": false,
+        "operation": "complete_inference"
+      },
+      "description": "AI completions require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_audit_event_required",
+        "required_action": "record_ai_audit_event"
+      },
+      "name": "completion_requires_audit_event"
+    },
+    "cost_limit_requires_review": {
+      "condition": {
+        "cost_review_recorded": false,
+        "estimated_cost_gt": 100.0,
+        "operation": "run_inference"
+      },
+      "description": "Inference above cost limit requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "cost_review_required",
+        "required_action": "record_cost_review"
+      },
+      "name": "cost_limit_requires_review"
+    },
+    "cross_tenant_routing_denied": {
+      "condition": {
+        "cross_tenant_route": true,
+        "operation": "run_inference"
+      },
+      "description": "Cross-tenant AI routing is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_routing_denied",
+        "required_action": "use_tenant_scoped_service"
+      },
+      "name": "cross_tenant_routing_denied"
+    },
+    "drift_review_required": {
+      "condition": {
+        "drift_review_recorded": false,
+        "drift_score_gt": 0.2,
+        "operation": "record_model_metric"
+      },
+      "description": "Model drift above threshold requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "drift_review_required",
+        "required_action": "record_drift_review"
+      },
+      "name": "drift_review_required"
+    },
+    "external_agent_action_requires_approval": {
+      "condition": {
+        "approval_recorded": false,
+        "external_action": true,
+        "operation": "run_agent_action"
+      },
+      "description": "External AI agent actions require approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "external_agent_action_approval_required",
+        "required_action": "record_agent_action_approval"
+      },
+      "name": "external_agent_action_requires_approval"
+    },
     "high_risk_workflow_requires_approval": {
       "condition": {
         "approval_recorded": false,
+        "operation": "run_inference",
         "workflow_risk": "high"
       },
       "description": "High-risk AI workflows require approval.",
       "effect": {
-        "decision": "deny",
+        "decision": "require_review",
         "reason": "workflow_approval_required",
         "required_action": "record_human_approval"
       },
@@ -485,6 +1478,7 @@
     "large_context_requires_review": {
       "condition": {
         "context_tokens_gt": 128000,
+        "operation": "run_inference",
         "review_recorded": false
       },
       "description": "Large context windows require cost and safety review.",
@@ -494,6 +1488,165 @@
         "required_action": "record_context_review"
       },
       "name": "large_context_requires_review"
+    },
+    "model_promotion_requires_evaluation": {
+      "condition": {
+        "evaluation_recorded": false,
+        "operation": "promote_model"
+      },
+      "description": "Model promotion requires evaluation evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_evaluation_required",
+        "required_action": "record_model_evaluation"
+      },
+      "name": "model_promotion_requires_evaluation"
+    },
+    "model_requires_owner": {
+      "condition": {
+        "operation": "register_model",
+        "owner_assigned": false
+      },
+      "description": "Model registrations require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_owner_required",
+        "required_action": "assign_model_owner"
+      },
+      "name": "model_requires_owner"
+    },
+    "model_requires_policy": {
+      "condition": {
+        "model_policy_attached": false,
+        "operation": "register_model"
+      },
+      "description": "Models require policy metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_policy_required",
+        "required_action": "attach_model_policy"
+      },
+      "name": "model_requires_policy"
+    },
+    "model_requires_registered_provider": {
+      "condition": {
+        "operation": "register_model",
+        "provider_registered": false
+      },
+      "description": "Models require a registered provider.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_provider_required",
+        "required_action": "register_provider"
+      },
+      "name": "model_requires_registered_provider"
+    },
+    "model_requires_supported_modality": {
+      "condition": {
+        "modality_supported": false,
+        "operation": "register_model"
+      },
+      "description": "Models require supported modality metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_model_modality",
+        "required_action": "choose_supported_modality"
+      },
+      "name": "model_requires_supported_modality"
+    },
+    "model_retirement_requires_impact_review": {
+      "condition": {
+        "impact_review_recorded": false,
+        "operation": "retire_model"
+      },
+      "description": "Model retirement requires impact review.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_retirement_review_required",
+        "required_action": "record_retirement_impact"
+      },
+      "name": "model_retirement_requires_impact_review"
+    },
+    "pii_inference_requires_redaction": {
+      "condition": {
+        "operation": "run_inference",
+        "pii_detected": true,
+        "pii_redaction_enabled": false
+      },
+      "description": "PII-bearing inference requires redaction policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "pii_redaction_required",
+        "required_action": "enable_pii_redaction"
+      },
+      "name": "pii_inference_requires_redaction"
+    },
+    "provider_requires_credential_vault": {
+      "condition": {
+        "credential_vault_ref_present": false,
+        "external_provider": true,
+        "operation": "register_provider"
+      },
+      "description": "External AI providers require credential vault references.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_credential_vault_required",
+        "required_action": "store_provider_credentials"
+      },
+      "name": "provider_requires_credential_vault"
+    },
+    "provider_requires_egress_policy": {
+      "condition": {
+        "egress_policy_attached": false,
+        "external_provider": true,
+        "operation": "register_provider"
+      },
+      "description": "External AI providers require egress policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_egress_policy_required",
+        "required_action": "attach_egress_policy"
+      },
+      "name": "provider_requires_egress_policy"
+    },
+    "provider_requires_owner": {
+      "condition": {
+        "operation": "register_provider",
+        "owner_assigned": false
+      },
+      "description": "AI providers require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_owner_required",
+        "required_action": "assign_provider_owner"
+      },
+      "name": "provider_requires_owner"
+    },
+    "provider_type_must_be_supported": {
+      "condition": {
+        "operation": "register_provider",
+        "provider_type_supported": false
+      },
+      "description": "AI providers require a supported provider type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_provider_type",
+        "required_action": "choose_supported_provider_type"
+      },
+      "name": "provider_type_must_be_supported"
+    },
+    "service_registration_requires_endpoint": {
+      "condition": {
+        "endpoint_present": false,
+        "operation": "register_service"
+      },
+      "description": "AI service registration requires a routeable endpoint.",
+      "effect": {
+        "decision": "deny",
+        "reason": "service_endpoint_required",
+        "required_action": "attach_service_endpoint"
+      },
+      "name": "service_registration_requires_endpoint"
     },
     "service_registration_requires_owner": {
       "condition": {
@@ -508,6 +1661,19 @@
       },
       "name": "service_registration_requires_owner"
     },
+    "streaming_requires_trace": {
+      "condition": {
+        "operation": "stream_inference",
+        "trace_enabled": false
+      },
+      "description": "Streaming AI output requires trace capture.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ai_trace_required",
+        "required_action": "enable_trace_capture"
+      },
+      "name": "streaming_requires_trace"
+    },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
@@ -520,8 +1686,23 @@
       },
       "name": "tenant_context_required"
     },
+    "tool_call_requires_allowlist": {
+      "condition": {
+        "operation": "run_inference",
+        "tool_allowlist_attached": false,
+        "tool_call_requested": true
+      },
+      "description": "Tool-using inference requires tool allowlist.",
+      "effect": {
+        "decision": "deny",
+        "reason": "tool_allowlist_required",
+        "required_action": "attach_tool_allowlist"
+      },
+      "name": "tool_call_requires_allowlist"
+    },
     "unhealthy_service_blocks_routing": {
       "condition": {
+        "operation": "run_inference",
         "routing_requested": true,
         "service_health": "unhealthy"
       },
@@ -532,6 +1713,45 @@
         "required_action": "restore_service_health"
       },
       "name": "unhealthy_service_blocks_routing"
+    },
+    "workflow_requires_owner": {
+      "condition": {
+        "operation": "create_workflow",
+        "owner_assigned": false
+      },
+      "description": "AI workflows require an owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_owner_required",
+        "required_action": "assign_workflow_owner"
+      },
+      "name": "workflow_requires_owner"
+    },
+    "workflow_requires_registered_services": {
+      "condition": {
+        "operation": "create_workflow",
+        "services_registered": false
+      },
+      "description": "AI workflows require registered service bindings.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_service_bindings_required",
+        "required_action": "bind_registered_services"
+      },
+      "name": "workflow_requires_registered_services"
+    },
+    "workflow_requires_steps": {
+      "condition": {
+        "operation": "create_workflow",
+        "steps_present": false
+      },
+      "description": "AI workflows require at least one step.",
+      "effect": {
+        "decision": "deny",
+        "reason": "workflow_steps_required",
+        "required_action": "define_workflow_steps"
+      },
+      "name": "workflow_requires_steps"
     }
   },
   "security": {},

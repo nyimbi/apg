@@ -13922,3 +13922,55 @@ Not run to preserve battery:
 - Rendered Flask/browser UI behavior.
 - Legacy AI, database, security, performance, and deployment heavy tests.
 - Load, latency, throughput, and transfer-size benchmarks.
+
+### 2026-05-30 07:57 EAT
+
+AICR lifecycle and guardrail packet:
+
+- Selected `capabilities/common/aicr` as the next common capability after IMEX
+  in the development order.
+- Added root `README.md` and replaced `SPECIFICATION.md`, `PLAN.md`, and
+  `cap_spec.md` to describe the current AI control-plane lifecycle.
+- Expanded the AICR contract to 30 deterministic guardrails, 12 UI routes,
+  service/provider/model/inference/workflow/agent-runtime/governance/
+  observability/adapter configuration, Bytewax event-stream adapter evidence,
+  and AI control-console theme components.
+- Extended `service.AicrService` with dependency-light provider, model,
+  evaluation, promotion, workflow, agent-runtime, inference approval, result,
+  summary, and audit behavior for generated applications.
+- Extended `api_helpers.py` with API-shaped provider, model, workflow, and
+  agent-runtime helper functions.
+- Extended `views.py` with provider registry, model catalog, workflow designer,
+  agent runtime console, audit timeline, and richer dashboard/metrics models.
+- Replaced static package evidence with contract-derived `app.py` semantics
+  and refreshed `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json`.
+- Expanded focused tests for contract shape, Bytewax adapter evidence,
+  rule-engine denials, provider/model/workflow/agent runtime lifecycle,
+  high-risk inference approval, missing policy/health/tenant evidence,
+  generated-app API helpers, UI models, and package evidence.
+- Manual review found and fixed stale package evidence, narrow rule coverage,
+  missing first-class agent runtime surfaces, missing provider/model lifecycle
+  surfaces, and stale wording in the legacy service initializer.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/aicr/__init__.py capabilities/common/aicr/capability_contract.py capabilities/common/aicr/service.py capabilities/common/aicr/api_helpers.py capabilities/common/aicr/views.py capabilities/common/aicr/app.py capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py` passed with 11 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, 12 routes, 30 rules, Bytewax event stream, and `service.AicrService`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/aicr --json` passed with `ok: true`; AICR remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/aicr --json` passed with 12 UI routes, 30 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/aicr/README.md capabilities/common/aicr/SPECIFICATION.md capabilities/common/aicr/PLAN.md capabilities/common/aicr/cap_spec.md capabilities/common/aicr/__init__.py capabilities/common/aicr/capability_contract.py capabilities/common/aicr/service.py capabilities/common/aicr/api_helpers.py capabilities/common/aicr/views.py capabilities/common/aicr/app.py capabilities/common/aicr/test_capability_contract.py capabilities/common/aicr/tests/test_package_contract.py capabilities/common/aicr/package_manifest.json capabilities/common/aicr/release_report.json capabilities/common/aicr/semantic_model.json capabilities/common/aicr/docs/README.md capabilities/common/aicr/docs/architecture.md capabilities/common/aicr/docs/configuration.md capabilities/common/aicr/docs/getting_started.md` returned no primary-slice stale markers.
+- `git diff --check -- capabilities/common/aicr docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live model provider calls.
+- Live agent CLI invocation.
+- Live Bytewax stream execution.
+- External AUTH, AUDL, MONI, KEYM, MLCM, and AGNT adapters.
+- Rendered Flask/browser UI behavior.
+- Legacy advanced ML, edge, federated, neuromorphic, quantum, security, and
+  deployment heavy tests.
+- Load, latency, token-cost, drift, and throughput benchmarks.

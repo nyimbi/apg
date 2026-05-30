@@ -4,13 +4,24 @@
       "capability_contract": {
         "display_name": "AI Core Framework",
         "errors": [],
-        "route_count": 8,
-        "rule_count": 6
+        "route_count": 12,
+        "rule_count": 30
       }
+    },
+    "runtime": {
+      "event_stream": "bytewax",
+      "generated_app_runtime": "service.AicrService"
     },
     "self_test": {
       "capability": "aicr",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

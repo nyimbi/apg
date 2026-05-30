@@ -11,7 +11,7 @@ from capabilities.common.aicr.capability_contract import (
 from capabilities.common.aicr.service import AicrService
 
 
-def test_contract_exposes_configuration_rules_ui_and_theme():
+def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	contract = get_capability_contract("tenant-ai", {"inference": {"max_concurrent_requests": 32}})
 
 	assert contract["capability"] == "aicr"
@@ -20,53 +20,67 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["configuration_schema"]["required"] == [
 		"tenant_id",
 		"services",
+		"providers",
+		"models",
 		"inference",
-		"orchestration",
+		"workflows",
+		"agent_runtimes",
 		"governance",
+		"observability",
+		"adapters",
 		"ui",
-		"theme"
+		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.AicrService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"services",
-		"inference",
+		"providers",
 		"models",
+		"inference",
 		"workflows",
+		"agents",
 		"governance",
+		"evaluations",
 		"metrics",
-		"settings"
+		"audit",
+		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/aicr/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert "workflow_graph" in contract["theme"]["components"]
+	assert "agent_runtime_card" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_ai_core_guardrails():
 	result = evaluate_capability_rules({
 		"tenant_context_present": False,
-		"operation": "register_service",
+		"operation": "run_inference",
 		"owner_assigned": False,
 		"workflow_risk": "high",
 		"approval_recorded": False,
 		"context_tokens": 256000,
-		"review_recorded": False
-	})
-	inference_result = evaluate_capability_rules({
-		"tenant_context_present": True,
-		"operation": "run_inference",
-		"model_policy_attached": False
+		"review_recorded": False,
+		"model_policy_attached": False,
+		"service_health": "unhealthy",
+		"routing_requested": True,
+		"pii_detected": True,
+		"pii_redaction_enabled": False,
+		"tool_call_requested": True,
+		"tool_allowlist_attached": False,
 	})
 
 	assert result["decision"] == "deny"
-	assert set(result["matched_rules"]) == {
+	assert set(result["matched_rules"]) >= {
 		"tenant_context_required",
-		"service_registration_requires_owner",
+		"inference_requires_model_policy",
+		"unhealthy_service_blocks_routing",
 		"high_risk_workflow_requires_approval",
-		"large_context_requires_review"
+		"large_context_requires_review",
+		"pii_inference_requires_redaction",
+		"tool_call_requires_allowlist",
 	}
-	assert inference_result["decision"] == "deny"
-	assert inference_result["matched_rules"] == ["inference_requires_model_policy"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -79,8 +93,76 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "aicr_ai_control_console"
 	assert registration["ui_components"]["services"] == "/aicr/services"
 	assert "inference_approval_governance" in registration["capabilities"]
+	assert "agent_runtime_registry" in registration["capabilities"]
 	assert "auth" in registration["dependencies"]
 	assert "aicr:run_inference" in registration["permissions"]
+	assert "aicr:manage_agents" in registration["permissions"]
+
+
+def test_service_registers_provider_model_workflow_and_agent_runtime():
+	service = AicrService()
+	provider = service.register_provider(
+		"codex-provider",
+		"tenant-ai",
+		"Codex",
+		"codex",
+		"ai-platform",
+		credential_vault_ref="keym://codex",
+		egress_policy_ref="policy://ai-egress",
+	)
+	service.register_ai_service(
+		service_id="llm-router",
+		tenant_id="tenant-ai",
+		name="LLM Router",
+		owner="ai-platform",
+		health="healthy",
+		model_policy={"policy_id": "safe-gen"},
+	)
+	model = service.register_model(
+		"reasoning-model",
+		"tenant-ai",
+		"Reasoning Model",
+		"codex-provider",
+		"ai-platform",
+		"text",
+		model_policy={"policy_id": "safe-gen"},
+	)
+	evaluated = service.record_model_evaluation("tenant-ai", "reasoning-model", 0.97, "eval-owner")
+	promoted = service.promote_model("tenant-ai", "reasoning-model")
+	workflow = service.create_workflow("support-flow", "tenant-ai", "Support Flow", "workflow-owner", ["llm-router"], risk="high")
+	agent = service.register_agent_runtime("codex-runtime", "tenant-ai", "Codex Runtime", "codex", "agent-owner", "policy://tools")
+	models = views.model_catalog_model(service, "tenant-ai")
+	agents = views.agent_runtime_console_model(service, "tenant-ai")
+
+	assert provider["provider_type"] == "codex"
+	assert model["status"] == "registered"
+	assert evaluated["evaluation_recorded"] is True
+	assert promoted["status"] == "promoted"
+	assert workflow["service_ids"] == ["llm-router"]
+	assert agent["runtime_type"] == "codex"
+	assert models["models"][0]["id"] == "reasoning-model"
+	assert agents["agent_runtimes"][0]["id"] == "codex-runtime"
+	assert service.governance_summary("tenant-ai")["agent_runtime_count"] == 1
+
+
+def test_service_blocks_provider_model_workflow_and_agent_guardrail_gaps():
+	service = AicrService()
+
+	with pytest.raises(PermissionError, match="provider_credential_vault_required"):
+		service.register_provider("external", "tenant-ai", "External", "openai", "ai-owner", external=True)
+
+	service.register_provider("local", "tenant-ai", "Local", "local", "ai-owner", external=False)
+	with pytest.raises(PermissionError, match="registered_provider_required"):
+		service.register_model("model", "tenant-ai", "Model", "missing", "ai-owner", "text", model_policy={"policy_id": "safe"})
+	with pytest.raises(PermissionError, match="unsupported_model_modality"):
+		service.register_model("model", "tenant-ai", "Model", "local", "ai-owner", "quantum", model_policy={"policy_id": "safe"})
+	service.register_ai_service("svc", "tenant-ai", "Service", "ai-owner", model_policy={"policy_id": "safe"})
+	with pytest.raises(PermissionError, match="workflow_service_bindings_required"):
+		service.create_workflow("wf", "tenant-ai", "Workflow", "owner", ["missing"])
+	with pytest.raises(PermissionError, match="unsupported_agent_runtime"):
+		service.register_agent_runtime("runtime", "tenant-ai", "Runtime", "unknown", "owner", "policy://tools")
+	with pytest.raises(PermissionError, match="agent_tool_policy_required"):
+		service.register_agent_runtime("runtime", "tenant-ai", "Runtime", "codex", "owner", "")
 
 
 def test_service_runs_high_risk_inference_approval_lifecycle():
