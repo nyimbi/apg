@@ -65,6 +65,73 @@ def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	"""Compatibility helper exposing geofences as GEOS records."""
 	return APG_SERVICE.list_records(tenant_id)
 
+
+def register_event_source(payload: dict[str, Any]) -> dict[str, Any]:
+	return APG_SERVICE.register_event_source(
+		source_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		source_type=str(payload.get("source_type") or "device"),
+		consent_model=str(payload.get("consent_model") or "explicit"),
+		data_residency_policy=str(payload["data_residency_policy"]),
+		sensitive_location=_payload_bool(payload, "sensitive_location", False),
+		privacy_review_recorded=_payload_bool(payload, "privacy_review_recorded", True),
+	)
+
+
+def create_geofence_record(payload: dict[str, Any]) -> dict[str, Any]:
+	return APG_SERVICE.create_geofence(
+		geofence_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		owner=str(payload["owner"]),
+		boundary=dict(payload["boundary"]),
+		trigger_events=[str(item) for item in payload.get("trigger_events", ["enter", "exit"])],
+		active_rule=_payload_bool(payload, "active_rule", True),
+		spatial_review_recorded=_payload_bool(payload, "spatial_review_recorded", True),
+	)
+
+
+def process_location_event(payload: dict[str, Any]) -> dict[str, Any]:
+	return APG_SERVICE.process_location_event(
+		event_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		source_id=str(payload["source_id"]),
+		entity_id=str(payload["entity_id"]),
+		entity_type=str(payload.get("entity_type") or "asset"),
+		latitude=float(payload["latitude"]),
+		longitude=float(payload["longitude"]),
+		location_consent_recorded=_payload_bool(payload, "location_consent_recorded", True),
+		accuracy_meters=float(payload.get("accuracy_meters", 10.0)),
+		sensitive_location=_payload_bool(payload, "sensitive_location", False),
+		privacy_review_recorded=_payload_bool(payload, "privacy_review_recorded", True),
+	)
+
+
+def register_location_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return APG_SERVICE.register_location_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		policy_ref=str(payload.get("policy_ref") or ""),
+		registered=_payload_bool(payload, "registered", True),
+	)
+
+
+def list_location_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return APG_SERVICE.list_location_agents(tenant_id)
+
+
+def _payload_bool(payload: dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)
+
 # =============================================================================
 # Router and Security Configuration
 # =============================================================================

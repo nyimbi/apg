@@ -4,6 +4,7 @@ import pytest
 
 from capabilities.common.geos import register_capability
 from capabilities.common.geos.capability_contract import evaluate_capability_rules, get_capability_contract
+from capabilities.common.geos import views
 from capabilities.common.geos.service import GeosService
 
 
@@ -13,12 +14,14 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "geos"
 	assert contract["configuration"]["tenant_id"] == "tenant-geo"
 	assert contract["configuration"]["events"]["event_retention_days"] == 30
-	assert contract["configuration_schema"]["required"] == ["tenant_id", "geofencing", "events", "analytics", "governance", "ui", "theme"]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "maps", "geofences", "events", "territories", "analytics", "privacy", "settings"}
+	assert contract["configuration_schema"]["required"] == ["tenant_id", "geofencing", "events", "analytics", "location_agents", "governance", "observability", "adapters", "ui", "theme"]
+	assert len(contract["rule_engine"]["rules"]) >= 18
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "maps", "geofences", "events", "territories", "analytics", "privacy", "agents", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/geos/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "map_console" in contract["theme"]["components"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "codex" in contract["configuration"]["location_agents"]["supported_runtimes"]
 
 
 def test_rule_engine_enforces_geo_guardrails():
@@ -35,10 +38,20 @@ def test_rule_engine_enforces_geo_guardrails():
 		"spatial_review_recorded": False
 	})
 	create_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "create_geofence", "geofence_owner_assigned": False})
+	agent_result = evaluate_capability_rules({
+		"location_agent_present": True,
+		"agent_registered": False,
+		"agent_runtime_supported": False,
+		"agent_scope_present": False,
+		"agent_contribution_disclosed": False,
+	})
+	stream_result = evaluate_capability_rules({"operation": "batch_location_mutation", "event_stream": "memory"})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "location_consent_required", "event_source_must_be_registered", "sensitive_location_requires_review", "large_polygon_requires_review"}
 	assert create_result["matched_rules"] == ["geofence_requires_owner"]
+	assert set(agent_result["matched_rules"]) == {"location_agent_requires_registration", "location_agent_runtime_supported", "location_agent_requires_scope", "location_agent_requires_disclosure"}
+	assert stream_result["matched_rules"] == ["batch_location_mutation_requires_bytewax"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -49,9 +62,13 @@ def test_registration_includes_full_capability_contract():
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "geos_location_intelligence"
+	assert registration["streaming"]["processor"] == "bytewax"
 	assert registration["ui_components"]["geofences"] == "/geos/geofences"
+	assert registration["ui_components"]["agents"] == "/geos/agents"
 	assert "pred" in registration["dependencies"]
 	assert "geos:analyze" in registration["permissions"]
+	assert "geos:audit" in registration["permissions"]
+	assert "location_agents" in registration["capabilities"]
 
 
 def test_geo_spatial_lifecycle_is_executable():
@@ -110,6 +127,17 @@ def test_geo_spatial_lifecycle_is_executable():
 		spatial_index_available=True,
 		aggregation_privacy_applied=True,
 	)
+	agent = service.register_location_agent(
+		agent_id="codex-location-agent",
+		tenant_id="tenant-geo",
+		name="Codex Location Agent",
+		runtime="codex",
+		role="geofence_reviewer",
+		scope="geofencing,privacy",
+		contribution_disclosed=True,
+		policy_ref="location-agent-policy",
+	)
+	changed = service.change_geofence_state("tenant-geo", geofence["id"], "paused", "maintenance window")
 	summary = service.dashboard_summary("tenant-geo")
 
 	assert source["status"] == "registered"
@@ -117,6 +145,8 @@ def test_geo_spatial_lifecycle_is_executable():
 	assert event["matched_geofences"] == ["geo-yard"]
 	assert territory["status"] == "active"
 	assert analysis["hotspot_count"] == 1
+	assert agent["runtime"] == "codex"
+	assert changed["status"] == "paused"
 	assert service.list_geofences("tenant-geo")[0]["event_count"] == 1
 	assert summary == {
 		"event_source_count": 1,
@@ -124,8 +154,13 @@ def test_geo_spatial_lifecycle_is_executable():
 		"location_event_count": 1,
 		"territory_count": 1,
 		"analytics_count": 1,
-		"audit_event_count": 5,
+		"agent_count": 1,
+		"audit_event_count": 7,
 	}
+	assert views.dashboard_model(service, "tenant-geo")["summary"]["agent_count"] == 1
+	assert views.location_agents_model(service, "tenant-geo")["agents"][0]["id"] == "codex-location-agent"
+	assert views.audit_trail_model(service, "tenant-geo")["streaming"]["processor"] == "bytewax"
+	assert "location_agents" in views.settings_model(service, "tenant-geo")["configuration"]
 
 
 def test_geos_service_enforces_policy_guardrails():
@@ -165,6 +200,13 @@ def test_geos_service_enforces_policy_guardrails():
 		)
 
 	service.register_event_source("src", "tenant-geo", "Source", "mobile", "explicit", "ke")
+	service.create_geofence(
+		"geo-valid",
+		"tenant-geo",
+		"Valid Fence",
+		"owner",
+		{"type": "circle", "center": {"latitude": 0, "longitude": 0}, "radius_meters": 100},
+	)
 	with pytest.raises(PermissionError, match="event_source_registration_required"):
 		service.process_location_event("evt", "tenant-geo", "unknown", "asset", "asset", 0, 0, True)
 	with pytest.raises(PermissionError, match="location_consent_required"):
@@ -175,3 +217,25 @@ def test_geos_service_enforces_policy_guardrails():
 		service.run_spatial_analysis("ana", "tenant-geo", spatial_index_available=False, aggregation_privacy_applied=True)
 	with pytest.raises(PermissionError, match="aggregation_privacy_required"):
 		service.run_spatial_analysis("ana", "tenant-geo", spatial_index_available=True, aggregation_privacy_applied=False)
+	with pytest.raises(PermissionError, match="location_agent_disclosure_required"):
+		service.register_location_agent("agent", "tenant-geo", "Agent", "codex", "geofence_reviewer", "geofencing", False)
+	with pytest.raises(PermissionError, match="location_agent_runtime_not_supported"):
+		service.register_location_agent("agent", "tenant-geo", "Agent", "unsupported", "geofence_reviewer", "geofencing", True)
+	with pytest.raises(PermissionError, match="geos_state_change_reason_required"):
+		service.change_geofence_state("tenant-geo", "geo-valid", "paused", "")
+
+
+def test_geos_service_keeps_duplicate_ids_isolated_by_tenant():
+	service = GeosService()
+	for tenant_id, owner in [("tenant-a", "owner-a"), ("tenant-b", "owner-b")]:
+		service.register_event_source("shared-source", tenant_id, "Shared", "mobile", "explicit", "policy")
+		service.create_geofence(
+			"shared-geofence",
+			tenant_id,
+			"Shared Fence",
+			owner,
+			{"type": "circle", "center": {"latitude": 0, "longitude": 0}, "radius_meters": 100},
+		)
+
+	assert service.list_geofences("tenant-a")[0]["owner"] == "owner-a"
+	assert service.list_geofences("tenant-b")[0]["owner"] == "owner-b"

@@ -16,7 +16,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "geos",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware geofencing, spatial analytics, territory management, location events, and predictive location intelligence",
+	"description": "Tenant-aware geofencing, spatial analytics, territory management, location events, AI location-agent coordination, and predictive location intelligence",
 	"category": "specialized_ai_analytics",
 	"subcategory": "geo_spatial_services",
 	"vendor": "Datacraft",
@@ -24,8 +24,8 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["geofencing", "location_events", "spatial_analytics", "territory_management", "location_prediction"],
-	"permissions": ["geos:view", "geos:manage_geofences", "geos:process_events", "geos:analyze", "geos:admin"]
+	"provides": ["geofencing", "location_events", "spatial_analytics", "territory_management", "location_prediction", "location_agents"],
+	"permissions": ["geos:view", "geos:manage_geofences", "geos:process_events", "geos:analyze", "geos:audit", "geos:admin"]
 }
 
 CAPABILITY_METADATA = capability_metadata
@@ -41,7 +41,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["ntfy", "edge", "audl", "wflo"],
+		"optional_dependencies": ["ntfy", "edge", "audl", "wflo", "bytewax", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,6 +50,7 @@ def register_capability() -> dict[str, Any]:
 			"location_events": "Process enter, exit, dwell, and movement events with policy controls",
 			"spatial_analytics": "Analyze density, proximity, routing, coverage, and territory patterns",
 			"territory_management": "Govern regions, service areas, routing zones, and ownership",
+			"location_agents": "Register Codex, Claude Code, OpenCode, Pi, and future runtimes as scoped location-intelligence collaborators",
 			"capability_rules": "Evaluate deterministic geo-spatial governance rules",
 			"visual_theming": "Apply location-intelligence theme tokens and components"
 		},
@@ -58,11 +59,14 @@ def register_capability() -> dict[str, Any]:
 			"events": "/geos/api/v1/events",
 			"territories": "/geos/api/v1/territories",
 			"analytics": "/geos/api/v1/analytics",
-			"maps": "/geos/api/v1/maps"
+			"maps": "/geos/api/v1/maps",
+			"agents": "/geos/api/v1/agents",
+			"audit": "/geos/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

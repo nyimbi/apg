@@ -12,6 +12,19 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "edge_runtime": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.GeosService",
+          "master_data": "mdm",
+          "notification": "ntfy",
+          "prediction": "pred",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
         "analytics": {
           "aggregation_privacy_required": true,
           "predictive_location_enabled": true,
@@ -32,9 +45,39 @@
         },
         "governance": {
           "audit_location_events": true,
+          "batch_event_stream": "bytewax",
           "data_residency_policy_required": true,
           "require_tenant_context": true,
-          "sensitive_location_review_required": true
+          "sensitive_location_review_required": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "location_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "geofence_reviewer",
+            "privacy_reviewer",
+            "territory_planner",
+            "event_analyst",
+            "edge_operator"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "quality_metrics_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -42,6 +85,9 @@
           "default_theme": "geos_location_intelligence"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_event_monitor": true,
           "enable_geofence_editor": true,
           "enable_map_console": true,
@@ -55,9 +101,18 @@
       "master_data": {},
       "name": "Geo-Spatial Services",
       "provides": [
-        "geos_operations"
+        "geofencing",
+        "location_events",
+        "spatial_analytics",
+        "territory_management",
+        "location_prediction",
+        "location_agents"
       ],
-      "requires": [],
+      "requires": [
+        "pred",
+        "aicr",
+        "mdm"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -136,6 +191,173 @@
               "required_action": "review_geofence_geometry"
             },
             "name": "large_polygon_requires_review"
+          },
+          {
+            "condition": {
+              "data_residency_policy_present": false,
+              "operation": "register_event_source"
+            },
+            "description": "Event sources require data residency policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "data_residency_policy_required",
+              "required_action": "attach_data_residency_policy"
+            },
+            "name": "data_residency_policy_required"
+          },
+          {
+            "condition": {
+              "active_geofence_rule_present": false,
+              "operation": "create_geofence"
+            },
+            "description": "Geofences require at least one active rule.",
+            "effect": {
+              "decision": "deny",
+              "reason": "active_geofence_rule_required",
+              "required_action": "activate_geofence_rule"
+            },
+            "name": "active_geofence_rule_required"
+          },
+          {
+            "condition": {
+              "accuracy_meters_gt": 50
+            },
+            "description": "Location events must meet minimum accuracy policy.",
+            "effect": {
+              "decision": "deny",
+              "reason": "minimum_accuracy_required",
+              "required_action": "provide_accurate_location"
+            },
+            "name": "minimum_location_accuracy_required"
+          },
+          {
+            "condition": {
+              "operation": "run_spatial_analysis",
+              "spatial_index_available": false
+            },
+            "description": "Spatial analytics require an available spatial index.",
+            "effect": {
+              "decision": "deny",
+              "reason": "spatial_index_required",
+              "required_action": "build_spatial_index"
+            },
+            "name": "spatial_index_required"
+          },
+          {
+            "condition": {
+              "aggregation_privacy_applied": false,
+              "operation": "run_spatial_analysis"
+            },
+            "description": "Spatial analytics require privacy-preserving aggregation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "aggregation_privacy_required",
+              "required_action": "apply_aggregation_privacy"
+            },
+            "name": "aggregation_privacy_required"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "location_agent_present": true
+            },
+            "description": "AI location agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "location_agent_registration_required",
+              "required_action": "register_location_agent"
+            },
+            "name": "location_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "location_agent_present": true
+            },
+            "description": "AI location agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "location_agent_runtime_not_supported",
+              "required_action": "choose_supported_location_agent_runtime"
+            },
+            "name": "location_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "location_agent_present": true
+            },
+            "description": "AI location agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "location_agent_scope_required",
+              "required_action": "set_location_agent_scope"
+            },
+            "name": "location_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "location_agent_present": true
+            },
+            "description": "AI location-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "location_agent_disclosure_required",
+              "required_action": "disclose_location_agent"
+            },
+            "name": "location_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "state_change_reason_present": false,
+              "state_change_requested": true
+            },
+            "description": "Location lifecycle state changes require a reason.",
+            "effect": {
+              "decision": "deny",
+              "reason": "geos_state_change_reason_required",
+              "required_action": "record_state_change_reason"
+            },
+            "name": "geos_state_change_requires_reason"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Location lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "geos_audit_event_required",
+              "required_action": "record_geos_audit_event"
+            },
+            "name": "geos_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "cross_tenant_access": true
+            },
+            "description": "Location records may not cross tenant boundaries.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_location_access_denied",
+              "required_action": "use_tenant_local_context"
+            },
+            "name": "cross_tenant_location_access_denied"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "batch_location_mutation"
+            },
+            "description": "Batch location mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_location_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -217,6 +439,173 @@
             "required_action": "review_geofence_geometry"
           },
           "name": "large_polygon_requires_review"
+        },
+        {
+          "condition": {
+            "data_residency_policy_present": false,
+            "operation": "register_event_source"
+          },
+          "description": "Event sources require data residency policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "data_residency_policy_required",
+            "required_action": "attach_data_residency_policy"
+          },
+          "name": "data_residency_policy_required"
+        },
+        {
+          "condition": {
+            "active_geofence_rule_present": false,
+            "operation": "create_geofence"
+          },
+          "description": "Geofences require at least one active rule.",
+          "effect": {
+            "decision": "deny",
+            "reason": "active_geofence_rule_required",
+            "required_action": "activate_geofence_rule"
+          },
+          "name": "active_geofence_rule_required"
+        },
+        {
+          "condition": {
+            "accuracy_meters_gt": 50
+          },
+          "description": "Location events must meet minimum accuracy policy.",
+          "effect": {
+            "decision": "deny",
+            "reason": "minimum_accuracy_required",
+            "required_action": "provide_accurate_location"
+          },
+          "name": "minimum_location_accuracy_required"
+        },
+        {
+          "condition": {
+            "operation": "run_spatial_analysis",
+            "spatial_index_available": false
+          },
+          "description": "Spatial analytics require an available spatial index.",
+          "effect": {
+            "decision": "deny",
+            "reason": "spatial_index_required",
+            "required_action": "build_spatial_index"
+          },
+          "name": "spatial_index_required"
+        },
+        {
+          "condition": {
+            "aggregation_privacy_applied": false,
+            "operation": "run_spatial_analysis"
+          },
+          "description": "Spatial analytics require privacy-preserving aggregation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "aggregation_privacy_required",
+            "required_action": "apply_aggregation_privacy"
+          },
+          "name": "aggregation_privacy_required"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "location_agent_present": true
+          },
+          "description": "AI location agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "location_agent_registration_required",
+            "required_action": "register_location_agent"
+          },
+          "name": "location_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "location_agent_present": true
+          },
+          "description": "AI location agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "location_agent_runtime_not_supported",
+            "required_action": "choose_supported_location_agent_runtime"
+          },
+          "name": "location_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "location_agent_present": true
+          },
+          "description": "AI location agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "location_agent_scope_required",
+            "required_action": "set_location_agent_scope"
+          },
+          "name": "location_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "location_agent_present": true
+          },
+          "description": "AI location-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "location_agent_disclosure_required",
+            "required_action": "disclose_location_agent"
+          },
+          "name": "location_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "state_change_reason_present": false,
+            "state_change_requested": true
+          },
+          "description": "Location lifecycle state changes require a reason.",
+          "effect": {
+            "decision": "deny",
+            "reason": "geos_state_change_reason_required",
+            "required_action": "record_state_change_reason"
+          },
+          "name": "geos_state_change_requires_reason"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Location lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "geos_audit_event_required",
+            "required_action": "record_geos_audit_event"
+          },
+          "name": "geos_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "cross_tenant_access": true
+          },
+          "description": "Location records may not cross tenant boundaries.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_location_access_denied",
+            "required_action": "use_tenant_local_context"
+          },
+          "name": "cross_tenant_location_access_denied"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "batch_location_mutation"
+          },
+          "description": "Batch location mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_location_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -226,10 +615,20 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "LocationAgentPanel",
+          "permission": "geos:admin",
+          "route": "/geos/agents"
+        },
         "analytics": {
           "component": "SpatialAnalytics",
           "permission": "geos:analyze",
           "route": "/geos/analytics"
+        },
+        "audit": {
+          "component": "LocationAuditTrail",
+          "permission": "geos:audit",
+          "route": "/geos/audit"
         },
         "dashboard": {
           "component": "GEOSDashboard",
@@ -267,9 +666,39 @@
           "route": "/geos/territories"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_location_mutation_requires_bytewax",
+        "events": [
+          "event_source_registered",
+          "geofence_created",
+          "location_event_processed",
+          "territory_created",
+          "spatial_analysis_completed",
+          "location_agent_registered",
+          "geofence_state_changed"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "event_sources",
+          "geofences",
+          "location_events",
+          "territories",
+          "analytics",
+          "location_agents",
+          "audit_events"
+        ],
+        "topic": "apg.geos.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "icon": "bot",
+            "status_style": "scope-chip"
+          },
+          "audit_timeline": {
+            "icon": "list-todo",
+            "status_style": "governance-chip"
+          },
           "event_monitor": {
             "status_style": "source-chip",
             "visual": "event-stream"
@@ -357,6 +786,20 @@
             "permission": "geos:admin"
           },
           {
+            "component": "LocationAgentPanel",
+            "name": "agents",
+            "nav_group": "Agents",
+            "path": "/geos/agents",
+            "permission": "geos:admin"
+          },
+          {
+            "component": "LocationAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/geos/audit",
+            "permission": "geos:audit"
+          },
+          {
             "component": "GEOSSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -377,12 +820,29 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "geos": []
+      "geos": [
+        "pred",
+        "aicr",
+        "mdm"
+      ]
     }
   },
   "contracts": {
     "geos": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "edge_runtime": "edge",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.GeosService",
+          "master_data": "mdm",
+          "notification": "ntfy",
+          "prediction": "pred",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
         "analytics": {
           "aggregation_privacy_required": true,
           "predictive_location_enabled": true,
@@ -403,9 +863,39 @@
         },
         "governance": {
           "audit_location_events": true,
+          "batch_event_stream": "bytewax",
           "data_residency_policy_required": true,
           "require_tenant_context": true,
-          "sensitive_location_review_required": true
+          "sensitive_location_review_required": true,
+          "state_change_reason_required": true,
+          "tenant_isolation_required": true
+        },
+        "location_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "geofence_reviewer",
+            "privacy_reviewer",
+            "territory_planner",
+            "event_analyst",
+            "edge_operator"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "latency_metrics_required": true,
+          "quality_metrics_required": true
         },
         "tenant_id": "default",
         "theme": {
@@ -413,6 +903,9 @@
           "default_theme": "geos_location_intelligence"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_analytics": true,
+          "enable_audit": true,
           "enable_event_monitor": true,
           "enable_geofence_editor": true,
           "enable_map_console": true,
@@ -421,9 +914,18 @@
       },
       "id": "geos",
       "provides": [
-        "geos_operations"
+        "geofencing",
+        "location_events",
+        "spatial_analytics",
+        "territory_management",
+        "location_prediction",
+        "location_agents"
       ],
-      "requires": []
+      "requires": [
+        "pred",
+        "aicr",
+        "mdm"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +937,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +958,70 @@
   },
   "roles": {},
   "rules": {
+    "active_geofence_rule_required": {
+      "condition": {
+        "active_geofence_rule_present": false,
+        "operation": "create_geofence"
+      },
+      "description": "Geofences require at least one active rule.",
+      "effect": {
+        "decision": "deny",
+        "reason": "active_geofence_rule_required",
+        "required_action": "activate_geofence_rule"
+      },
+      "name": "active_geofence_rule_required"
+    },
+    "aggregation_privacy_required": {
+      "condition": {
+        "aggregation_privacy_applied": false,
+        "operation": "run_spatial_analysis"
+      },
+      "description": "Spatial analytics require privacy-preserving aggregation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "aggregation_privacy_required",
+        "required_action": "apply_aggregation_privacy"
+      },
+      "name": "aggregation_privacy_required"
+    },
+    "batch_location_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "batch_location_mutation"
+      },
+      "description": "Batch location mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_location_mutation_requires_bytewax"
+    },
+    "cross_tenant_location_access_denied": {
+      "condition": {
+        "cross_tenant_access": true
+      },
+      "description": "Location records may not cross tenant boundaries.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_location_access_denied",
+        "required_action": "use_tenant_local_context"
+      },
+      "name": "cross_tenant_location_access_denied"
+    },
+    "data_residency_policy_required": {
+      "condition": {
+        "data_residency_policy_present": false,
+        "operation": "register_event_source"
+      },
+      "description": "Event sources require data residency policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "data_residency_policy_required",
+        "required_action": "attach_data_residency_policy"
+      },
+      "name": "data_residency_policy_required"
+    },
     "event_source_must_be_registered": {
       "condition": {
         "event_source_registered": false,
@@ -482,6 +1048,32 @@
       },
       "name": "geofence_requires_owner"
     },
+    "geos_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Location lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "geos_audit_event_required",
+        "required_action": "record_geos_audit_event"
+      },
+      "name": "geos_state_change_requires_audit"
+    },
+    "geos_state_change_requires_reason": {
+      "condition": {
+        "state_change_reason_present": false,
+        "state_change_requested": true
+      },
+      "description": "Location lifecycle state changes require a reason.",
+      "effect": {
+        "decision": "deny",
+        "reason": "geos_state_change_reason_required",
+        "required_action": "record_state_change_reason"
+      },
+      "name": "geos_state_change_requires_reason"
+    },
     "large_polygon_requires_review": {
       "condition": {
         "polygon_vertices_gt": 5000,
@@ -494,6 +1086,58 @@
         "required_action": "review_geofence_geometry"
       },
       "name": "large_polygon_requires_review"
+    },
+    "location_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "location_agent_present": true
+      },
+      "description": "AI location-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "location_agent_disclosure_required",
+        "required_action": "disclose_location_agent"
+      },
+      "name": "location_agent_requires_disclosure"
+    },
+    "location_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "location_agent_present": true
+      },
+      "description": "AI location agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "location_agent_registration_required",
+        "required_action": "register_location_agent"
+      },
+      "name": "location_agent_requires_registration"
+    },
+    "location_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "location_agent_present": true
+      },
+      "description": "AI location agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "location_agent_scope_required",
+        "required_action": "set_location_agent_scope"
+      },
+      "name": "location_agent_requires_scope"
+    },
+    "location_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "location_agent_present": true
+      },
+      "description": "AI location agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "location_agent_runtime_not_supported",
+        "required_action": "choose_supported_location_agent_runtime"
+      },
+      "name": "location_agent_runtime_supported"
     },
     "location_consent_required": {
       "condition": {
@@ -508,6 +1152,18 @@
       },
       "name": "location_consent_required"
     },
+    "minimum_location_accuracy_required": {
+      "condition": {
+        "accuracy_meters_gt": 50
+      },
+      "description": "Location events must meet minimum accuracy policy.",
+      "effect": {
+        "decision": "deny",
+        "reason": "minimum_accuracy_required",
+        "required_action": "provide_accurate_location"
+      },
+      "name": "minimum_location_accuracy_required"
+    },
     "sensitive_location_requires_review": {
       "condition": {
         "privacy_review_recorded": false,
@@ -520,6 +1176,19 @@
         "required_action": "record_privacy_review"
       },
       "name": "sensitive_location_requires_review"
+    },
+    "spatial_index_required": {
+      "condition": {
+        "operation": "run_spatial_analysis",
+        "spatial_index_available": false
+      },
+      "description": "Spatial analytics require an available spatial index.",
+      "effect": {
+        "decision": "deny",
+        "reason": "spatial_index_required",
+        "required_action": "build_spatial_index"
+      },
+      "name": "spatial_index_required"
     },
     "tenant_context_required": {
       "condition": {

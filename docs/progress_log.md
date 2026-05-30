@@ -16,6 +16,66 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 16:10 EAT
+
+GEOS geo-spatial lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, then replaced
+  `cap_spec.md` and older broad GEOS docs with current executable packet and
+  adapter-boundary notes.
+- Expanded `capability_contract.py` with location-agent, governance,
+  observability, adapter, UI, theme, and Bytewax lifecycle-stream
+  configuration.
+- Expanded deterministic rules to cover tenant context, location consent,
+  geofence ownership, event-source registration, sensitive-location review,
+  large-polygon review, data residency, active geofence rules, minimum
+  location accuracy, spatial index availability, aggregation privacy, AI
+  location-agent registration/runtime/scope/disclosure, state-change
+  reason/audit, cross-tenant access, and Bytewax batch mutation enforcement.
+- Tightened `GeosService` package state so event sources, geofences, location
+  events, territories, analytics, and agents are tenant-qualified and duplicate
+  IDs can exist safely across tenants.
+- Added AI location-agent registration, geofence state changes, API helpers,
+  agent/audit/settings view models, and dashboard agent counts.
+- Renamed the package test to `tests/test_package_contract.py` and expanded
+  coverage for Bytewax, location agents, tenant-isolated duplicate IDs,
+  state-change guardrails, UI models, and package evidence.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) to match the expanded
+  contract.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/geos/__init__.py
+  capabilities/common/geos/capability_contract.py capabilities/common/geos/service.py
+  capabilities/common/geos/api.py capabilities/common/geos/views.py
+  capabilities/common/geos/test_capability_contract.py
+  capabilities/common/geos/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/geos/test_capability_contract.py
+  capabilities/common/geos/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.geos import app; ..."`
+  passed; optional OpenTelemetry warning is expected when the production
+  observability adapter is not installed.
+- `jq '.capabilities.geos.streaming.processor,
+  .capabilities.geos.configuration.location_agents.supported_runtimes,
+  .capabilities.geos.screens.agents.route'
+  capabilities/common/geos/semantic_model.json` confirmed `bytewax`,
+  `codex`/`claude_code`/`opencode`/`pi`, and `/geos/agents`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/geos --json` passed with `geos` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/geos --json`
+  passed with `side_effect_free: true` and no warnings.
+- GEOS stale-marker and banned stream search returned no matches for old package
+  markers, unsupported overclaims, unfinished scaffolding, TODOs, or Kafka
+  references.
+- `git diff --check -- capabilities/common/geos docs/progress_log.md` passed.
+- Not run: full repository pytest suite, live map/geocoding/routing providers,
+  native H3/GEOS engines, warehouse spatial indexes, edge telemetry ingestion,
+  production PRED/AICR/MDM/AUDL/NTFY/WFLO/MONI adapters, live Bytewax topology,
+  rendered browser UI, and performance/resilience checks.
+
 ### 2026-05-30 16:00 EAT
 
 AUDP audio-processing lifecycle/guardrail packet:
