@@ -176,6 +176,7 @@ class DriftReport:
 	drift_score: float
 	threshold: float
 	status: str
+	review_recorded: bool = False
 	created_at: datetime = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -187,6 +188,7 @@ class DriftReport:
 			"drift_score": self.drift_score,
 			"threshold": self.threshold,
 			"status": self.status,
+			"review_recorded": self.review_recorded,
 			"created_at": isoformat(self.created_at),
 		}
 

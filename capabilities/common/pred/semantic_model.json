@@ -8,29 +8,95 @@
   },
   "capabilities": {
     "pred": {
-      "approvals": {},
+      "adapters": {
+        "ai_core": "aicr",
+        "audit_sink": "audl",
+        "auth_provider": "auth",
+        "cache": "cach",
+        "configuration": "conf",
+        "data_pipeline": "etlp",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.PredService",
+        "helper_runtime": "predictive_runtime.py",
+        "http_api": "api.py",
+        "metrics_sink": "moni",
+        "model_lifecycle": "mlcm",
+        "production_runtime": "service.PredService"
+      },
+      "approvals": {
+        "drift": "DriftReport",
+        "forecast": "ForecastRun",
+        "model": "PredictiveModel",
+        "score": "ScoreRun"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "configuration": "conf",
+          "data_pipeline": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.PredService",
+          "helper_runtime": "predictive_runtime.py",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.PredService"
+        },
+        "drift": {
+          "monitoring_window_days": 30,
+          "review_required_above_threshold": true,
+          "threshold_required": true
+        },
+        "feature_sets": {
+          "feature_names_required": true,
+          "lineage_required": true,
+          "owner_required": true,
+          "source_system_required": true
+        },
         "forecasting": {
           "confidence_intervals": true,
           "enabled": true,
-          "horizon_limit": 365,
-          "minimum_history_points": 24
+          "horizon_limit_days": 365,
+          "minimum_history_points": 24,
+          "review_required_for_long_horizon": true
         },
         "governance": {
           "audit_predictions": true,
-          "production_approval_required": true,
+          "auth_required": true,
+          "cross_tenant_scoring_allowed": false,
           "require_tenant_context": true
         },
         "models": {
+          "algorithm_required": true,
           "approved_model_required": true,
           "explainability_required": true,
-          "monitor_drift": true
+          "monitor_drift": true,
+          "owner_required": true,
+          "target_required": true,
+          "training_history_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "scenarios": {
+          "adjustments_required": true,
+          "assumptions_required": true,
+          "baseline_required": true
         },
         "scoring": {
           "batch_scoring_enabled": true,
           "feature_lineage_required": true,
+          "high_impact_explainability_required": true,
+          "production_approval_required": true,
           "real_time_scoring_enabled": true
         },
         "tenant_id": "default",
@@ -39,10 +105,18 @@
           "default_theme": "pred_forecast_console"
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_batch_scoring": true,
+          "enable_dashboard": true,
+          "enable_drift_monitor": true,
+          "enable_explainability": true,
+          "enable_feature_registry": true,
           "enable_forecast_console": true,
+          "enable_governance": true,
           "enable_model_board": true,
           "enable_scenario_lab": true,
-          "enable_score_monitor": true
+          "enable_score_monitor": true,
+          "enable_settings": true
         }
       },
       "erp_modules": [
@@ -51,6 +125,15 @@
       "i18n": {},
       "master_data": {},
       "name": "Predictive Analytics",
+      "prediction_lifecycle": {
+        "audit": "PredAuditEvent",
+        "drift": "DriftReport",
+        "feature_set": "FeatureSet",
+        "forecast": "ForecastRun",
+        "model": "PredictiveModel",
+        "scenario": "ScenarioSimulation",
+        "score": "ScoreRun"
+      },
       "provides": [
         "pred_operations"
       ],
@@ -71,6 +154,162 @@
           },
           {
             "condition": {
+              "operation": "register_model",
+              "owner_present": false
+            },
+            "description": "Predictive models require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_owner_required",
+              "required_action": "assign_model_owner"
+            },
+            "name": "model_requires_owner"
+          },
+          {
+            "condition": {
+              "algorithm_present": false,
+              "operation": "register_model"
+            },
+            "description": "Predictive models require algorithm metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_algorithm_required",
+              "required_action": "attach_algorithm_metadata"
+            },
+            "name": "model_requires_algorithm"
+          },
+          {
+            "condition": {
+              "operation": "register_model",
+              "target_present": false
+            },
+            "description": "Predictive models require a prediction target.",
+            "effect": {
+              "decision": "deny",
+              "reason": "model_target_required",
+              "required_action": "attach_prediction_target"
+            },
+            "name": "model_requires_target"
+          },
+          {
+            "condition": {
+              "operation": "register_model",
+              "training_history_points_lt": 24
+            },
+            "description": "Predictive models require training history evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "training_history_review_required",
+              "required_action": "record_training_history_review"
+            },
+            "name": "model_requires_training_history"
+          },
+          {
+            "condition": {
+              "feature_names_present": false,
+              "operation": "register_model"
+            },
+            "description": "Predictive models require feature metadata.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "model_feature_metadata_required",
+              "required_action": "attach_feature_metadata"
+            },
+            "name": "model_requires_feature_names"
+          },
+          {
+            "condition": {
+              "explainability_attached": false,
+              "operation": "approve_model"
+            },
+            "description": "Model approval requires explainability evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "model_explainability_review_required",
+              "required_action": "attach_explainability"
+            },
+            "name": "model_approval_requires_explainability"
+          },
+          {
+            "condition": {
+              "operation": "register_feature_set",
+              "owner_present": false
+            },
+            "description": "Feature sets require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feature_owner_required",
+              "required_action": "assign_feature_owner"
+            },
+            "name": "feature_set_requires_owner"
+          },
+          {
+            "condition": {
+              "feature_names_present": false,
+              "operation": "register_feature_set"
+            },
+            "description": "Feature sets require feature names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feature_names_required",
+              "required_action": "attach_feature_names"
+            },
+            "name": "feature_set_requires_features"
+          },
+          {
+            "condition": {
+              "feature_lineage_present": false,
+              "operation": "register_feature_set"
+            },
+            "description": "Feature sets require lineage references for scoring.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "feature_lineage_review_required",
+              "required_action": "attach_feature_lineage"
+            },
+            "name": "feature_set_requires_lineage"
+          },
+          {
+            "condition": {
+              "operation": "register_feature_set",
+              "source_system_present": false
+            },
+            "description": "Feature sets require a source system.",
+            "effect": {
+              "decision": "deny",
+              "reason": "feature_source_system_required",
+              "required_action": "attach_source_system"
+            },
+            "name": "feature_set_requires_source_system"
+          },
+          {
+            "condition": {
+              "model_present": false,
+              "operation": "create_forecast"
+            },
+            "description": "Forecasts require a registered model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_model_required",
+              "required_action": "select_model"
+            },
+            "name": "forecast_requires_model"
+          },
+          {
+            "condition": {
+              "operation": "create_forecast",
+              "series_name_present": false
+            },
+            "description": "Forecasts require a series name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_series_required",
+              "required_action": "attach_series_name"
+            },
+            "name": "forecast_requires_series"
+          },
+          {
+            "condition": {
               "history_points_lt": 24,
               "operation": "create_forecast"
             },
@@ -84,8 +323,36 @@
           },
           {
             "condition": {
+              "forecast_horizon_days_lt": 1,
+              "operation": "create_forecast"
+            },
+            "description": "Forecast horizon must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_horizon_required",
+              "required_action": "choose_positive_horizon"
+            },
+            "name": "forecast_requires_positive_horizon"
+          },
+          {
+            "condition": {
+              "forecast_horizon_days_gt": 365,
+              "operation": "create_forecast",
+              "review_recorded": false
+            },
+            "description": "Long forecast horizons require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "long_horizon_review_required",
+              "required_action": "record_forecast_review"
+            },
+            "name": "long_horizon_requires_review"
+          },
+          {
+            "condition": {
               "environment": "production",
-              "model_approved": false
+              "model_approved": false,
+              "operation": "score"
             },
             "description": "Production scoring requires an approved model.",
             "effect": {
@@ -111,7 +378,8 @@
           {
             "condition": {
               "explainability_attached": false,
-              "impact": "high"
+              "impact": "high",
+              "operation": "score"
             },
             "description": "High-impact predictions require explainability artifacts.",
             "effect": {
@@ -123,16 +391,159 @@
           },
           {
             "condition": {
-              "forecast_horizon_days_gt": 365,
+              "entity_present": false,
+              "operation": "score"
+            },
+            "description": "Scores require an entity identifier.",
+            "effect": {
+              "decision": "deny",
+              "reason": "score_entity_required",
+              "required_action": "attach_entity"
+            },
+            "name": "score_requires_entity"
+          },
+          {
+            "condition": {
+              "feature_values_present": false,
+              "operation": "score"
+            },
+            "description": "Scores require feature values.",
+            "effect": {
+              "decision": "deny",
+              "reason": "score_features_required",
+              "required_action": "attach_feature_values"
+            },
+            "name": "score_requires_feature_values"
+          },
+          {
+            "condition": {
+              "model_present": false,
+              "operation": "simulate_scenario"
+            },
+            "description": "Scenarios require a registered model.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_model_required",
+              "required_action": "select_model"
+            },
+            "name": "scenario_requires_model"
+          },
+          {
+            "condition": {
+              "assumptions_present": false,
+              "operation": "simulate_scenario"
+            },
+            "description": "Scenarios require explicit assumptions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_assumptions_required",
+              "required_action": "attach_assumptions"
+            },
+            "name": "scenario_requires_assumptions"
+          },
+          {
+            "condition": {
+              "adjustments_present": false,
+              "operation": "simulate_scenario"
+            },
+            "description": "Scenarios require feature adjustments.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_adjustments_required",
+              "required_action": "attach_adjustments"
+            },
+            "name": "scenario_requires_adjustments"
+          },
+          {
+            "condition": {
+              "baseline_present": false,
+              "operation": "simulate_scenario"
+            },
+            "description": "Scenarios require a baseline score.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_baseline_required",
+              "required_action": "attach_baseline_score"
+            },
+            "name": "scenario_requires_baseline"
+          },
+          {
+            "condition": {
+              "metric_name_present": false,
+              "operation": "record_drift"
+            },
+            "description": "Drift reports require metric metadata.",
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_metric_required",
+              "required_action": "attach_drift_metric"
+            },
+            "name": "drift_requires_metric"
+          },
+          {
+            "condition": {
+              "operation": "record_drift",
+              "threshold_present": false
+            },
+            "description": "Drift reports require thresholds.",
+            "effect": {
+              "decision": "deny",
+              "reason": "drift_threshold_required",
+              "required_action": "attach_drift_threshold"
+            },
+            "name": "drift_requires_threshold"
+          },
+          {
+            "condition": {
+              "drift_over_threshold": true,
+              "operation": "record_drift",
               "review_recorded": false
             },
-            "description": "Long forecast horizons require review.",
+            "description": "Above-threshold drift requires review.",
             "effect": {
               "decision": "require_review",
-              "reason": "long_horizon_review_required",
-              "required_action": "record_forecast_review"
+              "reason": "drift_review_required",
+              "required_action": "record_drift_review"
             },
-            "name": "long_horizon_requires_review"
+            "name": "high_drift_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "configure_batch_scoring"
+            },
+            "description": "Batch scoring streams must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_scoring_requires_bytewax"
+          },
+          {
+            "condition": {
+              "cross_tenant_scoring": true
+            },
+            "description": "Cross-tenant scoring is denied by default.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cross_tenant_scoring_denied",
+              "required_action": "use_tenant_scoped_features"
+            },
+            "name": "cross_tenant_scoring_denied"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Prediction state changes require audit events.",
+            "effect": {
+              "decision": "deny",
+              "reason": "audit_event_required",
+              "required_action": "record_audit_event"
+            },
+            "name": "prediction_state_change_requires_audit"
           }
         ],
         "type": "deterministic"
@@ -152,6 +563,162 @@
         },
         {
           "condition": {
+            "operation": "register_model",
+            "owner_present": false
+          },
+          "description": "Predictive models require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_owner_required",
+            "required_action": "assign_model_owner"
+          },
+          "name": "model_requires_owner"
+        },
+        {
+          "condition": {
+            "algorithm_present": false,
+            "operation": "register_model"
+          },
+          "description": "Predictive models require algorithm metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_algorithm_required",
+            "required_action": "attach_algorithm_metadata"
+          },
+          "name": "model_requires_algorithm"
+        },
+        {
+          "condition": {
+            "operation": "register_model",
+            "target_present": false
+          },
+          "description": "Predictive models require a prediction target.",
+          "effect": {
+            "decision": "deny",
+            "reason": "model_target_required",
+            "required_action": "attach_prediction_target"
+          },
+          "name": "model_requires_target"
+        },
+        {
+          "condition": {
+            "operation": "register_model",
+            "training_history_points_lt": 24
+          },
+          "description": "Predictive models require training history evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "training_history_review_required",
+            "required_action": "record_training_history_review"
+          },
+          "name": "model_requires_training_history"
+        },
+        {
+          "condition": {
+            "feature_names_present": false,
+            "operation": "register_model"
+          },
+          "description": "Predictive models require feature metadata.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "model_feature_metadata_required",
+            "required_action": "attach_feature_metadata"
+          },
+          "name": "model_requires_feature_names"
+        },
+        {
+          "condition": {
+            "explainability_attached": false,
+            "operation": "approve_model"
+          },
+          "description": "Model approval requires explainability evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "model_explainability_review_required",
+            "required_action": "attach_explainability"
+          },
+          "name": "model_approval_requires_explainability"
+        },
+        {
+          "condition": {
+            "operation": "register_feature_set",
+            "owner_present": false
+          },
+          "description": "Feature sets require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feature_owner_required",
+            "required_action": "assign_feature_owner"
+          },
+          "name": "feature_set_requires_owner"
+        },
+        {
+          "condition": {
+            "feature_names_present": false,
+            "operation": "register_feature_set"
+          },
+          "description": "Feature sets require feature names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feature_names_required",
+            "required_action": "attach_feature_names"
+          },
+          "name": "feature_set_requires_features"
+        },
+        {
+          "condition": {
+            "feature_lineage_present": false,
+            "operation": "register_feature_set"
+          },
+          "description": "Feature sets require lineage references for scoring.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "feature_lineage_review_required",
+            "required_action": "attach_feature_lineage"
+          },
+          "name": "feature_set_requires_lineage"
+        },
+        {
+          "condition": {
+            "operation": "register_feature_set",
+            "source_system_present": false
+          },
+          "description": "Feature sets require a source system.",
+          "effect": {
+            "decision": "deny",
+            "reason": "feature_source_system_required",
+            "required_action": "attach_source_system"
+          },
+          "name": "feature_set_requires_source_system"
+        },
+        {
+          "condition": {
+            "model_present": false,
+            "operation": "create_forecast"
+          },
+          "description": "Forecasts require a registered model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_model_required",
+            "required_action": "select_model"
+          },
+          "name": "forecast_requires_model"
+        },
+        {
+          "condition": {
+            "operation": "create_forecast",
+            "series_name_present": false
+          },
+          "description": "Forecasts require a series name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_series_required",
+            "required_action": "attach_series_name"
+          },
+          "name": "forecast_requires_series"
+        },
+        {
+          "condition": {
             "history_points_lt": 24,
             "operation": "create_forecast"
           },
@@ -165,8 +732,36 @@
         },
         {
           "condition": {
+            "forecast_horizon_days_lt": 1,
+            "operation": "create_forecast"
+          },
+          "description": "Forecast horizon must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_horizon_required",
+            "required_action": "choose_positive_horizon"
+          },
+          "name": "forecast_requires_positive_horizon"
+        },
+        {
+          "condition": {
+            "forecast_horizon_days_gt": 365,
+            "operation": "create_forecast",
+            "review_recorded": false
+          },
+          "description": "Long forecast horizons require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "long_horizon_review_required",
+            "required_action": "record_forecast_review"
+          },
+          "name": "long_horizon_requires_review"
+        },
+        {
+          "condition": {
             "environment": "production",
-            "model_approved": false
+            "model_approved": false,
+            "operation": "score"
           },
           "description": "Production scoring requires an approved model.",
           "effect": {
@@ -192,7 +787,8 @@
         {
           "condition": {
             "explainability_attached": false,
-            "impact": "high"
+            "impact": "high",
+            "operation": "score"
           },
           "description": "High-impact predictions require explainability artifacts.",
           "effect": {
@@ -204,29 +800,198 @@
         },
         {
           "condition": {
-            "forecast_horizon_days_gt": 365,
+            "entity_present": false,
+            "operation": "score"
+          },
+          "description": "Scores require an entity identifier.",
+          "effect": {
+            "decision": "deny",
+            "reason": "score_entity_required",
+            "required_action": "attach_entity"
+          },
+          "name": "score_requires_entity"
+        },
+        {
+          "condition": {
+            "feature_values_present": false,
+            "operation": "score"
+          },
+          "description": "Scores require feature values.",
+          "effect": {
+            "decision": "deny",
+            "reason": "score_features_required",
+            "required_action": "attach_feature_values"
+          },
+          "name": "score_requires_feature_values"
+        },
+        {
+          "condition": {
+            "model_present": false,
+            "operation": "simulate_scenario"
+          },
+          "description": "Scenarios require a registered model.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_model_required",
+            "required_action": "select_model"
+          },
+          "name": "scenario_requires_model"
+        },
+        {
+          "condition": {
+            "assumptions_present": false,
+            "operation": "simulate_scenario"
+          },
+          "description": "Scenarios require explicit assumptions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_assumptions_required",
+            "required_action": "attach_assumptions"
+          },
+          "name": "scenario_requires_assumptions"
+        },
+        {
+          "condition": {
+            "adjustments_present": false,
+            "operation": "simulate_scenario"
+          },
+          "description": "Scenarios require feature adjustments.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_adjustments_required",
+            "required_action": "attach_adjustments"
+          },
+          "name": "scenario_requires_adjustments"
+        },
+        {
+          "condition": {
+            "baseline_present": false,
+            "operation": "simulate_scenario"
+          },
+          "description": "Scenarios require a baseline score.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_baseline_required",
+            "required_action": "attach_baseline_score"
+          },
+          "name": "scenario_requires_baseline"
+        },
+        {
+          "condition": {
+            "metric_name_present": false,
+            "operation": "record_drift"
+          },
+          "description": "Drift reports require metric metadata.",
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_metric_required",
+            "required_action": "attach_drift_metric"
+          },
+          "name": "drift_requires_metric"
+        },
+        {
+          "condition": {
+            "operation": "record_drift",
+            "threshold_present": false
+          },
+          "description": "Drift reports require thresholds.",
+          "effect": {
+            "decision": "deny",
+            "reason": "drift_threshold_required",
+            "required_action": "attach_drift_threshold"
+          },
+          "name": "drift_requires_threshold"
+        },
+        {
+          "condition": {
+            "drift_over_threshold": true,
+            "operation": "record_drift",
             "review_recorded": false
           },
-          "description": "Long forecast horizons require review.",
+          "description": "Above-threshold drift requires review.",
           "effect": {
             "decision": "require_review",
-            "reason": "long_horizon_review_required",
-            "required_action": "record_forecast_review"
+            "reason": "drift_review_required",
+            "required_action": "record_drift_review"
           },
-          "name": "long_horizon_requires_review"
+          "name": "high_drift_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "configure_batch_scoring"
+          },
+          "description": "Batch scoring streams must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_scoring_requires_bytewax"
+        },
+        {
+          "condition": {
+            "cross_tenant_scoring": true
+          },
+          "description": "Cross-tenant scoring is denied by default.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cross_tenant_scoring_denied",
+            "required_action": "use_tenant_scoped_features"
+          },
+          "name": "cross_tenant_scoring_denied"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Prediction state changes require audit events.",
+          "effect": {
+            "decision": "deny",
+            "reason": "audit_event_required",
+            "required_action": "record_audit_event"
+          },
+          "name": "prediction_state_change_requires_audit"
         }
       ],
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helper_runtime": "predictive_runtime.py",
+        "service": "service.PredService",
         "views": "views.py"
       },
       "screens": {
+        "audit": {
+          "component": "PredictionAuditTimeline",
+          "permission": "pred:audit",
+          "route": "/pred/audit"
+        },
+        "batch": {
+          "component": "BatchScoringQueue",
+          "permission": "pred:score",
+          "route": "/pred/batch"
+        },
         "dashboard": {
           "component": "PREDDashboard",
           "permission": "pred:view",
           "route": "/pred/dashboard"
+        },
+        "drift": {
+          "component": "DriftMonitor",
+          "permission": "pred:govern",
+          "route": "/pred/drift"
+        },
+        "explainability": {
+          "component": "ExplainabilityWorkbench",
+          "permission": "pred:govern",
+          "route": "/pred/explainability"
+        },
+        "features": {
+          "component": "FeatureRegistry",
+          "permission": "pred:manage_models",
+          "route": "/pred/features"
         },
         "forecasts": {
           "component": "ForecastConsole",
@@ -259,9 +1024,23 @@
           "route": "/pred/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "audit_timeline": {
+            "status_style": "evidence-chip",
+            "visual": "event-timeline"
+          },
+          "batch_queue": {
+            "status_style": "bytewax-chip",
+            "visual": "queue-table"
+          },
+          "drift_monitor": {
+            "status_style": "review-chip",
+            "visual": "threshold-band"
+          },
           "feature_lineage_panel": {
             "status_style": "evidence-pill",
             "visual": "lineage-list"
@@ -270,6 +1049,10 @@
             "icon": "trending-up",
             "status_indicator": "horizon-chip",
             "visual": "confidence-band"
+          },
+          "model_board": {
+            "status_style": "approval-chip",
+            "visual": "model-card-grid"
           },
           "scenario_matrix": {
             "highlight": "delta-chip",
@@ -321,6 +1104,13 @@
             "permission": "pred:score"
           },
           {
+            "component": "FeatureRegistry",
+            "name": "features",
+            "nav_group": "Scoring",
+            "path": "/pred/features",
+            "permission": "pred:manage_models"
+          },
+          {
             "component": "ScenarioLab",
             "name": "scenarios",
             "nav_group": "Simulation",
@@ -335,11 +1125,39 @@
             "permission": "pred:manage_models"
           },
           {
+            "component": "DriftMonitor",
+            "name": "drift",
+            "nav_group": "Models",
+            "path": "/pred/drift",
+            "permission": "pred:govern"
+          },
+          {
+            "component": "BatchScoringQueue",
+            "name": "batch",
+            "nav_group": "Scoring",
+            "path": "/pred/batch",
+            "permission": "pred:score"
+          },
+          {
+            "component": "ExplainabilityWorkbench",
+            "name": "explainability",
+            "nav_group": "Governance",
+            "path": "/pred/explainability",
+            "permission": "pred:govern"
+          },
+          {
             "component": "PredictionGovernance",
             "name": "governance",
             "nav_group": "Governance",
             "path": "/pred/governance",
             "permission": "pred:govern"
+          },
+          {
+            "component": "PredictionAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/pred/audit",
+            "permission": "pred:audit"
           },
           {
             "component": "PREDSettings",
@@ -354,7 +1172,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "__init__.py"
+        "view_module": "views.py"
       }
     }
   },
@@ -368,25 +1186,71 @@
   "contracts": {
     "pred": {
       "configuration": {
+        "adapters": {
+          "ai_core": "aicr",
+          "audit_sink": "audl",
+          "auth_provider": "auth",
+          "cache": "cach",
+          "configuration": "conf",
+          "data_pipeline": "etlp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.PredService",
+          "helper_runtime": "predictive_runtime.py",
+          "http_api": "api.py",
+          "metrics_sink": "moni",
+          "model_lifecycle": "mlcm",
+          "production_runtime": "service.PredService"
+        },
+        "drift": {
+          "monitoring_window_days": 30,
+          "review_required_above_threshold": true,
+          "threshold_required": true
+        },
+        "feature_sets": {
+          "feature_names_required": true,
+          "lineage_required": true,
+          "owner_required": true,
+          "source_system_required": true
+        },
         "forecasting": {
           "confidence_intervals": true,
           "enabled": true,
-          "horizon_limit": 365,
-          "minimum_history_points": 24
+          "horizon_limit_days": 365,
+          "minimum_history_points": 24,
+          "review_required_for_long_horizon": true
         },
         "governance": {
           "audit_predictions": true,
-          "production_approval_required": true,
+          "auth_required": true,
+          "cross_tenant_scoring_allowed": false,
           "require_tenant_context": true
         },
         "models": {
+          "algorithm_required": true,
           "approved_model_required": true,
           "explainability_required": true,
-          "monitor_drift": true
+          "monitor_drift": true,
+          "owner_required": true,
+          "target_required": true,
+          "training_history_required": true
+        },
+        "observability": {
+          "audit_required": true,
+          "event_stream": "bytewax",
+          "metrics_required": true,
+          "quality_metrics_required": true,
+          "trace_required": true
+        },
+        "scenarios": {
+          "adjustments_required": true,
+          "assumptions_required": true,
+          "baseline_required": true
         },
         "scoring": {
           "batch_scoring_enabled": true,
           "feature_lineage_required": true,
+          "high_impact_explainability_required": true,
+          "production_approval_required": true,
           "real_time_scoring_enabled": true
         },
         "tenant_id": "default",
@@ -395,10 +1259,18 @@
           "default_theme": "pred_forecast_console"
         },
         "ui": {
+          "enable_audit_timeline": true,
+          "enable_batch_scoring": true,
+          "enable_dashboard": true,
+          "enable_drift_monitor": true,
+          "enable_explainability": true,
+          "enable_feature_registry": true,
           "enable_forecast_console": true,
+          "enable_governance": true,
           "enable_model_board": true,
           "enable_scenario_lab": true,
-          "enable_score_monitor": true
+          "enable_score_monitor": true,
+          "enable_settings": true
         }
       },
       "id": "pred",
@@ -438,6 +1310,109 @@
   },
   "roles": {},
   "rules": {
+    "batch_scoring_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "configure_batch_scoring"
+      },
+      "description": "Batch scoring streams must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_scoring_requires_bytewax"
+    },
+    "cross_tenant_scoring_denied": {
+      "condition": {
+        "cross_tenant_scoring": true
+      },
+      "description": "Cross-tenant scoring is denied by default.",
+      "effect": {
+        "decision": "deny",
+        "reason": "cross_tenant_scoring_denied",
+        "required_action": "use_tenant_scoped_features"
+      },
+      "name": "cross_tenant_scoring_denied"
+    },
+    "drift_requires_metric": {
+      "condition": {
+        "metric_name_present": false,
+        "operation": "record_drift"
+      },
+      "description": "Drift reports require metric metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "drift_metric_required",
+        "required_action": "attach_drift_metric"
+      },
+      "name": "drift_requires_metric"
+    },
+    "drift_requires_threshold": {
+      "condition": {
+        "operation": "record_drift",
+        "threshold_present": false
+      },
+      "description": "Drift reports require thresholds.",
+      "effect": {
+        "decision": "deny",
+        "reason": "drift_threshold_required",
+        "required_action": "attach_drift_threshold"
+      },
+      "name": "drift_requires_threshold"
+    },
+    "feature_set_requires_features": {
+      "condition": {
+        "feature_names_present": false,
+        "operation": "register_feature_set"
+      },
+      "description": "Feature sets require feature names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feature_names_required",
+        "required_action": "attach_feature_names"
+      },
+      "name": "feature_set_requires_features"
+    },
+    "feature_set_requires_lineage": {
+      "condition": {
+        "feature_lineage_present": false,
+        "operation": "register_feature_set"
+      },
+      "description": "Feature sets require lineage references for scoring.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "feature_lineage_review_required",
+        "required_action": "attach_feature_lineage"
+      },
+      "name": "feature_set_requires_lineage"
+    },
+    "feature_set_requires_owner": {
+      "condition": {
+        "operation": "register_feature_set",
+        "owner_present": false
+      },
+      "description": "Feature sets require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feature_owner_required",
+        "required_action": "assign_feature_owner"
+      },
+      "name": "feature_set_requires_owner"
+    },
+    "feature_set_requires_source_system": {
+      "condition": {
+        "operation": "register_feature_set",
+        "source_system_present": false
+      },
+      "description": "Feature sets require a source system.",
+      "effect": {
+        "decision": "deny",
+        "reason": "feature_source_system_required",
+        "required_action": "attach_source_system"
+      },
+      "name": "feature_set_requires_source_system"
+    },
     "forecast_requires_history": {
       "condition": {
         "history_points_lt": 24,
@@ -451,10 +1426,64 @@
       },
       "name": "forecast_requires_history"
     },
+    "forecast_requires_model": {
+      "condition": {
+        "model_present": false,
+        "operation": "create_forecast"
+      },
+      "description": "Forecasts require a registered model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_model_required",
+        "required_action": "select_model"
+      },
+      "name": "forecast_requires_model"
+    },
+    "forecast_requires_positive_horizon": {
+      "condition": {
+        "forecast_horizon_days_lt": 1,
+        "operation": "create_forecast"
+      },
+      "description": "Forecast horizon must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_horizon_required",
+        "required_action": "choose_positive_horizon"
+      },
+      "name": "forecast_requires_positive_horizon"
+    },
+    "forecast_requires_series": {
+      "condition": {
+        "operation": "create_forecast",
+        "series_name_present": false
+      },
+      "description": "Forecasts require a series name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_series_required",
+        "required_action": "attach_series_name"
+      },
+      "name": "forecast_requires_series"
+    },
+    "high_drift_requires_review": {
+      "condition": {
+        "drift_over_threshold": true,
+        "operation": "record_drift",
+        "review_recorded": false
+      },
+      "description": "Above-threshold drift requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "drift_review_required",
+        "required_action": "record_drift_review"
+      },
+      "name": "high_drift_requires_review"
+    },
     "high_impact_prediction_requires_explainability": {
       "condition": {
         "explainability_attached": false,
-        "impact": "high"
+        "impact": "high",
+        "operation": "score"
       },
       "description": "High-impact predictions require explainability artifacts.",
       "effect": {
@@ -467,6 +1496,7 @@
     "long_horizon_requires_review": {
       "condition": {
         "forecast_horizon_days_gt": 365,
+        "operation": "create_forecast",
         "review_recorded": false
       },
       "description": "Long forecast horizons require review.",
@@ -477,10 +1507,102 @@
       },
       "name": "long_horizon_requires_review"
     },
+    "model_approval_requires_explainability": {
+      "condition": {
+        "explainability_attached": false,
+        "operation": "approve_model"
+      },
+      "description": "Model approval requires explainability evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "model_explainability_review_required",
+        "required_action": "attach_explainability"
+      },
+      "name": "model_approval_requires_explainability"
+    },
+    "model_requires_algorithm": {
+      "condition": {
+        "algorithm_present": false,
+        "operation": "register_model"
+      },
+      "description": "Predictive models require algorithm metadata.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_algorithm_required",
+        "required_action": "attach_algorithm_metadata"
+      },
+      "name": "model_requires_algorithm"
+    },
+    "model_requires_feature_names": {
+      "condition": {
+        "feature_names_present": false,
+        "operation": "register_model"
+      },
+      "description": "Predictive models require feature metadata.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "model_feature_metadata_required",
+        "required_action": "attach_feature_metadata"
+      },
+      "name": "model_requires_feature_names"
+    },
+    "model_requires_owner": {
+      "condition": {
+        "operation": "register_model",
+        "owner_present": false
+      },
+      "description": "Predictive models require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_owner_required",
+        "required_action": "assign_model_owner"
+      },
+      "name": "model_requires_owner"
+    },
+    "model_requires_target": {
+      "condition": {
+        "operation": "register_model",
+        "target_present": false
+      },
+      "description": "Predictive models require a prediction target.",
+      "effect": {
+        "decision": "deny",
+        "reason": "model_target_required",
+        "required_action": "attach_prediction_target"
+      },
+      "name": "model_requires_target"
+    },
+    "model_requires_training_history": {
+      "condition": {
+        "operation": "register_model",
+        "training_history_points_lt": 24
+      },
+      "description": "Predictive models require training history evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "training_history_review_required",
+        "required_action": "record_training_history_review"
+      },
+      "name": "model_requires_training_history"
+    },
+    "prediction_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Prediction state changes require audit events.",
+      "effect": {
+        "decision": "deny",
+        "reason": "audit_event_required",
+        "required_action": "record_audit_event"
+      },
+      "name": "prediction_state_change_requires_audit"
+    },
     "production_score_requires_approved_model": {
       "condition": {
         "environment": "production",
-        "model_approved": false
+        "model_approved": false,
+        "operation": "score"
       },
       "description": "Production scoring requires an approved model.",
       "effect": {
@@ -489,6 +1611,84 @@
         "required_action": "approve_model"
       },
       "name": "production_score_requires_approved_model"
+    },
+    "scenario_requires_adjustments": {
+      "condition": {
+        "adjustments_present": false,
+        "operation": "simulate_scenario"
+      },
+      "description": "Scenarios require feature adjustments.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_adjustments_required",
+        "required_action": "attach_adjustments"
+      },
+      "name": "scenario_requires_adjustments"
+    },
+    "scenario_requires_assumptions": {
+      "condition": {
+        "assumptions_present": false,
+        "operation": "simulate_scenario"
+      },
+      "description": "Scenarios require explicit assumptions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_assumptions_required",
+        "required_action": "attach_assumptions"
+      },
+      "name": "scenario_requires_assumptions"
+    },
+    "scenario_requires_baseline": {
+      "condition": {
+        "baseline_present": false,
+        "operation": "simulate_scenario"
+      },
+      "description": "Scenarios require a baseline score.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_baseline_required",
+        "required_action": "attach_baseline_score"
+      },
+      "name": "scenario_requires_baseline"
+    },
+    "scenario_requires_model": {
+      "condition": {
+        "model_present": false,
+        "operation": "simulate_scenario"
+      },
+      "description": "Scenarios require a registered model.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_model_required",
+        "required_action": "select_model"
+      },
+      "name": "scenario_requires_model"
+    },
+    "score_requires_entity": {
+      "condition": {
+        "entity_present": false,
+        "operation": "score"
+      },
+      "description": "Scores require an entity identifier.",
+      "effect": {
+        "decision": "deny",
+        "reason": "score_entity_required",
+        "required_action": "attach_entity"
+      },
+      "name": "score_requires_entity"
+    },
+    "score_requires_feature_values": {
+      "condition": {
+        "feature_values_present": false,
+        "operation": "score"
+      },
+      "description": "Scores require feature values.",
+      "effect": {
+        "decision": "deny",
+        "reason": "score_features_required",
+        "required_action": "attach_feature_values"
+      },
+      "name": "score_requires_feature_values"
     },
     "scoring_requires_feature_lineage": {
       "condition": {
@@ -518,7 +1718,10 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "service.py",
+    "predictive_runtime.py",
+    "views.py"
   ],
   "symbols": {
     "capability.pred": {

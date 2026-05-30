@@ -113,6 +113,7 @@ def record_drift(payload: dict[str, Any]) -> dict[str, Any]:
 		metric_name=str(payload["metric_name"]),
 		drift_score=float(payload["drift_score"]),
 		threshold=float(payload["threshold"]),
+		review_recorded=bool(payload.get("review_recorded", False)),
 		actor=str(payload.get("actor") or "pred"),
 	)
 

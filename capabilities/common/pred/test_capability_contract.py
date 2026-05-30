@@ -1,55 +1,89 @@
 """Regression coverage for the PRED executable capability contract."""
 
+from __future__ import annotations
+
 import pytest
 
-from capabilities.common.pred import register_capability
+from capabilities.common.pred import register_capability, views
 from capabilities.common.pred.capability_contract import (
 	evaluate_capability_rules,
-	get_capability_contract
+	get_capability_contract,
 )
 from capabilities.common.pred.service import PredService
-from capabilities.common.pred import views
 
 
-def test_contract_exposes_configuration_rules_ui_and_theme():
-	contract = get_capability_contract("tenant-forecast", {"forecasting": {"horizon_limit": 90}})
+def test_contract_exposes_full_lifecycle_configuration_rules_ui_and_theme():
+	contract = get_capability_contract("tenant-forecast", {"forecasting": {"horizon_limit_days": 90}})
 
 	assert contract["capability"] == "pred"
 	assert contract["configuration"]["tenant_id"] == "tenant-forecast"
-	assert contract["configuration"]["forecasting"]["horizon_limit"] == 90
+	assert contract["configuration"]["forecasting"]["horizon_limit_days"] == 90
 	assert contract["configuration_schema"]["required"] == [
 		"tenant_id",
 		"forecasting",
 		"scoring",
+		"feature_sets",
 		"models",
+		"scenarios",
+		"drift",
 		"governance",
+		"observability",
+		"adapters",
 		"ui",
-		"theme"
+		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 6
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "forecasts", "scores", "scenarios", "models", "governance", "settings"}
+	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {
+		"dashboard",
+		"forecasts",
+		"scores",
+		"features",
+		"scenarios",
+		"models",
+		"drift",
+		"batch",
+		"explainability",
+		"governance",
+		"audit",
+		"settings",
+	}
+	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.PredService"
+	assert next(route for route in contract["ui"]["routes"] if route["name"] == "audit")["permission"] == "pred:audit"
 	assert contract["ui"]["api_prefix"] == "/pred/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
-	assert "forecast_chart" in contract["theme"]["components"]
+	assert {"forecast_chart", "score_card", "drift_monitor", "batch_queue", "audit_timeline"} <= set(contract["theme"]["components"])
 
 
 def test_rule_engine_enforces_predictive_guardrails():
 	result = evaluate_capability_rules({
 		"tenant_context_present": False,
 		"operation": "score",
-		"history_points": 12,
 		"environment": "production",
 		"model_approved": False,
 		"feature_lineage_present": False,
 		"impact": "high",
 		"explainability_attached": False,
-		"forecast_horizon_days": 730,
-		"review_recorded": False
+		"cross_tenant_scoring": True,
 	})
 	forecast_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "create_forecast",
-		"history_points": 12
+		"model_present": True,
+		"series_name_present": True,
+		"history_points": 12,
+		"forecast_horizon_days": 7,
+		"review_recorded": False,
+	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "configure_batch_scoring",
+		"event_stream": "kafka",
+	})
+	state_change_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"state_change_requested": True,
+		"audit_event_recorded": False,
 	})
 
 	assert result["decision"] == "deny"
@@ -58,10 +92,14 @@ def test_rule_engine_enforces_predictive_guardrails():
 		"production_score_requires_approved_model",
 		"scoring_requires_feature_lineage",
 		"high_impact_prediction_requires_explainability",
-		"long_horizon_requires_review"
+		"cross_tenant_scoring_denied",
 	}
 	assert forecast_result["decision"] == "deny"
 	assert forecast_result["matched_rules"] == ["forecast_requires_history"]
+	assert batch_result["matched_rules"] == ["batch_scoring_requires_bytewax"]
+	assert batch_result["actions"][0]["reason"] == "bytewax_event_stream_required"
+	assert state_change_result["matched_rules"] == ["prediction_state_change_requires_audit"]
+	assert state_change_result["actions"][0]["reason"] == "audit_event_required"
 
 
 def test_registration_includes_full_capability_contract():
@@ -70,14 +108,17 @@ def test_registration_includes_full_capability_contract():
 	assert registration["name"] == "pred"
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
+	assert registration["adapters"]["event_stream"] == "bytewax"
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "pred_forecast_console"
 	assert registration["ui_components"]["forecasts"] == "/pred/forecasts"
+	assert registration["ui_components"]["audit"] == "/pred/audit"
 	assert "mlcm" in registration["dependencies"]
-	assert "pred:forecast" in registration["permissions"]
+	assert "pred:audit" in registration["permissions"]
+	assert {"feature_registry", "drift_monitoring", "batch_scoring"} <= set(registration["capabilities"])
 
 
-def test_service_runs_model_forecast_score_scenario_and_drift_lifecycle():
+def test_service_runs_model_forecast_score_scenario_drift_and_audit_lifecycle():
 	service = PredService()
 	tenant_id = "tenant-forecast"
 	model = service.register_model(
@@ -140,23 +181,33 @@ def test_service_runs_model_forecast_score_scenario_and_drift_lifecycle():
 		metric_name="population_stability_index",
 		drift_score=0.42,
 		threshold=0.30,
+		review_recorded=True,
 		actor="monitor",
 	)
 
 	summary = service.dashboard_summary(tenant_id)
 	dashboard = views.dashboard_model(service, tenant_id)
 	score_monitor = views.score_monitor_model(service, tenant_id)
-	governance = views.governance_model(service, tenant_id)
+	feature_registry = views.feature_registry_model(service, tenant_id)
+	drift_monitor = views.drift_monitor_model(service, tenant_id)
+	batch_queue = views.batch_scoring_model(service, tenant_id)
+	explainability = views.explainability_model(service, tenant_id)
+	audit_timeline = views.audit_timeline_model(service, tenant_id)
 
 	assert forecast["history_points"] == 24
 	assert len(forecast["forecast_values"]) == 7
 	assert score["score"] > 0
 	assert scenario["delta"] == 3.0
 	assert drift["status"] == "review_required"
+	assert drift["review_recorded"] is True
 	assert summary["approved_model_count"] == 1
 	assert dashboard["summary"]["forecast_count"] == 1
 	assert score_monitor["scores"][0]["id"] == "score-order-1"
-	assert governance["drift_reports"][0]["status"] == "review_required"
+	assert feature_registry["feature_sets"][0]["source_system"] == "etlp"
+	assert drift_monitor["drift_reports"][0]["status"] == "review_required"
+	assert batch_queue["streaming"]["engine"] == "bytewax"
+	assert explainability["models"][0]["explainability_attached"] is True
+	assert audit_timeline["audit_events"]
 
 
 def test_service_enforces_predictive_governance_guardrails():
@@ -183,6 +234,39 @@ def test_service_enforces_predictive_governance_guardrails():
 			target="risk",
 		)
 
+	with pytest.raises(PermissionError, match="model_target_required"):
+		service.register_model(
+			model_id="missing-target",
+			tenant_id=tenant_id,
+			name="Missing Target",
+			owner="analytics",
+			algorithm="linear",
+			target="",
+		)
+
+	with pytest.raises(PermissionError, match="training_history_review_required"):
+		service.register_model(
+			model_id="short-training-history",
+			tenant_id=tenant_id,
+			name="Short Training History",
+			owner="analytics",
+			algorithm="linear",
+			target="risk",
+			training_history_points=12,
+			feature_names=["risk"],
+		)
+
+	with pytest.raises(PermissionError, match="feature_source_system_required"):
+		service.register_feature_set(
+			feature_set_id="features-no-source",
+			tenant_id=tenant_id,
+			name="No Source",
+			owner="analytics",
+			feature_names=["risk"],
+			lineage_refs=["etlp://risk/features"],
+			source_system="",
+		)
+
 	unapproved = service.register_model(
 		model_id="model-risk",
 		tenant_id=tenant_id,
@@ -193,6 +277,7 @@ def test_service_enforces_predictive_governance_guardrails():
 		approved=False,
 		explainability_attached=False,
 		training_history_points=24,
+		feature_names=["risk", "age"],
 	)
 	lineage = service.register_feature_set(
 		feature_set_id="features-risk",
@@ -212,6 +297,7 @@ def test_service_enforces_predictive_governance_guardrails():
 		lineage_refs=[],
 		source_system="manual",
 	)
+	assert no_lineage["status"] == "review_required"
 
 	with pytest.raises(PermissionError, match="insufficient_history"):
 		service.create_forecast(
@@ -255,7 +341,7 @@ def test_service_enforces_predictive_governance_guardrails():
 			environment="production",
 		)
 
-	service.approve_model(unapproved["id"], tenant_id, approver="governance")
+	service.approve_model(unapproved["id"], tenant_id, approver="governance", explainability_ref="explain://model-risk")
 
 	with pytest.raises(PermissionError, match="feature_lineage_required"):
 		service.score_entity(
@@ -281,6 +367,28 @@ def test_service_enforces_predictive_governance_guardrails():
 			explanation_ref="",
 		)
 
+	with pytest.raises(PermissionError, match="score_entity_required"):
+		service.score_entity(
+			score_id="missing-entity",
+			tenant_id=tenant_id,
+			model_id=unapproved["id"],
+			feature_set_id=lineage["id"],
+			entity_id="",
+			feature_values={"risk": 20},
+			environment="development",
+		)
+
+	with pytest.raises(PermissionError, match="score_features_required"):
+		service.score_entity(
+			score_id="missing-features",
+			tenant_id=tenant_id,
+			model_id=unapproved["id"],
+			feature_set_id=lineage["id"],
+			entity_id="loan-4",
+			feature_values={},
+			environment="development",
+		)
+
 	with pytest.raises(PermissionError, match="scenario_assumptions_required"):
 		service.simulate_scenario(
 			scenario_id="no-assumptions",
@@ -290,6 +398,38 @@ def test_service_enforces_predictive_governance_guardrails():
 			baseline_score=50,
 			adjustments={"risk": 1},
 			assumptions=[],
+		)
+
+	with pytest.raises(PermissionError, match="scenario_adjustments_required"):
+		service.simulate_scenario(
+			scenario_id="no-adjustments",
+			tenant_id=tenant_id,
+			model_id=unapproved["id"],
+			name="No adjustments",
+			baseline_score=50,
+			adjustments={},
+			assumptions=["portfolio unchanged"],
+		)
+
+	with pytest.raises(PermissionError, match="drift_metric_required"):
+		service.record_drift(
+			report_id="missing-metric",
+			tenant_id=tenant_id,
+			model_id=unapproved["id"],
+			metric_name="",
+			drift_score=0.5,
+			threshold=0.3,
+		)
+
+	with pytest.raises(PermissionError, match="drift_review_required"):
+		service.record_drift(
+			report_id="high-drift-no-review",
+			tenant_id=tenant_id,
+			model_id=unapproved["id"],
+			metric_name="population_stability_index",
+			drift_score=0.5,
+			threshold=0.3,
+			review_recorded=False,
 		)
 
 

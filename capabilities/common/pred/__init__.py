@@ -13,7 +13,7 @@ from .capability_contract import (
 __version__ = "1.0.0"
 __capability_id__ = "pred"
 __capability_name__ = "Predictive Analytics"
-__apg_dependencies__ = ["aicr", "mlcm", "etlp"]
+__apg_dependencies__ = ["aicr", "mlcm", "etlp", "conf", "auth", "audl", "moni"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "pred",
@@ -48,6 +48,7 @@ capability_metadata: dict[str, Any] = {
 		"pred:simulate",
 		"pred:manage_models",
 		"pred:govern",
+		"pred:audit",
 		"pred:admin"
 	]
 }
@@ -63,24 +64,31 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["moni", "audl", "cach", "nlpc"],
+		"optional_dependencies": ["cach", "nlpc"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"adapters": contract["configuration"]["adapters"],
 		"capabilities": {
 			"forecasting": "Run governed time-series and demand forecasts",
 			"predictive_scoring": "Score tenant-scoped entities through approved models",
+			"feature_registry": "Register feature sets with ETLP lineage evidence",
 			"scenario_simulation": "Compare what-if scenarios with audit evidence",
 			"feature_lineage": "Track prediction features back to ETLP and metadata sources",
+			"drift_monitoring": "Record drift reports and review above-threshold drift",
+			"batch_scoring": "Expose Bytewax-backed batch scoring composition metadata",
 			"capability_rules": "Evaluate deterministic predictive-analytics governance rules",
 			"visual_theming": "Apply forecast-console theme tokens and components"
 		},
 		"endpoints": {
 			"forecasts": "/pred/api/v1/forecasts",
 			"scores": "/pred/api/v1/scores",
+			"features": "/pred/api/v1/features",
 			"models": "/pred/api/v1/models",
 			"scenarios": "/pred/api/v1/scenarios",
-			"monitoring": "/pred/api/v1/monitoring"
+			"drift": "/pred/api/v1/drift",
+			"batch": "/pred/api/v1/batch",
+			"audit": "/pred/api/v1/audit"
 		},
 		"ui_components": {
 			route["name"]: route["path"]

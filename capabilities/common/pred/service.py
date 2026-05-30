@@ -61,10 +61,23 @@ class PredService:
 		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
+		features = normalize_names(feature_names)
 		if not owner:
 			raise PermissionError("model_owner_required")
 		if not algorithm:
 			raise PermissionError("model_algorithm_required")
+		if not target:
+			raise PermissionError("model_target_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_model",
+			"owner_present": bool(owner),
+			"algorithm_present": bool(algorithm),
+			"target_present": bool(target),
+			"training_history_points": max(0, int(training_history_points)),
+			"feature_names_present": bool(features),
+		})
+		self._raise_if_blocked(result)
 		model = PredictiveModel(
 			id=model_id,
 			tenant_id=tenant_id,
@@ -76,7 +89,7 @@ class PredService:
 			approved=bool(approved),
 			explainability_attached=bool(explainability_attached),
 			training_history_points=max(0, int(training_history_points)),
-			feature_names=normalize_names(feature_names),
+			feature_names=features,
 			status="approved" if approved else "registered",
 			metadata=dict(metadata or {}),
 		)
@@ -94,6 +107,12 @@ class PredService:
 		model = self._require_model(model_id, tenant_id)
 		if not approver:
 			raise PermissionError("model_approver_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "approve_model",
+			"explainability_attached": model.explainability_attached or bool(explainability_ref),
+		})
+		self._raise_if_blocked(result)
 		model.approved = True
 		model.explainability_attached = model.explainability_attached or bool(explainability_ref)
 		model.status = "approved"
@@ -117,14 +136,28 @@ class PredService:
 		features = normalize_names(feature_names)
 		if not features:
 			raise PermissionError("feature_names_required")
+		if not source_system:
+			raise PermissionError("feature_source_system_required")
+		lineage = normalize_names(lineage_refs)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_feature_set",
+			"owner_present": bool(owner),
+			"feature_names_present": bool(features),
+			"feature_lineage_present": bool(lineage),
+			"source_system_present": bool(source_system),
+		})
+		if any(action.get("decision") == "deny" for action in result["actions"]):
+			self._raise_if_blocked(result)
 		feature_set = FeatureSet(
 			id=feature_set_id,
 			tenant_id=tenant_id,
 			name=name,
 			owner=owner,
 			feature_names=features,
-			lineage_refs=normalize_names(lineage_refs),
+			lineage_refs=lineage,
 			source_system=source_system,
+			status="review_required" if result["decision"] == "require_review" else "active",
 		)
 		self._feature_sets[feature_set.id] = feature_set
 		self._record_audit(tenant_id, feature_set.id, "feature_set_registered", owner, "allow")
@@ -149,6 +182,8 @@ class PredService:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_forecast",
+			"model_present": True,
+			"series_name_present": bool(series_name),
 			"history_points": history_points,
 			"forecast_horizon_days": int(horizon_days),
 			"review_recorded": bool(review_recorded),
@@ -185,6 +220,10 @@ class PredService:
 	) -> dict[str, Any]:
 		model = self._require_model(model_id, tenant_id)
 		feature_set = self._require_feature_set(feature_set_id, tenant_id)
+		if not entity_id:
+			raise PermissionError("score_entity_required")
+		if not feature_values:
+			raise PermissionError("score_features_required")
 		environment_value = normalize_environment(environment)
 		impact_value = normalize_impact(impact)
 		result = self.evaluate({
@@ -226,6 +265,19 @@ class PredService:
 		model = self._require_model(model_id, tenant_id)
 		if not assumptions:
 			raise PermissionError("scenario_assumptions_required")
+		if not adjustments:
+			raise PermissionError("scenario_adjustments_required")
+		if baseline_score is None:
+			raise PermissionError("scenario_baseline_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "simulate_scenario",
+			"model_present": True,
+			"assumptions_present": bool(assumptions),
+			"adjustments_present": bool(adjustments),
+			"baseline_present": baseline_score is not None,
+		})
+		self._raise_if_blocked(result)
 		scenario_score, delta = scenario_projection(baseline_score, adjustments)
 		scenario = ScenarioSimulation(
 			id=scenario_id,
@@ -249,9 +301,23 @@ class PredService:
 		metric_name: str,
 		drift_score: float,
 		threshold: float,
+		review_recorded: bool = False,
 		actor: str = "pred",
 	) -> dict[str, Any]:
 		model = self._require_model(model_id, tenant_id)
+		if not metric_name:
+			raise PermissionError("drift_metric_required")
+		if threshold is None:
+			raise PermissionError("drift_threshold_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_drift",
+			"metric_name_present": bool(metric_name),
+			"threshold_present": threshold is not None,
+			"drift_over_threshold": float(drift_score) > float(threshold),
+			"review_recorded": bool(review_recorded),
+		})
+		self._raise_if_blocked(result)
 		report = DriftReport(
 			id=report_id,
 			tenant_id=tenant_id,
@@ -260,6 +326,7 @@ class PredService:
 			drift_score=round(float(drift_score), 4),
 			threshold=round(float(threshold), 4),
 			status=drift_status(drift_score, threshold),
+			review_recorded=bool(review_recorded),
 		)
 		self._drift_reports[report.id] = report
 		self._record_audit(tenant_id, report.id, "drift_recorded", actor, report.status)
@@ -285,7 +352,7 @@ class PredService:
 			approved=approved,
 			explainability_attached=bool(metadata.get("explainability_attached", approved)),
 			training_history_points=int(metadata.get("training_history_points") or 24),
-			feature_names=list(metadata.get("feature_names") or ()),
+			feature_names=list(metadata.get("feature_names") or ("prediction_signal",)),
 			metadata=metadata,
 		)
 

@@ -5,13 +5,122 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Predictive Analytics package-backed APG capability", "entity_count": 0, "name": "pred", "version": "1.0.0"}, "capabilities": {"pred": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"forecasting": {"confidence_intervals": true, "enabled": true, "horizon_limit": 365, "minimum_history_points": 24}, "governance": {"audit_predictions": true, "production_approval_required": true, "require_tenant_context": true}, "models": {"approved_model_required": true, "explainability_required": true, "monitor_drift": true}, "scoring": {"batch_scoring_enabled": true, "feature_lineage_required": true, "real_time_scoring_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "pred_forecast_console"}, "ui": {"enable_forecast_console": true, "enable_model_board": true, "enable_scenario_lab": true, "enable_score_monitor": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Predictive Analytics", "provides": ["pred_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All predictive analytics operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"history_points_lt": 24, "operation": "create_forecast"}, "description": "Forecasts require enough historical observations.", "effect": {"decision": "deny", "reason": "insufficient_history", "required_action": "load_more_history"}, "name": "forecast_requires_history"}, {"condition": {"environment": "production", "model_approved": false}, "description": "Production scoring requires an approved model.", "effect": {"decision": "deny", "reason": "approved_model_required", "required_action": "approve_model"}, "name": "production_score_requires_approved_model"}, {"condition": {"feature_lineage_present": false, "operation": "score"}, "description": "Predictive scoring requires feature lineage.", "effect": {"decision": "deny", "reason": "feature_lineage_required", "required_action": "attach_feature_lineage"}, "name": "scoring_requires_feature_lineage"}, {"condition": {"explainability_attached": false, "impact": "high"}, "description": "High-impact predictions require explainability artifacts.", "effect": {"decision": "deny", "reason": "explainability_required", "required_action": "attach_explainability"}, "name": "high_impact_prediction_requires_explainability"}, {"condition": {"forecast_horizon_days_gt": 365, "review_recorded": false}, "description": "Long forecast horizons require review.", "effect": {"decision": "require_review", "reason": "long_horizon_review_required", "required_action": "record_forecast_review"}, "name": "long_horizon_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All predictive analytics operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"history_points_lt": 24, "operation": "create_forecast"}, "description": "Forecasts require enough historical observations.", "effect": {"decision": "deny", "reason": "insufficient_history", "required_action": "load_more_history"}, "name": "forecast_requires_history"}, {"condition": {"environment": "production", "model_approved": false}, "description": "Production scoring requires an approved model.", "effect": {"decision": "deny", "reason": "approved_model_required", "required_action": "approve_model"}, "name": "production_score_requires_approved_model"}, {"condition": {"feature_lineage_present": false, "operation": "score"}, "description": "Predictive scoring requires feature lineage.", "effect": {"decision": "deny", "reason": "feature_lineage_required", "required_action": "attach_feature_lineage"}, "name": "scoring_requires_feature_lineage"}, {"condition": {"explainability_attached": false, "impact": "high"}, "description": "High-impact predictions require explainability artifacts.", "effect": {"decision": "deny", "reason": "explainability_required", "required_action": "attach_explainability"}, "name": "high_impact_prediction_requires_explainability"}, {"condition": {"forecast_horizon_days_gt": 365, "review_recorded": false}, "description": "Long forecast horizons require review.", "effect": {"decision": "require_review", "reason": "long_horizon_review_required", "required_action": "record_forecast_review"}, "name": "long_horizon_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"dashboard": {"component": "PREDDashboard", "permission": "pred:view", "route": "/pred/dashboard"}, "forecasts": {"component": "ForecastConsole", "permission": "pred:forecast", "route": "/pred/forecasts"}, "governance": {"component": "PredictionGovernance", "permission": "pred:govern", "route": "/pred/governance"}, "models": {"component": "PredictiveModelBoard", "permission": "pred:manage_models", "route": "/pred/models"}, "scenarios": {"component": "ScenarioLab", "permission": "pred:simulate", "route": "/pred/scenarios"}, "scores": {"component": "ScoreMonitor", "permission": "pred:score", "route": "/pred/scores"}, "settings": {"component": "PREDSettings", "permission": "pred:admin", "route": "/pred/settings"}}, "streaming": {}, "theme": {"components": {"feature_lineage_panel": {"status_style": "evidence-pill", "visual": "lineage-list"}, "forecast_chart": {"icon": "trending-up", "status_indicator": "horizon-chip", "visual": "confidence-band"}, "scenario_matrix": {"highlight": "delta-chip", "visual": "comparison-grid"}, "score_card": {"risk_style": "impact-band", "visual": "distribution-bar"}}, "name": "pred_forecast_console", "tokens": {"border.radius": "8px", "color.accent": "#E07A5F", "color.danger": "#C53030", "color.primary": "#345995", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F6F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/pred/api/v1", "requires_theme": true, "routes": [{"component": "PREDDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/pred/dashboard", "permission": "pred:view"}, {"component": "ForecastConsole", "name": "forecasts", "nav_group": "Forecasts", "path": "/pred/forecasts", "permission": "pred:forecast"}, {"component": "ScoreMonitor", "name": "scores", "nav_group": "Scoring", "path": "/pred/scores", "permission": "pred:score"}, {"component": "ScenarioLab", "name": "scenarios", "nav_group": "Simulation", "path": "/pred/scenarios", "permission": "pred:simulate"}, {"component": "PredictiveModelBoard", "name": "models", "nav_group": "Models", "path": "/pred/models", "permission": "pred:manage_models"}, {"component": "PredictionGovernance", "name": "governance", "nav_group": "Governance", "path": "/pred/governance", "permission": "pred:govern"}, {"component": "PREDSettings", "name": "settings", "nav_group": "Administration", "path": "/pred/settings", "permission": "pred:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "__init__.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"pred": []}}, "contracts": {"pred": {"configuration": {"forecasting": {"confidence_intervals": true, "enabled": true, "horizon_limit": 365, "minimum_history_points": 24}, "governance": {"audit_predictions": true, "production_approval_required": true, "require_tenant_context": true}, "models": {"approved_model_required": true, "explainability_required": true, "monitor_drift": true}, "scoring": {"batch_scoring_enabled": true, "feature_lineage_required": true, "real_time_scoring_enabled": true}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "pred_forecast_console"}, "ui": {"enable_forecast_console": true, "enable_model_board": true, "enable_scenario_lab": true, "enable_score_monitor": true}}, "id": "pred", "provides": ["pred_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"pred": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"forecast_requires_history": {"condition": {"history_points_lt": 24, "operation": "create_forecast"}, "description": "Forecasts require enough historical observations.", "effect": {"decision": "deny", "reason": "insufficient_history", "required_action": "load_more_history"}, "name": "forecast_requires_history"}, "high_impact_prediction_requires_explainability": {"condition": {"explainability_attached": false, "impact": "high"}, "description": "High-impact predictions require explainability artifacts.", "effect": {"decision": "deny", "reason": "explainability_required", "required_action": "attach_explainability"}, "name": "high_impact_prediction_requires_explainability"}, "long_horizon_requires_review": {"condition": {"forecast_horizon_days_gt": 365, "review_recorded": false}, "description": "Long forecast horizons require review.", "effect": {"decision": "require_review", "reason": "long_horizon_review_required", "required_action": "record_forecast_review"}, "name": "long_horizon_requires_review"}, "production_score_requires_approved_model": {"condition": {"environment": "production", "model_approved": false}, "description": "Production scoring requires an approved model.", "effect": {"decision": "deny", "reason": "approved_model_required", "required_action": "approve_model"}, "name": "production_score_requires_approved_model"}, "scoring_requires_feature_lineage": {"condition": {"feature_lineage_present": false, "operation": "score"}, "description": "Predictive scoring requires feature lineage.", "effect": {"decision": "deny", "reason": "feature_lineage_required", "required_action": "attach_feature_lineage"}, "name": "scoring_requires_feature_lineage"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All predictive analytics operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.pred": {"file": "capability_contract.py", "id": "capability.pred", "kind": "capability", "name": "Predictive Analytics", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("pred_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "pred",
+			"version": "1.0.0",
+			"description": "Predictive Analytics package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {"pred": {"profile": "capability", "entrypoint": "app.py"}},
+		"capabilities": {
+			"pred": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["pred_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
+					"helper_runtime": contract["configuration"]["adapters"]["helper_runtime"],
+					"views": contract["ui"]["view_module"],
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"model": "PredictiveModel",
+					"forecast": "ForecastRun",
+					"score": "ScoreRun",
+					"drift": "DriftReport",
+				},
+				"prediction_lifecycle": {
+					"model": "PredictiveModel",
+					"feature_set": "FeatureSet",
+					"forecast": "ForecastRun",
+					"score": "ScoreRun",
+					"scenario": "ScenarioSimulation",
+					"drift": "DriftReport",
+					"audit": "PredAuditEvent",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+			}
+		},
+		"contracts": {
+			"pred": {
+				"id": "pred",
+				"configuration": contract["configuration"],
+				"provides": ["pred_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
+		"composition": {"capability_dependencies": {"pred": []}, "applications": {}, "agent_teams": {}},
+		"deployment": {"source": "capability_contract.py", "target": "python"},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py", "service.py", "predictive_runtime.py", "views.py"],
+		"symbols": {
+			"capability.pred": {
+				"id": "capability.pred",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {"start": {"line": 0, "character": 0}, "end": {"line": 0, "character": 1}},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +145,24 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("pred", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "pred" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 12:
+		errors.append("PRED semantic model route manifest is stale")
+	if len(rules) < 30:
+		errors.append("PRED semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("PRED adapter manifest must use Bytewax for event streaming")
+	if capability.get("runtime", {}).get("service") != "service.PredService":
+		errors.append("PRED generated-app runtime is missing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

@@ -54,6 +54,19 @@ def score_monitor_model(
 	}
 
 
+def feature_registry_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	return {
+		"tenant_id": tenant_id,
+		"feature_sets": service.list_feature_sets(tenant_id),
+		"lineage_required": service.describe(tenant_id)["configuration"]["feature_sets"]["lineage_required"],
+		"route": "/pred/features",
+	}
+
+
 def scenario_lab_model(
 	service: PredService | None = None,
 	tenant_id: str = "default",
@@ -80,6 +93,47 @@ def model_board_model(
 	}
 
 
+def drift_monitor_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	return {
+		"tenant_id": tenant_id,
+		"drift_reports": service.list_drift_reports(tenant_id),
+		"threshold_required": service.describe(tenant_id)["configuration"]["drift"]["threshold_required"],
+		"route": "/pred/drift",
+	}
+
+
+def batch_scoring_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	event_stream = service.describe(tenant_id)["configuration"]["adapters"]["event_stream"]
+	return {
+		"tenant_id": tenant_id,
+		"event_stream": event_stream,
+		"streaming": {"engine": event_stream, "mode": "batch_scoring"},
+		"scores": service.list_scores(tenant_id),
+		"route": "/pred/batch",
+	}
+
+
+def explainability_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	return {
+		"tenant_id": tenant_id,
+		"models": [model for model in service.list_models(tenant_id) if model["explainability_attached"]],
+		"high_impact_scores": [score for score in service.list_scores(tenant_id) if score["impact"] == "high"],
+		"route": "/pred/explainability",
+	}
+
+
 def governance_model(
 	service: PredService | None = None,
 	tenant_id: str = "default",
@@ -91,4 +145,16 @@ def governance_model(
 		"drift_reports": service.list_drift_reports(tenant_id),
 		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
 		"route": "/pred/governance",
+	}
+
+
+def audit_timeline_model(
+	service: PredService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or PredService()
+	return {
+		"tenant_id": tenant_id,
+		"audit_events": service.list_audit_events(tenant_id),
+		"route": "/pred/audit",
 	}
