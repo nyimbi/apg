@@ -25,17 +25,19 @@ def _load_module(name: str, path: Path):
 
 
 def test_contract_shape_is_valid():
-	module = _load_module("materialized_contract_seop", PACKAGE_DIR / "capability_contract.py")
+	module = _load_module("package_contract_seop", PACKAGE_DIR / "capability_contract.py")
 	contract = module.get_capability_contract("tenant-test")
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "seop"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["streaming"]["processor"] == "bytewax"
+	assert "seop_agents" in contract["provides"]
 
 
 def test_app_entrypoint_is_publishable():
-	module = _load_module("materialized_app_seop", PACKAGE_DIR / "app.py")
+	module = _load_module("package_app_seop", PACKAGE_DIR / "app.py")
 
 	self_test = module.self_test()
 	manifest = module.component_manifest()
@@ -94,6 +96,16 @@ def test_security_operations_lifecycle_executes():
 		incident_id=incident["id"],
 		closure_evidence="case://closure/1",
 		actor="analyst-1",
+		post_incident_review="case://review/1",
+		compliance_mapping="control://iso-27001/A.5",
+	)
+	agent = service.register_seop_agent(
+		tenant_id="tenant-a",
+		name="Triage reviewer",
+		runtime="codex",
+		role="detection_reviewer",
+		scope="review high-confidence detections and prepare analyst notes",
+		owner="secops-lead",
 	)
 	summary = service.dashboard_summary("tenant-a")
 
@@ -103,10 +115,13 @@ def test_security_operations_lifecycle_executes():
 	assert response["status"] == "executed"
 	assert posture["status"] == "gap"
 	assert closed["status"] == "closed"
+	assert agent["runtime"] == "codex"
 	assert summary["detection_count"] == 1
 	assert summary["incident_count"] == 1
 	assert summary["response_count"] == 1
 	assert summary["posture_gap_count"] == 1
+	assert summary["seop_agent_count"] == 1
+	assert summary["streaming"]["processor"] == "bytewax"
 
 
 def test_guardrails_require_tenant_source_owner_escalation_and_playbook_approval():
@@ -127,14 +142,14 @@ def test_guardrails_require_tenant_source_owner_escalation_and_playbook_approval
 		raise AssertionError("missing alert source was accepted")
 
 	try:
-		service.open_incident("tenant-a", "No owner", "", "high")
+		service.open_incident("tenant-a", "No owner", "", "high", evidence_refs=["case://evidence"])
 	except PermissionError as exc:
 		assert str(exc) == "incident_owner_required"
 	else:
 		raise AssertionError("missing incident owner was accepted")
 
 	try:
-		service.open_incident("tenant-a", "Critical", "owner", "critical", escalation_recorded=False)
+		service.open_incident("tenant-a", "Critical", "owner", "critical", escalation_recorded=False, evidence_refs=["case://evidence"])
 	except PermissionError as exc:
 		assert str(exc) == "critical_escalation_required"
 	else:
@@ -153,6 +168,44 @@ def test_guardrails_require_tenant_source_owner_escalation_and_playbook_approval
 		assert str(exc) == "anomaly_confidence_out_of_range:1.5"
 	else:
 		raise AssertionError("invalid confidence was accepted")
+
+	try:
+		service.create_detection("tenant-a", "Wrong stream", "siem", 0.2, event_stream="memory")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_event_stream_required"
+	else:
+		raise AssertionError("non-Bytewax detection stream was accepted")
+
+	try:
+		service.register_seop_agent("tenant-a", "Bad agent", "unsupported", "incident_commander", "review incidents")
+	except PermissionError as exc:
+		assert str(exc) == "seop_agent_runtime_not_supported"
+	else:
+		raise AssertionError("unsupported agent runtime was accepted")
+
+	detection = service.create_detection("tenant-a", "Containment path", "siem", 0.2)
+	incident = service.open_incident(
+		"tenant-a",
+		"Containment review",
+		"owner",
+		"high",
+		detection_ids=[detection["id"]],
+	)
+	playbook = service.approve_playbook("tenant-a", "Containment", "owner", ["contain"], "manager")
+
+	try:
+		service.execute_response("tenant-a", incident["id"], playbook["id"], "contain", "analyst", containment_reviewed=False)
+	except PermissionError as exc:
+		assert str(exc) == "containment_review_required"
+	else:
+		raise AssertionError("response without containment review was accepted")
+
+	try:
+		service.close_incident("tenant-a", incident["id"], "case://closure", "analyst")
+	except PermissionError as exc:
+		assert str(exc) == "post_incident_review_required, compliance_mapping_required"
+	else:
+		raise AssertionError("incident closure without review and compliance mapping was accepted")
 
 
 def test_api_and_view_models_expose_security_operations_surfaces():
@@ -193,6 +246,14 @@ def test_api_and_view_models_expose_security_operations_surfaces():
 		"coverage": 0.95,
 		"owner": "analyst",
 	})
+	agent = api.register_seop_agent({
+		"tenant_id": "tenant-b",
+		"name": "Response reviewer",
+		"runtime": "claude_code",
+		"role": "response_reviewer",
+		"scope": "review containment recommendations before execution",
+		"owner": "manager",
+	})
 
 	status = api.capability_status("tenant-b")
 	ops = api.list_security_operations("tenant-b")
@@ -202,16 +263,23 @@ def test_api_and_view_models_expose_security_operations_surfaces():
 	playbooks = views.playbook_manager_model(local_service, "tenant-b")
 	responses = views.response_actions_model(local_service, "tenant-b")
 	posture = views.posture_model(local_service, "tenant-b")
+	agents = views.agent_workbench_model(local_service, "tenant-b")
+	audit = views.audit_trail_model(local_service, "tenant-b")
 	triage = views.triage_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
 	assert status["detection_count"] == 1
+	assert status["seop_agent_count"] == 1
 	assert ops["summary"]["response_count"] == 1
+	assert ops["seop_agents"][0]["id"] == agent["id"]
 	assert dashboard["summary"]["approved_playbook_count"] == 1
 	assert detections["route"] == "/seop/detections"
 	assert incidents["state_filters"][0] == "open"
 	assert playbooks["approval_required"] is True
 	assert responses["statuses"] == ["planned", "executed", "blocked"]
 	assert posture["coverage_bands"] == ["gap", "partial", "covered"]
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert audit["event_types"][-1] == "seop_agent_registered"
 	assert triage["review_required"] == []
 	assert settings["theme"]["name"] == "seop_security_ops"
+	assert settings["streaming"]["processor"] == "bytewax"

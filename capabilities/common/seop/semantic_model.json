@@ -12,11 +12,20 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "edr": "adapter",
+          "event_stream": "bytewax",
+          "siem": "adapter",
+          "soar": "adapter",
+          "threat_intel": "adapter",
+          "ticketing": "adapter"
+        },
         "detection": {
           "alert_source_required": true,
           "anomaly_context_required": true,
           "confidence_threshold": 0.7,
-          "correlation_enabled": true
+          "correlation_enabled": true,
+          "deduplicate_signals": true
         },
         "governance": {
           "audit_response_actions": true,
@@ -28,13 +37,41 @@
           "critical_escalation_required": true,
           "evidence_required": true,
           "incident_owner_required": true,
+          "post_incident_review_required": true,
           "severity_required": true
+        },
+        "observability": {
+          "emit_detection_events": true,
+          "emit_response_events": true,
+          "event_stream": "apg.seop.lifecycle",
+          "stream_processor": "bytewax"
         },
         "response": {
           "closure_evidence_required": true,
           "containment_review_required": true,
           "isolation_authorization_required": true,
-          "playbook_approval_required": true
+          "playbook_approval_required": true,
+          "response_actor_required": true
+        },
+        "seop_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_severity": "medium",
+          "supported_roles": [
+            "detection_reviewer",
+            "incident_commander",
+            "response_reviewer",
+            "playbook_author",
+            "posture_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -42,6 +79,8 @@
           "default_theme": "seop_security_ops"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_audit_trail": true,
           "enable_detection_console": true,
           "enable_incident_queue": true,
           "enable_playbook_manager": true,
@@ -55,9 +94,20 @@
       "master_data": {},
       "name": "Security Operations",
       "provides": [
-        "seop_operations"
+        "detection_pipeline",
+        "incident_response",
+        "threat_triage",
+        "response_playbooks",
+        "security_posture",
+        "seop_agents"
       ],
-      "requires": [],
+      "requires": [
+        "secu",
+        "anom",
+        "moni",
+        "logt",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -87,6 +137,19 @@
           },
           {
             "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "create_detection"
+            },
+            "description": "Detection lifecycle events must be emitted through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_detection_lifecycle_to_bytewax"
+            },
+            "name": "detection_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "incident_owner_assigned": false,
               "operation": "open_incident"
             },
@@ -97,6 +160,19 @@
               "required_action": "assign_incident_owner"
             },
             "name": "incident_requires_owner"
+          },
+          {
+            "condition": {
+              "evidence_attached": false,
+              "operation": "open_incident"
+            },
+            "description": "Incidents require evidence references before they can enter the queue.",
+            "effect": {
+              "decision": "deny",
+              "reason": "incident_evidence_required",
+              "required_action": "attach_incident_evidence"
+            },
+            "name": "incident_requires_evidence"
           },
           {
             "condition": {
@@ -126,6 +202,32 @@
           },
           {
             "condition": {
+              "operation": "execute_response",
+              "response_actor_present": false
+            },
+            "description": "Response actions require an accountable human or delegated agent actor.",
+            "effect": {
+              "decision": "deny",
+              "reason": "response_actor_required",
+              "required_action": "attach_response_actor"
+            },
+            "name": "response_requires_actor"
+          },
+          {
+            "condition": {
+              "containment_review_recorded": false,
+              "operation": "execute_response"
+            },
+            "description": "Containment actions require review evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "containment_review_required",
+              "required_action": "record_containment_review"
+            },
+            "name": "response_requires_containment_review"
+          },
+          {
+            "condition": {
               "anomaly_confidence_gt": 0.9,
               "triage_review_recorded": false
             },
@@ -136,6 +238,72 @@
               "required_action": "review_anomaly"
             },
             "name": "high_confidence_anomaly_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "close_incident",
+              "post_incident_review_present": false
+            },
+            "description": "Closed incidents require a post-incident review reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "post_incident_review_required",
+              "required_action": "attach_post_incident_review"
+            },
+            "name": "closure_requires_post_incident_review"
+          },
+          {
+            "condition": {
+              "compliance_mapping_present": false,
+              "operation": "close_incident"
+            },
+            "description": "Closed incidents require compliance impact mapping.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_mapping_required",
+              "required_action": "attach_compliance_mapping"
+            },
+            "name": "closure_requires_compliance_mapping"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_seop_agent"
+            },
+            "description": "Security operations agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "seop_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "seop_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_seop_agent"
+            },
+            "description": "Security operations agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "seop_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "seop_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "incident_severity": "critical",
+              "operation": "agent_response_action"
+            },
+            "description": "Critical response actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "critical_agent_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -168,6 +336,19 @@
         },
         {
           "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "create_detection"
+          },
+          "description": "Detection lifecycle events must be emitted through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_detection_lifecycle_to_bytewax"
+          },
+          "name": "detection_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "incident_owner_assigned": false,
             "operation": "open_incident"
           },
@@ -178,6 +359,19 @@
             "required_action": "assign_incident_owner"
           },
           "name": "incident_requires_owner"
+        },
+        {
+          "condition": {
+            "evidence_attached": false,
+            "operation": "open_incident"
+          },
+          "description": "Incidents require evidence references before they can enter the queue.",
+          "effect": {
+            "decision": "deny",
+            "reason": "incident_evidence_required",
+            "required_action": "attach_incident_evidence"
+          },
+          "name": "incident_requires_evidence"
         },
         {
           "condition": {
@@ -207,6 +401,32 @@
         },
         {
           "condition": {
+            "operation": "execute_response",
+            "response_actor_present": false
+          },
+          "description": "Response actions require an accountable human or delegated agent actor.",
+          "effect": {
+            "decision": "deny",
+            "reason": "response_actor_required",
+            "required_action": "attach_response_actor"
+          },
+          "name": "response_requires_actor"
+        },
+        {
+          "condition": {
+            "containment_review_recorded": false,
+            "operation": "execute_response"
+          },
+          "description": "Containment actions require review evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "containment_review_required",
+            "required_action": "record_containment_review"
+          },
+          "name": "response_requires_containment_review"
+        },
+        {
+          "condition": {
             "anomaly_confidence_gt": 0.9,
             "triage_review_recorded": false
           },
@@ -217,6 +437,72 @@
             "required_action": "review_anomaly"
           },
           "name": "high_confidence_anomaly_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "close_incident",
+            "post_incident_review_present": false
+          },
+          "description": "Closed incidents require a post-incident review reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "post_incident_review_required",
+            "required_action": "attach_post_incident_review"
+          },
+          "name": "closure_requires_post_incident_review"
+        },
+        {
+          "condition": {
+            "compliance_mapping_present": false,
+            "operation": "close_incident"
+          },
+          "description": "Closed incidents require compliance impact mapping.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_mapping_required",
+            "required_action": "attach_compliance_mapping"
+          },
+          "name": "closure_requires_compliance_mapping"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_seop_agent"
+          },
+          "description": "Security operations agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "seop_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "seop_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_seop_agent"
+          },
+          "description": "Security operations agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "seop_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "seop_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "incident_severity": "critical",
+            "operation": "agent_response_action"
+          },
+          "description": "Critical response actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "critical_agent_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -226,6 +512,16 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "SEOPAgentWorkbench",
+          "permission": "seop:admin",
+          "route": "/seop/agents"
+        },
+        "audit": {
+          "component": "SEOPAuditTrail",
+          "permission": "seop:admin",
+          "route": "/seop/audit"
+        },
         "dashboard": {
           "component": "SEOPDashboard",
           "permission": "seop:view",
@@ -267,9 +563,42 @@
           "route": "/seop/triage"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "detection_created",
+          "incident_opened",
+          "playbook_approved",
+          "response_executed",
+          "incident_closed",
+          "seop_agent_registered"
+        ],
+        "guardrails": [
+          "detection_requires_bytewax_stream",
+          "critical_agent_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "new",
+          "review_required",
+          "open",
+          "escalated",
+          "responding",
+          "contained",
+          "closed"
+        ],
+        "stream": "apg.seop.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_workbench": {
+            "status_style": "approval-chip",
+            "visual": "review-lane"
+          },
+          "audit_timeline": {
+            "status_style": "severity-chip",
+            "visual": "event-stream"
+          },
           "detection_card": {
             "icon": "shield-alert",
             "risk_style": "threat-band",
@@ -357,6 +686,20 @@
             "permission": "seop:view"
           },
           {
+            "component": "SEOPAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/seop/agents",
+            "permission": "seop:admin"
+          },
+          {
+            "component": "SEOPAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/seop/audit",
+            "permission": "seop:admin"
+          },
+          {
             "component": "SEOPSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -377,17 +720,32 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "seop": []
+      "seop": [
+        "secu",
+        "anom",
+        "moni",
+        "logt",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "seop": {
       "configuration": {
+        "adapters": {
+          "edr": "adapter",
+          "event_stream": "bytewax",
+          "siem": "adapter",
+          "soar": "adapter",
+          "threat_intel": "adapter",
+          "ticketing": "adapter"
+        },
         "detection": {
           "alert_source_required": true,
           "anomaly_context_required": true,
           "confidence_threshold": 0.7,
-          "correlation_enabled": true
+          "correlation_enabled": true,
+          "deduplicate_signals": true
         },
         "governance": {
           "audit_response_actions": true,
@@ -399,13 +757,41 @@
           "critical_escalation_required": true,
           "evidence_required": true,
           "incident_owner_required": true,
+          "post_incident_review_required": true,
           "severity_required": true
+        },
+        "observability": {
+          "emit_detection_events": true,
+          "emit_response_events": true,
+          "event_stream": "apg.seop.lifecycle",
+          "stream_processor": "bytewax"
         },
         "response": {
           "closure_evidence_required": true,
           "containment_review_required": true,
           "isolation_authorization_required": true,
-          "playbook_approval_required": true
+          "playbook_approval_required": true,
+          "response_actor_required": true
+        },
+        "seop_agents": {
+          "disclose_agent_recommendations": true,
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_severity": "medium",
+          "supported_roles": [
+            "detection_reviewer",
+            "incident_commander",
+            "response_reviewer",
+            "playbook_author",
+            "posture_reviewer",
+            "compliance_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "tenant_id": "default",
         "theme": {
@@ -413,6 +799,8 @@
           "default_theme": "seop_security_ops"
         },
         "ui": {
+          "enable_agent_workbench": true,
+          "enable_audit_trail": true,
           "enable_detection_console": true,
           "enable_incident_queue": true,
           "enable_playbook_manager": true,
@@ -421,9 +809,20 @@
       },
       "id": "seop",
       "provides": [
-        "seop_operations"
+        "detection_pipeline",
+        "incident_response",
+        "threat_triage",
+        "response_playbooks",
+        "security_posture",
+        "seop_agents"
       ],
-      "requires": []
+      "requires": [
+        "secu",
+        "anom",
+        "moni",
+        "logt",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -435,7 +834,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -456,6 +855,46 @@
   },
   "roles": {},
   "rules": {
+    "closure_requires_compliance_mapping": {
+      "condition": {
+        "compliance_mapping_present": false,
+        "operation": "close_incident"
+      },
+      "description": "Closed incidents require compliance impact mapping.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compliance_mapping_required",
+        "required_action": "attach_compliance_mapping"
+      },
+      "name": "closure_requires_compliance_mapping"
+    },
+    "closure_requires_post_incident_review": {
+      "condition": {
+        "operation": "close_incident",
+        "post_incident_review_present": false
+      },
+      "description": "Closed incidents require a post-incident review reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "post_incident_review_required",
+        "required_action": "attach_post_incident_review"
+      },
+      "name": "closure_requires_post_incident_review"
+    },
+    "critical_agent_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "incident_severity": "critical",
+        "operation": "agent_response_action"
+      },
+      "description": "Critical response actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "critical_agent_action_requires_human_approval"
+    },
     "critical_incident_requires_escalation": {
       "condition": {
         "escalation_recorded": false,
@@ -482,6 +921,19 @@
       },
       "name": "detection_requires_alert_source"
     },
+    "detection_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "create_detection"
+      },
+      "description": "Detection lifecycle events must be emitted through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_detection_lifecycle_to_bytewax"
+      },
+      "name": "detection_requires_bytewax_stream"
+    },
     "high_confidence_anomaly_requires_review": {
       "condition": {
         "anomaly_confidence_gt": 0.9,
@@ -494,6 +946,19 @@
         "required_action": "review_anomaly"
       },
       "name": "high_confidence_anomaly_requires_review"
+    },
+    "incident_requires_evidence": {
+      "condition": {
+        "evidence_attached": false,
+        "operation": "open_incident"
+      },
+      "description": "Incidents require evidence references before they can enter the queue.",
+      "effect": {
+        "decision": "deny",
+        "reason": "incident_evidence_required",
+        "required_action": "attach_incident_evidence"
+      },
+      "name": "incident_requires_evidence"
     },
     "incident_requires_owner": {
       "condition": {
@@ -508,6 +973,32 @@
       },
       "name": "incident_requires_owner"
     },
+    "response_requires_actor": {
+      "condition": {
+        "operation": "execute_response",
+        "response_actor_present": false
+      },
+      "description": "Response actions require an accountable human or delegated agent actor.",
+      "effect": {
+        "decision": "deny",
+        "reason": "response_actor_required",
+        "required_action": "attach_response_actor"
+      },
+      "name": "response_requires_actor"
+    },
+    "response_requires_containment_review": {
+      "condition": {
+        "containment_review_recorded": false,
+        "operation": "execute_response"
+      },
+      "description": "Containment actions require review evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "containment_review_required",
+        "required_action": "record_containment_review"
+      },
+      "name": "response_requires_containment_review"
+    },
     "response_requires_playbook_approval": {
       "condition": {
         "operation": "execute_response",
@@ -520,6 +1011,32 @@
         "required_action": "approve_response_playbook"
       },
       "name": "response_requires_playbook_approval"
+    },
+    "seop_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_seop_agent"
+      },
+      "description": "Security operations agents must use an approved role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "seop_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
+      },
+      "name": "seop_agent_role_supported"
+    },
+    "seop_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_seop_agent"
+      },
+      "description": "Security operations agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "seop_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "seop_agent_runtime_supported"
     },
     "tenant_context_required": {
       "condition": {

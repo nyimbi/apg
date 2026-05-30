@@ -9,6 +9,7 @@ from .ops_runtime import (
 	PlaybookRecord,
 	PostureControlRecord,
 	ResponseActionRecord,
+	SeopAgentRecord,
 )
 
 
@@ -22,5 +23,6 @@ __all__ = [
 	"PlaybookRecord",
 	"PostureControlRecord",
 	"ResponseActionRecord",
+	"SeopAgentRecord",
 	"SeopRecord",
 ]

@@ -16,6 +16,78 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 20:49 EAT
+
+Common SEOP security-operations lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the SEOP
+  capability, and replaced `cap_spec.md` with the active packet summary.
+- Expanded `capability_contract.py` with SEOP-agent, detection, incident,
+  response, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, detection alert source,
+  detection Bytewax stream use, incident owner, incident evidence, critical
+  escalation, approved playbook, response actor, containment review,
+  high-confidence anomaly review, closure post-incident review, closure
+  compliance mapping, SEOP-agent runtime/role, and critical agent-response
+  human approval.
+- Added `SeopAgentRecord` and metadata-rich audit event support, then extended
+  `SeopService` with agent registration, agent action validation, audit counts,
+  Bytewax stream metadata, closure review/compliance enforcement, and stronger
+  response guardrails.
+- Extended API helpers and view models with SEOP-agent, audit trail, dashboard,
+  settings, and Bytewax metadata surfaces.
+- Updated package registration to expose SEOP agents, audit endpoints, required
+  dependencies, and streaming metadata.
+- Refreshed generated package evidence (`app.py`, `semantic_model.json`,
+  `package_manifest.json`, `release_report.json`) from the expanded contract.
+- Expanded focused tests for contract, rule, service, API/view, app, semantic,
+  agent, Bytewax, containment, and closure guardrails.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/seop/__init__.py
+  capabilities/common/seop/capability_contract.py
+  capabilities/common/seop/models.py capabilities/common/seop/ops_runtime.py
+  capabilities/common/seop/service.py capabilities/common/seop/api.py
+  capabilities/common/seop/views.py capabilities/common/seop/app.py
+  capabilities/common/seop/test_capability_contract.py
+  capabilities/common/seop/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/seop/test_capability_contract.py
+  capabilities/common/seop/tests/test_package_contract.py` passed with 9 tests
+  and only pre-existing adjacent SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.seop import SeopService;
+  service=SeopService(); service.register_seop_agent('tenant-proof',
+  'Proof agent', 'codex', 'response_reviewer', 'review response gates');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  SEOP-agent registration, audit event emission, and Bytewax stream metadata.
+  A basic OpenTelemetry warning was emitted by an adjacent optional monitoring
+  adapter.
+- `jq '.capabilities.seop.streaming.processor,
+  .capabilities.seop.provides, .capabilities.seop.requires,
+  .capabilities.seop.screens.agents.route,
+  (.capabilities.seop.rules[] |
+  select(.name=="seop_agent_runtime_supported") | .effect.reason),
+  (.capabilities.seop.rules[] |
+  select(.name=="detection_requires_bytewax_stream") | .effect.reason)'
+  capabilities/common/seop/semantic_model.json` confirmed `bytewax`,
+  SEOP-agent provides, required services, `/seop/agents`,
+  `seop_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/seop --json` passed with `seop` classified as
+  `domain_specific`, 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/seop --json |
+  jq '.side_effect_free, .warnings, (.capabilities[0].capability),
+  (.capabilities[0].configuration.adapters.event_stream),
+  (.capabilities[0].streaming.processor)'` confirmed `true`, no warnings,
+  `seop`, and `bytewax` for both adapter and stream processor.
+- Touched package-file stale-marker and unsupported stream search returned no
+  matches.
+- `git diff --check -- capabilities/common/seop docs/progress_log.md` passed
+  before this progress entry; rerun after this entry before commit.
+- Not run: live SIEM/SOAR/EDR/ticketing/compliance adapters, live Bytewax
+  topology, rendered browser UI, performance checks, and full repository tests.
+
 ### 2026-05-30 20:34 EAT
 
 Common SBOX sandbox/testing lifecycle/guardrail packet:

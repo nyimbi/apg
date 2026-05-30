@@ -1,40 +1,13 @@
 # Security Operations Capability Specification
 
-- **Capability Name**: Security Operations
-- **Capability ID**: `seop`
-- **Category**: common
-- **Version**: 1.0.0
+- Capability Name: Security Operations
+- Capability ID: `seop`
+- Category: common
+- Version: 1.0.0
 
 ## Purpose
 
-SEOP provides the dependency-light security-operations runtime for APG. It
-turns alert detections, anomaly triage, incident response, playbook approvals,
-response actions, posture controls, and audit evidence into deterministic
-package behavior that generated applications can compose immediately.
-
-## Current Executable Runtime
-
-The package exposes `SeopService`, API helpers, and UI view models behind the
-existing SEOP capability contract.
-
-Current behavior:
-
-- creates detections from trusted alert sources with anomaly confidence,
-  severity, signal references, rule decisions, and required triage actions;
-- opens incidents with owner, severity, linked detections, escalation evidence,
-  and critical-incident guardrails;
-- approves response playbooks with owner, ordered steps, and approver identity;
-- executes response actions against incidents only through approved playbooks;
-- records posture controls with coverage bands for operations readiness;
-- closes incidents only when closure evidence is attached;
-- records audit events for detections, incidents, playbooks, responses, and
-  closures;
-- exposes dashboard, detection console, incident queue, triage, playbook,
-  response, posture, settings, and list APIs.
-
-The compatibility `create_record` and `list_records` helpers map older generic
-package calls to detection behavior while new code uses the domain-specific
-methods.
+SEOP provides the executable APG security-operations runtime for generated applications. It coordinates detections, anomaly triage, incidents, response playbooks, posture controls, AI-assisted review lanes, lifecycle events, and audit evidence through deterministic package behavior.
 
 ## Provided Services
 
@@ -43,65 +16,67 @@ methods.
 - `threat_triage`
 - `response_playbooks`
 - `security_posture`
-- `seop_operations`
+- `seop_agents`
 
 ## Required Services
 
-- `tenant_context`
-- `secu` for security policy and posture integration
-- `anom` for anomaly detection inputs
-- `moni` for telemetry and alert feeds
-- optional `logt`, `ztna`, `dlpd`, and compliance adapters
+- `secu`
+- `anom`
+- `moni`
+- `logt`
+- `audl`
 
-## Configuration
+## Current Runtime
 
-Configuration is defined by `capability_contract.py` and exposed through
-`get_capability_contract()`. Tenant context is required for executable
-operations. Response playbooks require explicit approval before execution.
+The package exposes `SeopService`, API helpers, UI view models, a deterministic rule engine, a visual theme contract, and package publication evidence.
+
+The service can:
+
+- create detections from trusted alert sources;
+- require Bytewax lifecycle routing for detection events;
+- open incidents with owners, evidence, linked detections, severity, and escalation;
+- approve response playbooks;
+- execute response actions with actor and containment review;
+- record posture controls;
+- close incidents with closure evidence, post-incident review, and compliance mapping;
+- register governed SEOP agents;
+- validate critical agent-driven response actions;
+- expose audit events and dashboard summaries.
 
 ## Rules
 
 - `tenant_context_required`
 - `detection_requires_alert_source`
+- `detection_requires_bytewax_stream`
 - `incident_requires_owner`
+- `incident_requires_evidence`
 - `critical_incident_requires_escalation`
 - `response_requires_playbook_approval`
+- `response_requires_actor`
+- `response_requires_containment_review`
 - `high_confidence_anomaly_requires_review`
+- `closure_requires_post_incident_review`
+- `closure_requires_compliance_mapping`
+- `seop_agent_runtime_supported`
+- `seop_agent_role_supported`
+- `critical_agent_action_requires_human_approval`
 
 ## UI
 
-The package exposes eight APG Python UI routes through `views.py` and the
-package semantic model:
-
-- `/seop/dashboard`
-- `/seop/detections`
-- `/seop/incidents`
-- `/seop/triage`
-- `/seop/playbooks`
-- `/seop/responses`
-- `/seop/posture`
-- `/seop/settings`
+SEOP exposes route-backed APG Python view models for dashboard, detection console, incident queue, triage, playbooks, response actions, posture, agent workbench, audit trail, and settings.
 
 ## Theme
 
-The package uses the `seop_security_ops` APG theme contract with compact
-security-operations density, severity indicators, incident priority lists,
-playbook approval chips, and posture coverage panels.
+SEOP uses the `seop_security_ops` theme with compact density, severity pills, priority queues, approval chips, coverage chips, agent review lanes, and audit timelines.
 
-## Adapter Boundaries
+## Event Stream
 
-The dependency-light runtime deliberately does not connect to live SIEM, SOAR,
-EDR, MDM, ZTNA, DLP, case-management, ticketing, compliance, threat-intel, or
-telemetry systems. Those systems should be added as adapters around the current
-service methods so local package behavior remains deterministic and testable.
+SEOP lifecycle events are described by the Bytewax stream manifest:
 
-## Focused Verification
+- processor: `bytewax`
+- stream: `apg.seop.lifecycle`
+- key: `tenant_id`
 
-Use these commands for battery-conscious package proof:
+## Detailed Packet
 
-```bash
-./.venv/bin/python -m py_compile capabilities/common/seop/__init__.py capabilities/common/seop/models.py capabilities/common/seop/ops_runtime.py capabilities/common/seop/service.py capabilities/common/seop/api.py capabilities/common/seop/views.py capabilities/common/seop/capability_contract.py capabilities/common/seop/app.py capabilities/common/seop/test_capability_contract.py capabilities/common/seop/tests/test_package_contract.py
-./.venv/bin/pytest -q capabilities/common/seop/test_capability_contract.py capabilities/common/seop/tests/test_package_contract.py
-./.venv/bin/apg capabilities implementation-audit --root capabilities/common/seop --json
-./.venv/bin/apg capabilities publish-plan capabilities/common/seop --json
-```
+See `SPECIFICATION.md`, `PLAN.md`, and `README.md` for the complete lifecycle packet, implementation plan, usage examples, and focused verification commands.

@@ -24,6 +24,7 @@ def dashboard_model(
 		"summary": service.dashboard_summary(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -93,6 +94,42 @@ def posture_model(
 	}
 
 
+def agent_workbench_model(
+	service: SeopService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or SeopService()
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/seop/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_seop_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["seop_agents"]["supported_runtimes"],
+		"supported_roles": contract["configuration"]["seop_agents"]["supported_roles"],
+		"approval_required": contract["configuration"]["seop_agents"]["human_approval_required"],
+	}
+
+
+def audit_trail_model(
+	service: SeopService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or SeopService()
+	return {
+		"route": "/seop/audit",
+		"tenant_id": tenant_id,
+		"events": service.list_audit_events(tenant_id),
+		"event_types": [
+			"detection_created",
+			"incident_opened",
+			"playbook_approved",
+			"response_executed",
+			"incident_closed",
+			"seop_agent_registered",
+		],
+	}
+
+
 def triage_model(
 	service: SeopService | None = None,
 	tenant_id: str = "default",
@@ -116,4 +153,5 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}

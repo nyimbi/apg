@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	SUPPORTED_SEOP_AGENT_ROLES,
+	SUPPORTED_SEOP_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+	streaming_manifest,
+)
 from .ops_runtime import (
 	DetectionRecord,
 	IncidentRecord,
@@ -12,6 +19,7 @@ from .ops_runtime import (
 	PlaybookRecord,
 	PostureControlRecord,
 	ResponseActionRecord,
+	SeopAgentRecord,
 	normalize_confidence,
 	normalize_severity,
 	response_required_actions,
@@ -30,6 +38,7 @@ class SeopService:
 		self.responses: dict[str, ResponseActionRecord] = {}
 		self.posture_controls: dict[str, PostureControlRecord] = {}
 		self.audit_events: dict[str, OpsAuditEventRecord] = {}
+		self.seop_agents: dict[str, SeopAgentRecord] = {}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -47,6 +56,7 @@ class SeopService:
 		signal_refs: list[str] | None = None,
 		triage_review_recorded: bool = False,
 		owner: str | None = None,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		if not str(title or "").strip():
@@ -57,6 +67,7 @@ class SeopService:
 			"alert_source_present": bool(str(alert_source or "").strip()),
 			"anomaly_confidence": normalize_confidence(anomaly_confidence),
 			"triage_review_recorded": bool(triage_review_recorded),
+			"event_stream": str(event_stream or "").strip().lower(),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -76,7 +87,15 @@ class SeopService:
 			required_actions=response_required_actions(result),
 		)
 		self.detections[record.id] = record
-		self._record_event(tenant_id, "detection_created", record.id, f"Detection created: {title}", owner or alert_source, record.severity)
+		self._record_event(
+			tenant_id,
+			"detection_created",
+			record.id,
+			f"Detection created: {title}",
+			owner or alert_source,
+			record.severity,
+			{"event_stream": event_stream_name(), "processor": "bytewax"},
+		)
 		return record.to_dict()
 
 	def open_incident(
@@ -99,6 +118,7 @@ class SeopService:
 			"incident_owner_assigned": bool(str(owner or "").strip()),
 			"incident_severity": normalized_severity,
 			"escalation_recorded": bool(escalation_recorded),
+			"evidence_attached": bool(detection_ids or evidence_refs),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -118,7 +138,15 @@ class SeopService:
 		for detection_id in record.detection_ids:
 			if detection_id in self.detections:
 				self.detections[detection_id].status = "linked"
-		self._record_event(tenant_id, "incident_opened", record.id, f"Incident opened: {title}", owner, normalized_severity)
+		self._record_event(
+			tenant_id,
+			"incident_opened",
+			record.id,
+			f"Incident opened: {title}",
+			owner,
+			normalized_severity,
+			{"event_stream": event_stream_name(), "detection_count": len(record.detection_ids)},
+		)
 		return record.to_dict()
 
 	def approve_playbook(
@@ -167,6 +195,7 @@ class SeopService:
 			"operation": "execute_response",
 			"playbook_approved": bool(playbook.approved),
 			"containment_review_recorded": bool(containment_reviewed),
+			"response_actor_present": bool(str(actor or "").strip()),
 		}
 		result = self.evaluate(context)
 		if result["decision"] == "deny":
@@ -183,7 +212,15 @@ class SeopService:
 		)
 		self.responses[record.id] = record
 		incident.status = "responding"
-		self._record_event(tenant_id, "response_executed", record.id, f"Response executed: {action}", actor, incident.severity)
+		self._record_event(
+			tenant_id,
+			"response_executed",
+			record.id,
+			f"Response executed: {action}",
+			actor,
+			incident.severity,
+			{"event_stream": event_stream_name(), "playbook_id": playbook_id},
+		)
 		return record.to_dict()
 
 	def record_posture_control(
@@ -219,15 +256,35 @@ class SeopService:
 		incident_id: str,
 		closure_evidence: str,
 		actor: str,
+		post_incident_review: str = "",
+		compliance_mapping: str = "",
 	) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		incident = self._get_incident(tenant_id, incident_id)
 		if not str(closure_evidence or "").strip():
 			raise PermissionError("closure_evidence_required")
+		context = {
+			"tenant_context_present": True,
+			"operation": "close_incident",
+			"post_incident_review_present": bool(str(post_incident_review or "").strip()),
+			"compliance_mapping_present": bool(str(compliance_mapping or "").strip()),
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
 		incident.status = "closed"
 		incident.closed_at = utc_now()
 		incident.evidence_refs.append(closure_evidence)
-		self._record_event(tenant_id, "incident_closed", incident.id, f"Incident closed: {incident.title}", actor, incident.severity)
+		incident.evidence_refs.extend([value for value in [post_incident_review, compliance_mapping] if str(value or "").strip()])
+		self._record_event(
+			tenant_id,
+			"incident_closed",
+			incident.id,
+			f"Incident closed: {incident.title}",
+			actor,
+			incident.severity,
+			{"event_stream": event_stream_name(), "review": post_incident_review, "compliance": compliance_mapping},
+		)
 		return incident.to_dict()
 
 	def create_record(
@@ -268,6 +325,76 @@ class SeopService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
+	def register_seop_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str = "secops",
+		human_approval_required: bool = True,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		context = {
+			"tenant_context_present": True,
+			"operation": "register_seop_agent",
+			"agent_runtime_supported": runtime_value in SUPPORTED_SEOP_AGENT_RUNTIMES,
+			"agent_role_supported": role_value in SUPPORTED_SEOP_AGENT_ROLES,
+		}
+		result = self.evaluate(context)
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		if not str(name or "").strip():
+			raise ValueError("seop_agent_name_required")
+		if not str(scope or "").strip():
+			raise ValueError("seop_agent_scope_required")
+		record = SeopAgentRecord(
+			id=stable_id("seop_agent", tenant_id, name, runtime_value, role_value),
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=scope,
+			owner=owner,
+			human_approval_required=bool(human_approval_required),
+		)
+		self.seop_agents[record.id] = record
+		self._record_event(
+			tenant_id,
+			"seop_agent_registered",
+			record.id,
+			f"SEOP agent registered: {name}",
+			owner,
+			"low",
+			{"runtime": runtime_value, "role": role_value, "event_stream": event_stream_name()},
+		)
+		return record.to_dict()
+
+	def validate_agent_response_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		incident_severity: str,
+		human_approval_recorded: bool,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent = self.seop_agents.get(agent_id)
+		if agent is None or agent.tenant_id != tenant_id:
+			raise KeyError(f"seop_agent_not_found:{agent_id}")
+		context = {
+			"tenant_context_present": True,
+			"operation": "agent_response_action",
+			"incident_severity": normalize_severity(incident_severity),
+			"human_approval_recorded": bool(human_approval_recorded),
+		}
+		return self.evaluate(context)
+
+	def list_seop_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.seop_agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		incidents = self.list_incidents(tenant_id)
 		detections = self.list_detections(tenant_id)
@@ -281,7 +408,10 @@ class SeopService:
 			"approved_playbook_count": len(self.list_playbooks(tenant_id)),
 			"response_count": len(self.list_responses(tenant_id)),
 			"posture_gap_count": sum(1 for item in self.list_posture_controls(tenant_id) if item["status"] == "gap"),
+			"seop_agent_count": len(self.list_seop_agents(tenant_id)),
+			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
+			"streaming": streaming_manifest(),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -312,6 +442,7 @@ class SeopService:
 		message: str,
 		actor: str,
 		severity: str = "low",
+		metadata: dict[str, Any] | None = None,
 	) -> dict[str, Any]:
 		record = OpsAuditEventRecord(
 			id=stable_id("seop_event", tenant_id, event_type, subject_id, len(self.audit_events)),
@@ -321,6 +452,7 @@ class SeopService:
 			message=message,
 			actor=actor,
 			severity=normalize_severity(severity),
+			metadata=dict(metadata or {}),
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
@@ -330,3 +462,6 @@ class SeopService:
 		if tenant_id is not None:
 			items = [item for item in items if item["tenant_id"] == tenant_id]
 		return sorted(items, key=lambda item: item["id"])
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

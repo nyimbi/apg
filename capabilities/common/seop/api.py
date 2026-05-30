@@ -23,6 +23,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"incident_count": summary["incident_count"],
 		"open_incident_count": summary["open_incident_count"],
 		"response_count": summary["response_count"],
+		"seop_agent_count": summary["seop_agent_count"],
 	}
 
 
@@ -36,6 +37,7 @@ def create_detection(payload: dict[str, Any]) -> dict[str, Any]:
 		signal_refs=list(payload.get("signal_refs") or []),
 		triage_review_recorded=bool(payload.get("triage_review_recorded", False)),
 		owner=payload.get("owner"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -88,6 +90,29 @@ def close_incident(payload: dict[str, Any]) -> dict[str, Any]:
 		incident_id=str(payload["incident_id"]),
 		closure_evidence=str(payload.get("closure_evidence") or ""),
 		actor=str(payload.get("actor") or ""),
+		post_incident_review=str(payload.get("post_incident_review") or ""),
+		compliance_mapping=str(payload.get("compliance_mapping") or ""),
+	)
+
+
+def register_seop_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_seop_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or "secops"),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+	)
+
+
+def validate_agent_response_action(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_agent_response_action(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["agent_id"]),
+		incident_severity=str(payload.get("incident_severity") or "medium"),
+		human_approval_recorded=bool(payload.get("human_approval_recorded", False)),
 	)
 
 
@@ -111,6 +136,7 @@ def list_security_operations(tenant_id: str = "default") -> dict[str, Any]:
 		"playbooks": SERVICE.list_playbooks(tenant_id),
 		"responses": SERVICE.list_responses(tenant_id),
 		"posture_controls": SERVICE.list_posture_controls(tenant_id),
+		"seop_agents": SERVICE.list_seop_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}
