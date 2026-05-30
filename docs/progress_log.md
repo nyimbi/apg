@@ -17121,3 +17121,62 @@ Not run to preserve battery:
 - Persistent database migrations.
 - Live Bytewax stream execution.
 - External MONI, CONF, AUDL, SRCH, ANOM, COMP, AGNT, or WFLO adapters.
+
+### 2026-05-30 19:57 EAT
+
+MCHN lifecycle and guardrail packet:
+
+- Selected `capabilities/common/mchn` after LOGT because it was the next
+  capability with an existing `cap_spec.md` but missing the local README,
+  specification, and plan packet.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
+  `cap_spec.md` with a compatibility pointer to the active specification.
+- Expanded the executable MCHN contract to cover output channels, approved
+  templates, delivery policies, delivery routes, rendered output, delivery
+  batches, provider receipts, MCHN agents, observability, APG adapters, UI
+  routes, visual theme tokens, and Bytewax event streaming.
+- Added deterministic guardrails for tenant context, channel ownership,
+  provider reference, template approval and approver, template content,
+  template channel type, recipient limits, throttling, compliance reference,
+  sensitive-output encryption, rendered-output recipient reference, unhealthy
+  channel delivery, delivery actor, rendered output presence, positive
+  recipient counts, Bytewax delivery stream, large-delivery review, provider
+  receipt reference, AI-agent registration, supported AI-agent runtime and
+  role, agent scope, contribution disclosure, audited state changes, and
+  Bytewax-backed batch output mutation.
+- Added the `MchnAgent` model and extended `MchnService` with tenant-local
+  lifecycle IDs, MCHN-agent registration, Bytewax delivery enforcement,
+  batch-mutation validation, stronger channel/template/policy/render/delivery
+  and receipt guardrails, and dashboard streaming metadata.
+- Added API helpers for MCHN-agent registration, audit listing, and batch
+  mutation validation.
+- Added dashboard streaming metadata plus AI-agent, audit-trail, and
+  delivery-governance view models.
+- Refreshed `app.py`, `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract.
+- Expanded focused coverage for lifecycle rules, MCHN-agent guardrails,
+  tenant-local IDs, Bytewax delivery and batch policy, generated evidence,
+  and publishability.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mchn/__init__.py capabilities/common/mchn/capability_contract.py capabilities/common/mchn/models.py capabilities/common/mchn/output_runtime.py capabilities/common/mchn/service.py capabilities/common/mchn/api.py capabilities/common/mchn/views.py capabilities/common/mchn/app.py capabilities/common/mchn/test_capability_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/mchn/test_capability_contract.py`
+  passed with 7 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python -c "... MchnService ... register_mchn_agent ... dashboard_summary ..."` returned dashboard evidence with one MCHN agent and `bytewax` streaming metadata; import emitted the existing optional OpenTelemetry warning.
+- `jq '.capabilities.mchn.streaming.processor, .capabilities.mchn.configuration.mchn_agents.supported_runtimes, .capabilities.mchn.screens.agents.route, ...' capabilities/common/mchn/semantic_model.json` confirmed `bytewax`, `codex`/`claude_code`/`opencode`/`pi`, `/mchn/agents`, `mchn_agent_runtime_not_supported`, and `bytewax_event_stream_required`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mchn --json` passed with `ok: true`; MCHN remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mchn --json` passed with deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
+- Stale-marker scan for generated-baseline, promotional, disallowed-broker,
+  and unfinished markers returned no matches.
+- `git diff --check -- capabilities/common/mchn docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live notification providers, document renderers, print systems, durable audit
+  stores, localization/theme/workflow providers, rendered browser UI, and
+  performance/load tests.
+- Persistent database migrations.
+- Live Bytewax stream execution.
+- External NTFY, AUTH, CONF, AUDL, I18N, THEM, WFLO, COMP, or AGNT adapters.

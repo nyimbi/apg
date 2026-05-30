@@ -4,8 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .models import DeliveryBatch, DeliveryPolicy, DeliveryReceipt, DeliveryRoute, MchnAuditEvent, OutputChannel, OutputTemplate, RenderedOutput
+from .capability_contract import (
+	SUPPORTED_MCHN_AGENT_ROLES,
+	SUPPORTED_MCHN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	event_stream_name,
+	get_capability_contract,
+)
+from .models import DeliveryBatch, DeliveryPolicy, DeliveryReceipt, DeliveryRoute, MchnAgent, MchnAuditEvent, OutputChannel, OutputTemplate, RenderedOutput
 from .output_runtime import OutputRuntime
 
 
@@ -21,6 +27,7 @@ class MchnService:
 		self._batches: dict[str, DeliveryBatch] = {}
 		self._receipts: dict[str, DeliveryReceipt] = {}
 		self._audit_events: dict[str, MchnAuditEvent] = {}
+		self._agents: dict[str, MchnAgent] = {}
 		self._runtime = OutputRuntime()
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -45,10 +52,9 @@ class MchnService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "create_channel",
 			"channel_owner_assigned": bool(owner),
+			"provider_ref_present": bool(provider_ref),
 		})
 		self._raise_if_denied(result)
-		if not provider_ref:
-			raise PermissionError("channel_provider_required")
 		health_value = self._runtime.normalize_health(health)
 		channel = OutputChannel(
 			id=channel_id,
@@ -61,7 +67,7 @@ class MchnService:
 			fallback_channel_id=fallback_channel_id,
 			status=status,
 		)
-		self._channels[channel_id] = channel
+		self._channels[_state_key(tenant_id, channel_id)] = channel
 		self._audit(tenant_id, channel_id, "channel_created", owner, result["decision"], reasons=self._reasons(result), metadata={"channel_type": channel.channel_type, "health": health_value})
 		return channel.to_dict()
 
@@ -83,15 +89,12 @@ class MchnService:
 			"tenant_context_present": bool(tenant_id),
 			"operation": "publish_template",
 			"template_approved": bool(approved),
+			"template_approver_present": bool(approved_by),
+			"template_content_present": bool(subject_template or body_template),
+			"template_channel_present": bool(channel_types),
 		})
 		self._raise_if_denied(result)
-		if not subject_template and not body_template:
-			raise PermissionError("template_content_required")
-		if approved and not approved_by:
-			raise PermissionError("template_approver_required")
 		types = tuple(self._runtime.normalize_channel_type(channel_type) for channel_type in channel_types)
-		if not types:
-			raise PermissionError("template_channel_required")
 		template = OutputTemplate(
 			id=template_id,
 			tenant_id=tenant_id,
@@ -105,7 +108,7 @@ class MchnService:
 			approved_by=approved_by,
 			status=status,
 		)
-		self._templates[template_id] = template
+		self._templates[_state_key(tenant_id, template_id)] = template
 		self._audit(tenant_id, template_id, "template_published", approved_by, result["decision"], reasons=self._reasons(result), metadata={"locale": locale, "channel_types": list(types)})
 		return template.to_dict()
 
@@ -120,13 +123,14 @@ class MchnService:
 		compliance_ref: str,
 		status: str = "active",
 	) -> dict[str, Any]:
-		self._require_tenant(tenant_id)
-		if max_recipients <= 0:
-			raise PermissionError("recipient_policy_required")
-		if throttle_per_minute <= 0:
-			raise PermissionError("throttle_policy_required")
-		if not compliance_ref:
-			raise PermissionError("compliance_policy_required")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "create_delivery_policy",
+			"recipient_limit_valid": max_recipients > 0,
+			"throttle_policy_valid": throttle_per_minute > 0,
+			"compliance_ref_present": bool(compliance_ref),
+		})
+		self._raise_if_denied(result)
 		policy = DeliveryPolicy(
 			id=policy_id,
 			tenant_id=tenant_id,
@@ -137,8 +141,8 @@ class MchnService:
 			compliance_ref=compliance_ref,
 			status=status,
 		)
-		self._policies[policy_id] = policy
-		self._audit(tenant_id, policy_id, "delivery_policy_created", "system", "allow", metadata={"max_recipients": max_recipients, "throttle_per_minute": throttle_per_minute})
+		self._policies[_state_key(tenant_id, policy_id)] = policy
+		self._audit(tenant_id, policy_id, "delivery_policy_created", "system", result["decision"], reasons=self._reasons(result), metadata={"max_recipients": max_recipients, "throttle_per_minute": throttle_per_minute})
 		return policy.to_dict()
 
 	def create_route(
@@ -168,7 +172,7 @@ class MchnService:
 			policy_id=policy_id,
 			status=status,
 		)
-		self._routes[route_id] = route
+		self._routes[_state_key(tenant_id, route_id)] = route
 		self._audit(tenant_id, route_id, "route_created", "system", "allow", metadata={"primary_channel_id": primary_channel_id, "fallback_count": len(fallback_channel_ids)})
 		return route.to_dict()
 
@@ -191,14 +195,14 @@ class MchnService:
 		selected_channel = self._require_channel(selected_channel_id, tenant_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": "render_output",
+			"recipient_ref_present": bool(recipient_ref),
 			"sensitive_output": bool(sensitive_output),
 			"output_encrypted": bool(output_encrypted),
 		})
 		self._raise_if_denied(result)
 		if selected_channel.channel_type not in template.channel_types:
 			raise PermissionError("template_channel_mismatch")
-		if not recipient_ref:
-			raise PermissionError("recipient_policy_required")
 		rendered = RenderedOutput(
 			id=output_id,
 			tenant_id=tenant_id,
@@ -214,7 +218,7 @@ class MchnService:
 			output_encrypted=output_encrypted,
 			status=self._runtime.rendered_status(sensitive_output, output_encrypted),
 		)
-		self._rendered_outputs[output_id] = rendered
+		self._rendered_outputs[_state_key(tenant_id, output_id)] = rendered
 		self._audit(tenant_id, output_id, "output_rendered", recipient_ref, result["decision"], reasons=self._reasons(result), metadata={"channel_id": selected_channel.id, "format": rendered.output_format})
 		return rendered.to_dict()
 
@@ -227,22 +231,23 @@ class MchnService:
 		rendered_output_ids: list[str] | tuple[str, ...],
 		recipient_count: int,
 		delivery_review_recorded: bool = False,
+		event_stream: str = "bytewax",
 	) -> dict[str, Any]:
 		route = self._require_route(route_id, tenant_id)
 		policy = self._require_policy(route.policy_id, tenant_id)
 		primary_channel = self._require_channel(route.primary_channel_id, tenant_id)
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
+			"operation": "deliver_batch",
 			"channel_health": primary_channel.health,
 			"delivery_requested": True,
+			"delivery_actor_present": bool(requested_by),
+			"rendered_output_present": bool(rendered_output_ids),
 			"recipient_count": recipient_count,
 			"delivery_review_recorded": bool(delivery_review_recorded),
+			"event_stream": event_stream_name(event_stream),
 		})
 		self._raise_if_review_required(result, delivery_review_recorded)
-		if not requested_by:
-			raise PermissionError("delivery_actor_required")
-		if recipient_count <= 0:
-			raise PermissionError("recipient_policy_required")
 		if recipient_count > policy.max_recipients and not delivery_review_recorded:
 			raise PermissionError("delivery_policy_review_required")
 		for output_id in rendered_output_ids:
@@ -261,7 +266,7 @@ class MchnService:
 			delivery_review_recorded=delivery_review_recorded,
 			status=self._runtime.batch_status(recipient_count, delivery_review_recorded),
 		)
-		self._batches[batch_id] = batch
+		self._batches[_state_key(tenant_id, batch_id)] = batch
 		self._audit(tenant_id, batch_id, "delivery_batch_queued", requested_by, result["decision"], reasons=self._reasons(result), metadata={"recipient_count": recipient_count, "output_count": len(rendered_output_ids)})
 		return batch.to_dict()
 
@@ -274,6 +279,12 @@ class MchnService:
 		delivery_state: str,
 		provider_message_id: str,
 	) -> dict[str, Any]:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_receipt",
+			"provider_message_present": bool(provider_message_id),
+		})
+		self._raise_if_denied(result)
 		batch = self._require_batch(batch_id, tenant_id)
 		output = self._require_rendered_output(rendered_output_id, tenant_id)
 		if rendered_output_id not in batch.rendered_output_ids:
@@ -288,8 +299,8 @@ class MchnService:
 			delivery_state=self._runtime.normalize_delivery_state(delivery_state),
 			provider_message_id=provider_message_id,
 		)
-		self._receipts[receipt_id] = receipt
-		self._audit(tenant_id, receipt_id, "delivery_receipt_recorded", output.recipient_ref, "allow", metadata={"delivery_state": receipt.delivery_state})
+		self._receipts[_state_key(tenant_id, receipt_id)] = receipt
+		self._audit(tenant_id, receipt_id, "delivery_receipt_recorded", output.recipient_ref, result["decision"], reasons=self._reasons(result), metadata={"delivery_state": receipt.delivery_state})
 		return receipt.to_dict()
 
 	def create_record(
@@ -301,7 +312,7 @@ class MchnService:
 	) -> dict[str, Any]:
 		metadata = dict(metadata or {})
 		channel_id = str(metadata.get("channel_id") or f"channel-{record_id}")
-		if channel_id not in self._channels:
+		if _state_key(tenant_id, channel_id) not in self._channels:
 			self.create_channel(
 				channel_id=channel_id,
 				tenant_id=tenant_id,
@@ -311,7 +322,7 @@ class MchnService:
 				provider_ref=str(metadata.get("provider_ref") or "provider://local"),
 			)
 		template_id = str(metadata.get("template_id") or f"template-{record_id}")
-		if template_id not in self._templates:
+		if _state_key(tenant_id, template_id) not in self._templates:
 			self.publish_template(
 				template_id=template_id,
 				tenant_id=tenant_id,
@@ -325,7 +336,7 @@ class MchnService:
 				approved_by=str(metadata.get("approved_by") or "system"),
 			)
 		policy_id = str(metadata.get("policy_id") or f"policy-{record_id}")
-		if policy_id not in self._policies:
+		if _state_key(tenant_id, policy_id) not in self._policies:
 			self.create_delivery_policy(
 				policy_id=policy_id,
 				tenant_id=tenant_id,
@@ -336,7 +347,7 @@ class MchnService:
 				compliance_ref=str(metadata.get("compliance_ref") or "compliance://default"),
 			)
 		route_id = str(metadata.get("route_id") or f"route-{record_id}")
-		if route_id not in self._routes:
+		if _state_key(tenant_id, route_id) not in self._routes:
 			self.create_route(
 				route_id=route_id,
 				tenant_id=tenant_id,
@@ -384,6 +395,51 @@ class MchnService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
+	def register_mchn_agent(
+		self,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		contribution_disclosed: bool = True,
+		agent_id: str | None = None,
+	) -> dict[str, Any]:
+		normalized_runtime = _normalize_token(runtime)
+		normalized_role = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"mchn_agent_present": True,
+			"agent_registered": True,
+			"agent_runtime_supported": normalized_runtime in SUPPORTED_MCHN_AGENT_RUNTIMES,
+			"agent_role_supported": normalized_role in SUPPORTED_MCHN_AGENT_ROLES,
+			"agent_scope_present": bool(scope),
+			"agent_contribution_disclosed": contribution_disclosed,
+		})
+		self._raise_if_denied(result)
+		agent = MchnAgent(
+			id=agent_id or f"mchn-agent-{len(self._agents) + 1:06d}",
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			contribution_disclosed=contribution_disclosed,
+		)
+		self._agents[_state_key(tenant_id, agent.id)] = agent
+		self._audit(tenant_id, agent.id, "mchn_agent_registered", name, result["decision"], metadata=agent.to_dict())
+		return agent.to_dict()
+
+	def validate_batch_output_mutation(self, event_stream: str) -> dict[str, Any]:
+		return self.evaluate({
+			"tenant_context_present": True,
+			"requested_operation": "batch_output_mutation",
+			"event_stream": event_stream,
+		})
+
+	def list_mchn_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		channels = self.list_channels(tenant_id)
 		batches = self.list_batches(tenant_id)
@@ -397,10 +453,12 @@ class MchnService:
 			"rendered_output_count": len(self.list_rendered_outputs(tenant_id)),
 			"delivery_batch_count": len(batches),
 			"receipt_count": len(receipts),
+			"mchn_agent_count": len(self.list_mchn_agents(tenant_id)),
 			"unhealthy_channel_count": len([channel for channel in channels if channel["health"] == "unhealthy"]),
 			"large_batch_count": len([batch for batch in batches if batch["recipient_count"] > 10000]),
 			"failed_receipt_count": len([receipt for receipt in receipts if receipt["delivery_state"] in {"failed", "bounced"}]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
+			"streaming": self.describe(tenant_id)["streaming"],
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -408,37 +466,37 @@ class MchnService:
 		self._raise_if_denied(result)
 
 	def _require_channel(self, channel_id: str, tenant_id: str) -> OutputChannel:
-		channel = self._channels.get(channel_id)
+		channel = self._channels.get(_state_key(tenant_id, channel_id))
 		if channel is None or channel.tenant_id != tenant_id:
 			raise KeyError("output_channel_not_found")
 		return channel
 
 	def _require_template(self, template_id: str, tenant_id: str) -> OutputTemplate:
-		template = self._templates.get(template_id)
+		template = self._templates.get(_state_key(tenant_id, template_id))
 		if template is None or template.tenant_id != tenant_id:
 			raise KeyError("output_template_not_found")
 		return template
 
 	def _require_policy(self, policy_id: str, tenant_id: str) -> DeliveryPolicy:
-		policy = self._policies.get(policy_id)
+		policy = self._policies.get(_state_key(tenant_id, policy_id))
 		if policy is None or policy.tenant_id != tenant_id:
 			raise KeyError("delivery_policy_not_found")
 		return policy
 
 	def _require_route(self, route_id: str, tenant_id: str) -> DeliveryRoute:
-		route = self._routes.get(route_id)
+		route = self._routes.get(_state_key(tenant_id, route_id))
 		if route is None or route.tenant_id != tenant_id:
 			raise KeyError("delivery_route_not_found")
 		return route
 
 	def _require_rendered_output(self, output_id: str, tenant_id: str) -> RenderedOutput:
-		output = self._rendered_outputs.get(output_id)
+		output = self._rendered_outputs.get(_state_key(tenant_id, output_id))
 		if output is None or output.tenant_id != tenant_id:
 			raise KeyError("rendered_output_not_found")
 		return output
 
 	def _require_batch(self, batch_id: str, tenant_id: str) -> DeliveryBatch:
-		batch = self._batches.get(batch_id)
+		batch = self._batches.get(_state_key(tenant_id, batch_id))
 		if batch is None or batch.tenant_id != tenant_id:
 			raise KeyError("delivery_batch_not_found")
 		return batch
@@ -488,3 +546,11 @@ class MchnService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "output_policy_blocked") for action in result.get("actions", ()))
+
+
+def _normalize_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _state_key(tenant_id: str, item_id: str) -> str:
+	return f"{tenant_id}:{item_id}"

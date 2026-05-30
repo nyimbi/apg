@@ -100,6 +100,7 @@ def deliver_batch(payload: dict[str, Any]) -> dict[str, Any]:
 		rendered_output_ids=tuple(payload.get("rendered_output_ids") or ()),
 		recipient_count=int(payload.get("recipient_count", 0)),
 		delivery_review_recorded=bool(payload.get("delivery_review_recorded", False)),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
 	)
 
 
@@ -114,6 +115,22 @@ def record_receipt(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_mchn_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_mchn_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		agent_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
+def validate_batch_output_mutation(event_stream: str) -> dict[str, Any]:
+	return SERVICE.validate_batch_output_mutation(event_stream)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -125,6 +142,14 @@ def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 
 def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_records(tenant_id)
+
+
+def list_mchn_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_mchn_agents(tenant_id)
+
+
+def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_audit_events(tenant_id)
 
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:

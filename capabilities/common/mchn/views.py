@@ -32,6 +32,7 @@ def dashboard_model(
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -89,4 +90,34 @@ def policy_model(service: MchnService, tenant_id: str = "default") -> dict[str, 
 		"tenant_id": tenant_id,
 		"policies": service.list_policies(tenant_id),
 		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
+	}
+
+
+def mchn_agent_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/mchn/agents",
+		"mchn_agents": service.list_mchn_agents(tenant_id),
+		"supported_runtimes": contract["configuration"]["mchn_agents"]["supported_runtimes"],
+		"allowed_roles": contract["configuration"]["mchn_agents"]["allowed_roles"],
+		"permissions": ["mchn:view", "mchn:admin"],
+	}
+
+
+def audit_trail_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	return {
+		"route": "/mchn/audit",
+		"audit_events": service.list_audit_events(tenant_id),
+		"permissions": ["mchn:admin"],
+	}
+
+
+def delivery_governance_model(service: MchnService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"route": "/mchn/policies",
+		"policies": service.list_policies(tenant_id),
+		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
+		"configuration": contract["configuration"],
 	}

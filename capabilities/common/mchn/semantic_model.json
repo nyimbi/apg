@@ -12,6 +12,20 @@
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "content_policy": "comp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MchnService",
+          "identity": "auth",
+          "localization": "i18n",
+          "notification": "ntfy",
+          "theme": "them",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
         "channels": {
           "channel_owner_required": true,
           "enabled": [
@@ -24,24 +38,63 @@
             "print"
           ],
           "fallback_required": true,
-          "health_required": true
+          "health_required": true,
+          "provider_required": true
         },
         "delivery": {
+          "delivery_actor_required": true,
           "delivery_receipts_enabled": true,
+          "event_stream": "bytewax",
           "recipient_policy_required": true,
+          "rendered_output_required": true,
           "sensitive_output_encryption_required": true,
           "throttle_policy_required": true
         },
         "governance": {
           "audit_output_events": true,
+          "batch_event_stream": "bytewax",
           "compliance_policy_required": true,
           "require_tenant_context": true,
-          "restricted_content_filtering": true
+          "restricted_content_filtering": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
+        },
+        "mchn_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "route_reviewer",
+            "template_reviewer",
+            "delivery_reviewer",
+            "channel_operator",
+            "compliance_reviewer",
+            "accessibility_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "channel_metrics_required": true,
+          "delivery_metrics_required": true,
+          "event_stream": "bytewax",
+          "render_metrics_required": true
         },
         "rendering": {
           "format_validation_required": true,
           "localization_supported": true,
           "template_approval_required": true,
+          "template_channel_required": true,
+          "template_content_required": true,
           "theme_policy_required": true
         },
         "tenant_id": "default",
@@ -50,8 +103,11 @@
           "default_theme": "mchn_omnichannel_output"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_channel_monitor": true,
           "enable_output_dashboard": true,
+          "enable_policies": true,
           "enable_route_console": true,
           "enable_template_manager": true
         }
@@ -63,9 +119,20 @@
       "master_data": {},
       "name": "Multi-Channel Output",
       "provides": [
-        "mchn_operations"
+        "channel_routing",
+        "format_rendering",
+        "output_templates",
+        "delivery_policy",
+        "delivery_receipts",
+        "omnichannel_analytics",
+        "mchn_agents"
       ],
-      "requires": [],
+      "requires": [
+        "ntfy",
+        "auth",
+        "conf",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -95,6 +162,19 @@
           },
           {
             "condition": {
+              "operation": "create_channel",
+              "provider_ref_present": false
+            },
+            "description": "Output channels require provider reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "channel_provider_required",
+              "required_action": "attach_channel_provider"
+            },
+            "name": "channel_requires_provider"
+          },
+          {
+            "condition": {
               "operation": "publish_template",
               "template_approved": false
             },
@@ -105,6 +185,85 @@
               "required_action": "approve_template"
             },
             "name": "template_requires_approval"
+          },
+          {
+            "condition": {
+              "operation": "publish_template",
+              "template_approved": true,
+              "template_approver_present": false
+            },
+            "description": "Approved output templates require approver identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_approver_required",
+              "required_action": "attach_template_approver"
+            },
+            "name": "template_requires_approver"
+          },
+          {
+            "condition": {
+              "operation": "publish_template",
+              "template_content_present": false
+            },
+            "description": "Output templates require subject or body content.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_content_required",
+              "required_action": "add_template_content"
+            },
+            "name": "template_requires_content"
+          },
+          {
+            "condition": {
+              "operation": "publish_template",
+              "template_channel_present": false
+            },
+            "description": "Output templates require at least one channel type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "template_channel_required",
+              "required_action": "attach_template_channel"
+            },
+            "name": "template_requires_channel"
+          },
+          {
+            "condition": {
+              "operation": "create_delivery_policy",
+              "recipient_limit_valid": false
+            },
+            "description": "Delivery policies require recipient limits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_policy_required",
+              "required_action": "set_recipient_limit"
+            },
+            "name": "policy_requires_recipient_limit"
+          },
+          {
+            "condition": {
+              "operation": "create_delivery_policy",
+              "throttle_policy_valid": false
+            },
+            "description": "Delivery policies require throttling.",
+            "effect": {
+              "decision": "deny",
+              "reason": "throttle_policy_required",
+              "required_action": "set_delivery_throttle"
+            },
+            "name": "policy_requires_throttle"
+          },
+          {
+            "condition": {
+              "compliance_ref_present": false,
+              "operation": "create_delivery_policy"
+            },
+            "description": "Delivery policies require compliance reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "compliance_policy_required",
+              "required_action": "attach_compliance_policy"
+            },
+            "name": "policy_requires_compliance_ref"
           },
           {
             "condition": {
@@ -121,6 +280,19 @@
           },
           {
             "condition": {
+              "operation": "render_output",
+              "recipient_ref_present": false
+            },
+            "description": "Rendered output requires a recipient reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_policy_required",
+              "required_action": "attach_recipient"
+            },
+            "name": "render_requires_recipient"
+          },
+          {
+            "condition": {
               "channel_health": "unhealthy",
               "delivery_requested": true
             },
@@ -134,6 +306,58 @@
           },
           {
             "condition": {
+              "delivery_actor_present": false,
+              "operation": "deliver_batch"
+            },
+            "description": "Delivery batches require requester identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "delivery_actor_required",
+              "required_action": "attach_delivery_actor"
+            },
+            "name": "delivery_requires_actor"
+          },
+          {
+            "condition": {
+              "operation": "deliver_batch",
+              "rendered_output_present": false
+            },
+            "description": "Delivery batches require rendered outputs.",
+            "effect": {
+              "decision": "deny",
+              "reason": "rendered_output_required",
+              "required_action": "attach_rendered_outputs"
+            },
+            "name": "delivery_requires_rendered_output"
+          },
+          {
+            "condition": {
+              "operation": "deliver_batch",
+              "recipient_count_lte": 0
+            },
+            "description": "Delivery batches require positive recipient count.",
+            "effect": {
+              "decision": "deny",
+              "reason": "recipient_policy_required",
+              "required_action": "set_recipient_count"
+            },
+            "name": "delivery_requires_positive_recipients"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "deliver_batch"
+            },
+            "description": "Delivery lifecycle events require Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "delivery_requires_bytewax_stream"
+          },
+          {
+            "condition": {
               "delivery_review_recorded": false,
               "recipient_count_gt": 10000
             },
@@ -144,6 +368,110 @@
               "required_action": "review_delivery"
             },
             "name": "large_delivery_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "record_receipt",
+              "provider_message_present": false
+            },
+            "description": "Delivery receipts require provider message reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "provider_message_required",
+              "required_action": "attach_provider_message"
+            },
+            "name": "receipt_requires_provider_message"
+          },
+          {
+            "condition": {
+              "agent_registered": false,
+              "mchn_agent_present": true
+            },
+            "description": "AI output agents must be registered.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mchn_agent_registration_required",
+              "required_action": "register_mchn_agent"
+            },
+            "name": "mchn_agent_requires_registration"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "mchn_agent_present": true
+            },
+            "description": "AI output agents must use a supported runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mchn_agent_runtime_not_supported",
+              "required_action": "choose_supported_mchn_agent_runtime"
+            },
+            "name": "mchn_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "mchn_agent_present": true
+            },
+            "description": "AI output agents must use a supported role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mchn_agent_role_not_supported",
+              "required_action": "choose_supported_mchn_agent_role"
+            },
+            "name": "mchn_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "mchn_agent_present": true
+            },
+            "description": "AI output agents require explicit scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mchn_agent_scope_required",
+              "required_action": "set_mchn_agent_scope"
+            },
+            "name": "mchn_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "mchn_agent_present": true
+            },
+            "description": "AI output-agent contributions require disclosure.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mchn_agent_disclosure_required",
+              "required_action": "disclose_mchn_agent"
+            },
+            "name": "mchn_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "audit_event_recorded": false,
+              "state_change_requested": true
+            },
+            "description": "Output lifecycle state changes require audit evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "mchn_audit_event_required",
+              "required_action": "record_mchn_audit_event"
+            },
+            "name": "mchn_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "requested_operation": "batch_output_mutation"
+            },
+            "description": "Batch output mutations must use Bytewax event streams.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "use_bytewax_event_stream"
+            },
+            "name": "batch_output_mutation_requires_bytewax"
           }
         ],
         "type": "deterministic"
@@ -176,6 +504,19 @@
         },
         {
           "condition": {
+            "operation": "create_channel",
+            "provider_ref_present": false
+          },
+          "description": "Output channels require provider reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "channel_provider_required",
+            "required_action": "attach_channel_provider"
+          },
+          "name": "channel_requires_provider"
+        },
+        {
+          "condition": {
             "operation": "publish_template",
             "template_approved": false
           },
@@ -186,6 +527,85 @@
             "required_action": "approve_template"
           },
           "name": "template_requires_approval"
+        },
+        {
+          "condition": {
+            "operation": "publish_template",
+            "template_approved": true,
+            "template_approver_present": false
+          },
+          "description": "Approved output templates require approver identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_approver_required",
+            "required_action": "attach_template_approver"
+          },
+          "name": "template_requires_approver"
+        },
+        {
+          "condition": {
+            "operation": "publish_template",
+            "template_content_present": false
+          },
+          "description": "Output templates require subject or body content.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_content_required",
+            "required_action": "add_template_content"
+          },
+          "name": "template_requires_content"
+        },
+        {
+          "condition": {
+            "operation": "publish_template",
+            "template_channel_present": false
+          },
+          "description": "Output templates require at least one channel type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "template_channel_required",
+            "required_action": "attach_template_channel"
+          },
+          "name": "template_requires_channel"
+        },
+        {
+          "condition": {
+            "operation": "create_delivery_policy",
+            "recipient_limit_valid": false
+          },
+          "description": "Delivery policies require recipient limits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_policy_required",
+            "required_action": "set_recipient_limit"
+          },
+          "name": "policy_requires_recipient_limit"
+        },
+        {
+          "condition": {
+            "operation": "create_delivery_policy",
+            "throttle_policy_valid": false
+          },
+          "description": "Delivery policies require throttling.",
+          "effect": {
+            "decision": "deny",
+            "reason": "throttle_policy_required",
+            "required_action": "set_delivery_throttle"
+          },
+          "name": "policy_requires_throttle"
+        },
+        {
+          "condition": {
+            "compliance_ref_present": false,
+            "operation": "create_delivery_policy"
+          },
+          "description": "Delivery policies require compliance reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "compliance_policy_required",
+            "required_action": "attach_compliance_policy"
+          },
+          "name": "policy_requires_compliance_ref"
         },
         {
           "condition": {
@@ -202,6 +622,19 @@
         },
         {
           "condition": {
+            "operation": "render_output",
+            "recipient_ref_present": false
+          },
+          "description": "Rendered output requires a recipient reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_policy_required",
+            "required_action": "attach_recipient"
+          },
+          "name": "render_requires_recipient"
+        },
+        {
+          "condition": {
             "channel_health": "unhealthy",
             "delivery_requested": true
           },
@@ -215,6 +648,58 @@
         },
         {
           "condition": {
+            "delivery_actor_present": false,
+            "operation": "deliver_batch"
+          },
+          "description": "Delivery batches require requester identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "delivery_actor_required",
+            "required_action": "attach_delivery_actor"
+          },
+          "name": "delivery_requires_actor"
+        },
+        {
+          "condition": {
+            "operation": "deliver_batch",
+            "rendered_output_present": false
+          },
+          "description": "Delivery batches require rendered outputs.",
+          "effect": {
+            "decision": "deny",
+            "reason": "rendered_output_required",
+            "required_action": "attach_rendered_outputs"
+          },
+          "name": "delivery_requires_rendered_output"
+        },
+        {
+          "condition": {
+            "operation": "deliver_batch",
+            "recipient_count_lte": 0
+          },
+          "description": "Delivery batches require positive recipient count.",
+          "effect": {
+            "decision": "deny",
+            "reason": "recipient_policy_required",
+            "required_action": "set_recipient_count"
+          },
+          "name": "delivery_requires_positive_recipients"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "deliver_batch"
+          },
+          "description": "Delivery lifecycle events require Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "delivery_requires_bytewax_stream"
+        },
+        {
+          "condition": {
             "delivery_review_recorded": false,
             "recipient_count_gt": 10000
           },
@@ -225,6 +710,110 @@
             "required_action": "review_delivery"
           },
           "name": "large_delivery_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "record_receipt",
+            "provider_message_present": false
+          },
+          "description": "Delivery receipts require provider message reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "provider_message_required",
+            "required_action": "attach_provider_message"
+          },
+          "name": "receipt_requires_provider_message"
+        },
+        {
+          "condition": {
+            "agent_registered": false,
+            "mchn_agent_present": true
+          },
+          "description": "AI output agents must be registered.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mchn_agent_registration_required",
+            "required_action": "register_mchn_agent"
+          },
+          "name": "mchn_agent_requires_registration"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "mchn_agent_present": true
+          },
+          "description": "AI output agents must use a supported runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mchn_agent_runtime_not_supported",
+            "required_action": "choose_supported_mchn_agent_runtime"
+          },
+          "name": "mchn_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "mchn_agent_present": true
+          },
+          "description": "AI output agents must use a supported role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mchn_agent_role_not_supported",
+            "required_action": "choose_supported_mchn_agent_role"
+          },
+          "name": "mchn_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "mchn_agent_present": true
+          },
+          "description": "AI output agents require explicit scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mchn_agent_scope_required",
+            "required_action": "set_mchn_agent_scope"
+          },
+          "name": "mchn_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "mchn_agent_present": true
+          },
+          "description": "AI output-agent contributions require disclosure.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mchn_agent_disclosure_required",
+            "required_action": "disclose_mchn_agent"
+          },
+          "name": "mchn_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "audit_event_recorded": false,
+            "state_change_requested": true
+          },
+          "description": "Output lifecycle state changes require audit evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "mchn_audit_event_required",
+            "required_action": "record_mchn_audit_event"
+          },
+          "name": "mchn_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "requested_operation": "batch_output_mutation"
+          },
+          "description": "Batch output mutations must use Bytewax event streams.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "use_bytewax_event_stream"
+          },
+          "name": "batch_output_mutation_requires_bytewax"
         }
       ],
       "runtime": {
@@ -234,10 +823,20 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "MCHNAgentPanel",
+          "permission": "mchn:admin",
+          "route": "/mchn/agents"
+        },
         "analytics": {
           "component": "OutputAnalytics",
           "permission": "mchn:view",
           "route": "/mchn/analytics"
+        },
+        "audit": {
+          "component": "OutputAuditTrail",
+          "permission": "mchn:admin",
+          "route": "/mchn/audit"
         },
         "channels": {
           "component": "ChannelMonitor",
@@ -275,9 +874,42 @@
           "route": "/mchn/templates"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "batch_mutation_guardrail": "batch_output_mutation_requires_bytewax",
+        "events": [
+          "mchn_channel_created",
+          "mchn_template_published",
+          "mchn_policy_created",
+          "mchn_route_created",
+          "mchn_output_rendered",
+          "mchn_delivery_queued",
+          "mchn_receipt_recorded",
+          "mchn_agent_registered"
+        ],
+        "processor": "bytewax",
+        "state": [
+          "channels",
+          "templates",
+          "policies",
+          "routes",
+          "rendered_outputs",
+          "batches",
+          "receipts",
+          "mchn_agents",
+          "audit_events"
+        ],
+        "topic": "apg.mchn.lifecycle"
+      },
       "theme": {
         "components": {
+          "agent_panel": {
+            "status_style": "scope-chip",
+            "visual": "agent-roster"
+          },
+          "audit_timeline": {
+            "status_style": "output-chip",
+            "visual": "event-timeline"
+          },
           "channel_monitor": {
             "status_style": "health-chip",
             "visual": "channel-health-table"
@@ -351,6 +983,13 @@
             "permission": "mchn:admin"
           },
           {
+            "component": "MCHNAgentPanel",
+            "name": "agents",
+            "nav_group": "Operations",
+            "path": "/mchn/agents",
+            "permission": "mchn:admin"
+          },
+          {
             "component": "OutputAnalytics",
             "name": "analytics",
             "nav_group": "Operations",
@@ -362,6 +1001,13 @@
             "name": "policies",
             "nav_group": "Governance",
             "path": "/mchn/policies",
+            "permission": "mchn:admin"
+          },
+          {
+            "component": "OutputAuditTrail",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/mchn/audit",
             "permission": "mchn:admin"
           },
           {
@@ -385,12 +1031,31 @@
     "agent_teams": {},
     "applications": {},
     "capability_dependencies": {
-      "mchn": []
+      "mchn": [
+        "ntfy",
+        "auth",
+        "conf",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "mchn": {
       "configuration": {
+        "adapters": {
+          "api_helpers": "api.py",
+          "audit_sink": "audl",
+          "configuration": "conf",
+          "content_policy": "comp",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MchnService",
+          "identity": "auth",
+          "localization": "i18n",
+          "notification": "ntfy",
+          "theme": "them",
+          "view_models": "views.py",
+          "workflow": "wflo"
+        },
         "channels": {
           "channel_owner_required": true,
           "enabled": [
@@ -403,24 +1068,63 @@
             "print"
           ],
           "fallback_required": true,
-          "health_required": true
+          "health_required": true,
+          "provider_required": true
         },
         "delivery": {
+          "delivery_actor_required": true,
           "delivery_receipts_enabled": true,
+          "event_stream": "bytewax",
           "recipient_policy_required": true,
+          "rendered_output_required": true,
           "sensitive_output_encryption_required": true,
           "throttle_policy_required": true
         },
         "governance": {
           "audit_output_events": true,
+          "batch_event_stream": "bytewax",
           "compliance_policy_required": true,
           "require_tenant_context": true,
-          "restricted_content_filtering": true
+          "restricted_content_filtering": true,
+          "state_change_audit_required": true,
+          "tenant_isolation_required": true
+        },
+        "mchn_agents": {
+          "agent_assist_enabled": true,
+          "agent_contribution_disclosure_required": true,
+          "agent_registration_required": true,
+          "agent_role_required": true,
+          "agent_runtime_required": true,
+          "agent_scope_required": true,
+          "allowed_roles": [
+            "route_reviewer",
+            "template_reviewer",
+            "delivery_reviewer",
+            "channel_operator",
+            "compliance_reviewer",
+            "accessibility_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "observability": {
+          "agent_activity_required": true,
+          "audit_required": true,
+          "channel_metrics_required": true,
+          "delivery_metrics_required": true,
+          "event_stream": "bytewax",
+          "render_metrics_required": true
         },
         "rendering": {
           "format_validation_required": true,
           "localization_supported": true,
           "template_approval_required": true,
+          "template_channel_required": true,
+          "template_content_required": true,
           "theme_policy_required": true
         },
         "tenant_id": "default",
@@ -429,17 +1133,31 @@
           "default_theme": "mchn_omnichannel_output"
         },
         "ui": {
+          "enable_agent_panel": true,
+          "enable_audit": true,
           "enable_channel_monitor": true,
           "enable_output_dashboard": true,
+          "enable_policies": true,
           "enable_route_console": true,
           "enable_template_manager": true
         }
       },
       "id": "mchn",
       "provides": [
-        "mchn_operations"
+        "channel_routing",
+        "format_rendering",
+        "output_templates",
+        "delivery_policy",
+        "delivery_receipts",
+        "omnichannel_analytics",
+        "mchn_agents"
       ],
-      "requires": []
+      "requires": [
+        "ntfy",
+        "auth",
+        "conf",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -451,7 +1169,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 4,
       "kind": "capability",
       "nodes": 1
     },
@@ -472,6 +1190,19 @@
   },
   "roles": {},
   "rules": {
+    "batch_output_mutation_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "requested_operation": "batch_output_mutation"
+      },
+      "description": "Batch output mutations must use Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "batch_output_mutation_requires_bytewax"
+    },
     "channel_requires_owner": {
       "condition": {
         "channel_owner_assigned": false,
@@ -485,6 +1216,71 @@
       },
       "name": "channel_requires_owner"
     },
+    "channel_requires_provider": {
+      "condition": {
+        "operation": "create_channel",
+        "provider_ref_present": false
+      },
+      "description": "Output channels require provider reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "channel_provider_required",
+        "required_action": "attach_channel_provider"
+      },
+      "name": "channel_requires_provider"
+    },
+    "delivery_requires_actor": {
+      "condition": {
+        "delivery_actor_present": false,
+        "operation": "deliver_batch"
+      },
+      "description": "Delivery batches require requester identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "delivery_actor_required",
+        "required_action": "attach_delivery_actor"
+      },
+      "name": "delivery_requires_actor"
+    },
+    "delivery_requires_bytewax_stream": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "deliver_batch"
+      },
+      "description": "Delivery lifecycle events require Bytewax event streams.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "use_bytewax_event_stream"
+      },
+      "name": "delivery_requires_bytewax_stream"
+    },
+    "delivery_requires_positive_recipients": {
+      "condition": {
+        "operation": "deliver_batch",
+        "recipient_count_lte": 0
+      },
+      "description": "Delivery batches require positive recipient count.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recipient_policy_required",
+        "required_action": "set_recipient_count"
+      },
+      "name": "delivery_requires_positive_recipients"
+    },
+    "delivery_requires_rendered_output": {
+      "condition": {
+        "operation": "deliver_batch",
+        "rendered_output_present": false
+      },
+      "description": "Delivery batches require rendered outputs.",
+      "effect": {
+        "decision": "deny",
+        "reason": "rendered_output_required",
+        "required_action": "attach_rendered_outputs"
+      },
+      "name": "delivery_requires_rendered_output"
+    },
     "large_delivery_requires_review": {
       "condition": {
         "delivery_review_recorded": false,
@@ -497,6 +1293,149 @@
         "required_action": "review_delivery"
       },
       "name": "large_delivery_requires_review"
+    },
+    "mchn_agent_requires_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "mchn_agent_present": true
+      },
+      "description": "AI output-agent contributions require disclosure.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mchn_agent_disclosure_required",
+        "required_action": "disclose_mchn_agent"
+      },
+      "name": "mchn_agent_requires_disclosure"
+    },
+    "mchn_agent_requires_registration": {
+      "condition": {
+        "agent_registered": false,
+        "mchn_agent_present": true
+      },
+      "description": "AI output agents must be registered.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mchn_agent_registration_required",
+        "required_action": "register_mchn_agent"
+      },
+      "name": "mchn_agent_requires_registration"
+    },
+    "mchn_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "mchn_agent_present": true
+      },
+      "description": "AI output agents require explicit scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mchn_agent_scope_required",
+        "required_action": "set_mchn_agent_scope"
+      },
+      "name": "mchn_agent_requires_scope"
+    },
+    "mchn_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "mchn_agent_present": true
+      },
+      "description": "AI output agents must use a supported role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mchn_agent_role_not_supported",
+        "required_action": "choose_supported_mchn_agent_role"
+      },
+      "name": "mchn_agent_role_supported"
+    },
+    "mchn_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "mchn_agent_present": true
+      },
+      "description": "AI output agents must use a supported runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mchn_agent_runtime_not_supported",
+        "required_action": "choose_supported_mchn_agent_runtime"
+      },
+      "name": "mchn_agent_runtime_supported"
+    },
+    "mchn_state_change_requires_audit": {
+      "condition": {
+        "audit_event_recorded": false,
+        "state_change_requested": true
+      },
+      "description": "Output lifecycle state changes require audit evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "mchn_audit_event_required",
+        "required_action": "record_mchn_audit_event"
+      },
+      "name": "mchn_state_change_requires_audit"
+    },
+    "policy_requires_compliance_ref": {
+      "condition": {
+        "compliance_ref_present": false,
+        "operation": "create_delivery_policy"
+      },
+      "description": "Delivery policies require compliance reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "compliance_policy_required",
+        "required_action": "attach_compliance_policy"
+      },
+      "name": "policy_requires_compliance_ref"
+    },
+    "policy_requires_recipient_limit": {
+      "condition": {
+        "operation": "create_delivery_policy",
+        "recipient_limit_valid": false
+      },
+      "description": "Delivery policies require recipient limits.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recipient_policy_required",
+        "required_action": "set_recipient_limit"
+      },
+      "name": "policy_requires_recipient_limit"
+    },
+    "policy_requires_throttle": {
+      "condition": {
+        "operation": "create_delivery_policy",
+        "throttle_policy_valid": false
+      },
+      "description": "Delivery policies require throttling.",
+      "effect": {
+        "decision": "deny",
+        "reason": "throttle_policy_required",
+        "required_action": "set_delivery_throttle"
+      },
+      "name": "policy_requires_throttle"
+    },
+    "receipt_requires_provider_message": {
+      "condition": {
+        "operation": "record_receipt",
+        "provider_message_present": false
+      },
+      "description": "Delivery receipts require provider message reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "provider_message_required",
+        "required_action": "attach_provider_message"
+      },
+      "name": "receipt_requires_provider_message"
+    },
+    "render_requires_recipient": {
+      "condition": {
+        "operation": "render_output",
+        "recipient_ref_present": false
+      },
+      "description": "Rendered output requires a recipient reference.",
+      "effect": {
+        "decision": "deny",
+        "reason": "recipient_policy_required",
+        "required_action": "attach_recipient"
+      },
+      "name": "render_requires_recipient"
     },
     "sensitive_output_requires_encryption": {
       "condition": {
@@ -523,6 +1462,46 @@
         "required_action": "approve_template"
       },
       "name": "template_requires_approval"
+    },
+    "template_requires_approver": {
+      "condition": {
+        "operation": "publish_template",
+        "template_approved": true,
+        "template_approver_present": false
+      },
+      "description": "Approved output templates require approver identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_approver_required",
+        "required_action": "attach_template_approver"
+      },
+      "name": "template_requires_approver"
+    },
+    "template_requires_channel": {
+      "condition": {
+        "operation": "publish_template",
+        "template_channel_present": false
+      },
+      "description": "Output templates require at least one channel type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_channel_required",
+        "required_action": "attach_template_channel"
+      },
+      "name": "template_requires_channel"
+    },
+    "template_requires_content": {
+      "condition": {
+        "operation": "publish_template",
+        "template_content_present": false
+      },
+      "description": "Output templates require subject or body content.",
+      "effect": {
+        "decision": "deny",
+        "reason": "template_content_required",
+        "required_action": "add_template_content"
+      },
+      "name": "template_requires_content"
     },
     "tenant_context_required": {
       "condition": {
