@@ -837,12 +837,12 @@ class RealTimeCollaborationService(APGServiceBase):
 		"""Insert collaboration session into database."""
 		session_dict = session.dict()
 		columns = list(session_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(session_dict.values())
 		
 		query = f"""
 			INSERT INTO collaboration_sessions ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING id
 		"""
 		

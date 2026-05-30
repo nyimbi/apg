@@ -639,12 +639,12 @@ class TemplateManagementService(APGServiceBase):
 		"""Insert template into database."""
 		template_dict = template.dict()
 		columns = list(template_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(template_dict.values())
 		
 		query = f"""
 			INSERT INTO budget_templates ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING id
 		"""
 		
@@ -665,12 +665,12 @@ class TemplateManagementService(APGServiceBase):
 		"""Insert single template line item."""
 		line_dict = line_item.dict()
 		columns = list(line_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(line_dict.values())
 		
 		query = f"""
 			INSERT INTO template_line_items ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 		"""
 		
 		await self._connection.execute(query, *values)

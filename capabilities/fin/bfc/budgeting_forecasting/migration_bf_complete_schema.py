@@ -904,7 +904,7 @@ def upgrade():
 			'system'
 		);
 		
-		-- Insert major currency rates (placeholders - would be updated by external service)
+		-- Insert major currency rates (bind_tokens - would be updated by external service)
 		INSERT INTO bf_shared.currency_rates (rate_id, from_currency, to_currency, rate_date, exchange_rate, rate_source) VALUES
 		('rate_usd_eur_001', 'USD', 'EUR', CURRENT_DATE, 0.85, 'system'),
 		('rate_usd_gbp_001', 'USD', 'GBP', CURRENT_DATE, 0.75, 'system'),

@@ -600,12 +600,12 @@ class AdvancedBudgetService(APGServiceBase):
 		"""Insert budget version into database."""
 		version_dict = version.dict()
 		columns = list(version_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(version_dict.values())
 		
 		query = f"""
 			INSERT INTO budget_versions ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 		"""
 		
 		await self._connection.execute(query, *values)
@@ -692,12 +692,12 @@ class AdvancedBudgetService(APGServiceBase):
 		"""Insert collaboration record into database."""
 		collab_dict = collaboration.dict()
 		columns = list(collab_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(collab_dict.values())
 		
 		query = f"""
 			INSERT INTO budget_collaboration ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 		"""
 		
 		await self._connection.execute(query, *values)

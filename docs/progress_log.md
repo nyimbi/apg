@@ -16,6 +16,107 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-30 23:40 EAT
+
+FIN BFC budgeting and forecasting lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md` for the
+  `bfc_budgeting_forecasting` capability, and replaced `cap_spec.md` with the
+  active package summary.
+- Replaced stale BFC API, implementation, migration, integration, architecture,
+  and task-planning notes with current package documentation for budgeting,
+  budget lines, approvals, forecasts, scenarios, variances, collaboration,
+  BFC-agent, UI, theme, adapter, and Bytewax lifecycle behavior.
+- Replaced the spec-factory contract with explicit budget, budget-line,
+  approval, forecast, forecast-point, scenario, variance, collaboration,
+  BFC-agent, governance, observability, adapter, UI, theme, provides/requires,
+  and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  budget owner/fiscal-year/currency/period evidence, budget-line budget/account
+  and line-type/amount controls, submission line count, approval state and
+  separation of duties, high-value review, forecast method/horizon/confidence,
+  forecast-point forecast and period evidence, scenario name/probability/
+  drivers, variance budget/actual/material review, collaboration budget/
+  participants, BFC batch/event Bytewax streams, BFC-agent runtime/role, and
+  privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light BFC lifecycle helpers for budgets, budget lines,
+  submissions, approvals, forecasts, forecast points, scenarios, variances,
+  collaboration sessions, BFC-agent registration, batch validation, dashboard
+  summaries, forecast summaries, variance summaries, audit events, API helpers,
+  and screen models.
+- Preserved `BFCService` as a compatibility alias while keeping optional web,
+  database, and provider imports out of the top-level APG surface.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  `release_report.json`) from the expanded contract.
+- Renamed and expanded focused tests for contract, rule, service, API/view,
+  app, semantic, agent, Bytewax, budget, forecast, scenario, variance,
+  collaboration, and guardrail behavior.
+- Narrowed `tests/conftest.py` so focused package tests do not require
+  optional HTTP-provider test tooling.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fin/bfc/budgeting_forecasting/__init__.py
+  capabilities/fin/bfc/budgeting_forecasting/capability_contract.py
+  capabilities/fin/bfc/budgeting_forecasting/service.py
+  capabilities/fin/bfc/budgeting_forecasting/api.py
+  capabilities/fin/bfc/budgeting_forecasting/views.py
+  capabilities/fin/bfc/budgeting_forecasting/app.py
+  capabilities/fin/bfc/budgeting_forecasting/tests/test_package_contract.py
+  capabilities/fin/bfc/budgeting_forecasting/tests/conftest.py` passed.
+- Syntax-only compile for edited legacy helper modules
+  (`ai_budget_recommendations.py`, `approval_workflows.py`,
+  `budget_management.py`, `custom_report_builder.py`,
+  `migration_bf_complete_schema.py`, `multitenant_operations.py`,
+  `realtime_collaboration.py`, `template_system.py`, and
+  `version_control_audit.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/fin/bfc/budgeting_forecasting/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fin/bfc/budgeting_forecasting/app.py`
+  passed package self-test.
+- `./.venv/bin/apg capabilities inspect bfc_budgeting_forecasting --json`
+  confirmed `ok: true`, 10 routes, 35 rules, and
+  `bfc_budgeting_forecasting_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fin/bfc/budgeting_forecasting --json` confirmed
+  side-effect-free publish planning with Bytewax stream metadata and no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fin/bfc/budgeting_forecasting --json` passed with
+  `domain_specific` implementation level and 0 baseline markers.
+- `jq '.capabilities.bfc_budgeting_forecasting.streaming.processor,
+  .capabilities.bfc_budgeting_forecasting.provides,
+  .capabilities.bfc_budgeting_forecasting.requires,
+  .capabilities.bfc_budgeting_forecasting.screens.agents.route,
+  (.capabilities.bfc_budgeting_forecasting.rules[] |
+  select(.name=="bfc_agent_runtime_supported") | .effect.reason),
+  (.capabilities.bfc_budgeting_forecasting.rules[] |
+  select(.name=="bfc_batch_requires_bytewax") | .effect.reason),
+  (.capabilities.bfc_budgeting_forecasting.rules[] |
+  select(.name=="variance_above_threshold_requires_review") |
+  .effect.reason)' capabilities/fin/bfc/budgeting_forecasting/
+  semantic_model.json` confirmed `bytewax`, BFC-agent provides, required
+  services, `/bfc-budgeting-forecasting/agents`,
+  `bfc_agent_runtime_not_supported`, `bytewax_event_stream_required`, and
+  `variance_review_required`.
+- `./.venv/bin/python -c "from capabilities.fin.bfc.budgeting_forecasting
+  import BudgetingForecastingService; service=BudgetingForecastingService();
+  budget=service.create_budget('budget','tenant-proof','Budget','owner',
+  2026,'USD','2026-01-01','2026-12-31');
+  service.add_budget_line('line','tenant-proof',budget['id'],'4000',
+  'revenue',1000,'2026'); service.register_bfc_agent('tenant-proof',
+  'Proof agent','codex','forecast_reviewer','review forecasts');
+  print(service.dashboard_summary('tenant-proof'))"` passed and confirmed
+  BFC-agent registration, audit event emission, and Bytewax stream metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- `git diff --check -- capabilities/fin/bfc/budgeting_forecasting
+  docs/progress_log.md` passed.
+- Not run: durable planning stores, live GL/AP/AR/cash/BI/audit/notification/
+  auth adapters, durable Bytewax topology, rendered browser UI, BFC
+  performance/failover checks, and full repository tests.
+
 ### 2026-05-30 23:28 EAT
 
 FIN APY accounts payable lifecycle/guardrail packet:

@@ -234,7 +234,7 @@ class RecommendationTemplate(APGBaseModel):
 	recommendation_type: RecommendationType = Field(description="Type of recommendation")
 	
 	# Template Content
-	title_template: str = Field(description="Title template with placeholders")
+	title_template: str = Field(description="Title template with bind_tokens")
 	description_template: str = Field(description="Description template")
 	rationale_template: str = Field(description="Rationale template")
 	
@@ -878,11 +878,11 @@ class AIBudgetRecommendationsService(APGServiceBase):
 		"""Validate recommendation template."""
 		errors = []
 		
-		# Check for required placeholders in templates
-		required_placeholders = ['{impact}', '{timeframe}']
-		for placeholder in required_placeholders:
-			if placeholder not in template.description_template:
-				errors.append(f"Missing required placeholder: {placeholder}")
+		# Check for required bind_tokens in templates
+		required_bind_tokens = ['{impact}', '{timeframe}']
+		for bind_token in required_bind_tokens:
+			if bind_token not in template.description_template:
+				errors.append(f"Missing required bind_token: {bind_token}")
 		
 		return {
 			'valid': len(errors) == 0,

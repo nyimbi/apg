@@ -1,60 +1,166 @@
 {
   "agents": {},
   "app": {
-    "description": "Core Financials: Budgeting & Forecasting package-backed APG capability",
-    "entity_count": 0,
+    "description": "Budgeting and forecasting package-backed APG capability",
+    "entity_count": 8,
     "name": "bfc_budgeting_forecasting",
-    "version": "1.0.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "bfc_budgeting_forecasting": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Bfc",
-          "enabled": true,
-          "id": "bfc_budgeting_forecasting",
-          "name": "Core Financials: Budgeting & Forecasting",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/bfc/budgeting_forecasting/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "accounts_payable": "adapter",
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "approvals": {
+          "approval_record_required": true,
+          "separation_of_duties_required": true,
+          "submission_required": true
+        },
+        "bfc_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "budget_planning_reviewer",
+            "forecast_reviewer",
+            "variance_reviewer",
+            "scenario_reviewer",
+            "approval_reviewer",
+            "cash_flow_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "budget_lines": {
+          "account_required": true,
+          "line_type_required": true,
+          "positive_amount_required": true,
+          "supported_line_types": [
+            "revenue",
+            "expense",
+            "capital",
+            "headcount"
+          ]
+        },
+        "budgets": {
+          "currency_required": true,
+          "fiscal_year_required": true,
+          "high_value_review_threshold": 1000000,
+          "line_required_for_submission": true,
+          "owner_required": true,
+          "period_dates_required": true
+        },
+        "collaboration": {
+          "enabled": true,
+          "participant_required": true,
+          "session_audit_required": true
+        },
+        "forecasts": {
+          "base_budget_optional": true,
+          "confidence_bounds": [
+            0,
+            100
+          ],
+          "max_horizon_months": 60,
+          "supported_methods": [
+            "trend",
+            "driver",
+            "statistical",
+            "manual"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_budget_events": true,
+          "emit_collaboration_events": true,
+          "emit_forecast_events": true,
+          "emit_scenario_events": true,
+          "emit_variance_events": true,
+          "event_stream": "apg.fin.bfc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "scenarios": {
+          "driver_required": true,
+          "minimum_driver_count": 1,
+          "probability_bounds": [
+            0,
+            100
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "bfc_budgeting_forecasting_operations"
+          "default_theme": "bfc_budgeting_forecasting_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_approvals": true,
+          "enable_budget_lines": true,
+          "enable_budgets": true,
+          "enable_collaboration": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_forecasts": true,
+          "enable_scenarios": true,
+          "enable_settings": true,
+          "enable_variances": true
+        },
+        "variances": {
+          "actual_required": true,
+          "budget_required": true,
+          "review_required_above_threshold": true,
+          "review_threshold_percent": 10
         }
       },
-      "erp_modules": [
-        "fin"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Core Financials: Budgeting & Forecasting",
+      "name": "Budgeting and Forecasting",
       "provides": [
-        "bfc_budgeting_forecasting_operations"
+        "budget_planning_lifecycle",
+        "budget_line_management",
+        "budget_approval_workflow",
+        "forecast_lifecycle",
+        "scenario_planning",
+        "variance_analysis_lifecycle",
+        "planning_collaboration",
+        "bfc_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "cash_management",
+        "business_intelligence"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Core Financials: Budgeting & Forecasting operations require tenant context.",
+            "description": "BFC operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +173,445 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Core Financials: Budgeting & Forecasting write operations require policy enforcement.",
+            "description": "BFC writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "bfc_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "budget_owner_assigned": false,
+              "operation": "create_budget"
             },
-            "description": "High-risk Core Financials: Budgeting & Forecasting operations require review.",
+            "description": "Budgets require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_owner_required",
+              "required_action": "assign_budget_owner"
+            },
+            "name": "budget_requires_owner"
+          },
+          {
+            "condition": {
+              "fiscal_year_present": false,
+              "operation": "create_budget"
+            },
+            "description": "Budgets require a fiscal year.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_fiscal_year_required",
+              "required_action": "set_fiscal_year"
+            },
+            "name": "budget_requires_fiscal_year"
+          },
+          {
+            "condition": {
+              "currency_present": false,
+              "operation": "create_budget"
+            },
+            "description": "Budgets require currency.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_currency_required",
+              "required_action": "set_currency"
+            },
+            "name": "budget_requires_currency"
+          },
+          {
+            "condition": {
+              "operation": "create_budget",
+              "period_dates_present": false
+            },
+            "description": "Budgets require start and end dates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_period_dates_required",
+              "required_action": "set_period_dates"
+            },
+            "name": "budget_requires_period_dates"
+          },
+          {
+            "condition": {
+              "operation": "create_budget",
+              "period_range_valid": false
+            },
+            "description": "Budget period end must be after start.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_period_range_invalid",
+              "required_action": "set_valid_period_range"
+            },
+            "name": "budget_period_end_after_start"
+          },
+          {
+            "condition": {
+              "budget_present": false,
+              "operation": "add_budget_line"
+            },
+            "description": "Budget lines require a budget.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_line_budget_required",
+              "required_action": "attach_budget"
+            },
+            "name": "budget_line_requires_budget"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "add_budget_line"
+            },
+            "description": "Budget lines require an account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_line_account_required",
+              "required_action": "attach_account"
+            },
+            "name": "budget_line_requires_account"
+          },
+          {
+            "condition": {
+              "line_type_supported": false,
+              "operation": "add_budget_line"
+            },
+            "description": "Budget line type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_line_type_not_supported",
+              "required_action": "select_supported_line_type"
+            },
+            "name": "budget_line_type_supported"
+          },
+          {
+            "condition": {
+              "line_amount_lte": 0,
+              "operation": "add_budget_line"
+            },
+            "description": "Budget line amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_line_amount_must_be_positive",
+              "required_action": "set_positive_line_amount"
+            },
+            "name": "budget_line_amount_positive"
+          },
+          {
+            "condition": {
+              "line_count_lte": 0,
+              "operation": "submit_budget"
+            },
+            "description": "Budget submission requires at least one line.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_lines_required_for_submission",
+              "required_action": "add_budget_lines"
+            },
+            "name": "budget_submission_requires_lines"
+          },
+          {
+            "condition": {
+              "budget_submitted": false,
+              "operation": "approve_budget"
+            },
+            "description": "Approvals require submitted budget state.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_submission_required",
+              "required_action": "submit_budget"
+            },
+            "name": "budget_approval_requires_submitted_budget"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "approve_budget"
+            },
+            "description": "Budget approval requires approval evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "budget_approval_record_required",
+              "required_action": "record_approval"
+            },
+            "name": "budget_approval_requires_record"
+          },
+          {
+            "condition": {
+              "operation": "approve_budget",
+              "separation_of_duties_passed": false
+            },
+            "description": "Budget submitter cannot self-approve.",
+            "effect": {
+              "decision": "deny",
+              "reason": "separation_of_duties_required",
+              "required_action": "select_independent_approver"
+            },
+            "name": "budget_approval_requires_separation"
+          },
+          {
+            "condition": {
+              "budget_total_gt": 1000000,
+              "high_value_review_recorded": false,
+              "operation": "approve_budget"
+            },
+            "description": "High value budgets require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "high_value_budget_review_required",
+              "required_action": "record_high_value_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "high_value_budget_requires_review"
+          },
+          {
+            "condition": {
+              "forecast_method_supported": false,
+              "operation": "create_forecast"
+            },
+            "description": "Forecast method must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_method_not_supported",
+              "required_action": "select_supported_forecast_method"
+            },
+            "name": "forecast_method_supported"
+          },
+          {
+            "condition": {
+              "horizon_months_lte": 0,
+              "operation": "create_forecast"
+            },
+            "description": "Forecast horizon must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_horizon_must_be_positive",
+              "required_action": "set_positive_horizon"
+            },
+            "name": "forecast_horizon_positive"
+          },
+          {
+            "condition": {
+              "horizon_months_gt": 60,
+              "operation": "create_forecast"
+            },
+            "description": "Forecast horizon must stay within configured limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_horizon_exceeds_limit",
+              "required_action": "reduce_forecast_horizon"
+            },
+            "name": "forecast_horizon_within_limit"
+          },
+          {
+            "condition": {
+              "confidence_out_of_bounds": true,
+              "operation": "create_forecast"
+            },
+            "description": "Forecast confidence must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_confidence_out_of_bounds",
+              "required_action": "set_valid_confidence"
+            },
+            "name": "forecast_confidence_within_bounds"
+          },
+          {
+            "condition": {
+              "forecast_present": false,
+              "operation": "record_forecast_point"
+            },
+            "description": "Forecast points require a forecast.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_point_forecast_required",
+              "required_action": "attach_forecast"
+            },
+            "name": "forecast_point_requires_forecast"
+          },
+          {
+            "condition": {
+              "operation": "record_forecast_point",
+              "period_present": false
+            },
+            "description": "Forecast points require a period.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_point_period_required",
+              "required_action": "set_period"
+            },
+            "name": "forecast_point_requires_period"
+          },
+          {
+            "condition": {
+              "operation": "create_scenario",
+              "scenario_name_present": false
+            },
+            "description": "Scenarios require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_name_required",
+              "required_action": "name_scenario"
+            },
+            "name": "scenario_requires_name"
+          },
+          {
+            "condition": {
+              "operation": "create_scenario",
+              "probability_out_of_bounds": true
+            },
+            "description": "Scenario probability must be between 0 and 100.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_probability_out_of_bounds",
+              "required_action": "set_valid_probability"
+            },
+            "name": "scenario_probability_within_bounds"
+          },
+          {
+            "condition": {
+              "driver_count_lte": 0,
+              "operation": "create_scenario"
+            },
+            "description": "Scenarios require planning drivers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scenario_driver_required",
+              "required_action": "attach_driver_assumptions"
+            },
+            "name": "scenario_requires_driver"
+          },
+          {
+            "condition": {
+              "budget_present": false,
+              "operation": "record_variance"
+            },
+            "description": "Variance analysis requires a budget.",
+            "effect": {
+              "decision": "deny",
+              "reason": "variance_budget_required",
+              "required_action": "attach_budget"
+            },
+            "name": "variance_requires_budget"
+          },
+          {
+            "condition": {
+              "actual_amount_present": false,
+              "operation": "record_variance"
+            },
+            "description": "Variance analysis requires actual amount.",
+            "effect": {
+              "decision": "deny",
+              "reason": "variance_actual_amount_required",
+              "required_action": "record_actual_amount"
+            },
+            "name": "variance_requires_actual"
+          },
+          {
+            "condition": {
+              "operation": "record_variance",
+              "variance_percent_abs_gt": 10,
+              "variance_review_recorded": false
+            },
+            "description": "Material variance requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "variance_review_required",
+              "required_action": "record_variance_review"
+            },
+            "name": "variance_above_threshold_requires_review"
+          },
+          {
+            "condition": {
+              "budget_present": false,
+              "operation": "start_collaboration_session"
+            },
+            "description": "Collaboration sessions require a budget.",
+            "effect": {
+              "decision": "deny",
+              "reason": "collaboration_budget_required",
+              "required_action": "attach_budget"
+            },
+            "name": "collaboration_requires_budget"
+          },
+          {
+            "condition": {
+              "operation": "start_collaboration_session",
+              "participant_count_lte": 0
+            },
+            "description": "Collaboration sessions require participants.",
+            "effect": {
+              "decision": "deny",
+              "reason": "collaboration_participant_required",
+              "required_action": "add_participants"
+            },
+            "name": "collaboration_requires_participants"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "bfc_batch"
+            },
+            "description": "BFC batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_bfc_batch_to_bytewax"
+            },
+            "name": "bfc_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "bfc_event"
+            },
+            "description": "BFC lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_bfc_event_to_bytewax"
+            },
+            "name": "bfc_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_bfc_agent"
+            },
+            "description": "BFC agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bfc_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "bfc_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_bfc_agent"
+            },
+            "description": "BFC agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bfc_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "bfc_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_bfc_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged BFC actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_bfc_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +621,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Core Financials: Budgeting & Forecasting operations require tenant context.",
+          "description": "BFC operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +634,445 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Core Financials: Budgeting & Forecasting write operations require policy enforcement.",
+          "description": "BFC writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "bfc_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "budget_owner_assigned": false,
+            "operation": "create_budget"
           },
-          "description": "High-risk Core Financials: Budgeting & Forecasting operations require review.",
+          "description": "Budgets require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_owner_required",
+            "required_action": "assign_budget_owner"
+          },
+          "name": "budget_requires_owner"
+        },
+        {
+          "condition": {
+            "fiscal_year_present": false,
+            "operation": "create_budget"
+          },
+          "description": "Budgets require a fiscal year.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_fiscal_year_required",
+            "required_action": "set_fiscal_year"
+          },
+          "name": "budget_requires_fiscal_year"
+        },
+        {
+          "condition": {
+            "currency_present": false,
+            "operation": "create_budget"
+          },
+          "description": "Budgets require currency.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_currency_required",
+            "required_action": "set_currency"
+          },
+          "name": "budget_requires_currency"
+        },
+        {
+          "condition": {
+            "operation": "create_budget",
+            "period_dates_present": false
+          },
+          "description": "Budgets require start and end dates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_period_dates_required",
+            "required_action": "set_period_dates"
+          },
+          "name": "budget_requires_period_dates"
+        },
+        {
+          "condition": {
+            "operation": "create_budget",
+            "period_range_valid": false
+          },
+          "description": "Budget period end must be after start.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_period_range_invalid",
+            "required_action": "set_valid_period_range"
+          },
+          "name": "budget_period_end_after_start"
+        },
+        {
+          "condition": {
+            "budget_present": false,
+            "operation": "add_budget_line"
+          },
+          "description": "Budget lines require a budget.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_line_budget_required",
+            "required_action": "attach_budget"
+          },
+          "name": "budget_line_requires_budget"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "add_budget_line"
+          },
+          "description": "Budget lines require an account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_line_account_required",
+            "required_action": "attach_account"
+          },
+          "name": "budget_line_requires_account"
+        },
+        {
+          "condition": {
+            "line_type_supported": false,
+            "operation": "add_budget_line"
+          },
+          "description": "Budget line type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_line_type_not_supported",
+            "required_action": "select_supported_line_type"
+          },
+          "name": "budget_line_type_supported"
+        },
+        {
+          "condition": {
+            "line_amount_lte": 0,
+            "operation": "add_budget_line"
+          },
+          "description": "Budget line amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_line_amount_must_be_positive",
+            "required_action": "set_positive_line_amount"
+          },
+          "name": "budget_line_amount_positive"
+        },
+        {
+          "condition": {
+            "line_count_lte": 0,
+            "operation": "submit_budget"
+          },
+          "description": "Budget submission requires at least one line.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_lines_required_for_submission",
+            "required_action": "add_budget_lines"
+          },
+          "name": "budget_submission_requires_lines"
+        },
+        {
+          "condition": {
+            "budget_submitted": false,
+            "operation": "approve_budget"
+          },
+          "description": "Approvals require submitted budget state.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_submission_required",
+            "required_action": "submit_budget"
+          },
+          "name": "budget_approval_requires_submitted_budget"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "approve_budget"
+          },
+          "description": "Budget approval requires approval evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "budget_approval_record_required",
+            "required_action": "record_approval"
+          },
+          "name": "budget_approval_requires_record"
+        },
+        {
+          "condition": {
+            "operation": "approve_budget",
+            "separation_of_duties_passed": false
+          },
+          "description": "Budget submitter cannot self-approve.",
+          "effect": {
+            "decision": "deny",
+            "reason": "separation_of_duties_required",
+            "required_action": "select_independent_approver"
+          },
+          "name": "budget_approval_requires_separation"
+        },
+        {
+          "condition": {
+            "budget_total_gt": 1000000,
+            "high_value_review_recorded": false,
+            "operation": "approve_budget"
+          },
+          "description": "High value budgets require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "high_value_budget_review_required",
+            "required_action": "record_high_value_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "high_value_budget_requires_review"
+        },
+        {
+          "condition": {
+            "forecast_method_supported": false,
+            "operation": "create_forecast"
+          },
+          "description": "Forecast method must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_method_not_supported",
+            "required_action": "select_supported_forecast_method"
+          },
+          "name": "forecast_method_supported"
+        },
+        {
+          "condition": {
+            "horizon_months_lte": 0,
+            "operation": "create_forecast"
+          },
+          "description": "Forecast horizon must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_horizon_must_be_positive",
+            "required_action": "set_positive_horizon"
+          },
+          "name": "forecast_horizon_positive"
+        },
+        {
+          "condition": {
+            "horizon_months_gt": 60,
+            "operation": "create_forecast"
+          },
+          "description": "Forecast horizon must stay within configured limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_horizon_exceeds_limit",
+            "required_action": "reduce_forecast_horizon"
+          },
+          "name": "forecast_horizon_within_limit"
+        },
+        {
+          "condition": {
+            "confidence_out_of_bounds": true,
+            "operation": "create_forecast"
+          },
+          "description": "Forecast confidence must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_confidence_out_of_bounds",
+            "required_action": "set_valid_confidence"
+          },
+          "name": "forecast_confidence_within_bounds"
+        },
+        {
+          "condition": {
+            "forecast_present": false,
+            "operation": "record_forecast_point"
+          },
+          "description": "Forecast points require a forecast.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_point_forecast_required",
+            "required_action": "attach_forecast"
+          },
+          "name": "forecast_point_requires_forecast"
+        },
+        {
+          "condition": {
+            "operation": "record_forecast_point",
+            "period_present": false
+          },
+          "description": "Forecast points require a period.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_point_period_required",
+            "required_action": "set_period"
+          },
+          "name": "forecast_point_requires_period"
+        },
+        {
+          "condition": {
+            "operation": "create_scenario",
+            "scenario_name_present": false
+          },
+          "description": "Scenarios require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_name_required",
+            "required_action": "name_scenario"
+          },
+          "name": "scenario_requires_name"
+        },
+        {
+          "condition": {
+            "operation": "create_scenario",
+            "probability_out_of_bounds": true
+          },
+          "description": "Scenario probability must be between 0 and 100.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_probability_out_of_bounds",
+            "required_action": "set_valid_probability"
+          },
+          "name": "scenario_probability_within_bounds"
+        },
+        {
+          "condition": {
+            "driver_count_lte": 0,
+            "operation": "create_scenario"
+          },
+          "description": "Scenarios require planning drivers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scenario_driver_required",
+            "required_action": "attach_driver_assumptions"
+          },
+          "name": "scenario_requires_driver"
+        },
+        {
+          "condition": {
+            "budget_present": false,
+            "operation": "record_variance"
+          },
+          "description": "Variance analysis requires a budget.",
+          "effect": {
+            "decision": "deny",
+            "reason": "variance_budget_required",
+            "required_action": "attach_budget"
+          },
+          "name": "variance_requires_budget"
+        },
+        {
+          "condition": {
+            "actual_amount_present": false,
+            "operation": "record_variance"
+          },
+          "description": "Variance analysis requires actual amount.",
+          "effect": {
+            "decision": "deny",
+            "reason": "variance_actual_amount_required",
+            "required_action": "record_actual_amount"
+          },
+          "name": "variance_requires_actual"
+        },
+        {
+          "condition": {
+            "operation": "record_variance",
+            "variance_percent_abs_gt": 10,
+            "variance_review_recorded": false
+          },
+          "description": "Material variance requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "variance_review_required",
+            "required_action": "record_variance_review"
+          },
+          "name": "variance_above_threshold_requires_review"
+        },
+        {
+          "condition": {
+            "budget_present": false,
+            "operation": "start_collaboration_session"
+          },
+          "description": "Collaboration sessions require a budget.",
+          "effect": {
+            "decision": "deny",
+            "reason": "collaboration_budget_required",
+            "required_action": "attach_budget"
+          },
+          "name": "collaboration_requires_budget"
+        },
+        {
+          "condition": {
+            "operation": "start_collaboration_session",
+            "participant_count_lte": 0
+          },
+          "description": "Collaboration sessions require participants.",
+          "effect": {
+            "decision": "deny",
+            "reason": "collaboration_participant_required",
+            "required_action": "add_participants"
+          },
+          "name": "collaboration_requires_participants"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "bfc_batch"
+          },
+          "description": "BFC batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_bfc_batch_to_bytewax"
+          },
+          "name": "bfc_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "bfc_event"
+          },
+          "description": "BFC lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_bfc_event_to_bytewax"
+          },
+          "name": "bfc_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_bfc_agent"
+          },
+          "description": "BFC agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bfc_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "bfc_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_bfc_agent"
+          },
+          "description": "BFC agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bfc_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "bfc_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_bfc_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged BFC actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_bfc_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +1082,128 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "BFCAgentWorkbench",
+          "permission": "bfc_budgeting_forecasting:admin",
+          "route": "/bfc-budgeting-forecasting/agents"
+        },
+        "approvals": {
+          "component": "BudgetApprovalQueue",
+          "permission": "bfc_budgeting_forecasting:approve",
+          "route": "/bfc-budgeting-forecasting/approvals"
+        },
+        "budget_lines": {
+          "component": "BudgetLineGrid",
+          "permission": "bfc_budgeting_forecasting:manage_budgets",
+          "route": "/bfc-budgeting-forecasting/budget-lines"
+        },
+        "budgets": {
+          "component": "BudgetWorkbench",
+          "permission": "bfc_budgeting_forecasting:manage_budgets",
+          "route": "/bfc-budgeting-forecasting/budgets"
+        },
+        "collaboration": {
+          "component": "PlanningCollaboration",
+          "permission": "bfc_budgeting_forecasting:collaborate",
+          "route": "/bfc-budgeting-forecasting/collaboration"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "BFCDashboard",
           "permission": "bfc_budgeting_forecasting:view",
           "route": "/bfc-budgeting-forecasting/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "bfc_budgeting_forecasting:operate",
-          "route": "/bfc-budgeting-forecasting/operations"
+        "forecasts": {
+          "component": "ForecastWorkbench",
+          "permission": "bfc_budgeting_forecasting:forecast",
+          "route": "/bfc-budgeting-forecasting/forecasts"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "bfc_budgeting_forecasting:govern",
-          "route": "/bfc-budgeting-forecasting/rules"
+        "scenarios": {
+          "component": "ScenarioWorkbench",
+          "permission": "bfc_budgeting_forecasting:scenario",
+          "route": "/bfc-budgeting-forecasting/scenarios"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "BFCSettings",
           "permission": "bfc_budgeting_forecasting:admin",
           "route": "/bfc-budgeting-forecasting/settings"
+        },
+        "variances": {
+          "component": "VarianceConsole",
+          "permission": "bfc_budgeting_forecasting:analyze",
+          "route": "/bfc-budgeting-forecasting/variances"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "budget_created",
+          "budget_line_added",
+          "budget_submitted",
+          "budget_approved",
+          "forecast_created",
+          "forecast_point_recorded",
+          "scenario_created",
+          "variance_recorded",
+          "collaboration_session_started",
+          "bfc_agent_registered"
+        ],
+        "guardrails": [
+          "bfc_batch_requires_bytewax",
+          "bfc_event_requires_bytewax",
+          "privileged_agent_bfc_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "planning",
+          "submitted",
+          "approved",
+          "active",
+          "locked",
+          "forecasted",
+          "reviewed",
+          "closed",
+          "blocked"
+        ],
+        "stream": "apg.fin.bfc.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agent_workbench": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "approvals": {
+            "status_style": "approval-chip",
+            "visual": "approval-queue"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "budget_lines": {
+            "status_style": "line-chip",
+            "visual": "planning-grid"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "budgets": {
+            "icon": "calculator",
+            "risk_style": "budget-band",
+            "status_indicator": "budget-pill"
+          },
+          "collaboration": {
+            "status_style": "presence-chip",
+            "visual": "planning-room"
+          },
+          "forecasts": {
+            "status_style": "confidence-chip",
+            "visual": "forecast-curve"
+          },
+          "scenarios": {
+            "status_style": "probability-chip",
+            "visual": "scenario-map"
+          },
+          "variances": {
+            "status_style": "variance-chip",
+            "visual": "variance-waterfall"
           }
         },
-        "name": "bfc_budgeting_forecasting_operations",
+        "name": "bfc_budgeting_forecasting_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1223,70 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "BFCDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/bfc-budgeting-forecasting/dashboard",
             "permission": "bfc_budgeting_forecasting:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/bfc-budgeting-forecasting/operations",
-            "permission": "bfc_budgeting_forecasting:operate"
+            "component": "BudgetWorkbench",
+            "name": "budgets",
+            "nav_group": "Budgets",
+            "path": "/bfc-budgeting-forecasting/budgets",
+            "permission": "bfc_budgeting_forecasting:manage_budgets"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/bfc-budgeting-forecasting/rules",
-            "permission": "bfc_budgeting_forecasting:govern"
+            "component": "BudgetLineGrid",
+            "name": "budget_lines",
+            "nav_group": "Budgets",
+            "path": "/bfc-budgeting-forecasting/budget-lines",
+            "permission": "bfc_budgeting_forecasting:manage_budgets"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "ForecastWorkbench",
+            "name": "forecasts",
+            "nav_group": "Forecasts",
+            "path": "/bfc-budgeting-forecasting/forecasts",
+            "permission": "bfc_budgeting_forecasting:forecast"
+          },
+          {
+            "component": "ScenarioWorkbench",
+            "name": "scenarios",
+            "nav_group": "Planning",
+            "path": "/bfc-budgeting-forecasting/scenarios",
+            "permission": "bfc_budgeting_forecasting:scenario"
+          },
+          {
+            "component": "VarianceConsole",
+            "name": "variances",
+            "nav_group": "Analysis",
+            "path": "/bfc-budgeting-forecasting/variances",
+            "permission": "bfc_budgeting_forecasting:analyze"
+          },
+          {
+            "component": "BudgetApprovalQueue",
+            "name": "approvals",
+            "nav_group": "Approvals",
+            "path": "/bfc-budgeting-forecasting/approvals",
+            "permission": "bfc_budgeting_forecasting:approve"
+          },
+          {
+            "component": "PlanningCollaboration",
+            "name": "collaboration",
+            "nav_group": "Planning",
+            "path": "/bfc-budgeting-forecasting/collaboration",
+            "permission": "bfc_budgeting_forecasting:collaborate"
+          },
+          {
+            "component": "BFCAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/bfc-budgeting-forecasting/agents",
+            "permission": "bfc_budgeting_forecasting:admin"
+          },
+          {
+            "component": "BFCSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/bfc-budgeting-forecasting/settings",
@@ -238,46 +1303,187 @@
     }
   },
   "composition": {
-    "agent_teams": {},
-    "applications": {},
+    "agent_teams": {
+      "budgeting_forecasting": {
+        "supported_roles": [
+          "budget_planning_reviewer",
+          "forecast_reviewer",
+          "variance_reviewer",
+          "scenario_reviewer",
+          "approval_reviewer",
+          "cash_flow_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "capability_dependencies": {
-      "bfc_budgeting_forecasting": []
+      "bfc_budgeting_forecasting": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "cash_management",
+        "business_intelligence"
+      ]
     }
   },
   "contracts": {
     "bfc_budgeting_forecasting": {
       "configuration": {
-        "capability": {
-          "category": "Bfc",
-          "enabled": true,
-          "id": "bfc_budgeting_forecasting",
-          "name": "Core Financials: Budgeting & Forecasting",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/bfc/budgeting_forecasting/cap_spec.md",
-          "version": "1.0.0"
+        "adapters": {
+          "accounts_payable": "adapter",
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "approvals": {
+          "approval_record_required": true,
+          "separation_of_duties_required": true,
+          "submission_required": true
+        },
+        "bfc_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "budget_planning_reviewer",
+            "forecast_reviewer",
+            "variance_reviewer",
+            "scenario_reviewer",
+            "approval_reviewer",
+            "cash_flow_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "budget_lines": {
+          "account_required": true,
+          "line_type_required": true,
+          "positive_amount_required": true,
+          "supported_line_types": [
+            "revenue",
+            "expense",
+            "capital",
+            "headcount"
+          ]
+        },
+        "budgets": {
+          "currency_required": true,
+          "fiscal_year_required": true,
+          "high_value_review_threshold": 1000000,
+          "line_required_for_submission": true,
+          "owner_required": true,
+          "period_dates_required": true
+        },
+        "collaboration": {
+          "enabled": true,
+          "participant_required": true,
+          "session_audit_required": true
+        },
+        "forecasts": {
+          "base_budget_optional": true,
+          "confidence_bounds": [
+            0,
+            100
+          ],
+          "max_horizon_months": 60,
+          "supported_methods": [
+            "trend",
+            "driver",
+            "statistical",
+            "manual"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_budget_events": true,
+          "emit_collaboration_events": true,
+          "emit_forecast_events": true,
+          "emit_scenario_events": true,
+          "emit_variance_events": true,
+          "event_stream": "apg.fin.bfc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "scenarios": {
+          "driver_required": true,
+          "minimum_driver_count": 1,
+          "probability_bounds": [
+            0,
+            100
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "bfc_budgeting_forecasting_operations"
+          "default_theme": "bfc_budgeting_forecasting_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_approvals": true,
+          "enable_budget_lines": true,
+          "enable_budgets": true,
+          "enable_collaboration": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
-          "enable_settings": true
+          "enable_forecasts": true,
+          "enable_scenarios": true,
+          "enable_settings": true,
+          "enable_variances": true
+        },
+        "variances": {
+          "actual_required": true,
+          "budget_required": true,
+          "review_required_above_threshold": true,
+          "review_threshold_percent": 10
         }
       },
       "id": "bfc_budgeting_forecasting",
       "provides": [
-        "bfc_budgeting_forecasting_operations"
+        "budget_planning_lifecycle",
+        "budget_line_management",
+        "budget_approval_workflow",
+        "forecast_lifecycle",
+        "scenario_planning",
+        "variance_analysis_lifecycle",
+        "planning_collaboration",
+        "bfc_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "cash_management",
+        "business_intelligence"
+      ]
     }
   },
   "deployment": {
@@ -289,89 +1495,475 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 10,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "bfc_budgeting_forecasting": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
   },
-  "roles": {},
   "rules": {
-    "high_risk_requires_review": {
+    "bfc_agent_role_supported": {
       "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
+        "agent_role_supported": false,
+        "operation": "register_bfc_agent"
       },
-      "description": "High-risk Core Financials: Budgeting & Forecasting operations require review.",
+      "description": "BFC agents must use an approved role.",
       "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
+        "decision": "deny",
+        "reason": "bfc_agent_role_not_supported",
+        "required_action": "select_supported_agent_role"
       },
-      "name": "high_risk_requires_review"
+      "name": "bfc_agent_role_supported"
     },
-    "operation_policy_required": {
+    "bfc_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_bfc_agent"
+      },
+      "description": "BFC agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bfc_agent_runtime_not_supported",
+        "required_action": "select_supported_agent_runtime"
+      },
+      "name": "bfc_agent_runtime_supported"
+    },
+    "bfc_batch_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "bfc_batch"
+      },
+      "description": "BFC batches require Bytewax coordination.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_bfc_batch_to_bytewax"
+      },
+      "name": "bfc_batch_requires_bytewax"
+    },
+    "bfc_event_requires_bytewax": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "bfc_event"
+      },
+      "description": "BFC lifecycle events require Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_event_stream_required",
+        "required_action": "route_bfc_event_to_bytewax"
+      },
+      "name": "bfc_event_requires_bytewax"
+    },
+    "bfc_write_requires_policy": {
       "condition": {
         "operation_type": "write",
         "policy_attached": false
       },
-      "description": "Core Financials: Budgeting & Forecasting write operations require policy enforcement.",
+      "description": "BFC writes require policy attachment.",
       "effect": {
         "decision": "deny",
         "reason": "operation_policy_required",
         "required_action": "attach_operation_policy"
       },
-      "name": "operation_policy_required"
+      "name": "bfc_write_requires_policy"
+    },
+    "budget_approval_requires_record": {
+      "condition": {
+        "approval_recorded": false,
+        "operation": "approve_budget"
+      },
+      "description": "Budget approval requires approval evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_approval_record_required",
+        "required_action": "record_approval"
+      },
+      "name": "budget_approval_requires_record"
+    },
+    "budget_approval_requires_separation": {
+      "condition": {
+        "operation": "approve_budget",
+        "separation_of_duties_passed": false
+      },
+      "description": "Budget submitter cannot self-approve.",
+      "effect": {
+        "decision": "deny",
+        "reason": "separation_of_duties_required",
+        "required_action": "select_independent_approver"
+      },
+      "name": "budget_approval_requires_separation"
+    },
+    "budget_approval_requires_submitted_budget": {
+      "condition": {
+        "budget_submitted": false,
+        "operation": "approve_budget"
+      },
+      "description": "Approvals require submitted budget state.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_submission_required",
+        "required_action": "submit_budget"
+      },
+      "name": "budget_approval_requires_submitted_budget"
+    },
+    "budget_line_amount_positive": {
+      "condition": {
+        "line_amount_lte": 0,
+        "operation": "add_budget_line"
+      },
+      "description": "Budget line amount must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_line_amount_must_be_positive",
+        "required_action": "set_positive_line_amount"
+      },
+      "name": "budget_line_amount_positive"
+    },
+    "budget_line_requires_account": {
+      "condition": {
+        "account_present": false,
+        "operation": "add_budget_line"
+      },
+      "description": "Budget lines require an account.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_line_account_required",
+        "required_action": "attach_account"
+      },
+      "name": "budget_line_requires_account"
+    },
+    "budget_line_requires_budget": {
+      "condition": {
+        "budget_present": false,
+        "operation": "add_budget_line"
+      },
+      "description": "Budget lines require a budget.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_line_budget_required",
+        "required_action": "attach_budget"
+      },
+      "name": "budget_line_requires_budget"
+    },
+    "budget_line_type_supported": {
+      "condition": {
+        "line_type_supported": false,
+        "operation": "add_budget_line"
+      },
+      "description": "Budget line type must be supported.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_line_type_not_supported",
+        "required_action": "select_supported_line_type"
+      },
+      "name": "budget_line_type_supported"
+    },
+    "budget_period_end_after_start": {
+      "condition": {
+        "operation": "create_budget",
+        "period_range_valid": false
+      },
+      "description": "Budget period end must be after start.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_period_range_invalid",
+        "required_action": "set_valid_period_range"
+      },
+      "name": "budget_period_end_after_start"
+    },
+    "budget_requires_currency": {
+      "condition": {
+        "currency_present": false,
+        "operation": "create_budget"
+      },
+      "description": "Budgets require currency.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_currency_required",
+        "required_action": "set_currency"
+      },
+      "name": "budget_requires_currency"
+    },
+    "budget_requires_fiscal_year": {
+      "condition": {
+        "fiscal_year_present": false,
+        "operation": "create_budget"
+      },
+      "description": "Budgets require a fiscal year.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_fiscal_year_required",
+        "required_action": "set_fiscal_year"
+      },
+      "name": "budget_requires_fiscal_year"
+    },
+    "budget_requires_owner": {
+      "condition": {
+        "budget_owner_assigned": false,
+        "operation": "create_budget"
+      },
+      "description": "Budgets require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_owner_required",
+        "required_action": "assign_budget_owner"
+      },
+      "name": "budget_requires_owner"
+    },
+    "budget_requires_period_dates": {
+      "condition": {
+        "operation": "create_budget",
+        "period_dates_present": false
+      },
+      "description": "Budgets require start and end dates.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_period_dates_required",
+        "required_action": "set_period_dates"
+      },
+      "name": "budget_requires_period_dates"
+    },
+    "budget_submission_requires_lines": {
+      "condition": {
+        "line_count_lte": 0,
+        "operation": "submit_budget"
+      },
+      "description": "Budget submission requires at least one line.",
+      "effect": {
+        "decision": "deny",
+        "reason": "budget_lines_required_for_submission",
+        "required_action": "add_budget_lines"
+      },
+      "name": "budget_submission_requires_lines"
+    },
+    "collaboration_requires_budget": {
+      "condition": {
+        "budget_present": false,
+        "operation": "start_collaboration_session"
+      },
+      "description": "Collaboration sessions require a budget.",
+      "effect": {
+        "decision": "deny",
+        "reason": "collaboration_budget_required",
+        "required_action": "attach_budget"
+      },
+      "name": "collaboration_requires_budget"
+    },
+    "collaboration_requires_participants": {
+      "condition": {
+        "operation": "start_collaboration_session",
+        "participant_count_lte": 0
+      },
+      "description": "Collaboration sessions require participants.",
+      "effect": {
+        "decision": "deny",
+        "reason": "collaboration_participant_required",
+        "required_action": "add_participants"
+      },
+      "name": "collaboration_requires_participants"
+    },
+    "forecast_confidence_within_bounds": {
+      "condition": {
+        "confidence_out_of_bounds": true,
+        "operation": "create_forecast"
+      },
+      "description": "Forecast confidence must be between 0 and 100.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_confidence_out_of_bounds",
+        "required_action": "set_valid_confidence"
+      },
+      "name": "forecast_confidence_within_bounds"
+    },
+    "forecast_horizon_positive": {
+      "condition": {
+        "horizon_months_lte": 0,
+        "operation": "create_forecast"
+      },
+      "description": "Forecast horizon must be positive.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_horizon_must_be_positive",
+        "required_action": "set_positive_horizon"
+      },
+      "name": "forecast_horizon_positive"
+    },
+    "forecast_horizon_within_limit": {
+      "condition": {
+        "horizon_months_gt": 60,
+        "operation": "create_forecast"
+      },
+      "description": "Forecast horizon must stay within configured limit.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_horizon_exceeds_limit",
+        "required_action": "reduce_forecast_horizon"
+      },
+      "name": "forecast_horizon_within_limit"
+    },
+    "forecast_method_supported": {
+      "condition": {
+        "forecast_method_supported": false,
+        "operation": "create_forecast"
+      },
+      "description": "Forecast method must be supported.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_method_not_supported",
+        "required_action": "select_supported_forecast_method"
+      },
+      "name": "forecast_method_supported"
+    },
+    "forecast_point_requires_forecast": {
+      "condition": {
+        "forecast_present": false,
+        "operation": "record_forecast_point"
+      },
+      "description": "Forecast points require a forecast.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_point_forecast_required",
+        "required_action": "attach_forecast"
+      },
+      "name": "forecast_point_requires_forecast"
+    },
+    "forecast_point_requires_period": {
+      "condition": {
+        "operation": "record_forecast_point",
+        "period_present": false
+      },
+      "description": "Forecast points require a period.",
+      "effect": {
+        "decision": "deny",
+        "reason": "forecast_point_period_required",
+        "required_action": "set_period"
+      },
+      "name": "forecast_point_requires_period"
+    },
+    "high_value_budget_requires_review": {
+      "condition": {
+        "budget_total_gt": 1000000,
+        "high_value_review_recorded": false,
+        "operation": "approve_budget"
+      },
+      "description": "High value budgets require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "high_value_budget_review_required",
+        "required_action": "record_high_value_review"
+      },
+      "name": "high_value_budget_requires_review"
+    },
+    "privileged_agent_bfc_action_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "agent_bfc_action",
+        "privileged_scope": true
+      },
+      "description": "Privileged BFC actions proposed by agents require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "human_approval_required",
+        "required_action": "record_human_approval"
+      },
+      "name": "privileged_agent_bfc_action_requires_human_approval"
+    },
+    "scenario_probability_within_bounds": {
+      "condition": {
+        "operation": "create_scenario",
+        "probability_out_of_bounds": true
+      },
+      "description": "Scenario probability must be between 0 and 100.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_probability_out_of_bounds",
+        "required_action": "set_valid_probability"
+      },
+      "name": "scenario_probability_within_bounds"
+    },
+    "scenario_requires_driver": {
+      "condition": {
+        "driver_count_lte": 0,
+        "operation": "create_scenario"
+      },
+      "description": "Scenarios require planning drivers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_driver_required",
+        "required_action": "attach_driver_assumptions"
+      },
+      "name": "scenario_requires_driver"
+    },
+    "scenario_requires_name": {
+      "condition": {
+        "operation": "create_scenario",
+        "scenario_name_present": false
+      },
+      "description": "Scenarios require a name.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scenario_name_required",
+        "required_action": "name_scenario"
+      },
+      "name": "scenario_requires_name"
     },
     "tenant_context_required": {
       "condition": {
         "tenant_context_present": false
       },
-      "description": "Core Financials: Budgeting & Forecasting operations require tenant context.",
+      "description": "BFC operations require tenant context.",
       "effect": {
         "decision": "deny",
         "reason": "tenant_context_required",
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.bfc_budgeting_forecasting": {
-      "file": "capability_contract.py",
-      "id": "capability.bfc_budgeting_forecasting",
-      "kind": "capability",
-      "name": "Core Financials: Budgeting & Forecasting",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
+    },
+    "variance_above_threshold_requires_review": {
+      "condition": {
+        "operation": "record_variance",
+        "variance_percent_abs_gt": 10,
+        "variance_review_recorded": false
       },
-      "references": []
+      "description": "Material variance requires review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "variance_review_required",
+        "required_action": "record_variance_review"
+      },
+      "name": "variance_above_threshold_requires_review"
+    },
+    "variance_requires_actual": {
+      "condition": {
+        "actual_amount_present": false,
+        "operation": "record_variance"
+      },
+      "description": "Variance analysis requires actual amount.",
+      "effect": {
+        "decision": "deny",
+        "reason": "variance_actual_amount_required",
+        "required_action": "record_actual_amount"
+      },
+      "name": "variance_requires_actual"
+    },
+    "variance_requires_budget": {
+      "condition": {
+        "budget_present": false,
+        "operation": "record_variance"
+      },
+      "description": "Variance analysis requires a budget.",
+      "effect": {
+        "decision": "deny",
+        "reason": "variance_budget_required",
+        "required_action": "attach_budget"
+      },
+      "name": "variance_requires_budget"
     }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

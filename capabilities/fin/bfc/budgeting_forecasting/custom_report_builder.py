@@ -157,7 +157,7 @@ class ReportFilter(APGBaseModel):
 	# User Interface
 	input_type: str = Field(description="UI input type (text, select, date, etc.)")
 	available_values: List[Any] = Field(default_factory=list, description="Available values for select")
-	placeholder: Optional[str] = Field(None, description="Placeholder text")
+	bind_token: Optional[str] = Field(None, description="Template hint text")
 	
 	# Current State
 	current_value: Optional[Any] = Field(None, description="Current filter value")

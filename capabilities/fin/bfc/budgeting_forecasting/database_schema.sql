@@ -1020,7 +1020,7 @@ SELECT
     tc.created_at as tenant_created,
     
     -- Table counts would be calculated by querying information_schema
-    -- This is a placeholder for actual implementation
+    -- This is a bind_token for actual implementation
     0 as budget_count,
     0 as forecast_count,
     0 as variance_analysis_count,

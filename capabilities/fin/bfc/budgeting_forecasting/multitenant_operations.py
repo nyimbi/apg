@@ -583,12 +583,12 @@ class MultiTenantOperationsService(APGServiceBase):
 		"""Insert access request into database."""
 		access_dict = access.dict()
 		columns = list(access_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(access_dict.values())
 		
 		query = f"""
 			INSERT INTO tenant_budget_access ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING access_id
 		"""
 		

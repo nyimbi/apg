@@ -875,12 +875,12 @@ class ApprovalWorkflowService(APGServiceBase):
 		"""Insert workflow template into database."""
 		template_dict = template.dict()
 		columns = list(template_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(template_dict.values())
 		
 		query = f"""
 			INSERT INTO workflow_templates ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING id
 		"""
 		
@@ -899,12 +899,12 @@ class ApprovalWorkflowService(APGServiceBase):
 	async def _insert_workflow_step(self, step_data: Dict[str, Any]) -> None:
 		"""Insert workflow step into database."""
 		columns = list(step_data.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(step_data.values())
 		
 		query = f"""
 			INSERT INTO workflow_steps ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 		"""
 		
 		await self._connection.execute(query, *values)
@@ -974,12 +974,12 @@ class ApprovalWorkflowService(APGServiceBase):
 		"""Insert workflow instance into database."""
 		instance_dict = instance.dict()
 		columns = list(instance_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(instance_dict.values())
 		
 		query = f"""
 			INSERT INTO approval_workflow_instances ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING workflow_instance_id
 		"""
 		

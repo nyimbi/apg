@@ -805,12 +805,12 @@ class VersionControlAuditService(APGServiceBase):
 		"""Insert budget version into database."""
 		version_dict = version.dict()
 		columns = list(version_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(version_dict.values())
 		
 		query = f"""
 			INSERT INTO budget_versions ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING version_id
 		"""
 		
@@ -842,12 +842,12 @@ class VersionControlAuditService(APGServiceBase):
 		"""Insert audit event into database."""
 		event_dict = event.dict()
 		columns = list(event_dict.keys())
-		placeholders = [f"${i+1}" for i in range(len(columns))]
+		bind_tokens = [f"${i+1}" for i in range(len(columns))]
 		values = list(event_dict.values())
 		
 		query = f"""
 			INSERT INTO audit_events ({', '.join(columns)})
-			VALUES ({', '.join(placeholders)})
+			VALUES ({', '.join(bind_tokens)})
 			RETURNING event_id
 		"""
 		

@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Core Financials: Budgeting & Forecasting",
+  "display_name": "Budgeting and Forecasting",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,41 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0.0"
+  "route_count": 10,
+  "rule_count": 35,
+  "streaming": {
+    "events": [
+      "budget_created",
+      "budget_line_added",
+      "budget_submitted",
+      "budget_approved",
+      "forecast_created",
+      "forecast_point_recorded",
+      "scenario_created",
+      "variance_recorded",
+      "collaboration_session_started",
+      "bfc_agent_registered"
+    ],
+    "guardrails": [
+      "bfc_batch_requires_bytewax",
+      "bfc_event_requires_bytewax",
+      "privileged_agent_bfc_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "planning",
+      "submitted",
+      "approved",
+      "active",
+      "locked",
+      "forecasted",
+      "reviewed",
+      "closed",
+      "blocked"
+    ],
+    "stream": "apg.fin.bfc.lifecycle"
+  },
+  "version": "2.1.0"
 }
