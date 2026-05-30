@@ -20149,3 +20149,32 @@ Not run to preserve battery:
 - Live Bytewax stream execution.
 - External AUTH, AUDL, NTFY, WFLO, media, commerce, ERP, translation-memory,
   taxonomy, theme, or AGNT adapters.
+
+### 2026-05-31 02:13 EAT
+
+DVRL Works documentation packet:
+
+- Selected `capabilities/common/dvrl/works` after the package-doc scan showed it
+  as the remaining directory with a local `cap_spec.md` but no README,
+  specification, or plan.
+- Classified the directory as a DVRL working-artifact packet rather than an
+  independent runtime capability.
+- Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md` explaining how to
+  use the reports, what this directory does not own, and when findings must be
+  promoted into the parent DVRL contract, service, metadata, and tests.
+- Replaced the local `cap_spec.md` with a source-of-truth pointer to the parent
+  `capabilities/common/dvrl` package.
+
+Battery-conscious verification:
+
+- Package-doc scan over capability-like directories returned `count 0`.
+- `git diff --check -- capabilities/common/dvrl/works docs/progress_log.md`
+  passed.
+- Stale-marker scan over the four touched DVRL Works packet docs returned no
+  matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- DVRL runtime connector, Singer tap, rendered browser UI, live Bytewax, and
+  performance/load tests; this was a documentation classification slice only.
