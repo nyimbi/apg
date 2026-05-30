@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 APG Metadata Management Capability
-World-class metadata management with AI-powered intelligence
+Tenant-scoped metadata catalog, classification, lineage, and governance.
 
 Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
@@ -15,17 +15,25 @@ from .capability_contract import (
 	evaluate_capability_rules
 )
 
-try:
-	# Core service and components
-	from .service import (
-		APGMetadataService,
-		ServiceStatus,
-		ServiceHealth,
-		create_metadata_service,
-		get_metadata_service,
-		shutdown_metadata_service
-	)
+from .service import (
+	APGMetadataService,
+	MetaAssetRecord,
+	MetaAuditEventRecord,
+	MetaCertificationRecord,
+	MetaClassificationRecord,
+	MetaDiscoveryJobRecord,
+	MetaGlossaryTermRecord,
+	MetaLineageRecord,
+	MetaQualityRecord,
+	MetaService,
+	ServiceHealth,
+	ServiceStatus,
+	create_metadata_service,
+	get_metadata_service,
+	shutdown_metadata_service
+)
 
+try:
 	# Database and models
 	from .database import MetaDatabaseManager, create_database_manager
 	from .models import (
@@ -66,7 +74,6 @@ try:
 	_RUNTIME_IMPORT_ERROR = None
 except ModuleNotFoundError as exc:
 	_RUNTIME_IMPORT_ERROR = exc
-	APGMetadataService = ServiceStatus = ServiceHealth = None
 	MetaDatabaseManager = None
 	MetaAsset = MetaColumn = MetaLineage = MetaClassification = MetaQualityAssessment = None
 	MetaDiscoveryJob = MetaDiscoverySchedule = None
@@ -104,7 +111,7 @@ CAPABILITY_INFO = {
 	"name": "metadata_management",
 	"display_name": "APG Metadata Management",
 	"version": __version__,
-	"description": "World-class metadata management with AI-powered intelligence",
+	"description": "Tenant-scoped metadata catalog, classification, lineage, search, and governance",
 	"category": "data_management",
 	"tags": ["metadata", "ai", "discovery", "lineage", "search"],
 	"capabilities": [
@@ -257,7 +264,7 @@ def register_capability() -> Dict[str, Any]:
 			"classification": "/meta/api/v1/classification",
 			"lineage": "/meta/api/v1/lineage",
 			"quality": "/meta/api/v1/quality",
-			"search": "/meta/api/v1/search"
+		"search": "/meta/api/v1/search"
 		},
 		"ui_components": {
 			route["name"]: route["path"]

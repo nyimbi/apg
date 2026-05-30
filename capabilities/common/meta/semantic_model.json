@@ -8,30 +8,90 @@
   },
   "capabilities": {
     "meta": {
-      "approvals": {},
+      "adapters": {
+        "classification_engine": "adapter",
+        "discovery_engine": "adapter",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.MetaService",
+        "lineage_engine": "adapter",
+        "metadata_store": "adapter",
+        "production_runtime": "service.APGMetadataService",
+        "search_engine": "adapter"
+      },
+      "approvals": {
+        "certification": "MetaCertificationRecord",
+        "classification_review": "MetaClassificationRecord",
+        "discovery_schedule": "MetaDiscoveryJobRecord"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "adapters": {
+          "classification_engine": "adapter",
+          "discovery_engine": "adapter",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MetaService",
+          "lineage_engine": "adapter",
+          "metadata_store": "adapter",
+          "production_runtime": "service.APGMetadataService",
+          "search_engine": "adapter"
+        },
         "catalog": {
           "asset_registration_required": true,
           "business_glossary_enabled": true,
+          "business_key_required": true,
           "default_asset_status": "draft",
-          "owner_required_for_published_assets": true
+          "owner_required_for_published_assets": true,
+          "source_system_required": true,
+          "supported_asset_types": [
+            "database",
+            "schema",
+            "table",
+            "column",
+            "file",
+            "api",
+            "stream",
+            "report",
+            "dashboard",
+            "model",
+            "pipeline",
+            "business_term"
+          ]
         },
         "classification": {
           "ai_classification_enabled": true,
           "confidence_review_threshold": 0.75,
           "pii_detection_enabled": true,
-          "restricted_data_requires_classification": true
+          "restricted_data_requires_classification": true,
+          "review_notes_required": true,
+          "sensitive_labels": [
+            "pii",
+            "phi",
+            "pci",
+            "secret",
+            "restricted"
+          ]
         },
         "discovery": {
+          "allowed_connector_types": [
+            "database",
+            "file",
+            "api",
+            "stream",
+            "ml",
+            "catalog"
+          ],
           "auto_discovery_enabled": true,
           "connector_approval_required": true,
+          "discovery_result_review_required": true,
           "max_concurrent_jobs": 5,
           "schedule_review_days": 30
         },
         "governance": {
           "audit_catalog_mutations": true,
+          "certification_review_required": true,
+          "glossary_owner_required": true,
+          "publish_requires_quality": true,
           "require_tenant_context": true,
           "steward_approval_required": true
         },
@@ -39,11 +99,25 @@
           "impact_analysis_enabled": true,
           "lineage_required_for_certified_assets": true,
           "lineage_tracking_enabled": true,
-          "max_lineage_depth": 8
+          "max_lineage_depth": 8,
+          "retire_requires_impact_analysis": true,
+          "source_and_target_registration_required": true
         },
         "quality": {
+          "dimensions": [
+            "completeness",
+            "freshness",
+            "accuracy",
+            "lineage",
+            "classification",
+            "usage"
+          ],
           "minimum_certification_score": 85.0,
           "quality_assessment_enabled": true,
+          "score_range": [
+            0.0,
+            100.0
+          ],
           "stale_asset_days": 90
         },
         "tenant_id": "default",
@@ -52,10 +126,16 @@
           "default_theme": "meta_catalog_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
           "enable_catalog": true,
+          "enable_certification_queue": true,
           "enable_classification_review": true,
           "enable_discovery_console": true,
-          "enable_lineage_viewer": true
+          "enable_glossary": true,
+          "enable_impact_analysis": true,
+          "enable_lineage_viewer": true,
+          "enable_quality_console": true
         }
       },
       "erp_modules": [
@@ -63,6 +143,16 @@
       ],
       "i18n": {},
       "master_data": {},
+      "metadata_lifecycle": {
+        "asset": "MetaAssetRecord",
+        "audit": "MetaAuditEventRecord",
+        "certification": "MetaCertificationRecord",
+        "classification": "MetaClassificationRecord",
+        "discovery": "MetaDiscoveryJobRecord",
+        "glossary": "MetaGlossaryTermRecord",
+        "lineage": "MetaLineageRecord",
+        "quality": "MetaQualityRecord"
+      },
       "name": "Metadata Management",
       "provides": [
         "meta_operations"
@@ -84,6 +174,45 @@
           },
           {
             "condition": {
+              "operation": "register_asset",
+              "unsupported_asset_type": true
+            },
+            "description": "Metadata assets must use a configured asset type.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_asset_type",
+              "required_action": "configure_asset_type"
+            },
+            "name": "asset_type_must_be_supported"
+          },
+          {
+            "condition": {
+              "business_key_present": false,
+              "operation": "register_asset"
+            },
+            "description": "Metadata assets require a durable business key.",
+            "effect": {
+              "decision": "deny",
+              "reason": "business_key_required",
+              "required_action": "attach_business_key"
+            },
+            "name": "asset_registration_requires_business_key"
+          },
+          {
+            "condition": {
+              "operation": "register_asset",
+              "source_system_present": false
+            },
+            "description": "Metadata assets require source-system context.",
+            "effect": {
+              "decision": "deny",
+              "reason": "source_system_required",
+              "required_action": "attach_source_system"
+            },
+            "name": "asset_registration_requires_source_system"
+          },
+          {
+            "condition": {
               "asset_owner_assigned": false,
               "operation": "publish_asset"
             },
@@ -97,8 +226,22 @@
           },
           {
             "condition": {
+              "operation": "publish_asset",
+              "quality_assessment_present": false
+            },
+            "description": "Published metadata assets require current quality evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_assessment_required",
+              "required_action": "run_quality_assessment"
+            },
+            "name": "publish_requires_quality_assessment"
+          },
+          {
+            "condition": {
               "asset_sensitivity": "restricted",
-              "classification_complete": false
+              "classification_complete": false,
+              "operation": "publish_asset"
             },
             "description": "Restricted assets require completed classification.",
             "effect": {
@@ -107,6 +250,19 @@
               "required_action": "complete_asset_classification"
             },
             "name": "restricted_asset_requires_classification"
+          },
+          {
+            "condition": {
+              "asset_sensitivity": "restricted",
+              "steward_assigned": false
+            },
+            "description": "Sensitive assets require an assigned data steward.",
+            "effect": {
+              "decision": "deny",
+              "reason": "steward_required",
+              "required_action": "assign_data_steward"
+            },
+            "name": "sensitive_asset_requires_steward"
           },
           {
             "condition": {
@@ -123,6 +279,32 @@
           },
           {
             "condition": {
+              "operation": "certify_asset",
+              "quality_score_lt": 85.0
+            },
+            "description": "Certification requires metadata quality above the configured threshold.",
+            "effect": {
+              "decision": "deny",
+              "reason": "quality_score_too_low",
+              "required_action": "improve_metadata_quality"
+            },
+            "name": "certification_requires_quality_threshold"
+          },
+          {
+            "condition": {
+              "operation": "review_classification",
+              "review_notes_present": false
+            },
+            "description": "Classification stewardship decisions require review notes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "review_notes_required",
+              "required_action": "attach_review_notes"
+            },
+            "name": "classification_review_requires_notes"
+          },
+          {
+            "condition": {
               "classification_confidence_lt": 0.75,
               "steward_review_recorded": false
             },
@@ -133,6 +315,84 @@
               "required_action": "complete_steward_classification_review"
             },
             "name": "low_classification_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "connector_approved": false,
+              "operation": "schedule_discovery"
+            },
+            "description": "Discovery jobs require approved connector configuration.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_approval_required",
+              "required_action": "approve_connector"
+            },
+            "name": "discovery_requires_approved_connector"
+          },
+          {
+            "condition": {
+              "operation": "schedule_discovery",
+              "schedule_review_current": false
+            },
+            "description": "Recurring discovery schedules require current schedule review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "schedule_review_required",
+              "required_action": "review_discovery_schedule"
+            },
+            "name": "discovery_schedule_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "capture_lineage",
+              "source_and_target_registered": false
+            },
+            "description": "Lineage edges require registered source and target assets.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registered_assets_required",
+              "required_action": "register_lineage_assets"
+            },
+            "name": "lineage_requires_registered_assets"
+          },
+          {
+            "condition": {
+              "lineage_depth_gt": 8,
+              "operation": "capture_lineage"
+            },
+            "description": "Lineage requests above configured depth require review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "lineage_depth_review_required",
+              "required_action": "review_lineage_depth"
+            },
+            "name": "lineage_depth_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "register_glossary_term",
+              "term_owner_assigned": false
+            },
+            "description": "Business glossary terms require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "term_owner_required",
+              "required_action": "assign_glossary_owner"
+            },
+            "name": "glossary_term_requires_owner"
+          },
+          {
+            "condition": {
+              "impact_analysis_present": false,
+              "operation": "retire_asset"
+            },
+            "description": "Retiring metadata assets requires impact analysis evidence.",
+            "effect": {
+              "decision": "deny",
+              "reason": "impact_analysis_required",
+              "required_action": "complete_impact_analysis"
+            },
+            "name": "retire_asset_requires_impact_analysis"
           },
           {
             "condition": {
@@ -165,6 +425,45 @@
         },
         {
           "condition": {
+            "operation": "register_asset",
+            "unsupported_asset_type": true
+          },
+          "description": "Metadata assets must use a configured asset type.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_asset_type",
+            "required_action": "configure_asset_type"
+          },
+          "name": "asset_type_must_be_supported"
+        },
+        {
+          "condition": {
+            "business_key_present": false,
+            "operation": "register_asset"
+          },
+          "description": "Metadata assets require a durable business key.",
+          "effect": {
+            "decision": "deny",
+            "reason": "business_key_required",
+            "required_action": "attach_business_key"
+          },
+          "name": "asset_registration_requires_business_key"
+        },
+        {
+          "condition": {
+            "operation": "register_asset",
+            "source_system_present": false
+          },
+          "description": "Metadata assets require source-system context.",
+          "effect": {
+            "decision": "deny",
+            "reason": "source_system_required",
+            "required_action": "attach_source_system"
+          },
+          "name": "asset_registration_requires_source_system"
+        },
+        {
+          "condition": {
             "asset_owner_assigned": false,
             "operation": "publish_asset"
           },
@@ -178,8 +477,22 @@
         },
         {
           "condition": {
+            "operation": "publish_asset",
+            "quality_assessment_present": false
+          },
+          "description": "Published metadata assets require current quality evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_assessment_required",
+            "required_action": "run_quality_assessment"
+          },
+          "name": "publish_requires_quality_assessment"
+        },
+        {
+          "condition": {
             "asset_sensitivity": "restricted",
-            "classification_complete": false
+            "classification_complete": false,
+            "operation": "publish_asset"
           },
           "description": "Restricted assets require completed classification.",
           "effect": {
@@ -188,6 +501,19 @@
             "required_action": "complete_asset_classification"
           },
           "name": "restricted_asset_requires_classification"
+        },
+        {
+          "condition": {
+            "asset_sensitivity": "restricted",
+            "steward_assigned": false
+          },
+          "description": "Sensitive assets require an assigned data steward.",
+          "effect": {
+            "decision": "deny",
+            "reason": "steward_required",
+            "required_action": "assign_data_steward"
+          },
+          "name": "sensitive_asset_requires_steward"
         },
         {
           "condition": {
@@ -204,6 +530,32 @@
         },
         {
           "condition": {
+            "operation": "certify_asset",
+            "quality_score_lt": 85.0
+          },
+          "description": "Certification requires metadata quality above the configured threshold.",
+          "effect": {
+            "decision": "deny",
+            "reason": "quality_score_too_low",
+            "required_action": "improve_metadata_quality"
+          },
+          "name": "certification_requires_quality_threshold"
+        },
+        {
+          "condition": {
+            "operation": "review_classification",
+            "review_notes_present": false
+          },
+          "description": "Classification stewardship decisions require review notes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "review_notes_required",
+            "required_action": "attach_review_notes"
+          },
+          "name": "classification_review_requires_notes"
+        },
+        {
+          "condition": {
             "classification_confidence_lt": 0.75,
             "steward_review_recorded": false
           },
@@ -214,6 +566,84 @@
             "required_action": "complete_steward_classification_review"
           },
           "name": "low_classification_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "connector_approved": false,
+            "operation": "schedule_discovery"
+          },
+          "description": "Discovery jobs require approved connector configuration.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_approval_required",
+            "required_action": "approve_connector"
+          },
+          "name": "discovery_requires_approved_connector"
+        },
+        {
+          "condition": {
+            "operation": "schedule_discovery",
+            "schedule_review_current": false
+          },
+          "description": "Recurring discovery schedules require current schedule review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "schedule_review_required",
+            "required_action": "review_discovery_schedule"
+          },
+          "name": "discovery_schedule_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "capture_lineage",
+            "source_and_target_registered": false
+          },
+          "description": "Lineage edges require registered source and target assets.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registered_assets_required",
+            "required_action": "register_lineage_assets"
+          },
+          "name": "lineage_requires_registered_assets"
+        },
+        {
+          "condition": {
+            "lineage_depth_gt": 8,
+            "operation": "capture_lineage"
+          },
+          "description": "Lineage requests above configured depth require review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "lineage_depth_review_required",
+            "required_action": "review_lineage_depth"
+          },
+          "name": "lineage_depth_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "register_glossary_term",
+            "term_owner_assigned": false
+          },
+          "description": "Business glossary terms require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "term_owner_required",
+            "required_action": "assign_glossary_owner"
+          },
+          "name": "glossary_term_requires_owner"
+        },
+        {
+          "condition": {
+            "impact_analysis_present": false,
+            "operation": "retire_asset"
+          },
+          "description": "Retiring metadata assets requires impact analysis evidence.",
+          "effect": {
+            "decision": "deny",
+            "reason": "impact_analysis_required",
+            "required_action": "complete_impact_analysis"
+          },
+          "name": "retire_asset_requires_impact_analysis"
         },
         {
           "condition": {
@@ -233,13 +663,28 @@
         "api": "api.py",
         "entrypoint": "app.py",
         "service": "service.py",
-        "views": "views.py"
+        "views": "view_models.py"
       },
       "screens": {
+        "adapters": {
+          "component": "MetadataAdapterHealth",
+          "permission": "meta:admin",
+          "route": "/meta/adapters"
+        },
+        "audit": {
+          "component": "MetadataAuditTimeline",
+          "permission": "meta:view_audit",
+          "route": "/meta/audit"
+        },
         "catalog": {
           "component": "AssetCatalog",
           "permission": "meta:view_assets",
           "route": "/meta/catalog"
+        },
+        "certification": {
+          "component": "CertificationQueue",
+          "permission": "meta:certify",
+          "route": "/meta/certification"
         },
         "classification": {
           "component": "ClassificationReview",
@@ -255,6 +700,16 @@
           "component": "DiscoveryConsole",
           "permission": "meta:run_discovery",
           "route": "/meta/discovery"
+        },
+        "glossary": {
+          "component": "BusinessGlossary",
+          "permission": "meta:manage_glossary",
+          "route": "/meta/glossary"
+        },
+        "impact": {
+          "component": "ImpactAnalysis",
+          "permission": "meta:view_impact",
+          "route": "/meta/impact"
         },
         "lineage": {
           "component": "LineageViewer",
@@ -277,13 +732,27 @@
           "route": "/meta/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax"
+      },
       "theme": {
         "components": {
+          "adapter_status_panel": {
+            "status_indicator": "adapter-state",
+            "visual": "backend-grid"
+          },
           "asset_catalog_card": {
             "icon": "database",
             "risk_style": "classification-band",
             "status_indicator": "certification-pill"
+          },
+          "audit_decision_timeline": {
+            "highlight": "matched-rule-chip",
+            "visual": "decision-timeline"
+          },
+          "certification_queue": {
+            "highlight": "certification-state",
+            "visual": "evidence-checklist"
           },
           "classification_review_queue": {
             "highlight": "sensitivity-chip",
@@ -292,6 +761,14 @@
           "discovery_job_timeline": {
             "status_style": "job-state-pill",
             "visual": "connector-run-timeline"
+          },
+          "glossary_term_panel": {
+            "status_indicator": "ownership-pill",
+            "visual": "term-definition-list"
+          },
+          "impact_analysis_graph": {
+            "edge_style": "risk-weighted-line",
+            "visual": "downstream-impact-graph"
           },
           "lineage_graph_viewer": {
             "edge_style": "transformation-line",
@@ -360,11 +837,46 @@
             "permission": "meta:view_quality"
           },
           {
+            "component": "CertificationQueue",
+            "name": "certification",
+            "nav_group": "Governance",
+            "path": "/meta/certification",
+            "permission": "meta:certify"
+          },
+          {
+            "component": "BusinessGlossary",
+            "name": "glossary",
+            "nav_group": "Catalog",
+            "path": "/meta/glossary",
+            "permission": "meta:manage_glossary"
+          },
+          {
+            "component": "ImpactAnalysis",
+            "name": "impact",
+            "nav_group": "Governance",
+            "path": "/meta/impact",
+            "permission": "meta:view_impact"
+          },
+          {
             "component": "MetadataSearch",
             "name": "search",
             "nav_group": "Catalog",
             "path": "/meta/search",
             "permission": "meta:search"
+          },
+          {
+            "component": "MetadataAuditTimeline",
+            "name": "audit",
+            "nav_group": "Governance",
+            "path": "/meta/audit",
+            "permission": "meta:view_audit"
+          },
+          {
+            "component": "MetadataAdapterHealth",
+            "name": "adapters",
+            "nav_group": "Administration",
+            "path": "/meta/adapters",
+            "permission": "meta:admin"
           },
           {
             "component": "MetadataSettings",
@@ -379,7 +891,7 @@
           "templates/",
           "static/"
         ],
-        "view_module": "blueprint.py"
+        "view_module": "view_models.py"
       }
     }
   },
@@ -393,26 +905,72 @@
   "contracts": {
     "meta": {
       "configuration": {
+        "adapters": {
+          "classification_engine": "adapter",
+          "discovery_engine": "adapter",
+          "event_stream": "bytewax",
+          "generated_app_runtime": "service.MetaService",
+          "lineage_engine": "adapter",
+          "metadata_store": "adapter",
+          "production_runtime": "service.APGMetadataService",
+          "search_engine": "adapter"
+        },
         "catalog": {
           "asset_registration_required": true,
           "business_glossary_enabled": true,
+          "business_key_required": true,
           "default_asset_status": "draft",
-          "owner_required_for_published_assets": true
+          "owner_required_for_published_assets": true,
+          "source_system_required": true,
+          "supported_asset_types": [
+            "database",
+            "schema",
+            "table",
+            "column",
+            "file",
+            "api",
+            "stream",
+            "report",
+            "dashboard",
+            "model",
+            "pipeline",
+            "business_term"
+          ]
         },
         "classification": {
           "ai_classification_enabled": true,
           "confidence_review_threshold": 0.75,
           "pii_detection_enabled": true,
-          "restricted_data_requires_classification": true
+          "restricted_data_requires_classification": true,
+          "review_notes_required": true,
+          "sensitive_labels": [
+            "pii",
+            "phi",
+            "pci",
+            "secret",
+            "restricted"
+          ]
         },
         "discovery": {
+          "allowed_connector_types": [
+            "database",
+            "file",
+            "api",
+            "stream",
+            "ml",
+            "catalog"
+          ],
           "auto_discovery_enabled": true,
           "connector_approval_required": true,
+          "discovery_result_review_required": true,
           "max_concurrent_jobs": 5,
           "schedule_review_days": 30
         },
         "governance": {
           "audit_catalog_mutations": true,
+          "certification_review_required": true,
+          "glossary_owner_required": true,
+          "publish_requires_quality": true,
           "require_tenant_context": true,
           "steward_approval_required": true
         },
@@ -420,11 +978,25 @@
           "impact_analysis_enabled": true,
           "lineage_required_for_certified_assets": true,
           "lineage_tracking_enabled": true,
-          "max_lineage_depth": 8
+          "max_lineage_depth": 8,
+          "retire_requires_impact_analysis": true,
+          "source_and_target_registration_required": true
         },
         "quality": {
+          "dimensions": [
+            "completeness",
+            "freshness",
+            "accuracy",
+            "lineage",
+            "classification",
+            "usage"
+          ],
           "minimum_certification_score": 85.0,
           "quality_assessment_enabled": true,
+          "score_range": [
+            0.0,
+            100.0
+          ],
           "stale_asset_days": 90
         },
         "tenant_id": "default",
@@ -433,10 +1005,16 @@
           "default_theme": "meta_catalog_console"
         },
         "ui": {
+          "enable_adapter_health": true,
+          "enable_audit_timeline": true,
           "enable_catalog": true,
+          "enable_certification_queue": true,
           "enable_classification_review": true,
           "enable_discovery_console": true,
-          "enable_lineage_viewer": true
+          "enable_glossary": true,
+          "enable_impact_analysis": true,
+          "enable_lineage_viewer": true,
+          "enable_quality_console": true
         }
       },
       "id": "meta",
@@ -476,6 +1054,58 @@
   },
   "roles": {},
   "rules": {
+    "asset_registration_requires_business_key": {
+      "condition": {
+        "business_key_present": false,
+        "operation": "register_asset"
+      },
+      "description": "Metadata assets require a durable business key.",
+      "effect": {
+        "decision": "deny",
+        "reason": "business_key_required",
+        "required_action": "attach_business_key"
+      },
+      "name": "asset_registration_requires_business_key"
+    },
+    "asset_registration_requires_source_system": {
+      "condition": {
+        "operation": "register_asset",
+        "source_system_present": false
+      },
+      "description": "Metadata assets require source-system context.",
+      "effect": {
+        "decision": "deny",
+        "reason": "source_system_required",
+        "required_action": "attach_source_system"
+      },
+      "name": "asset_registration_requires_source_system"
+    },
+    "asset_type_must_be_supported": {
+      "condition": {
+        "operation": "register_asset",
+        "unsupported_asset_type": true
+      },
+      "description": "Metadata assets must use a configured asset type.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_asset_type",
+        "required_action": "configure_asset_type"
+      },
+      "name": "asset_type_must_be_supported"
+    },
+    "certification_requires_quality_threshold": {
+      "condition": {
+        "operation": "certify_asset",
+        "quality_score_lt": 85.0
+      },
+      "description": "Certification requires metadata quality above the configured threshold.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quality_score_too_low",
+        "required_action": "improve_metadata_quality"
+      },
+      "name": "certification_requires_quality_threshold"
+    },
     "certified_asset_requires_lineage": {
       "condition": {
         "certification_requested": true,
@@ -489,6 +1119,84 @@
       },
       "name": "certified_asset_requires_lineage"
     },
+    "classification_review_requires_notes": {
+      "condition": {
+        "operation": "review_classification",
+        "review_notes_present": false
+      },
+      "description": "Classification stewardship decisions require review notes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "review_notes_required",
+        "required_action": "attach_review_notes"
+      },
+      "name": "classification_review_requires_notes"
+    },
+    "discovery_requires_approved_connector": {
+      "condition": {
+        "connector_approved": false,
+        "operation": "schedule_discovery"
+      },
+      "description": "Discovery jobs require approved connector configuration.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_approval_required",
+        "required_action": "approve_connector"
+      },
+      "name": "discovery_requires_approved_connector"
+    },
+    "discovery_schedule_requires_review": {
+      "condition": {
+        "operation": "schedule_discovery",
+        "schedule_review_current": false
+      },
+      "description": "Recurring discovery schedules require current schedule review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "schedule_review_required",
+        "required_action": "review_discovery_schedule"
+      },
+      "name": "discovery_schedule_requires_review"
+    },
+    "glossary_term_requires_owner": {
+      "condition": {
+        "operation": "register_glossary_term",
+        "term_owner_assigned": false
+      },
+      "description": "Business glossary terms require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "term_owner_required",
+        "required_action": "assign_glossary_owner"
+      },
+      "name": "glossary_term_requires_owner"
+    },
+    "lineage_depth_requires_review": {
+      "condition": {
+        "lineage_depth_gt": 8,
+        "operation": "capture_lineage"
+      },
+      "description": "Lineage requests above configured depth require review.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "lineage_depth_review_required",
+        "required_action": "review_lineage_depth"
+      },
+      "name": "lineage_depth_requires_review"
+    },
+    "lineage_requires_registered_assets": {
+      "condition": {
+        "operation": "capture_lineage",
+        "source_and_target_registered": false
+      },
+      "description": "Lineage edges require registered source and target assets.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registered_assets_required",
+        "required_action": "register_lineage_assets"
+      },
+      "name": "lineage_requires_registered_assets"
+    },
     "low_classification_confidence_requires_review": {
       "condition": {
         "classification_confidence_lt": 0.75,
@@ -501,6 +1209,19 @@
         "required_action": "complete_steward_classification_review"
       },
       "name": "low_classification_confidence_requires_review"
+    },
+    "publish_requires_quality_assessment": {
+      "condition": {
+        "operation": "publish_asset",
+        "quality_assessment_present": false
+      },
+      "description": "Published metadata assets require current quality evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "quality_assessment_required",
+        "required_action": "run_quality_assessment"
+      },
+      "name": "publish_requires_quality_assessment"
     },
     "published_asset_requires_owner": {
       "condition": {
@@ -518,7 +1239,8 @@
     "restricted_asset_requires_classification": {
       "condition": {
         "asset_sensitivity": "restricted",
-        "classification_complete": false
+        "classification_complete": false,
+        "operation": "publish_asset"
       },
       "description": "Restricted assets require completed classification.",
       "effect": {
@@ -527,6 +1249,32 @@
         "required_action": "complete_asset_classification"
       },
       "name": "restricted_asset_requires_classification"
+    },
+    "retire_asset_requires_impact_analysis": {
+      "condition": {
+        "impact_analysis_present": false,
+        "operation": "retire_asset"
+      },
+      "description": "Retiring metadata assets requires impact analysis evidence.",
+      "effect": {
+        "decision": "deny",
+        "reason": "impact_analysis_required",
+        "required_action": "complete_impact_analysis"
+      },
+      "name": "retire_asset_requires_impact_analysis"
+    },
+    "sensitive_asset_requires_steward": {
+      "condition": {
+        "asset_sensitivity": "restricted",
+        "steward_assigned": false
+      },
+      "description": "Sensitive assets require an assigned data steward.",
+      "effect": {
+        "decision": "deny",
+        "reason": "steward_required",
+        "required_action": "assign_data_steward"
+      },
+      "name": "sensitive_asset_requires_steward"
     },
     "stale_asset_requires_review": {
       "condition": {

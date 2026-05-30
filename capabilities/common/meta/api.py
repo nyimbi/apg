@@ -18,11 +18,100 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_restx import Api, Resource, fields, Namespace
 from werkzeug.exceptions import BadRequest, NotFound, InternalServerError
 
-from .service import get_metadata_service, APGMetadataService
+from .service import (
+	APGMetadataService,
+	MetaAssetRecord,
+	MetaCertificationRecord,
+	MetaClassificationRecord,
+	MetaDiscoveryJobRecord,
+	MetaGlossaryTermRecord,
+	MetaLineageRecord,
+	MetaQualityRecord,
+	MetaService,
+	get_metadata_service,
+)
 from .search_engine import SearchQuery
 from .discovery import DiscoverySchedule
 from .connectors import ConnectorConfig
 from .lineage_engine import LineageEdge
+
+
+SERVICE = MetaService()
+
+
+def capability_status(tenant_id: str = "default") -> dict[str, Any]:
+	contract = SERVICE.describe(tenant_id)
+	return {
+		"capability": contract["capability"],
+		"display_name": contract["display_name"],
+		"tenant_id": tenant_id,
+		"route_count": len(contract["ui"]["routes"]),
+		"rule_count": len(contract["rule_engine"]["rules"]),
+		"record_count": len(SERVICE.list_records(tenant_id)),
+	}
+
+
+def register_asset_record(**kwargs: Any) -> MetaAssetRecord:
+	return SERVICE.register_asset(**kwargs)
+
+
+def schedule_discovery_record(**kwargs: Any) -> MetaDiscoveryJobRecord:
+	return SERVICE.schedule_discovery(**kwargs)
+
+
+def classify_asset_record(**kwargs: Any) -> MetaClassificationRecord:
+	return SERVICE.classify_asset(**kwargs)
+
+
+def review_classification_record(**kwargs: Any) -> MetaClassificationRecord:
+	return SERVICE.review_classification(**kwargs)
+
+
+def capture_lineage_record(**kwargs: Any) -> MetaLineageRecord:
+	return SERVICE.capture_lineage(**kwargs)
+
+
+def assess_quality_record(**kwargs: Any) -> MetaQualityRecord:
+	return SERVICE.assess_quality(**kwargs)
+
+
+def request_certification_record(**kwargs: Any) -> MetaCertificationRecord:
+	return SERVICE.request_certification(**kwargs)
+
+
+def register_glossary_term_record(**kwargs: Any) -> MetaGlossaryTermRecord:
+	return SERVICE.register_glossary_term(**kwargs)
+
+
+def publish_asset_record(**kwargs: Any) -> MetaAssetRecord:
+	return SERVICE.publish_asset(**kwargs)
+
+
+def create_record(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.create_record(
+		record_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		metadata=dict(payload.get("metadata") or {}),
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def list_records(tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_records(tenant_id, record_type)
+
+
+def list_metadata(tenant_id: str | None = None) -> dict[str, Any]:
+	return {
+		"summary": SERVICE.dashboard_summary(tenant_id),
+		"assets": SERVICE.list_records(tenant_id, "assets"),
+		"discovery_jobs": SERVICE.list_records(tenant_id, "discovery_jobs"),
+		"classifications": SERVICE.list_records(tenant_id, "classifications"),
+		"lineage": SERVICE.list_records(tenant_id, "lineage"),
+		"quality_assessments": SERVICE.list_records(tenant_id, "quality_assessments"),
+		"certifications": SERVICE.list_records(tenant_id, "certifications"),
+		"glossary_terms": SERVICE.list_records(tenant_id, "glossary_terms"),
+		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
+	}
 
 
 # Create API namespace
@@ -460,7 +549,7 @@ def create_metadata_api() -> Api:
 	api = Api(
 		version='1.0',
 		title='APG Metadata Management API',
-		description='World-class metadata management with AI-powered intelligence',
+		description='Tenant-scoped metadata catalog, discovery, lineage, and governance API',
 		doc='/docs/',
 		prefix='/api/v1'
 	)
@@ -518,7 +607,7 @@ class APIInfoResource(Resource):
 		return {
 			'api_name': 'APG Metadata Management API',
 			'version': '1.0.0',
-			'description': 'World-class metadata management with AI-powered intelligence',
+			'description': 'Tenant-scoped metadata catalog, discovery, lineage, and governance API',
 			'capabilities': [
 				'auto_discovery',
 				'ai_classification',

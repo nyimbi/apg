@@ -7,21 +7,34 @@ Author: Nyimbi Odero
 Copyright: © 2025 Datacraft
 """
 
+from __future__ import annotations
+
 import asyncio
 import json
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional, Set, Union
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from uuid_extensions import uuid7str
 
-from .database import MetaDatabaseManager, create_database_manager
-from .integrations import APGMetadataIntegrationManager, create_apg_integration_manager
-from .discovery import MetadataDiscoveryService, DiscoverySchedule, create_discovery_service
-from .ai_classifier import AIClassificationEngine, create_ai_classifier
-from .lineage_engine import DataLineageEngine, LineageEdge, create_lineage_engine
-from .search_engine import MetadataSearchEngine, SearchQuery, create_search_engine
-from .connectors import ConnectorConfig
+try:
+	from .database import MetaDatabaseManager, create_database_manager
+	from .integrations import APGMetadataIntegrationManager, create_apg_integration_manager
+	from .discovery import MetadataDiscoveryService, DiscoverySchedule, create_discovery_service
+	from .ai_classifier import AIClassificationEngine, create_ai_classifier
+	from .lineage_engine import DataLineageEngine, LineageEdge, create_lineage_engine
+	from .search_engine import MetadataSearchEngine, SearchQuery, create_search_engine
+	from .connectors import ConnectorConfig
+	_RUNTIME_IMPORT_ERROR = None
+except ModuleNotFoundError as exc:
+	MetaDatabaseManager = APGMetadataIntegrationManager = MetadataDiscoveryService = object
+	DiscoverySchedule = AIClassificationEngine = DataLineageEngine = LineageEdge = object
+	MetadataSearchEngine = SearchQuery = ConnectorConfig = object
+	create_database_manager = create_apg_integration_manager = None
+	create_discovery_service = create_ai_classifier = create_lineage_engine = create_search_engine = None
+	_RUNTIME_IMPORT_ERROR = exc
+
+from .capability_contract import evaluate_capability_rules, get_capability_contract
 
 
 class ServiceStatus(str, Enum):
@@ -91,6 +104,613 @@ class ServiceHealth:
 		}
 
 
+@dataclass
+class MetaAssetRecord:
+	"""Dependency-light metadata asset record for generated applications."""
+
+	record_id: str
+	tenant_id: str
+	asset_id: str
+	asset_type: str
+	name: str
+	business_key: str
+	source_system: str
+	owner: str | None
+	steward: str | None
+	sensitivity: str = "internal"
+	status: str = "draft"
+	decision: str = "allow"
+	quality_score: float | None = None
+	classification_id: str | None = None
+	lineage_available: bool = False
+	age_days: int = 0
+	matched_rules: list[str] = field(default_factory=list)
+	tags: list[str] = field(default_factory=list)
+	metadata: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	updated_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaDiscoveryJobRecord:
+	"""Discovery schedule or job evidence."""
+
+	job_id: str
+	tenant_id: str
+	connector_type: str
+	source_system: str
+	schedule: str
+	connector_approved: bool
+	schedule_review_current: bool
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	discovered_asset_ids: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaClassificationRecord:
+	"""Classification evidence and steward review state."""
+
+	classification_id: str
+	tenant_id: str
+	asset_id: str
+	label: str
+	confidence: float
+	classification_complete: bool
+	decision: str
+	status: str
+	steward_review_recorded: bool = False
+	steward: str | None = None
+	review_notes: str | None = None
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+	reviewed_at: datetime | None = None
+
+
+@dataclass
+class MetaLineageRecord:
+	"""Lineage edge evidence."""
+
+	lineage_id: str
+	tenant_id: str
+	source_asset_id: str
+	target_asset_id: str
+	lineage_type: str
+	depth: int
+	evidence: str | None
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaQualityRecord:
+	"""Metadata quality assessment evidence."""
+
+	quality_id: str
+	tenant_id: str
+	asset_id: str
+	score: float
+	dimensions: dict[str, float]
+	assessor: str
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaCertificationRecord:
+	"""Certification decision state."""
+
+	certification_id: str
+	tenant_id: str
+	asset_id: str
+	requester: str
+	decision: str
+	status: str
+	matched_rules: list[str] = field(default_factory=list)
+	review_notes: str | None = None
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaGlossaryTermRecord:
+	"""Business glossary term and ownership evidence."""
+
+	term_id: str
+	tenant_id: str
+	term: str
+	definition: str
+	owner: str | None
+	linked_asset_ids: list[str] = field(default_factory=list)
+	decision: str = "allow"
+	status: str = "active"
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaAuditEventRecord:
+	"""Dependency-light META audit event."""
+
+	event_id: str
+	tenant_id: str
+	event_type: str
+	subject: str
+	actor: str
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	details: dict[str, Any] = field(default_factory=dict)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+class MetaService:
+	"""Dependency-light META lifecycle and guardrail control plane."""
+
+	def __init__(self, tenant_id: str = "default"):
+		self.tenant_id = tenant_id
+		self.contract = get_capability_contract(tenant_id)
+		self.assets: dict[str, MetaAssetRecord] = {}
+		self.discovery_jobs: dict[str, MetaDiscoveryJobRecord] = {}
+		self.classifications: dict[str, MetaClassificationRecord] = {}
+		self.lineage: dict[str, MetaLineageRecord] = {}
+		self.quality_assessments: dict[str, MetaQualityRecord] = {}
+		self.certifications: dict[str, MetaCertificationRecord] = {}
+		self.glossary_terms: dict[str, MetaGlossaryTermRecord] = {}
+		self.audit_events: list[MetaAuditEventRecord] = []
+		self.records: dict[str, dict[str, Any]] = {}
+
+	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
+		return get_capability_contract(tenant_id)
+
+	def create_record(
+		self,
+		*,
+		record_id: str,
+		tenant_id: str,
+		metadata: dict[str, Any] | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		record_id = self._require_text(record_id, "record_id")
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		record = {
+			"id": record_id,
+			"tenant_id": tenant_id,
+			"metadata": dict(metadata or {}),
+			"status": status,
+			"created_at": datetime.utcnow().isoformat(),
+		}
+		self.records[f"{tenant_id}:{record_id}"] = record
+		self._audit(tenant_id, "record.created", record_id, "system", "allow", [], record)
+		return record
+
+	def register_asset(
+		self,
+		*,
+		tenant_id: str,
+		asset_id: str,
+		asset_type: str,
+		name: str,
+		business_key: str,
+		source_system: str,
+		owner: str | None = None,
+		steward: str | None = None,
+		sensitivity: str = "internal",
+		tags: list[str] | None = None,
+		metadata: dict[str, Any] | None = None,
+		age_days: int = 0,
+	) -> MetaAssetRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		asset_type = self._require_text(asset_type, "asset_type")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_asset",
+			"unsupported_asset_type": asset_type not in self._supported_asset_types(tenant_id),
+			"business_key_present": bool(str(business_key or "").strip()),
+			"source_system_present": bool(str(source_system or "").strip()),
+			"asset_sensitivity": "restricted" if sensitivity in {"restricted", "pii", "phi", "pci", "secret"} else sensitivity,
+			"steward_assigned": bool(steward),
+		}
+		decision = evaluate_capability_rules(context)
+		record = MetaAssetRecord(
+			record_id=uuid7str(),
+			tenant_id=tenant_id,
+			asset_id=self._require_text(asset_id, "asset_id"),
+			asset_type=asset_type,
+			name=self._require_text(name, "name"),
+			business_key=str(business_key or "").strip(),
+			source_system=str(source_system or "").strip(),
+			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
+			steward=steward.strip() if isinstance(steward, str) and steward.strip() else None,
+			sensitivity=sensitivity,
+			status="draft" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=decision["matched_rules"],
+			tags=list(tags or []),
+			metadata=dict(metadata or {}),
+			age_days=age_days,
+		)
+		self.assets[self._asset_key(tenant_id, record.asset_id)] = record
+		self._audit(tenant_id, "asset.registered", record.asset_id, record.owner or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def schedule_discovery(
+		self,
+		*,
+		tenant_id: str,
+		connector_type: str,
+		source_system: str,
+		schedule: str,
+		connector_approved: bool,
+		schedule_review_current: bool,
+	) -> MetaDiscoveryJobRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		connector_type = self._require_choice(connector_type, "connector_type", set(self.describe(tenant_id)["configuration"]["discovery"]["allowed_connector_types"]))
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "schedule_discovery",
+			"connector_approved": connector_approved,
+			"schedule_review_current": schedule_review_current,
+		}
+		decision = evaluate_capability_rules(context)
+		record = MetaDiscoveryJobRecord(
+			job_id=uuid7str(),
+			tenant_id=tenant_id,
+			connector_type=connector_type,
+			source_system=self._require_text(source_system, "source_system"),
+			schedule=self._require_text(schedule, "schedule"),
+			connector_approved=connector_approved,
+			schedule_review_current=schedule_review_current,
+			decision=decision["decision"],
+			status="scheduled" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+		)
+		self.discovery_jobs[record.job_id] = record
+		self._audit(tenant_id, "discovery.scheduled", record.job_id, record.source_system, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def record_discovery_result(self, *, job_id: str, discovered_asset_ids: list[str]) -> MetaDiscoveryJobRecord:
+		if job_id not in self.discovery_jobs:
+			raise KeyError(f"Discovery job {job_id} not found")
+		record = self.discovery_jobs[job_id]
+		if record.status != "scheduled":
+			raise ValueError(f"Discovery job {job_id} is {record.status} and cannot record results")
+		record.discovered_asset_ids = list(discovered_asset_ids)
+		record.status = "completed"
+		self._audit(record.tenant_id, "discovery.completed", record.job_id, record.source_system, "allow", [], asdict(record))
+		return record
+
+	def classify_asset(
+		self,
+		*,
+		tenant_id: str,
+		asset_id: str,
+		label: str,
+		confidence: float,
+		classification_complete: bool,
+		steward_review_recorded: bool = False,
+	) -> MetaClassificationRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		asset = self._require_asset(tenant_id, asset_id)
+		if confidence < 0.0 or confidence > 1.0:
+			raise ValueError("confidence must be between 0 and 1")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"asset_sensitivity": "restricted" if label in self.describe(tenant_id)["configuration"]["classification"]["sensitive_labels"] else asset.sensitivity,
+			"classification_complete": classification_complete,
+			"classification_confidence": confidence,
+			"steward_review_recorded": steward_review_recorded,
+		}
+		decision = evaluate_capability_rules(context)
+		record = MetaClassificationRecord(
+			classification_id=uuid7str(),
+			tenant_id=tenant_id,
+			asset_id=asset.asset_id,
+			label=self._require_text(label, "label"),
+			confidence=confidence,
+			classification_complete=classification_complete,
+			decision=decision["decision"],
+			status="accepted" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			steward_review_recorded=steward_review_recorded,
+			matched_rules=decision["matched_rules"],
+		)
+		self.classifications[record.classification_id] = record
+		if decision["decision"] == "allow":
+			asset.classification_id = record.classification_id
+			asset.sensitivity = "restricted" if label in self.describe(tenant_id)["configuration"]["classification"]["sensitive_labels"] else asset.sensitivity
+			asset.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "asset.classified", asset.asset_id, "classifier", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def review_classification(self, *, classification_id: str, steward: str, review_notes: str) -> MetaClassificationRecord:
+		if classification_id not in self.classifications:
+			raise KeyError(f"Classification {classification_id} not found")
+		record = self.classifications[classification_id]
+		context = {
+			"tenant_context_present": bool(record.tenant_id),
+			"operation": "review_classification",
+			"review_notes_present": bool(str(review_notes or "").strip()),
+		}
+		decision = evaluate_capability_rules(context)
+		record.steward = self._require_text(steward, "steward")
+		record.review_notes = str(review_notes or "").strip() or None
+		record.steward_review_recorded = decision["decision"] == "allow"
+		record.decision = "reviewed" if decision["decision"] == "allow" else decision["decision"]
+		record.status = "reviewed" if decision["decision"] == "allow" else "review_denied"
+		record.matched_rules = decision["matched_rules"]
+		record.reviewed_at = datetime.utcnow()
+		self._audit(record.tenant_id, "classification.reviewed", record.classification_id, record.steward, record.decision, record.matched_rules, context)
+		return record
+
+	def capture_lineage(
+		self,
+		*,
+		tenant_id: str,
+		source_asset_id: str,
+		target_asset_id: str,
+		lineage_type: str,
+		depth: int = 1,
+		evidence: str | None = None,
+	) -> MetaLineageRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		source_registered = self._asset_key(tenant_id, source_asset_id) in self.assets
+		target_registered = self._asset_key(tenant_id, target_asset_id) in self.assets
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "capture_lineage",
+			"source_and_target_registered": source_registered and target_registered,
+			"lineage_depth": depth,
+		}
+		decision = evaluate_capability_rules(context)
+		record = MetaLineageRecord(
+			lineage_id=uuid7str(),
+			tenant_id=tenant_id,
+			source_asset_id=self._require_text(source_asset_id, "source_asset_id"),
+			target_asset_id=self._require_text(target_asset_id, "target_asset_id"),
+			lineage_type=self._require_text(lineage_type, "lineage_type"),
+			depth=depth,
+			evidence=evidence,
+			decision=decision["decision"],
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+		)
+		self.lineage[record.lineage_id] = record
+		if decision["decision"] == "allow":
+			self._require_asset(tenant_id, source_asset_id).lineage_available = True
+			self._require_asset(tenant_id, target_asset_id).lineage_available = True
+		self._audit(tenant_id, "lineage.captured", record.lineage_id, "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def assess_quality(
+		self,
+		*,
+		tenant_id: str,
+		asset_id: str,
+		score: float,
+		dimensions: dict[str, float],
+		assessor: str,
+	) -> MetaQualityRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		asset = self._require_asset(tenant_id, asset_id)
+		if score < 0.0 or score > 100.0 or any(value < 0.0 or value > 100.0 for value in dimensions.values()):
+			raise ValueError("quality scores must be between 0 and 100")
+		record = MetaQualityRecord(
+			quality_id=uuid7str(),
+			tenant_id=tenant_id,
+			asset_id=asset.asset_id,
+			score=score,
+			dimensions=dict(dimensions),
+			assessor=self._require_text(assessor, "assessor"),
+			decision="allow",
+			status="accepted",
+		)
+		self.quality_assessments[record.quality_id] = record
+		asset.quality_score = score
+		asset.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "quality.assessed", asset.asset_id, record.assessor, "allow", [], asdict(record))
+		return record
+
+	def request_certification(self, *, tenant_id: str, asset_id: str, requester: str, review_notes: str | None = None) -> MetaCertificationRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		asset = self._require_asset(tenant_id, asset_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "certify_asset",
+			"certification_requested": True,
+			"lineage_available": asset.lineage_available,
+			"quality_score": asset.quality_score or 0.0,
+			"asset_age_days": asset.age_days,
+			"freshness_review_recorded": bool(review_notes),
+		}
+		decision = evaluate_capability_rules(context)
+		record = MetaCertificationRecord(
+			certification_id=uuid7str(),
+			tenant_id=tenant_id,
+			asset_id=asset.asset_id,
+			requester=self._require_text(requester, "requester"),
+			decision=decision["decision"],
+			status="certified" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+			review_notes=review_notes,
+		)
+		self.certifications[record.certification_id] = record
+		if decision["decision"] == "allow":
+			asset.status = "certified"
+			asset.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "asset.certification_requested", asset.asset_id, record.requester, decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def publish_asset(self, *, tenant_id: str, asset_id: str) -> MetaAssetRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		asset = self._require_asset(tenant_id, asset_id)
+		classification = self._classification_for_asset(tenant_id, asset.asset_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "publish_asset",
+			"asset_owner_assigned": bool(asset.owner),
+			"quality_assessment_present": asset.quality_score is not None,
+			"asset_sensitivity": "restricted" if asset.sensitivity in {"restricted", "pii", "phi", "pci", "secret"} else asset.sensitivity,
+			"classification_complete": bool(classification and classification.classification_complete),
+			"steward_assigned": bool(asset.steward),
+		}
+		decision = evaluate_capability_rules(context)
+		asset.decision = decision["decision"]
+		asset.matched_rules = decision["matched_rules"]
+		if decision["decision"] == "allow":
+			asset.status = "published"
+		asset.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "asset.publish_evaluated", asset.asset_id, asset.owner or "system", decision["decision"], decision["matched_rules"], context)
+		return asset
+
+	def register_glossary_term(
+		self,
+		*,
+		tenant_id: str,
+		term: str,
+		definition: str,
+		owner: str | None,
+		linked_asset_ids: list[str] | None = None,
+	) -> MetaGlossaryTermRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_glossary_term",
+			"term_owner_assigned": bool(owner),
+		}
+		decision = evaluate_capability_rules(context)
+		record = MetaGlossaryTermRecord(
+			term_id=uuid7str(),
+			tenant_id=tenant_id,
+			term=self._require_text(term, "term"),
+			definition=self._require_text(definition, "definition"),
+			owner=owner.strip() if isinstance(owner, str) and owner.strip() else None,
+			linked_asset_ids=list(linked_asset_ids or []),
+			decision=decision["decision"],
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			matched_rules=decision["matched_rules"],
+		)
+		self.glossary_terms[record.term_id] = record
+		self._audit(tenant_id, "glossary.term.registered", record.term_id, record.owner or "system", decision["decision"], decision["matched_rules"], context)
+		return record
+
+	def retire_asset(self, *, tenant_id: str, asset_id: str, impact_analysis_present: bool, actor: str) -> MetaAssetRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		asset = self._require_asset(tenant_id, asset_id)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "retire_asset",
+			"impact_analysis_present": impact_analysis_present,
+		}
+		decision = evaluate_capability_rules(context)
+		asset.decision = decision["decision"]
+		asset.matched_rules = decision["matched_rules"]
+		if decision["decision"] == "allow":
+			asset.status = "retired"
+			asset.updated_at = datetime.utcnow()
+		self._audit(tenant_id, "asset.retired", asset.asset_id, self._require_text(actor, "actor"), decision["decision"], decision["matched_rules"], context)
+		return asset
+
+	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
+		tenant_id = tenant_id or self.tenant_id
+		collections: dict[str, Any] = {
+			"assets": self.assets.values(),
+			"discovery_jobs": self.discovery_jobs.values(),
+			"classifications": self.classifications.values(),
+			"lineage": self.lineage.values(),
+			"quality_assessments": self.quality_assessments.values(),
+			"certifications": self.certifications.values(),
+			"glossary_terms": self.glossary_terms.values(),
+			"audit_events": self.audit_events,
+			"records": self.records.values(),
+		}
+		if record_type:
+			if record_type not in collections:
+				raise ValueError(f"Unsupported record_type {record_type}")
+			values = collections[record_type]
+		else:
+			values = []
+			for collection in collections.values():
+				values.extend(collection)
+		return [
+			dict(record) if isinstance(record, dict) else asdict(record)
+			for record in values
+			if (record.get("tenant_id") if isinstance(record, dict) else getattr(record, "tenant_id", None)) == tenant_id
+		]
+
+	def dashboard_summary(self, tenant_id: str | None = None) -> dict[str, Any]:
+		tenant_id = tenant_id or self.tenant_id
+		return {
+			"tenant_id": tenant_id,
+			"asset_count": len(self.list_records(tenant_id, "assets")),
+			"published_asset_count": sum(1 for row in self.list_records(tenant_id, "assets") if row["status"] == "published"),
+			"discovery_job_count": len(self.list_records(tenant_id, "discovery_jobs")),
+			"classification_review_count": sum(1 for row in self.list_records(tenant_id, "classifications") if row["status"] == "pending_review"),
+			"lineage_edge_count": len(self.list_records(tenant_id, "lineage")),
+			"certified_asset_count": sum(1 for row in self.list_records(tenant_id, "assets") if row["status"] == "certified"),
+			"glossary_term_count": len(self.list_records(tenant_id, "glossary_terms")),
+			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
+		}
+
+	def _audit(self, tenant_id: str, event_type: str, subject: str, actor: str, decision: str, matched_rules: list[str], details: dict[str, Any]) -> None:
+		self.audit_events.append(MetaAuditEventRecord(
+			event_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_type=event_type,
+			subject=subject,
+			actor=actor,
+			decision=decision,
+			matched_rules=list(matched_rules),
+			details=details,
+		))
+
+	def _supported_asset_types(self, tenant_id: str) -> set[str]:
+		return set(self.describe(tenant_id)["configuration"]["catalog"]["supported_asset_types"])
+
+	def _require_asset(self, tenant_id: str, asset_id: str) -> MetaAssetRecord:
+		asset_id = self._require_text(asset_id, "asset_id")
+		record = self.assets.get(self._asset_key(tenant_id, asset_id))
+		if record is None:
+			raise KeyError(f"Asset {asset_id} not found for tenant {tenant_id}")
+		if record.status == "denied":
+			raise ValueError(f"Asset {asset_id} is denied and cannot continue lifecycle operations")
+		return record
+
+	def _classification_for_asset(self, tenant_id: str, asset_id: str) -> MetaClassificationRecord | None:
+		for classification in reversed(list(self.classifications.values())):
+			if classification.tenant_id == tenant_id and classification.asset_id == asset_id:
+				return classification
+		return None
+
+	@staticmethod
+	def _status_for_decision(decision: str) -> str:
+		if decision == "require_review":
+			return "pending_review"
+		if decision == "deny":
+			return "denied"
+		return "active"
+
+	@staticmethod
+	def _require_text(value: str, field_name: str) -> str:
+		if not isinstance(value, str) or not value.strip():
+			raise ValueError(f"{field_name} is required")
+		return value.strip()
+
+	@staticmethod
+	def _require_choice(value: str, field_name: str, allowed: set[str]) -> str:
+		text = MetaService._require_text(value, field_name)
+		if text not in allowed:
+			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
+		return text
+
+	@staticmethod
+	def _asset_key(tenant_id: str, asset_id: str) -> str:
+		return f"{tenant_id}:{asset_id}"
+
+
 class APGMetadataService:
 	"""Main APG Metadata Management Service orchestrating all components"""
 	
@@ -131,6 +751,10 @@ class APGMetadataService:
 	
 	async def initialize(self) -> Dict[str, Any]:
 		"""Initialize all service components"""
+		if _RUNTIME_IMPORT_ERROR is not None:
+			raise ModuleNotFoundError(
+				"META production runtime requires optional database/search dependencies such as asyncpg"
+			) from _RUNTIME_IMPORT_ERROR
 		if self.initialized:
 			return {"status": "already_initialized"}
 		

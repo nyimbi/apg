@@ -4,13 +4,26 @@
       "capability_contract": {
         "display_name": "Metadata Management",
         "errors": [],
-        "route_count": 8,
-        "rule_count": 6
+        "route_count": 13,
+        "rule_count": 19
       }
+    },
+    "runtime": {
+      "api": "api.py",
+      "entrypoint": "app.py",
+      "service": "service.py",
+      "views": "view_models.py"
     },
     "self_test": {
       "capability": "meta",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

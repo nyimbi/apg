@@ -5,13 +5,141 @@ from __future__ import annotations
 import json
 from typing import Any
 
+try:
+	from .capability_contract import get_capability_contract
+except ImportError:  # pragma: no cover - standalone package loading path
+	import importlib.util
+	import sys
+	from pathlib import Path
 
-SEMANTIC_MODEL: dict[str, Any] = json.loads(r"""{"agents": {}, "app": {"description": "Metadata Management package-backed APG capability", "entity_count": 0, "name": "meta", "version": "1.0.0"}, "capabilities": {"meta": {"approvals": {}, "business_rules": [], "components": {}, "configuration": {"catalog": {"asset_registration_required": true, "business_glossary_enabled": true, "default_asset_status": "draft", "owner_required_for_published_assets": true}, "classification": {"ai_classification_enabled": true, "confidence_review_threshold": 0.75, "pii_detection_enabled": true, "restricted_data_requires_classification": true}, "discovery": {"auto_discovery_enabled": true, "connector_approval_required": true, "max_concurrent_jobs": 5, "schedule_review_days": 30}, "governance": {"audit_catalog_mutations": true, "require_tenant_context": true, "steward_approval_required": true}, "lineage": {"impact_analysis_enabled": true, "lineage_required_for_certified_assets": true, "lineage_tracking_enabled": true, "max_lineage_depth": 8}, "quality": {"minimum_certification_score": 85.0, "quality_assessment_enabled": true, "stale_asset_days": 90}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "meta_catalog_console"}, "ui": {"enable_catalog": true, "enable_classification_review": true, "enable_discovery_console": true, "enable_lineage_viewer": true}}, "erp_modules": ["common"], "i18n": {}, "master_data": {}, "name": "Metadata Management", "provides": ["meta_operations"], "requires": [], "rule_engine": {"rules": [{"condition": {"tenant_context_present": false}, "description": "All metadata operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"asset_owner_assigned": false, "operation": "publish_asset"}, "description": "Published metadata assets require an assigned owner.", "effect": {"decision": "deny", "reason": "asset_owner_required", "required_action": "assign_asset_owner"}, "name": "published_asset_requires_owner"}, {"condition": {"asset_sensitivity": "restricted", "classification_complete": false}, "description": "Restricted assets require completed classification.", "effect": {"decision": "deny", "reason": "classification_required", "required_action": "complete_asset_classification"}, "name": "restricted_asset_requires_classification"}, {"condition": {"certification_requested": true, "lineage_available": false}, "description": "Certified assets require lineage evidence.", "effect": {"decision": "deny", "reason": "lineage_required", "required_action": "capture_asset_lineage"}, "name": "certified_asset_requires_lineage"}, {"condition": {"classification_confidence_lt": 0.75, "steward_review_recorded": false}, "description": "Low confidence AI classifications require steward review.", "effect": {"decision": "require_review", "reason": "classification_review_required", "required_action": "complete_steward_classification_review"}, "name": "low_classification_confidence_requires_review"}, {"condition": {"asset_age_days_gt": 90, "freshness_review_recorded": false}, "description": "Stale metadata assets require review before certification.", "effect": {"decision": "require_review", "reason": "freshness_review_required", "required_action": "review_asset_freshness"}, "name": "stale_asset_requires_review"}], "type": "deterministic"}, "rules": [{"condition": {"tenant_context_present": false}, "description": "All metadata operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}, {"condition": {"asset_owner_assigned": false, "operation": "publish_asset"}, "description": "Published metadata assets require an assigned owner.", "effect": {"decision": "deny", "reason": "asset_owner_required", "required_action": "assign_asset_owner"}, "name": "published_asset_requires_owner"}, {"condition": {"asset_sensitivity": "restricted", "classification_complete": false}, "description": "Restricted assets require completed classification.", "effect": {"decision": "deny", "reason": "classification_required", "required_action": "complete_asset_classification"}, "name": "restricted_asset_requires_classification"}, {"condition": {"certification_requested": true, "lineage_available": false}, "description": "Certified assets require lineage evidence.", "effect": {"decision": "deny", "reason": "lineage_required", "required_action": "capture_asset_lineage"}, "name": "certified_asset_requires_lineage"}, {"condition": {"classification_confidence_lt": 0.75, "steward_review_recorded": false}, "description": "Low confidence AI classifications require steward review.", "effect": {"decision": "require_review", "reason": "classification_review_required", "required_action": "complete_steward_classification_review"}, "name": "low_classification_confidence_requires_review"}, {"condition": {"asset_age_days_gt": 90, "freshness_review_recorded": false}, "description": "Stale metadata assets require review before certification.", "effect": {"decision": "require_review", "reason": "freshness_review_required", "required_action": "review_asset_freshness"}, "name": "stale_asset_requires_review"}], "runtime": {"api": "api.py", "entrypoint": "app.py", "service": "service.py", "views": "views.py"}, "screens": {"catalog": {"component": "AssetCatalog", "permission": "meta:view_assets", "route": "/meta/catalog"}, "classification": {"component": "ClassificationReview", "permission": "meta:classify", "route": "/meta/classification"}, "dashboard": {"component": "MetadataDashboard", "permission": "meta:view", "route": "/meta/dashboard"}, "discovery": {"component": "DiscoveryConsole", "permission": "meta:run_discovery", "route": "/meta/discovery"}, "lineage": {"component": "LineageViewer", "permission": "meta:view_lineage", "route": "/meta/lineage"}, "quality": {"component": "MetadataQualityConsole", "permission": "meta:view_quality", "route": "/meta/quality"}, "search": {"component": "MetadataSearch", "permission": "meta:search", "route": "/meta/search"}, "settings": {"component": "MetadataSettings", "permission": "meta:admin", "route": "/meta/settings"}}, "streaming": {}, "theme": {"components": {"asset_catalog_card": {"icon": "database", "risk_style": "classification-band", "status_indicator": "certification-pill"}, "classification_review_queue": {"highlight": "sensitivity-chip", "visual": "confidence-stack"}, "discovery_job_timeline": {"status_style": "job-state-pill", "visual": "connector-run-timeline"}, "lineage_graph_viewer": {"edge_style": "transformation-line", "visual": "directed-lineage-graph"}}, "name": "meta_catalog_console", "tokens": {"border.radius": "8px", "color.accent": "#81B29A", "color.danger": "#C53030", "color.primary": "#3D405B", "color.success": "#2F855A", "color.warning": "#B7791F", "density": "compact", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#1F2933", "text.secondary": "#52606D"}}, "ui": {"api_prefix": "/meta/api/v1", "requires_theme": true, "routes": [{"component": "MetadataDashboard", "name": "dashboard", "nav_group": "Overview", "path": "/meta/dashboard", "permission": "meta:view"}, {"component": "AssetCatalog", "name": "catalog", "nav_group": "Catalog", "path": "/meta/catalog", "permission": "meta:view_assets"}, {"component": "DiscoveryConsole", "name": "discovery", "nav_group": "Discovery", "path": "/meta/discovery", "permission": "meta:run_discovery"}, {"component": "LineageViewer", "name": "lineage", "nav_group": "Catalog", "path": "/meta/lineage", "permission": "meta:view_lineage"}, {"component": "ClassificationReview", "name": "classification", "nav_group": "Governance", "path": "/meta/classification", "permission": "meta:classify"}, {"component": "MetadataQualityConsole", "name": "quality", "nav_group": "Governance", "path": "/meta/quality", "permission": "meta:view_quality"}, {"component": "MetadataSearch", "name": "search", "nav_group": "Catalog", "path": "/meta/search", "permission": "meta:search"}, {"component": "MetadataSettings", "name": "settings", "nav_group": "Administration", "path": "/meta/settings", "permission": "meta:admin"}], "shell": "apg_python", "template_roots": ["templates/", "static/"], "view_module": "blueprint.py"}}}, "composition": {"agent_teams": {}, "applications": {}, "capability_dependencies": {"meta": []}}, "contracts": {"meta": {"configuration": {"catalog": {"asset_registration_required": true, "business_glossary_enabled": true, "default_asset_status": "draft", "owner_required_for_published_assets": true}, "classification": {"ai_classification_enabled": true, "confidence_review_threshold": 0.75, "pii_detection_enabled": true, "restricted_data_requires_classification": true}, "discovery": {"auto_discovery_enabled": true, "connector_approval_required": true, "max_concurrent_jobs": 5, "schedule_review_days": 30}, "governance": {"audit_catalog_mutations": true, "require_tenant_context": true, "steward_approval_required": true}, "lineage": {"impact_analysis_enabled": true, "lineage_required_for_certified_assets": true, "lineage_tracking_enabled": true, "max_lineage_depth": 8}, "quality": {"minimum_certification_score": 85.0, "quality_assessment_enabled": true, "stale_asset_days": 90}, "tenant_id": "default", "theme": {"allow_tenant_overrides": true, "default_theme": "meta_catalog_console"}, "ui": {"enable_catalog": true, "enable_classification_review": true, "enable_discovery_console": true, "enable_lineage_viewer": true}}, "id": "meta", "provides": ["meta_operations"], "requires": []}}, "deployment": {"source": "capability_contract.py", "target": "python"}, "diagnostics": [], "flows": {}, "format": "apg.semantic-model.v1", "graphs": {"capability": {"edges": 0, "kind": "capability", "nodes": 1}, "package": {"edges": 1, "kind": "package", "nodes": 2}}, "llms": {}, "ok": true, "operations": {}, "packages": {"meta": {"entrypoint": "app.py", "profile": "capability"}}, "roles": {}, "rules": {"certified_asset_requires_lineage": {"condition": {"certification_requested": true, "lineage_available": false}, "description": "Certified assets require lineage evidence.", "effect": {"decision": "deny", "reason": "lineage_required", "required_action": "capture_asset_lineage"}, "name": "certified_asset_requires_lineage"}, "low_classification_confidence_requires_review": {"condition": {"classification_confidence_lt": 0.75, "steward_review_recorded": false}, "description": "Low confidence AI classifications require steward review.", "effect": {"decision": "require_review", "reason": "classification_review_required", "required_action": "complete_steward_classification_review"}, "name": "low_classification_confidence_requires_review"}, "published_asset_requires_owner": {"condition": {"asset_owner_assigned": false, "operation": "publish_asset"}, "description": "Published metadata assets require an assigned owner.", "effect": {"decision": "deny", "reason": "asset_owner_required", "required_action": "assign_asset_owner"}, "name": "published_asset_requires_owner"}, "restricted_asset_requires_classification": {"condition": {"asset_sensitivity": "restricted", "classification_complete": false}, "description": "Restricted assets require completed classification.", "effect": {"decision": "deny", "reason": "classification_required", "required_action": "complete_asset_classification"}, "name": "restricted_asset_requires_classification"}, "stale_asset_requires_review": {"condition": {"asset_age_days_gt": 90, "freshness_review_recorded": false}, "description": "Stale metadata assets require review before certification.", "effect": {"decision": "require_review", "reason": "freshness_review_required", "required_action": "review_asset_freshness"}, "name": "stale_asset_requires_review"}, "tenant_context_required": {"condition": {"tenant_context_present": false}, "description": "All metadata operations require tenant context.", "effect": {"decision": "deny", "reason": "tenant_context_required", "required_action": "attach_tenant_context"}, "name": "tenant_context_required"}}, "security": {}, "source_files": ["capability_contract.py"], "symbols": {"capability.meta": {"file": "capability_contract.py", "id": "capability.meta", "kind": "capability", "name": "Metadata Management", "range": {"end": {"character": 1, "line": 0}, "start": {"character": 0, "line": 0}}, "references": []}}, "tables": {}, "views": {}}""")
+	_CONTRACT_PATH = Path(__file__).with_name("capability_contract.py")
+	_SPEC = importlib.util.spec_from_file_location("meta_capability_contract", _CONTRACT_PATH)
+	assert _SPEC is not None
+	assert _SPEC.loader is not None
+	_MODULE = importlib.util.module_from_spec(_SPEC)
+	sys.modules[_SPEC.name] = _MODULE
+	_SPEC.loader.exec_module(_MODULE)
+	get_capability_contract = _MODULE.get_capability_contract
 
 
 def semantic_model() -> dict[str, Any]:
-	"""Return the package semantic model."""
-	return json.loads(json.dumps(SEMANTIC_MODEL, sort_keys=True))
+	"""Return the package semantic model from the current capability contract."""
+	contract = get_capability_contract("default")
+	routes = {
+		route["name"]: {
+			"route": route["path"],
+			"component": route["component"],
+			"permission": route["permission"],
+		}
+		for route in contract["ui"]["routes"]
+	}
+	return {
+		"format": "apg.semantic-model.v1",
+		"ok": True,
+		"app": {
+			"name": "meta",
+			"version": "1.0.0",
+			"description": "Metadata Management package-backed APG capability",
+			"entity_count": 0,
+		},
+		"packages": {
+			"meta": {
+				"profile": "capability",
+				"entrypoint": "app.py",
+			}
+		},
+		"capabilities": {
+			"meta": {
+				"name": contract["display_name"],
+				"configuration": contract["configuration"],
+				"provides": ["meta_operations"],
+				"requires": [],
+				"erp_modules": ["common"],
+				"rule_engine": contract["rule_engine"],
+				"rules": contract["rule_engine"]["rules"],
+				"ui": contract["ui"],
+				"screens": routes,
+				"theme": contract["theme"],
+				"runtime": {
+					"api": "api.py",
+					"entrypoint": "app.py",
+					"service": "service.py",
+					"views": "view_models.py",
+				},
+				"business_rules": [],
+				"components": {},
+				"approvals": {
+					"classification_review": "MetaClassificationRecord",
+					"certification": "MetaCertificationRecord",
+					"discovery_schedule": "MetaDiscoveryJobRecord",
+				},
+				"metadata_lifecycle": {
+					"asset": "MetaAssetRecord",
+					"discovery": "MetaDiscoveryJobRecord",
+					"classification": "MetaClassificationRecord",
+					"lineage": "MetaLineageRecord",
+					"quality": "MetaQualityRecord",
+					"certification": "MetaCertificationRecord",
+					"glossary": "MetaGlossaryTermRecord",
+					"audit": "MetaAuditEventRecord",
+				},
+				"adapters": contract["configuration"]["adapters"],
+				"i18n": {},
+				"master_data": {},
+				"streaming": {
+					"engine": contract["configuration"]["adapters"]["event_stream"],
+				},
+			}
+		},
+		"contracts": {
+			"meta": {
+				"id": "meta",
+				"configuration": contract["configuration"],
+				"provides": ["meta_operations"],
+				"requires": [],
+			}
+		},
+		"rules": {
+			rule["name"]: rule
+			for rule in contract["rule_engine"]["rules"]
+		},
+		"composition": {
+			"capability_dependencies": {"meta": []},
+			"applications": {},
+			"agent_teams": {},
+		},
+		"deployment": {
+			"source": "capability_contract.py",
+			"target": "python",
+		},
+		"graphs": {
+			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"package": {"kind": "package", "nodes": 2, "edges": 1},
+		},
+		"source_files": ["capability_contract.py"],
+		"symbols": {
+			"capability.meta": {
+				"id": "capability.meta",
+				"kind": "capability",
+				"name": contract["display_name"],
+				"file": "capability_contract.py",
+				"range": {
+					"start": {"line": 0, "character": 0},
+					"end": {"line": 0, "character": 1},
+				},
+				"references": [],
+			}
+		},
+		"agents": {},
+		"flows": {},
+		"llms": {},
+		"operations": {},
+		"roles": {},
+		"security": {},
+		"tables": {},
+		"views": {},
+		"diagnostics": [],
+	}
 
 
 def component_manifest() -> dict[str, Any]:
@@ -36,12 +164,22 @@ def self_test() -> dict[str, Any]:
 	model = semantic_model()
 	manifest = component_manifest()
 	errors: list[str] = []
+	capability = model.get("capabilities", {}).get("meta", {})
+	routes = capability.get("ui", {}).get("routes", [])
+	rules = capability.get("rule_engine", {}).get("rules", [])
+	adapters = capability.get("adapters", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "meta" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
+	if len(routes) < 13:
+		errors.append("META semantic model route manifest is stale")
+	if len(rules) < 17:
+		errors.append("META semantic model rule manifest is stale")
+	if adapters.get("event_stream") != "bytewax":
+		errors.append("META adapter manifest must use Bytewax for event streaming")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

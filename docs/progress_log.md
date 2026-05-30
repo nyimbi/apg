@@ -13471,3 +13471,63 @@ Battery-conscious verification so far:
 - `./.venv/bin/apg capabilities publish-plan capabilities/common/cach --json` passed with 12 routes, 16 deterministic rules, adapter boundary evidence, side-effect-free catalog evidence, and no publish warnings.
 - `rg -n "10x|Gartner|Revolutionary|microsecond|99\\.9|test_materialized_package|materialized_contract_cach|materialized_app_cach|Materialized capability package|This package materializes|mock data|placeholder" capabilities/common/cach/README.md capabilities/common/cach/SPECIFICATION.md capabilities/common/cach/PLAN.md capabilities/common/cach/cap_spec.md capabilities/common/cach/app.py capabilities/common/cach/api.py capabilities/common/cach/service.py capabilities/common/cach/view_models.py capabilities/common/cach/tests/test_capability_contract.py capabilities/common/cach/tests/test_package_contract.py capabilities/common/cach/package_manifest.json capabilities/common/cach/release_report.json capabilities/common/cach/semantic_model.json` returned no stale primary CACH package markers.
 - `git diff --check -- capabilities/common/cach docs/progress_log.md` passed with no whitespace errors.
+
+### 2026-05-30 05:27 EAT
+
+META specification, plan, and executable metadata-governance packet:
+
+- Selected `capabilities/common/meta` as the next common capability after MDM
+  in the development order.
+- Replaced overclaiming package documentation with a practical README,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` covering metadata asset
+  registration, discovery, classification, lineage, quality, certification,
+  glossary, publication, retirement, UI, theming, audit, and adapter
+  boundaries.
+- Expanded the META contract with catalog, discovery, classification, lineage,
+  quality, governance, adapter, UI, and theme configuration.
+- Added 19 deterministic guardrails for tenant context, supported asset types,
+  business keys, source systems, owner assignment, quality evidence,
+  restricted classification, steward assignment, lineage, certification
+  quality, review notes, discovery approvals, schedule review, registered
+  lineage endpoints, lineage depth, glossary ownership, impact analysis, and
+  stale asset review.
+- Added `MetaService` with dependency-light asset, discovery, classification,
+  lineage, quality, certification, glossary, audit, publish, and retirement
+  lifecycle records for generated APG applications.
+- Kept `APGMetadataService` as the production runtime surface while making its
+  optional runtime dependencies explicit, so generated-app imports still work
+  without live database/search/classifier dependencies.
+- Added generated-app API helpers and `view_models.py` route models for
+  dashboard, catalog, discovery, classification, lineage, quality,
+  certification, glossary, impact, search, audit, adapter health, and settings
+  screens.
+- Replaced static semantic evidence in `app.py`, `semantic_model.json`,
+  `package_manifest.json`, and `release_report.json` with contract-derived
+  package evidence.
+- Renamed the stale package test file to `tests/test_package_contract.py`.
+- Code review found and fixed optional dependency import failures,
+  classification rule scoping, latest-classification lookup, denied publish
+  status handling, denied discovery-result completion, and stale API
+  description language.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/meta/__init__.py capabilities/common/meta/capability_contract.py capabilities/common/meta/service.py capabilities/common/meta/api.py capabilities/common/meta/view_models.py capabilities/common/meta/app.py capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py` passed.
+- `./.venv/bin/pytest -q capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py` passed with 8 tests and only unrelated SQLAlchemy/Pydantic deprecation warnings from imported modules.
+- `./.venv/bin/python -c "from capabilities.common.meta import MetaService; service=MetaService(); print(service.dashboard_summary()['asset_count'])"` imported the generated-app runtime without `asyncpg` and returned `0`.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/meta --json` passed with `ok: true`; META remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/meta --json` passed with 13 UI routes, 19 deterministic rules, Bytewax adapter evidence, side-effect-free catalog evidence, and no publish warnings.
+- `rg -n -e "World-class" -e "Revolutionary" -e "10x" -e "Gartner" -e "test_materialized_package" -e "materialized_contract_meta" -e "materialized_app_meta" -e "Materialized capability package" -e "This package materializes" -e "mock data" -e "mock calculation" -e "placeholder" -e "synthetic" capabilities/common/meta/README.md capabilities/common/meta/SPECIFICATION.md capabilities/common/meta/PLAN.md capabilities/common/meta/cap_spec.md capabilities/common/meta/app.py capabilities/common/meta/api.py capabilities/common/meta/service.py capabilities/common/meta/view_models.py capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py capabilities/common/meta/package_manifest.json capabilities/common/meta/release_report.json capabilities/common/meta/semantic_model.json capabilities/common/meta/__init__.py capabilities/common/meta/capability_contract.py capabilities/common/meta/models.py` returned no stale primary META package markers.
+- `git diff --check -- capabilities/common/meta docs/progress_log.md` passed with no whitespace errors.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live database persistence.
+- Discovery connectors.
+- AI classification engine.
+- Lineage graph traversal.
+- Search indexing.
+- Bytewax runtime flow execution.
+- Rendered dashboard/browser behavior.
+- Performance benchmarks.
