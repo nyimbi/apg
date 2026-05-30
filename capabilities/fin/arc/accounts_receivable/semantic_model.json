@@ -1,60 +1,196 @@
 {
-  "agents": {},
   "app": {
-    "description": "Core Financials - Accounts Receivable package-backed APG capability",
-    "entity_count": 0,
+    "description": "Accounts Receivable package-backed APG capability",
+    "entity_count": 9,
     "name": "arc_accounts_receivable",
-    "version": "1.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "arc_accounts_receivable": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Arc",
-          "enabled": true,
-          "id": "arc_accounts_receivable",
-          "name": "Core Financials - Accounts Receivable",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/arc/accounts_receivable/cap_spec.md",
-          "version": "1.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "customer_relationship_management": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "arc_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "credit_reviewer",
+            "invoice_reviewer",
+            "cash_application_reviewer",
+            "collections_reviewer",
+            "dispute_reviewer",
+            "revenue_recognition_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "cash_application": {
+          "allocation_amount_positive_required": true,
+          "invoice_required": true,
+          "overapplication_blocked": true,
+          "payment_required": true,
+          "unapplied_cash_requires_review": true
+        },
+        "collections": {
+          "contact_method_required": true,
+          "overdue_invoice_required": true,
+          "priority_required": true,
+          "promise_to_pay_review_required": true
+        },
+        "credit": {
+          "credit_hold_blocks_invoice_issue": true,
+          "credit_limit_required": true,
+          "credit_score_review_threshold": 0.6,
+          "review_required_for_limit_increase": true
+        },
+        "customers": {
+          "credit_profile_required_for_invoicing": true,
+          "customer_code_required": true,
+          "customer_type_required": true,
+          "legal_name_required": true,
+          "supported_customer_types": [
+            "business",
+            "government",
+            "individual",
+            "intercompany"
+          ]
+        },
+        "disputes": {
+          "invoice_required": true,
+          "owner_required": true,
+          "reason_required": true,
+          "resolution_review_required": true,
+          "supported_reasons": [
+            "pricing",
+            "quantity",
+            "tax",
+            "delivery",
+            "quality",
+            "duplicate",
+            "other"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "invoice_lines": {
+          "description_required": true,
+          "quantity_positive_required": true,
+          "revenue_account_required": true,
+          "unit_price_nonnegative_required": true
+        },
+        "invoices": {
+          "approval_required_for_issue": true,
+          "customer_required": true,
+          "due_date_required": true,
+          "invoice_date_required": true,
+          "invoice_number_required": true,
+          "line_required": true,
+          "positive_total_required": true,
+          "supported_statuses": [
+            "draft",
+            "approved",
+            "issued",
+            "partially_paid",
+            "paid",
+            "void"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_cash_application_events": true,
+          "emit_collection_events": true,
+          "emit_credit_events": true,
+          "emit_customer_events": true,
+          "emit_dispute_events": true,
+          "emit_invoice_events": true,
+          "emit_payment_events": true,
+          "event_stream": "apg.fin.arc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "amount_positive_required": true,
+          "cash_account_required": true,
+          "customer_required": true,
+          "payment_date_required": true,
+          "payment_reference_required": true,
+          "supported_methods": [
+            "bank_transfer",
+            "card",
+            "cash",
+            "check",
+            "mobile_money",
+            "lockbox"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "arc_accounts_receivable_operations"
+          "default_theme": "arc_accounts_receivable_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_cash_application": true,
+          "enable_collections": true,
+          "enable_credit": true,
+          "enable_customers": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_disputes": true,
+          "enable_invoices": true,
+          "enable_payments": true,
           "enable_settings": true
         }
       },
-      "erp_modules": [
-        "fin"
-      ],
-      "i18n": {},
-      "master_data": {},
-      "name": "Core Financials - Accounts Receivable",
+      "name": "Accounts Receivable",
       "provides": [
-        "arc_accounts_receivable_operations"
+        "customer_receivable_lifecycle",
+        "credit_assessment_workflow",
+        "invoice_lifecycle",
+        "invoice_line_management",
+        "payment_receipt_lifecycle",
+        "cash_application_workflow",
+        "collections_workflow",
+        "dispute_resolution_workflow",
+        "receivables_aging_service",
+        "arc_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "cash_management",
+        "document_management",
+        "business_intelligence",
+        "customer_relationship_management"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Core Financials - Accounts Receivable operations require tenant context.",
+            "description": "Accounts receivable operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +203,497 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Core Financials - Accounts Receivable write operations require policy enforcement.",
+            "description": "Accounts receivable writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "arc_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "customer_code_present": false,
+              "operation": "create_customer"
             },
-            "description": "High-risk Core Financials - Accounts Receivable operations require review.",
+            "description": "Customers require a customer code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_code_required",
+              "required_action": "set_customer_code"
+            },
+            "name": "customer_requires_code"
+          },
+          {
+            "condition": {
+              "legal_name_present": false,
+              "operation": "create_customer"
+            },
+            "description": "Customers require a legal name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "legal_name_required",
+              "required_action": "set_legal_name"
+            },
+            "name": "customer_requires_legal_name"
+          },
+          {
+            "condition": {
+              "customer_type_supported": false,
+              "operation": "create_customer"
+            },
+            "description": "Customer type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_type_not_supported",
+              "required_action": "select_supported_customer_type"
+            },
+            "name": "customer_type_supported"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "assess_credit"
+            },
+            "description": "Credit assessments require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_required",
+              "required_action": "attach_customer"
+            },
+            "name": "credit_requires_customer"
+          },
+          {
+            "condition": {
+              "credit_limit_present": false,
+              "operation": "assess_credit"
+            },
+            "description": "Credit assessments require credit limit.",
+            "effect": {
+              "decision": "deny",
+              "reason": "credit_limit_required",
+              "required_action": "set_credit_limit"
+            },
+            "name": "credit_limit_required"
+          },
+          {
+            "condition": {
+              "credit_review_recorded": false,
+              "credit_score_lt": 0.6,
+              "operation": "assess_credit"
+            },
+            "description": "Low credit score requires review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "credit_review_required",
+              "required_action": "record_credit_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "low_credit_score_requires_review"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "create_invoice"
+            },
+            "description": "Invoices require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_customer_required",
+              "required_action": "attach_customer"
+            },
+            "name": "invoice_requires_customer"
+          },
+          {
+            "condition": {
+              "invoice_number_present": false,
+              "operation": "create_invoice"
+            },
+            "description": "Invoices require invoice number.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_number_required",
+              "required_action": "set_invoice_number"
+            },
+            "name": "invoice_requires_number"
+          },
+          {
+            "condition": {
+              "invoice_dates_present": false,
+              "operation": "create_invoice"
+            },
+            "description": "Invoices require invoice and due dates.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_dates_required",
+              "required_action": "set_invoice_dates"
+            },
+            "name": "invoice_requires_dates"
+          },
+          {
+            "condition": {
+              "due_date_valid": false,
+              "operation": "create_invoice"
+            },
+            "description": "Invoice due date must not precede invoice date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_due_date_invalid",
+              "required_action": "set_valid_due_date"
+            },
+            "name": "invoice_due_after_invoice_date"
+          },
+          {
+            "condition": {
+              "invoice_line_count_lte": 0,
+              "operation": "create_invoice"
+            },
+            "description": "Invoices require line items.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_lines_required",
+              "required_action": "add_invoice_lines"
+            },
+            "name": "invoice_requires_lines"
+          },
+          {
+            "condition": {
+              "invoice_total_lte": 0,
+              "operation": "create_invoice"
+            },
+            "description": "Invoice total must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_total_positive_required",
+              "required_action": "set_positive_invoice_total"
+            },
+            "name": "invoice_total_positive"
+          },
+          {
+            "condition": {
+              "credit_hold": true,
+              "operation": "issue_invoice"
+            },
+            "description": "Credit hold blocks invoice issue.",
+            "effect": {
+              "decision": "deny",
+              "reason": "customer_credit_hold",
+              "required_action": "release_credit_hold"
+            },
+            "name": "invoice_blocks_credit_hold"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "issue_invoice"
+            },
+            "description": "Invoice issue requires approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_approval_required",
+              "required_action": "approve_invoice"
+            },
+            "name": "invoice_issue_requires_approval"
+          },
+          {
+            "condition": {
+              "customer_present": false,
+              "operation": "record_payment"
+            },
+            "description": "Payments require customer.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_customer_required",
+              "required_action": "attach_customer"
+            },
+            "name": "payment_requires_customer"
+          },
+          {
+            "condition": {
+              "operation": "record_payment",
+              "payment_reference_present": false
+            },
+            "description": "Payments require reference.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_reference_required",
+              "required_action": "set_payment_reference"
+            },
+            "name": "payment_requires_reference"
+          },
+          {
+            "condition": {
+              "operation": "record_payment",
+              "payment_date_present": false
+            },
+            "description": "Payments require payment date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_date_required",
+              "required_action": "set_payment_date"
+            },
+            "name": "payment_requires_date"
+          },
+          {
+            "condition": {
+              "operation": "record_payment",
+              "payment_amount_lte": 0
+            },
+            "description": "Payment amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_amount_positive_required",
+              "required_action": "set_positive_payment_amount"
+            },
+            "name": "payment_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "record_payment",
+              "payment_method_supported": false
+            },
+            "description": "Payment method must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_method_not_supported",
+              "required_action": "select_supported_payment_method"
+            },
+            "name": "payment_method_supported"
+          },
+          {
+            "condition": {
+              "cash_account_present": false,
+              "operation": "record_payment"
+            },
+            "description": "Payments require cash account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_account_required",
+              "required_action": "attach_cash_account"
+            },
+            "name": "payment_requires_cash_account"
+          },
+          {
+            "condition": {
+              "operation": "apply_cash",
+              "payment_present": false
+            },
+            "description": "Cash application requires payment.",
+            "effect": {
+              "decision": "deny",
+              "reason": "payment_required",
+              "required_action": "select_payment"
+            },
+            "name": "cash_application_requires_payment"
+          },
+          {
+            "condition": {
+              "invoice_present": false,
+              "operation": "apply_cash"
+            },
+            "description": "Cash application requires invoice.",
+            "effect": {
+              "decision": "deny",
+              "reason": "invoice_required",
+              "required_action": "select_invoice"
+            },
+            "name": "cash_application_requires_invoice"
+          },
+          {
+            "condition": {
+              "allocation_amount_lte": 0,
+              "operation": "apply_cash"
+            },
+            "description": "Cash application amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_application_amount_positive_required",
+              "required_action": "set_positive_allocation"
+            },
+            "name": "cash_application_amount_positive"
+          },
+          {
+            "condition": {
+              "operation": "apply_cash",
+              "overapplication": true
+            },
+            "description": "Cash application cannot exceed invoice outstanding balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_overapplication_blocked",
+              "required_action": "reduce_allocation"
+            },
+            "name": "cash_application_blocks_overapplication"
+          },
+          {
+            "condition": {
+              "cash_application_review_recorded": false,
+              "operation": "apply_cash",
+              "unapplied_amount_gt": 0
+            },
+            "description": "Unapplied cash requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "unapplied_cash_review_required",
+              "required_action": "record_cash_application_review"
+            },
+            "name": "unapplied_cash_requires_review"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_activity",
+              "overdue_invoice_present": false
+            },
+            "description": "Collection activity requires overdue invoice.",
+            "effect": {
+              "decision": "deny",
+              "reason": "overdue_invoice_required",
+              "required_action": "select_overdue_invoice"
+            },
+            "name": "collection_requires_overdue_invoice"
+          },
+          {
+            "condition": {
+              "contact_method_present": false,
+              "operation": "record_collection_activity"
+            },
+            "description": "Collection activity requires contact method.",
+            "effect": {
+              "decision": "deny",
+              "reason": "contact_method_required",
+              "required_action": "set_contact_method"
+            },
+            "name": "collection_requires_contact_method"
+          },
+          {
+            "condition": {
+              "operation": "record_collection_activity",
+              "priority_present": false
+            },
+            "description": "Collection activity requires priority.",
+            "effect": {
+              "decision": "deny",
+              "reason": "collection_priority_required",
+              "required_action": "set_collection_priority"
+            },
+            "name": "collection_requires_priority"
+          },
+          {
+            "condition": {
+              "invoice_present": false,
+              "operation": "open_dispute"
+            },
+            "description": "Disputes require invoice.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_invoice_required",
+              "required_action": "select_invoice"
+            },
+            "name": "dispute_requires_invoice"
+          },
+          {
+            "condition": {
+              "dispute_reason_supported": false,
+              "operation": "open_dispute"
+            },
+            "description": "Dispute reason must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_reason_not_supported",
+              "required_action": "select_supported_reason"
+            },
+            "name": "dispute_reason_supported"
+          },
+          {
+            "condition": {
+              "operation": "open_dispute",
+              "owner_present": false
+            },
+            "description": "Disputes require owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_owner_required",
+              "required_action": "assign_owner"
+            },
+            "name": "dispute_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "resolve_dispute",
+              "resolution_review_recorded": false
+            },
+            "description": "Dispute resolution requires review.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dispute_resolution_review_required",
+              "required_action": "record_resolution_review"
+            },
+            "name": "dispute_resolution_requires_review"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "arc_batch"
+            },
+            "description": "Accounts receivable batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_arc_batch_to_bytewax"
+            },
+            "name": "arc_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "arc_event"
+            },
+            "description": "Accounts receivable lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_arc_event_to_bytewax"
+            },
+            "name": "arc_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_arc_agent"
+            },
+            "description": "ARC agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "arc_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "arc_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_arc_agent"
+            },
+            "description": "ARC agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "arc_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "arc_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_arc_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged ARC actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_arc_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +703,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Core Financials - Accounts Receivable operations require tenant context.",
+          "description": "Accounts receivable operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +716,497 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Core Financials - Accounts Receivable write operations require policy enforcement.",
+          "description": "Accounts receivable writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "arc_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "customer_code_present": false,
+            "operation": "create_customer"
           },
-          "description": "High-risk Core Financials - Accounts Receivable operations require review.",
+          "description": "Customers require a customer code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_code_required",
+            "required_action": "set_customer_code"
+          },
+          "name": "customer_requires_code"
+        },
+        {
+          "condition": {
+            "legal_name_present": false,
+            "operation": "create_customer"
+          },
+          "description": "Customers require a legal name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "legal_name_required",
+            "required_action": "set_legal_name"
+          },
+          "name": "customer_requires_legal_name"
+        },
+        {
+          "condition": {
+            "customer_type_supported": false,
+            "operation": "create_customer"
+          },
+          "description": "Customer type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_type_not_supported",
+            "required_action": "select_supported_customer_type"
+          },
+          "name": "customer_type_supported"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "assess_credit"
+          },
+          "description": "Credit assessments require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_required",
+            "required_action": "attach_customer"
+          },
+          "name": "credit_requires_customer"
+        },
+        {
+          "condition": {
+            "credit_limit_present": false,
+            "operation": "assess_credit"
+          },
+          "description": "Credit assessments require credit limit.",
+          "effect": {
+            "decision": "deny",
+            "reason": "credit_limit_required",
+            "required_action": "set_credit_limit"
+          },
+          "name": "credit_limit_required"
+        },
+        {
+          "condition": {
+            "credit_review_recorded": false,
+            "credit_score_lt": 0.6,
+            "operation": "assess_credit"
+          },
+          "description": "Low credit score requires review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "credit_review_required",
+            "required_action": "record_credit_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "low_credit_score_requires_review"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "create_invoice"
+          },
+          "description": "Invoices require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_customer_required",
+            "required_action": "attach_customer"
+          },
+          "name": "invoice_requires_customer"
+        },
+        {
+          "condition": {
+            "invoice_number_present": false,
+            "operation": "create_invoice"
+          },
+          "description": "Invoices require invoice number.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_number_required",
+            "required_action": "set_invoice_number"
+          },
+          "name": "invoice_requires_number"
+        },
+        {
+          "condition": {
+            "invoice_dates_present": false,
+            "operation": "create_invoice"
+          },
+          "description": "Invoices require invoice and due dates.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_dates_required",
+            "required_action": "set_invoice_dates"
+          },
+          "name": "invoice_requires_dates"
+        },
+        {
+          "condition": {
+            "due_date_valid": false,
+            "operation": "create_invoice"
+          },
+          "description": "Invoice due date must not precede invoice date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_due_date_invalid",
+            "required_action": "set_valid_due_date"
+          },
+          "name": "invoice_due_after_invoice_date"
+        },
+        {
+          "condition": {
+            "invoice_line_count_lte": 0,
+            "operation": "create_invoice"
+          },
+          "description": "Invoices require line items.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_lines_required",
+            "required_action": "add_invoice_lines"
+          },
+          "name": "invoice_requires_lines"
+        },
+        {
+          "condition": {
+            "invoice_total_lte": 0,
+            "operation": "create_invoice"
+          },
+          "description": "Invoice total must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_total_positive_required",
+            "required_action": "set_positive_invoice_total"
+          },
+          "name": "invoice_total_positive"
+        },
+        {
+          "condition": {
+            "credit_hold": true,
+            "operation": "issue_invoice"
+          },
+          "description": "Credit hold blocks invoice issue.",
+          "effect": {
+            "decision": "deny",
+            "reason": "customer_credit_hold",
+            "required_action": "release_credit_hold"
+          },
+          "name": "invoice_blocks_credit_hold"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "issue_invoice"
+          },
+          "description": "Invoice issue requires approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_approval_required",
+            "required_action": "approve_invoice"
+          },
+          "name": "invoice_issue_requires_approval"
+        },
+        {
+          "condition": {
+            "customer_present": false,
+            "operation": "record_payment"
+          },
+          "description": "Payments require customer.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_customer_required",
+            "required_action": "attach_customer"
+          },
+          "name": "payment_requires_customer"
+        },
+        {
+          "condition": {
+            "operation": "record_payment",
+            "payment_reference_present": false
+          },
+          "description": "Payments require reference.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_reference_required",
+            "required_action": "set_payment_reference"
+          },
+          "name": "payment_requires_reference"
+        },
+        {
+          "condition": {
+            "operation": "record_payment",
+            "payment_date_present": false
+          },
+          "description": "Payments require payment date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_date_required",
+            "required_action": "set_payment_date"
+          },
+          "name": "payment_requires_date"
+        },
+        {
+          "condition": {
+            "operation": "record_payment",
+            "payment_amount_lte": 0
+          },
+          "description": "Payment amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_amount_positive_required",
+            "required_action": "set_positive_payment_amount"
+          },
+          "name": "payment_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "record_payment",
+            "payment_method_supported": false
+          },
+          "description": "Payment method must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_method_not_supported",
+            "required_action": "select_supported_payment_method"
+          },
+          "name": "payment_method_supported"
+        },
+        {
+          "condition": {
+            "cash_account_present": false,
+            "operation": "record_payment"
+          },
+          "description": "Payments require cash account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_account_required",
+            "required_action": "attach_cash_account"
+          },
+          "name": "payment_requires_cash_account"
+        },
+        {
+          "condition": {
+            "operation": "apply_cash",
+            "payment_present": false
+          },
+          "description": "Cash application requires payment.",
+          "effect": {
+            "decision": "deny",
+            "reason": "payment_required",
+            "required_action": "select_payment"
+          },
+          "name": "cash_application_requires_payment"
+        },
+        {
+          "condition": {
+            "invoice_present": false,
+            "operation": "apply_cash"
+          },
+          "description": "Cash application requires invoice.",
+          "effect": {
+            "decision": "deny",
+            "reason": "invoice_required",
+            "required_action": "select_invoice"
+          },
+          "name": "cash_application_requires_invoice"
+        },
+        {
+          "condition": {
+            "allocation_amount_lte": 0,
+            "operation": "apply_cash"
+          },
+          "description": "Cash application amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_application_amount_positive_required",
+            "required_action": "set_positive_allocation"
+          },
+          "name": "cash_application_amount_positive"
+        },
+        {
+          "condition": {
+            "operation": "apply_cash",
+            "overapplication": true
+          },
+          "description": "Cash application cannot exceed invoice outstanding balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_overapplication_blocked",
+            "required_action": "reduce_allocation"
+          },
+          "name": "cash_application_blocks_overapplication"
+        },
+        {
+          "condition": {
+            "cash_application_review_recorded": false,
+            "operation": "apply_cash",
+            "unapplied_amount_gt": 0
+          },
+          "description": "Unapplied cash requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "unapplied_cash_review_required",
+            "required_action": "record_cash_application_review"
+          },
+          "name": "unapplied_cash_requires_review"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_activity",
+            "overdue_invoice_present": false
+          },
+          "description": "Collection activity requires overdue invoice.",
+          "effect": {
+            "decision": "deny",
+            "reason": "overdue_invoice_required",
+            "required_action": "select_overdue_invoice"
+          },
+          "name": "collection_requires_overdue_invoice"
+        },
+        {
+          "condition": {
+            "contact_method_present": false,
+            "operation": "record_collection_activity"
+          },
+          "description": "Collection activity requires contact method.",
+          "effect": {
+            "decision": "deny",
+            "reason": "contact_method_required",
+            "required_action": "set_contact_method"
+          },
+          "name": "collection_requires_contact_method"
+        },
+        {
+          "condition": {
+            "operation": "record_collection_activity",
+            "priority_present": false
+          },
+          "description": "Collection activity requires priority.",
+          "effect": {
+            "decision": "deny",
+            "reason": "collection_priority_required",
+            "required_action": "set_collection_priority"
+          },
+          "name": "collection_requires_priority"
+        },
+        {
+          "condition": {
+            "invoice_present": false,
+            "operation": "open_dispute"
+          },
+          "description": "Disputes require invoice.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_invoice_required",
+            "required_action": "select_invoice"
+          },
+          "name": "dispute_requires_invoice"
+        },
+        {
+          "condition": {
+            "dispute_reason_supported": false,
+            "operation": "open_dispute"
+          },
+          "description": "Dispute reason must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_reason_not_supported",
+            "required_action": "select_supported_reason"
+          },
+          "name": "dispute_reason_supported"
+        },
+        {
+          "condition": {
+            "operation": "open_dispute",
+            "owner_present": false
+          },
+          "description": "Disputes require owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_owner_required",
+            "required_action": "assign_owner"
+          },
+          "name": "dispute_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "resolve_dispute",
+            "resolution_review_recorded": false
+          },
+          "description": "Dispute resolution requires review.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dispute_resolution_review_required",
+            "required_action": "record_resolution_review"
+          },
+          "name": "dispute_resolution_requires_review"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "arc_batch"
+          },
+          "description": "Accounts receivable batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_arc_batch_to_bytewax"
+          },
+          "name": "arc_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "arc_event"
+          },
+          "description": "Accounts receivable lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_arc_event_to_bytewax"
+          },
+          "name": "arc_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_arc_agent"
+          },
+          "description": "ARC agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "arc_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "arc_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_arc_agent"
+          },
+          "description": "ARC agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "arc_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "arc_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_arc_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged ARC actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_arc_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +1216,134 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "ARCAgentWorkbench",
+          "permission": "arc_accounts_receivable:admin",
+          "route": "/arc-accounts-receivable/agents"
+        },
+        "aging": {
+          "component": "ReceivablesAgingConsole",
+          "permission": "arc_accounts_receivable:report",
+          "route": "/arc-accounts-receivable/aging"
+        },
+        "cash_application": {
+          "component": "CashApplicationWorkbench",
+          "permission": "arc_accounts_receivable:apply_cash",
+          "route": "/arc-accounts-receivable/cash-application"
+        },
+        "collections": {
+          "component": "CollectionsWorkbench",
+          "permission": "arc_accounts_receivable:collect",
+          "route": "/arc-accounts-receivable/collections"
+        },
+        "credit": {
+          "component": "CreditAssessmentWorkbench",
+          "permission": "arc_accounts_receivable:credit",
+          "route": "/arc-accounts-receivable/credit"
+        },
+        "customers": {
+          "component": "CustomerReceivablesWorkbench",
+          "permission": "arc_accounts_receivable:manage_customers",
+          "route": "/arc-accounts-receivable/customers"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "AccountsReceivableDashboard",
           "permission": "arc_accounts_receivable:view",
           "route": "/arc-accounts-receivable/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "arc_accounts_receivable:operate",
-          "route": "/arc-accounts-receivable/operations"
+        "disputes": {
+          "component": "DisputeResolutionWorkbench",
+          "permission": "arc_accounts_receivable:resolve_disputes",
+          "route": "/arc-accounts-receivable/disputes"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "arc_accounts_receivable:govern",
-          "route": "/arc-accounts-receivable/rules"
+        "invoices": {
+          "component": "InvoiceWorkbench",
+          "permission": "arc_accounts_receivable:invoice",
+          "route": "/arc-accounts-receivable/invoices"
+        },
+        "payments": {
+          "component": "PaymentReceiptConsole",
+          "permission": "arc_accounts_receivable:receive_payments",
+          "route": "/arc-accounts-receivable/payments"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "AccountsReceivableSettings",
           "permission": "arc_accounts_receivable:admin",
           "route": "/arc-accounts-receivable/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "customer_created",
+          "credit_assessed",
+          "invoice_created",
+          "invoice_issued",
+          "payment_recorded",
+          "cash_applied",
+          "collection_activity_recorded",
+          "dispute_opened",
+          "dispute_resolved",
+          "arc_agent_registered"
+        ],
+        "guardrails": [
+          "arc_batch_requires_bytewax",
+          "arc_event_requires_bytewax",
+          "privileged_agent_arc_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "assessed",
+          "approved",
+          "issued",
+          "paid",
+          "applied",
+          "overdue",
+          "disputed",
+          "resolved",
+          "blocked"
+        ],
+        "stream": "apg.fin.arc.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "cash_application": {
+            "status_style": "match-chip",
+            "visual": "allocation-grid"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "collections": {
+            "status_style": "priority-chip",
+            "visual": "collection-queue"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "credit": {
+            "status_style": "risk-chip",
+            "visual": "score-lane"
+          },
+          "customers": {
+            "icon": "users",
+            "risk_style": "credit-band",
+            "status_indicator": "customer-pill"
+          },
+          "disputes": {
+            "status_style": "dispute-chip",
+            "visual": "resolution-board"
+          },
+          "invoices": {
+            "status_style": "invoice-chip",
+            "visual": "invoice-grid"
+          },
+          "payments": {
+            "status_style": "payment-chip",
+            "visual": "receipt-list"
           }
         },
-        "name": "arc_accounts_receivable_operations",
+        "name": "arc_accounts_receivable_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1363,77 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "AccountsReceivableDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/arc-accounts-receivable/dashboard",
             "permission": "arc_accounts_receivable:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/arc-accounts-receivable/operations",
-            "permission": "arc_accounts_receivable:operate"
+            "component": "CustomerReceivablesWorkbench",
+            "name": "customers",
+            "nav_group": "Customers",
+            "path": "/arc-accounts-receivable/customers",
+            "permission": "arc_accounts_receivable:manage_customers"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/arc-accounts-receivable/rules",
-            "permission": "arc_accounts_receivable:govern"
+            "component": "CreditAssessmentWorkbench",
+            "name": "credit",
+            "nav_group": "Customers",
+            "path": "/arc-accounts-receivable/credit",
+            "permission": "arc_accounts_receivable:credit"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "InvoiceWorkbench",
+            "name": "invoices",
+            "nav_group": "Invoices",
+            "path": "/arc-accounts-receivable/invoices",
+            "permission": "arc_accounts_receivable:invoice"
+          },
+          {
+            "component": "PaymentReceiptConsole",
+            "name": "payments",
+            "nav_group": "Cash",
+            "path": "/arc-accounts-receivable/payments",
+            "permission": "arc_accounts_receivable:receive_payments"
+          },
+          {
+            "component": "CashApplicationWorkbench",
+            "name": "cash_application",
+            "nav_group": "Cash",
+            "path": "/arc-accounts-receivable/cash-application",
+            "permission": "arc_accounts_receivable:apply_cash"
+          },
+          {
+            "component": "CollectionsWorkbench",
+            "name": "collections",
+            "nav_group": "Collections",
+            "path": "/arc-accounts-receivable/collections",
+            "permission": "arc_accounts_receivable:collect"
+          },
+          {
+            "component": "DisputeResolutionWorkbench",
+            "name": "disputes",
+            "nav_group": "Collections",
+            "path": "/arc-accounts-receivable/disputes",
+            "permission": "arc_accounts_receivable:resolve_disputes"
+          },
+          {
+            "component": "ReceivablesAgingConsole",
+            "name": "aging",
+            "nav_group": "Reports",
+            "path": "/arc-accounts-receivable/aging",
+            "permission": "arc_accounts_receivable:report"
+          },
+          {
+            "component": "ARCAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/arc-accounts-receivable/agents",
+            "permission": "arc_accounts_receivable:admin"
+          },
+          {
+            "component": "AccountsReceivableSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/arc-accounts-receivable/settings",
@@ -234,50 +1446,224 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "arc_revenue_review": {
+        "roles": [
+          "credit_reviewer",
+          "invoice_reviewer",
+          "cash_application_reviewer",
+          "collections_reviewer",
+          "dispute_reviewer",
+          "revenue_recognition_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "arc_accounts_receivable": []
+      "arc_accounts_receivable": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "cash_management",
+        "document_management",
+        "business_intelligence",
+        "customer_relationship_management"
+      ]
     }
   },
   "contracts": {
     "arc_accounts_receivable": {
       "configuration": {
-        "capability": {
-          "category": "Arc",
-          "enabled": true,
-          "id": "arc_accounts_receivable",
-          "name": "Core Financials - Accounts Receivable",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/arc/accounts_receivable/cap_spec.md",
-          "version": "1.0"
+        "adapters": {
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "cash_management": "adapter",
+          "customer_relationship_management": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "arc_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "credit_reviewer",
+            "invoice_reviewer",
+            "cash_application_reviewer",
+            "collections_reviewer",
+            "dispute_reviewer",
+            "revenue_recognition_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "cash_application": {
+          "allocation_amount_positive_required": true,
+          "invoice_required": true,
+          "overapplication_blocked": true,
+          "payment_required": true,
+          "unapplied_cash_requires_review": true
+        },
+        "collections": {
+          "contact_method_required": true,
+          "overdue_invoice_required": true,
+          "priority_required": true,
+          "promise_to_pay_review_required": true
+        },
+        "credit": {
+          "credit_hold_blocks_invoice_issue": true,
+          "credit_limit_required": true,
+          "credit_score_review_threshold": 0.6,
+          "review_required_for_limit_increase": true
+        },
+        "customers": {
+          "credit_profile_required_for_invoicing": true,
+          "customer_code_required": true,
+          "customer_type_required": true,
+          "legal_name_required": true,
+          "supported_customer_types": [
+            "business",
+            "government",
+            "individual",
+            "intercompany"
+          ]
+        },
+        "disputes": {
+          "invoice_required": true,
+          "owner_required": true,
+          "reason_required": true,
+          "resolution_review_required": true,
+          "supported_reasons": [
+            "pricing",
+            "quantity",
+            "tax",
+            "delivery",
+            "quality",
+            "duplicate",
+            "other"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "invoice_lines": {
+          "description_required": true,
+          "quantity_positive_required": true,
+          "revenue_account_required": true,
+          "unit_price_nonnegative_required": true
+        },
+        "invoices": {
+          "approval_required_for_issue": true,
+          "customer_required": true,
+          "due_date_required": true,
+          "invoice_date_required": true,
+          "invoice_number_required": true,
+          "line_required": true,
+          "positive_total_required": true,
+          "supported_statuses": [
+            "draft",
+            "approved",
+            "issued",
+            "partially_paid",
+            "paid",
+            "void"
+          ]
+        },
+        "observability": {
+          "emit_agent_events": true,
+          "emit_cash_application_events": true,
+          "emit_collection_events": true,
+          "emit_credit_events": true,
+          "emit_customer_events": true,
+          "emit_dispute_events": true,
+          "emit_invoice_events": true,
+          "emit_payment_events": true,
+          "event_stream": "apg.fin.arc.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payments": {
+          "amount_positive_required": true,
+          "cash_account_required": true,
+          "customer_required": true,
+          "payment_date_required": true,
+          "payment_reference_required": true,
+          "supported_methods": [
+            "bank_transfer",
+            "card",
+            "cash",
+            "check",
+            "mobile_money",
+            "lockbox"
+          ]
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "arc_accounts_receivable_operations"
+          "default_theme": "arc_accounts_receivable_control"
         },
         "ui": {
+          "enable_agents": true,
+          "enable_cash_application": true,
+          "enable_collections": true,
+          "enable_credit": true,
+          "enable_customers": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_disputes": true,
+          "enable_invoices": true,
+          "enable_payments": true,
           "enable_settings": true
         }
       },
       "id": "arc_accounts_receivable",
       "provides": [
-        "arc_accounts_receivable_operations"
+        "customer_receivable_lifecycle",
+        "credit_assessment_workflow",
+        "invoice_lifecycle",
+        "invoice_line_management",
+        "payment_receipt_lifecycle",
+        "cash_application_workflow",
+        "collections_workflow",
+        "dispute_resolution_workflow",
+        "receivables_aging_service",
+        "arc_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "cash_management",
+        "document_management",
+        "business_intelligence",
+        "customer_relationship_management"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1671,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 10,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "arc_accounts_receivable": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Core Financials - Accounts Receivable operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Core Financials - Accounts Receivable write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Core Financials - Accounts Receivable operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.arc_accounts_receivable": {
-      "file": "capability_contract.py",
-      "id": "capability.arc_accounts_receivable",
-      "kind": "capability",
-      "name": "Core Financials - Accounts Receivable",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

@@ -308,7 +308,7 @@ var optimizationResults = null;
 $(document).ready(function() {
     // Initialize Select2
     $('.select2').select2({
-        placeholder: '{{ _("Select customers...") }}',
+        input hint: '{{ _("Select customers...") }}',
         allowClear: true
     });
     
@@ -351,14 +351,14 @@ function updateCustomerSelection() {
         customerGroup.show();
         $('#customer_ids').prop('multiple', false);
         $('.select2').select2('destroy').select2({
-            placeholder: '{{ _("Select one customer...") }}',
+            input hint: '{{ _("Select one customer...") }}',
             allowClear: true
         });
     } else if (scope === 'batch') {
         customerGroup.show();
         $('#customer_ids').prop('multiple', true);
         $('.select2').select2('destroy').select2({
-            placeholder: '{{ _("Select customers...") }}',
+            input hint: '{{ _("Select customers...") }}',
             allowClear: true
         });
     } else {

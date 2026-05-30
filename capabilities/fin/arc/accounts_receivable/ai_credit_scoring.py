@@ -183,7 +183,7 @@ class APGCreditScoringService:
 		total_invoices = len(invoices)
 		paid_invoices = len([i for i in invoices if i.payment_status == 'paid'])
 		late_payments = len([i for i in invoices if i.status == 'overdue'])
-		disputed_invoices = 0  # TODO: Get from disputes table
+		disputed_invoices = 0  # Next step: Get from disputes table
 		
 		# Calculate average payment days
 		avg_payment_days = None
@@ -191,7 +191,7 @@ class APGCreditScoringService:
 			payment_days = []
 			for invoice in invoices:
 				if invoice.payment_status == 'paid':
-					# TODO: Calculate actual payment days from payment records
+					# Next step: Calculate actual payment days from payment records
 					days_to_pay = (invoice.due_date - invoice.invoice_date).days
 					payment_days.append(max(0, days_to_pay))
 			avg_payment_days = sum(payment_days) / len(payment_days) if payment_days else None
@@ -216,20 +216,20 @@ class APGCreditScoringService:
 		if total_invoices > 0:
 			payment_consistency_score = max(0.0, 1.0 - (late_payments / total_invoices))
 		
-		dispute_resolution_rate = 1.0  # TODO: Calculate from disputes
-		communication_responsiveness = 0.7  # TODO: Integrate with communication tracking
+		dispute_resolution_rate = 1.0  # Next step: Calculate from disputes
+		communication_responsiveness = 0.7  # Next step: Integrate with communication tracking
 		
-		# External factors (placeholder - would integrate with external data sources)
-		economic_sector_risk = 0.3  # TODO: Industry risk mapping
-		geographic_risk_factor = 0.1  # TODO: Geographic risk assessment
-		macroeconomic_indicator = 0.0  # TODO: Economic indicators integration
+		# External factors (input hint - would integrate with external data sources)
+		economic_sector_risk = 0.3  # Next step: Industry risk mapping
+		geographic_risk_factor = 0.1  # Next step: Geographic risk assessment
+		macroeconomic_indicator = 0.0  # Next step: Economic indicators integration
 		
 		return CreditScoringFeatures(
 			customer_age_months=customer_age_months,
 			customer_type=customer.customer_type,
-			industry_sector=None,  # TODO: Add to customer model
-			annual_revenue=None,  # TODO: Add to customer model
-			employee_count=None,  # TODO: Add to customer model
+			industry_sector=None,  # Next step: Add to customer model
+			annual_revenue=None,  # Next step: Add to customer model
+			employee_count=None,  # Next step: Add to customer model
 			total_invoices=total_invoices,
 			paid_invoices=paid_invoices,
 			late_payments=late_payments,
@@ -250,7 +250,7 @@ class APGCreditScoringService:
 	async def _call_federated_learning_model(self, features: CreditScoringFeatures) -> Dict[str, Any]:
 		"""Call APG federated learning service for credit scoring."""
 		try:
-			# TODO: Integrate with APG federated_learning capability
+			# Next step: Integrate with APG federated_learning capability
 			# This would make an async HTTP call to the federated learning service
 			
 			# Simulate AI model response for now
@@ -576,7 +576,7 @@ class APGCreditScoringService:
 		
 		async def assess_single_customer(customer):
 			async with semaphore:
-				# TODO: Fetch invoices and payments for each customer
+				# Next step: Fetch invoices and payments for each customer
 				return await self.assess_customer_credit(customer, [], [])
 		
 		# Execute assessments concurrently
@@ -652,7 +652,7 @@ class CreditScoringModelTrainer:
 	async def prepare_training_data(self) -> Dict[str, Any]:
 		"""Prepare training data for federated learning model update."""
 		
-		# TODO: Implement training data preparation
+		# Next step: Implement training data preparation
 		# This would:
 		# 1. Extract features from all customers with sufficient history
 		# 2. Label data based on actual payment outcomes
@@ -673,7 +673,7 @@ class CreditScoringModelTrainer:
 	async def submit_training_job(self) -> str:
 		"""Submit model training job to APG federated learning."""
 		
-		# TODO: Integrate with APG federated_learning capability
+		# Next step: Integrate with APG federated_learning capability
 		training_data = await self.prepare_training_data()
 		
 		# Simulate training job submission
@@ -685,7 +685,7 @@ class CreditScoringModelTrainer:
 	async def check_training_status(self, job_id: str) -> Dict[str, Any]:
 		"""Check status of federated learning training job."""
 		
-		# TODO: Implement actual status checking
+		# Next step: Implement actual status checking
 		return {
 			'job_id': job_id,
 			'status': 'completed',

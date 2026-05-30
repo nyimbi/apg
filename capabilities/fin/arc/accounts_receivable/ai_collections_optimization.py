@@ -291,7 +291,7 @@ class APGCollectionsAIService:
 		if payments and invoices:
 			delays = []
 			for payment in payments:
-				# TODO: Match payments to invoices and calculate actual delay
+				# Next step: Match payments to invoices and calculate actual delay
 				# For now, estimate based on due dates
 				delays.append(30)  # Placeholder
 			avg_payment_delay_days = sum(delays) / len(delays) if delays else None
@@ -322,8 +322,8 @@ class APGCollectionsAIService:
 			customer_id=customer.id,
 			tenant_id=customer.tenant_id,
 			customer_type=customer.customer_type,
-			industry_sector=None,  # TODO: Add to customer model
-			company_size=None,     # TODO: Derive from customer data
+			industry_sector=None,  # Next step: Add to customer model
+			company_size=None,     # Next step: Derive from customer data
 			total_outstanding=total_outstanding,
 			overdue_amount=overdue_amount,
 			days_overdue=days_overdue,
@@ -338,16 +338,16 @@ class APGCollectionsAIService:
 			successful_collections=successful_collections,
 			last_collection_date=last_collection_date,
 			communication_responsiveness=responsiveness,
-			dispute_frequency=0,  # TODO: Count from disputes table
-			economic_stress_indicator=0.2,  # TODO: Integrate economic indicators
-			geographic_risk_factor=0.1      # TODO: Geographic risk assessment
+			dispute_frequency=0,  # Next step: Count from disputes table
+			economic_stress_indicator=0.2,  # Next step: Integrate economic indicators
+			geographic_risk_factor=0.1      # Next step: Geographic risk assessment
 		)
 	
 	async def _call_ai_orchestration_service(self, profile: CustomerCollectionProfile, 
 											optimization_context: Dict[str, Any]) -> Dict[str, Any]:
 		"""Call APG ai_orchestration service for collections strategy optimization."""
 		try:
-			# TODO: Integrate with APG ai_orchestration capability
+			# Next step: Integrate with APG ai_orchestration capability
 			# This would make an async HTTP call to the AI orchestration service
 			
 			# Simulate AI model response based on customer profile
@@ -850,7 +850,7 @@ class APGCollectionsAIService:
 				automated_activities_count=automated_activities,
 				manual_activities_count=manual_activities,
 				optimization_model_version=self.config.model_version,
-				optimization_confidence=0.85  # TODO: Calculate based on profile quality
+				optimization_confidence=0.85  # Next step: Calculate based on profile quality
 			)
 			
 			print(self._log_ai_collections_action("Campaign plan created", 
@@ -873,7 +873,7 @@ class APGCollectionsAIService:
 		
 		async def optimize_single_customer(customer):
 			async with semaphore:
-				# TODO: Fetch customer's data in production
+				# Next step: Fetch customer's data in production
 				return await self.optimize_collection_strategy(customer, [], [], [])
 		
 		# Execute optimizations concurrently

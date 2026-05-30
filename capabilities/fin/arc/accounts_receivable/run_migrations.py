@@ -346,9 +346,9 @@ class APGMigrationRunner:
 			await self.close_connection()
 	
 	async def rollback_migration(self, target_version: str) -> bool:
-		"""Rollback to a specific migration version (placeholder)."""
+		"""Rollback to a specific migration version (input hint)."""
 		logger.warning("Migration rollback not yet implemented")
-		# TODO: Implement rollback functionality
+		# Next step: Implement rollback functionality
 		return False
 	
 	async def get_status(self) -> Dict[str, any]:

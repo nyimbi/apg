@@ -1,5 +1,5 @@
 """
-Intelligent Three-Way Matching Engine - Revolutionary Feature #5
+Intelligent Three-Way Matching Engine - Advanced Feature #5
 Transform matching from manual drudgery to AI-powered precision intelligence
 
 © 2025 Datacraft
@@ -196,7 +196,7 @@ class MatchingException(APGBaseModel):
 
 class IntelligentMatchingService:
 	"""
-	Revolutionary Intelligent Three-Way Matching Engine Service
+	Advanced Intelligent Three-Way Matching Engine Service
 	
 	Transforms manual matching drudgery into AI-powered precision intelligence
 	with ML-based pattern recognition, semantic understanding, and predictive

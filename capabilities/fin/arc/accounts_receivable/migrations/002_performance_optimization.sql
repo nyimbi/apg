@@ -95,10 +95,10 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ar_payments_application_pct
 	WHERE payment_amount > 0;
 
 -- =============================================================================
--- Materialized Views for Heavy Reporting Queries
+-- Precomputed Views for Heavy Reporting Queries
 -- =============================================================================
 
--- Customer aging materialized view for faster dashboard queries
+-- Customer aging precomputed view for faster dashboard queries
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_ar_customer_aging AS
 SELECT 
 	c.id as customer_id,
@@ -129,7 +129,7 @@ LEFT JOIN ar_invoices i ON c.id = i.customer_id
 	AND i.status NOT IN ('cancelled', 'paid')
 GROUP BY c.id, c.tenant_id, c.customer_code, c.legal_name, c.status, c.credit_limit, c.total_outstanding;
 
--- Create indexes on materialized view
+-- Create indexes on precomputed view
 CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_customer_aging_pk 
 	ON mv_ar_customer_aging(customer_id);
 CREATE INDEX IF NOT EXISTS idx_mv_customer_aging_tenant 
@@ -138,7 +138,7 @@ CREATE INDEX IF NOT EXISTS idx_mv_customer_aging_overdue
 	ON mv_ar_customer_aging(max_days_overdue DESC) 
 	WHERE max_days_overdue > 0;
 
--- Monthly sales and collection performance materialized view
+-- Monthly sales and collection performance precomputed view
 CREATE MATERIALIZED VIEW IF NOT EXISTS mv_ar_monthly_performance AS
 WITH monthly_invoices AS (
 	SELECT 
@@ -199,8 +199,8 @@ CREATE INDEX IF NOT EXISTS idx_mv_monthly_performance_customer
 -- Database Statistics and Optimization Functions
 -- =============================================================================
 
--- Function to refresh materialized views
-CREATE OR REPLACE FUNCTION refresh_ar_materialized_views()
+-- Function to refresh precomputed views
+CREATE OR REPLACE FUNCTION refresh_ar_precomputed_views()
 RETURNS TEXT AS $$
 DECLARE
 	start_time TIMESTAMP;
@@ -215,7 +215,7 @@ BEGIN
 	REFRESH MATERIALIZED VIEW CONCURRENTLY mv_ar_monthly_performance;
 	
 	result := format(
-		'Materialized views refreshed in %s ms',
+		'Precomputed views refreshed in %s ms',
 		EXTRACT(milliseconds FROM clock_timestamp() - start_time)
 	);
 	
@@ -308,7 +308,7 @@ RETURNS TEXT AS $$
 BEGIN
 	-- Update statistics on tables with significant changes
 	PERFORM analyze_ar_tables();
-	PERFORM refresh_ar_materialized_views();
+	PERFORM refresh_ar_precomputed_views();
 	
 	RETURN 'Automated analysis and refresh completed';
 END;
@@ -413,7 +413,7 @@ SELECT record_migration(
 
 -- Refresh statistics after index creation
 SELECT analyze_ar_tables();
-SELECT refresh_ar_materialized_views();
+SELECT refresh_ar_precomputed_views();
 
 COMMENT ON SCHEMA apg_accounts_receivable IS 'APG Accounts Receivable schema with performance optimizations applied';
 

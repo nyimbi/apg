@@ -16,6 +16,113 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 00:42 EAT
+
+FIN ARC accounts receivable lifecycle/guardrail packet:
+
+- Added `SPECIFICATION.md` and `PLAN.md`, replaced the package `README.md`,
+  and refreshed `cap_spec.md` with the active customer-to-cash runtime summary.
+- Replaced the generated contract wrapper with explicit customer, credit,
+  invoice, invoice-line, payment, cash-application, collections, dispute,
+  receivables-aging, ARC-agent, governance, observability, adapter, UI, theme,
+  provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  customer code/legal name/type, credit customer/limit/low-score review,
+  invoice customer/number/dates/due date/lines/positive total/credit hold/
+  approval, payment customer/reference/date/positive amount/method/cash
+  account, cash application payment/invoice/positive allocation/
+  overapplication/unapplied review, collection overdue invoice/contact
+  method/priority, dispute invoice/reason/owner/resolution review, ARC batch
+  and event Bytewax streams, ARC-agent runtime/role, and privileged
+  agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light ARC lifecycle helpers for customers, credit assessments,
+  invoices, payments, cash application, collections, disputes, aging,
+  ARC-agent registration, batch validation, dashboard summaries, API helpers,
+  and screen models.
+- Preserved `ARCService` as a compatibility alias while keeping optional
+  FastAPI, Flask, SQLAlchemy, payment providers, model providers, and live
+  adapter imports out of the top-level APG surface.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the expanded contract.
+- Renamed and expanded focused package tests for contract, rule, service,
+  guardrail, API/view, app, semantic, ARC-agent, cash application, dispute,
+  collection, and Bytewax behavior.
+- Removed stale generated planning notes and cleaned stale package markers in
+  ARC legacy docs, templates, helper modules, migrations, and performance
+  notes.
+- Review hardening: made `AccountsReceivableService.list_records()` handle
+  dict-backed and list-backed record collections explicitly, then reran focused
+  service checks.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fin/arc/accounts_receivable/__init__.py
+  capabilities/fin/arc/accounts_receivable/capability_contract.py
+  capabilities/fin/arc/accounts_receivable/service.py
+  capabilities/fin/arc/accounts_receivable/api.py
+  capabilities/fin/arc/accounts_receivable/views.py
+  capabilities/fin/arc/accounts_receivable/app.py
+  capabilities/fin/arc/accounts_receivable/tests/test_package_contract.py`
+  passed.
+- Syntax-only compile for edited legacy helper modules
+  (`ai_credit_scoring.py`, `ai_collections_optimization.py`,
+  `period_close_autopilot.py`, `duplicate_prevention.py`,
+  `vendor_self_service.py`, `compliance_monitoring.py`,
+  `natural_language_commands.py`, `living_approval_dashboard.py`,
+  `cash_flow_analytics.py`, `intelligent_matching.py`, and
+  `run_migrations.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/fin/arc/accounts_receivable/tests/test_package_contract.py`
+  passed with 6 tests.
+- `./.venv/bin/python capabilities/fin/arc/accounts_receivable/app.py` passed
+  package self-test.
+- `./.venv/bin/apg capabilities inspect arc_accounts_receivable --json`
+  confirmed `ok: true`, 11 routes, 39 rules, and
+  `arc_accounts_receivable_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fin/arc/accounts_receivable --json` confirmed side-effect-free
+  publish planning with Bytewax stream metadata and no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fin/arc/accounts_receivable --json` passed with
+  `domain_specific` implementation level and 0 baseline markers.
+- `./.venv/bin/python -c "import json;
+  m=json.load(open('capabilities/fin/arc/accounts_receivable/
+  semantic_model.json')); c=m['capabilities']['arc_accounts_receivable'];
+  print(c['streaming']['processor']); print('arc_agents' in c['provides']);
+  print(c['screens']['agents']['route']);
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='arc_agent_runtime_supported'));
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='arc_batch_requires_bytewax'));
+  print(next(r['effect']['reason'] for r in c['rules'] if
+  r['name']=='cash_application_blocks_overapplication'))"` confirmed
+  `bytewax`, ARC-agent provides, `/arc-accounts-receivable/agents`,
+  `arc_agent_runtime_not_supported`, `bytewax_event_stream_required`, and
+  `cash_overapplication_blocked`.
+- `./.venv/bin/python -c "from capabilities.fin.arc.accounts_receivable
+  import AccountsReceivableService; s=AccountsReceivableService();
+  c=s.create_customer('cust','tenant-proof','CUST','Customer','business');
+  s.assess_credit('credit','tenant-proof',c['id'],1000,0.9);
+  inv=s.create_invoice('inv','tenant-proof',c['id'],'INV-001','2026-05-31',
+  '2026-06-30',[{'description':'Services','quantity':1,'unit_price':500,
+  'revenue_account':'4000'}]); s.issue_invoice(inv['id'],'tenant-proof',
+  'approver'); p=s.record_payment('pay','tenant-proof',c['id'],'PAY-001',
+  '2026-06-01',500,'bank_transfer','cash'); s.apply_cash('app',
+  'tenant-proof',p['id'],inv['id'],500); s.register_arc_agent(
+  'tenant-proof','Proof agent','codex','invoice_reviewer','review invoices');
+  print(s.dashboard_summary('tenant-proof'))"` passed and confirmed payment
+  application, ARC-agent registration, audit event emission, and Bytewax stream
+  metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- `git diff --check -- capabilities/fin/arc/accounts_receivable
+  docs/progress_log.md` passed after fixing one trailing-space issue in
+  `database_schema.md`.
+- Not run: durable receivables stores, live CRM/GL/cash/document/BI/auth/
+  audit/notification adapters, durable Bytewax topology, rendered browser UI,
+  performance/failover checks, and full repository tests.
+
 ### 2026-05-31 00:16 EAT
 
 FIN CBM cash management lifecycle/guardrail packet:

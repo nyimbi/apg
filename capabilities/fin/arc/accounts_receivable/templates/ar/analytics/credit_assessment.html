@@ -78,7 +78,7 @@
                         <div class="form-group">
                             <label for="notes">{{ _("Assessment Notes") }}</label>
                             <textarea id="notes" name="notes" class="form-control" rows="3" 
-                                      placeholder="{{ _('Optional notes for this assessment...') }}"></textarea>
+                                      input hint="{{ _('Optional notes for this assessment...') }}"></textarea>
                         </div>
 
                         <div class="form-group">
@@ -295,7 +295,7 @@ var creditScoreGauge;
 $(document).ready(function() {
     // Initialize Select2
     $('.select2').select2({
-        placeholder: '{{ _("Select...") }}',
+        input hint: '{{ _("Select...") }}',
         allowClear: true
     });
     

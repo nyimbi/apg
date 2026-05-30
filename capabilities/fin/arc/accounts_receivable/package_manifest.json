@@ -1,10 +1,10 @@
 {
   "base_target": "python",
-  "display_name": "Core Financials - Accounts Receivable",
+  "display_name": "Accounts Receivable",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,42 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0"
+  "route_count": 11,
+  "rule_count": 39,
+  "streaming": {
+    "events": [
+      "customer_created",
+      "credit_assessed",
+      "invoice_created",
+      "invoice_issued",
+      "payment_recorded",
+      "cash_applied",
+      "collection_activity_recorded",
+      "dispute_opened",
+      "dispute_resolved",
+      "arc_agent_registered"
+    ],
+    "guardrails": [
+      "arc_batch_requires_bytewax",
+      "arc_event_requires_bytewax",
+      "privileged_agent_arc_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "assessed",
+      "approved",
+      "issued",
+      "paid",
+      "applied",
+      "overdue",
+      "disputed",
+      "resolved",
+      "blocked"
+    ],
+    "stream": "apg.fin.arc.lifecycle"
+  },
+  "version": "2.1.0"
 }

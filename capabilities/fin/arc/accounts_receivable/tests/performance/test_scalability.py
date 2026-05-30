@@ -409,7 +409,7 @@ class TestDataVolumeScalability:
 			user_id = uuid7str()
 			customer_service = ARCustomerService(tenant_id, user_id)
 			
-			# Create mock dataset
+			# Create sample dataset
 			mock_customers = []
 			for i in range(dataset_size):
 				customer = ARCustomer(

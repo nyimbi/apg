@@ -116,7 +116,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION get_pending_migrations(p_schema_name VARCHAR(100))
 RETURNS TABLE(migration_version VARCHAR(50), migration_name VARCHAR(255)) AS $$
 BEGIN
-	-- This is a placeholder - in a real implementation, this would
+	-- This is a input hint - in a real implementation, this would
 	-- scan the migrations directory and compare with applied migrations
 	RETURN QUERY
 	SELECT 

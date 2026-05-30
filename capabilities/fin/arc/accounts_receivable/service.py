@@ -1,1020 +1,509 @@
-"""
-APG Accounts Receivable - Service Layer Foundation
+"""Dependency-light Accounts Receivable lifecycle service."""
 
-Enterprise-grade business logic services for the APG Accounts Receivable capability.
-Implements CLAUDE.md standards with async Python, APG integration, and modern patterns.
+from __future__ import annotations
 
-© 2025 Datacraft. All rights reserved.
-Author: Nyimbi Odero <nyimbi@gmail.com>
-"""
-
-import asyncio
-from datetime import datetime, date, timedelta
+from copy import deepcopy
+from datetime import datetime
 from decimal import Decimal
-from typing import Any, Dict, List, Optional, Tuple, Union
-from uuid import UUID
+from typing import Any
+from uuid import uuid4
 
-from fastapi import HTTPException
-from pydantic import ValidationError
+try:
+	from .capability_contract import (
+		ARC_EVENT_STREAM,
+		STREAMING,
+		SUPPORTED_ARC_AGENT_ROLES,
+		SUPPORTED_ARC_AGENT_RUNTIMES,
+		SUPPORTED_CUSTOMER_TYPES,
+		SUPPORTED_DISPUTE_REASONS,
+		SUPPORTED_PAYMENT_METHODS,
+		evaluate_capability_rules,
+	)
+except ImportError:  # pragma: no cover - supports direct file loading in tests
+	from capability_contract import (  # type: ignore
+		ARC_EVENT_STREAM,
+		STREAMING,
+		SUPPORTED_ARC_AGENT_ROLES,
+		SUPPORTED_ARC_AGENT_RUNTIMES,
+		SUPPORTED_CUSTOMER_TYPES,
+		SUPPORTED_DISPUTE_REASONS,
+		SUPPORTED_PAYMENT_METHODS,
+		evaluate_capability_rules,
+	)
 
-from uuid_extensions import uuid7str
 
-from .models import (
-	ARCustomer, ARCustomerContact, ARCustomerAddress, ARCustomerPaymentTerms, 
-	ARCustomerCreditInfo, ARInvoice, ARInvoiceLineItem, ARInvoiceTax, 
-	ARPayment, ARPaymentAllocation, ARCollectionActivity, ARCreditAssessment,
-	ARDispute, ARCashApplication, ARCustomerStatus, ARCustomerType,
-	ARInvoiceStatus, ARPaymentStatus, ARPaymentMethod, ARCollectionPriority,
-	ARDisputeStatus, ARCreditRating, PositiveAmount, CurrencyCode
-)
+class AccountsReceivableService:
+	"""In-memory executable service for the ARC lifecycle packet."""
 
-from .ai_credit_scoring import (
-	APGCreditScoringService, CreditScoringConfig, CreditScoringResult,
-	create_credit_scoring_service
-)
-
-
-# =============================================================================
-# Base Service Foundation
-# =============================================================================
-
-class APGServiceBase:
-	"""Base service class with APG integration patterns and error handling."""
-	
-	def __init__(self, tenant_id: str, user_id: str):
-		assert tenant_id, "tenant_id required for APG multi-tenancy"
-		assert user_id, "user_id required for audit compliance"
-		
+	def __init__(self, tenant_id: str | None = None, user_id: str | None = None) -> None:
 		self.tenant_id = tenant_id
 		self.user_id = user_id
-		self._audit_context = {
-			'tenant_id': tenant_id,
-			'user_id': user_id,
-			'service': self.__class__.__name__
+		self.customers: dict[str, dict[str, Any]] = {}
+		self.credit_assessments: dict[str, dict[str, Any]] = {}
+		self.invoices: dict[str, dict[str, Any]] = {}
+		self.payments: dict[str, dict[str, Any]] = {}
+		self.cash_applications: dict[str, dict[str, Any]] = {}
+		self.collection_activities: dict[str, dict[str, Any]] = {}
+		self.disputes: dict[str, dict[str, Any]] = {}
+		self.agents: dict[str, dict[str, Any]] = {}
+		self._audit_events: list[dict[str, Any]] = []
+
+	def _tenant(self, tenant_id: str | None = None) -> str:
+		value = tenant_id or self.tenant_id
+		if not value:
+			raise PermissionError("tenant_context_required")
+		return value
+
+	def _record_id(self, prefix: str, explicit: str | None = None) -> str:
+		return explicit or f"{prefix}-{uuid4().hex[:12]}"
+
+	def _now(self) -> str:
+		return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+	def _assert_rules(self, context: dict[str, Any]) -> None:
+		result = evaluate_capability_rules(context)
+		if result["decision"] != "allow":
+			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+
+	def _base_context(self, tenant_id: str, operation: str) -> dict[str, Any]:
+		return {
+			"tenant_id": tenant_id,
+			"tenant_context_present": True,
+			"operation": operation,
+			"operation_type": "write",
+			"policy_attached": True,
 		}
 
-	def _log_service_action(self, action: str, entity_id: str = None, details: str = None) -> str:
-		"""Log service actions with consistent formatting."""
-		log_parts = [f"Service action: {action}"]
-		if entity_id:
-			log_parts.append(f"Entity: {entity_id}")
-		if details:
-			log_parts.append(f"Details: {details}")
-		return " | ".join(log_parts)
+	def _emit(self, tenant_id: str, event_type: str, record: dict[str, Any]) -> None:
+		self._audit_events.append({
+			"tenant_id": tenant_id,
+			"event_type": event_type,
+			"record_id": record["id"],
+			"record_type": record["type"],
+			"status": record["status"],
+			"stream": ARC_EVENT_STREAM,
+			"processor": "bytewax",
+			"emitted_at": self._now(),
+		})
 
-	async def _validate_permissions(self, permission: str, resource_id: str = None) -> bool:
-		"""Validate user permissions using APG auth_rbac integration."""
-		# TODO: Integrate with APG auth_rbac capability for permission checking
-		# For now, return True - this will be implemented in integration phase
-		return True
-
-	async def _audit_action(self, action: str, entity_type: str, entity_id: str, 
-						   old_data: Dict[str, Any] = None, new_data: Dict[str, Any] = None):
-		"""Log actions for APG audit_compliance integration."""
-		audit_entry = {
-			'tenant_id': self.tenant_id,
-			'user_id': self.user_id,
-			'action': action,
-			'entity_type': entity_type,
-			'entity_id': entity_id,
-			'timestamp': datetime.utcnow(),
-			'old_data': old_data,
-			'new_data': new_data
+	def create_customer(
+		self,
+		customer_id: str,
+		tenant_id: str,
+		customer_code: str,
+		legal_name: str,
+		customer_type: str,
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "create_customer")
+		context.update({
+			"customer_code_present": bool(customer_code),
+			"legal_name_present": bool(legal_name),
+			"customer_type_supported": customer_type in SUPPORTED_CUSTOMER_TYPES,
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("cust", customer_id),
+			"type": "ar_customer",
+			"tenant_id": tenant,
+			"customer_code": customer_code,
+			"legal_name": legal_name,
+			"customer_type": customer_type,
+			"currency": currency,
+			"credit_limit": Decimal("0"),
+			"credit_score": None,
+			"credit_hold": False,
+			"status": "active",
+			"created_at": self._now(),
 		}
-		# TODO: Integrate with APG audit_compliance capability
-		# For now, just log the action
-		print(self._log_service_action(f"AUDIT: {action}", entity_id))
+		self.customers[record["id"]] = record
+		self._emit(tenant, "customer_created", record)
+		return deepcopy(record)
 
-	def _handle_service_error(self, error: Exception, context: str) -> HTTPException:
-		"""Handle service errors with consistent error responses."""
-		if isinstance(error, ValidationError):
-			return HTTPException(
-				status_code=422,
-				detail=f"Validation error in {context}: {str(error)}"
-			)
-		elif isinstance(error, ValueError):
-			return HTTPException(
-				status_code=400,
-				detail=f"Invalid input in {context}: {str(error)}"
-			)
-		else:
-			return HTTPException(
-				status_code=500,
-				detail=f"Internal error in {context}: {str(error)}"
-			)
+	def assess_credit(
+		self,
+		assessment_id: str,
+		tenant_id: str,
+		customer_id: str,
+		credit_limit: float | int | Decimal,
+		credit_score: float,
+		reviewed_by: str | None = None,
+		credit_hold: bool = False,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		customer = self.customers.get(customer_id)
+		context = self._base_context(tenant, "assess_credit")
+		context.update({
+			"customer_present": bool(customer and customer["tenant_id"] == tenant),
+			"credit_limit_present": credit_limit is not None,
+			"credit_score": credit_score,
+			"credit_review_recorded": bool(reviewed_by),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("credit", assessment_id),
+			"type": "credit_assessment",
+			"tenant_id": tenant,
+			"customer_id": customer_id,
+			"credit_limit": Decimal(str(credit_limit)),
+			"credit_score": credit_score,
+			"credit_hold": credit_hold,
+			"reviewed_by": reviewed_by,
+			"status": "reviewed" if reviewed_by else "assessed",
+			"created_at": self._now(),
+		}
+		self.credit_assessments[record["id"]] = record
+		customer["credit_limit"] = Decimal(str(credit_limit))
+		customer["credit_score"] = credit_score
+		customer["credit_hold"] = credit_hold
+		self._emit(tenant, "credit_assessed", record)
+		return deepcopy(record)
 
+	def create_invoice(
+		self,
+		invoice_id: str,
+		tenant_id: str,
+		customer_id: str,
+		invoice_number: str,
+		invoice_date: str,
+		due_date: str,
+		lines: list[dict[str, Any]],
+		currency: str = "USD",
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		customer = self.customers.get(customer_id)
+		total = sum(Decimal(str(line.get("quantity", 0))) * Decimal(str(line.get("unit_price", 0))) for line in lines)
+		context = self._base_context(tenant, "create_invoice")
+		context.update({
+			"customer_present": bool(customer and customer["tenant_id"] == tenant),
+			"invoice_number_present": bool(invoice_number),
+			"invoice_dates_present": bool(invoice_date and due_date),
+			"due_date_valid": bool(invoice_date and due_date and due_date >= invoice_date),
+			"invoice_line_count": len(lines),
+			"invoice_total": total,
+		})
+		self._assert_rules(context)
+		for line in lines:
+			if (
+				not line.get("description")
+				or Decimal(str(line.get("quantity", 0))) <= 0
+				or Decimal(str(line.get("unit_price", -1))) < 0
+				or not line.get("revenue_account")
+			):
+				raise PermissionError("invoice_line_invalid")
+		record = {
+			"id": self._record_id("inv", invoice_id),
+			"type": "ar_invoice",
+			"tenant_id": tenant,
+			"customer_id": customer_id,
+			"invoice_number": invoice_number,
+			"invoice_date": invoice_date,
+			"due_date": due_date,
+			"currency": currency,
+			"lines": deepcopy(lines),
+			"total_amount": total,
+			"paid_amount": Decimal("0"),
+			"outstanding_amount": total,
+			"approved_by": None,
+			"status": "draft",
+			"created_at": self._now(),
+		}
+		self.invoices[record["id"]] = record
+		self._emit(tenant, "invoice_created", record)
+		return deepcopy(record)
 
-# =============================================================================
-# Customer Management Service
-# =============================================================================
+	def issue_invoice(self, invoice_id: str, tenant_id: str, approved_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		invoice = self.invoices.get(invoice_id)
+		customer = self.customers.get(invoice["customer_id"]) if invoice else None
+		context = self._base_context(tenant, "issue_invoice")
+		context.update({
+			"credit_hold": bool(customer and customer.get("credit_hold")),
+			"approval_recorded": bool(approved_by),
+		})
+		self._assert_rules(context)
+		if not invoice or invoice["tenant_id"] != tenant:
+			raise PermissionError("invoice_required")
+		invoice["approved_by"] = approved_by
+		invoice["status"] = "issued"
+		invoice["issued_at"] = self._now()
+		self._emit(tenant, "invoice_issued", invoice)
+		return deepcopy(invoice)
 
-class ARCustomerService(APGServiceBase):
-	"""
-	Customer and credit management service with APG AI credit scoring integration.
-	
-	Integrates with:
-	- customer_relationship_management for customer data sync
-	- auth_rbac for permission checking
-	- audit_compliance for transaction logging
-	- federated_learning for AI-powered credit scoring
-	- ai_orchestration for intelligent credit decisions
-	"""
-	
-	def __init__(self, tenant_id: str, user_id: str):
-		super().__init__(tenant_id, user_id)
-		self._credit_scoring_service: Optional[APGCreditScoringService] = None
-	
-	async def _get_credit_scoring_service(self) -> APGCreditScoringService:
-		"""Get or create credit scoring service instance."""
-		if not self._credit_scoring_service:
-			self._credit_scoring_service = await create_credit_scoring_service(
-				self.tenant_id, self.user_id
-			)
-		return self._credit_scoring_service
+	def record_payment(
+		self,
+		payment_id: str,
+		tenant_id: str,
+		customer_id: str,
+		payment_reference: str,
+		payment_date: str,
+		amount: float | int | Decimal,
+		method: str,
+		cash_account_id: str,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		customer = self.customers.get(customer_id)
+		context = self._base_context(tenant, "record_payment")
+		context.update({
+			"customer_present": bool(customer and customer["tenant_id"] == tenant),
+			"payment_reference_present": bool(payment_reference),
+			"payment_date_present": bool(payment_date),
+			"payment_amount": amount,
+			"payment_method_supported": method in SUPPORTED_PAYMENT_METHODS,
+			"cash_account_present": bool(cash_account_id),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("pay", payment_id),
+			"type": "ar_payment",
+			"tenant_id": tenant,
+			"customer_id": customer_id,
+			"payment_reference": payment_reference,
+			"payment_date": payment_date,
+			"amount": Decimal(str(amount)),
+			"unapplied_amount": Decimal(str(amount)),
+			"method": method,
+			"cash_account_id": cash_account_id,
+			"status": "recorded",
+			"created_at": self._now(),
+		}
+		self.payments[record["id"]] = record
+		self._emit(tenant, "payment_recorded", record)
+		return deepcopy(record)
 
-	async def create_customer(self, customer_data: Dict[str, Any]) -> ARCustomer:
-		"""Create a new customer with comprehensive validation and APG integration."""
-		try:
-			# Validate permissions
-			await self._validate_permissions('customer.create')
-			
-			# Add audit fields
-			customer_data.update({
-				'tenant_id': self.tenant_id,
-				'created_by': self.user_id,
-				'updated_by': self.user_id
-			})
-			
-			# Create customer with validation
-			customer = ARCustomer(**customer_data)
-			
-			# Audit the creation
-			await self._audit_action(
-				'create', 'customer', customer.id, 
-				new_data=customer.dict()
-			)
-			
-			# TODO: Integrate with customer_relationship_management capability
-			# await self._sync_with_crm(customer)
-			
-			print(self._log_service_action("Customer created", customer.id, 
-				f"Code: {customer.customer_code}, Name: {customer.legal_name}"))
-			
-			return customer
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "create_customer")
+	def apply_cash(
+		self,
+		application_id: str,
+		tenant_id: str,
+		payment_id: str,
+		invoice_id: str,
+		allocation_amount: float | int | Decimal,
+		reviewed_by: str | None = None,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		payment = self.payments.get(payment_id)
+		invoice = self.invoices.get(invoice_id)
+		allocation = Decimal(str(allocation_amount))
+		overapplication = bool(invoice and allocation > invoice["outstanding_amount"])
+		unapplied_after = (payment["unapplied_amount"] - allocation) if payment else Decimal("0")
+		context = self._base_context(tenant, "apply_cash")
+		context.update({
+			"payment_present": bool(payment and payment["tenant_id"] == tenant),
+			"invoice_present": bool(invoice and invoice["tenant_id"] == tenant),
+			"allocation_amount": allocation,
+			"overapplication": overapplication,
+			"unapplied_amount": unapplied_after,
+			"cash_application_review_recorded": bool(reviewed_by),
+		})
+		self._assert_rules(context)
+		if allocation > payment["unapplied_amount"]:
+			raise PermissionError("payment_unapplied_amount_exceeded")
+		invoice["paid_amount"] += allocation
+		invoice["outstanding_amount"] -= allocation
+		invoice["status"] = "paid" if invoice["outstanding_amount"] == 0 else "partially_paid"
+		payment["unapplied_amount"] = unapplied_after
+		payment["status"] = "applied" if unapplied_after == 0 else "partially_applied"
+		record = {
+			"id": self._record_id("apply", application_id),
+			"type": "cash_application",
+			"tenant_id": tenant,
+			"payment_id": payment_id,
+			"invoice_id": invoice_id,
+			"allocation_amount": allocation,
+			"reviewed_by": reviewed_by,
+			"status": "applied",
+			"created_at": self._now(),
+		}
+		self.cash_applications[record["id"]] = record
+		self._emit(tenant, "cash_applied", record)
+		return deepcopy(record)
 
-	async def get_customer(self, customer_id: str) -> Optional[ARCustomer]:
-		"""Retrieve customer by ID with permission validation."""
-		try:
-			await self._validate_permissions('customer.read', customer_id)
-			
-			# TODO: Implement database retrieval
-			# For now, return None - this will be implemented with database integration
-			return None
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "get_customer")
+	def record_collection_activity(
+		self,
+		activity_id: str,
+		tenant_id: str,
+		invoice_id: str,
+		contact_method: str,
+		priority: str,
+		outcome: str,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		invoice = self.invoices.get(invoice_id)
+		overdue = bool(invoice and invoice["tenant_id"] == tenant and invoice["status"] in {"issued", "partially_paid", "disputed"})
+		context = self._base_context(tenant, "record_collection_activity")
+		context.update({
+			"overdue_invoice_present": overdue,
+			"contact_method_present": bool(contact_method),
+			"priority_present": bool(priority),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("collect", activity_id),
+			"type": "collection_activity",
+			"tenant_id": tenant,
+			"invoice_id": invoice_id,
+			"contact_method": contact_method,
+			"priority": priority,
+			"outcome": outcome,
+			"status": "recorded",
+			"created_at": self._now(),
+		}
+		self.collection_activities[record["id"]] = record
+		self._emit(tenant, "collection_activity_recorded", record)
+		return deepcopy(record)
 
-	async def update_customer(self, customer_id: str, update_data: Dict[str, Any]) -> ARCustomer:
-		"""Update customer information with validation and audit trail."""
-		try:
-			await self._validate_permissions('customer.update', customer_id)
-			
-			# Get existing customer
-			existing_customer = await self.get_customer(customer_id)
-			if not existing_customer:
-				raise ValueError(f"Customer {customer_id} not found")
-			
-			# Prepare update data
-			update_data.update({
-				'updated_by': self.user_id,
-				'updated_at': datetime.utcnow(),
-				'version': existing_customer.version + 1
-			})
-			
-			# Create updated customer
-			updated_data = existing_customer.dict()
-			updated_data.update(update_data)
-			updated_customer = ARCustomer(**updated_data)
-			
-			# Audit the update
-			await self._audit_action(
-				'update', 'customer', customer_id,
-				old_data=existing_customer.dict(),
-				new_data=updated_customer.dict()
-			)
-			
-			print(self._log_service_action("Customer updated", customer_id))
-			
-			return updated_customer
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "update_customer")
+	def open_dispute(self, dispute_id: str, tenant_id: str, invoice_id: str, reason: str, owner: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		invoice = self.invoices.get(invoice_id)
+		context = self._base_context(tenant, "open_dispute")
+		context.update({
+			"invoice_present": bool(invoice and invoice["tenant_id"] == tenant),
+			"dispute_reason_supported": reason in SUPPORTED_DISPUTE_REASONS,
+			"owner_present": bool(owner),
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("dispute", dispute_id),
+			"type": "ar_dispute",
+			"tenant_id": tenant,
+			"invoice_id": invoice_id,
+			"reason": reason,
+			"owner": owner,
+			"status": "open",
+			"created_at": self._now(),
+		}
+		self.disputes[record["id"]] = record
+		invoice["status"] = "disputed"
+		self._emit(tenant, "dispute_opened", record)
+		return deepcopy(record)
 
-	async def assess_customer_credit(self, customer_id: str, assessment_options: Dict[str, Any] = None) -> ARCreditAssessment:
-		"""Perform comprehensive AI-powered credit assessment using APG federated learning."""
-		try:
-			await self._validate_permissions('customer.credit_assess', customer_id)
-			
-			# Get customer data
-			customer = await self.get_customer(customer_id)
-			if not customer:
-				raise ValueError(f"Customer {customer_id} not found")
-			
-			# TODO: Fetch customer's invoice and payment history from database
-			# For now, using empty lists - this would be replaced with actual data queries
-			invoices = []  # await self._get_customer_invoices(customer_id)
-			payments = []  # await self._get_customer_payments(customer_id)
-			
-			# Get AI credit scoring service
-			credit_service = await self._get_credit_scoring_service()
-			
-			# Perform AI-powered credit assessment
-			scoring_result = await credit_service.assess_customer_credit(
-				customer, invoices, payments
-			)
-			
-			# Create assessment database record
-			assessment = await credit_service.create_credit_assessment_record(scoring_result)
-			
-			# Update customer credit information if assessment is confident
-			if not scoring_result.requires_manual_review and scoring_result.confidence_score > 0.85:
-				await credit_service.update_customer_credit_info(customer, scoring_result)
-			
-			# Audit the assessment
-			await self._audit_action(
-				'ai_credit_assess', 'customer', customer_id,
-				new_data={
-					'credit_score': scoring_result.credit_score,
-					'risk_rating': scoring_result.risk_rating.value,
-					'confidence_score': scoring_result.confidence_score,
-					'model_version': scoring_result.model_version,
-					'requires_manual_review': scoring_result.requires_manual_review,
-					'risk_factors': scoring_result.risk_factors,
-					'positive_factors': scoring_result.positive_factors
-				}
-			)
-			
-			print(self._log_service_action("AI credit assessment completed", customer_id,
-				f"Score: {scoring_result.credit_score}, Rating: {scoring_result.risk_rating}, "
-				f"Confidence: {scoring_result.confidence_score:.2f}, "
-				f"Manual Review: {scoring_result.requires_manual_review}"))
-			
-			return assessment
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "assess_customer_credit")
+	def resolve_dispute(self, dispute_id: str, tenant_id: str, resolution: str, reviewed_by: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		dispute = self.disputes.get(dispute_id)
+		context = self._base_context(tenant, "resolve_dispute")
+		context.update({"resolution_review_recorded": bool(reviewed_by)})
+		self._assert_rules(context)
+		if not dispute or dispute["tenant_id"] != tenant:
+			raise PermissionError("dispute_required")
+		dispute["resolution"] = resolution
+		dispute["reviewed_by"] = reviewed_by
+		dispute["status"] = "resolved"
+		invoice = self.invoices.get(dispute["invoice_id"])
+		if invoice and invoice["tenant_id"] == tenant and invoice["status"] == "disputed":
+			invoice["status"] = "issued" if invoice["outstanding_amount"] > 0 else "paid"
+		self._emit(tenant, "dispute_resolved", dispute)
+		return deepcopy(dispute)
 
-	async def place_customer_on_hold(self, customer_id: str, reason: str) -> ARCustomer:
-		"""Place customer on credit hold with proper authorization."""
-		try:
-			await self._validate_permissions('customer.credit_hold', customer_id)
-			
-			# Update customer status
-			update_data = {
-				'status': ARCustomerStatus.CREDIT_HOLD,
-				'collection_notes': f"Credit hold placed by {self.user_id}: {reason}"
-			}
-			
-			updated_customer = await self.update_customer(customer_id, update_data)
-			
-			print(self._log_service_action("Customer placed on credit hold", customer_id, reason))
-			
-			return updated_customer
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "place_customer_on_hold")
+	def register_arc_agent(self, tenant_id: str, name: str, runtime: str, role: str, scope: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		context = self._base_context(tenant, "register_arc_agent")
+		context.update({
+			"agent_runtime_supported": runtime in SUPPORTED_ARC_AGENT_RUNTIMES,
+			"agent_role_supported": role in SUPPORTED_ARC_AGENT_ROLES,
+		})
+		self._assert_rules(context)
+		record = {
+			"id": self._record_id("agent"),
+			"type": "arc_agent",
+			"tenant_id": tenant,
+			"name": name,
+			"runtime": runtime,
+			"role": role,
+			"scope": scope,
+			"status": "active",
+			"created_at": self._now(),
+		}
+		self.agents[record["id"]] = record
+		self._emit(tenant, "arc_agent_registered", record)
+		return deepcopy(record)
 
-	async def release_customer_hold(self, customer_id: str) -> ARCustomer:
-		"""Release customer from credit hold with proper authorization."""
-		try:
-			await self._validate_permissions('customer.credit_release', customer_id)
-			
-			# Update customer status
-			update_data = {
-				'status': ARCustomerStatus.ACTIVE,
-				'collection_notes': f"Credit hold released by {self.user_id}"
-			}
-			
-			updated_customer = await self.update_customer(customer_id, update_data)
-			
-			print(self._log_service_action("Customer credit hold released", customer_id))
-			
-			return updated_customer
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "release_customer_hold")
+	def validate_agent_arc_action(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		action: str,
+		privileged_scope: bool,
+		human_approval_recorded: bool,
+	) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		agent = self.agents.get(agent_id)
+		if not agent or agent["tenant_id"] != tenant:
+			raise PermissionError("arc_agent_required")
+		result = evaluate_capability_rules({
+			"tenant_id": tenant,
+			"tenant_context_present": True,
+			"operation": "agent_arc_action",
+			"action": action,
+			"privileged_scope": privileged_scope,
+			"human_approval_recorded": human_approval_recorded,
+		})
+		if result["decision"] != "allow":
+			raise PermissionError(",".join(effect["reason"] for effect in result["effects"]))
+		return result
 
-	async def batch_assess_customers_credit(self, customer_ids: List[str] = None, 
-											risk_threshold: float = 0.3) -> List[ARCreditAssessment]:
-		"""Perform batch AI-powered credit assessments for multiple customers."""
-		try:
-			await self._validate_permissions('customer.batch_credit_assess')
-			
-			# Get customers to assess
-			if customer_ids:
-				customers = []
-				for customer_id in customer_ids:
-					customer = await self.get_customer(customer_id)
-					if customer:
-						customers.append(customer)
+	def validate_batch(self, tenant_id: str, event_count: int, event_stream: str = "bytewax") -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		self._assert_rules({
+			"tenant_id": tenant,
+			"tenant_context_present": True,
+			"operation": "arc_batch",
+			"event_stream": event_stream,
+		})
+		return {
+			"tenant_id": tenant,
+			"event_count": event_count,
+			"processor": "bytewax",
+			"stream": ARC_EVENT_STREAM,
+		}
+
+	def aging_summary(self, tenant_id: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		buckets = {"current": Decimal("0"), "overdue": Decimal("0"), "disputed": Decimal("0"), "paid": Decimal("0")}
+		for invoice in self.invoices.values():
+			if invoice["tenant_id"] != tenant:
+				continue
+			if invoice["status"] == "disputed":
+				buckets["disputed"] += invoice["outstanding_amount"]
+			elif invoice["status"] in {"issued", "partially_paid"}:
+				buckets["overdue"] += invoice["outstanding_amount"]
+			elif invoice["status"] == "paid":
+				buckets["paid"] += invoice["total_amount"]
 			else:
-				# TODO: Get all active customers needing assessment
-				customers = []  # await self._get_customers_needing_assessment()
-			
-			if not customers:
-				print(self._log_service_action("No customers found for batch assessment"))
-				return []
-			
-			# Get AI credit scoring service
-			credit_service = await self._get_credit_scoring_service()
-			
-			# Perform batch assessment
-			scoring_results = await credit_service.batch_assess_customers(customers)
-			
-			# Create assessment records
-			assessments = []
-			high_risk_customers = []
-			
-			for scoring_result in scoring_results:
-				# Create database record
-				assessment = await credit_service.create_credit_assessment_record(scoring_result)
-				assessments.append(assessment)
-				
-				# Track high-risk customers
-				if scoring_result.default_probability > risk_threshold:
-					high_risk_customers.append(scoring_result.customer_id)
-				
-				# Auto-update customer info if confident
-				if not scoring_result.requires_manual_review and scoring_result.confidence_score > 0.85:
-					customer = next(c for c in customers if c.id == scoring_result.customer_id)
-					await credit_service.update_customer_credit_info(customer, scoring_result)
-			
-			# Audit batch assessment
-			await self._audit_action(
-				'batch_credit_assess', 'customer_batch', None,
-				new_data={
-					'customers_assessed': len(assessments),
-					'high_risk_count': len(high_risk_customers),
-					'high_risk_customers': high_risk_customers,
-					'risk_threshold': risk_threshold
-				}
-			)
-			
-			print(self._log_service_action("Batch credit assessment completed", 
-				details=f"Assessed: {len(assessments)}, High Risk: {len(high_risk_customers)}"))
-			
-			return assessments
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "batch_assess_customers_credit")
-	
-	async def monitor_credit_risk_changes(self, lookback_days: int = 30) -> Dict[str, Any]:
-		"""Monitor customers for significant credit risk changes using AI analysis."""
-		try:
-			await self._validate_permissions('customer.risk_monitoring')
-			
-			# TODO: Get customers with recent activity changes
-			customers_to_monitor = []  # await self._get_customers_with_recent_activity(lookback_days)
-			
-			if not customers_to_monitor:
-				return {
-					'monitoring_period_days': lookback_days,
-					'customers_monitored': 0,
-					'risk_alerts': [],
-					'recommendations': []
-				}
-			
-			# Get AI credit scoring service
-			credit_service = await self._get_credit_scoring_service()
-			
-			# Assess current risk levels
-			current_assessments = await credit_service.batch_assess_customers(customers_to_monitor)
-			
-			risk_alerts = []
-			recommendations = []
-			
-			for assessment in current_assessments:
-				# TODO: Compare with previous assessment to detect changes
-				# For now, flag high-risk situations
-				if assessment.default_probability > 0.4:
-					risk_alerts.append({
-						'customer_id': assessment.customer_id,
-						'risk_level': 'high',
-						'default_probability': assessment.default_probability,
-						'risk_factors': assessment.risk_factors,
-						'recommended_action': 'immediate_review'
-					})
-				elif assessment.requires_manual_review:
-					risk_alerts.append({
-						'customer_id': assessment.customer_id,
-						'risk_level': 'medium',
-						'confidence_score': assessment.confidence_score,
-						'recommended_action': 'manual_review'
-					})
-				
-				# Generate recommendations based on risk factors
-				if 'high_credit_utilization' in assessment.risk_factors:
-					recommendations.append({
-						'customer_id': assessment.customer_id,
-						'recommendation': 'reduce_credit_limit',
-						'current_utilization': assessment.model_explanation.get('credit_utilization', 0)
-					})
-			
-			# Audit risk monitoring
-			await self._audit_action(
-				'credit_risk_monitoring', 'customer_batch', None,
-				new_data={
-					'monitoring_period_days': lookback_days,
-					'customers_monitored': len(customers_to_monitor),
-					'risk_alerts_count': len(risk_alerts),
-					'high_risk_customers': [alert['customer_id'] for alert in risk_alerts if alert['risk_level'] == 'high']
-				}
-			)
-			
-			print(self._log_service_action("Credit risk monitoring completed",
-				details=f"Monitored: {len(customers_to_monitor)}, Alerts: {len(risk_alerts)}"))
-			
-			return {
-				'monitoring_period_days': lookback_days,
-				'customers_monitored': len(customers_to_monitor),
-				'risk_alerts': risk_alerts,
-				'recommendations': recommendations,
-				'monitoring_timestamp': datetime.utcnow()
-			}
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "monitor_credit_risk_changes")
-	
-	async def get_customer_credit_insights(self, customer_id: str) -> Dict[str, Any]:
-		"""Get AI-powered insights and explanations for customer credit profile."""
-		try:
-			await self._validate_permissions('customer.credit_insights', customer_id)
-			
-			# Get latest credit assessment
-			customer = await self.get_customer(customer_id)
-			if not customer:
-				raise ValueError(f"Customer {customer_id} not found")
-			
-			# TODO: Get recent invoices and payments for analysis
-			invoices = []  # await self._get_customer_invoices(customer_id, limit=50)
-			payments = []  # await self._get_customer_payments(customer_id, limit=50)
-			
-			# Get AI credit scoring service
-			credit_service = await self._get_credit_scoring_service()
-			
-			# Perform fresh assessment for insights
-			scoring_result = await credit_service.assess_customer_credit(customer, invoices, payments)
-			
-			# Generate detailed insights
-			insights = {
-				'customer_id': customer_id,
-				'customer_code': customer.customer_code,
-				'current_credit_score': scoring_result.credit_score,
-				'risk_rating': scoring_result.risk_rating.value,
-				'confidence_level': scoring_result.confidence_score,
-				
-				# Risk analysis
-				'risk_factors': [
-					{
-						'factor': factor,
-						'impact': 'high' if factor in ['poor_credit_score', 'high_late_payment_rate'] else 'medium',
-						'explanation': self._get_risk_factor_explanation(factor)
-					}
-					for factor in scoring_result.risk_factors
-				],
-				
-				# Positive factors
-				'positive_factors': [
-					{
-						'factor': factor,
-						'impact': 'high' if factor in ['excellent_payment_history', 'high_credit_score'] else 'medium',
-						'explanation': self._get_positive_factor_explanation(factor)
-					}
-					for factor in scoring_result.positive_factors
-				],
-				
-				# Recommendations
-				'recommendations': self._generate_credit_recommendations(scoring_result),
-				
-				# Model explanation
-				'feature_importance': scoring_result.model_explanation,
-				'model_version': scoring_result.model_version,
-				'assessment_timestamp': scoring_result.assessed_at
-			}
-			
-			print(self._log_service_action("Credit insights generated", customer_id,
-				f"Score: {scoring_result.credit_score}, Factors: {len(scoring_result.risk_factors)}"))
-			
-			return insights
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "get_customer_credit_insights")
-	
-	def _get_risk_factor_explanation(self, risk_factor: str) -> str:
-		"""Get human-readable explanation for risk factors."""
-		explanations = {
-			'high_late_payment_rate': 'Customer has a pattern of late payments that increases default risk',
-			'high_credit_utilization': 'Customer is using a high percentage of available credit',
-			'limited_payment_history': 'Insufficient payment history to fully assess creditworthiness',
-			'inconsistent_payment_behavior': 'Payment timing varies significantly between invoices',
-			'frequent_disputes': 'Customer frequently disputes invoices, indicating potential issues',
-			'high_industry_risk': 'Customer operates in a high-risk industry sector',
-			'poor_credit_score': 'Current credit score indicates elevated default risk'
+				buckets["current"] += invoice["outstanding_amount"]
+		return {key: str(value) for key, value in buckets.items()}
+
+	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
+		tenant = self._tenant(tenant_id)
+		return {
+			"tenant_id": tenant,
+			"customer_count": len([record for record in self.customers.values() if record["tenant_id"] == tenant]),
+			"credit_assessment_count": len([record for record in self.credit_assessments.values() if record["tenant_id"] == tenant]),
+			"invoice_count": len([record for record in self.invoices.values() if record["tenant_id"] == tenant]),
+			"payment_count": len([record for record in self.payments.values() if record["tenant_id"] == tenant]),
+			"cash_application_count": len([record for record in self.cash_applications.values() if record["tenant_id"] == tenant]),
+			"collection_activity_count": len([record for record in self.collection_activities.values() if record["tenant_id"] == tenant]),
+			"dispute_count": len([record for record in self.disputes.values() if record["tenant_id"] == tenant]),
+			"arc_agent_count": len([record for record in self.agents.values() if record["tenant_id"] == tenant]),
+			"audit_event_count": len([event for event in self._audit_events if event["tenant_id"] == tenant]),
+			"aging": self.aging_summary(tenant),
+			"streaming": deepcopy(STREAMING),
 		}
-		return explanations.get(risk_factor, f'Risk factor: {risk_factor}')
-	
-	def _get_positive_factor_explanation(self, positive_factor: str) -> str:
-		"""Get human-readable explanation for positive factors."""
-		explanations = {
-			'excellent_payment_consistency': 'Customer consistently pays invoices on time',
-			'established_relationship': 'Long-term customer relationship reduces risk',
-			'low_credit_utilization': 'Customer uses only a small portion of available credit',
-			'excellent_payment_history': 'Customer has a strong track record of payments',
-			'fast_payment_processing': 'Customer typically pays invoices quickly',
-			'good_dispute_resolution': 'Customer resolves disputes efficiently and fairly',
-			'high_credit_score': 'Current credit score indicates low default risk'
-		}
-		return explanations.get(positive_factor, f'Positive factor: {positive_factor}')
-	
-	def _generate_credit_recommendations(self, scoring_result: CreditScoringResult) -> List[Dict[str, str]]:
-		"""Generate actionable recommendations based on credit assessment."""
-		recommendations = []
-		
-		# Credit limit recommendations
-		if scoring_result.credit_score > 700:
-			recommendations.append({
-				'type': 'credit_limit',
-				'action': 'increase',
-				'description': f'Consider increasing credit limit to ${scoring_result.recommended_credit_limit:,.2f}'
-			})
-		elif scoring_result.credit_score < 500:
-			recommendations.append({
-				'type': 'credit_limit',
-				'action': 'decrease',
-				'description': 'Consider reducing credit limit due to elevated risk'
-			})
-		
-		# Payment terms recommendations
-		if 'high_late_payment_rate' in scoring_result.risk_factors:
-			recommendations.append({
-				'type': 'payment_terms',
-				'action': 'tighten',
-				'description': f'Consider reducing payment terms to {scoring_result.payment_terms_days} days'
-			})
-		
-		# Manual review recommendations
-		if scoring_result.requires_manual_review:
-			recommendations.append({
-				'type': 'review',
-				'action': 'manual_review',
-				'description': 'Manual review recommended due to risk factors or low confidence'
-			})
-		
-		# Monitoring recommendations
-		if scoring_result.default_probability > 0.2:
-			recommendations.append({
-				'type': 'monitoring',
-				'action': 'increase_frequency',
-				'description': f'Increase monitoring frequency, next review: {scoring_result.next_review_date}'
-			})
-		
-		return recommendations
-	
-	def _log_customer_action(self, action: str, customer: ARCustomer) -> str:
-		"""Log customer-specific actions with formatted details."""
-		return self._log_service_action(action, customer.id, 
-			f"{customer.customer_code} - {customer.legal_name}")
+
+	def audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		return [deepcopy(event) for event in self._audit_events if event["tenant_id"] == tenant]
+
+	def list_records(self, collection: str, tenant_id: str) -> list[dict[str, Any]]:
+		tenant = self._tenant(tenant_id)
+		if not hasattr(self, collection):
+			raise KeyError(collection)
+		store = getattr(self, collection)
+		if isinstance(store, dict):
+			return [deepcopy(record) for record in store.values() if record["tenant_id"] == tenant]
+		if isinstance(store, list):
+			return [deepcopy(record) for record in store if record["tenant_id"] == tenant]
+		raise TypeError(f"{collection} is not a record collection")
 
 
-# =============================================================================
-# Invoice Management Service
-# =============================================================================
-
-class ARInvoiceService(APGServiceBase):
-	"""
-	Invoice lifecycle management service with APG integration.
-	
-	Integrates with:
-	- document_management for invoice document storage
-	- ai_orchestration for smart invoice processing
-	- workflow_engine for approval workflows
-	- general_ledger for GL posting
-	"""
-
-	async def create_invoice(self, invoice_data: Dict[str, Any]) -> ARInvoice:
-		"""Create a new invoice with comprehensive validation and APG integration."""
-		try:
-			await self._validate_permissions('invoice.create')
-			
-			# Generate invoice number if not provided
-			if 'invoice_number' not in invoice_data:
-				invoice_data['invoice_number'] = await self._generate_invoice_number()
-			
-			# Add audit fields
-			invoice_data.update({
-				'tenant_id': self.tenant_id,
-				'created_by': self.user_id,
-				'updated_by': self.user_id
-			})
-			
-			# Create invoice with validation
-			invoice = ARInvoice(**invoice_data)
-			
-			# TODO: Integrate with document_management for document storage
-			# if 'document_file' in invoice_data:
-			#     invoice.document_id = await self._store_invoice_document(invoice_data['document_file'])
-			
-			# TODO: Start approval workflow if required
-			# if await self._requires_approval(invoice):
-			#     invoice.workflow_id = await self._start_approval_workflow(invoice)
-			
-			# Audit the creation
-			await self._audit_action(
-				'create', 'invoice', invoice.id,
-				new_data=invoice.dict()
-			)
-			
-			print(self._log_service_action("Invoice created", invoice.id,
-				f"Number: {invoice.invoice_number}, Amount: ${invoice.total_amount}"))
-			
-			return invoice
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "create_invoice")
-
-	async def process_invoice_with_ai(self, document_file: bytes, 
-									  processing_options: Dict[str, Any]) -> Dict[str, Any]:
-		"""Process invoice document using APG AI orchestration capability."""
-		try:
-			await self._validate_permissions('invoice.ai_process')
-			
-			processing_id = uuid7str()
-			
-			# TODO: Integrate with APG ai_orchestration capability
-			processing_result = {
-				'processing_id': processing_id,
-				'status': 'processing',
-				'estimated_completion': datetime.utcnow() + timedelta(minutes=2)
-			}
-			
-			print(self._log_service_action("AI invoice processing started", processing_id))
-			
-			return processing_result
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "process_invoice_with_ai")
-
-	async def approve_invoice(self, invoice_id: str, approval_data: Dict[str, Any]) -> ARInvoice:
-		"""Approve invoice with workflow integration."""
-		try:
-			await self._validate_permissions('invoice.approve', invoice_id)
-			
-			# Get existing invoice
-			existing_invoice = await self.get_invoice(invoice_id)
-			if not existing_invoice:
-				raise ValueError(f"Invoice {invoice_id} not found")
-			
-			# Update invoice status
-			update_data = {
-				'status': ARInvoiceStatus.SENT,
-				'updated_by': self.user_id,
-				'updated_at': datetime.utcnow()
-			}
-			
-			updated_invoice = await self.update_invoice(invoice_id, update_data)
-			
-			# TODO: Integrate with workflow_engine to complete approval step
-			# await self._complete_workflow_step(existing_invoice.workflow_id, approval_data)
-			
-			# Audit the approval
-			await self._audit_action(
-				'approve', 'invoice', invoice_id,
-				old_data={'status': existing_invoice.status},
-				new_data={'status': updated_invoice.status}
-			)
-			
-			print(self._log_service_action("Invoice approved", invoice_id))
-			
-			return updated_invoice
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "approve_invoice")
-
-	async def get_invoice(self, invoice_id: str) -> Optional[ARInvoice]:
-		"""Retrieve invoice by ID with permission validation."""
-		try:
-			await self._validate_permissions('invoice.read', invoice_id)
-			
-			# TODO: Implement database retrieval
-			return None
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "get_invoice")
-
-	async def update_invoice(self, invoice_id: str, update_data: Dict[str, Any]) -> ARInvoice:
-		"""Update invoice with validation and audit trail."""
-		try:
-			await self._validate_permissions('invoice.update', invoice_id)
-			
-			# Similar pattern to customer update
-			# Implementation would follow the same pattern as customer update
-			pass
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "update_invoice")
-
-	async def _generate_invoice_number(self) -> str:
-		"""Generate unique invoice number with proper sequencing."""
-		# TODO: Implement proper number generation with database sequences
-		return f"INV-{datetime.now().year}-{uuid7str()[:8].upper()}"
-
-
-# =============================================================================
-# Collections Management Service
-# =============================================================================
-
-class ARCollectionsService(APGServiceBase):
-	"""
-	Collections and dunning management service with APG integration.
-	
-	Integrates with:
-	- notification_engine for automated communications
-	- workflow_engine for collection workflows
-	- ai_orchestration for collection optimization
-	"""
-
-	async def create_collection_activity(self, activity_data: Dict[str, Any]) -> ARCollectionActivity:
-		"""Create collection activity with APG notification integration."""
-		try:
-			await self._validate_permissions('collections.create')
-			
-			# Add audit fields
-			activity_data.update({
-				'tenant_id': self.tenant_id,
-				'created_by': self.user_id,
-				'updated_by': self.user_id
-			})
-			
-			# Create activity with validation
-			activity = ARCollectionActivity(**activity_data)
-			
-			# TODO: Integrate with notification_engine for automated communications
-			# if activity.contact_method == 'email':
-			#     activity.notification_id = await self._send_collection_email(activity)
-			
-			# Audit the creation
-			await self._audit_action(
-				'create', 'collection_activity', activity.id,
-				new_data=activity.dict()
-			)
-			
-			print(self._log_service_action("Collection activity created", activity.id,
-				f"Type: {activity.activity_type}, Customer: {activity.customer_id}"))
-			
-			return activity
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "create_collection_activity")
-
-	async def generate_automated_collections(self, criteria: Dict[str, Any]) -> List[ARCollectionActivity]:
-		"""Generate automated collection activities using AI optimization."""
-		try:
-			await self._validate_permissions('collections.auto_generate')
-			
-			# TODO: Integrate with ai_orchestration for collection strategy optimization
-			collection_activities = []
-			
-			print(self._log_service_action("Automated collections generated", 
-				details=f"Count: {len(collection_activities)}"))
-			
-			return collection_activities
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "generate_automated_collections")
-
-
-# =============================================================================
-# Cash Application Service
-# =============================================================================
-
-class ARCashApplicationService(APGServiceBase):
-	"""
-	Payment processing and cash application service with AI matching.
-	
-	Integrates with:
-	- ai_orchestration for intelligent payment matching
-	- banking_integration for payment data
-	- machine_learning for pattern recognition
-	"""
-
-	async def create_payment(self, payment_data: Dict[str, Any]) -> ARPayment:
-		"""Create payment with fraud detection and validation."""
-		try:
-			await self._validate_permissions('payment.create')
-			
-			# Generate payment number if not provided
-			if 'payment_number' not in payment_data:
-				payment_data['payment_number'] = await self._generate_payment_number()
-			
-			# Add audit fields
-			payment_data.update({
-				'tenant_id': self.tenant_id,
-				'created_by': self.user_id,
-				'updated_by': self.user_id
-			})
-			
-			# Create payment with validation
-			payment = ARPayment(**payment_data)
-			
-			# TODO: Integrate fraud detection
-			# payment = await self._run_fraud_detection(payment)
-			
-			# Audit the creation
-			await self._audit_action(
-				'create', 'payment', payment.id,
-				new_data=payment.dict()
-			)
-			
-			print(self._log_service_action("Payment created", payment.id,
-				f"Number: {payment.payment_number}, Amount: ${payment.payment_amount}"))
-			
-			return payment
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "create_payment")
-
-	async def auto_apply_cash(self, payment_id: str, matching_options: Dict[str, Any]) -> ARCashApplication:
-		"""Automatically apply cash using AI-powered matching."""
-		try:
-			await self._validate_permissions('cash_application.auto_apply', payment_id)
-			
-			# Create cash application record
-			application_data = {
-				'tenant_id': self.tenant_id,
-				'created_by': self.user_id,
-				'updated_by': self.user_id,
-				'payment_id': payment_id,
-				'customer_id': matching_options.get('customer_id'),
-				'matching_method': 'ai_auto',
-				'model_version': 'cash_matching_v2.1'
-			}
-			
-			application = ARCashApplication(**application_data)
-			
-			# TODO: Integrate with ai_orchestration for intelligent matching
-			# application = await self._run_cash_matching_ai(application, matching_options)
-			
-			# Audit the application
-			await self._audit_action(
-				'auto_apply_cash', 'payment', payment_id,
-				new_data=application.dict()
-			)
-			
-			print(self._log_service_action("Cash auto-applied", payment_id,
-				f"Confidence: {application.ai_matching_score:.2f}"))
-			
-			return application
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "auto_apply_cash")
-
-	async def _generate_payment_number(self) -> str:
-		"""Generate unique payment number with proper sequencing."""
-		return f"PAY-{datetime.now().year}-{uuid7str()[:8].upper()}"
-
-
-# =============================================================================
-# Analytics Service
-# =============================================================================
-
-class ARAnalyticsService(APGServiceBase):
-	"""
-	Analytics and reporting service with AI insights.
-	
-	Integrates with:
-	- business_intelligence for advanced analytics
-	- time_series_analytics for forecasting
-	- federated_learning for predictive models
-	"""
-
-	async def generate_cash_flow_forecast(self, forecast_params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Generate AI-powered cash flow forecast using time series analytics."""
-		try:
-			await self._validate_permissions('analytics.cash_flow_forecast')
-			
-			forecast_id = uuid7str()
-			
-			# TODO: Integrate with APG time_series_analytics capability
-			forecast_result = {
-				'forecast_id': forecast_id,
-				'horizon_days': forecast_params.get('horizon_days', 30),
-				'confidence_score': 0.92,
-				'model_version': 'cash_flow_v2.1',
-				'daily_projections': [],
-				'scenario_analysis': {
-					'best_case': 850000.00,
-					'most_likely': 750000.00,
-					'worst_case': 650000.00
-				}
-			}
-			
-			print(self._log_service_action("Cash flow forecast generated", forecast_id,
-				f"Horizon: {forecast_params.get('horizon_days', 30)} days"))
-			
-			return forecast_result
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "generate_cash_flow_forecast")
-
-	async def analyze_customer_risk(self, analysis_params: Dict[str, Any]) -> Dict[str, Any]:
-		"""Analyze customer payment risk using federated learning models."""
-		try:
-			await self._validate_permissions('analytics.risk_analysis')
-			
-			# TODO: Integrate with federated_learning capability
-			risk_analysis = {
-				'analysis_id': uuid7str(),
-				'overall_risk_score': 0.23,
-				'high_risk_customers': [],
-				'risk_trends': [],
-				'recommendations': []
-			}
-			
-			print(self._log_service_action("Customer risk analysis completed"))
-			
-			return risk_analysis
-			
-		except Exception as e:
-			raise self._handle_service_error(e, "analyze_customer_risk")
-
-
-# =============================================================================
-# Service Factory and Registration
-# =============================================================================
-
-class ARServiceFactory:
-	"""Factory for creating AR service instances with proper APG integration."""
-	
-	@staticmethod
-	def create_customer_service(tenant_id: str, user_id: str) -> ARCustomerService:
-		"""Create customer service instance."""
-		assert tenant_id and user_id, "tenant_id and user_id required"
-		return ARCustomerService(tenant_id, user_id)
-	
-	@staticmethod
-	def create_invoice_service(tenant_id: str, user_id: str) -> ARInvoiceService:
-		"""Create invoice service instance."""
-		assert tenant_id and user_id, "tenant_id and user_id required"
-		return ARInvoiceService(tenant_id, user_id)
-	
-	@staticmethod
-	def create_collections_service(tenant_id: str, user_id: str) -> ARCollectionsService:
-		"""Create collections service instance."""
-		assert tenant_id and user_id, "tenant_id and user_id required"
-		return ARCollectionsService(tenant_id, user_id)
-	
-	@staticmethod
-	def create_cash_application_service(tenant_id: str, user_id: str) -> ARCashApplicationService:
-		"""Create cash application service instance."""
-		assert tenant_id and user_id, "tenant_id and user_id required"
-		return ARCashApplicationService(tenant_id, user_id)
-	
-	@staticmethod
-	def create_analytics_service(tenant_id: str, user_id: str) -> ARAnalyticsService:
-		"""Create analytics service instance."""
-		assert tenant_id and user_id, "tenant_id and user_id required"
-		return ARAnalyticsService(tenant_id, user_id)
-
-
-# =============================================================================
-# Service Integration Helper
-# =============================================================================
-
-async def initialize_ar_services(tenant_id: str, user_id: str) -> Dict[str, Any]:
-	"""Initialize all AR services for a tenant/user context."""
-	try:
-		services = {
-			'customer': ARServiceFactory.create_customer_service(tenant_id, user_id),
-			'invoice': ARServiceFactory.create_invoice_service(tenant_id, user_id),
-			'collections': ARServiceFactory.create_collections_service(tenant_id, user_id),
-			'cash_application': ARServiceFactory.create_cash_application_service(tenant_id, user_id),
-			'analytics': ARServiceFactory.create_analytics_service(tenant_id, user_id)
-		}
-		
-		print(f"AR services initialized for tenant {tenant_id}, user {user_id}")
-		return services
-		
-	except Exception as e:
-		raise HTTPException(
-			status_code=500,
-			detail=f"Failed to initialize AR services: {str(e)}"
-		)
-
-
-def _log_service_summary() -> str:
-	"""Log summary of service capabilities."""
-	service_count = 5  # ARCustomerService, ARInvoiceService, etc.
-	return f"APG Accounts Receivable services loaded: {service_count} service classes"
+ARCService = AccountsReceivableService

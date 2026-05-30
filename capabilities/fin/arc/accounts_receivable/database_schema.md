@@ -12,7 +12,7 @@
 3. [Core Tables](#core-tables)
 4. [Relationships and Foreign Keys](#relationships-and-foreign-keys)
 5. [Indexes and Performance](#indexes-and-performance)
-6. [Views and Materialized Views](#views-and-materialized-views)
+6. [Views and Precomputed Views](#views-and-precomputed-views)
 7. [Triggers and Business Logic](#triggers-and-business-logic)
 8. [Migration Management](#migration-management)
 9. [Performance Optimization](#performance-optimization)
@@ -27,12 +27,12 @@ The APG Accounts Receivable database schema implements a comprehensive, multi-te
 **Architecture Principles**:
 - **Multi-tenant**: All tables include `tenant_id` for data isolation
 - **APG Integration**: Designed for seamless integration with APG platform capabilities
-- **Performance Optimized**: Extensive indexing, partitioning, and materialized views
+- **Performance Optimized**: Extensive indexing, partitioning, and precomputed views
 - **Audit Compliant**: Complete audit trails with versioning and change tracking
 - **Scalable**: Partitioned tables and optimized for high-volume operations
 
 **Schema Name**: `apg_accounts_receivable`  
-**Total Tables**: 11 core tables + 2 materialized views  
+**Total Tables**: 11 core tables + 2 precomputed views
 **Total Indexes**: 35+ optimized indexes  
 **Row Level Security**: Enabled on all tables  
 
@@ -322,7 +322,7 @@ WHERE status NOT IN ('cancelled', 'paid') AND balance_amount > 0;
 
 ---
 
-## Views and Materialized Views
+## Views and Precomputed Views
 
 ### Standard Views
 
@@ -351,7 +351,7 @@ FROM ar_customers c
 **Purpose**: Aging bucket analysis  
 **Usage**: Aging reports and collection prioritization  
 
-### Materialized Views
+### Precomputed Views
 
 #### `mv_ar_customer_aging`
 **Purpose**: Pre-computed aging analysis for fast dashboard queries  
@@ -372,7 +372,7 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY mv_ar_customer_aging;
 
 ```sql
 -- Automated refresh function
-CREATE OR REPLACE FUNCTION refresh_ar_materialized_views()
+CREATE OR REPLACE FUNCTION refresh_ar_precomputed_views()
 RETURNS TEXT AS $$
 BEGIN
     REFRESH MATERIALIZED VIEW CONCURRENTLY mv_ar_customer_aging;
@@ -475,7 +475,7 @@ CREATE TABLE apg_schema_migrations (
 
 1. **000_migration_system.sql**: Migration framework setup
 2. **001_initial_schema.sql**: Base schema and tables
-3. **002_performance_optimization.sql**: Indexes and materialized views
+3. **002_performance_optimization.sql**: Indexes and precomputed views
 
 #### Migration Functions
 
@@ -504,7 +504,7 @@ SELECT record_migration('apg_accounts_receivable', '001_initial_schema',
 | Query Type | Target Time | Optimization Strategy |
 |------------|-------------|----------------------|
 | Customer lookup | <5ms | Hash indexes, caching |
-| Aging reports | <50ms | Materialized views |
+| Aging reports | <50ms | Precomputed views |
 | Collection queue | <30ms | Partial indexes |
 | Payment matching | <20ms | Specialized indexes |
 | Dashboard queries | <100ms | Pre-aggregated data |
@@ -520,14 +520,14 @@ SELECT record_migration('apg_accounts_receivable', '001_initial_schema',
 - **Partial Indexes**: Indexes only on active/relevant records
 - **Expression Indexes**: For calculated fields and business logic
 
-#### 3. Materialized Views
+#### 3. Precomputed Views
 - **Pre-aggregation**: Complex calculations pre-computed
 - **Refresh Strategy**: Automated refresh during low-usage periods
 - **Concurrent Refresh**: No locking during refresh operations
 
 #### 4. Query Optimization
 ```sql
--- Optimized customer aging query using materialized view
+-- Optimized customer aging query using precomputed view
 SELECT * FROM mv_ar_customer_aging 
 WHERE tenant_id = $1 AND days_over_90 > 0
 ORDER BY days_over_90 DESC;
@@ -554,8 +554,8 @@ SELECT * FROM analyze_ar_query_performance();
 -- Automated statistics update
 SELECT auto_analyze_ar_tables();
 
--- Materialized view refresh
-SELECT refresh_ar_materialized_views();
+-- Precomputed view refresh
+SELECT refresh_ar_precomputed_views();
 ```
 
 ---

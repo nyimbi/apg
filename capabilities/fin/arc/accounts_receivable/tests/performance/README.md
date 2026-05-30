@@ -23,7 +23,7 @@ Based on the APG capability specification, the AR system must meet these perform
 - **AI Assessments**: 100+ credit assessments per minute
 
 ### Scalability Targets
-- **Linear Scalability**: 70%+ efficiency up to 10x load
+- **Linear Scalability**: 70%+ efficiency up to measurable load
 - **Memory Efficiency**: < 1KB per customer record
 - **Database Performance**: Query response < 100ms for 100K+ records
 

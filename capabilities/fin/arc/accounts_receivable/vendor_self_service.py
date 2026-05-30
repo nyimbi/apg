@@ -1,5 +1,5 @@
 """
-Vendor Self-Service Portal 2.0 - Revolutionary Feature #4
+Vendor Self-Service Portal 2.0 - Advanced Feature #4
 Transform vendor relationship management with AI-powered self-service intelligence
 
 © 2025 Datacraft
@@ -213,7 +213,7 @@ class VendorNotification(APGBaseModel):
 
 class VendorSelfServiceService:
 	"""
-	Revolutionary Vendor Self-Service Portal 2.0 Service
+	Advanced Vendor Self-Service Portal 2.0 Service
 	
 	Transforms vendor relationship management from reactive customer service
 	to proactive partnership intelligence with AI-powered self-service capabilities.
