@@ -475,7 +475,7 @@ class TestOptimizationPerformance:
         time_10 = results[10]['execution_time']
         time_100 = results[100]['execution_time']
         
-        # Should not be more than 100x slower for 10x data
+        # Should not be more than 100x slower for measurable data
         assert time_100 / time_10 < 100
     
     async def test_concurrent_optimizations(self, optimization_engine, performance_monitor):

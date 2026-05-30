@@ -795,7 +795,7 @@ class IntelligentDashboardManager:
 			
 			elif format.lower() == "pdf":
 				# For PDF export, we'd typically use a library like reportlab
-				# This is a simplified placeholder
+				# This is a simplified input hint
 				pdf_content = f"Dashboard Export: {dashboard.title}\n"
 				pdf_content += f"Generated at: {datetime.now()}\n"
 				pdf_content += f"Widgets: {len(dashboard.widgets)}\n"

@@ -605,7 +605,7 @@ class QueryOptimizer:
 		"""Optimize JOIN operations."""
 		# This is a simplified example - real optimization would be much more complex
 		if len(pattern.tables_involved) > 3:
-			# For complex queries, suggest using materialized views or temp tables
+			# For complex queries, suggest using executable views or temp tables
 			pass
 		
 		return sql

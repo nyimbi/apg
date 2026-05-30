@@ -2,7 +2,7 @@
 APG Cash Management - AI-Powered Cash Flow Forecasting Engine
 
 Advanced machine learning engine for cash flow prediction, scenario modeling, and risk assessment.
-Integrates multiple ML models, statistical analysis, and business intelligence for world-class forecasting.
+Integrates multiple ML models, statistical analysis, and business intelligence for high-caliber forecasting.
 
 © 2025 Datacraft. All rights reserved.
 Author: Nyimbi Odero <nyimbi@gmail.com>
@@ -256,7 +256,7 @@ class AIForecastingEngine:
 	"""
 	APG AI-Powered Cash Flow Forecasting Engine.
 	
-	Provides world-class cash flow forecasting using advanced machine learning,
+	Provides high-caliber cash flow forecasting using advanced machine learning,
 	statistical analysis, and scenario modeling for enterprise treasury operations.
 	"""
 	

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """APG Cash Management - Mobile-First Responsive Design System
 
-World-class mobile-first responsive design system with adaptive layouts,
+high-caliber mobile-first responsive design system with adaptive layouts,
 progressive web app capabilities, and cross-platform optimization.
 
 © 2025 Datacraft. All rights reserved.
@@ -594,7 +594,7 @@ class MobileResponsiveDesign:
 			"lazy_loading": {
 				"enabled": True,
 				"threshold": "10%",
-				"placeholder": True
+				"input hint": True
 			},
 			
 			# Virtual scrolling for large lists

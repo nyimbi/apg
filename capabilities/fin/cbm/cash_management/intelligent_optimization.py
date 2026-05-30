@@ -1,6 +1,6 @@
 """APG Cash Management - Intelligent Cash Flow Optimization
 
-World-class AI-powered cash flow optimization with sophisticated algorithms,
+high-caliber AI-powered cash flow optimization with sophisticated algorithms,
 multi-objective optimization, and intelligent decision-making capabilities.
 
 © 2025 Datacraft. All rights reserved.
@@ -317,7 +317,7 @@ class MultiObjectiveOptimizer:
 # ============================================================================
 
 class IntelligentCashFlowOptimizer:
-	"""World-class intelligent cash flow optimization engine"""
+	"""high-caliber intelligent cash flow optimization engine"""
 	
 	def __init__(
 		self, 

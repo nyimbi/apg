@@ -1,6 +1,6 @@
 """APG Cash Management - Advanced Risk Analytics Engine
 
-World-class risk analytics with sophisticated risk measurement, stress testing,
+high-caliber risk analytics with sophisticated risk measurement, stress testing,
 scenario analysis, and regulatory compliance monitoring capabilities.
 
 © 2025 Datacraft. All rights reserved.

@@ -16,6 +16,112 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 00:16 EAT
+
+FIN CBM cash management lifecycle/guardrail packet:
+
+- Added `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and refreshed
+  `cap_spec.md` with the active cash-management package summary.
+- Replaced the generated contract-factory wrapper with explicit bank, cash
+  account, cash position, cash flow, forecast, liquidity, reconciliation,
+  investment, payment-run, CBM-agent, governance, observability, adapter, UI,
+  theme, provides/requires, and Bytewax lifecycle-stream metadata.
+- Added deterministic guardrails for tenant context, write policy attachment,
+  bank code/name, cash-account bank/number/name/type/currency, position
+  account/date/balance/liquidity-buffer review, cash-flow account/type/positive
+  amount/category/expected date, forecast horizon/scenario/confidence review,
+  reconciliation statement/ledger/variance review, investment type/
+  counterparty/maturity/approval, payment-run funding account/current position/
+  deficit approval, CBM batch/event Bytewax streams, CBM-agent runtime/role,
+  and privileged agent-action approval.
+- Replaced dependency-heavy top-level service/API/view/app surfaces with
+  dependency-light CBM lifecycle helpers for banks, accounts, positions, flows,
+  forecasts, liquidity reviews, reconciliations, investments, payment runs,
+  CBM-agent registration, batch validation, dashboard summaries, API helpers,
+  and screen models.
+- Preserved `CBMService` as a compatibility alias while keeping optional
+  FastAPI, SQLAlchemy, Redis, bank SDK, AI-provider, and visualization imports
+  out of the top-level APG surface.
+- Renamed the UX helper module to `advanced_ux_engine.py`, removed stale
+  generated planning notes, narrowed package test configuration away from
+  optional provider imports, and fixed a legacy analytics helper indentation
+  issue surfaced by syntax compilation.
+- Refreshed package evidence (`semantic_model.json`, `package_manifest.json`,
+  and `release_report.json`) from the expanded contract.
+- Renamed and expanded focused package tests for contract, rule, service,
+  guardrail, API/view, app, semantic, CBM-agent, liquidity, reconciliation,
+  payment-run, and Bytewax behavior.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile
+  capabilities/fin/cbm/cash_management/__init__.py
+  capabilities/fin/cbm/cash_management/capability_contract.py
+  capabilities/fin/cbm/cash_management/service.py
+  capabilities/fin/cbm/cash_management/api.py
+  capabilities/fin/cbm/cash_management/views.py
+  capabilities/fin/cbm/cash_management/app.py
+  capabilities/fin/cbm/cash_management/tests/test_package_contract.py
+  capabilities/fin/cbm/cash_management/tests/conftest.py
+  capabilities/fin/cbm/cash_management/tests/__init__.py` passed.
+- Syntax-only compile for edited legacy helper modules
+  (`advanced_ml_models.py`, `advanced_risk_analytics.py`,
+  `advanced_ux_engine.py`, `advanced_visualization_engine.py`,
+  `ai_forecasting.py`, `analytics_dashboard.py`,
+  `intelligent_dashboard_manager.py`, `intelligent_optimization.py`,
+  `mobile_responsive_design.py`, `performance_benchmarking.py`,
+  `performance_optimizer.py`, and `query_optimizer.py`) passed.
+- `./.venv/bin/pytest -q
+  capabilities/fin/cbm/cash_management/tests/test_package_contract.py` passed
+  with 6 tests.
+- `./.venv/bin/python capabilities/fin/cbm/cash_management/app.py` passed
+  package self-test.
+- `./.venv/bin/apg capabilities inspect cbm_cash_management --json` confirmed
+  `ok: true`, 12 routes, 36 rules, and `cbm_cash_management_control`.
+- `./.venv/bin/apg capabilities publish-plan
+  capabilities/fin/cbm/cash_management --json` confirmed side-effect-free
+  publish planning with Bytewax stream metadata and no errors.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/fin/cbm/cash_management --json` passed with `domain_specific`
+  implementation level and 0 baseline markers.
+- `jq '.capabilities.cbm_cash_management.streaming.processor,
+  .capabilities.cbm_cash_management.provides,
+  .capabilities.cbm_cash_management.requires,
+  .capabilities.cbm_cash_management.screens.agents.route,
+  (.capabilities.cbm_cash_management.rules[] |
+  select(.name=="cbm_agent_runtime_supported") | .effect.reason),
+  (.capabilities.cbm_cash_management.rules[] |
+  select(.name=="cbm_batch_requires_bytewax") | .effect.reason),
+  (.capabilities.cbm_cash_management.rules[] |
+  select(.name=="payment_run_blocks_deficit") | .effect.reason)'
+  capabilities/fin/cbm/cash_management/semantic_model.json` confirmed
+  `bytewax`, CBM-agent provides, required services, `/cbm-cash-management/
+  agents`, `cbm_agent_runtime_not_supported`, `bytewax_event_stream_required`,
+  and `cash_deficit_approval_required`.
+- `./.venv/bin/python -c "from capabilities.fin.cbm.cash_management import
+  CashManagementService; s=CashManagementService();
+  bank=s.create_bank('bank','tenant-proof','BANK','Primary Bank');
+  acct=s.create_cash_account('acct','tenant-proof',bank['id'],'001',
+  'Operating','operating','USD',100); s.record_cash_position('pos',
+  'tenant-proof',acct['id'],'2026-05-31',1000,1000);
+  s.record_cash_flow('flow','tenant-proof',acct['id'],'inflow',250,'receipt',
+  '2026-06-01'); s.create_cash_forecast('forecast','tenant-proof',30,'base',
+  0.9); s.record_bank_reconciliation('recon','tenant-proof',acct['id'],1000,
+  1000); s.create_treasury_investment('inv','tenant-proof','deposit','Bank',
+  500,'2026-09-30',0.05,'approver'); s.validate_payment_run('payrun',
+  'tenant-proof',acct['id'],200); s.register_cbm_agent('tenant-proof',
+  'Proof agent','codex','cash_position_reviewer','review positions');
+  print(s.dashboard_summary('tenant-proof'))"` passed and confirmed payment
+  funding, CBM-agent registration, audit event emission, and Bytewax stream
+  metadata.
+- Package-file stale-marker and unsupported stream search returned no matches.
+- `git diff --check -- capabilities/fin/cbm/cash_management
+  docs/progress_log.md` passed.
+- Not run: durable treasury stores, live bank APIs, live exchange-rate feeds,
+  live auth/audit/notification/document/BI/GL/AP/AR adapters, durable Bytewax
+  topology, rendered browser UI, CBM performance/failover checks, and full
+  repository tests.
+
 ### 2026-05-31 00:04 EAT
 
 FIN GLR general ledger lifecycle/guardrail packet:

@@ -1,60 +1,205 @@
 {
-  "agents": {},
   "app": {
     "description": "Cash Management package-backed APG capability",
-    "entity_count": 0,
+    "entity_count": 9,
     "name": "cbm_cash_management",
-    "version": "1.0"
+    "version": "2.1.0"
   },
   "capabilities": {
     "cbm_cash_management": {
-      "approvals": {},
-      "business_rules": [],
-      "components": {},
       "configuration": {
-        "capability": {
-          "category": "Cbm",
-          "enabled": true,
-          "id": "cbm_cash_management",
-          "name": "Cash Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/cbm/cash_management/cap_spec.md",
-          "version": "1.0"
+        "adapters": {
+          "accounts_payable": "adapter",
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "banks": {
+          "bank_code_required": true,
+          "bank_name_required": true,
+          "connectivity_status_required": true
+        },
+        "cash_accounts": {
+          "account_name_required": true,
+          "account_number_required": true,
+          "account_type_required": true,
+          "bank_required": true,
+          "currency_required": true,
+          "supported_account_types": [
+            "operating",
+            "savings",
+            "money_market",
+            "investment",
+            "petty_cash",
+            "lockbox"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "cash_flows": {
+          "account_required": true,
+          "amount_must_be_positive": true,
+          "category_required": true,
+          "expected_date_required": true,
+          "flow_type_required": true,
+          "supported_flow_types": [
+            "inflow",
+            "outflow",
+            "transfer"
+          ]
+        },
+        "cash_positions": {
+          "account_required": true,
+          "as_of_date_required": true,
+          "available_balance_required": true,
+          "minimum_liquidity_review_required": true
+        },
+        "cbm_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "cash_position_reviewer",
+            "forecast_reviewer",
+            "liquidity_reviewer",
+            "bank_reconciliation_reviewer",
+            "investment_reviewer",
+            "payment_run_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "forecasts": {
+          "confidence_review_threshold": 0.75,
+          "horizon_required": true,
+          "scenario_required": true,
+          "source_flow_required": true,
+          "supported_scenarios": [
+            "base",
+            "optimistic",
+            "pessimistic",
+            "stress"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "investments": {
+          "approval_required": true,
+          "counterparty_required": true,
+          "maturity_date_required": true,
+          "supported_types": [
+            "deposit",
+            "treasury_bill",
+            "money_market",
+            "commercial_paper",
+            "overnight_sweep"
+          ],
+          "yield_review_required": true
+        },
+        "liquidity": {
+          "deficit_requires_review": true,
+          "minimum_buffer_required": true,
+          "stress_review_required": true
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_bank_events": true,
+          "emit_flow_events": true,
+          "emit_forecast_events": true,
+          "emit_investment_events": true,
+          "emit_position_events": true,
+          "emit_reconciliation_events": true,
+          "event_stream": "apg.fin.cbm.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payment_runs": {
+          "approval_required": true,
+          "cash_position_required": true,
+          "deficit_blocking": true,
+          "funding_account_required": true
+        },
+        "reconciliation": {
+          "bank_statement_required": true,
+          "ledger_balance_required": true,
+          "review_required_for_variance": true,
+          "variance_review_threshold": 100
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "cbm_cash_management_operations"
+          "default_theme": "cbm_cash_management_control"
         },
         "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_banks": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_flows": true,
+          "enable_forecasts": true,
+          "enable_investments": true,
+          "enable_liquidity": true,
+          "enable_payment_runs": true,
+          "enable_positions": true,
+          "enable_reconciliation": true,
           "enable_settings": true
         }
       },
-      "erp_modules": [
-        "fin"
-      ],
-      "i18n": {},
-      "master_data": {},
       "name": "Cash Management",
       "provides": [
-        "cbm_cash_management_operations"
+        "bank_relationship_lifecycle",
+        "cash_account_lifecycle",
+        "cash_position_service",
+        "cash_flow_lifecycle",
+        "cash_forecasting_workflow",
+        "liquidity_control_workflow",
+        "bank_reconciliation_workflow",
+        "treasury_investment_workflow",
+        "payment_run_funding_control",
+        "cbm_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "document_management",
+        "business_intelligence"
+      ],
       "rule_engine": {
         "rules": [
           {
             "condition": {
               "tenant_context_present": false
             },
-            "description": "Cash Management operations require tenant context.",
+            "description": "Cash management operations require tenant context.",
             "effect": {
               "decision": "deny",
               "reason": "tenant_context_required",
@@ -67,26 +212,460 @@
               "operation_type": "write",
               "policy_attached": false
             },
-            "description": "Cash Management write operations require policy enforcement.",
+            "description": "Cash management writes require policy attachment.",
             "effect": {
               "decision": "deny",
               "reason": "operation_policy_required",
               "required_action": "attach_operation_policy"
             },
-            "name": "operation_policy_required"
+            "name": "cbm_write_requires_policy"
           },
           {
             "condition": {
-              "review_recorded": false,
-              "risk_level": "high"
+              "bank_code_present": false,
+              "operation": "create_bank"
             },
-            "description": "High-risk Cash Management operations require review.",
+            "description": "Banks require a code.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bank_code_required",
+              "required_action": "set_bank_code"
+            },
+            "name": "bank_requires_code"
+          },
+          {
+            "condition": {
+              "bank_name_present": false,
+              "operation": "create_bank"
+            },
+            "description": "Banks require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bank_name_required",
+              "required_action": "set_bank_name"
+            },
+            "name": "bank_requires_name"
+          },
+          {
+            "condition": {
+              "bank_present": false,
+              "operation": "create_cash_account"
+            },
+            "description": "Cash accounts require a bank.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bank_required",
+              "required_action": "attach_bank"
+            },
+            "name": "cash_account_requires_bank"
+          },
+          {
+            "condition": {
+              "account_number_present": false,
+              "operation": "create_cash_account"
+            },
+            "description": "Cash accounts require an account number.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_number_required",
+              "required_action": "set_account_number"
+            },
+            "name": "cash_account_requires_number"
+          },
+          {
+            "condition": {
+              "account_name_present": false,
+              "operation": "create_cash_account"
+            },
+            "description": "Cash accounts require a name.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_name_required",
+              "required_action": "set_account_name"
+            },
+            "name": "cash_account_requires_name"
+          },
+          {
+            "condition": {
+              "account_type_supported": false,
+              "operation": "create_cash_account"
+            },
+            "description": "Cash account type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "account_type_not_supported",
+              "required_action": "select_supported_account_type"
+            },
+            "name": "cash_account_type_supported"
+          },
+          {
+            "condition": {
+              "currency_supported": false,
+              "operation": "create_cash_account"
+            },
+            "description": "Cash account currency must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "currency_not_supported",
+              "required_action": "select_supported_currency"
+            },
+            "name": "cash_account_currency_supported"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "record_cash_position"
+            },
+            "description": "Cash positions require an account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_account_required",
+              "required_action": "attach_cash_account"
+            },
+            "name": "position_requires_account"
+          },
+          {
+            "condition": {
+              "as_of_date_present": false,
+              "operation": "record_cash_position"
+            },
+            "description": "Cash positions require an as-of date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "as_of_date_required",
+              "required_action": "set_as_of_date"
+            },
+            "name": "position_requires_date"
+          },
+          {
+            "condition": {
+              "available_balance_present": false,
+              "operation": "record_cash_position"
+            },
+            "description": "Cash positions require available balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "available_balance_required",
+              "required_action": "record_available_balance"
+            },
+            "name": "position_requires_available_balance"
+          },
+          {
+            "condition": {
+              "below_minimum_buffer": true,
+              "liquidity_review_recorded": false,
+              "operation": "record_cash_position"
+            },
+            "description": "Positions below liquidity buffer require review.",
             "effect": {
               "decision": "require_review",
-              "reason": "high_risk_review_required",
-              "required_action": "record_review"
+              "reason": "liquidity_review_required",
+              "required_action": "record_liquidity_review"
             },
-            "name": "high_risk_requires_review"
+            "name": "position_below_buffer_requires_review"
+          },
+          {
+            "condition": {
+              "account_present": false,
+              "operation": "record_cash_flow"
+            },
+            "description": "Cash flows require an account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_account_required",
+              "required_action": "attach_cash_account"
+            },
+            "name": "cash_flow_requires_account"
+          },
+          {
+            "condition": {
+              "flow_type_supported": false,
+              "operation": "record_cash_flow"
+            },
+            "description": "Cash flow type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "flow_type_not_supported",
+              "required_action": "select_supported_flow_type"
+            },
+            "name": "cash_flow_type_supported"
+          },
+          {
+            "condition": {
+              "amount_lte": 0,
+              "operation": "record_cash_flow"
+            },
+            "description": "Cash flow amount must be positive.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_flow_amount_positive_required",
+              "required_action": "set_positive_amount"
+            },
+            "name": "cash_flow_amount_positive"
+          },
+          {
+            "condition": {
+              "category_present": false,
+              "operation": "record_cash_flow"
+            },
+            "description": "Cash flows require category.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_flow_category_required",
+              "required_action": "set_category"
+            },
+            "name": "cash_flow_requires_category"
+          },
+          {
+            "condition": {
+              "expected_date_present": false,
+              "operation": "record_cash_flow"
+            },
+            "description": "Cash flows require expected date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_flow_expected_date_required",
+              "required_action": "set_expected_date"
+            },
+            "name": "cash_flow_requires_expected_date"
+          },
+          {
+            "condition": {
+              "horizon_days_lte": 0,
+              "operation": "create_cash_forecast"
+            },
+            "description": "Cash forecasts require a horizon.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_horizon_required",
+              "required_action": "set_forecast_horizon"
+            },
+            "name": "forecast_requires_horizon"
+          },
+          {
+            "condition": {
+              "operation": "create_cash_forecast",
+              "scenario_supported": false
+            },
+            "description": "Cash forecast scenario must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "forecast_scenario_not_supported",
+              "required_action": "select_supported_scenario"
+            },
+            "name": "forecast_scenario_supported"
+          },
+          {
+            "condition": {
+              "confidence_score_lt": 0.75,
+              "forecast_review_recorded": false,
+              "operation": "create_cash_forecast"
+            },
+            "description": "Low forecast confidence requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "forecast_review_required",
+              "required_action": "record_forecast_review"
+            },
+            "name": "forecast_confidence_requires_review"
+          },
+          {
+            "condition": {
+              "bank_statement_present": false,
+              "operation": "record_bank_reconciliation"
+            },
+            "description": "Bank reconciliation requires statement balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bank_statement_required",
+              "required_action": "attach_bank_statement"
+            },
+            "name": "reconciliation_requires_statement"
+          },
+          {
+            "condition": {
+              "ledger_balance_present": false,
+              "operation": "record_bank_reconciliation"
+            },
+            "description": "Bank reconciliation requires ledger balance.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ledger_balance_required",
+              "required_action": "attach_ledger_balance"
+            },
+            "name": "reconciliation_requires_ledger_balance"
+          },
+          {
+            "condition": {
+              "operation": "record_bank_reconciliation",
+              "reconciliation_review_recorded": false,
+              "variance_abs_gt": 100
+            },
+            "description": "Material reconciliation variance requires review.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "reconciliation_review_required",
+              "required_action": "record_reconciliation_review"
+            },
+            "name": "reconciliation_variance_requires_review"
+          },
+          {
+            "condition": {
+              "investment_type_supported": false,
+              "operation": "create_treasury_investment"
+            },
+            "description": "Treasury investment type must be supported.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_type_not_supported",
+              "required_action": "select_supported_investment_type"
+            },
+            "name": "investment_type_supported"
+          },
+          {
+            "condition": {
+              "counterparty_present": false,
+              "operation": "create_treasury_investment"
+            },
+            "description": "Treasury investments require counterparty.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_counterparty_required",
+              "required_action": "set_counterparty"
+            },
+            "name": "investment_requires_counterparty"
+          },
+          {
+            "condition": {
+              "maturity_date_present": false,
+              "operation": "create_treasury_investment"
+            },
+            "description": "Treasury investments require maturity date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_maturity_required",
+              "required_action": "set_maturity_date"
+            },
+            "name": "investment_requires_maturity"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "create_treasury_investment"
+            },
+            "description": "Treasury investments require approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "investment_approval_required",
+              "required_action": "approve_investment"
+            },
+            "name": "investment_requires_approval"
+          },
+          {
+            "condition": {
+              "funding_account_present": false,
+              "operation": "validate_payment_run"
+            },
+            "description": "Payment runs require funding account.",
+            "effect": {
+              "decision": "deny",
+              "reason": "funding_account_required",
+              "required_action": "select_funding_account"
+            },
+            "name": "payment_run_requires_funding_account"
+          },
+          {
+            "condition": {
+              "cash_position_present": false,
+              "operation": "validate_payment_run"
+            },
+            "description": "Payment runs require current cash position.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_position_required",
+              "required_action": "record_cash_position"
+            },
+            "name": "payment_run_requires_position"
+          },
+          {
+            "condition": {
+              "approval_recorded": false,
+              "operation": "validate_payment_run",
+              "projected_deficit": true
+            },
+            "description": "Payment runs cannot create unapproved cash deficits.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cash_deficit_approval_required",
+              "required_action": "approve_deficit"
+            },
+            "name": "payment_run_blocks_deficit"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "cbm_batch"
+            },
+            "description": "Cash management batches require Bytewax coordination.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_cbm_batch_to_bytewax"
+            },
+            "name": "cbm_batch_requires_bytewax"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "cbm_event"
+            },
+            "description": "Cash management lifecycle events require Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_event_stream_required",
+              "required_action": "route_cbm_event_to_bytewax"
+            },
+            "name": "cbm_event_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_cbm_agent"
+            },
+            "description": "CBM agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cbm_agent_runtime_not_supported",
+              "required_action": "select_supported_agent_runtime"
+            },
+            "name": "cbm_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_cbm_agent"
+            },
+            "description": "CBM agents must use an approved role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "cbm_agent_role_not_supported",
+              "required_action": "select_supported_agent_role"
+            },
+            "name": "cbm_agent_role_supported"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "agent_cbm_action",
+              "privileged_scope": true
+            },
+            "description": "Privileged CBM actions proposed by agents require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "human_approval_required",
+              "required_action": "record_human_approval"
+            },
+            "name": "privileged_agent_cbm_action_requires_human_approval"
           }
         ],
         "type": "deterministic"
@@ -96,7 +675,7 @@
           "condition": {
             "tenant_context_present": false
           },
-          "description": "Cash Management operations require tenant context.",
+          "description": "Cash management operations require tenant context.",
           "effect": {
             "decision": "deny",
             "reason": "tenant_context_required",
@@ -109,26 +688,460 @@
             "operation_type": "write",
             "policy_attached": false
           },
-          "description": "Cash Management write operations require policy enforcement.",
+          "description": "Cash management writes require policy attachment.",
           "effect": {
             "decision": "deny",
             "reason": "operation_policy_required",
             "required_action": "attach_operation_policy"
           },
-          "name": "operation_policy_required"
+          "name": "cbm_write_requires_policy"
         },
         {
           "condition": {
-            "review_recorded": false,
-            "risk_level": "high"
+            "bank_code_present": false,
+            "operation": "create_bank"
           },
-          "description": "High-risk Cash Management operations require review.",
+          "description": "Banks require a code.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bank_code_required",
+            "required_action": "set_bank_code"
+          },
+          "name": "bank_requires_code"
+        },
+        {
+          "condition": {
+            "bank_name_present": false,
+            "operation": "create_bank"
+          },
+          "description": "Banks require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bank_name_required",
+            "required_action": "set_bank_name"
+          },
+          "name": "bank_requires_name"
+        },
+        {
+          "condition": {
+            "bank_present": false,
+            "operation": "create_cash_account"
+          },
+          "description": "Cash accounts require a bank.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bank_required",
+            "required_action": "attach_bank"
+          },
+          "name": "cash_account_requires_bank"
+        },
+        {
+          "condition": {
+            "account_number_present": false,
+            "operation": "create_cash_account"
+          },
+          "description": "Cash accounts require an account number.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_number_required",
+            "required_action": "set_account_number"
+          },
+          "name": "cash_account_requires_number"
+        },
+        {
+          "condition": {
+            "account_name_present": false,
+            "operation": "create_cash_account"
+          },
+          "description": "Cash accounts require a name.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_name_required",
+            "required_action": "set_account_name"
+          },
+          "name": "cash_account_requires_name"
+        },
+        {
+          "condition": {
+            "account_type_supported": false,
+            "operation": "create_cash_account"
+          },
+          "description": "Cash account type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "account_type_not_supported",
+            "required_action": "select_supported_account_type"
+          },
+          "name": "cash_account_type_supported"
+        },
+        {
+          "condition": {
+            "currency_supported": false,
+            "operation": "create_cash_account"
+          },
+          "description": "Cash account currency must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "currency_not_supported",
+            "required_action": "select_supported_currency"
+          },
+          "name": "cash_account_currency_supported"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "record_cash_position"
+          },
+          "description": "Cash positions require an account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_account_required",
+            "required_action": "attach_cash_account"
+          },
+          "name": "position_requires_account"
+        },
+        {
+          "condition": {
+            "as_of_date_present": false,
+            "operation": "record_cash_position"
+          },
+          "description": "Cash positions require an as-of date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "as_of_date_required",
+            "required_action": "set_as_of_date"
+          },
+          "name": "position_requires_date"
+        },
+        {
+          "condition": {
+            "available_balance_present": false,
+            "operation": "record_cash_position"
+          },
+          "description": "Cash positions require available balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "available_balance_required",
+            "required_action": "record_available_balance"
+          },
+          "name": "position_requires_available_balance"
+        },
+        {
+          "condition": {
+            "below_minimum_buffer": true,
+            "liquidity_review_recorded": false,
+            "operation": "record_cash_position"
+          },
+          "description": "Positions below liquidity buffer require review.",
           "effect": {
             "decision": "require_review",
-            "reason": "high_risk_review_required",
-            "required_action": "record_review"
+            "reason": "liquidity_review_required",
+            "required_action": "record_liquidity_review"
           },
-          "name": "high_risk_requires_review"
+          "name": "position_below_buffer_requires_review"
+        },
+        {
+          "condition": {
+            "account_present": false,
+            "operation": "record_cash_flow"
+          },
+          "description": "Cash flows require an account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_account_required",
+            "required_action": "attach_cash_account"
+          },
+          "name": "cash_flow_requires_account"
+        },
+        {
+          "condition": {
+            "flow_type_supported": false,
+            "operation": "record_cash_flow"
+          },
+          "description": "Cash flow type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "flow_type_not_supported",
+            "required_action": "select_supported_flow_type"
+          },
+          "name": "cash_flow_type_supported"
+        },
+        {
+          "condition": {
+            "amount_lte": 0,
+            "operation": "record_cash_flow"
+          },
+          "description": "Cash flow amount must be positive.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_flow_amount_positive_required",
+            "required_action": "set_positive_amount"
+          },
+          "name": "cash_flow_amount_positive"
+        },
+        {
+          "condition": {
+            "category_present": false,
+            "operation": "record_cash_flow"
+          },
+          "description": "Cash flows require category.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_flow_category_required",
+            "required_action": "set_category"
+          },
+          "name": "cash_flow_requires_category"
+        },
+        {
+          "condition": {
+            "expected_date_present": false,
+            "operation": "record_cash_flow"
+          },
+          "description": "Cash flows require expected date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_flow_expected_date_required",
+            "required_action": "set_expected_date"
+          },
+          "name": "cash_flow_requires_expected_date"
+        },
+        {
+          "condition": {
+            "horizon_days_lte": 0,
+            "operation": "create_cash_forecast"
+          },
+          "description": "Cash forecasts require a horizon.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_horizon_required",
+            "required_action": "set_forecast_horizon"
+          },
+          "name": "forecast_requires_horizon"
+        },
+        {
+          "condition": {
+            "operation": "create_cash_forecast",
+            "scenario_supported": false
+          },
+          "description": "Cash forecast scenario must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "forecast_scenario_not_supported",
+            "required_action": "select_supported_scenario"
+          },
+          "name": "forecast_scenario_supported"
+        },
+        {
+          "condition": {
+            "confidence_score_lt": 0.75,
+            "forecast_review_recorded": false,
+            "operation": "create_cash_forecast"
+          },
+          "description": "Low forecast confidence requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "forecast_review_required",
+            "required_action": "record_forecast_review"
+          },
+          "name": "forecast_confidence_requires_review"
+        },
+        {
+          "condition": {
+            "bank_statement_present": false,
+            "operation": "record_bank_reconciliation"
+          },
+          "description": "Bank reconciliation requires statement balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bank_statement_required",
+            "required_action": "attach_bank_statement"
+          },
+          "name": "reconciliation_requires_statement"
+        },
+        {
+          "condition": {
+            "ledger_balance_present": false,
+            "operation": "record_bank_reconciliation"
+          },
+          "description": "Bank reconciliation requires ledger balance.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ledger_balance_required",
+            "required_action": "attach_ledger_balance"
+          },
+          "name": "reconciliation_requires_ledger_balance"
+        },
+        {
+          "condition": {
+            "operation": "record_bank_reconciliation",
+            "reconciliation_review_recorded": false,
+            "variance_abs_gt": 100
+          },
+          "description": "Material reconciliation variance requires review.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "reconciliation_review_required",
+            "required_action": "record_reconciliation_review"
+          },
+          "name": "reconciliation_variance_requires_review"
+        },
+        {
+          "condition": {
+            "investment_type_supported": false,
+            "operation": "create_treasury_investment"
+          },
+          "description": "Treasury investment type must be supported.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_type_not_supported",
+            "required_action": "select_supported_investment_type"
+          },
+          "name": "investment_type_supported"
+        },
+        {
+          "condition": {
+            "counterparty_present": false,
+            "operation": "create_treasury_investment"
+          },
+          "description": "Treasury investments require counterparty.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_counterparty_required",
+            "required_action": "set_counterparty"
+          },
+          "name": "investment_requires_counterparty"
+        },
+        {
+          "condition": {
+            "maturity_date_present": false,
+            "operation": "create_treasury_investment"
+          },
+          "description": "Treasury investments require maturity date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_maturity_required",
+            "required_action": "set_maturity_date"
+          },
+          "name": "investment_requires_maturity"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "create_treasury_investment"
+          },
+          "description": "Treasury investments require approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "investment_approval_required",
+            "required_action": "approve_investment"
+          },
+          "name": "investment_requires_approval"
+        },
+        {
+          "condition": {
+            "funding_account_present": false,
+            "operation": "validate_payment_run"
+          },
+          "description": "Payment runs require funding account.",
+          "effect": {
+            "decision": "deny",
+            "reason": "funding_account_required",
+            "required_action": "select_funding_account"
+          },
+          "name": "payment_run_requires_funding_account"
+        },
+        {
+          "condition": {
+            "cash_position_present": false,
+            "operation": "validate_payment_run"
+          },
+          "description": "Payment runs require current cash position.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_position_required",
+            "required_action": "record_cash_position"
+          },
+          "name": "payment_run_requires_position"
+        },
+        {
+          "condition": {
+            "approval_recorded": false,
+            "operation": "validate_payment_run",
+            "projected_deficit": true
+          },
+          "description": "Payment runs cannot create unapproved cash deficits.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cash_deficit_approval_required",
+            "required_action": "approve_deficit"
+          },
+          "name": "payment_run_blocks_deficit"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "cbm_batch"
+          },
+          "description": "Cash management batches require Bytewax coordination.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_cbm_batch_to_bytewax"
+          },
+          "name": "cbm_batch_requires_bytewax"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "cbm_event"
+          },
+          "description": "Cash management lifecycle events require Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_event_stream_required",
+            "required_action": "route_cbm_event_to_bytewax"
+          },
+          "name": "cbm_event_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_cbm_agent"
+          },
+          "description": "CBM agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cbm_agent_runtime_not_supported",
+            "required_action": "select_supported_agent_runtime"
+          },
+          "name": "cbm_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_cbm_agent"
+          },
+          "description": "CBM agents must use an approved role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "cbm_agent_role_not_supported",
+            "required_action": "select_supported_agent_role"
+          },
+          "name": "cbm_agent_role_supported"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "agent_cbm_action",
+            "privileged_scope": true
+          },
+          "description": "Privileged CBM actions proposed by agents require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "human_approval_required",
+            "required_action": "record_human_approval"
+          },
+          "name": "privileged_agent_cbm_action_requires_human_approval"
         }
       ],
       "runtime": {
@@ -138,49 +1151,136 @@
         "views": "views.py"
       },
       "screens": {
+        "accounts": {
+          "component": "CashAccountWorkbench",
+          "permission": "cbm_cash_management:manage_accounts",
+          "route": "/cbm-cash-management/accounts"
+        },
+        "agents": {
+          "component": "CBMAgentWorkbench",
+          "permission": "cbm_cash_management:admin",
+          "route": "/cbm-cash-management/agents"
+        },
+        "banks": {
+          "component": "BankRelationshipWorkbench",
+          "permission": "cbm_cash_management:manage_banks",
+          "route": "/cbm-cash-management/banks"
+        },
         "dashboard": {
-          "component": "CapabilityDashboard",
+          "component": "CashManagementDashboard",
           "permission": "cbm_cash_management:view",
           "route": "/cbm-cash-management/dashboard"
         },
-        "operations": {
-          "component": "CapabilityOperations",
-          "permission": "cbm_cash_management:operate",
-          "route": "/cbm-cash-management/operations"
+        "flows": {
+          "component": "CashFlowConsole",
+          "permission": "cbm_cash_management:manage_flows",
+          "route": "/cbm-cash-management/flows"
         },
-        "rules": {
-          "component": "CapabilityRules",
-          "permission": "cbm_cash_management:govern",
-          "route": "/cbm-cash-management/rules"
+        "forecasts": {
+          "component": "CashForecastWorkbench",
+          "permission": "cbm_cash_management:forecast",
+          "route": "/cbm-cash-management/forecasts"
+        },
+        "investments": {
+          "component": "TreasuryInvestmentWorkbench",
+          "permission": "cbm_cash_management:invest",
+          "route": "/cbm-cash-management/investments"
+        },
+        "liquidity": {
+          "component": "LiquidityControlDesk",
+          "permission": "cbm_cash_management:liquidity",
+          "route": "/cbm-cash-management/liquidity"
+        },
+        "payment_runs": {
+          "component": "PaymentFundingWorkbench",
+          "permission": "cbm_cash_management:fund_payments",
+          "route": "/cbm-cash-management/payment-runs"
+        },
+        "positions": {
+          "component": "CashPositionConsole",
+          "permission": "cbm_cash_management:view_positions",
+          "route": "/cbm-cash-management/positions"
+        },
+        "reconciliation": {
+          "component": "BankReconciliationWorkbench",
+          "permission": "cbm_cash_management:reconcile",
+          "route": "/cbm-cash-management/reconciliation"
         },
         "settings": {
-          "component": "CapabilitySettings",
+          "component": "CashManagementSettings",
           "permission": "cbm_cash_management:admin",
           "route": "/cbm-cash-management/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "events": [
+          "bank_created",
+          "cash_account_created",
+          "cash_position_recorded",
+          "cash_flow_recorded",
+          "cash_forecast_created",
+          "liquidity_review_recorded",
+          "bank_reconciliation_recorded",
+          "treasury_investment_created",
+          "payment_run_validated",
+          "cbm_agent_registered"
+        ],
+        "guardrails": [
+          "cbm_batch_requires_bytewax",
+          "cbm_event_requires_bytewax",
+          "privileged_agent_cbm_action_requires_human_approval"
+        ],
+        "key": "tenant_id",
+        "processor": "bytewax",
+        "states": [
+          "draft",
+          "active",
+          "recorded",
+          "forecasted",
+          "reviewed",
+          "approved",
+          "funded",
+          "blocked"
+        ],
+        "stream": "apg.fin.cbm.lifecycle"
+      },
       "theme": {
         "components": {
-          "dashboard": {
-            "icon": "layout-dashboard",
-            "risk_style": "policy-band",
-            "status_indicator": "health-pill"
+          "accounts": {
+            "status_style": "account-chip",
+            "visual": "account-list"
           },
-          "operations": {
-            "status_style": "sla-chip",
-            "visual": "work-queue"
+          "agents": {
+            "status_style": "agent-chip",
+            "visual": "review-lane"
           },
-          "rules": {
-            "status_style": "decision-chip",
-            "visual": "rule-list"
+          "banks": {
+            "icon": "landmark",
+            "risk_style": "bank-band",
+            "status_indicator": "connectivity-pill"
           },
-          "settings": {
-            "density": "compact",
-            "visual": "settings-panel"
+          "flows": {
+            "status_style": "flow-chip",
+            "visual": "flow-timeline"
+          },
+          "forecasts": {
+            "status_style": "confidence-chip",
+            "visual": "forecast-fan"
+          },
+          "investments": {
+            "status_style": "yield-chip",
+            "visual": "maturity-ladder"
+          },
+          "positions": {
+            "status_style": "liquidity-chip",
+            "visual": "position-grid"
+          },
+          "reconciliation": {
+            "status_style": "variance-chip",
+            "visual": "match-grid"
           }
         },
-        "name": "cbm_cash_management_operations",
+        "name": "cbm_cash_management_control",
         "tokens": {
           "border.radius": "8px",
           "color.accent": "#C44536",
@@ -200,28 +1300,84 @@
         "requires_theme": true,
         "routes": [
           {
-            "component": "CapabilityDashboard",
+            "component": "CashManagementDashboard",
             "name": "dashboard",
             "nav_group": "Overview",
             "path": "/cbm-cash-management/dashboard",
             "permission": "cbm_cash_management:view"
           },
           {
-            "component": "CapabilityOperations",
-            "name": "operations",
-            "nav_group": "Operations",
-            "path": "/cbm-cash-management/operations",
-            "permission": "cbm_cash_management:operate"
+            "component": "BankRelationshipWorkbench",
+            "name": "banks",
+            "nav_group": "Banks",
+            "path": "/cbm-cash-management/banks",
+            "permission": "cbm_cash_management:manage_banks"
           },
           {
-            "component": "CapabilityRules",
-            "name": "rules",
-            "nav_group": "Governance",
-            "path": "/cbm-cash-management/rules",
-            "permission": "cbm_cash_management:govern"
+            "component": "CashAccountWorkbench",
+            "name": "accounts",
+            "nav_group": "Banks",
+            "path": "/cbm-cash-management/accounts",
+            "permission": "cbm_cash_management:manage_accounts"
           },
           {
-            "component": "CapabilitySettings",
+            "component": "CashPositionConsole",
+            "name": "positions",
+            "nav_group": "Cash",
+            "path": "/cbm-cash-management/positions",
+            "permission": "cbm_cash_management:view_positions"
+          },
+          {
+            "component": "CashFlowConsole",
+            "name": "flows",
+            "nav_group": "Cash",
+            "path": "/cbm-cash-management/flows",
+            "permission": "cbm_cash_management:manage_flows"
+          },
+          {
+            "component": "CashForecastWorkbench",
+            "name": "forecasts",
+            "nav_group": "Forecasting",
+            "path": "/cbm-cash-management/forecasts",
+            "permission": "cbm_cash_management:forecast"
+          },
+          {
+            "component": "LiquidityControlDesk",
+            "name": "liquidity",
+            "nav_group": "Controls",
+            "path": "/cbm-cash-management/liquidity",
+            "permission": "cbm_cash_management:liquidity"
+          },
+          {
+            "component": "BankReconciliationWorkbench",
+            "name": "reconciliation",
+            "nav_group": "Controls",
+            "path": "/cbm-cash-management/reconciliation",
+            "permission": "cbm_cash_management:reconcile"
+          },
+          {
+            "component": "TreasuryInvestmentWorkbench",
+            "name": "investments",
+            "nav_group": "Treasury",
+            "path": "/cbm-cash-management/investments",
+            "permission": "cbm_cash_management:invest"
+          },
+          {
+            "component": "PaymentFundingWorkbench",
+            "name": "payment_runs",
+            "nav_group": "Treasury",
+            "path": "/cbm-cash-management/payment-runs",
+            "permission": "cbm_cash_management:fund_payments"
+          },
+          {
+            "component": "CBMAgentWorkbench",
+            "name": "agents",
+            "nav_group": "Automation",
+            "path": "/cbm-cash-management/agents",
+            "permission": "cbm_cash_management:admin"
+          },
+          {
+            "component": "CashManagementSettings",
             "name": "settings",
             "nav_group": "Administration",
             "path": "/cbm-cash-management/settings",
@@ -234,50 +1390,233 @@
           "static/"
         ],
         "view_module": "views.py"
-      }
+      },
+      "version": "2.1.0"
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "cbm_liquidity_review": {
+        "roles": [
+          "cash_position_reviewer",
+          "forecast_reviewer",
+          "liquidity_reviewer",
+          "bank_reconciliation_reviewer",
+          "investment_reviewer",
+          "payment_run_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "cbm_cash_management": []
+      "cbm_cash_management": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "document_management",
+        "business_intelligence"
+      ]
     }
   },
   "contracts": {
     "cbm_cash_management": {
       "configuration": {
-        "capability": {
-          "category": "Cbm",
-          "enabled": true,
-          "id": "cbm_cash_management",
-          "name": "Cash Management",
-          "spec_path": "/Users/nyimbiodero/src/pjs/apg/capabilities/fin/cbm/cash_management/cap_spec.md",
-          "version": "1.0"
+        "adapters": {
+          "accounts_payable": "adapter",
+          "accounts_receivable": "adapter",
+          "audit": "adapter",
+          "authorization": "adapter",
+          "business_intelligence": "adapter",
+          "document_management": "adapter",
+          "event_stream": "bytewax",
+          "general_ledger": "adapter",
+          "notification": "adapter",
+          "theme": "adapter"
         },
-        "execution": {
-          "async_supported": true,
-          "audit_operations": true,
-          "policy_enforced": true,
-          "require_tenant_context": true
+        "banks": {
+          "bank_code_required": true,
+          "bank_name_required": true,
+          "connectivity_status_required": true
+        },
+        "cash_accounts": {
+          "account_name_required": true,
+          "account_number_required": true,
+          "account_type_required": true,
+          "bank_required": true,
+          "currency_required": true,
+          "supported_account_types": [
+            "operating",
+            "savings",
+            "money_market",
+            "investment",
+            "petty_cash",
+            "lockbox"
+          ],
+          "supported_currencies": [
+            "USD",
+            "EUR",
+            "GBP",
+            "KES",
+            "ZAR",
+            "NGN",
+            "GHS",
+            "UGX",
+            "TZS"
+          ]
+        },
+        "cash_flows": {
+          "account_required": true,
+          "amount_must_be_positive": true,
+          "category_required": true,
+          "expected_date_required": true,
+          "flow_type_required": true,
+          "supported_flow_types": [
+            "inflow",
+            "outflow",
+            "transfer"
+          ]
+        },
+        "cash_positions": {
+          "account_required": true,
+          "as_of_date_required": true,
+          "available_balance_required": true,
+          "minimum_liquidity_review_required": true
+        },
+        "cbm_agents": {
+          "enabled": true,
+          "human_approval_required": true,
+          "max_autonomous_scope": "recommend_validate_and_prepare",
+          "supported_roles": [
+            "cash_position_reviewer",
+            "forecast_reviewer",
+            "liquidity_reviewer",
+            "bank_reconciliation_reviewer",
+            "investment_reviewer",
+            "payment_run_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
+        "forecasts": {
+          "confidence_review_threshold": 0.75,
+          "horizon_required": true,
+          "scenario_required": true,
+          "source_flow_required": true,
+          "supported_scenarios": [
+            "base",
+            "optimistic",
+            "pessimistic",
+            "stress"
+          ]
+        },
+        "governance": {
+          "audit_state_changes": true,
+          "policy_attached_for_writes": true,
+          "require_tenant_context": true,
+          "segregation_of_duties": true
+        },
+        "investments": {
+          "approval_required": true,
+          "counterparty_required": true,
+          "maturity_date_required": true,
+          "supported_types": [
+            "deposit",
+            "treasury_bill",
+            "money_market",
+            "commercial_paper",
+            "overnight_sweep"
+          ],
+          "yield_review_required": true
+        },
+        "liquidity": {
+          "deficit_requires_review": true,
+          "minimum_buffer_required": true,
+          "stress_review_required": true
+        },
+        "observability": {
+          "emit_account_events": true,
+          "emit_agent_events": true,
+          "emit_bank_events": true,
+          "emit_flow_events": true,
+          "emit_forecast_events": true,
+          "emit_investment_events": true,
+          "emit_position_events": true,
+          "emit_reconciliation_events": true,
+          "event_stream": "apg.fin.cbm.lifecycle",
+          "stream_processor": "bytewax"
+        },
+        "payment_runs": {
+          "approval_required": true,
+          "cash_position_required": true,
+          "deficit_blocking": true,
+          "funding_account_required": true
+        },
+        "reconciliation": {
+          "bank_statement_required": true,
+          "ledger_balance_required": true,
+          "review_required_for_variance": true,
+          "variance_review_threshold": 100
         },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
-          "default_theme": "cbm_cash_management_operations"
+          "default_theme": "cbm_cash_management_control"
         },
         "ui": {
+          "enable_accounts": true,
+          "enable_agents": true,
+          "enable_banks": true,
           "enable_dashboard": true,
-          "enable_operations": true,
-          "enable_rules": true,
+          "enable_flows": true,
+          "enable_forecasts": true,
+          "enable_investments": true,
+          "enable_liquidity": true,
+          "enable_payment_runs": true,
+          "enable_positions": true,
+          "enable_reconciliation": true,
           "enable_settings": true
         }
       },
       "id": "cbm_cash_management",
       "provides": [
-        "cbm_cash_management_operations"
+        "bank_relationship_lifecycle",
+        "cash_account_lifecycle",
+        "cash_position_service",
+        "cash_flow_lifecycle",
+        "cash_forecasting_workflow",
+        "liquidity_control_workflow",
+        "bank_reconciliation_workflow",
+        "treasury_investment_workflow",
+        "payment_run_funding_control",
+        "cbm_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "audl",
+        "ntfy",
+        "composition_events",
+        "composition_config",
+        "general_ledger",
+        "accounts_payable",
+        "accounts_receivable",
+        "document_management",
+        "business_intelligence"
+      ]
     }
   },
   "deployment": {
@@ -285,93 +1624,19 @@
     "target": "python"
   },
   "diagnostics": [],
-  "flows": {},
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 10,
       "kind": "capability",
       "nodes": 1
-    },
-    "package": {
-      "edges": 1,
-      "kind": "package",
-      "nodes": 2
     }
   },
-  "llms": {},
   "ok": true,
-  "operations": {},
   "packages": {
     "cbm_cash_management": {
       "entrypoint": "app.py",
       "profile": "capability"
     }
-  },
-  "roles": {},
-  "rules": {
-    "high_risk_requires_review": {
-      "condition": {
-        "review_recorded": false,
-        "risk_level": "high"
-      },
-      "description": "High-risk Cash Management operations require review.",
-      "effect": {
-        "decision": "require_review",
-        "reason": "high_risk_review_required",
-        "required_action": "record_review"
-      },
-      "name": "high_risk_requires_review"
-    },
-    "operation_policy_required": {
-      "condition": {
-        "operation_type": "write",
-        "policy_attached": false
-      },
-      "description": "Cash Management write operations require policy enforcement.",
-      "effect": {
-        "decision": "deny",
-        "reason": "operation_policy_required",
-        "required_action": "attach_operation_policy"
-      },
-      "name": "operation_policy_required"
-    },
-    "tenant_context_required": {
-      "condition": {
-        "tenant_context_present": false
-      },
-      "description": "Cash Management operations require tenant context.",
-      "effect": {
-        "decision": "deny",
-        "reason": "tenant_context_required",
-        "required_action": "attach_tenant_context"
-      },
-      "name": "tenant_context_required"
-    }
-  },
-  "security": {},
-  "source_files": [
-    "capability_contract.py"
-  ],
-  "symbols": {
-    "capability.cbm_cash_management": {
-      "file": "capability_contract.py",
-      "id": "capability.cbm_cash_management",
-      "kind": "capability",
-      "name": "Cash Management",
-      "range": {
-        "end": {
-          "character": 1,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
-        }
-      },
-      "references": []
-    }
-  },
-  "tables": {},
-  "views": {}
+  }
 }

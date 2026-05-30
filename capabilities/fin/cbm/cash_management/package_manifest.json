@@ -4,7 +4,7 @@
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
-    "models.py",
+    "capability_contract.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +17,39 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
-  "version": "1.0"
+  "route_count": 12,
+  "rule_count": 36,
+  "streaming": {
+    "events": [
+      "bank_created",
+      "cash_account_created",
+      "cash_position_recorded",
+      "cash_flow_recorded",
+      "cash_forecast_created",
+      "liquidity_review_recorded",
+      "bank_reconciliation_recorded",
+      "treasury_investment_created",
+      "payment_run_validated",
+      "cbm_agent_registered"
+    ],
+    "guardrails": [
+      "cbm_batch_requires_bytewax",
+      "cbm_event_requires_bytewax",
+      "privileged_agent_cbm_action_requires_human_approval"
+    ],
+    "key": "tenant_id",
+    "processor": "bytewax",
+    "states": [
+      "draft",
+      "active",
+      "recorded",
+      "forecasted",
+      "reviewed",
+      "approved",
+      "funded",
+      "blocked"
+    ],
+    "stream": "apg.fin.cbm.lifecycle"
+  },
+  "version": "2.1.0"
 }

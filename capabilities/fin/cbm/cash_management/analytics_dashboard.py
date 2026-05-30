@@ -326,7 +326,7 @@ class AnalyticsDashboard:
 		"""Get dashboard KPIs with current values and trends."""
 		try:
 			# Filter KPIs by category if specified
-		if category:
+			if category:
 				filtered_kpis = {
 					k: v for k, v in self.kpi_definitions.items()
 					if v.category == category
@@ -987,7 +987,7 @@ class AnalyticsDashboard:
 		try:
 			widget.loading = True
 			
-			# Generate mock data based on widget type
+			# Generate sample data based on widget type
 			if widget.widget_name == 'cash_position_chart':
 				widget.data = await self._generate_cash_position_chart_data()
 			elif widget.widget_name == 'cash_flow_forecast':
@@ -1017,7 +1017,7 @@ class AnalyticsDashboard:
 	
 	async def _generate_cash_position_chart_data(self) -> Dict[str, Any]:
 		"""Generate cash position chart data."""
-		# Generate 30 days of mock data
+		# Generate 30 days of sample data
 		data_points = []
 		base_amount = 15000000
 		

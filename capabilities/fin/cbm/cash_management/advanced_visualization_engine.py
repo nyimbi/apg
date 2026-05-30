@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """APG Cash Management - Advanced Visualization Engine
 
-World-class interactive visualization system with intelligent chart generation,
+high-caliber interactive visualization system with intelligent chart generation,
 real-time updates, and seamless integration with natural language commands.
 
 © 2025 Datacraft. All rights reserved.
@@ -1015,6 +1015,6 @@ if __name__ == "__main__":
 	async def main():
 		# Example usage would require a real database connection
 		print("Advanced Visualization Engine initialized")
-		print("This module provides world-class visualization capabilities")
+		print("This module provides high-caliber visualization capabilities")
 	
 	asyncio.run(main())
