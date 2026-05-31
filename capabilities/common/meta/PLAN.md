@@ -4,14 +4,16 @@
 
 Build one coherent metadata-management lifecycle and guardrail packet so APG
 applications can compose a governed catalog before production discovery,
-classification, lineage, search, and persistence adapters are attached.
+classification, lineage, search, catalog-agent, Bytewax lifecycle, and
+persistence adapters are attached.
 
 ## Sequence
 
 ### 1. Specification
 
 - Define asset, discovery, classification, lineage, quality, certification,
-  glossary, publication, retirement, audit, UI, theme, and adapter boundaries.
+  glossary, publication, retirement, catalog-agent, Bytewax lifecycle, audit,
+  UI, theme, and adapter boundaries.
 - Separate dependency-light generated-app behavior from production runtime
   orchestration.
 - Record non-goals to avoid claiming infrastructure that belongs to adapters.
@@ -19,13 +21,16 @@ classification, lineage, search, and persistence adapters are attached.
 ### 2. Contract
 
 - Expand tenant configuration for catalog, discovery, classification, lineage,
-  quality, governance, adapters, UI, and theme.
+  quality, governance, agents, Bytewax lifecycle streams, adapters, UI, and
+  theme.
 - Add deterministic rules for registration, publication, classification,
   certification, discovery, lineage, glossary ownership, retirement, stale
-  assets, and review notes.
+  assets, review notes, supported catalog-agent runtimes, supported
+  catalog-agent roles, agent scope, owner, purpose, machine contribution
+  disclosure, privileged-role human approval, and Bytewax lifecycle batches.
 - Add UI routes for dashboard, catalog, discovery, lineage, classification,
-  quality, certification, glossary, impact, search, audit, adapters, and
-  settings.
+  quality, certification, glossary, impact, search, audit, adapters, catalog
+  agents, lifecycle batches, and settings.
 
 ### 3. Control Plane
 
@@ -34,6 +39,7 @@ classification, lineage, search, and persistence adapters are attached.
 - Implement lifecycle records for assets, discovery jobs, classifications,
   lineage edges, quality assessments, certifications, glossary terms, and audit
   events.
+- Implement catalog-agent records and lifecycle-batch records.
 - Ensure all lifecycle methods evaluate rules and preserve matched-rule
   evidence.
 
@@ -65,7 +71,10 @@ classification, lineage, search, and persistence adapters are attached.
 ## Follow-On Work
 
 - Connect `MetaService` decisions to durable persistence in `APGMetadataService`.
-- Add production Bytewax flow definitions for metadata catalog events.
+- Add production Bytewax flow definitions for metadata catalog and catalog-agent
+  lifecycle events.
+- Add real runtime adapter shims for Codex, Claude Code, opencode, Pi, and
+  later AI-agent providers without making any one runtime mandatory.
 - Add live adapter tests for discovery, classification, lineage, search,
   metadata store, auth, audit, MDM, ETL, connector, monitoring, and notification
   integration.

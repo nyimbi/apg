@@ -171,7 +171,12 @@ class MetadataBaseView(BaseView):
 				# Get scheduled jobs from discovery service
 				discovery_service = g.metadata_service.discovery_service
 				if discovery_service and hasattr(discovery_service, 'get_scheduled_jobs'):
-					schedules = await discovery_service.get_scheduled_jobs()
+					loop = asyncio.new_event_loop()
+					try:
+						asyncio.set_event_loop(loop)
+						schedules = loop.run_until_complete(discovery_service.get_scheduled_jobs())
+					finally:
+						loop.close()
 				else:
 					# Fallback: create sample schedules for display
 					schedules = [

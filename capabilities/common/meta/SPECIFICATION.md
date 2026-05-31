@@ -16,6 +16,8 @@ management, publication, retirement, generated UI state, and audit evidence.
 - Governance teams managing glossary terms, ownership, and audit evidence.
 - Platform operators connecting discovery, classification, lineage, search,
   metadata-store, and Bytewax stream adapters.
+- AI/catalog-agent operators who register Codex, Claude Code, opencode, Pi, or
+  other APG-compatible agents as governed metadata contributors.
 
 ## Runtime Surfaces
 
@@ -31,6 +33,19 @@ runtime.
 `APGMetadataService` remains the production orchestration surface for durable
 persistence, discovery connectors, AI classification, lineage engines, search
 indexes, and APG integration adapters.
+
+### First-Class Catalog Agents
+
+AI/catalog agents are first-class metadata participants. They can assist with
+discovery review, classification review, lineage review, glossary ownership,
+certification, stewardship, and publish gates when they are registered with
+runtime, role, scope, owner, purpose, and contribution disclosure metadata.
+Privileged catalog-agent roles must be human approved before they can influence
+classification, lineage, certification, or publication-sensitive decisions.
+
+The contract starts with supported runtimes `codex`, `claude_code`,
+`opencode`, and `pi`. New runtimes must be added through the contract instead
+of hidden inside service code.
 
 ## Functional Requirements
 
@@ -90,11 +105,32 @@ indexes, and APG integration adapters.
 - Retire only when impact-analysis evidence is present.
 - Audit every publication and retirement decision.
 
+### Catalog-Agent Composition
+
+- Register agent contributors per tenant.
+- Require supported runtime, supported role, declared scope, owner, purpose,
+  and machine-contribution disclosure.
+- Require human approval for privileged roles that can influence
+  classification, lineage, certification, and publish-gate outcomes.
+- Persist catalog-agent records in the generated-app control plane for UI
+  display and audit evidence.
+- Surface catalog-agent registration failures as matched guardrails.
+
+### Bytewax Lifecycle Batches
+
+- Validate metadata lifecycle batch processing through Bytewax.
+- Require lifecycle processors to declare the `bytewax` event stream.
+- Track batch status, mutation count, and matched guardrails for UI/runtime
+  evidence.
+- Keep broker transports out of the core lifecycle contract; event brokers may
+  exist behind adapters, but Bytewax is the required lifecycle processing
+  engine for this packet.
+
 ### UI And Theme
 
 - Expose routes and view models for dashboard, catalog, discovery, lineage,
   classification, quality, certification, glossary, impact analysis, search,
-  audit, adapters, and settings.
+  audit, adapters, catalog agents, lifecycle batches, and settings.
 - Expose compact catalog-console theme tokens and component metadata.
 
 ## Guardrails
@@ -120,6 +156,14 @@ The deterministic rule engine must include at least:
 - `glossary_term_requires_owner`
 - `retire_asset_requires_impact_analysis`
 - `stale_asset_requires_review`
+- `catalog_agent_runtime_supported`
+- `catalog_agent_role_supported`
+- `catalog_agent_requires_scope`
+- `catalog_agent_requires_owner`
+- `catalog_agent_requires_purpose`
+- `catalog_agent_requires_contribution_disclosure`
+- `catalog_agent_privileged_role_requires_human_approval`
+- `bytewax_meta_stream_required`
 
 ## Adapter Requirements
 
@@ -130,7 +174,7 @@ Production adapters may provide:
 - AI or deterministic classification.
 - Lineage graph persistence and traversal.
 - Search index updates and query execution.
-- Bytewax event streams.
+- Bytewax lifecycle streams.
 - APG audit, auth, MDM, ETL, connector, monitoring, and notification
   integrations.
 
@@ -140,10 +184,13 @@ contract.
 ## Non-Goals For This Packet
 
 - Running live discovery connectors.
+- Embedding Codex, Claude Code, opencode, Pi, or any other agent runtime
+  client directly in META.
 - Training or serving AI classification models.
 - Rendering production browser UI.
-- Running external databases, graph stores, search indexes, caches, or Bytewax
-  flows.
+- Running external databases, graph stores, search indexes, caches, event
+  brokers, or Bytewax flows.
+- Treating any broker as the core lifecycle processor.
 - Replacing `APGMetadataService`.
 - Running the full repository test suite during battery-constrained capability
   delivery.
@@ -154,6 +201,8 @@ contract.
 - `capability_contract.py` exposes configuration, schema, rules, routes, and
   theme data.
 - `service.py` exposes `MetaService` lifecycle behavior and audit records.
+- `service.py` registers catalog agents and validates Bytewax lifecycle batches
+  using deterministic guardrails.
 - `view_models.py` exposes generated-application view models.
 - `app.py` builds semantic model data from the live contract.
 - Focused tests prove guardrails, lifecycle behavior, view models,

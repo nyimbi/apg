@@ -20908,3 +20908,68 @@ Not run to preserve battery:
   metadata catalog, lineage graph, cache, event broker, external APG services,
   rendered browser UI, external AI-agent runtime clients, and performance/load
   tests.
+
+### 2026-05-31 04:51 EAT
+
+META catalog-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/meta` as the next data-platform capability
+  after MDM.
+- Extended the META executable contract with first-class catalog-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported metadata-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and
+  contract-level `provides`/`requires`.
+- Added deterministic guardrails for unsupported catalog-agent runtime,
+  unsupported catalog-agent role, missing catalog-agent scope, owner, purpose,
+  missing machine contribution disclosure, privileged catalog-agent
+  registration without human approval, and non-Bytewax META lifecycle batch
+  routing.
+- Added `MetaCatalogAgentRecord`, `MetaLifecycleBatchRecord`,
+  tenant-qualified catalog-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, API helper payload
+  handling, catalog-agent roster view models, and lifecycle-batch monitor view
+  models.
+- Added `/meta/agents`, `/meta/lifecycle`, catalog-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`, and
+  `todo.md` so the documented packet matches the executable contract and does
+  not imply embedded external agent runtimes or broker-first processing.
+- Review pass found and fixed a META `blueprint.py` syntax blocker caused by
+  `await` inside a synchronous view method, allowing the full META package to
+  compile.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/meta/capability_contract.py capabilities/common/meta/service.py capabilities/common/meta/api.py capabilities/common/meta/view_models.py capabilities/common/meta/app.py capabilities/common/meta/__init__.py capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/meta/test_capability_contract.py capabilities/common/meta/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/meta/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect meta --json` passed with `ok: true`,
+  15 APG Python routes, 27 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/meta --json`
+  passed with `ok: true`; META remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/meta --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/meta -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed after fixing the `blueprint.py` syntax blocker.
+- `./.venv/bin/python -c "... MetaService ... register_catalog_agent ... validate_meta_lifecycle_batch ..."`
+  returned one `codex` classification reviewer with owner and purpose evidence,
+  human approval required, normalized role, and `bytewax` lifecycle-batch
+  evidence.
+- Focused stale-marker scan over touched META packet source, docs, tests, and
+  evidence returned no matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live metadata store, live discovery connectors, live Bytewax topology,
+  classification engines, lineage graph, search index, external APG services,
+  rendered browser UI, external AI-agent runtime clients, and performance/load
+  tests.

@@ -34,7 +34,13 @@ except ModuleNotFoundError as exc:
 	create_discovery_service = create_ai_classifier = create_lineage_engine = create_search_engine = None
 	_RUNTIME_IMPORT_ERROR = exc
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_META_AGENT_ROLES,
+	SUPPORTED_META_AGENT_ROLES,
+	SUPPORTED_META_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 
 
 class ServiceStatus(str, Enum):
@@ -234,6 +240,40 @@ class MetaGlossaryTermRecord:
 
 
 @dataclass
+class MetaCatalogAgentRecord:
+	"""First-class metadata catalog governance agent registration."""
+
+	agent_id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class MetaLifecycleBatchRecord:
+	"""Bytewax metadata lifecycle-batch validation evidence."""
+
+	batch_id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
 class MetaAuditEventRecord:
 	"""Dependency-light META audit event."""
 
@@ -254,6 +294,9 @@ class MetaService:
 	def __init__(self, tenant_id: str = "default"):
 		self.tenant_id = tenant_id
 		self.contract = get_capability_contract(tenant_id)
+		self._agent_runtimes = set(SUPPORTED_META_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_META_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_META_AGENT_ROLES)
 		self.assets: dict[str, MetaAssetRecord] = {}
 		self.discovery_jobs: dict[str, MetaDiscoveryJobRecord] = {}
 		self.classifications: dict[str, MetaClassificationRecord] = {}
@@ -261,6 +304,8 @@ class MetaService:
 		self.quality_assessments: dict[str, MetaQualityRecord] = {}
 		self.certifications: dict[str, MetaCertificationRecord] = {}
 		self.glossary_terms: dict[str, MetaGlossaryTermRecord] = {}
+		self.catalog_agents: dict[str, MetaCatalogAgentRecord] = {}
+		self.lifecycle_batches: dict[str, MetaLifecycleBatchRecord] = {}
 		self.audit_events: list[MetaAuditEventRecord] = []
 		self.records: dict[str, dict[str, Any]] = {}
 
@@ -614,6 +659,105 @@ class MetaService:
 		self._audit(tenant_id, "asset.retired", asset.asset_id, self._require_text(actor, "actor"), decision["decision"], decision["matched_rules"], context)
 		return asset
 
+	def register_catalog_agent(
+		self,
+		*,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> MetaCatalogAgentRecord:
+		"""Register a first-class metadata catalog agent with guardrail evidence."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		agent_id = self._require_text(agent_id, "agent_id")
+		name = self._require_text(name, "name")
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_catalog_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		}
+		decision = evaluate_capability_rules(context)
+		if decision["decision"] == "deny":
+			self._audit(
+				tenant_id,
+				"agent.registration_denied",
+				agent_id,
+				str(owner or "system").strip() or "system",
+				decision["decision"],
+				decision["matched_rules"],
+				context,
+			)
+			raise PermissionError(self._first_reason(decision))
+		record_key = self._agent_key(tenant_id, agent_id)
+		if record_key in self.catalog_agents:
+			raise ValueError(f"catalog_agent_already_exists:{agent_id}")
+		record = MetaCatalogAgentRecord(
+			agent_id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=self._require_text(scope, "scope"),
+			owner=self._require_text(owner, "owner"),
+			purpose=self._require_text(purpose, "purpose"),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+		)
+		self.catalog_agents[record_key] = record
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", decision["matched_rules"], asdict(record))
+		return record
+
+	def validate_meta_lifecycle_batch(
+		self,
+		*,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> MetaLifecycleBatchRecord:
+		"""Validate that metadata lifecycle mutation batches flow through Bytewax."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("meta_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_meta_lifecycle_batch",
+			"event_stream": stream_value,
+		}
+		decision = evaluate_capability_rules(context)
+		accepted = decision["decision"] == "allow"
+		record = MetaLifecycleBatchRecord(
+			batch_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			accepted=accepted,
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[record.batch_id] = record
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "meta", decision["decision"], decision["matched_rules"], asdict(record))
+		if not accepted:
+			raise PermissionError(self._first_reason(decision))
+		return record
+
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		tenant_id = tenant_id or self.tenant_id
 		collections: dict[str, Any] = {
@@ -624,6 +768,8 @@ class MetaService:
 			"quality_assessments": self.quality_assessments.values(),
 			"certifications": self.certifications.values(),
 			"glossary_terms": self.glossary_terms.values(),
+			"catalog_agents": self.catalog_agents.values(),
+			"lifecycle_batches": self.lifecycle_batches.values(),
 			"audit_events": self.audit_events,
 			"records": self.records.values(),
 		}
@@ -652,6 +798,9 @@ class MetaService:
 			"lineage_edge_count": len(self.list_records(tenant_id, "lineage")),
 			"certified_asset_count": sum(1 for row in self.list_records(tenant_id, "assets") if row["status"] == "certified"),
 			"glossary_term_count": len(self.list_records(tenant_id, "glossary_terms")),
+			"catalog_agent_count": len(self.list_records(tenant_id, "catalog_agents")),
+			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
+			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
 
@@ -705,6 +854,21 @@ class MetaService:
 		if text not in allowed:
 			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
 		return text
+
+	@staticmethod
+	def _agent_key(tenant_id: str, agent_id: str) -> str:
+		return f"{tenant_id}:{agent_id}"
+
+	@staticmethod
+	def _normalize_agent_token(value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	@staticmethod
+	def _first_reason(result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "meta_operation_denied"
 
 	@staticmethod
 	def _asset_key(tenant_id: str, asset_id: str) -> str:

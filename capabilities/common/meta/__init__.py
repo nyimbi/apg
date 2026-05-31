@@ -20,9 +20,11 @@ from .service import (
 	MetaAssetRecord,
 	MetaAuditEventRecord,
 	MetaCertificationRecord,
+	MetaCatalogAgentRecord,
 	MetaClassificationRecord,
 	MetaDiscoveryJobRecord,
 	MetaGlossaryTermRecord,
+	MetaLifecycleBatchRecord,
 	MetaLineageRecord,
 	MetaQualityRecord,
 	MetaService,
@@ -121,6 +123,8 @@ CAPABILITY_INFO = {
 		"natural_language_search",
 		"impact_analysis",
 		"data_quality_assessment",
+		"catalog_agent_composition",
+		"lifecycle_batch_validation",
 		"real_time_monitoring"
 	],
 	"integrations": [
@@ -246,6 +250,7 @@ def register_capability() -> Dict[str, Any]:
 		"version": CAPABILITY_INFO["version"],
 		"dependencies": ["mdm", "auth", "audl"],
 		"optional_dependencies": ["aicr", "conn", "etlp", "mqeb", "moni"],
+		"api_prefix": contract["ui"]["api_prefix"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -256,7 +261,9 @@ def register_capability() -> Dict[str, Any]:
 			"lineage_tracking": "Capture upstream/downstream asset lineage",
 			"impact_analysis": "Analyze downstream impact from asset changes",
 			"capability_rules": "Evaluate deterministic metadata governance rules",
-			"visual_theming": "Apply catalog-console theme tokens and components"
+			"visual_theming": "Apply catalog-console theme tokens and components",
+			"catalog_agent_composition": "Register first-class metadata agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
+			"lifecycle_batch_validation": "Validate metadata lifecycle mutation batches against Bytewax-first stream rules"
 		},
 		"endpoints": {
 			"assets": "/meta/api/v1/assets",
@@ -264,13 +271,17 @@ def register_capability() -> Dict[str, Any]:
 			"classification": "/meta/api/v1/classification",
 			"lineage": "/meta/api/v1/lineage",
 			"quality": "/meta/api/v1/quality",
-		"search": "/meta/api/v1/search"
+			"search": "/meta/api/v1/search",
+			"agents": "/meta/api/v1/agents",
+			"lifecycle": "/meta/api/v1/lifecycle"
 		},
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]
 		},
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"permissions": [
 			"meta:view",
@@ -279,6 +290,10 @@ def register_capability() -> Dict[str, Any]:
 			"meta:view_lineage",
 			"meta:classify",
 			"meta:view_quality",
+			"meta:certify",
+			"meta:manage_glossary",
+			"meta:view_impact",
+			"meta:view_audit",
 			"meta:search",
 			"meta:admin"
 		]
@@ -424,6 +439,7 @@ __all__ = [
 	"create_metadata_service",
 	"get_metadata_service",
 	"shutdown_metadata_service",
+	"MetaService",
 	
 	# Database and models
 	"MetaDatabaseManager",
@@ -464,6 +480,16 @@ __all__ = [
 	"DiscoverySchedule",
 	"LineageEdge",
 	"SearchQuery",
+	"MetaAssetRecord",
+	"MetaDiscoveryJobRecord",
+	"MetaClassificationRecord",
+	"MetaLineageRecord",
+	"MetaQualityRecord",
+	"MetaCertificationRecord",
+	"MetaGlossaryTermRecord",
+	"MetaCatalogAgentRecord",
+	"MetaLifecycleBatchRecord",
+	"MetaAuditEventRecord",
 	
 	# Capability management
 	"initialize_capability",

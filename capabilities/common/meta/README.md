@@ -31,6 +31,12 @@ Bytewax event streams behind the same contract.
 - Certification gates for governed assets.
 - Business glossary ownership and asset links.
 - Publication and retirement guardrails.
+- First-class catalog-agent registration for Codex, Claude Code, opencode, Pi,
+  and future APG-compatible runtimes.
+- Catalog-agent guardrails for supported roles, declared scope, owner, purpose,
+  machine-contribution disclosure, and human approval for privileged roles.
+- Bytewax lifecycle batch validation for asset, discovery, classification,
+  lineage, quality, certification, glossary, and catalog-agent streams.
 - Generated-application UI routes, view models, theme tokens, and adapter
   metadata.
 
@@ -45,9 +51,13 @@ Bytewax event streams behind the same contract.
 6. Request certification after quality and lineage evidence are present.
 7. Publish assets only when owner, quality, classification, and steward gates
    pass.
-8. Manage glossary terms with accountable owners.
-9. Retire assets only after impact-analysis evidence exists.
-10. Preserve audit events for every lifecycle decision.
+8. Register catalog agents that can contribute to metadata governance and
+   publish-gate workflows.
+9. Validate lifecycle batches through Bytewax before publishing operational
+   evidence.
+10. Manage glossary terms with accountable owners.
+11. Retire assets only after impact-analysis evidence exists.
+12. Preserve audit events for every lifecycle decision.
 
 ## Quick Use
 
@@ -93,6 +103,31 @@ published = service.publish_asset(
 assert published.status == "published"
 ```
 
+Register a governed catalog-agent contributor:
+
+```python
+agent = service.register_catalog_agent(
+    tenant_id="tenant-a",
+    agent_id="classification-reviewer",
+    name="Classification Reviewer",
+    runtime="codex",
+    role="classification_reviewer",
+    scope="restricted metadata classification",
+    owner="metadata-office",
+    purpose="review sensitive classification evidence",
+    human_approval_required=True,
+)
+
+batch = service.validate_meta_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=8,
+)
+
+assert agent.runtime == "codex"
+assert batch.status == "accepted"
+```
+
 ## Generated UI Surfaces
 
 `capability_contract.py` and `view_models.py` expose:
@@ -109,6 +144,8 @@ assert published.status == "published"
 - Search
 - Audit timeline
 - Adapter health
+- Catalog-agent roster
+- Lifecycle batch monitor
 - Settings
 
 The packet does not require a particular web framework. Generated APG targets
@@ -132,6 +169,11 @@ META evaluates deterministic rules before lifecycle decisions. Key guardrails:
 - Glossary terms require owners.
 - Asset retirement requires impact analysis.
 - Stale assets require freshness review before certification.
+- Catalog-agent runtime and role must be supported.
+- Catalog-agent scope, owner, purpose, and machine-contribution disclosure are
+  required.
+- Privileged catalog-agent roles require human approval.
+- Lifecycle batch processing must use Bytewax.
 
 ## Adapter Boundaries
 
@@ -142,11 +184,16 @@ This packet defines the executable control plane. Production adapters may supply
 - AI or rules-based classification.
 - Lineage graph persistence and traversal.
 - Search index maintenance.
-- Bytewax streams for metadata events.
+- Bytewax lifecycle streams for metadata and catalog-agent events.
 - APG audit, auth, MDM, ETL, connector, monitoring, and notification
   integration.
 
 Adapters must not bypass `capability_contract.py` decisions.
+
+The META packet intentionally does not embed SDK clients for Codex, Claude
+Code, opencode, Pi, or future agent providers. Those runtimes connect through
+adapters that preserve the APG contract, guardrail decisions, audit events, and
+human-approval requirements.
 
 ## Local Proof
 

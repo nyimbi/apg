@@ -26,6 +26,7 @@ def dashboard_model(service: MetaService, tenant_id: str = "default") -> dict[st
 			{"id": "schedule_discovery", "label": "Schedule discovery", "permission": "meta:run_discovery"},
 			{"id": "review_classification", "label": "Review classification", "permission": "meta:classify"},
 			{"id": "request_certification", "label": "Request certification", "permission": "meta:certify"},
+			{"id": "register_agent", "label": "Register agent", "permission": "meta:admin"},
 		],
 	}
 
@@ -131,12 +132,39 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def catalog_agent_roster_model(service: MetaService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return first-class META catalog-agent roster state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "catalog_agents"),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"columns": ["name", "runtime", "role", "owner", "purpose", "status", "human_approval_required"],
+	}
+
+
+def lifecycle_batch_model(service: MetaService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return Bytewax metadata lifecycle-batch monitor state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"rows": service.list_records(tenant_id, "lifecycle_batches"),
+		"columns": ["event_stream", "mutation_count", "accepted", "decision", "required_processor", "status"],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

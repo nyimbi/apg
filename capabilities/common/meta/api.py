@@ -22,9 +22,11 @@ from .service import (
 	APGMetadataService,
 	MetaAssetRecord,
 	MetaCertificationRecord,
+	MetaCatalogAgentRecord,
 	MetaClassificationRecord,
 	MetaDiscoveryJobRecord,
 	MetaGlossaryTermRecord,
+	MetaLifecycleBatchRecord,
 	MetaLineageRecord,
 	MetaQualityRecord,
 	MetaService,
@@ -87,6 +89,14 @@ def publish_asset_record(**kwargs: Any) -> MetaAssetRecord:
 	return SERVICE.publish_asset(**kwargs)
 
 
+def register_catalog_agent(**kwargs: Any) -> MetaCatalogAgentRecord:
+	return SERVICE.register_catalog_agent(**kwargs)
+
+
+def validate_meta_lifecycle_batch(**kwargs: Any) -> MetaLifecycleBatchRecord:
+	return SERVICE.validate_meta_lifecycle_batch(**kwargs)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -110,6 +120,8 @@ def list_metadata(tenant_id: str | None = None) -> dict[str, Any]:
 		"quality_assessments": SERVICE.list_records(tenant_id, "quality_assessments"),
 		"certifications": SERVICE.list_records(tenant_id, "certifications"),
 		"glossary_terms": SERVICE.list_records(tenant_id, "glossary_terms"),
+		"catalog_agents": SERVICE.list_records(tenant_id, "catalog_agents"),
+		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
 		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
 	}
 

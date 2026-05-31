@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_META_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_META_AGENT_ROLES = [
+	"metadata_steward_reviewer",
+	"discovery_reviewer",
+	"classification_reviewer",
+	"lineage_reviewer",
+	"glossary_reviewer",
+	"certification_reviewer",
+	"publish_gate_reviewer",
+]
+PRIVILEGED_META_AGENT_ROLES = [
+	"classification_reviewer",
+	"lineage_reviewer",
+	"certification_reviewer",
+	"publish_gate_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped META configuration defaults and schema."""
@@ -90,6 +108,42 @@ class CapabilityConfiguration:
 			"event_stream": "bytewax",
 			"metadata_store": "adapter"
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_META_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_META_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_META_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "meta.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"asset_batch",
+				"discovery_batch",
+				"classification_batch",
+				"lineage_batch",
+				"quality_batch",
+				"certification_batch",
+				"glossary_batch",
+				"catalog_agent_batch"
+			],
+			"topics": [
+				"meta.assets",
+				"meta.discovery",
+				"meta.classification",
+				"meta.lineage",
+				"meta.quality",
+				"meta.certification",
+				"meta.glossary",
+				"meta.agents"
+			]
+		},
 		"ui": {
 			"enable_catalog": True,
 			"enable_discovery_console": True,
@@ -100,7 +154,9 @@ class CapabilityConfiguration:
 			"enable_glossary": True,
 			"enable_impact_analysis": True,
 			"enable_audit_timeline": True,
-			"enable_adapter_health": True
+			"enable_adapter_health": True,
+			"enable_catalog_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True
 		},
 		"theme": {
 			"default_theme": "meta_catalog_console",
@@ -118,6 +174,8 @@ class CapabilityConfiguration:
 			"quality",
 			"governance",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme"
 		],
@@ -130,6 +188,8 @@ class CapabilityConfiguration:
 			"quality": {"type": "object"},
 			"governance": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -251,6 +311,16 @@ class CapabilityTheme:
 		"adapter_status_panel": {
 			"visual": "backend-grid",
 			"status_indicator": "adapter-state"
+		},
+		"catalog_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-state",
+			"variant": "metadata-agent-governance"
+		},
+		"bytewax_lifecycle_panel": {
+			"icon": "activity",
+			"status_indicator": "processor-state",
+			"variant": "metadata-stream-lifecycle"
 		}
 	})
 
@@ -447,6 +517,86 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "freshness_review_required",
 				"required_action": "review_asset_freshness"
 			}
+		),
+		CapabilityRule(
+			name="catalog_agent_runtime_supported",
+			description="Metadata catalog agents must use a supported runtime adapter.",
+			condition={"operation": "register_catalog_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_catalog_agent_runtime",
+				"required_action": "select_supported_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="catalog_agent_role_supported",
+			description="Metadata catalog agents must use a supported governance role.",
+			condition={"operation": "register_catalog_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_catalog_agent_role",
+				"required_action": "select_supported_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="catalog_agent_requires_scope",
+			description="Metadata catalog agents require an explicit operating scope.",
+			condition={"operation": "register_catalog_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "catalog_agent_scope_required",
+				"required_action": "attach_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="catalog_agent_requires_owner",
+			description="Metadata catalog agents require an accountable owner.",
+			condition={"operation": "register_catalog_agent", "agent_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "catalog_agent_owner_required",
+				"required_action": "attach_agent_owner"
+			}
+		),
+		CapabilityRule(
+			name="catalog_agent_requires_purpose",
+			description="Metadata catalog agents require a declared purpose.",
+			condition={"operation": "register_catalog_agent", "agent_purpose_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "catalog_agent_purpose_required",
+				"required_action": "attach_agent_purpose"
+			}
+		),
+		CapabilityRule(
+			name="catalog_agent_requires_contribution_disclosure",
+			description="Metadata catalog agents must disclose machine contribution in stewardship decisions.",
+			condition={"operation": "register_catalog_agent", "contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "catalog_agent_contribution_disclosure_required",
+				"required_action": "enable_agent_contribution_disclosure"
+			}
+		),
+		CapabilityRule(
+			name="catalog_agent_privileged_role_requires_human_approval",
+			description="Privileged metadata catalog-agent roles require human approval.",
+			condition={"operation": "register_catalog_agent", "privileged_agent_role": True, "human_approval_required": False},
+			effect={
+				"decision": "deny",
+				"reason": "catalog_agent_human_approval_required",
+				"required_action": "require_human_approval_for_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_meta_stream_required",
+			description="META lifecycle batches must declare Bytewax as the metadata lifecycle processor.",
+			condition={"operation": "validate_meta_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_meta_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -466,6 +616,8 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("search", "/meta/search", "MetadataSearch", "meta:search", "Catalog"),
 		CapabilityUIRoute("audit", "/meta/audit", "MetadataAuditTimeline", "meta:view_audit", "Governance"),
 		CapabilityUIRoute("adapters", "/meta/adapters", "MetadataAdapterHealth", "meta:admin", "Administration"),
+		CapabilityUIRoute("agents", "/meta/agents", "CatalogAgentRoster", "meta:admin", "Administration"),
+		CapabilityUIRoute("lifecycle", "/meta/lifecycle", "MetadataLifecycleBatchMonitor", "meta:admin", "Runtime"),
 		CapabilityUIRoute("settings", "/meta/settings", "MetadataSettings", "meta:admin", "Administration")
 	]
 	return {
@@ -478,6 +630,57 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class META catalog-agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_META_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_META_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_META_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return META lifecycle stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "meta.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"asset_batch",
+			"discovery_batch",
+			"classification_batch",
+			"lineage_batch",
+			"quality_batch",
+			"certification_batch",
+			"glossary_batch",
+			"catalog_agent_batch"
+		],
+		"topics": [
+			"meta.assets",
+			"meta.discovery",
+			"meta.classification",
+			"meta.lineage",
+			"meta.quality",
+			"meta.certification",
+			"meta.glossary",
+			"meta.agents"
+		],
+		"broker_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable META capability contract."""
 	config = CapabilityConfiguration()
@@ -485,6 +688,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "meta",
 		"display_name": "Metadata Management",
+		"provides": ["metadata_catalog_governance", "metadata_lifecycle", "catalog_agent_composition"],
+		"requires": ["mdm", "auth", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -492,6 +697,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"rules": [rule.__dict__ for rule in default_rules()]
 		},
 		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,
@@ -514,6 +721,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		elif key.endswith("_lt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

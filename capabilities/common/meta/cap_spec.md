@@ -18,6 +18,11 @@ The current packet focuses on executable composition: contract data, lifecycle
 service methods, guardrails, UI route metadata, theme tokens, view models,
 semantic model generation, package tests, and adapter boundaries.
 
+It also makes AI/catalog agents first-class META participants. Agents can be
+registered per tenant with supported runtime, role, scope, owner, purpose,
+machine-contribution disclosure, and human-approval metadata. Bytewax is the
+required lifecycle processing engine for this packet.
+
 ## Lifecycle
 
 1. Register asset.
@@ -31,7 +36,10 @@ semantic model generation, package tests, and adapter boundaries.
 9. Publish governed assets.
 10. Register glossary terms.
 11. Retire assets with impact evidence.
-12. Audit every lifecycle decision.
+12. Register governed catalog agents for discovery, classification, lineage,
+    glossary, certification, and publish-gate workflows.
+13. Validate lifecycle batches through Bytewax.
+14. Audit every lifecycle decision.
 
 ## Guardrails
 
@@ -52,6 +60,10 @@ The capability denies or routes decisions when:
 - Glossary term lacks an owner.
 - Retirement lacks impact-analysis evidence.
 - Stale assets need freshness review before certification.
+- Catalog-agent runtime or role is unsupported.
+- Catalog-agent scope, owner, purpose, or contribution disclosure is missing.
+- Privileged catalog-agent roles are registered without human approval.
+- Lifecycle batches are submitted through anything other than Bytewax.
 
 ## UI And Theme
 
@@ -69,6 +81,8 @@ Generated applications can compose these surfaces:
 - Search
 - Audit timeline
 - Adapter health
+- Catalog-agent roster
+- Bytewax lifecycle monitor
 - Settings
 
 The theme contract exposes compact catalog-console tokens and component metadata
@@ -87,8 +101,12 @@ can connect those systems behind the same contract:
 - classification engines
 - lineage graph traversal
 - search indexes
-- Bytewax event streams
+- Bytewax lifecycle streams
 - APG audit, auth, MDM, ETL, connector, monitoring, and notification services
 
 Adapters must preserve the guardrail decisions produced by
 `capability_contract.py`.
+
+Agent runtime adapters may integrate Codex, Claude Code, opencode, Pi, or later
+providers. They must remain adapter-level integrations and must not replace the
+META contract as the authority for allowed actions.
