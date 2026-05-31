@@ -22,6 +22,8 @@ def dashboard_model(service: NlpcService | None = None, tenant_id: str = "defaul
 		"routes": capability_routes(tenant_id),
 		"recent_documents": service.list_documents(tenant_id)[-10:],
 		"recent_runs": service.list_processing_runs(tenant_id)[-10:],
+		"nlp_agents": service.list_nlp_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -67,8 +69,10 @@ def batch_queue_model(service: NlpcService | None = None, tenant_id: str = "defa
 		"tenant_id": tenant_id,
 		"route": "/nlpc/batches",
 		"engine": contract["configuration"]["adapters"]["event_stream"],
+		"lifecycle_stream": contract["streaming"]["lifecycle_stream"],
 		"async_threshold_documents": contract["configuration"]["processing"]["async_threshold_documents"],
 		"pending_documents": [item for item in service.list_documents(tenant_id) if item["status"] == "ingested"],
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 	}
 
 
@@ -150,6 +154,10 @@ def governance_model(service: NlpcService | None = None, tenant_id: str = "defau
 		"tenant_id": tenant_id,
 		"route": "/nlpc/governance",
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"nlp_agents": service.list_nlp_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"audit_events": service.list_audit_events(tenant_id),
 	}
@@ -161,4 +169,34 @@ def audit_timeline_model(service: NlpcService | None = None, tenant_id: str = "d
 		"tenant_id": tenant_id,
 		"route": "/nlpc/audit",
 		"audit_events": service.list_audit_events(tenant_id),
+	}
+
+
+def nlp_agent_roster_model(service: NlpcService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or NlpcService()
+	contract = service.describe(tenant_id)
+	agents = service.list_nlp_agents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/nlpc/agents",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(service: NlpcService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or NlpcService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/nlpc/lifecycle",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
 	}

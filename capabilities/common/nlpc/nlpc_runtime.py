@@ -189,6 +189,66 @@ class NlpcLexicon:
 
 
 @dataclass
+class NlpAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"agent_id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+		}
+
+
+@dataclass
+class NlpcLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"batch_id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"required_processor": self.required_processor,
+			"status": self.status,
+		}
+
+
+@dataclass
 class NlpcAuditEvent:
 	id: str
 	tenant_id: str
@@ -220,10 +280,16 @@ class NlpcService:
 		self._annotation_projects: dict[str, NlpcAnnotationProject] = {}
 		self._annotations: dict[str, NlpcAnnotation] = {}
 		self._lexicons: dict[str, NlpcLexicon] = {}
+		self._agents: dict[str, NlpAgentRecord] = {}
+		self._lifecycle_batches: dict[str, NlpcLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, NlpcAuditEvent] = {}
 		self._supported_languages = set(SUPPORTED_LANGUAGES)
 		self._enabled_tasks = set(contract["configuration"]["tasks"]["enabled"])
 		self._max_document_chars = contract["configuration"]["processing"]["max_document_chars"]
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -523,6 +589,92 @@ class NlpcService:
 		self._audit(tenant_id, "lexicon_registered", lexicon_id, result)
 		return lexicon.to_dict()
 
+	def register_nlp_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_nlp_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not name:
+			raise ValueError("nlp_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		agent = NlpAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._agents[self._tenant_record_key(tenant_id, agent.id)] = agent
+		self._audit(tenant_id, "nlp_agent_registered", agent.id, result)
+		return agent.to_dict()
+
+	def validate_nlpc_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "nlp_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("nlpc_lifecycle_batch_empty")
+		stream_value = self._normalize_token(event_stream)
+		operation_value = self._normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_nlpc_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_nlpc_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		batch = NlpcLifecycleBatchRecord(
+			id=batch_id or f"nlpcbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, batch.id)] = batch
+		self._audit(tenant_id, f"nlpc_lifecycle_batch_{batch.status}", batch.id, result)
+		if not accepted:
+			self._raise_if_denied(result)
+		return batch.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -570,6 +722,12 @@ class NlpcService:
 	def list_lexicons(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._lexicons, tenant_id)
 
+	def list_nlp_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -584,6 +742,10 @@ class NlpcService:
 			"annotation_project_count": len(self.list_annotation_projects(tenant_id)),
 			"annotation_count": len(self.list_annotations(tenant_id)),
 			"lexicon_count": len(self.list_lexicons(tenant_id)),
+			"nlp_agent_count": len(self.list_nlp_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_nlp_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"supported_language_count": len(self._supported_languages),
 			"african_language_count": len(AFRICAN_LANGUAGE_CODES),
@@ -671,6 +833,10 @@ class NlpcService:
 		if result["decision"] in {"deny", "require_review"}:
 			raise PermissionError(self._reasons(result))
 
+	def _raise_if_denied(self, result: dict[str, Any]) -> None:
+		if result["decision"] == "deny":
+			raise PermissionError(self._reasons(result))
+
 	def _combine(self, left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
 		actions = list(left.get("actions", [])) + list(right.get("actions", []))
 		matched = list(dict.fromkeys(list(left.get("matched_rules", [])) + list(right.get("matched_rules", []))))
@@ -686,3 +852,9 @@ class NlpcService:
 
 	def _digest(self, value: str) -> str:
 		return sha256(value.encode("utf-8")).hexdigest()
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"

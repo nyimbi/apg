@@ -47,8 +47,8 @@ def semantic_model() -> dict[str, Any]:
 			"nlpc": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["nlpc_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
@@ -68,6 +68,7 @@ def semantic_model() -> dict[str, Any]:
 					"model_release": "NlpcModelRegistration",
 					"annotation_review": "NlpcAnnotation",
 					"pipeline_registration": "NlpcPipeline",
+					"nlp_agent": "NlpAgentRecord",
 				},
 				"nlp_lifecycle": {
 					"document": "NlpcDocument",
@@ -77,24 +78,39 @@ def semantic_model() -> dict[str, Any]:
 					"annotation_project": "NlpcAnnotationProject",
 					"annotation": "NlpcAnnotation",
 					"lexicon": "NlpcLexicon",
+					"nlp_agent": "NlpAgentRecord",
+					"lifecycle_batch": "NlpcLifecycleBatchRecord",
 					"audit": "NlpcAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
+				"agents": contract["agents"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"nlpc": {
 				"id": "nlpc",
 				"configuration": contract["configuration"],
-				"provides": ["nlpc_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"nlpc": []}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"nlpc": contract["requires"]},
+			"applications": {},
+			"agent_teams": {
+				"nlpc_text_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
 			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
@@ -111,7 +127,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"nlpc_text_governance": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -149,18 +165,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "nlpc" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 16:
 		errors.append("NLPC semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 38:
 		errors.append("NLPC semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("NLPC adapter manifest must use Bytewax for event streaming")
+	if agents.get("first_class") is not True:
+		errors.append("NLPC agents must be first-class semantic citizens")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("NLPC lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "nlpc_runtime.NlpcService":
 		errors.append("NLPC generated-app runtime is missing")
 	return {

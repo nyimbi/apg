@@ -13,6 +13,26 @@ SUPPORTED_LANGUAGES: list[str] = [
 	"ss", "ti", "ts", "tn", "tw", "ve", "wo", "xh", "yo", "zu", "kab", "kam",
 	"luo", "mas", "mer", "mos", "nus", "suk", "tzm", "tig", "umb",
 ]
+SUPPORTED_NLPC_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_NLPC_AGENT_ROLES = [
+	"document_reviewer",
+	"language_reviewer",
+	"pii_reviewer",
+	"generation_safety_reviewer",
+	"annotation_reviewer",
+	"pipeline_reviewer",
+	"model_release_reviewer",
+	"semantic_search_reviewer",
+	"language_steward",
+]
+PRIVILEGED_NLPC_AGENT_ROLES = [
+	"pii_reviewer",
+	"generation_safety_reviewer",
+	"annotation_reviewer",
+	"pipeline_reviewer",
+	"model_release_reviewer",
+	"semantic_search_reviewer",
+]
 
 
 DEFAULT_CONFIGURATION: dict[str, Any] = {
@@ -66,6 +86,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"evaluation_required": True,
 		"release_approval_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_NLPC_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_NLPC_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_NLPC_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "nlpc.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"document_batch",
+			"processing_batch",
+			"pipeline_batch",
+			"annotation_batch",
+			"model_batch",
+			"lexicon_batch",
+			"language_registry_batch",
+			"nlp_agent_batch",
+		],
+		"topics": [
+			"nlpc.documents",
+			"nlpc.processing",
+			"nlpc.pipelines",
+			"nlpc.annotations",
+			"nlpc.models",
+			"nlpc.lexicons",
+			"nlpc.languages",
+			"nlpc.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"auth_required": True,
@@ -106,6 +165,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_language_coverage": True,
 		"enable_lexicon_manager": True,
 		"enable_semantic_search": True,
+		"enable_nlp_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_governance": True,
 		"enable_audit_timeline": True,
 		"enable_settings": True,
@@ -124,6 +185,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"pipelines",
 		"annotation",
 		"model_registry",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -137,6 +200,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"pipelines",
 		"annotation",
 		"model_registry",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -177,6 +242,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "cross_tenant_processing_denied", "description": "Cross-tenant text processing is denied by default.", "condition": {"cross_tenant_processing": True}, "effect": {"decision": "deny", "reason": "cross_tenant_processing_denied", "required_action": "use_tenant_scoped_document"}},
 	{"name": "audit_event_required_for_processing", "description": "NLP processing state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
 	{"name": "african_language_coverage_required", "description": "The language registry must keep at least 40 African language codes.", "condition": {"operation": "validate_language_registry", "african_language_count_lt": 40}, "effect": {"decision": "deny", "reason": "african_language_coverage_required", "required_action": "restore_african_language_codes"}},
+	{"name": "nlp_agent_runtime_supported", "description": "NLP agents must use supported runtimes.", "condition": {"operation": "register_nlp_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_nlp_agent_runtime", "required_action": "choose_supported_nlp_agent_runtime"}},
+	{"name": "nlp_agent_role_supported", "description": "NLP agents must use supported text-intelligence roles.", "condition": {"operation": "register_nlp_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_nlp_agent_role", "required_action": "choose_supported_nlp_agent_role"}},
+	{"name": "nlp_agent_requires_scope", "description": "NLP agents require an explicit bounded scope.", "condition": {"operation": "register_nlp_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "nlp_agent_scope_required", "required_action": "declare_nlp_agent_scope"}},
+	{"name": "nlp_agent_requires_owner", "description": "NLP agents require an accountable owner.", "condition": {"operation": "register_nlp_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "nlp_agent_owner_required", "required_action": "assign_nlp_agent_owner"}},
+	{"name": "nlp_agent_requires_purpose", "description": "NLP agents require a documented purpose.", "condition": {"operation": "register_nlp_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "nlp_agent_purpose_required", "required_action": "document_nlp_agent_purpose"}},
+	{"name": "nlp_agent_requires_contribution_disclosure", "description": "NLP agents must disclose machine-authored text-intelligence contributions.", "condition": {"operation": "register_nlp_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "nlp_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "nlp_agent_privileged_role_requires_human_approval", "description": "Privileged NLP-agent roles require human approval evidence.", "condition": {"operation": "register_nlp_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "nlp_agent_human_approval_required", "required_action": "record_human_nlp_agent_approval"}},
+	{"name": "bytewax_nlpc_stream_required", "description": "NLPC lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_nlpc_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_nlpc_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -192,6 +265,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "languages", "path": "/nlpc/languages", "component": "LanguageCoverage", "permission": "nlpc:view", "nav_group": "Coverage"},
 	{"name": "lexicons", "path": "/nlpc/lexicons", "component": "LexiconManager", "permission": "nlpc:manage_models", "nav_group": "Coverage"},
 	{"name": "search", "path": "/nlpc/search", "component": "SemanticSearchConsole", "permission": "nlpc:process", "nav_group": "Search"},
+	{"name": "agents", "path": "/nlpc/agents", "component": "NLPAgentRoster", "permission": "nlpc:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/nlpc/lifecycle", "component": "NLPCLifecycleBatchMonitor", "permission": "nlpc:govern", "nav_group": "Operations"},
 	{"name": "governance", "path": "/nlpc/governance", "component": "NLPGovernance", "permission": "nlpc:govern", "nav_group": "Governance"},
 	{"name": "audit", "path": "/nlpc/audit", "component": "NLPCAuditTimeline", "permission": "nlpc:view", "nav_group": "Governance"},
 	{"name": "settings", "path": "/nlpc/settings", "component": "NLPCSettings", "permission": "nlpc:admin", "nav_group": "Administration"},
@@ -222,9 +297,63 @@ THEME: dict[str, Any] = {
 		"batch_queue": {"visual": "document-stack", "status_style": "async-chip"},
 		"lexicon_manager": {"visual": "term-table", "status_style": "language-chip"},
 		"semantic_search": {"visual": "ranked-results", "highlight": "similarity-chip"},
+		"nlp_agent_roster": {"icon": "bot-message-square", "status_indicator": "agent-approval-chip", "risk_style": "scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class NLPC agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_NLPC_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_NLPC_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_NLPC_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the NLPC Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "nlpc.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"document_batch",
+			"processing_batch",
+			"pipeline_batch",
+			"annotation_batch",
+			"model_batch",
+			"lexicon_batch",
+			"language_registry_batch",
+			"nlp_agent_batch",
+		],
+		"topics": [
+			"nlpc.documents",
+			"nlpc.processing",
+			"nlpc.pipelines",
+			"nlpc.annotations",
+			"nlpc.models",
+			"nlpc.lexicons",
+			"nlpc.languages",
+			"nlpc.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -236,6 +365,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "nlpc",
 		"display_name": "NLP Core",
+		"provides": ["text_intelligence", "multilingual_processing", "nlp_agent_composition"],
+		"requires": ["aicr", "mlcm", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -247,6 +378,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

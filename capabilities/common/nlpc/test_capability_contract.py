@@ -18,7 +18,9 @@ from capabilities.common.nlpc.view_models import (
 	governance_model,
 	language_coverage_model,
 	lexicon_manager_model,
+	lifecycle_batch_model,
 	model_registry_model,
+	nlp_agent_roster_model,
 	pipeline_designer_model,
 	processing_console_model,
 	review_console_model,
@@ -51,6 +53,8 @@ def test_contract_exposes_configuration_rules_ui_theme_adapters_and_languages():
 		"pipelines",
 		"annotation",
 		"model_registry",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -70,15 +74,25 @@ def test_contract_exposes_configuration_rules_ui_theme_adapters_and_languages():
 		"languages",
 		"lexicons",
 		"search",
+		"agents",
+		"lifecycle",
 		"governance",
 		"audit",
 		"settings"
 	}
+	assert contract["provides"] == ["text_intelligence", "multilingual_processing", "nlp_agent_composition"]
+	assert contract["requires"] == ["aicr", "mlcm", "conf"]
+	assert contract["agents"]["first_class"] is True
+	assert {"codex", "claude_code", "opencode", "pi"} <= set(contract["agents"]["supported_runtimes"])
+	assert "generation_safety_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "nlp_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "nlpc_runtime.NlpcService"
 	assert contract["ui"]["api_prefix"] == "/nlpc/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "pipeline_designer" in contract["theme"]["components"]
+	assert "nlp_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_nlp_guardrails():
@@ -125,6 +139,44 @@ def test_rule_engine_enforces_nlp_guardrails():
 	assert pii_result["matched_rules"] == ["pii_requires_redaction_policy"]
 	assert stream_result["matched_rules"] == ["batch_requires_bytewax_stream"]
 	assert bytewax_result["decision"] == "allow"
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_nlp_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+	})
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"nlp_agent_runtime_supported",
+		"nlp_agent_role_supported",
+		"nlp_agent_requires_scope",
+		"nlp_agent_requires_owner",
+		"nlp_agent_requires_purpose",
+		"nlp_agent_requires_contribution_disclosure",
+	}
+	review_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_nlp_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"scope_present": True,
+		"owner_present": True,
+		"purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	assert review_result["decision"] == "require_review"
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_nlpc_lifecycle_batch",
+		"event_stream": "redis",
+	})
+	assert lifecycle_result["matched_rules"] == ["bytewax_nlpc_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -137,6 +189,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "nlpc_text_intelligence"
 	assert registration["ui_components"]["languages"] == "/nlpc/languages"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "nlp_agent_composition" in registration["capabilities"]
 	assert "aicr" in registration["dependencies"]
 	assert "moni" in registration["dependencies"]
 	assert "nlpc:process" in registration["permissions"]
@@ -220,11 +275,38 @@ def test_nlpc_lifecycle_is_executable():
 		"annotation_project_count": 1,
 		"annotation_count": 1,
 		"lexicon_count": 1,
+		"nlp_agent_count": 0,
+		"pending_agent_review_count": 0,
+		"lifecycle_batch_count": 0,
+		"denied_lifecycle_batch_count": 0,
 		"audit_event_count": 8,
 		"supported_language_count": len(SUPPORTED_LANGUAGES),
 		"african_language_count": len(AFRICAN_LANGUAGE_CODES),
 	}
+	agent = service.register_nlp_agent(
+		"nlp-reviewer",
+		"tenant-text",
+		"NLPC Safety Reviewer",
+		"codex",
+		"generation_safety_reviewer",
+		"pipe-001 generation outputs",
+		"language-team",
+		"Review generated summaries and safety policy drift",
+		human_approval_required=True,
+	)
+	batch = service.validate_nlpc_lifecycle_batch(
+		"tenant-text",
+		"bytewax",
+		4,
+		"nlp_agent_batch",
+		"nlpc-batch-001",
+	)
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "generation_safety_reviewer"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
 	assert dashboard_model(service, "tenant-text")["summary"]["processing_run_count"] == 1
+	assert dashboard_model(service, "tenant-text")["summary"]["nlp_agent_count"] == 1
 	assert processing_console_model(service, "tenant-text")["enabled_tasks"]
 	assert document_workbench_model(service, "tenant-text")["documents"][0]["id"] == "doc-001"
 	assert pipeline_designer_model(service, "tenant-text")["pipelines"][0]["id"] == "pipe-001"
@@ -235,6 +317,8 @@ def test_nlpc_lifecycle_is_executable():
 	assert language_coverage_model("tenant-text")["african_language_count"] >= 40
 	assert lexicon_manager_model(service, "tenant-text")["lexicons"][0]["id"] == "lex-001"
 	assert semantic_search_model(service, "tenant-text")["search_runs"][0]["id"] == "run-001"
+	assert nlp_agent_roster_model(service, "tenant-text")["agents"][0]["id"] == "nlp-reviewer"
+	assert lifecycle_batch_model(service, "tenant-text")["batches"][0]["id"] == "nlpc-batch-001"
 	assert governance_model(service, "tenant-text")["rules"]
 	assert audit_timeline_model(service, "tenant-text")["audit_events"]
 
@@ -294,3 +378,16 @@ def test_nlpc_service_enforces_policy_guardrails():
 		service.submit_annotation("ann", "tenant-text", "project", "doc", "reviewer", ["ORG"], 0.20, False)
 	with pytest.raises(PermissionError, match="lexicon_language_required"):
 		service.register_lexicon("lex", "tenant-text", "Lexicon", "", ["term"])
+
+	with pytest.raises(PermissionError, match="unsupported_nlp_agent_runtime"):
+		service.register_nlp_agent("agent-bad-runtime", "tenant-text", "Bad Runtime", "unknown", "language_steward", "doc", "owner", "purpose")
+	with pytest.raises(PermissionError, match="nlp_agent_scope_required"):
+		service.register_nlp_agent("agent-no-scope", "tenant-text", "No Scope", "codex", "language_steward", "", "owner", "purpose")
+	agent = service.register_nlp_agent("agent-review", "tenant-text", "Review Agent", "claude-code", "pii reviewer", "doc", "owner", "purpose")
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "pii_reviewer"
+	assert agent["status"] == "pending_review"
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_nlpc_lifecycle_batch("tenant-text", "kafka", 1)
+	batch = service.validate_nlpc_lifecycle_batch("tenant-text", "bytewax", 1, "language_registry_batch")
+	assert batch["accepted"] is True

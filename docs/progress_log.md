@@ -21551,3 +21551,62 @@ Not run to preserve battery:
   topology, live AICR/MLCM/ENCR/MTEN/AUDL/MONI/AUTH adapters, rendered browser
   UI, external AI-agent runtime clients, and performance/load/convergence
   tests.
+
+### 2026-05-31 06:56 EAT
+
+NLPC NLP-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/nlpc` as the next ordered AI capability after
+  FEDL.
+- Extended the NLPC executable contract with first-class NLP-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  text-governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and contract `provides`/
+  `requires`.
+- Added deterministic guardrails for unsupported NLP-agent runtime, unsupported
+  NLP-agent role, missing agent scope, owner, purpose, missing machine
+  contribution disclosure, privileged NLP-agent registration without human
+  approval, and non-Bytewax NLPC lifecycle batch routing.
+- Added `NlpAgentRecord`, `NlpcLifecycleBatchRecord`, tenant-qualified
+  NLP-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, NLP-agent roster view models, and lifecycle-batch
+  monitor view models.
+- Added `/nlpc/agents`, `/nlpc/lifecycle`, NLP-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py`
+  passed.
+- `find capabilities/common/nlpc -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python capabilities/common/nlpc/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py`
+  passed with 10 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect nlpc --json` passed with `ok: true`,
+  16 APG Python routes, 38 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/nlpc --json`
+  passed with `ok: true`; NLPC remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/nlpc --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -c "... NlpcService ... register_nlp_agent ... validate_nlpc_lifecycle_batch ..."`
+  returned one `codex` active language steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched NLPC packet source, docs, tests, and
+  evidence returned only one intentional Kafka-denial test.
+- `git diff --check -- capabilities/common/nlpc docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live NLP model inference, live Bytewax topology, live AICR/MLCM/CONF/AUDL/
+  MONI/AUTH/SRCH adapters, rendered browser UI, external AI-agent runtime
+  clients, and performance/load/quality benchmark tests.

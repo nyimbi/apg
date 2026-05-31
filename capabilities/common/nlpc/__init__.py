@@ -49,7 +49,9 @@ CAPABILITY_INFO = {
 		"text_classification",
 		"semantic_search",
 		"text_generation",
-		"multilingual_processing"
+		"multilingual_processing",
+		"nlp_agent_composition",
+		"bytewax_lifecycle_governance"
 	],
 	"supported_languages": [
 		"en", "es", "fr", "de", "it", "pt", "ru", "zh", "ja", "ko", "ar", "hi",
@@ -259,6 +261,8 @@ def register_capability() -> dict[str, Any]:
 			"annotation_governance": "Manage annotation projects, consensus, adjudication, and review work",
 			"model_release": "Link NLP model registrations to MLCM evaluation and release approval",
 			"semantic_search": "Expose search-index binding metadata for text retrieval workflows",
+			"nlp_agent_composition": "Register provider-neutral AI agents for text-intelligence governance",
+			"bytewax_lifecycle_governance": "Validate NLPC lifecycle mutation batches through Bytewax",
 			"capability_rules": "Evaluate deterministic NLP governance rules",
 			"visual_theming": "Apply text-intelligence console theme tokens and components"
 		},
@@ -270,9 +274,13 @@ def register_capability() -> dict[str, Any]:
 			"models": "/nlpc/api/v1/models",
 			"languages": "/nlpc/api/v1/languages",
 			"lexicons": "/nlpc/api/v1/lexicons",
+			"agents": "/nlpc/api/v1/agents",
+			"lifecycle": "/nlpc/api/v1/lifecycle",
 			"audit": "/nlpc/api/v1/audit",
 			"analytics": "/nlpc/api/v1/analytics"
 		},
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]

@@ -31,10 +31,12 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "nlpc"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 16
+	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "nlpc_runtime.NlpcService"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -55,6 +57,11 @@ def test_package_app_entrypoint_is_publishable():
 	assert "nlpc" in model["capabilities"]
 	assert model["capabilities"]["nlpc"]["runtime"]["service"] == "nlpc_runtime.NlpcService"
 	assert model["capabilities"]["nlpc"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["nlpc"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["nlpc"]["agents"]["first_class"] is True
+	assert model["capabilities"]["nlpc"]["nlp_lifecycle"]["nlp_agent"] == "NlpAgentRecord"
+	assert model["capabilities"]["nlpc"]["nlp_lifecycle"]["lifecycle_batch"] == "NlpcLifecycleBatchRecord"
+	assert model["composition"]["capability_dependencies"]["nlpc"] == ["aicr", "mlcm", "conf"]
 	assert committed_model == model
 	assert set(committed_manifest["generated_artifacts"]) >= {
 		"README.md",
@@ -66,9 +73,10 @@ def test_package_app_entrypoint_is_publishable():
 		"app.py",
 	}
 	assert committed_report["ok"] is True
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 12
-	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 30
-	assert committed_report["evidence"]["runtime"]["event_stream"] == "bytewax"
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["route_count"] >= 16
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 38
+	assert committed_report["evidence"]["streaming"]["engine"] == "bytewax"
+	assert committed_report["evidence"]["streaming"]["required_processor"] == "bytewax"
 	assert committed_report["evidence"]["runtime"]["generated_app_runtime"] == "nlpc_runtime.NlpcService"
 
 

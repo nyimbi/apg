@@ -21,6 +21,10 @@ evidence through a deterministic rule engine.
   checks, and annotation records.
 - Tenant lexicons with language metadata and term ownership.
 - At least 40 African language codes in the language registry.
+- First-class NLP-agent composition for Codex, Claude Code, OpenCode, Pi, and
+  future AICR-adapted runtimes.
+- Bytewax lifecycle-batch validation for generated-app and agent-authored text
+  mutations.
 - Rule-engine metadata, UI route metadata, theme tokens, and generated-app
   semantic package evidence.
 - Adapter configuration for AICR, MLCM, CONF, AUTH, AUDL, MONI, SRCH, and
@@ -75,6 +79,24 @@ run = service.process_document(
 	pipeline["tasks"],
 	search_index_attached=True,
 )
+service.register_nlp_agent(
+	"nlp-reviewer",
+	"tenant-a",
+	"NLPC Safety Reviewer",
+	"codex",
+	"generation_safety_reviewer",
+	"pipe-001 generation outputs",
+	"language-team",
+	"Review generated summaries and safety policy drift",
+	human_approval_required=True,
+)
+service.validate_nlpc_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	4,
+	"nlp_agent_batch",
+	"batch-001",
+)
 ```
 
 ## Guardrails
@@ -92,12 +114,41 @@ without guidelines, low annotation consensus without adjudication, lexicons
 without language, quality metrics without owner, cross-tenant processing, state
 changes without audit evidence, and language registries with fewer than 40
 African language codes.
+Agent guardrails also block unsupported runtimes, unsupported roles, missing
+scope, missing owner, missing purpose, undisclosed machine contribution, and
+non-Bytewax lifecycle batches. Privileged NLP-agent roles without explicit
+human approval are retained as `pending_review` instead of being silently
+activated.
+
+## Agent Composition
+
+NLPC agents are provider-neutral text-governance actors. The contract currently
+recognizes `codex`, `claude_code`, `opencode`, and `pi` runtime codes; live
+runtime execution remains behind AICR adapter contracts. Generated
+applications compose agents through `register_nlp_agent()` and inspect them
+through `list_nlp_agents()` or the `/nlpc/agents` route metadata.
+
+Supported roles include document review, language review, PII review,
+generation safety, annotation review, pipeline review, model-release review,
+semantic-search review, and language steward responsibilities. PII,
+generation-safety, annotation, pipeline, model-release, and semantic-search
+roles are privileged and require human approval evidence for active status.
+
+## Bytewax Lifecycle Batches
+
+NLPC uses Bytewax for lifecycle mutation governance. The streaming manifest
+requires the `nlpc.lifecycle` stream and declares operation names for document,
+processing, pipeline, annotation, model, lexicon, language-registry, and
+NLP-agent batches. Generated applications validate those batches with
+`validate_nlpc_lifecycle_batch()` and inspect accepted or denied evidence
+through `list_lifecycle_batches()` or the `/nlpc/lifecycle` route metadata.
 
 ## Focused Verification
 
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/nlpc/__init__.py capabilities/common/nlpc/capability_contract.py capabilities/common/nlpc/nlpc_runtime.py capabilities/common/nlpc/view_models.py capabilities/common/nlpc/app.py capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/nlpc/test_capability_contract.py capabilities/common/nlpc/test_language_codes.py capabilities/common/nlpc/tests/test_package_contract.py
+./.venv/bin/python capabilities/common/nlpc/app.py
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/nlpc --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/nlpc --json
 ```
