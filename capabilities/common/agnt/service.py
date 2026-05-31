@@ -6,7 +6,7 @@ from typing import Any
 
 from .agent_composition import AgentCompositionPlanner
 from .capability_contract import evaluate_capability_rules, get_capability_contract
-from .models import AgentDefinition, AgentRuntime, AgentTeam, HandoffEdge
+from .models import AgentDefinition, AgentExecutionRun, AgentRuntime, AgentTeam, HandoffEdge
 from .models import AgentAuditEvent, RuntimeApprovalRequest
 
 
@@ -17,6 +17,7 @@ class AgntService:
 		self._agents: dict[str, AgentDefinition] = {}
 		self._runtimes: dict[str, AgentRuntime] = {}
 		self._teams: dict[str, AgentTeam] = {}
+		self._execution_runs: dict[str, AgentExecutionRun] = {}
 		self._runtime_approvals: dict[str, RuntimeApprovalRequest] = {}
 		self._events: list[AgentAuditEvent] = []
 		self._planner = AgentCompositionPlanner()
@@ -333,6 +334,67 @@ class AgntService:
 		)
 		return plan
 
+	def record_execution_run(
+		self,
+		run_id: str,
+		tenant_id: str,
+		team_id: str,
+		objective: str,
+		requested_by: str,
+		trace_sink: str,
+		side_effects_requested: bool = False,
+		human_approval_recorded: bool = False,
+		status: str = "planned",
+	) -> dict[str, Any]:
+		self._enforce_execution_run_policy(
+			tenant_id=tenant_id,
+			requester_present=bool(requested_by),
+			trace_sink_present=bool(trace_sink),
+			side_effects_requested=side_effects_requested,
+			human_approval_recorded=human_approval_recorded,
+		)
+		if status not in {"planned", "running", "completed", "failed", "cancelled"}:
+			raise ValueError("execution run status must be planned, running, completed, failed, or cancelled")
+		key = self._key(tenant_id, run_id)
+		if key in self._execution_runs:
+			raise ValueError(f"duplicate execution run for tenant: {run_id}")
+		plan = self.plan_execution(team_id, objective, tenant_id=tenant_id)
+		run = AgentExecutionRun(
+			id=run_id,
+			tenant_id=tenant_id,
+			team_id=team_id,
+			plan_id=plan["id"],
+			objective=objective,
+			requested_by=requested_by,
+			trace_sink=trace_sink,
+			status=status,
+			side_effects_requested=side_effects_requested,
+			human_approval_recorded=human_approval_recorded,
+			plan_snapshot=plan,
+		)
+		self._execution_runs[key] = run
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="execution_run_recorded",
+			subject_id=run_id,
+			message=f"Recorded agent execution run {run_id}.",
+			evidence={
+				"team_id": team_id,
+				"plan_id": plan["id"],
+				"requested_by": requested_by,
+				"trace_sink": trace_sink,
+				"side_effects_requested": side_effects_requested,
+				"human_approval_recorded": human_approval_recorded,
+			},
+		)
+		return run.to_dict()
+
+	def list_execution_runs(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		runs = list(self._execution_runs.values())
+		if tenant_id is not None:
+			runs = [run for run in runs if run.tenant_id == tenant_id]
+		return [run.to_dict() for run in sorted(runs, key=lambda item: item.id)]
+
 	def composition_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		contract = self.describe(tenant_id)
 		return {
@@ -341,6 +403,7 @@ class AgntService:
 			"tenant_id": tenant_id,
 			"agent_count": len(self.list_agents(tenant_id)),
 			"team_count": len(self.list_teams(tenant_id)),
+			"execution_run_count": len(self.list_execution_runs(tenant_id)),
 			"runtime_count": len(self.list_runtimes(tenant_id)),
 			"runtime_approval_count": len(self.list_runtime_approvals(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
@@ -410,6 +473,24 @@ class AgntService:
 			"operation": "decide_runtime_approval",
 			"reviewer_present": bool(reviewer),
 			"decision_notes_present": bool(notes),
+		})
+		_raise_if_blocked(result)
+
+	def _enforce_execution_run_policy(
+		self,
+		tenant_id: str,
+		requester_present: bool,
+		trace_sink_present: bool,
+		side_effects_requested: bool,
+		human_approval_recorded: bool,
+	) -> None:
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "record_execution_run",
+			"requester_present": requester_present,
+			"trace_sink_present": trace_sink_present,
+			"side_effects_requested": side_effects_requested,
+			"human_approval_recorded": human_approval_recorded,
 		})
 		_raise_if_blocked(result)
 

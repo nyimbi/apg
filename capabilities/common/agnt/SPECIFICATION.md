@@ -47,8 +47,10 @@ AGNT owns these records:
 - `HandoffEdge`: validated directed handoff between team members.
 - `ExecutionPlan`: deterministic plan for running one team against an
   objective.
+- `AgentExecutionRun`: provider-neutral execution run record with requester,
+  trace sink, side-effect approval evidence, status, and plan snapshot.
 - `AgentAuditEvent`: tenant-scoped evidence for runtime, agent, team, plan,
-  and approval lifecycle changes.
+  run, and approval lifecycle changes.
 
 ## Lifecycle
 
@@ -62,10 +64,13 @@ The primary lifecycle is:
 5. Validate handoff edges against declared team members.
 6. Build deterministic execution plans with runtime assignments, tools,
    handoff targets, approval evidence, and cost-limit metadata.
-7. Validate Bytewax-backed batch agent mutation metadata.
-8. Expose operational view models for registry, team builder, runtime manager,
-   approval queue, execution trace, audit trail, analytics, settings, and
-   governance evidence.
+7. Record provider-neutral execution runs with requester identity, trace sink,
+   side-effect approval evidence, status, and a plan snapshot before adapters
+   invoke external providers.
+8. Validate Bytewax-backed batch agent mutation metadata.
+9. Expose operational view models for registry, team builder, runtime manager,
+   approval queue, execution trace, execution-run console, audit trail,
+   analytics, settings, and governance evidence.
 
 ## Rules And Guardrails
 
@@ -93,6 +98,12 @@ The contract rules are executable guardrails:
 - `external_runtime_requires_approval`: external providers require approval
   before direct registration/use.
 - `execution_plan_requires_objective`: execution plans require an objective.
+- `execution_run_requires_requester`: execution runs require requester
+  identity.
+- `execution_run_requires_trace_sink`: execution runs require an audit or trace
+  sink.
+- `execution_side_effect_requires_human_approval`: execution runs with external
+  side effects require recorded human approval.
 - `agnt_state_change_requires_audit`: lifecycle changes require audit
   evidence.
 - `cross_tenant_agent_access_denied`: tenant records cannot cross boundaries.
@@ -114,14 +125,15 @@ AGNT exposes route and view-model surfaces for:
 - runtime manager;
 - runtime approval queue;
 - execution trace;
+- execution-run console;
 - memory policy;
 - audit trail;
 - analytics;
 - settings.
 
 The `agnt_agent_ops` theme must provide semantic tokens and component metadata
-for agent cards, team graphs, runtime matrices, approval queues, audit
-timelines, and execution trace decisions.
+for agent cards, team graphs, runtime matrices, approval queues,
+execution-run ledgers, audit timelines, and execution trace decisions.
 
 ## Adapter Boundaries
 

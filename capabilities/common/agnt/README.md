@@ -4,7 +4,8 @@ AGNT makes AI agents first-class APG citizens. It gives generated applications
 a provider-neutral way to register agent runtimes, request approval for
 external providers, declare agents with models and contracts, compose teams
 through validated handoff graphs, build deterministic execution plans, expose
-operational screens, and preserve audit evidence.
+operational screens, record governed execution runs, and preserve audit
+evidence.
 
 The package is intentionally side-effect-free. It does not invoke Codex,
 Claude Code, OpenCode, Pi, shell tools, browsers, memory stores, or provider
@@ -23,12 +24,14 @@ handoffs, and tenant boundaries.
 - Agent team registry with tenant-owned members and validated handoff edges.
 - Deterministic execution plan generation with runtime assignments, tools,
   handoff targets, approval evidence, and estimated cost limits.
+- Provider-neutral execution run records with requester identity, trace sink,
+  side-effect approval evidence, status, and plan snapshots.
 - Tenant-safe runtime, agent, team, approval, and event stores.
 - Bytewax lifecycle stream metadata for batch agent mutation and generated app
   composition.
 - UI/view-model surfaces for dashboards, agent registry, team builder,
   handoff graph, runtime manager, approval queue, execution trace, memory
-  policy, audit trail, analytics, and settings.
+  policy, run console, audit trail, analytics, and settings.
 - Visual theme tokens for compact AI-agent operations screens.
 
 ## Core Lifecycle
@@ -40,7 +43,9 @@ handoffs, and tenant boundaries.
 4. Register teams with one or more tenant-local agents.
 5. Validate handoff graph endpoints against declared team members.
 6. Build execution plans for concrete objectives.
-7. Use audit events and Bytewax stream metadata to compose AGNT into larger
+7. Record execution runs with requester, trace sink, and side-effect approval
+   evidence before a provider adapter executes the plan.
+8. Use audit events and Bytewax stream metadata to compose AGNT into larger
    generated applications.
 
 ## Runtime Approval Example
@@ -101,6 +106,23 @@ plan = service.plan_execution(
 )
 ```
 
+## Execution Run Example
+
+```python
+run = service.record_execution_run(
+    run_id="delivery-run-1",
+    tenant_id="tenant-a",
+    team_id=team["id"],
+    objective="Implement a capability package",
+    requested_by="platform-owner",
+    trace_sink="audl",
+    side_effects_requested=True,
+    human_approval_recorded=True,
+)
+
+assert run["plan_snapshot"]["team_id"] == team["id"]
+```
+
 ## Composition Contract
 
 `get_capability_contract()` returns the executable APG contract:
@@ -110,8 +132,9 @@ plan = service.plan_execution(
 - `rule_engine`: deterministic guardrails for tenant context, model, system
   prompt, tool allowlist, IO contracts, memory policy, runtime registration,
   cost limits, requester/reviewer/notes, team membership, handoff resolution,
-  sandbox policy, external runtime approval, execution objective, audit
-  evidence, tenant isolation, and Bytewax batch mutation.
+  sandbox policy, external runtime approval, execution objective, execution
+  requester, trace sink, side-effect approval, audit evidence, tenant
+  isolation, and Bytewax batch mutation.
 - `ui`: APG Python route metadata and view-model module.
 - `theme`: AI-agent operations tokens and component metadata.
 - `streaming`: Bytewax processor, topic, state collections, lifecycle events,

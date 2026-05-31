@@ -23488,3 +23488,70 @@ Known gaps:
   battery-conscious capability slice.
 - Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
   tests remain outside this slice.
+
+### 2026-06-01 02:53 EAT
+
+AGNT governed execution run lifecycle slice:
+
+- Added an `AgentExecutionRun` runtime model so AI agent composition can record
+  provider-neutral run requests before any adapter invokes Codex, Claude Code,
+  OpenCode, Pi, local tools, or future providers.
+- Added deterministic run guardrails for requester identity, trace sink, and
+  human approval when external side effects are requested.
+- Added service/API behavior for recording and listing execution runs, storing
+  plan snapshots, emitting audit events, and keeping run records tenant-scoped.
+- Surfaced execution runs in dashboards, governance evidence, analytics, audit
+  trails, and a dedicated run-console view model.
+- Extended the AGNT contract with the `/agnt/runs` route, `run_console` theme
+  metadata, `execution_runs` provided/state surfaces, and the
+  `execution_run_recorded` Bytewax lifecycle event.
+- Replaced the AGNT `cap_spec.md` compatibility pointer with a real capability
+  packet and aligned `SPECIFICATION.md`, `PLAN.md`, `README.md`,
+  `semantic_model.json`, `release_report.json`, and `app.py` with the
+  executable run behavior.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/agnt/__init__.py capabilities/common/agnt/models.py capabilities/common/agnt/agent_composition.py capabilities/common/agnt/service.py capabilities/common/agnt/api.py capabilities/common/agnt/views.py capabilities/common/agnt/capability_contract.py capabilities/common/agnt/app.py capabilities/common/agnt/test_capability_contract.py capabilities/common/agnt/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/agnt/test_capability_contract.py capabilities/common/agnt/tests/test_package_contract.py`
+  passed with 14 tests and 10 pre-existing dependency deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.agnt import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/agnt --json`
+  passed with one domain-specific AGNT implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/agnt --json`
+  passed and showed `execution_runs`, 22 rules, 12 routes, and the run
+  route/theme/Bytewax event surfaces.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/agnt --json`
+  passed with one complete lifecycle record, 22 rules, 12 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` passed all 21 tooling surfaces.
+- `git diff --check -- capabilities/common/agnt docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed provider boundaries: run recording stores governance metadata and a
+  plan snapshot only; it does not invoke provider CLIs, shell tools, browser
+  automation, memory stores, or live Bytewax workers.
+- Reviewed guardrail behavior: requester and trace sink failures deny the run;
+  side-effecting runs require human approval before a run can be recorded.
+- Reviewed tenant scope: run records are keyed and listed by tenant, and runs
+  can only be created from a tenant-local team.
+- Reviewed evidence drift: generated semantic and release evidence now matches
+  the 22-rule, 12-route contract.
+- Kept the package side-effect-free while making execution run governance
+  composable by larger generated applications.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live provider
+  adapters, browser/shell/IDE automation, durable memory stores, workflow
+  engine integration, performance checks, or a live Bytewax topology during
+  this battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

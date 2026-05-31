@@ -44,6 +44,9 @@ RULES: list[dict[str, Any]] = [
 	{"name": "workspace_runtime_requires_sandbox", "description": "Workspace-aware agent runtimes require sandbox policy.", "condition": {"workspace_runtime": True, "sandbox_policy_attached": False}, "effect": {"decision": "deny", "reason": "workspace_sandbox_required", "required_action": "attach_sandbox_policy"}},
 	{"name": "external_runtime_requires_approval", "description": "External agent backends require approval before use.", "condition": {"external_runtime": True, "approval_recorded": False}, "effect": {"decision": "require_review", "reason": "external_runtime_approval_required", "required_action": "review_external_runtime"}},
 	{"name": "execution_plan_requires_objective", "description": "Agent execution plans require an objective.", "condition": {"operation": "plan_execution", "objective_present": False}, "effect": {"decision": "deny", "reason": "execution_objective_required", "required_action": "declare_execution_objective"}},
+	{"name": "execution_run_requires_requester", "description": "Agent execution runs require requester identity.", "condition": {"operation": "record_execution_run", "requester_present": False}, "effect": {"decision": "deny", "reason": "execution_requester_required", "required_action": "declare_execution_requester"}},
+	{"name": "execution_run_requires_trace_sink", "description": "Agent execution runs require a trace sink.", "condition": {"operation": "record_execution_run", "trace_sink_present": False}, "effect": {"decision": "deny", "reason": "execution_trace_sink_required", "required_action": "attach_execution_trace_sink"}},
+	{"name": "execution_side_effect_requires_human_approval", "description": "Agent execution runs with external side effects require human approval.", "condition": {"operation": "record_execution_run", "side_effects_requested": True, "human_approval_recorded": False}, "effect": {"decision": "require_review", "reason": "execution_side_effect_approval_required", "required_action": "record_human_execution_approval"}},
 	{"name": "agnt_state_change_requires_audit", "description": "Agent composition lifecycle changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "agnt_audit_event_required", "required_action": "record_agent_audit_event"}},
 	{"name": "cross_tenant_agent_access_denied", "description": "Agent composition records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_agent_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_agent_mutation_requires_bytewax", "description": "Batch agent mutations must use Bytewax event streams.", "condition": {"operation": "batch_agent_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}}
@@ -56,6 +59,7 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "handoffs", "path": "/agnt/handoffs", "component": "HandoffGraph", "permission": "agnt:compose", "nav_group": "Teams"},
 	{"name": "runtimes", "path": "/agnt/runtimes", "component": "RuntimeManager", "permission": "agnt:manage_runtimes", "nav_group": "Runtimes"},
 	{"name": "executions", "path": "/agnt/executions", "component": "ExecutionTrace", "permission": "agnt:run", "nav_group": "Operations"},
+	{"name": "runs", "path": "/agnt/runs", "component": "AgentRunConsole", "permission": "agnt:run", "nav_group": "Operations"},
 	{"name": "memory", "path": "/agnt/memory", "component": "AgentMemoryPolicy", "permission": "agnt:admin", "nav_group": "Governance"},
 	{"name": "approvals", "path": "/agnt/approvals", "component": "RuntimeApprovalQueue", "permission": "agnt:manage_runtimes", "nav_group": "Governance"},
 	{"name": "audit", "path": "/agnt/audit", "component": "AgentAuditTrail", "permission": "agnt:audit", "nav_group": "Governance"},
@@ -66,14 +70,14 @@ UI_ROUTES: list[dict[str, str]] = [
 THEME: dict[str, Any] = {
 	"name": "agnt_agent_ops",
 	"tokens": {"color.primary": "#2B4C7E", "color.accent": "#2F855A", "color.success": "#2F855A", "color.warning": "#B7791F", "color.danger": "#C53030", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D", "border.radius": "8px", "density": "compact"},
-	"components": {"agent_card": {"icon": "bot", "status_indicator": "runtime-pill", "risk_style": "approval-band"}, "team_graph": {"visual": "handoff-dag", "highlight": "edge-chip"}, "runtime_matrix": {"visual": "backend-table", "status_style": "availability-chip"}, "execution_trace": {"visual": "timeline", "status_style": "decision-chip"}, "approval_queue": {"icon": "shield-check", "status_style": "decision-chip"}, "audit_timeline": {"icon": "list-checks", "status_style": "governance-chip"}}
+	"components": {"agent_card": {"icon": "bot", "status_indicator": "runtime-pill", "risk_style": "approval-band"}, "team_graph": {"visual": "handoff-dag", "highlight": "edge-chip"}, "runtime_matrix": {"visual": "backend-table", "status_style": "availability-chip"}, "execution_trace": {"visual": "timeline", "status_style": "decision-chip"}, "run_console": {"visual": "run-ledger", "status_style": "approval-chip"}, "approval_queue": {"icon": "shield-check", "status_style": "decision-chip"}, "audit_timeline": {"icon": "list-checks", "status_style": "governance-chip"}}
 }
 
 STREAMING: dict[str, Any] = {
 	"processor": "bytewax",
 	"topic": "apg.agnt.lifecycle",
-	"state": ["runtimes", "runtime_approvals", "agents", "teams", "execution_plans", "audit_events"],
-	"events": ["runtime_approval_requested", "runtime_approval_decided", "runtime_registered", "agent_registered", "team_registered", "execution_plan_built"],
+	"state": ["runtimes", "runtime_approvals", "agents", "teams", "execution_plans", "execution_runs", "audit_events"],
+	"events": ["runtime_approval_requested", "runtime_approval_decided", "runtime_registered", "agent_registered", "team_registered", "execution_plan_built", "execution_run_recorded"],
 	"batch_mutation_guardrail": "batch_agent_mutation_requires_bytewax",
 }
 
@@ -83,7 +87,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	config["tenant_id"] = tenant_id
 	if overrides:
 		_deep_merge(config, overrides)
-	return {"capability": "agnt", "display_name": "AI Agent Composition", "provides": ["agent_registry", "runtime_registry", "agent_teams", "handoff_graphs", "execution_plans", "runtime_approval_governance"], "requires": ["aicr", "sbox", "audl"], "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "view_module": config["adapters"]["view_models"], "api_prefix": "/agnt/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME), "streaming": deepcopy(STREAMING)}
+	return {"capability": "agnt", "display_name": "AI Agent Composition", "provides": ["agent_registry", "runtime_registry", "agent_teams", "handoff_graphs", "execution_plans", "execution_runs", "runtime_approval_governance"], "requires": ["aicr", "sbox", "audl"], "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "view_module": config["adapters"]["view_models"], "api_prefix": "/agnt/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME), "streaming": deepcopy(STREAMING)}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

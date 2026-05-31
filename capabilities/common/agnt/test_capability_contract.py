@@ -18,9 +18,9 @@ def test_contract_exposes_agent_runtimes_rules_ui_and_theme():
 	assert set(DEFAULT_AGENT_INTEGRATIONS.names()) >= {"local", "codex", "claude_code", "opencode", "pi"}
 	assert contract["configuration_schema"]["required"] == ["tenant_id", "agents", "teams", "runtimes", "memory", "governance", "observability", "adapters", "ui", "theme"]
 	assert contract["streaming"]["processor"] == "bytewax"
-	assert set(contract["provides"]) >= {"agent_registry", "runtime_registry", "execution_plans", "runtime_approval_governance"}
+	assert set(contract["provides"]) >= {"agent_registry", "runtime_registry", "execution_plans", "execution_runs", "runtime_approval_governance"}
 	assert contract["requires"] == ["aicr", "sbox", "audl"]
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "agents", "teams", "handoffs", "runtimes", "executions", "memory", "approvals", "audit", "analytics", "settings"}
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "agents", "teams", "handoffs", "runtimes", "executions", "runs", "memory", "approvals", "audit", "analytics", "settings"}
 	assert contract["theme"]["name"] == "agnt_agent_ops"
 
 
@@ -29,12 +29,15 @@ def test_rule_engine_enforces_agent_composition_guardrails():
 	team_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "register_team", "agent_count": 0, "runtime_registered": True, "handoff_endpoint_resolved": True})
 	review_result = evaluate_capability_rules({"tenant_context_present": True, "runtime_registered": True, "handoff_endpoint_resolved": True, "external_runtime": True, "approval_recorded": False})
 	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_agent_mutation", "event_stream": "memory"})
+	run_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "record_execution_run", "requester_present": False, "trace_sink_present": False, "side_effects_requested": True, "human_approval_recorded": False})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "agent_requires_model", "agent_requires_system_prompt", "agent_requires_tool_allowlist", "agent_requires_io_contract", "agent_requires_memory_policy", "agent_runtime_must_be_registered", "handoff_endpoint_must_resolve", "workspace_runtime_requires_sandbox"}
 	assert team_result["matched_rules"] == ["team_requires_agent"]
 	assert review_result["decision"] == "require_review"
 	assert batch_result["matched_rules"] == ["batch_agent_mutation_requires_bytewax"]
+	assert run_result["decision"] == "deny"
+	assert set(run_result["matched_rules"]) == {"execution_run_requires_requester", "execution_run_requires_trace_sink", "execution_side_effect_requires_human_approval"}
 
 
 def test_registration_includes_full_agent_capability_contract():
@@ -48,6 +51,8 @@ def test_registration_includes_full_agent_capability_contract():
 	assert "agnt:run" in registration["permissions"]
 	assert "runtime_adapters" in registration["capabilities"]
 	assert "runtime_approval_governance" in registration["capabilities"]
+	assert "execution_runs" in registration["capabilities"]
+	assert registration["ui_components"]["runs"] == "/agnt/runs"
 
 
 def test_service_registers_agents_teams_and_execution_plans():
@@ -79,6 +84,79 @@ def test_service_registers_agents_teams_and_execution_plans():
 	assert plan["team_id"] == "delivery"
 	assert plan["runtime_assignments"] == {"builder": "codex"}
 	assert plan["steps"][0]["tools"] == ["shell", "pytest"]
+
+
+def test_service_records_governed_execution_runs():
+	service = AgntService()
+	service.register_agent(
+		agent_id="runner",
+		tenant_id="tenant-agnt-run",
+		name="Runner",
+		model="gpt-5.4",
+		runtime="codex",
+		system_prompt="Run governed APG work.",
+		tool_allowlist=["shell"],
+		input_contract={"objective": "string"},
+		output_contract={"trace": "object"},
+		memory_policy={"store": "tenant-vector", "retention_days": 7},
+	)
+	service.register_team(
+		team_id="run-team",
+		tenant_id="tenant-agnt-run",
+		name="Run Team",
+		agent_ids=["runner"],
+	)
+
+	with pytest.raises(PermissionError, match="execution_requester_required"):
+		service.record_execution_run(
+			run_id="run-missing-requester",
+			tenant_id="tenant-agnt-run",
+			team_id="run-team",
+			objective="Build an APG slice.",
+			requested_by="",
+			trace_sink="audl",
+		)
+	with pytest.raises(PermissionError, match="execution_trace_sink_required"):
+		service.record_execution_run(
+			run_id="run-missing-trace",
+			tenant_id="tenant-agnt-run",
+			team_id="run-team",
+			objective="Build an APG slice.",
+			requested_by="platform-owner",
+			trace_sink="",
+		)
+	with pytest.raises(PermissionError, match="execution_side_effect_approval_required"):
+		service.record_execution_run(
+			run_id="run-side-effect",
+			tenant_id="tenant-agnt-run",
+			team_id="run-team",
+			objective="Push changes.",
+			requested_by="platform-owner",
+			trace_sink="audl",
+			side_effects_requested=True,
+			human_approval_recorded=False,
+		)
+
+	run = service.record_execution_run(
+		run_id="run-1",
+		tenant_id="tenant-agnt-run",
+		team_id="run-team",
+		objective="Build an APG slice.",
+		requested_by="platform-owner",
+		trace_sink="audl",
+		side_effects_requested=True,
+		human_approval_recorded=True,
+	)
+	console = views.execution_run_console_model(service, "tenant-agnt-run")
+	evidence = views.governance_evidence_model(service, "tenant-agnt-run")
+	analytics = views.analytics_model(service, "tenant-agnt-run")
+
+	assert run["plan_snapshot"]["runtime_assignments"] == {"runner": "codex"}
+	assert run["trace_sink"] == "audl"
+	assert console["execution_runs"][0]["id"] == "run-1"
+	assert evidence["summary"]["execution_run_count"] == 1
+	assert analytics["runs_per_team"] == 1.0
+	assert "execution_run_recorded" in {event["event_type"] for event in evidence["audit_events"]}
 
 
 def test_service_blocks_invalid_agent_team_and_runtime_changes():
@@ -315,3 +393,36 @@ def test_api_helpers_expose_batch_agent_mutation_guardrail():
 	})
 
 	assert batch["accepted"] is True
+
+
+def test_api_helpers_expose_execution_run_lifecycle():
+	tenant_id = "tenant-api-agnt-run"
+	agent = api.register_agent({
+		"id": "api-runner",
+		"tenant_id": tenant_id,
+		"name": "API Runner",
+		"model": "gpt-5.4",
+		"runtime": "codex",
+		"system_prompt": "Run governed APG work.",
+		"tool_allowlist": ["shell"],
+		"input_contract": {"objective": "string"},
+		"output_contract": {"trace": "object"},
+		"memory_policy": {"store": "tenant-vector", "retention_days": 7},
+	})
+	team = api.register_team({
+		"id": "api-run-team",
+		"tenant_id": tenant_id,
+		"name": "API Run Team",
+		"agent_ids": [agent["id"]],
+	})
+	run = api.record_execution_run({
+		"id": "api-run-1",
+		"tenant_id": tenant_id,
+		"team_id": team["id"],
+		"objective": "Build an API-driven APG slice.",
+		"requested_by": "api-owner",
+		"trace_sink": "audl",
+	})
+
+	assert run["requested_by"] == "api-owner"
+	assert api.list_execution_runs(tenant_id)[0]["id"] == "api-run-1"

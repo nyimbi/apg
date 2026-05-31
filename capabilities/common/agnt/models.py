@@ -137,6 +137,38 @@ class ExecutionPlan:
 
 
 @dataclass(frozen=True)
+class AgentExecutionRun:
+	"""Provider-neutral execution run record for a planned agent team."""
+
+	id: str
+	tenant_id: str
+	team_id: str
+	plan_id: str
+	objective: str
+	requested_by: str
+	trace_sink: str
+	status: str = "planned"
+	side_effects_requested: bool = False
+	human_approval_recorded: bool = False
+	plan_snapshot: dict[str, Any] = field(default_factory=dict)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"team_id": self.team_id,
+			"plan_id": self.plan_id,
+			"objective": self.objective,
+			"requested_by": self.requested_by,
+			"trace_sink": self.trace_sink,
+			"status": self.status,
+			"side_effects_requested": self.side_effects_requested,
+			"human_approval_recorded": self.human_approval_recorded,
+			"plan_snapshot": dict(self.plan_snapshot),
+		}
+
+
+@dataclass(frozen=True)
 class RuntimeApprovalRequest:
 	"""Governed request to enable an external agent runtime."""
 

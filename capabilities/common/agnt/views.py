@@ -20,6 +20,7 @@ def dashboard_model(
 		"summary": service.composition_summary(tenant_id),
 		"agents": service.list_agents(tenant_id),
 		"teams": service.list_teams(tenant_id),
+		"execution_runs": service.list_execution_runs(tenant_id),
 		"runtimes": service.list_runtimes(tenant_id),
 		"runtime_approvals": service.list_runtime_approvals(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
@@ -79,6 +80,7 @@ def governance_evidence_model(
 	return {
 		"summary": service.composition_summary(tenant_id),
 		"runtime_approvals": service.list_runtime_approvals(tenant_id),
+		"execution_runs": service.list_execution_runs(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 	}
 
@@ -97,6 +99,7 @@ def audit_trail_model(
 			"agent_registered",
 			"team_registered",
 			"execution_plan_built",
+			"execution_run_recorded",
 		],
 	}
 
@@ -111,6 +114,7 @@ def analytics_model(
 		"summary": summary,
 		"agents_per_team": _safe_ratio(summary["agent_count"], summary["team_count"]),
 		"approval_density": _safe_ratio(summary["runtime_approval_count"], summary["runtime_count"]),
+		"runs_per_team": _safe_ratio(summary["execution_run_count"], summary["team_count"]),
 		"audit_events_per_agent": _safe_ratio(summary["audit_event_count"], summary["agent_count"]),
 	}
 
@@ -132,6 +136,19 @@ def execution_trace_model(plan: dict[str, object]) -> dict[str, object]:
 		"steps": plan["steps"],
 		"approvals_required": plan["approvals_required"],
 		"trace_columns": ["order", "agent", "runtime", "model", "handoff_targets"],
+	}
+
+
+def execution_run_console_model(
+	service: AgntService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AgntService()
+	return {
+		"execution_runs": service.list_execution_runs(tenant_id),
+		"actions": ["record_run", "review_side_effects", "attach_trace"],
+		"required_fields": ["team_id", "objective", "requested_by", "trace_sink"],
+		"status_values": ["planned", "running", "completed", "failed", "cancelled"],
 	}
 
 

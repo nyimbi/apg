@@ -98,6 +98,7 @@
         "agent_teams",
         "handoff_graphs",
         "execution_plans",
+        "execution_runs",
         "runtime_approval_governance"
       ],
       "requires": [
@@ -311,6 +312,46 @@
               "required_action": "declare_execution_objective"
             },
             "name": "execution_plan_requires_objective"
+          },
+          {
+            "condition": {
+              "operation": "record_execution_run",
+              "requester_present": false
+            },
+            "description": "Agent execution runs require requester identity.",
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_requester_required",
+              "required_action": "declare_execution_requester"
+            },
+            "name": "execution_run_requires_requester"
+          },
+          {
+            "condition": {
+              "operation": "record_execution_run",
+              "trace_sink_present": false
+            },
+            "description": "Agent execution runs require a trace sink.",
+            "effect": {
+              "decision": "deny",
+              "reason": "execution_trace_sink_required",
+              "required_action": "attach_execution_trace_sink"
+            },
+            "name": "execution_run_requires_trace_sink"
+          },
+          {
+            "condition": {
+              "human_approval_recorded": false,
+              "operation": "record_execution_run",
+              "side_effects_requested": true
+            },
+            "description": "Agent execution runs with external side effects require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "execution_side_effect_approval_required",
+              "required_action": "record_human_execution_approval"
+            },
+            "name": "execution_side_effect_requires_human_approval"
           },
           {
             "condition": {
@@ -561,6 +602,46 @@
         },
         {
           "condition": {
+            "operation": "record_execution_run",
+            "requester_present": false
+          },
+          "description": "Agent execution runs require requester identity.",
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_requester_required",
+            "required_action": "declare_execution_requester"
+          },
+          "name": "execution_run_requires_requester"
+        },
+        {
+          "condition": {
+            "operation": "record_execution_run",
+            "trace_sink_present": false
+          },
+          "description": "Agent execution runs require a trace sink.",
+          "effect": {
+            "decision": "deny",
+            "reason": "execution_trace_sink_required",
+            "required_action": "attach_execution_trace_sink"
+          },
+          "name": "execution_run_requires_trace_sink"
+        },
+        {
+          "condition": {
+            "human_approval_recorded": false,
+            "operation": "record_execution_run",
+            "side_effects_requested": true
+          },
+          "description": "Agent execution runs with external side effects require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "execution_side_effect_approval_required",
+            "required_action": "record_human_execution_approval"
+          },
+          "name": "execution_side_effect_requires_human_approval"
+        },
+        {
+          "condition": {
             "audit_event_recorded": false,
             "state_change_requested": true
           },
@@ -645,6 +726,11 @@
           "permission": "agnt:admin",
           "route": "/agnt/memory"
         },
+        "runs": {
+          "component": "AgentRunConsole",
+          "permission": "agnt:run",
+          "route": "/agnt/runs"
+        },
         "runtimes": {
           "component": "RuntimeManager",
           "permission": "agnt:manage_runtimes",
@@ -669,7 +755,8 @@
           "runtime_registered",
           "agent_registered",
           "team_registered",
-          "execution_plan_built"
+          "execution_plan_built",
+          "execution_run_recorded"
         ],
         "processor": "bytewax",
         "state": [
@@ -678,6 +765,7 @@
           "agents",
           "teams",
           "execution_plans",
+          "execution_runs",
           "audit_events"
         ],
         "topic": "apg.agnt.lifecycle"
@@ -700,6 +788,10 @@
           "execution_trace": {
             "status_style": "decision-chip",
             "visual": "timeline"
+          },
+          "run_console": {
+            "status_style": "approval-chip",
+            "visual": "run-ledger"
           },
           "runtime_matrix": {
             "status_style": "availability-chip",
@@ -769,6 +861,13 @@
             "name": "executions",
             "nav_group": "Operations",
             "path": "/agnt/executions",
+            "permission": "agnt:run"
+          },
+          {
+            "component": "AgentRunConsole",
+            "name": "runs",
+            "nav_group": "Operations",
+            "path": "/agnt/runs",
             "permission": "agnt:run"
           },
           {
@@ -911,6 +1010,7 @@
         "agent_teams",
         "handoff_graphs",
         "execution_plans",
+        "execution_runs",
         "runtime_approval_governance"
       ],
       "requires": [
@@ -1077,6 +1177,46 @@
         "required_action": "declare_execution_objective"
       },
       "name": "execution_plan_requires_objective"
+    },
+    "execution_run_requires_requester": {
+      "condition": {
+        "operation": "record_execution_run",
+        "requester_present": false
+      },
+      "description": "Agent execution runs require requester identity.",
+      "effect": {
+        "decision": "deny",
+        "reason": "execution_requester_required",
+        "required_action": "declare_execution_requester"
+      },
+      "name": "execution_run_requires_requester"
+    },
+    "execution_run_requires_trace_sink": {
+      "condition": {
+        "operation": "record_execution_run",
+        "trace_sink_present": false
+      },
+      "description": "Agent execution runs require a trace sink.",
+      "effect": {
+        "decision": "deny",
+        "reason": "execution_trace_sink_required",
+        "required_action": "attach_execution_trace_sink"
+      },
+      "name": "execution_run_requires_trace_sink"
+    },
+    "execution_side_effect_requires_human_approval": {
+      "condition": {
+        "human_approval_recorded": false,
+        "operation": "record_execution_run",
+        "side_effects_requested": true
+      },
+      "description": "Agent execution runs with external side effects require human approval.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "execution_side_effect_approval_required",
+        "required_action": "record_human_execution_approval"
+      },
+      "name": "execution_side_effect_requires_human_approval"
     },
     "external_runtime_requires_approval": {
       "condition": {

@@ -88,6 +88,20 @@ def plan_execution(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def record_execution_run(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.record_execution_run(
+		run_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		team_id=str(payload["team_id"]),
+		objective=str(payload.get("objective") or ""),
+		requested_by=str(payload.get("requested_by") or ""),
+		trace_sink=str(payload.get("trace_sink") or ""),
+		side_effects_requested=bool(payload.get("side_effects_requested", False)),
+		human_approval_recorded=bool(payload.get("human_approval_recorded", False)),
+		status=str(payload.get("status") or "planned"),
+	)
+
+
 def validate_batch_agent_mutation(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.validate_batch_agent_mutation(
 		tenant_id=str(payload.get("tenant_id") or "default"),
@@ -110,6 +124,10 @@ def list_runtimes(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_runtime_approvals(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_runtime_approvals(tenant_id)
+
+
+def list_execution_runs(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_execution_runs(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

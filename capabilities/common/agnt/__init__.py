@@ -17,7 +17,7 @@ capability_metadata: dict[str, Any] = {
 	"name": "agnt",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "First-class AI agent declarations, provider-neutral runtimes, team handoffs, memory policy, and governed execution",
+	"description": "First-class AI agent declarations, provider-neutral runtimes, team handoffs, memory policy, governed execution plans, and execution run evidence",
 	"category": "ai",
 	"subcategory": "agent_composition",
 	"vendor": "Datacraft",
@@ -25,7 +25,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["agent_registry", "runtime_registry", "team_composition", "handoff_graphs", "execution_plans", "runtime_approval_governance"],
+	"provides": ["agent_registry", "runtime_registry", "team_composition", "handoff_graphs", "execution_plans", "execution_runs", "runtime_approval_governance"],
 	"permissions": ["agnt:view", "agnt:compose", "agnt:run", "agnt:manage_runtimes", "agnt:audit", "agnt:admin"]
 }
 
@@ -51,10 +51,11 @@ def register_capability() -> dict[str, Any]:
 			"team_composition": "Compose agents into swarms, teams, and handoff graphs",
 			"handoff_graphs": "Validate agent-to-agent flow edges before execution",
 			"execution_plans": "Build deterministic execution plans with runtime assignments, handoffs, cost limits, and approval evidence",
+			"execution_runs": "Record provider-neutral execution run requests with trace sinks and side-effect approval evidence",
 			"capability_rules": "Evaluate deterministic agent-composition governance rules",
 			"visual_theming": "Apply AI-agent operations theme tokens and components"
 		},
-		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "executions": "/agnt/api/v1/executions", "memory": "/agnt/api/v1/memory", "audit": "/agnt/api/v1/audit"},
+		"endpoints": {"agents": "/agnt/api/v1/agents", "teams": "/agnt/api/v1/teams", "runtimes": "/agnt/api/v1/runtimes", "runtime_approvals": "/agnt/api/v1/runtime-approvals", "executions": "/agnt/api/v1/executions", "runs": "/agnt/api/v1/runs", "memory": "/agnt/api/v1/memory", "audit": "/agnt/api/v1/audit"},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

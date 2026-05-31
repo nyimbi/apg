@@ -4,11 +4,28 @@
 
 AGNT is a domain-specific package with agent runtime registration, external
 runtime approval, first-class agent declarations, teams, handoff validation,
-execution planning, API helpers, route metadata, theme metadata, generated
-package evidence, and focused tests. The external-runtime approval lifecycle is
-implemented. This packet brings AGNT up to the current common-capability
-standard by adding local README coverage, Bytewax lifecycle metadata,
-tenant-safe stores, stricter agent/runtime guardrails, and expanded evidence.
+execution planning, execution run evidence, API helpers, route metadata, theme
+metadata, generated package evidence, and focused tests. The external-runtime
+approval lifecycle is implemented. This packet deepens the execution lifecycle
+by recording provider-neutral run requests with requester identity, trace sink,
+side-effect approval evidence, status, and plan snapshots before adapters
+invoke fast-changing providers.
+
+## Packet: Governed Execution Run Lifecycle
+
+Deliver a focused lifecycle packet:
+
+- add an `AgentExecutionRun` runtime model;
+- add contract rules requiring requester identity, trace sink, and human
+  approval for side-effecting runs;
+- expose run recording and listing from service and API helpers;
+- surface runs in dashboard, governance evidence, analytics, audit trail, and a
+  dedicated run-console view model;
+- keep run records provider-neutral by storing plan snapshots and trace sink
+  metadata, not live provider invocations;
+- refresh the package specification, README, `cap_spec.md`, semantic model,
+  release evidence, tests, and progress log;
+- run focused AGNT proof plus catalog lifecycle/publish gates.
 
 ## Packet: Agent Runtime And Tenant Guardrail Lifecycle
 
@@ -31,19 +48,20 @@ Deliver a focused lifecycle packet:
 
 ## Implementation Steps
 
-1. Extend `capability_contract.py` with stream metadata, provides/requires
-   metadata, stricter rules, new routes, and richer configuration.
-2. Extend `models.py` so runtimes carry tenant scope.
-3. Harden `service.py` with tenant-qualified keys, runtime resolution,
-   stricter agent/runtime validation, batch mutation validation, and
-   tenant-local execution planning.
-4. Extend `api.py` and `views.py` to expose the new lifecycle surfaces.
-5. Add `README.md` and align `SPECIFICATION.md`/`cap_spec.md` with current
+1. Extend `models.py` with `AgentExecutionRun`.
+2. Extend `capability_contract.py` with run guardrails, UI route, theme
+   component, provided surface, state, and lifecycle event metadata.
+3. Extend `service.py` with tenant-scoped run recording, plan snapshots,
+   requester/trace/side-effect approval enforcement, run listing, summaries,
+   and audit events.
+4. Extend `api.py` and `views.py` to expose run recording, listing, dashboard,
+   governance, analytics, audit, and run-console data.
+5. Align `SPECIFICATION.md`, `README.md`, and `cap_spec.md` with executable run
    behavior.
-6. Regenerate `app.py`, `semantic_model.json`, `release_report.json`, and
-   `package_manifest.json`.
+6. Regenerate `app.py`, `semantic_model.json`, and `release_report.json`.
 7. Run focused AGNT compile, tests, self-test, implementation audit,
-   publish-plan, semantic-model, stale-marker, and diff checks.
+   publish-plan, lifecycle audit, strict package artifact audit, tooling audit
+   if battery allows, and diff checks.
 
 ## Review Checklist
 
@@ -58,5 +76,9 @@ Deliver a focused lifecycle packet:
 - API helpers expose the same behavior as service methods.
 - View models expose routes, rules, approvals, audit events, analytics,
   streaming, and theme state.
+- Execution runs cannot be recorded without requester identity, trace sink, and
+  side-effect approval evidence when side effects are requested.
+- Execution run records store plan snapshots and audit events without invoking
+  live provider adapters.
 - Provider SDKs and live execution remain adapter boundaries, not package
   dependencies.
