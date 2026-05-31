@@ -12,6 +12,17 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_SECU_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_SECU_AGENT_ROLES = [
+	"risk_reviewer",
+	"threat_triage",
+	"incident_responder",
+	"compliance_reviewer",
+	"exception_reviewer",
+]
+PRIVILEGED_SECU_AGENT_ROLES = {"incident_responder", "compliance_reviewer", "exception_reviewer"}
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped SECU configuration defaults and schema."""
@@ -47,6 +58,22 @@ class CapabilityConfiguration:
 			"require_independent_exception_review": True,
 			"policy_exception_max_days": 30
 		},
+		"agents": {
+			"enabled": True,
+			"supported_runtimes": list(SUPPORTED_SECU_AGENT_RUNTIMES),
+			"supported_roles": list(SUPPORTED_SECU_AGENT_ROLES),
+			"privileged_roles": sorted(PRIVILEGED_SECU_AGENT_ROLES),
+			"privileged_roles_require_human_approval": True,
+			"scope_required": True,
+			"contribution_disclosure_required": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "secu.lifecycle",
+			"required_for_operations": ["security_lifecycle_batch", "threat_batch_triage"],
+			"topics": ["secu.risk", "secu.threats", "secu.incidents", "secu.agents"],
+			"watermark_field": "event_time"
+		},
 		"ui": {
 			"enable_security_dashboard": True,
 			"enable_policy_workbench": True,
@@ -64,7 +91,7 @@ class CapabilityConfiguration:
 	})
 	schema: dict[str, Any] = field(default_factory=lambda: {
 		"type": "object",
-		"required": ["tenant_id", "zero_trust", "risk", "threat_detection", "compliance", "incident_response", "ui", "theme"],
+		"required": ["tenant_id", "zero_trust", "risk", "threat_detection", "compliance", "incident_response", "agents", "streaming", "ui", "theme"],
 		"properties": {
 			"tenant_id": {"type": "string", "minLength": 1},
 			"zero_trust": {"type": "object"},
@@ -72,6 +99,8 @@ class CapabilityConfiguration:
 			"threat_detection": {"type": "object"},
 			"compliance": {"type": "object"},
 			"incident_response": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -195,6 +224,16 @@ class CapabilityTheme:
 			"icon": "scroll-text",
 			"line_style": "segmented",
 			"variant": "evidence"
+		},
+		"security_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-chip",
+			"variant": "governed"
+		},
+		"bytewax_stream_indicator": {
+			"icon": "activity",
+			"status_indicator": "stream-chip",
+			"variant": "lifecycle"
 		}
 	})
 
@@ -291,6 +330,60 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "incident_containment_evidence_required",
 				"required_action": "record_containment_evidence"
 			}
+		),
+		CapabilityRule(
+			name="security_agent_runtime_supported",
+			description="SECU agents must run on an approved runtime.",
+			condition={"operation": "register_security_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_runtime_unsupported",
+				"required_action": "select_supported_security_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_role_supported",
+			description="SECU agents must use an approved security role.",
+			condition={"operation": "register_security_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_role_unsupported",
+				"required_action": "select_supported_security_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_requires_scope",
+			description="SECU agents require explicit operating scope.",
+			condition={"operation": "register_security_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_scope_required",
+				"required_action": "set_security_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="security_agent_privileged_role_requires_human_approval",
+			description="Privileged SECU agent roles require human approval.",
+			condition={
+				"operation": "register_security_agent",
+				"agent_privileged_role": True,
+				"human_approval_required": False
+			},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_human_approval_required",
+				"required_action": "enable_human_approval_for_privileged_security_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_security_stream_required",
+			description="Security lifecycle batch operations must use Bytewax.",
+			condition={"operation": "security_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_security_stream_required",
+				"required_action": "route_security_lifecycle_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -307,6 +400,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("quarantine", "/secu/quarantine", "DeviceQuarantineConsole", "secu:respond", "Operations"),
 		CapabilityUIRoute("compliance", "/secu/compliance", "ComplianceConsole", "secu:view_compliance", "Governance"),
 		CapabilityUIRoute("audit", "/secu/audit", "SecurityAuditTimeline", "secu:view", "Governance"),
+		CapabilityUIRoute("agents", "/secu/agents", "SecurityAgentRoster", "secu:admin", "Governance"),
 		CapabilityUIRoute("rules", "/secu/rules", "SecurityRuleWorkbench", "secu:admin", "Governance"),
 		CapabilityUIRoute("settings", "/secu/settings", "SecuritySettings", "secu:admin", "Administration")
 	]
@@ -319,6 +413,68 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class SECU security-agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_SECU_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_SECU_AGENT_ROLES),
+		"privileged_roles": sorted(PRIVILEGED_SECU_AGENT_ROLES),
+		"composition_points": [
+			"risk_review",
+			"threat_triage",
+			"incident_response",
+			"compliance_evidence_review",
+			"policy_exception_review"
+		],
+		"guardrails": [
+			"security_agent_runtime_supported",
+			"security_agent_role_supported",
+			"security_agent_requires_scope",
+			"security_agent_privileged_role_requires_human_approval"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return SECU lifecycle stream metadata."""
+	return {
+		"engine": "bytewax",
+		"processor": "bytewax",
+		"lifecycle_stream": "secu.lifecycle",
+		"topics": ["secu.risk", "secu.threats", "secu.incidents", "secu.agents"],
+		"watermark_field": "event_time",
+		"state": [
+			"policies",
+			"devices",
+			"threats",
+			"assessments",
+			"controls",
+			"policy_exceptions",
+			"incidents",
+			"security_agents",
+			"audit_events"
+		],
+		"events": [
+			"policy_created",
+			"device_posture_recorded",
+			"device_quarantined",
+			"threat_indicator_registered",
+			"access_challenge",
+			"access_quarantine",
+			"access_deny",
+			"compliance_gap_recorded",
+			"policy_exception_requested",
+			"policy_exception_decided",
+			"security_incident_opened",
+			"security_incident_contained",
+			"security_incident_resolved",
+			"security_agent_registered"
+		],
+		"guardrails": ["bytewax_security_stream_required"]
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable SECU capability contract."""
 	config = CapabilityConfiguration()
@@ -326,6 +482,15 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "secu",
 		"display_name": "Security Framework",
+		"provides": [
+			"risk_assessment",
+			"threat_detection",
+			"security_policies",
+			"compliance_automation",
+			"incident_response_governance",
+			"security_agents"
+		],
+		"requires": ["auth", "conf", "audl"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -337,7 +502,9 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
-		}
+		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest()
 	}
 
 
@@ -351,6 +518,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		if key.endswith("_gte"):
 			field_name = key[:-4]
 			if not context.get(field_name, 0) >= expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

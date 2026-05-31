@@ -20,6 +20,7 @@ THREAT_SEVERITIES = {"info", "low", "medium", "high", "critical"}
 CONTROL_STATUSES = {"implemented", "evidence_required", "non_compliant", "waived"}
 EXCEPTION_STATUSES = {"pending", "approved", "rejected", "expired"}
 INCIDENT_STATUSES = {"open", "contained", "resolved"}
+SECU_AGENT_STATUSES = {"active", "suspended", "retired"}
 
 
 def utc_now() -> str:
@@ -256,18 +257,40 @@ class SecurityIncidentRecord:
 		return serialize_record(self)
 
 
+@dataclass(slots=True)
+class SecurityAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	policy_ref: str | None = None
+	status: str = "active"
+	registered_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize_record(self)
+
+
 __all__ = [
 	"CONTROL_STATUSES",
 	"DEVICE_TRUST_STATES",
 	"EXCEPTION_STATUSES",
 	"INCIDENT_STATUSES",
 	"SECURITY_LEVELS",
+	"SECU_AGENT_STATUSES",
 	"THREAT_SEVERITIES",
 	"ComplianceControlRecord",
 	"DevicePostureRecord",
 	"PolicyExceptionRecord",
 	"RiskAssessmentRecord",
 	"SecurityAuditEventRecord",
+	"SecurityAgentRecord",
 	"SecurityIncidentRecord",
 	"SecurityPolicyRecord",
 	"ThreatIndicatorRecord",

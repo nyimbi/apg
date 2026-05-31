@@ -1,5 +1,40 @@
 {
-  "agents": {},
+  "agents": {
+    "secu_agent_contract": {
+      "composition_points": [
+        "risk_review",
+        "threat_triage",
+        "incident_response",
+        "compliance_evidence_review",
+        "policy_exception_review"
+      ],
+      "first_class": true,
+      "guardrails": [
+        "security_agent_runtime_supported",
+        "security_agent_role_supported",
+        "security_agent_requires_scope",
+        "security_agent_privileged_role_requires_human_approval"
+      ],
+      "privileged_roles": [
+        "compliance_reviewer",
+        "exception_reviewer",
+        "incident_responder"
+      ],
+      "supported_roles": [
+        "risk_reviewer",
+        "threat_triage",
+        "incident_responder",
+        "compliance_reviewer",
+        "exception_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Security Framework package-backed APG capability",
     "entity_count": 0,
@@ -8,13 +43,72 @@
   },
   "capabilities": {
     "secu": {
+      "agents": {
+        "composition_points": [
+          "risk_review",
+          "threat_triage",
+          "incident_response",
+          "compliance_evidence_review",
+          "policy_exception_review"
+        ],
+        "first_class": true,
+        "guardrails": [
+          "security_agent_runtime_supported",
+          "security_agent_role_supported",
+          "security_agent_requires_scope",
+          "security_agent_privileged_role_requires_human_approval"
+        ],
+        "privileged_roles": [
+          "compliance_reviewer",
+          "exception_reviewer",
+          "incident_responder"
+        ],
+        "supported_roles": [
+          "risk_reviewer",
+          "threat_triage",
+          "incident_responder",
+          "compliance_reviewer",
+          "exception_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "incident_response": "SecurityIncidentRecord",
-        "policy_exception": "PolicyExceptionRecord"
+        "policy_exception": "PolicyExceptionRecord",
+        "security_agent": "SecurityAgentRecord"
       },
       "business_rules": [],
       "components": {},
       "configuration": {
+        "agents": {
+          "contribution_disclosure_required": true,
+          "enabled": true,
+          "privileged_roles": [
+            "compliance_reviewer",
+            "exception_reviewer",
+            "incident_responder"
+          ],
+          "privileged_roles_require_human_approval": true,
+          "scope_required": true,
+          "supported_roles": [
+            "risk_reviewer",
+            "threat_triage",
+            "incident_responder",
+            "compliance_reviewer",
+            "exception_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "compliance": {
           "assessment_interval_days": 30,
           "frameworks": [
@@ -35,6 +129,21 @@
           "challenge_threshold": 50,
           "critical_threshold": 90,
           "high_threshold": 70
+        },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "secu.lifecycle",
+          "required_for_operations": [
+            "security_lifecycle_batch",
+            "threat_batch_triage"
+          ],
+          "topics": [
+            "secu.risk",
+            "secu.threats",
+            "secu.incidents",
+            "secu.agents"
+          ],
+          "watermark_field": "event_time"
         },
         "tenant_id": "default",
         "theme": {
@@ -71,9 +180,18 @@
       "master_data": {},
       "name": "Security Framework",
       "provides": [
-        "secu_operations"
+        "risk_assessment",
+        "threat_detection",
+        "security_policies",
+        "compliance_automation",
+        "incident_response_governance",
+        "security_agents"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -190,6 +308,72 @@
               "required_action": "record_containment_evidence"
             },
             "name": "incident_resolution_requires_containment"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_security_agent"
+            },
+            "description": "SECU agents must run on an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_runtime_unsupported",
+              "required_action": "select_supported_security_agent_runtime"
+            },
+            "name": "security_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_security_agent"
+            },
+            "description": "SECU agents must use an approved security role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_role_unsupported",
+              "required_action": "select_supported_security_agent_role"
+            },
+            "name": "security_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_security_agent"
+            },
+            "description": "SECU agents require explicit operating scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_scope_required",
+              "required_action": "set_security_agent_scope"
+            },
+            "name": "security_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_privileged_role": true,
+              "human_approval_required": false,
+              "operation": "register_security_agent"
+            },
+            "description": "Privileged SECU agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_human_approval_required",
+              "required_action": "enable_human_approval_for_privileged_security_agent"
+            },
+            "name": "security_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "security_lifecycle_batch"
+            },
+            "description": "Security lifecycle batch operations must use Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_security_stream_required",
+              "required_action": "route_security_lifecycle_batch_through_bytewax"
+            },
+            "name": "bytewax_security_stream_required"
           }
         ],
         "type": "deterministic"
@@ -309,6 +493,72 @@
             "required_action": "record_containment_evidence"
           },
           "name": "incident_resolution_requires_containment"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_security_agent"
+          },
+          "description": "SECU agents must run on an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_runtime_unsupported",
+            "required_action": "select_supported_security_agent_runtime"
+          },
+          "name": "security_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_security_agent"
+          },
+          "description": "SECU agents must use an approved security role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_role_unsupported",
+            "required_action": "select_supported_security_agent_role"
+          },
+          "name": "security_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_security_agent"
+          },
+          "description": "SECU agents require explicit operating scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_scope_required",
+            "required_action": "set_security_agent_scope"
+          },
+          "name": "security_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_privileged_role": true,
+            "human_approval_required": false,
+            "operation": "register_security_agent"
+          },
+          "description": "Privileged SECU agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_human_approval_required",
+            "required_action": "enable_human_approval_for_privileged_security_agent"
+          },
+          "name": "security_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "security_lifecycle_batch"
+          },
+          "description": "Security lifecycle batch operations must use Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_security_stream_required",
+            "required_action": "route_security_lifecycle_batch_through_bytewax"
+          },
+          "name": "bytewax_security_stream_required"
         }
       ],
       "runtime": {
@@ -318,6 +568,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "SecurityAgentRoster",
+          "permission": "secu:admin",
+          "route": "/secu/agents"
+        },
         "audit": {
           "component": "SecurityAuditTimeline",
           "permission": "secu:view",
@@ -374,9 +629,55 @@
           "route": "/secu/threats"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax",
+        "events": [
+          "policy_created",
+          "device_posture_recorded",
+          "device_quarantined",
+          "threat_indicator_registered",
+          "access_challenge",
+          "access_quarantine",
+          "access_deny",
+          "compliance_gap_recorded",
+          "policy_exception_requested",
+          "policy_exception_decided",
+          "security_incident_opened",
+          "security_incident_contained",
+          "security_incident_resolved",
+          "security_agent_registered"
+        ],
+        "guardrails": [
+          "bytewax_security_stream_required"
+        ],
+        "lifecycle_stream": "secu.lifecycle",
+        "processor": "bytewax",
+        "state": [
+          "policies",
+          "devices",
+          "threats",
+          "assessments",
+          "controls",
+          "policy_exceptions",
+          "incidents",
+          "security_agents",
+          "audit_events"
+        ],
+        "topics": [
+          "secu.risk",
+          "secu.threats",
+          "secu.incidents",
+          "secu.agents"
+        ],
+        "watermark_field": "event_time"
+      },
       "theme": {
         "components": {
+          "bytewax_stream_indicator": {
+            "icon": "activity",
+            "status_indicator": "stream-chip",
+            "variant": "lifecycle"
+          },
           "compliance_badge": {
             "icon": "badge-check",
             "variant": "subtle"
@@ -404,6 +705,11 @@
             "critical_band": "color.danger",
             "safe_band": "color.success",
             "visual": "threshold-gauge"
+          },
+          "security_agent_roster": {
+            "icon": "bot",
+            "status_indicator": "approval-chip",
+            "variant": "governed"
           },
           "security_audit_timeline": {
             "icon": "scroll-text",
@@ -498,6 +804,13 @@
             "permission": "secu:view"
           },
           {
+            "component": "SecurityAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/secu/agents",
+            "permission": "secu:admin"
+          },
+          {
             "component": "SecurityRuleWorkbench",
             "name": "rules",
             "nav_group": "Governance",
@@ -520,15 +833,66 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "secu_security_operations": {
+        "capability": "secu",
+        "guardrails": [
+          "security_agent_runtime_supported",
+          "security_agent_role_supported",
+          "security_agent_requires_scope",
+          "security_agent_privileged_role_requires_human_approval"
+        ],
+        "roles": [
+          "risk_reviewer",
+          "threat_triage",
+          "incident_responder",
+          "compliance_reviewer",
+          "exception_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "secu": []
+      "secu": [
+        "auth",
+        "conf",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "secu": {
       "configuration": {
+        "agents": {
+          "contribution_disclosure_required": true,
+          "enabled": true,
+          "privileged_roles": [
+            "compliance_reviewer",
+            "exception_reviewer",
+            "incident_responder"
+          ],
+          "privileged_roles_require_human_approval": true,
+          "scope_required": true,
+          "supported_roles": [
+            "risk_reviewer",
+            "threat_triage",
+            "incident_responder",
+            "compliance_reviewer",
+            "exception_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
+        },
         "compliance": {
           "assessment_interval_days": 30,
           "frameworks": [
@@ -549,6 +913,21 @@
           "challenge_threshold": 50,
           "critical_threshold": 90,
           "high_threshold": 70
+        },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "secu.lifecycle",
+          "required_for_operations": [
+            "security_lifecycle_batch",
+            "threat_batch_triage"
+          ],
+          "topics": [
+            "secu.risk",
+            "secu.threats",
+            "secu.incidents",
+            "secu.agents"
+          ],
+          "watermark_field": "event_time"
         },
         "tenant_id": "default",
         "theme": {
@@ -580,9 +959,18 @@
       },
       "id": "secu",
       "provides": [
-        "secu_operations"
+        "risk_assessment",
+        "threat_detection",
+        "security_policies",
+        "compliance_automation",
+        "incident_response_governance",
+        "security_agents"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "conf",
+        "audl"
+      ]
     }
   },
   "deployment": {
@@ -594,7 +982,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 3,
       "kind": "capability",
       "nodes": 1
     },
@@ -615,6 +1003,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_security_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "security_lifecycle_batch"
+      },
+      "description": "Security lifecycle batch operations must use Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_security_stream_required",
+        "required_action": "route_security_lifecycle_batch_through_bytewax"
+      },
+      "name": "bytewax_security_stream_required"
+    },
     "compliance_violation_alert": {
       "condition": {
         "audit_evidence_attached": false,
@@ -729,6 +1130,59 @@
         "required_action": "assign_independent_reviewer"
       },
       "name": "policy_exception_requires_independent_reviewer"
+    },
+    "security_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "agent_privileged_role": true,
+        "human_approval_required": false,
+        "operation": "register_security_agent"
+      },
+      "description": "Privileged SECU agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_human_approval_required",
+        "required_action": "enable_human_approval_for_privileged_security_agent"
+      },
+      "name": "security_agent_privileged_role_requires_human_approval"
+    },
+    "security_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "operation": "register_security_agent"
+      },
+      "description": "SECU agents require explicit operating scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_scope_required",
+        "required_action": "set_security_agent_scope"
+      },
+      "name": "security_agent_requires_scope"
+    },
+    "security_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_security_agent"
+      },
+      "description": "SECU agents must use an approved security role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_role_unsupported",
+        "required_action": "select_supported_security_agent_role"
+      },
+      "name": "security_agent_role_supported"
+    },
+    "security_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_security_agent"
+      },
+      "description": "SECU agents must run on an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_runtime_unsupported",
+        "required_action": "select_supported_security_agent_runtime"
+      },
+      "name": "security_agent_runtime_supported"
     }
   },
   "security": {},

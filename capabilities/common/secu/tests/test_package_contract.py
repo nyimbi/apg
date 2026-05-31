@@ -32,9 +32,11 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "secu"
-	assert len(contract["ui"]["routes"]) >= 11
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 14
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_app_entrypoint_is_publishable():
@@ -53,6 +55,10 @@ def test_app_entrypoint_is_publishable():
 	assert len(capability["ui"]["routes"]) >= 11
 	assert capability["approvals"]["policy_exception"] == "PolicyExceptionRecord"
 	assert capability["approvals"]["incident_response"] == "SecurityIncidentRecord"
+	assert capability["approvals"]["security_agent"] == "SecurityAgentRecord"
+	assert capability["agents"]["first_class"] is True
+	assert capability["streaming"]["engine"] == "bytewax"
+	assert model["agents"]["secu_agent_contract"]["first_class"] is True
 
 
 def test_security_lifecycle_records_governed_exception_incident_and_audit_state():
@@ -134,6 +140,19 @@ def test_security_lifecycle_records_governed_exception_incident_and_audit_state(
 		resolution="Credentials rotated and monitoring confirmed clean.",
 		notes="Post-incident review attached.",
 	)
+	agent = service.register_security_agent(
+		tenant_id="tenant-a",
+		agent_id="incident-agent",
+		name="Incident Response Agent",
+		runtime="claude-code",
+		role="incident-responder",
+		scope="summarize containment evidence for human responders",
+		owner="security-admin",
+		purpose="incident response evidence review",
+		human_approval_required=True,
+		policy_ref="secu-agent-policy",
+	)
+	batch = service.validate_security_lifecycle_batch("tenant-a", "ByteWax", 3)
 	summary = service.dashboard_summary("tenant-a")
 
 	assert policy["security_level"] == "restricted"
@@ -144,17 +163,23 @@ def test_security_lifecycle_records_governed_exception_incident_and_audit_state(
 	assert control["status"] == "evidence_required"
 	assert approved["status"] == "approved"
 	assert resolved["status"] == "resolved"
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "incident_responder"
+	assert batch["event_stream"] == "bytewax"
+	assert batch["accepted"] is True
 	assert summary["policy_count"] == 1
 	assert summary["assessment_count"] == 1
 	assert summary["compliance_gap_count"] == 1
 	assert summary["policy_exception_count"] == 1
 	assert summary["open_incident_count"] == 0
+	assert summary["security_agent_count"] == 1
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"policy_exception_requested",
 		"policy_exception_decided",
 		"security_incident_opened",
 		"security_incident_contained",
 		"security_incident_resolved",
+		"security_agent_registered",
 	}
 
 
@@ -167,6 +192,20 @@ def test_rule_guardrails_deny_quarantine_and_require_tenant_context():
 		service.create_policy("tenant-a", "No owner", "")
 	with pytest.raises(ValueError, match="unsupported_device_trust:rooted"):
 		service.record_device_posture("tenant-a", "device-1", "user-1", trust_state="rooted")
+	with pytest.raises(PermissionError, match="security_agent_human_approval_required"):
+		service.register_security_agent(
+			"tenant-a",
+			"unapproved-agent",
+			"Unapproved Agent",
+			"codex",
+			"exception_reviewer",
+			"policy exception review",
+			"secops",
+			"review exceptions",
+			human_approval_required=False,
+		)
+	with pytest.raises(PermissionError, match="bytewax_security_stream_required"):
+		service.validate_security_lifecycle_batch("tenant-a", "memory", 1)
 
 	service.record_device_posture("tenant-a", "device-2", "user-1", trust_state="compromised")
 	quarantined = service.assess_access("tenant-a", "user-1", "user", 60, device_id="device-2")
@@ -355,6 +394,21 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 		"containment_action": "Revoked token.",
 		"containment_evidence": "audit://incident/incident-1/containment",
 	})
+	agent = api.register_security_agent({
+		"tenant_id": "tenant-b",
+		"id": "risk-agent",
+		"name": "Risk Review Agent",
+		"runtime": "opencode",
+		"role": "risk_reviewer",
+		"scope": "risk assessment review",
+		"owner": "secops",
+		"purpose": "risk evidence summarization",
+	})
+	batch = api.validate_security_lifecycle_batch({
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+	})
 
 	status = api.capability_status("tenant-b")
 	posture = api.list_security_posture("tenant-b")
@@ -366,6 +420,7 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 	incidents = views.incident_response_model(tenant_id="tenant-b")
 	quarantine = views.quarantine_console_model(tenant_id="tenant-b")
 	compliance = views.compliance_console_model(tenant_id="tenant-b")
+	agents = views.security_agents_model(tenant_id="tenant-b")
 	audit = views.audit_timeline_model(tenant_id="tenant-b")
 	rules = views.rule_workbench_model("tenant-b")
 	settings = views.settings_model("tenant-b")
@@ -373,7 +428,9 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 	assert status["policy_count"] == 1
 	assert status["policy_exception_count"] == 2
 	assert status["open_incident_count"] == 1
+	assert status["security_agent_count"] == 1
 	assert posture["summary"]["active_threat_count"] == 1
+	assert posture["security_agents"][0]["id"] == agent["id"]
 	assert dashboard["summary"]["assessment_count"] == 1
 	assert risk["route"] == "/secu/risk"
 	assert threats["severity_filters"] == ["info", "low", "medium", "high", "critical"]
@@ -383,6 +440,9 @@ def test_api_and_view_models_expose_security_posture_surfaces():
 	assert incidents["open_incidents"][0]["status"] == "contained"
 	assert quarantine["devices"] == []
 	assert compliance["controls"][0]["status"] == "implemented"
+	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert agents["agents"][0]["runtime"] == "opencode"
+	assert batch["accepted"] is True
 	assert audit["events"]
 	assert rules["decision_order"] == ["deny", "quarantine", "challenge", "allow"]
 	assert settings["theme"]["name"] == "secu_zero_trust"

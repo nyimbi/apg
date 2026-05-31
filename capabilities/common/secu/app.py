@@ -52,14 +52,15 @@ def semantic_model() -> dict[str, Any]:
 			"secu": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["secu_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -71,18 +72,19 @@ def semantic_model() -> dict[str, Any]:
 				"approvals": {
 					"policy_exception": "PolicyExceptionRecord",
 					"incident_response": "SecurityIncidentRecord",
+					"security_agent": "SecurityAgentRecord",
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"secu": {
 				"id": "secu",
 				"configuration": contract["configuration"],
-				"provides": ["secu_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 			}
 		},
 		"rules": {
@@ -90,16 +92,23 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"secu": []},
+			"capability_dependencies": {"secu": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"secu_security_operations": {
+					"capability": "secu",
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"guardrails": contract["agents"]["guardrails"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
 			"target": "python",
 		},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py"],
@@ -116,7 +125,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"secu_agent_contract": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -162,6 +173,10 @@ def self_test() -> dict[str, Any]:
 		errors.append("SECU semantic model route manifest is stale")
 	if "policy_exception" not in approvals or "incident_response" not in approvals:
 		errors.append("SECU semantic model approval manifest is stale")
+	if not model.get("agents"):
+		errors.append("SECU semantic model agent manifest is stale")
+	if model.get("capabilities", {}).get("secu", {}).get("streaming", {}).get("engine") != "bytewax":
+		errors.append("SECU semantic model Bytewax stream manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

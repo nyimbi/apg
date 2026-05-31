@@ -2,85 +2,70 @@
 
 ## Slice
 
-Implement the policy exception and incident response lifecycle as the next
-coherent SECU guardrail packet.
+Implement first-class SECU security-agent composition and Bytewax lifecycle
+guardrails as the next coherent foundation packet.
 
-SECU already has a dependency-light policy, device, threat, assessment, and
-compliance runtime. This slice completes the security foundation by making
-exceptions and incident response first-class composable workflows.
+SECU already has deterministic security policy, device posture, threat,
+assessment, compliance, policy exception, incident response, quarantine, and
+audit lifecycle behavior. This slice makes AI security agents governed
+participants in those workflows and makes batch security lifecycle intent
+explicitly Bytewax-routed.
 
 ## Implementation Steps
 
-1. Add package-local records:
-   - `PolicyExceptionRecord`
-   - `SecurityIncidentRecord`
+1. Extend `capability_contract.py`:
+   - supported agent runtimes: `codex`, `claude_code`, `opencode`, `pi`;
+   - supported roles for risk review, threat triage, incident response,
+     compliance review, and exception review;
+   - privileged agent roles and human-approval guardrail;
+   - `/secu/agents` route and theme metadata;
+   - Bytewax lifecycle stream metadata and batch guardrail.
 
-2. Extend `SecuService`:
-   - tenant-qualified exception and incident stores
-   - exception request/decision workflow
-   - expired exception denial
-   - independent reviewer and reviewer-note enforcement
-   - incident opening, containment, and resolution workflow
-   - critical incident containment enforcement
-   - dashboard summary and list helpers
+2. Extend runtime state:
+   - add `SecurityAgentRecord`;
+   - add tenant-qualified security-agent store;
+   - add registration, listing, audit event, and dashboard summary behavior;
+   - add Bytewax lifecycle batch validation.
 
-3. Extend API helpers:
-   - request/decide policy exception
-   - open/contain/resolve incident
-   - list posture surfaces with exceptions and incidents
+3. Extend generated-application surfaces:
+   - add API helpers for agent registration and batch validation;
+   - add security-agent roster view model;
+   - expose agents and streaming metadata through settings and dashboard views;
+   - include agents and streaming in the package semantic model.
 
-4. Extend view models:
-   - policy exception queue
-   - incident response console
-   - device quarantine console
-   - audit timeline
+4. Extend verification:
+   - positive agent registration and Bytewax validation;
+   - negative unsupported/privileged agent guardrails;
+   - contract, app, API, view, semantic model, and package evidence checks.
 
-5. Extend executable contract:
-   - rules for exception review, expired exception, critical incident
-     containment, and incident resolution containment
-   - routes for exceptions, incidents, quarantine, and audit
-   - theme components for exception queue, incident response, quarantine, and
-     audit evidence
+5. Refresh package evidence:
+   - `semantic_model.json`;
+   - `release_report.json`;
+   - `cap_spec.md`;
+   - `README.md` and `SPECIFICATION.md`.
 
-6. Refresh package evidence:
-   - `app.py` contract-derived semantic model
-   - `semantic_model.json`
-   - `release_report.json`
-   - `package_manifest.json`
-   - `cap_spec.md`
-
-7. Extend tests:
-   - contract route/rule/theme coverage
-   - positive policy-device-threat-assessment-compliance-exception-incident
-     lifecycle coverage
-   - negative self-review, missing notes, expired exception, missing
-     containment plan, missing containment evidence, and missing resolution
-     evidence coverage
-   - API/view shared-state coverage
-
-8. Review and focused proof:
-   - py_compile package files
-   - focused pytest package suite
-   - implementation audit
-   - publish-plan
-   - stale marker search
-   - diff whitespace check
+6. Review and focused proof:
+   - py_compile focused package files;
+   - focused pytest package suite;
+   - app self-test;
+   - inspect, implementation-audit, publish-plan;
+   - full SECU Python compile;
+   - service smoke;
+   - diff whitespace check.
 
 ## Non-Goals For This Slice
 
-- Live SIEM, EDR, MDM, SOAR, DLP, GRC, or IAM integrations.
+- Live SIEM, EDR, MDM, SOAR, DLP, GRC, IAM, or AI-provider integrations.
 - Production persistence.
-- AI threat detection execution.
+- Live Bytewax topology execution.
 - Full repository test suite.
 
-Those remain adapters after the executable lifecycle is stable.
+Those remain adapter and integration concerns after the executable lifecycle
+packet is stable.
 
 ## Review Risks
 
-- Existing `app.py` embeds stale semantic evidence; replace with
-  contract-derived evidence.
-- Policy exception approval must be backed by package state, not caller booleans.
-- Critical incident resolution must fail closed unless containment evidence
-  exists.
-- View helpers currently instantiate fresh services by default; use shared API
-  state where appropriate for generated application composition.
+- Agent role/runtime normalization must be predictable for CLI-style names.
+- Privileged security-agent roles must fail closed without human approval.
+- Batch lifecycle routing must reject non-Bytewax streams.
+- Semantic model and release evidence must stay contract-derived.

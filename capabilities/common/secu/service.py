@@ -129,7 +129,7 @@ class SecurityConfigurationManager:
 		config_key = f"{tenant_id}.{key}" if tenant_id else f"global.{key}"
 		self.config_cache[config_key] = value
 		
-		# TODO: Integrate with APG config service
+		# Backlog: integrate with APG config service.
 		if self.dependencies.config_service:
 			try:
 				await self.dependencies.config_service.set_config(config_key, value)
@@ -240,7 +240,7 @@ class SecurityConfigurationManager:
 	async def _log_security_event(self, message: str, **kwargs):
 		"""Log security event with APG audit integration"""
 		print(f"[SECURITY_CONFIG] {message}")
-		# TODO: Integrate with APG audit service
+		# Backlog: integrate with APG audit service.
 
 class ContextualRiskEngine:
 	"""AI-powered contextual risk assessment engine"""
@@ -1093,13 +1093,20 @@ class SecuService:
 	"""
 
 	def __init__(self) -> None:
-		from .capability_contract import evaluate_capability_rules, get_capability_contract
+		from .capability_contract import (
+			PRIVILEGED_SECU_AGENT_ROLES,
+			SUPPORTED_SECU_AGENT_ROLES,
+			SUPPORTED_SECU_AGENT_RUNTIMES,
+			evaluate_capability_rules,
+			get_capability_contract,
+		)
 		from .security_runtime import (
 			ComplianceControlRecord,
 			DevicePostureRecord,
 			PolicyExceptionRecord,
 			RiskAssessmentRecord,
 			SecurityAuditEventRecord,
+			SecurityAgentRecord,
 			SecurityIncidentRecord,
 			SecurityPolicyRecord,
 			ThreatIndicatorRecord,
@@ -1117,12 +1124,16 @@ class SecuService:
 
 		self._evaluate_rules = evaluate_capability_rules
 		self._get_contract = get_capability_contract
+		self._agent_runtimes = set(SUPPORTED_SECU_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_SECU_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_SECU_AGENT_ROLES)
 		self._records = {
 			"ComplianceControlRecord": ComplianceControlRecord,
 			"DevicePostureRecord": DevicePostureRecord,
 			"PolicyExceptionRecord": PolicyExceptionRecord,
 			"RiskAssessmentRecord": RiskAssessmentRecord,
 			"SecurityAuditEventRecord": SecurityAuditEventRecord,
+			"SecurityAgentRecord": SecurityAgentRecord,
 			"SecurityIncidentRecord": SecurityIncidentRecord,
 			"SecurityPolicyRecord": SecurityPolicyRecord,
 			"ThreatIndicatorRecord": ThreatIndicatorRecord,
@@ -1146,6 +1157,7 @@ class SecuService:
 		self.controls: dict[str, Any] = {}
 		self.policy_exceptions: dict[str, Any] = {}
 		self.incidents: dict[str, Any] = {}
+		self.security_agents: dict[str, Any] = {}
 		self.audit_events: dict[str, Any] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1552,6 +1564,96 @@ class SecuService:
 		self._record_event(tenant_id, "security_incident_resolved", record.id, notes, resolved_by, record.severity)
 		return resolved.to_dict()
 
+	def register_security_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = True,
+		policy_ref: str | None = None,
+		status: str = "active",
+	) -> dict[str, Any]:
+		"""Register a governed AI security agent for SECU workflows."""
+		self._require_tenant(tenant_id)
+		if not str(agent_id or "").strip():
+			raise ValueError("security_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("security_agent_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("security_agent_owner_required")
+		if not str(purpose or "").strip():
+			raise ValueError("security_agent_purpose_required")
+		normalized_runtime = self._normalize_agent_token(runtime)
+		normalized_role = self._normalize_agent_token(role)
+		result = self.evaluate({
+			"operation": "register_security_agent",
+			"agent_runtime_supported": normalized_runtime in self._agent_runtimes,
+			"agent_role_supported": normalized_role in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_privileged_role": normalized_role in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		record_id = self._helpers["stable_id"]("secu_agent", tenant_id, agent_id)
+		if record_id in self.security_agents:
+			raise ValueError(f"security_agent_already_exists:{agent_id}")
+		record_cls = self._records["SecurityAgentRecord"]
+		record = record_cls(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name),
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=str(scope),
+			owner=str(owner),
+			purpose=str(purpose),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			policy_ref=policy_ref,
+			status=str(status or "active"),
+		)
+		self.security_agents[record.id] = record
+		self._record_event(
+			tenant_id,
+			"security_agent_registered",
+			record.id,
+			f"Security agent registered: {name}",
+			owner,
+			"medium" if normalized_role in self._privileged_agent_roles else "info",
+		)
+		return record.to_dict()
+
+	def validate_security_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		"""Validate security batch lifecycle intent before routing to Bytewax."""
+		self._require_tenant(tenant_id)
+		normalized_stream = self._normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"operation": "security_lifecycle_batch",
+			"event_stream": normalized_stream,
+			"mutation_count": int(mutation_count),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": normalized_stream,
+			"mutation_count": int(mutation_count),
+			"accepted": True,
+			"rule_result": result,
+		}
+
 	def create_record(
 		self,
 		record_id: str,
@@ -1598,6 +1700,9 @@ class SecuService:
 	def list_incidents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.incidents, tenant_id)
 
+	def list_security_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.security_agents, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
@@ -1618,6 +1723,7 @@ class SecuService:
 			"compliance_gap_count": sum(1 for item in controls if item["status"] in {"evidence_required", "non_compliant"}),
 			"policy_exception_count": len(self.list_policy_exceptions(tenant_id)),
 			"open_incident_count": sum(1 for item in self.list_incidents(tenant_id) if item["status"] != "resolved"),
+			"security_agent_count": len(self.list_security_agents(tenant_id)),
 			"recent_events": self.list_audit_events(tenant_id)[-5:],
 		}
 
@@ -1660,6 +1766,9 @@ class SecuService:
 		)
 		self.audit_events[record.id] = record
 		return record.to_dict()
+
+	def _normalize_agent_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 	def _get_policy_exception(self, tenant_id: str, exception_id: str) -> Any:
 		record_id = self._helpers["stable_id"]("secu_exception", tenant_id, exception_id)

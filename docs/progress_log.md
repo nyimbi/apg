@@ -20436,3 +20436,61 @@ Not run to preserve battery:
   behavioral ML engines, cryptographic providers, federated mesh services,
   rendered browser UI, persistent storage, live Bytewax stream execution, and
   performance/load tests.
+
+### 2026-05-31 04:34 EAT
+
+SECU security-agent composition and Bytewax guardrail packet:
+
+- Selected `capabilities/common/secu` as the next foundation capability after
+  AUTH.
+- Added first-class SECU security-agent composition metadata to the executable
+  contract, generated app semantic model, package evidence, API helpers, view
+  models, specification, plan, cap spec pointer, README, and backlog.
+- Added supported SECU agent runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`, with roles for risk review, threat triage, incident response,
+  compliance review, and policy-exception review.
+- Added privileged SECU agent roles for incident response, compliance review,
+  and exception review, plus deterministic denial when human approval is not
+  required.
+- Added `SecurityAgentRecord`, tenant-qualified security-agent storage,
+  registration, listing, audit events, API helper payload handling, view model
+  roster, and dashboard counts.
+- Added Bytewax lifecycle stream metadata on `secu.lifecycle`, state and event
+  lists, topics for risk/threats/incidents/agents, and batch validation that
+  denies non-Bytewax streams.
+- Added `/secu/agents`, security-agent roster theme metadata, and Bytewax
+  stream indicator theme metadata.
+- Replaced stale `cap_spec.md` and `todo.md` content with current
+  source-of-truth pointers and integration backlog.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/secu/capability_contract.py capabilities/common/secu/security_runtime.py capabilities/common/secu/service.py capabilities/common/secu/api.py capabilities/common/secu/views.py capabilities/common/secu/app.py capabilities/common/secu/__init__.py capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/secu/tests/test_capability_contract.py capabilities/common/secu/tests/test_package_contract.py`
+  passed with 16 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/secu/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect secu --json` passed with `ok: true`,
+  12 APG Python routes, 14 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/secu --json`
+  passed with `ok: true`; SECU remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/secu --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/secu -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "... SecuService ... register_security_agent ... validate_security_lifecycle_batch ..."`
+  returned one `claude_code` incident-response agent with owner and purpose
+  evidence, human approval required, normalized role, and `bytewax` stream
+  evidence.
+- Stale-marker scan over `capabilities/common/secu` returned no matches.
+- `git diff --check -- capabilities/common/secu docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live SIEM, SOAR, EDR, MDM, IAM, GRC, DLP, notification, ticketing, AI threat
+  providers, persistent storage, rendered browser UI, live Bytewax topology,
+  and performance/load tests.

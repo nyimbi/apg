@@ -29,7 +29,9 @@ def dashboard_model(
 		"controls": service.list_controls(tenant_id),
 		"policy_exceptions": service.list_policy_exceptions(tenant_id),
 		"incidents": service.list_incidents(tenant_id),
+		"security_agents": service.list_security_agents(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -160,6 +162,24 @@ def audit_timeline_model(
 	return audit_model(service, tenant_id)
 
 
+def security_agents_model(
+	service: SecuService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or api.SERVICE
+	contract = get_capability_contract(tenant_id)
+	return {
+		"route": "/secu/agents",
+		"tenant_id": tenant_id,
+		"agents": service.list_security_agents(tenant_id),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"required_fields": ["name", "runtime", "role", "scope", "owner", "purpose"],
+	}
+
+
 def rule_workbench_model(tenant_id: str = "default") -> dict[str, object]:
 	contract = get_capability_contract(tenant_id)
 	return {
@@ -176,5 +196,7 @@ def settings_model(tenant_id: str = "default") -> dict[str, object]:
 		"route": "/secu/settings",
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}

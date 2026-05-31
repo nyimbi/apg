@@ -5,11 +5,12 @@
 `secu` is the APG Security Framework capability. It provides the executable
 security control plane for generated APG applications: zero-trust policy,
 device posture, threat indicators, access/risk decisions, compliance evidence,
-policy exceptions, incident response, containment, and audit evidence.
+policy exceptions, incident response, governed AI security agents, Bytewax
+lifecycle routing, containment, and audit evidence.
 
 The package must remain usable without live identity providers, SIEM, EDR/MDM,
-SOAR, compliance platforms, AI detectors, FastAPI, Flask-AppBuilder, or policy
-providers. Those systems are adapters behind the package contract.
+SOAR, compliance platforms, AI detectors, web frameworks, or policy providers.
+Those systems are adapters behind the package contract.
 
 ## Capability Outcomes
 
@@ -21,6 +22,9 @@ providers. Those systems are adapters behind the package contract.
 - Record compliance controls and require audit evidence for gaps.
 - Govern policy exceptions with independent approval and expiry evidence.
 - Open, contain, resolve, and audit security incidents.
+- Register AI security agents for risk review, threat triage, incident
+  response, compliance review, and exception review.
+- Validate security lifecycle batch intent against the Bytewax lifecycle stream.
 - Expose API helpers, view models, UI routes, theme components, rules,
   semantic evidence, and focused tests for APG composition.
 
@@ -83,6 +87,23 @@ Required evidence:
 - `resolution`
 - `resolved_by`
 
+### Security Agent
+
+First-class AI agent registration for SECU review and response workflows.
+
+Required evidence:
+
+- `id`
+- `tenant_id`
+- `runtime`
+- `role`
+- `scope`
+- `owner`
+- `purpose`
+- `contribution_disclosed`
+- `human_approval_required`
+- `policy_ref`
+
 ## Lifecycle Requirements
 
 ### Policy And Posture
@@ -114,6 +135,10 @@ Required evidence:
 - Containment requires actor and evidence.
 - Resolution requires containment evidence, resolver, resolution, and notes.
 - Incidents and containment emit security audit events.
+- Security agents require supported runtime, supported role, explicit scope,
+  owner, purpose, and contribution disclosure.
+- Privileged security-agent roles require human approval.
+- Security lifecycle batch operations require the Bytewax stream.
 
 ## Rules
 
@@ -128,6 +153,11 @@ The deterministic rule engine must enforce at least:
 - `expired_policy_exception_denied`
 - `critical_incident_requires_containment`
 - `incident_resolution_requires_containment`
+- `security_agent_runtime_supported`
+- `security_agent_role_supported`
+- `security_agent_requires_scope`
+- `security_agent_privileged_role_requires_human_approval`
+- `bytewax_security_stream_required`
 
 ## UI Surfaces
 
@@ -140,6 +170,7 @@ SECU must expose routes and theme components for:
 - Policy exception queue
 - Incident response queue
 - Device quarantine console
+- Security-agent roster
 - Compliance console
 - Rule workbench
 - Audit timeline
@@ -158,6 +189,8 @@ Production adapters must preserve the same guardrails:
 - Do not approve policy exceptions without independent review.
 - Do not resolve critical incidents without containment evidence.
 - Do not satisfy compliance controls without audit evidence.
+- Do not allow privileged security-agent actions without human approval.
+- Do not route security lifecycle batches outside Bytewax.
 
 ## Focused Proof
 

@@ -3,9 +3,9 @@
 The Security Framework capability (`secu`) is the executable security control
 plane for generated APG applications. It provides tenant-scoped security
 policy, device posture, threat indicator, access assessment, compliance
-control, policy exception, incident response, quarantine, and audit timeline
-surfaces without requiring live SIEM, EDR, SOAR, IAM, GRC, DLP, or AI-provider
-integrations.
+control, policy exception, incident response, governed AI security-agent,
+Bytewax lifecycle, quarantine, and audit timeline surfaces without requiring
+live SIEM, EDR, SOAR, IAM, GRC, DLP, or AI-provider integrations.
 
 SECU is intentionally dependency-light at package runtime. Generated
 applications can compose and test the capability locally, while production
@@ -28,6 +28,11 @@ the same rule and lifecycle contracts.
   rejection, notes, and expiry guardrails.
 - Incident response workflow with open, contain, and resolve lifecycle states,
   critical incident containment requirements, and resolution evidence checks.
+- Governed security-agent registration for `codex`, `claude_code`,
+  `opencode`, and `pi` runtimes, including owner, purpose, scope, role,
+  disclosure, and privileged-role human approval evidence.
+- Bytewax lifecycle stream metadata and batch-routing guardrail for security
+  lifecycle mutations.
 - Audit events for governed security state transitions.
 - API helpers and UI view models for generated applications.
 - Capability contract, visual theme, semantic model, and release evidence for
@@ -96,6 +101,38 @@ resolved = service.resolve_incident(
 )
 ```
 
+Security agents are explicit participants in review and response workflows.
+Privileged roles such as `incident_responder`, `compliance_reviewer`, and
+`exception_reviewer` fail closed unless human approval is required.
+
+```python
+agent = service.register_security_agent(
+	tenant_id="tenant-a",
+	agent_id="incident-agent",
+	name="Incident Response Agent",
+	runtime="claude-code",
+	role="incident-responder",
+	scope="Summarize containment evidence for human responders.",
+	owner="secops",
+	purpose="Incident evidence review.",
+	human_approval_required=True,
+	policy_ref="secu-agent-policy",
+)
+
+assert agent["runtime"] == "claude_code"
+assert agent["role"] == "incident_responder"
+```
+
+Batch security lifecycle mutation intent must route through Bytewax:
+
+```python
+service.validate_security_lifecycle_batch(
+	tenant_id="tenant-a",
+	event_stream="bytewax",
+	mutation_count=3,
+)
+```
+
 ## API Helpers
 
 `api.py` exposes package-level helpers backed by a shared `SERVICE` instance:
@@ -111,6 +148,8 @@ resolved = service.resolve_incident(
 - `open_incident`
 - `contain_incident`
 - `resolve_incident`
+- `register_security_agent`
+- `validate_security_lifecycle_batch`
 - `list_security_posture`
 
 These helpers are designed for generated APG applications and package smoke
@@ -128,13 +167,15 @@ tests. Long-running services should inject or wrap `SecuService` explicitly.
 - incident response console
 - device quarantine console
 - compliance console
+- security-agent roster
 - security audit timeline
 - rule workbench
 - settings
 
 The UI contract also declares theme components for risk meters, threat
 indicators, policy cards, compliance badges, exception queues, incident panels,
-quarantine lists, and audit timelines.
+quarantine lists, security-agent rosters, Bytewax stream indicators, and audit
+timelines.
 
 ## Guardrails
 
@@ -149,6 +190,10 @@ The deterministic rule engine currently enforces:
 - expired policy exceptions cannot be approved;
 - critical incidents require a containment plan;
 - incident resolution requires containment evidence.
+- security agents must use supported runtimes, supported roles, and explicit
+  scope;
+- privileged security-agent roles require human approval;
+- security lifecycle batch operations must use Bytewax.
 
 These rules are exposed through `capability_contract.py`, `app.py`,
 `semantic_model.json`, and `release_report.json` so APG composition tooling can

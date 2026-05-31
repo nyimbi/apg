@@ -25,6 +25,7 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"compliance_gap_count": summary["compliance_gap_count"],
 		"policy_exception_count": summary["policy_exception_count"],
 		"open_incident_count": summary["open_incident_count"],
+		"security_agent_count": summary["security_agent_count"],
 	}
 
 
@@ -143,6 +144,31 @@ def resolve_incident(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_security_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_security_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "risk_reviewer"),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", True)),
+		policy_ref=str(payload["policy_ref"]) if payload.get("policy_ref") else None,
+		status=str(payload.get("status") or "active"),
+	)
+
+
+def validate_security_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_security_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -165,6 +191,7 @@ def list_security_posture(tenant_id: str = "default") -> dict[str, Any]:
 		"controls": SERVICE.list_controls(tenant_id),
 		"policy_exceptions": SERVICE.list_policy_exceptions(tenant_id),
 		"incidents": SERVICE.list_incidents(tenant_id),
+		"security_agents": SERVICE.list_security_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

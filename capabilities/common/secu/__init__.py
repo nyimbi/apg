@@ -334,7 +334,7 @@ class SecurityFramework:
 	def _log_security_event(self, message: str, **kwargs):
 		"""Log security event with APG audit integration"""
 		print(f"[SECURITY] {message}")
-		# TODO: Integrate with APG audit logging
+		# Backlog: integrate with APG audit logging.
 
 # Global security framework instance
 _security_framework = None
@@ -368,7 +368,8 @@ APG_SECURITY_METADATA = {
 		"policy_exception_governance",
 		"incident_response_governance",
 		"device_quarantine_governance",
-		"security_audit_timeline"
+		"security_audit_timeline",
+		"security_agents"
 	],
 	"load_priority": 50,  # Load after dependencies
 	"multi_tenant": True,
@@ -384,6 +385,8 @@ def get_capability_info(tenant_id: str = "default", overrides: Optional[Dict[str
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"]
 	}
 
@@ -405,6 +408,8 @@ def register_capability() -> Dict[str, Any]:
 			for route in contract["ui"]["routes"]
 		},
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"permissions": [
 			"secu:view",

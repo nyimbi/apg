@@ -21,10 +21,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"threat_detection",
 		"compliance",
 		"incident_response",
+		"agents",
+		"streaming",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["rule_engine"]["rules"]) >= 14
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
+	assert "security_agent_privileged_role_requires_human_approval" in contract["agents"]["guardrails"]
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"risk",
@@ -35,6 +40,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"quarantine",
 		"compliance",
 		"audit",
+		"agents",
 		"rules",
 		"settings",
 	}
@@ -45,6 +51,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"incident_response_panel",
 		"device_quarantine_list",
 		"security_audit_timeline",
+		"security_agent_roster",
+		"bytewax_stream_indicator",
 	} <= set(contract["theme"]["components"])
 
 
@@ -71,6 +79,33 @@ def test_rule_engine_denies_high_risk_context():
 @pytest.mark.parametrize(
 	"context, reason",
 	[
+		(
+			{
+				"operation": "register_security_agent",
+				"agent_runtime_supported": False,
+				"agent_role_supported": True,
+				"agent_scope_present": True,
+			},
+			"security_agent_runtime_unsupported",
+		),
+		(
+			{
+				"operation": "register_security_agent",
+				"agent_runtime_supported": True,
+				"agent_role_supported": True,
+				"agent_scope_present": True,
+				"agent_privileged_role": True,
+				"human_approval_required": False,
+			},
+			"security_agent_human_approval_required",
+		),
+		(
+			{
+				"operation": "security_lifecycle_batch",
+				"event_stream": "memory",
+			},
+			"bytewax_security_stream_required",
+		),
 		(
 			{
 				"operation": "approve_policy_exception",
@@ -118,10 +153,14 @@ def test_capability_info_and_registration_include_manifest_theme_and_permissions
 	assert info["metadata"]["capability_name"] == "secu"
 	assert info["configuration"]["tenant_id"] == "default"
 	assert info["ui_manifest"]["requires_theme"] is True
+	assert info["agents"]["first_class"] is True
+	assert info["streaming"]["engine"] == "bytewax"
 	assert info["theme"]["name"] == "secu_zero_trust"
 	assert registration["rule_engine"]["type"] == "deterministic"
 	assert registration["ui_components"]["policies"] == "/secu/policies"
 	assert registration["ui_components"]["exceptions"] == "/secu/exceptions"
 	assert registration["ui_components"]["incidents"] == "/secu/incidents"
+	assert registration["ui_components"]["agents"] == "/secu/agents"
+	assert registration["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
 	assert "secu:approve_exception" in registration["permissions"]
 	assert "secu:respond" in registration["permissions"]
