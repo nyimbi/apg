@@ -14,6 +14,8 @@ def dashboard_model(service: ConnService, tenant_id: str = "default") -> dict[st
 		"title": "Connection Management",
 		"tenant_id": tenant_id,
 		"summary": service.dashboard_summary(tenant_id),
+		"connector_agents": service.list_connector_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
 	}
@@ -94,6 +96,30 @@ def audit_timeline_model(service: ConnService, tenant_id: str = "default") -> di
 	}
 
 
+def connector_agent_roster_model(service: ConnService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_connector_agents(tenant_id),
+		"agent_contract": contract["agents"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"required_fields": ["name", "runtime", "role", "scope", "owner", "purpose", "contribution_disclosed"],
+	}
+
+
+def lifecycle_batch_model(service: ConnService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"batches": service.list_lifecycle_batches(tenant_id),
+		"streaming": contract["streaming"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"summary": service.dashboard_summary(tenant_id),
+	}
+
+
 def settings_model(service: ConnService, tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
 	return {
@@ -101,5 +127,7 @@ def settings_model(service: ConnService, tenant_id: str = "default") -> dict[str
 		"configuration": contract["configuration"],
 		"schema": contract["configuration_schema"],
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}

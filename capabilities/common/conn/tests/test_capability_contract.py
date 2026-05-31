@@ -7,9 +7,11 @@ from capabilities.common.conn.capability_contract import evaluate_capability_rul
 from capabilities.common.conn.conn_runtime import ConnService
 from capabilities.common.conn.view_models import (
 	connection_workbench_model,
+	connector_agent_roster_model,
 	connector_catalog_model,
 	dashboard_model,
 	flow_designer_model,
+	lifecycle_batch_model,
 )
 
 
@@ -29,10 +31,18 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"governance",
 		"observability",
 		"adapters",
+		"agents",
+		"streaming",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 25
+	assert len(contract["rule_engine"]["rules"]) >= 39
+	assert contract["provides"] == ["connector_management", "connection_orchestration", "connector_agent_composition"]
+	assert contract["requires"] == ["apig", "auth", "encr", "audl"]
+	assert contract["agents"]["first_class"] is True
+	assert "codex" in contract["agents"]["supported_runtimes"]
+	assert "connector_reviewer" in contract["agents"]["supported_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "conn_runtime.ConnService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -46,12 +56,15 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"marketplace",
 		"security",
 		"audit",
+		"agents",
+		"lifecycle",
 		"rules",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "sync_monitor" in contract["theme"]["components"]
+	assert "connector_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_denies_unsafe_activation_and_flow_creation():
@@ -77,6 +90,39 @@ def test_rule_engine_denies_unsafe_activation_and_flow_creation():
 		"flow_requires_quality_gate",
 		"pii_requires_policy",
 	}
+
+
+def test_rule_engine_enforces_connector_agent_and_bytewax_guardrails():
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_connector_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	stream_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_conn_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"connector_agent_runtime_supported",
+		"connector_agent_role_supported",
+		"connector_agent_requires_scope",
+		"connector_agent_requires_owner",
+		"connector_agent_requires_purpose",
+		"connector_agent_requires_contribution_disclosure",
+		"connector_agent_privileged_role_requires_human_approval",
+	}
+	assert stream_result["decision"] == "deny"
+	assert stream_result["matched_rules"] == ["bytewax_conn_stream_required"]
 
 
 def test_conn_runtime_registers_connections_flows_and_syncs():
@@ -160,6 +206,57 @@ def test_conn_runtime_enforces_connector_runtime_allowlist():
 		service.register_connector("tap-unsafe", "tenant-a", "Unsafe", "shell", "src", "sha256:abc", "platform")
 
 
+def test_conn_runtime_governs_agents_and_lifecycle_batches():
+	service = ConnService()
+
+	with pytest.raises(PermissionError, match="unsupported_connector_agent_runtime"):
+		service.register_connector_agent(
+			agent_id="unknown-agent",
+			tenant_id="tenant-a",
+			name="Unknown Agent",
+			runtime="unsupported",
+			role="connector_reviewer",
+			scope="connector package reviews",
+			owner="platform",
+			purpose="review connector packages",
+		)
+
+	pending = service.register_connector_agent(
+		agent_id="review-agent",
+		tenant_id="tenant-a",
+		name="Review Agent",
+		runtime="Claude Code",
+		role="connector reviewer",
+		scope="connector package reviews",
+		owner="platform",
+		purpose="review connector packages",
+		human_approval_required=False,
+	)
+	active = service.register_connector_agent(
+		agent_id="tap-steward",
+		tenant_id="tenant-a",
+		name="Tap Steward",
+		runtime="codex",
+		role="tap_steward",
+		scope="local singer tap catalog",
+		owner="integration-office",
+		purpose="maintain local Singer tap metadata",
+	)
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_conn_lifecycle_batch("tenant-a", "kafka", 2)
+	batch = service.validate_conn_lifecycle_batch("tenant-a", "bytewax", 4)
+	summary = service.dashboard_summary("tenant-a")
+
+	assert pending["status"] == "pending_review"
+	assert pending["runtime"] == "claude_code"
+	assert active["status"] == "active"
+	assert batch["status"] == "accepted"
+	assert summary["connector_agent_count"] == 2
+	assert summary["lifecycle_batch_count"] == 2
+	assert summary["denied_lifecycle_batch_count"] == 1
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -168,7 +265,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "conn_integration_console"
 	assert registration["ui_components"]["rules"] == "/conn/rules"
-	assert "keym" in registration["dependencies"]
+	assert "encr" in registration["dependencies"]
+	assert "keym" in registration["optional_dependencies"]
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 
 
 def test_generated_ui_models_are_composable():
@@ -178,8 +278,23 @@ def test_generated_ui_models_are_composable():
 	catalog = connector_catalog_model(service, "tenant-a")
 	workbench = connection_workbench_model(service, "tenant-a")
 	designer = flow_designer_model(service, "tenant-a")
+	service.register_connector_agent(
+		agent_id="tap-steward",
+		tenant_id="tenant-a",
+		name="Tap Steward",
+		runtime="codex",
+		role="tap_steward",
+		scope="local singer tap catalog",
+		owner="integration-office",
+		purpose="maintain local Singer tap metadata",
+	)
+	service.validate_conn_lifecycle_batch("tenant-a", "bytewax", 1)
+	agents = connector_agent_roster_model(service, "tenant-a")
+	batches = lifecycle_batch_model(service, "tenant-a")
 
 	assert dashboard["summary"]["connector_count"] == 1
 	assert catalog["connectors"][0]["id"] == "tap-postgres"
 	assert "register_connection" in workbench["actions"]
 	assert designer["defaults"]["mapping_required"] is True
+	assert agents["agents"][0]["runtime"] == "codex"
+	assert batches["required_processor"] == "bytewax"

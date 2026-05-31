@@ -1038,6 +1038,33 @@ def retire_generated_connection(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def register_generated_connector_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Register a governed connector agent through the generated-app control plane."""
+	return generated_conn_service.register_connector_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_conn_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Validate a CONN lifecycle batch before adapter side effects."""
+	return generated_conn_service.validate_conn_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload["event_stream"]),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "connector_agent_batch"),
+		batch_id=payload.get("id"),
+	)
+
+
 def list_generated_connectors(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return generated_conn_service.list_connectors(tenant_id)
 
@@ -1060,6 +1087,14 @@ def list_generated_schedules(tenant_id: str | None = None) -> List[Dict[str, Any
 
 def list_generated_reviews(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return generated_conn_service.list_reviews(tenant_id)
+
+
+def list_generated_connector_agents(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_connector_agents(tenant_id)
+
+
+def list_generated_lifecycle_batches(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_conn_service.list_lifecycle_batches(tenant_id)
 
 
 def list_generated_audit_events(tenant_id: str | None = None) -> List[Dict[str, Any]]:

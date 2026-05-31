@@ -5,6 +5,9 @@ applications register local Singer taps and other connectors, create secured
 connections, test and activate those connections, compose data flows with
 mapping/lineage/quality evidence, run sync jobs, schedule and replay work, and
 retire connections with audit evidence.
+CONN also treats AI and automation agents as governed connector participants,
+so tools such as Codex, Claude Code, OpenCode, Pi, and future runtimes compose
+through policy-controlled adapters instead of untracked operator scripts.
 
 CONN is intentionally split into two layers:
 
@@ -28,11 +31,16 @@ CONN is intentionally split into two layers:
 - Sync run, schedule, replay, schema-review, batch-size, and monitoring
   guardrails.
 - Marketplace review records for unverified connector packages.
+- First-class connector-agent composition with supported runtimes, role
+  guardrails, bounded scope, accountable owner, purpose, contribution
+  disclosure, and human approval for privileged connector roles.
+- Bytewax lifecycle batch validation for connector, connection, flow, sync,
+  schedule, review, and connector-agent mutation streams.
 - Deterministic rule decisions that return `allow`, `deny`, or
   `require_review`.
 - UI view models for dashboard, connectors, connections, visual design, sync
   monitoring, quality, lineage, marketplace, security, audit, rules, and
-  settings.
+  settings, plus connector-agent roster and lifecycle-batch monitor surfaces.
 - Contract-derived semantic model, package manifest, and release evidence.
 
 ## Important Files
@@ -87,27 +95,55 @@ activated = conn.activate_connection(
 )
 
 assert activated["status"] == "active"
+
+agent = conn.register_connector_agent(
+    agent_id="tap-steward",
+    tenant_id="tenant-a",
+    name="Tap Steward",
+    runtime="codex",
+    role="tap_steward",
+    scope="local singer tap catalog",
+    owner="integration-office",
+    purpose="maintain local Singer tap metadata",
+)
+
+batch = conn.validate_conn_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=4,
+)
+
+assert agent["status"] == "active"
+assert batch["status"] == "accepted"
 ```
 
 ## UI Composition
 
 ```python
 from capabilities.common.conn.conn_runtime import ConnService
-from capabilities.common.conn.view_models import dashboard_model, connection_workbench_model
+from capabilities.common.conn.view_models import (
+    connection_workbench_model,
+    connector_agent_roster_model,
+    dashboard_model,
+    lifecycle_batch_model,
+)
 
 service = ConnService()
 dashboard = dashboard_model(service, "tenant-a")
 connections = connection_workbench_model(service, "tenant-a")
+agents = connector_agent_roster_model(service, "tenant-a")
+lifecycle = lifecycle_batch_model(service, "tenant-a")
 ```
 
 ## Production Runtime Boundary
 
 The generated-app control plane does not execute Singer taps, open network
-connections, read secrets, write lineage stores, run Bytewax flows, or call
-external SaaS systems. Production deployments must bind adapters for auth,
-credential vault, encryption, audit, monitoring, lineage, data quality, local
-Singer runtime, APG registry, APG gateway, and Bytewax event streaming. Those
-adapters must honor CONN guardrail decisions before side effects.
+connections, read secrets, write lineage stores, run Bytewax flows, call
+external SaaS systems, or execute vendor-specific agent runtimes. Production
+deployments must bind adapters for auth, credential vault, encryption, audit,
+monitoring, lineage, data quality, local Singer runtime, APG registry, APG
+gateway, external AI runtimes, and Bytewax event streaming. Those adapters must
+honor CONN guardrail decisions before side effects.
 
 ## Focused Verification
 

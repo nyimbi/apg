@@ -33,6 +33,8 @@ def semantic_model() -> dict[str, Any]:
 		}
 		for route in contract["ui"]["routes"]
 	}
+	provides = list(contract["provides"])
+	requires = list(contract["requires"])
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -52,11 +54,12 @@ def semantic_model() -> dict[str, Any]:
 			"conn": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["conn_operations"],
-				"requires": [],
+				"provides": provides,
+				"requires": requires,
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
+				"agents": contract["agents"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
@@ -74,6 +77,7 @@ def semantic_model() -> dict[str, Any]:
 					"schema_review": "ReviewRecord",
 					"owner_transfer": "ReviewRecord",
 					"connection_retirement": "ConnectionRecord",
+					"connector_agent_privileged_role": "ConnectorAgentRecord",
 				},
 				"connector_lifecycle": {
 					"connector": "ConnectorRecord",
@@ -82,13 +86,15 @@ def semantic_model() -> dict[str, Any]:
 					"sync_run": "SyncRunRecord",
 					"schedule": "ScheduleRecord",
 					"review": "ReviewRecord",
+					"connector_agent": "ConnectorAgentRecord",
+					"lifecycle_batch": "ConnectorLifecycleBatchRecord",
 					"audit": "ConnectorAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
 				"streaming": {
-					"engine": contract["configuration"]["adapters"]["event_stream"],
+					**contract["streaming"],
 				},
 			}
 		},
@@ -96,8 +102,10 @@ def semantic_model() -> dict[str, Any]:
 			"conn": {
 				"id": "conn",
 				"configuration": contract["configuration"],
-				"provides": ["conn_operations"],
-				"requires": [],
+				"provides": provides,
+				"requires": requires,
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -105,9 +113,15 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"conn": []},
+			"capability_dependencies": {"conn": requires},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"connector_governance": {
+					"supported_runtimes": contract["agents"]["supported_runtimes"],
+					"roles": contract["agents"]["supported_roles"],
+					"approval": contract["agents"]["approval"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -131,7 +145,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"conn": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -175,14 +191,18 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("CONN semantic model route manifest is stale")
-	if len(rules) < 25:
+	if len(rules) < 39:
 		errors.append("CONN semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("CONN adapter manifest must use Bytewax for event streaming")
 	if capability.get("runtime", {}).get("service") != "conn_runtime.py":
 		errors.append("CONN generated-app runtime is missing")
+	if capability.get("agents", {}).get("first_class") is not True:
+		errors.append("CONN semantic model must expose first-class connector agents")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("CONN lifecycle batches must require Bytewax")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

@@ -21225,3 +21225,68 @@ Not run to preserve battery:
 - Live service mesh, live APG auth/config/monitoring/audit adapters, live APG
   gateway, live cache store, live Bytewax topology, rendered browser UI,
   external AI-agent runtime clients, and performance/load tests.
+
+### 2026-05-31 05:53 EAT
+
+CONN connector-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/conn` as the next integration capability after
+  REGY.
+- Extended the CONN executable contract with first-class connector-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported connector-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and
+  contract-level `provides`/`requires`.
+- Added deterministic guardrails for unsupported connector-agent runtime,
+  unsupported connector-agent role, missing agent scope, owner, purpose,
+  missing machine contribution disclosure, privileged connector-agent
+  registration without human approval, and non-Bytewax CONN lifecycle batch
+  routing.
+- Added `ConnectorAgentRecord`, `ConnectorLifecycleBatchRecord`,
+  tenant-qualified connector-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, API helper payload
+  handling, connector-agent roster view models, and lifecycle-batch monitor
+  view models.
+- Added `/conn/agents`, `/conn/lifecycle`, connector-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/conn/__init__.py capabilities/common/conn/capability_contract.py capabilities/common/conn/conn_runtime.py capabilities/common/conn/api.py capabilities/common/conn/view_models.py capabilities/common/conn/app.py capabilities/common/conn/tests/test_capability_contract.py capabilities/common/conn/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/conn/tests/test_capability_contract.py capabilities/common/conn/tests/test_package_contract.py`
+  passed with 12 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/conn/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect conn --json` passed with `ok: true`,
+  14 APG Python routes, 39 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/conn --json`
+  passed with `ok: true`; CONN remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/conn --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/conn -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "import capabilities.common.conn.api as api; print(api.capability_status()['capability'])"`
+  imported `api.py` successfully and returned `conn`.
+- `./.venv/bin/python -c "... ConnService ... register_connector_agent ... validate_conn_lifecycle_batch ..."`
+  returned one `codex` connector reviewer with owner and purpose evidence,
+  human approval required, normalized role, and `bytewax` lifecycle-batch
+  evidence.
+- Focused stale-marker scan over touched CONN packet source, docs, tests, and
+  evidence returned no matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Singer tap execution, live source/target connectors, live SaaS/database
+  calls, live credential vault access, live lineage/quality/monitoring/audit
+  adapters, live APG gateway/registry integration, live Bytewax topology,
+  rendered frontend/browser UI, external AI-agent runtime clients, and
+  performance/load tests.

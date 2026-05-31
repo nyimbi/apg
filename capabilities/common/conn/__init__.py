@@ -31,10 +31,14 @@ def register_capability() -> dict:
 		'display_name': 'Connection Management',
 		'description': 'Governed connector, connection, flow, and Singer tap lifecycle control plane',
 		'version': '1.0.0',
-		'dependencies': ['apig', 'auth', 'encr', 'audl', 'keym', 'moni', 'regy'],
+		'dependencies': contract['requires'],
+		'optional_dependencies': ['keym', 'moni', 'regy', 'meta', 'dqol'],
+		'provides': contract['provides'],
 		'configuration': contract['configuration'],
 		'configuration_schema': contract['configuration_schema'],
 		'rule_engine': contract['rule_engine'],
+		'agents': contract['agents'],
+		'streaming': contract['streaming'],
 		'capabilities': {
 			'connectors': 'Register local Singer, APG, HTTP, database, file, and stream connectors',
 			'connections': 'Manage tenant-scoped data source and target connections',
@@ -44,6 +48,8 @@ def register_capability() -> dict:
 			'singer_taps': 'Local Singer.io tap management and registry integration',
 			'visual_designer': 'Generated-app flow design and composition metadata',
 			'capability_rules': 'Capability-specific rule evaluation',
+			'connector_agent_composition': 'Govern AI and automation agents that review or mutate connector state',
+			'bytewax_lifecycle_batches': 'Validate connector lifecycle mutation batches through Bytewax',
 			'visual_theming': 'Tenant-aware UI theme tokens and components'
 		},
 		'endpoints': {
@@ -51,7 +57,9 @@ def register_capability() -> dict:
 			'flows': '/api/v1/flows',
 			'taps': '/api/v1/taps',
 			'monitoring': '/api/v1/monitoring',
-			'lineage': '/api/v1/lineage'
+			'lineage': '/api/v1/lineage',
+			'agents': '/api/v1/agents',
+			'lifecycle': '/api/v1/lifecycle'
 		},
 		'ui_components': {
 			route['name']: route['path']

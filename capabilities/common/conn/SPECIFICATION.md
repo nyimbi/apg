@@ -10,9 +10,9 @@ retirement.
 
 CONN must be useful without executing a real Singer tap, opening network
 connections, reading secrets, writing lineage stores, starting Bytewax workers,
-or calling external SaaS APIs. Those systems remain adapter boundaries. The
-dependency-light lifecycle service must still make connector decisions
-executable and auditable.
+calling external SaaS APIs, or executing external AI-agent runtimes. Those
+systems remain adapter boundaries. The dependency-light lifecycle service must
+still make connector decisions executable and auditable.
 
 ## Scope
 
@@ -25,6 +25,11 @@ CONN owns:
 - sync run, schedule, replay, and schema-review lifecycle records;
 - marketplace, activation, schema, owner-transfer, and retirement review
   records;
+- first-class connector-agent registrations for AI and automation tools that
+  participate in connector review, connection review, flow design, sync
+  operation, quality review, lineage review, marketplace review, credential
+  review, or local Singer tap stewardship;
+- Bytewax lifecycle batch validation for connector mutation streams;
 - connector audit events;
 - generated application API helpers, UI view models, theme tokens, and package
   evidence.
@@ -41,6 +46,8 @@ CONN integrates with:
 - `regy` for connector and service registry publication;
 - `apig` for API exposure when needed;
 - Bytewax-backed streams for connector lifecycle events.
+- external AI and automation runtimes such as Codex, Claude Code, OpenCode,
+  Pi, and future tools through governed adapter boundaries.
 
 ## Functional Requirements
 
@@ -81,12 +88,35 @@ idempotency keys.
 CONN must retire connections only after impact review evidence. Retirement
 keeps historical records and emits audit evidence.
 
+### Connector-Agent Lifecycle
+
+CONN must model AI and automation agents as first-class connector
+participants. Agent registration requires a supported runtime, supported role,
+bounded scope, accountable owner, documented purpose, and
+machine-contribution disclosure. Privileged roles such as connector reviewer,
+connection reviewer, sync operator, quality reviewer, lineage reviewer,
+marketplace reviewer, and credential reviewer require human approval evidence
+before they can mutate connector state.
+
+Supported runtimes are adapter identifiers, not embedded SDK commitments:
+`codex`, `claude_code`, `opencode`, and `pi`. Future runtimes can be added by
+extending the contract and adapter policy while preserving the same guardrail
+shape.
+
+### Bytewax Lifecycle Batches
+
+CONN must validate lifecycle mutation batches before adapter side effects.
+Accepted lifecycle batches must use Bytewax as the required processor. Non-
+Bytewax batches are recorded as denied evidence and blocked.
+
 ### UI and Theme
 
 CONN must expose generated UI models for dashboard, connectors, connections,
 visual designer, sync monitor, quality, lineage, marketplace, security, audit,
-rules, and settings. Theme metadata must include compact connector, connection,
-flow, sync, quality, lineage, review, security, and audit components.
+rules, connector-agent roster, lifecycle-batch monitor, and settings. Theme
+metadata must include compact connector, connection, flow, sync, quality,
+lineage, review, security, audit, connector-agent roster, and Bytewax lifecycle
+panel components.
 
 ## Guardrails
 
@@ -97,15 +127,18 @@ registered connector, credential vault, encryption, secret rotation, activation
 tests, production review, cross-tenant connection denial, active source/target,
 mapping, lineage, quality gate, batch monitoring, batch maximum, schema review,
 PII policy, webhook auth, schedule timezone, replay idempotency, destructive
-delete review, retirement impact review, and owner-transfer review.
+delete review, retirement impact review, owner-transfer review, connector-agent
+runtime, connector-agent role, agent scope, agent owner, agent purpose,
+contribution disclosure, human approval for privileged agent roles, and Bytewax
+lifecycle processing.
 
 ## Adapter Boundaries
 
 The dependency-light control plane must not execute live connector operations.
 Singer taps, target execution, SaaS APIs, database drivers, secret stores,
 lineage stores, quality engines, monitoring sinks, audit sinks, API gateways,
-service registries, and Bytewax workers are adapters that must honor CONN
-decisions before side effects.
+service registries, external AI runtimes, and Bytewax workers are adapters
+that must honor CONN decisions before side effects.
 
 ## Acceptance Criteria
 
@@ -113,7 +146,7 @@ decisions before side effects.
   behavior and adapter boundaries.
 - Contract exposes configuration, rules, adapters, UI, theme, and package
   evidence for connector, connection, flow, sync, schedule, replay, review,
-  retirement, and audit workflows.
+  connector-agent, lifecycle-batch, retirement, and audit workflows.
 - Generated apps can use a dependency-light service for connector lifecycle
   workflows without optional production dependencies.
 - Focused tests cover positive and negative guardrail paths.

@@ -6,7 +6,13 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_CONN_AGENT_ROLES,
+	SUPPORTED_CONN_AGENT_ROLES,
+	SUPPORTED_CONN_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 
 
 @dataclass(frozen=True)
@@ -105,16 +111,48 @@ class ConnectorAuditEvent:
 	created_at: str = field(default_factory=lambda: _now())
 
 
+@dataclass(frozen=True)
+class ConnectorAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	status: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	created_at: str = field(default_factory=lambda: _now())
+
+
+@dataclass(frozen=True)
+class ConnectorLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	operation: str
+	mutation_count: int
+	status: str
+	created_at: str = field(default_factory=lambda: _now())
+
+
 class ConnService:
 	"""Tenant-scoped connector lifecycle facade for generated APG apps."""
 
 	def __init__(self) -> None:
+		self._agent_runtimes = set(SUPPORTED_CONN_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_CONN_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_CONN_AGENT_ROLES)
 		self._connectors: dict[tuple[str, str], ConnectorRecord] = {}
 		self._connections: dict[tuple[str, str], ConnectionRecord] = {}
 		self._flows: dict[tuple[str, str], FlowRecord] = {}
 		self._runs: dict[tuple[str, str], SyncRunRecord] = {}
 		self._schedules: dict[tuple[str, str], ScheduleRecord] = {}
 		self._reviews: dict[tuple[str, str], ReviewRecord] = {}
+		self._connector_agents: dict[tuple[str, str], ConnectorAgentRecord] = {}
+		self._lifecycle_batches: dict[tuple[str, str], ConnectorLifecycleBatchRecord] = {}
 		self._events: list[ConnectorAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -414,8 +452,92 @@ class ConnService:
 		self._record_event(tenant_id, "connection_retired", connection_id, f"Retired connection {connection.name}.", {"actor": actor})
 		return _dump(record)
 
+	def register_connector_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		"""Register a governed AI/automation participant for connector work."""
+		self._enforce_tenant(tenant_id)
+		normalized_runtime = _normalize_agent_token(runtime)
+		normalized_role = _normalize_agent_token(role)
+		privileged_role = normalized_role in self._privileged_agent_roles
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_connector_agent",
+			"agent_runtime_supported": normalized_runtime in self._agent_runtimes,
+			"agent_role_supported": normalized_role in self._agent_roles,
+			"scope_present": bool(scope),
+			"owner_present": bool(owner),
+			"purpose_present": bool(purpose),
+			"contribution_disclosed": contribution_disclosed,
+			"privileged_role": privileged_role,
+			"human_approval_required": human_approval_required,
+		})
+		if result["decision"] == "deny":
+			self._record_event(tenant_id, "connector_agent_registration_denied", agent_id, f"Denied connector agent {name}.", {"matched_rules": result["matched_rules"]})
+			_raise_if_blocked(result)
+		if self._tenant_key(tenant_id, agent_id) in self._connector_agents:
+			raise ValueError(f"connector agent already exists for tenant: {agent_id}")
+		record = ConnectorAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			owner=owner,
+			purpose=purpose,
+			status=_status_for_decision(result),
+			contribution_disclosed=contribution_disclosed,
+			human_approval_required=human_approval_required,
+		)
+		self._connector_agents[self._tenant_key(tenant_id, agent_id)] = record
+		self._record_event(tenant_id, "connector_agent_registered", agent_id, f"Registered connector agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		return _dump(record)
+
+	def validate_conn_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "connector_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Validate that connector lifecycle mutations are processed by Bytewax."""
+		self._enforce_tenant(tenant_id)
+		normalized_stream = _normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_conn_lifecycle_batch",
+			"event_stream": normalized_stream,
+		})
+		resolved_batch_id = batch_id or f"{operation}:{len(self._lifecycle_batches) + 1}"
+		record = ConnectorLifecycleBatchRecord(
+			id=resolved_batch_id,
+			tenant_id=tenant_id,
+			event_stream=normalized_stream,
+			operation=operation,
+			mutation_count=mutation_count,
+			status="denied" if result["decision"] == "deny" else "accepted",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, resolved_batch_id)] = record
+		self._record_event(tenant_id, "conn_lifecycle_batch_validated", resolved_batch_id, f"Validated CONN lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		return _dump(record)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		connections = [connection for connection in self._connections.values() if connection.tenant_id == tenant_id]
+		lifecycle_batches = [batch for batch in self._lifecycle_batches.values() if batch.tenant_id == tenant_id]
 		return {
 			"tenant_id": tenant_id,
 			"connector_count": len([connector for connector in self._connectors.values() if connector.tenant_id == tenant_id]),
@@ -424,6 +546,9 @@ class ConnService:
 			"flow_count": len([flow for flow in self._flows.values() if flow.tenant_id == tenant_id]),
 			"sync_run_count": len([run for run in self._runs.values() if run.tenant_id == tenant_id]),
 			"pending_review_count": len([review for review in self._reviews.values() if review.tenant_id == tenant_id and review.status == "pending"]),
+			"connector_agent_count": len([agent for agent in self._connector_agents.values() if agent.tenant_id == tenant_id]),
+			"lifecycle_batch_count": len(lifecycle_batches),
+			"denied_lifecycle_batch_count": len([batch for batch in lifecycle_batches if batch.status == "denied"]),
 			"audit_event_count": len([event for event in self._events if event.tenant_id == tenant_id]),
 		}
 
@@ -444,6 +569,12 @@ class ConnService:
 
 	def list_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._reviews, tenant_id)
+
+	def list_connector_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._connector_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [_dump(event) for event in self._events if tenant_id is None or event.tenant_id == tenant_id]
@@ -511,6 +642,14 @@ def _dump(record: Any) -> dict[str, Any]:
 def _raise_if_blocked(result: dict[str, Any]) -> None:
 	reasons = [action.get("reason", "connector_guardrail_failed") for action in result.get("actions", [])]
 	raise PermissionError(",".join(reasons) or "connector_guardrail_failed")
+
+
+def _normalize_agent_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _status_for_decision(result: dict[str, Any]) -> str:
+	return "pending_review" if result["decision"] == "require_review" else "active"
 
 
 def _now() -> str:

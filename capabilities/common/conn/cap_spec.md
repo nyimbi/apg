@@ -2,7 +2,8 @@
 
 CONN provides APG applications with a governed connector and data-flow control
 plane for local Singer taps, secured connections, flow composition, sync runs,
-schedules, replays, lineage, quality gates, and audit evidence.
+schedules, replays, lineage, quality gates, first-class connector-agent
+composition, Bytewax lifecycle batches, and audit evidence.
 
 ## Runtime Shape
 
@@ -27,8 +28,12 @@ schedules, replays, lineage, quality gates, and audit evidence.
 5. Start sync runs with batch, monitoring, and schema-review evidence.
 6. Schedule flows with timezone evidence and replay syncs with idempotency
    evidence.
-7. Retire connections only after impact review evidence.
-8. Emit audit events for lifecycle decisions.
+7. Register governed AI and automation agents with runtime, role, scope, owner,
+   purpose, contribution disclosure, and human approval for privileged roles.
+8. Validate connector lifecycle mutation batches through Bytewax before adapter
+   side effects.
+9. Retire connections only after impact review evidence.
+10. Emit audit events for lifecycle decisions.
 
 ## Guardrails
 
@@ -38,9 +43,13 @@ encryption, secret rotation, activation test, cross-tenant connection,
 inactive source or target, missing mapping, lineage, quality gate, batch
 monitoring, oversized batches, PII policy, webhook auth, schedule timezone,
 replay idempotency, destructive delete review, and retirement impact review.
+They also deny unsupported connector-agent runtimes, unsupported agent roles,
+missing agent scope, missing owner, missing purpose, missing contribution
+disclosure, and non-Bytewax connector lifecycle batches.
 
 CONN guardrails require review for unverified connector packages, production
-activation, schema changes, and owner transfers.
+activation, schema changes, owner transfers, and privileged connector-agent
+roles that lack human approval evidence.
 
 ## Adapter Boundaries
 
@@ -48,4 +57,5 @@ Generated-app CONN does not run Singer taps, open network/database/SaaS
 connections, read secrets, write lineage stores, execute Bytewax flows, or
 perform external side effects. Production adapters for `auth`, `keym`, `encr`,
 `audl`, `moni`, `meta`, data quality, `regy`, `apig`, local Singer runtime, and
-Bytewax must honor CONN decisions before side effects.
+external agent runtimes, and Bytewax must honor CONN decisions before side
+effects.

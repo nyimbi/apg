@@ -19,6 +19,10 @@ Known gaps addressed by this packet:
 - Package evidence and tests did not cover connector marketplace review,
   credential vault, activation, flow, sync, schedule, replay, retirement,
   adapter metadata, or Bytewax streaming.
+- Connector agents were not first-class citizens with supported runtimes, role
+  guardrails, ownership, scope, purpose, contribution disclosure, approval
+  state, UI, or audit evidence.
+- Lifecycle mutation batches did not have executable Bytewax validation.
 
 ## Build Sequence
 
@@ -31,19 +35,24 @@ Known gaps addressed by this packet:
 2. Contract expansion
    - Add connector, connection, flow, sync, security, quality, governance,
      observability, adapter, UI, and theme configuration.
-   - Expand deterministic guardrails to at least 25 lifecycle rules.
+   - Add first-class connector-agent and Bytewax lifecycle-batch configuration.
+   - Expand deterministic guardrails to at least 39 lifecycle rules.
 
 3. Dependency-light lifecycle service
    - Add `conn_runtime.ConnService` for connector, connection, test,
      activation, flow, sync, schedule, replay, owner transfer, retirement,
      review, summary, and audit records.
+   - Add connector-agent records, lifecycle-batch records, guardrail-backed
+     registration, Bytewax validation, summaries, and audit events.
    - Keep Singer execution, service calls, credentials, monitoring, lineage,
      quality engines, and Bytewax behavior behind adapter boundaries.
 
 4. API and UI
    - Keep the existing FastAPI runtime intact.
-   - Add generated-app API helper functions.
-   - Add `view_models.py` for generated application UIs.
+   - Add generated-app API helper functions for connectors, agents, and
+     lifecycle batches.
+   - Add `view_models.py` for generated application UIs, including agent
+     roster and lifecycle-batch monitor views.
 
 5. Package evidence and tests
    - Replace static app semantic JSON with contract-derived evidence.

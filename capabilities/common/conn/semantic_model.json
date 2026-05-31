@@ -1,5 +1,43 @@
 {
-  "agents": {},
+  "agents": {
+    "conn": {
+      "approval": "human approval is required before privileged connector agents mutate connector state",
+      "external_runtimes_are_adapters": true,
+      "first_class": true,
+      "privileged_roles": [
+        "connector_reviewer",
+        "connection_reviewer",
+        "sync_operator",
+        "quality_reviewer",
+        "lineage_reviewer",
+        "marketplace_reviewer",
+        "credential_reviewer"
+      ],
+      "requires": [
+        "scope",
+        "owner",
+        "purpose",
+        "contribution_disclosure"
+      ],
+      "supported_roles": [
+        "connector_reviewer",
+        "connection_reviewer",
+        "flow_designer",
+        "sync_operator",
+        "quality_reviewer",
+        "lineage_reviewer",
+        "marketplace_reviewer",
+        "credential_reviewer",
+        "tap_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Connection Management package-backed APG capability",
     "entity_count": 0,
@@ -25,9 +63,47 @@
         "singer_runtime": "singer_runtime.SingerRuntime",
         "singer_tap_registry": "singer_taps.erp_registry"
       },
+      "agents": {
+        "approval": "human approval is required before privileged connector agents mutate connector state",
+        "external_runtimes_are_adapters": true,
+        "first_class": true,
+        "privileged_roles": [
+          "connector_reviewer",
+          "connection_reviewer",
+          "sync_operator",
+          "quality_reviewer",
+          "lineage_reviewer",
+          "marketplace_reviewer",
+          "credential_reviewer"
+        ],
+        "requires": [
+          "scope",
+          "owner",
+          "purpose",
+          "contribution_disclosure"
+        ],
+        "supported_roles": [
+          "connector_reviewer",
+          "connection_reviewer",
+          "flow_designer",
+          "sync_operator",
+          "quality_reviewer",
+          "lineage_reviewer",
+          "marketplace_reviewer",
+          "credential_reviewer",
+          "tap_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "activation_review": "ReviewRecord",
         "connection_retirement": "ConnectionRecord",
+        "connector_agent_privileged_role": "ConnectorAgentRecord",
         "marketplace_review": "ReviewRecord",
         "owner_transfer": "ReviewRecord",
         "schema_review": "ReviewRecord"
@@ -51,6 +127,40 @@
           "registry": "regy",
           "singer_runtime": "singer_runtime.SingerRuntime",
           "singer_tap_registry": "singer_taps.erp_registry"
+        },
+        "agents": {
+          "contribution_disclosure_required": true,
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "owner_required": true,
+          "privileged_roles": [
+            "connector_reviewer",
+            "connection_reviewer",
+            "sync_operator",
+            "quality_reviewer",
+            "lineage_reviewer",
+            "marketplace_reviewer",
+            "credential_reviewer"
+          ],
+          "purpose_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "connector_reviewer",
+            "connection_reviewer",
+            "flow_designer",
+            "sync_operator",
+            "quality_reviewer",
+            "lineage_reviewer",
+            "marketplace_reviewer",
+            "credential_reviewer",
+            "tap_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "connections": {
           "credential_vault_required": true,
@@ -111,6 +221,30 @@
           "pii_policy_required": true,
           "webhook_auth_required": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "conn.lifecycle",
+          "operations": [
+            "connector_batch",
+            "connection_batch",
+            "flow_batch",
+            "sync_batch",
+            "schedule_batch",
+            "review_batch",
+            "connector_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "conn.connectors",
+            "conn.connections",
+            "conn.flows",
+            "conn.sync_runs",
+            "conn.schedules",
+            "conn.reviews",
+            "conn.agents"
+          ],
+          "watermark": "event_time"
+        },
         "sync": {
           "allowed_modes": [
             "full_refresh",
@@ -132,8 +266,10 @@
         "ui": {
           "enable_audit_timeline": true,
           "enable_connection_workbench": true,
+          "enable_connector_agent_roster": true,
           "enable_connector_catalog": true,
           "enable_dashboard": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_lineage_view": true,
           "enable_marketplace": true,
           "enable_quality_console": true,
@@ -147,7 +283,9 @@
         "audit": "ConnectorAuditEvent",
         "connection": "ConnectionRecord",
         "connector": "ConnectorRecord",
+        "connector_agent": "ConnectorAgentRecord",
         "flow": "FlowRecord",
+        "lifecycle_batch": "ConnectorLifecycleBatchRecord",
         "review": "ReviewRecord",
         "schedule": "ScheduleRecord",
         "sync_run": "SyncRunRecord"
@@ -159,9 +297,16 @@
       "master_data": {},
       "name": "Connection Management",
       "provides": [
-        "conn_operations"
+        "connector_management",
+        "connection_orchestration",
+        "connector_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "apig",
+        "auth",
+        "encr",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -574,6 +719,111 @@
               "required_action": "record_owner_transfer_review"
             },
             "name": "owner_transfer_requires_review"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_connector_agent"
+            },
+            "description": "Connector agents must use a supported runtime adapter.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_connector_agent_runtime",
+              "required_action": "choose_supported_connector_agent_runtime"
+            },
+            "name": "connector_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_connector_agent"
+            },
+            "description": "Connector agents must use a supported connector role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_connector_agent_role",
+              "required_action": "choose_supported_connector_agent_role"
+            },
+            "name": "connector_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_connector_agent",
+              "scope_present": false
+            },
+            "description": "Connector agents require an explicit bounded scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_agent_scope_required",
+              "required_action": "declare_connector_agent_scope"
+            },
+            "name": "connector_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_connector_agent",
+              "owner_present": false
+            },
+            "description": "Connector agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_agent_owner_required",
+              "required_action": "assign_connector_agent_owner"
+            },
+            "name": "connector_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_connector_agent",
+              "purpose_present": false
+            },
+            "description": "Connector agents require a documented purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_agent_purpose_required",
+              "required_action": "document_connector_agent_purpose"
+            },
+            "name": "connector_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_connector_agent"
+            },
+            "description": "Connector agents must disclose machine-authored connector contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "connector_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "connector_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_connector_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged connector-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "connector_agent_human_approval_required",
+              "required_action": "record_human_connector_agent_approval"
+            },
+            "name": "connector_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_conn_lifecycle_batch"
+            },
+            "description": "CONN lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_conn_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_conn_stream_required"
           }
         ],
         "type": "deterministic"
@@ -989,6 +1239,111 @@
             "required_action": "record_owner_transfer_review"
           },
           "name": "owner_transfer_requires_review"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_connector_agent"
+          },
+          "description": "Connector agents must use a supported runtime adapter.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_connector_agent_runtime",
+            "required_action": "choose_supported_connector_agent_runtime"
+          },
+          "name": "connector_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_connector_agent"
+          },
+          "description": "Connector agents must use a supported connector role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_connector_agent_role",
+            "required_action": "choose_supported_connector_agent_role"
+          },
+          "name": "connector_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_connector_agent",
+            "scope_present": false
+          },
+          "description": "Connector agents require an explicit bounded scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_agent_scope_required",
+            "required_action": "declare_connector_agent_scope"
+          },
+          "name": "connector_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_connector_agent",
+            "owner_present": false
+          },
+          "description": "Connector agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_agent_owner_required",
+            "required_action": "assign_connector_agent_owner"
+          },
+          "name": "connector_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_connector_agent",
+            "purpose_present": false
+          },
+          "description": "Connector agents require a documented purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_agent_purpose_required",
+            "required_action": "document_connector_agent_purpose"
+          },
+          "name": "connector_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_connector_agent"
+          },
+          "description": "Connector agents must disclose machine-authored connector contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "connector_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "connector_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_connector_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged connector-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "connector_agent_human_approval_required",
+            "required_action": "record_human_connector_agent_approval"
+          },
+          "name": "connector_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_conn_lifecycle_batch"
+          },
+          "description": "CONN lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_conn_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_conn_stream_required"
         }
       ],
       "runtime": {
@@ -998,6 +1353,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "ConnectorAgentRoster",
+          "permission": "conn:admin",
+          "route": "/conn/agents"
+        },
         "audit": {
           "component": "ConnectionAuditTimeline",
           "permission": "conn:view",
@@ -1022,6 +1382,11 @@
           "component": "VisualFlowDesigner",
           "permission": "conn:create",
           "route": "/conn/designer"
+        },
+        "lifecycle": {
+          "component": "ConnectorLifecycleBatchMonitor",
+          "permission": "conn:view",
+          "route": "/conn/lifecycle"
         },
         "lineage": {
           "component": "DataLineageView",
@@ -1060,7 +1425,28 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "engine": "bytewax",
+        "lifecycle_stream": "conn.lifecycle",
+        "operations": [
+          "connector_batch",
+          "connection_batch",
+          "flow_batch",
+          "sync_batch",
+          "schedule_batch",
+          "review_batch",
+          "connector_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "conn.connectors",
+          "conn.connections",
+          "conn.flows",
+          "conn.sync_runs",
+          "conn.schedules",
+          "conn.reviews",
+          "conn.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
@@ -1068,9 +1454,17 @@
             "status_style": "decision-pill",
             "visual": "event-timeline"
           },
+          "bytewax_lifecycle_panel": {
+            "status_indicator": "processor-chip",
+            "visual": "stream-batches"
+          },
           "connection_workbench": {
             "status_indicator": "test-chip",
             "visual": "connection-table"
+          },
+          "connector_agent_roster": {
+            "status_indicator": "approval-chip",
+            "visual": "agent-roster"
           },
           "connector_catalog_row": {
             "icon": "plug",
@@ -1193,6 +1587,20 @@
             "permission": "conn:view"
           },
           {
+            "component": "ConnectorAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/conn/agents",
+            "permission": "conn:admin"
+          },
+          {
+            "component": "ConnectorLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/conn/lifecycle",
+            "permission": "conn:view"
+          },
+          {
             "component": "CapabilityRuleWorkbench",
             "name": "rules",
             "nav_group": "Governance",
@@ -1217,14 +1625,77 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "connector_governance": {
+        "approval": "human approval is required before privileged connector agents mutate connector state",
+        "roles": [
+          "connector_reviewer",
+          "connection_reviewer",
+          "flow_designer",
+          "sync_operator",
+          "quality_reviewer",
+          "lineage_reviewer",
+          "marketplace_reviewer",
+          "credential_reviewer",
+          "tap_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "conn": []
+      "conn": [
+        "apig",
+        "auth",
+        "encr",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "conn": {
+      "agents": {
+        "approval": "human approval is required before privileged connector agents mutate connector state",
+        "external_runtimes_are_adapters": true,
+        "first_class": true,
+        "privileged_roles": [
+          "connector_reviewer",
+          "connection_reviewer",
+          "sync_operator",
+          "quality_reviewer",
+          "lineage_reviewer",
+          "marketplace_reviewer",
+          "credential_reviewer"
+        ],
+        "requires": [
+          "scope",
+          "owner",
+          "purpose",
+          "contribution_disclosure"
+        ],
+        "supported_roles": [
+          "connector_reviewer",
+          "connection_reviewer",
+          "flow_designer",
+          "sync_operator",
+          "quality_reviewer",
+          "lineage_reviewer",
+          "marketplace_reviewer",
+          "credential_reviewer",
+          "tap_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "audit_sink": "audl",
@@ -1242,6 +1713,40 @@
           "registry": "regy",
           "singer_runtime": "singer_runtime.SingerRuntime",
           "singer_tap_registry": "singer_taps.erp_registry"
+        },
+        "agents": {
+          "contribution_disclosure_required": true,
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "owner_required": true,
+          "privileged_roles": [
+            "connector_reviewer",
+            "connection_reviewer",
+            "sync_operator",
+            "quality_reviewer",
+            "lineage_reviewer",
+            "marketplace_reviewer",
+            "credential_reviewer"
+          ],
+          "purpose_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "connector_reviewer",
+            "connection_reviewer",
+            "flow_designer",
+            "sync_operator",
+            "quality_reviewer",
+            "lineage_reviewer",
+            "marketplace_reviewer",
+            "credential_reviewer",
+            "tap_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "connections": {
           "credential_vault_required": true,
@@ -1302,6 +1807,30 @@
           "pii_policy_required": true,
           "webhook_auth_required": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "conn.lifecycle",
+          "operations": [
+            "connector_batch",
+            "connection_batch",
+            "flow_batch",
+            "sync_batch",
+            "schedule_batch",
+            "review_batch",
+            "connector_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "conn.connectors",
+            "conn.connections",
+            "conn.flows",
+            "conn.sync_runs",
+            "conn.schedules",
+            "conn.reviews",
+            "conn.agents"
+          ],
+          "watermark": "event_time"
+        },
         "sync": {
           "allowed_modes": [
             "full_refresh",
@@ -1323,8 +1852,10 @@
         "ui": {
           "enable_audit_timeline": true,
           "enable_connection_workbench": true,
+          "enable_connector_agent_roster": true,
           "enable_connector_catalog": true,
           "enable_dashboard": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_lineage_view": true,
           "enable_marketplace": true,
           "enable_quality_console": true,
@@ -1336,9 +1867,40 @@
       },
       "id": "conn",
       "provides": [
-        "conn_operations"
+        "connector_management",
+        "connection_orchestration",
+        "connector_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "apig",
+        "auth",
+        "encr",
+        "audl"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "lifecycle_stream": "conn.lifecycle",
+        "operations": [
+          "connector_batch",
+          "connection_batch",
+          "flow_batch",
+          "sync_batch",
+          "schedule_batch",
+          "review_batch",
+          "connector_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "conn.connectors",
+          "conn.connections",
+          "conn.flows",
+          "conn.sync_runs",
+          "conn.schedules",
+          "conn.reviews",
+          "conn.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1371,6 +1933,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_conn_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_conn_lifecycle_batch"
+      },
+      "description": "CONN lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_conn_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_conn_stream_required"
+    },
     "connection_requires_owner": {
       "condition": {
         "operation": "register_connection",
@@ -1409,6 +1984,98 @@
         "required_action": "record_retirement_impact_review"
       },
       "name": "connection_retirement_requires_impact_review"
+    },
+    "connector_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_connector_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged connector-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "connector_agent_human_approval_required",
+        "required_action": "record_human_connector_agent_approval"
+      },
+      "name": "connector_agent_privileged_role_requires_human_approval"
+    },
+    "connector_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_connector_agent"
+      },
+      "description": "Connector agents must disclose machine-authored connector contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "connector_agent_requires_contribution_disclosure"
+    },
+    "connector_agent_requires_owner": {
+      "condition": {
+        "operation": "register_connector_agent",
+        "owner_present": false
+      },
+      "description": "Connector agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_agent_owner_required",
+        "required_action": "assign_connector_agent_owner"
+      },
+      "name": "connector_agent_requires_owner"
+    },
+    "connector_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_connector_agent",
+        "purpose_present": false
+      },
+      "description": "Connector agents require a documented purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_agent_purpose_required",
+        "required_action": "document_connector_agent_purpose"
+      },
+      "name": "connector_agent_requires_purpose"
+    },
+    "connector_agent_requires_scope": {
+      "condition": {
+        "operation": "register_connector_agent",
+        "scope_present": false
+      },
+      "description": "Connector agents require an explicit bounded scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "connector_agent_scope_required",
+        "required_action": "declare_connector_agent_scope"
+      },
+      "name": "connector_agent_requires_scope"
+    },
+    "connector_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_connector_agent"
+      },
+      "description": "Connector agents must use a supported connector role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_connector_agent_role",
+        "required_action": "choose_supported_connector_agent_role"
+      },
+      "name": "connector_agent_role_supported"
+    },
+    "connector_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_connector_agent"
+      },
+      "description": "Connector agents must use a supported runtime adapter.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_connector_agent_runtime",
+        "required_action": "choose_supported_connector_agent_runtime"
+      },
+      "name": "connector_agent_runtime_supported"
     },
     "connector_requires_checksum": {
       "condition": {

@@ -28,11 +28,15 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "conn"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 25
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 39
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "conn_runtime.ConnService"
 	assert contract["theme"]["tokens"]["border.radius"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["provides"] == ["connector_management", "connection_orchestration", "connector_agent_composition"]
+	assert contract["requires"] == ["apig", "auth", "encr", "audl"]
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -50,4 +54,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["capabilities"]["conn"]["runtime"]["service"] == "conn_runtime.py"
 	assert model["capabilities"]["conn"]["runtime"]["views"] == "view_models.py"
 	assert model["capabilities"]["conn"]["connector_lifecycle"]["connection"] == "ConnectionRecord"
+	assert model["capabilities"]["conn"]["connector_lifecycle"]["connector_agent"] == "ConnectorAgentRecord"
 	assert model["capabilities"]["conn"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["conn"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["conn"]["agents"]["first_class"] is True
