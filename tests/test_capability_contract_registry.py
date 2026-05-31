@@ -114,4 +114,16 @@ def test_registry_evaluates_capability_rules():
 
 	assert result["decision"] == "deny"
 	assert "tenant_context_required" in result["matched_rules"]
-	assert "operation_policy_required" in result["matched_rules"]
+	assert "event_write_requires_policy" in result["matched_rules"]
+
+
+def test_registry_normalizes_legacy_rule_effects_to_actions():
+	result = evaluate_rules(
+		"arc_accounts_receivable",
+		{"tenant_context_present": False, "operation_type": "write", "policy_attached": False},
+	)
+
+	assert result["decision"] == "deny"
+	assert isinstance(result["matched_rules"], list)
+	assert isinstance(result["actions"], list)
+	assert result["actions"]

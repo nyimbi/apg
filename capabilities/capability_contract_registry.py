@@ -126,8 +126,10 @@ def evaluate_rules(
 	"""Evaluate a capability's deterministic rules through the registry."""
 	record = load_contract_registry(root, tenant_id)[capability_id]
 	if hasattr(record.module, "evaluate_capability_rules"):
-		return record.module.evaluate_capability_rules(context)
-	return _evaluate_default(record.contract["rule_engine"]["rules"], context)
+		result = record.module.evaluate_capability_rules(context)
+	else:
+		result = _evaluate_default(record.contract["rule_engine"]["rules"], context)
+	return _normalize_rule_evaluation_result(result, context)
 
 
 def validate_contract_shape(contract: dict[str, Any], source: Path | str = "<contract>") -> None:
@@ -254,6 +256,44 @@ def _evaluate_default(rules: Iterable[dict[str, Any]], context: dict[str, Any]) 
 			elif effect.get("decision") == "require_review" and decision != "deny":
 				decision = "require_review"
 	return {"decision": decision, "matched_rules": matched, "actions": actions, "context": context}
+
+
+def _normalize_rule_evaluation_result(result: Any, context: dict[str, Any]) -> dict[str, Any]:
+	"""Normalize package-specific rule evaluators to the registry result contract."""
+	if not isinstance(result, dict):
+		return {
+			"decision": None,
+			"matched_rules": [],
+			"actions": [],
+			"context": context,
+			"errors": ["rule evaluator returned a non-object result"],
+		}
+
+	normalized = dict(result)
+	matched_rules = normalized.get("matched_rules")
+	if not isinstance(matched_rules, list):
+		matched_rules = normalized.get("matched", [])
+	if isinstance(matched_rules, list):
+		normalized["matched_rules"] = [
+			str(rule.get("name", "unnamed_rule")) if isinstance(rule, dict) else str(rule)
+			for rule in matched_rules
+		]
+	else:
+		normalized["matched_rules"] = []
+
+	actions = normalized.get("actions")
+	if not isinstance(actions, list):
+		actions = normalized.get("effects", [])
+	if isinstance(actions, list):
+		normalized["actions"] = [
+			dict(action) if isinstance(action, dict) else {"value": action}
+			for action in actions
+		]
+	else:
+		normalized["actions"] = []
+
+	normalized.setdefault("context", context)
+	return normalized
 
 
 def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:

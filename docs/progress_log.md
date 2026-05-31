@@ -23243,3 +23243,69 @@ Known gaps:
 - Did not run full repository tests, rendered UI checks, live adapters, live
   Bytewax topology, package-specific tests, or performance checks because this
   was a documentation/control-plane slice under the battery-conscious policy.
+
+### 2026-06-01 02:36 EAT
+
+Capability rule-evaluation shape normalization slice:
+
+- Fixed the strict capability operability audit failure caused by package
+  rule evaluators returning `effects` while the registry, CLI, and audit
+  contract required `actions`.
+- Added registry-level normalization in
+  `capabilities/capability_contract_registry.py` so custom package
+  `evaluate_capability_rules()` results consistently expose `decision`,
+  `matched_rules`, `actions`, and `context`.
+- Preserved package-owned evaluator behavior while normalizing effect/action
+  aliases at the shared registry boundary.
+- Normalized matched-rule entries to stable rule-name strings when packages
+  return richer rule objects.
+- Added regression coverage proving `arc_accounts_receivable` now returns an
+  `actions` list through the shared registry.
+- Updated stale `composition_events` tests to use the current
+  `event_write_requires_policy` rule name and schema-review context.
+- Refreshed `capabilities/README.md` to state the new strict-audit baseline:
+  109 operable contracts, 109 complete package artifact sets, 0 package gaps,
+  0 warnings, and 0 errors.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/capability_contract_registry.py compiler/capability_operability.py cli/capabilities_command.py tests/test_capability_contract_registry.py tests/test_cli_capability_operability.py`
+  passed.
+- `./.venv/bin/apg capabilities evaluate-rules arc_accounts_receivable --context-json '{"tenant_context_present": false, "operation_type": "write", "policy_attached": false}' --json`
+  passed and returned `ok: true`, `decision: deny`, matched rules
+  `tenant_context_required` and `arc_write_requires_policy`, plus a normalized
+  `actions` list.
+- `./.venv/bin/pytest -q tests/test_capability_contract_registry.py tests/test_cli_capability_operability.py`
+  passed with 13 tests.
+- `./.venv/bin/apg capabilities validate-contracts --json` passed with 109
+  valid contracts and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with
+  `ok: true`, 109 domain-specific packages, 0 materialized baselines, 0 mixed
+  packages, 0 contract-only packages, and 0 warnings.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with `ok: true`, 109 operable contracts, 109 complete packages,
+  0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg docs audit --json` passed with 15 required docs present,
+  61 local links valid, 49 documented commands recognized, and 0 violations.
+- `./.venv/bin/apg tooling audit --json` did not pass: 19 of 20 tooling
+  surfaces passed, including capability operability and capability
+  implementation; the remaining failing surface is repository hygiene with
+  pre-existing product-specific streaming-runtime text across capability docs
+  and tests. The README text touched in this slice was adjusted to avoid adding
+  another such hit.
+
+Code review:
+
+- Reviewed the fix against the audit caller and CLI report builder; normalizing
+  at `evaluate_rules()` keeps the public registry contract stable for all
+  callers without forcing 13 package-local edits.
+- Left invalid non-dict evaluator returns visibly invalid instead of pretending
+  they are successful rule decisions.
+
+Known gaps:
+
+- Did not run full repository tests, rendered UI checks, live adapters, live
+  Bytewax topology, or performance checks during this battery-conscious shared
+  registry slice.
+- Did not attempt to clear the broader repository-hygiene streaming-runtime
+  text backlog in this slice.

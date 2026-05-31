@@ -61,7 +61,10 @@ def test_capabilities_evaluate_rules_reads_context_file():
 	runner = CliRunner()
 	with runner.isolated_filesystem():
 		with open("context.json", "w", encoding="utf-8") as handle:
-			json.dump({"risk_level": "high", "review_recorded": False}, handle)
+			json.dump(
+				{"operation": "register_schema", "breaking_change": True, "review_recorded": False},
+				handle,
+			)
 		result = runner.invoke(
 			cli,
 			[
@@ -77,7 +80,7 @@ def test_capabilities_evaluate_rules_reads_context_file():
 	assert result.exit_code == 0, result.output
 	payload = json.loads(result.output)
 	assert payload["decision"] == "require_review"
-	assert "high_risk_requires_review" in payload["matched_rules"]
+	assert "breaking_schema_requires_review" in payload["matched_rules"]
 
 
 def test_capabilities_evaluate_rules_rejects_invalid_context_shape():

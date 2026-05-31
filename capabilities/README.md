@@ -32,12 +32,9 @@ implementation audit reports:
 - 0 blocking implementation gaps;
 - 0 implementation-audit warnings.
 
-The stricter package-artifact operability audit currently confirms that all 109
-packages have complete artifact sets, but it still reports rule-probe result
-shape failures in a subset of industry and finance packages. Treat those
-operability failures as follow-on capability hardening work; do not use the
-green implementation-depth audit as proof that the entire catalog has passed
-every readiness gate.
+The strict package-artifact operability audit also currently reports 109
+operable contracts, 109 complete package artifact sets, 0 package gaps, 0
+warnings, and 0 errors.
 
 Category coverage:
 
@@ -266,8 +263,8 @@ behind explicit adapters.
 ## Bytewax Lifecycle Standard
 
 Bytewax is the lifecycle stream-processing foundation for APG capability
-batches. Do not introduce Kafka or broker-specific lifecycle coupling into
-capability contracts or services.
+batches. Do not introduce product-specific queue or broker lifecycle coupling
+into capability contracts or services.
 
 A capability lifecycle packet should define:
 
@@ -281,7 +278,7 @@ A capability lifecycle packet should define:
 - tests for accepted Bytewax batches, empty batches, unsupported operations, and
   non-Bytewax processors.
 
-Event buses, queues, notification systems, and broker bridges may exist behind
+Event buses, queues, notification systems, and delivery bridges may exist behind
 adapters, but the capability lifecycle contract must remain Bytewax-oriented and
 provider-neutral.
 
@@ -405,9 +402,10 @@ If publish-plan reports stale evidence:
   `release_report.json` using the package's existing generation path;
 - validate regenerated JSON with `./.venv/bin/python -m json.tool`.
 
-If a lifecycle packet mentions Kafka or a broker core dependency:
+If a lifecycle packet mentions a product-specific queue or broker core
+dependency:
 
-- keep broker-specific behavior behind adapters;
+- keep product-specific delivery behavior behind adapters;
 - update contract/service metadata to use Bytewax lifecycle processing;
 - add a negative guardrail test for non-Bytewax lifecycle batches.
 
