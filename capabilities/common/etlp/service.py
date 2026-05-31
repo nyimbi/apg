@@ -15,7 +15,13 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Union, AsyncGenerator
 from uuid_extensions import uuid7str
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_ETLP_AGENT_ROLES,
+	SUPPORTED_ETLP_AGENT_ROLES,
+	SUPPORTED_ETLP_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	Pipeline, Transformation, Execution, DataSource, QualityRule, Schedule,
 	PipelineStatus, ExecutionMode, TransformationType, QualityRuleType,
@@ -151,6 +157,36 @@ class ETLPReplayRecord:
 
 
 @dataclass
+class ETLPPipelineAgentRecord:
+	agent_id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class ETLPLifecycleBatchRecord:
+	batch_id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
 class ETLPAuditEventRecord:
 	event_id: str
 	tenant_id: str
@@ -168,6 +204,9 @@ class ETLPLifecycleService:
 
 	def __init__(self, tenant_id: str = "default"):
 		self.tenant_id = tenant_id
+		self._agent_runtimes = set(SUPPORTED_ETLP_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_ETLP_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_ETLP_AGENT_ROLES)
 		self.pipelines: dict[str, ETLPPipelineRecord] = {}
 		self.datasources: dict[str, ETLPDatasourceRecord] = {}
 		self.mappings: dict[str, ETLPMappingRecord] = {}
@@ -176,6 +215,8 @@ class ETLPLifecycleService:
 		self.schedules: dict[str, ETLPScheduleRecord] = {}
 		self.publish_reviews: dict[str, ETLPPublishRecord] = {}
 		self.replay_requests: dict[str, ETLPReplayRecord] = {}
+		self.pipeline_agents: dict[str, ETLPPipelineAgentRecord] = {}
+		self.lifecycle_batches: dict[str, ETLPLifecycleBatchRecord] = {}
 		self.audit_events: list[ETLPAuditEventRecord] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -519,6 +560,102 @@ class ETLPLifecycleService:
 		self._audit(tenant_id, "pipeline.retire_evaluated", pipeline.pipeline_id, self._require_text(actor, "actor"), decision, context)
 		return pipeline
 
+	def register_pipeline_agent(
+		self,
+		*,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> ETLPPipelineAgentRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		agent_id = self._require_text(agent_id, "agent_id")
+		name = self._require_text(name, "name")
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_pipeline_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		}
+		decision = evaluate_capability_rules(context)
+		if decision["decision"] == "deny":
+			self._audit(
+				tenant_id,
+				"agent.registration_denied",
+				agent_id,
+				str(owner or "system").strip() or "system",
+				decision,
+				context,
+			)
+			raise PermissionError(self._first_reason(decision))
+		record_key = self._key(tenant_id, agent_id)
+		if record_key in self.pipeline_agents:
+			raise ValueError(f"pipeline_agent_already_exists:{agent_id}")
+		record = ETLPPipelineAgentRecord(
+			agent_id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=self._require_text(scope, "scope"),
+			owner=self._require_text(owner, "owner"),
+			purpose=self._require_text(purpose, "purpose"),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+		)
+		self.pipeline_agents[record_key] = record
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, decision, asdict(record))
+		return record
+
+	def validate_etlp_lifecycle_batch(
+		self,
+		*,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> ETLPLifecycleBatchRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("etlp_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_etlp_lifecycle_batch",
+			"event_stream": stream_value,
+		}
+		decision = evaluate_capability_rules(context)
+		accepted = decision["decision"] == "allow"
+		record = ETLPLifecycleBatchRecord(
+			batch_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			accepted=accepted,
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[self._key(tenant_id, record.batch_id)] = record
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "etlp", decision, asdict(record))
+		if not accepted:
+			raise PermissionError(self._first_reason(decision))
+		return record
+
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		tenant_id = tenant_id or self.tenant_id
 		collections: dict[str, Any] = {
@@ -530,6 +667,8 @@ class ETLPLifecycleService:
 			"schedules": self.schedules.values(),
 			"publish_reviews": self.publish_reviews.values(),
 			"replay_requests": self.replay_requests.values(),
+			"pipeline_agents": self.pipeline_agents.values(),
+			"lifecycle_batches": self.lifecycle_batches.values(),
 			"audit_events": self.audit_events,
 		}
 		if record_type:
@@ -557,6 +696,9 @@ class ETLPLifecycleService:
 			"schedule_count": len(self.list_records(tenant_id, "schedules")),
 			"published_count": sum(1 for row in self.list_records(tenant_id, "publish_reviews") if row["status"] == "published"),
 			"review_count": sum(1 for record_type in ("datasources", "executions", "replay_requests") for row in self.list_records(tenant_id, record_type) if row["status"] == "pending_review"),
+			"pipeline_agent_count": len(self.list_records(tenant_id, "pipeline_agents")),
+			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
+			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
 
@@ -614,6 +756,17 @@ class ETLPLifecycleService:
 		if text not in allowed:
 			raise ValueError(f"{field_name} must be one of {sorted(allowed)}")
 		return text
+
+	@staticmethod
+	def _normalize_agent_token(value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	@staticmethod
+	def _first_reason(result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "etlp_operation_denied"
 
 	@staticmethod
 	def _key(tenant_id: str, record_id: str) -> str:

@@ -52,13 +52,17 @@ def semantic_model() -> dict[str, Any]:
 			"etlp": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["etlp_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
+				"agents": {
+					"pipeline_agent_contract": contract["agents"],
+				},
+				"streaming": contract["streaming"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -74,6 +78,7 @@ def semantic_model() -> dict[str, Any]:
 					"schedule": "ETLPScheduleRecord",
 					"publish": "ETLPPublishRecord",
 					"replay": "ETLPReplayRecord",
+					"pipeline_agent": "ETLPPipelineAgentRecord",
 				},
 				"pipeline_lifecycle": {
 					"pipeline": "ETLPPipelineRecord",
@@ -84,22 +89,22 @@ def semantic_model() -> dict[str, Any]:
 					"schedule": "ETLPScheduleRecord",
 					"publish": "ETLPPublishRecord",
 					"replay": "ETLPReplayRecord",
+					"lifecycle_batch": "ETLPLifecycleBatchRecord",
 					"audit": "ETLPAuditEventRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {
-					"engine": contract["configuration"]["adapters"]["event_stream"],
-				},
 			}
 		},
 		"contracts": {
 			"etlp": {
 				"id": "etlp",
 				"configuration": contract["configuration"],
-				"provides": ["etlp_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -107,9 +112,15 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"etlp": []},
+			"capability_dependencies": {"etlp": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"etlp_pipeline_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -133,7 +144,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"pipeline_agents": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -171,18 +184,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {}).get("pipeline_agent_contract", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "etlp" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 14:
+	if len(routes) < 16:
 		errors.append("ETLP semantic model route manifest is stale")
-	if len(rules) < 18:
+	if len(rules) < 31:
 		errors.append("ETLP semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("ETLP adapter manifest must use Bytewax for event streaming")
+	if "codex" not in agents.get("supported_runtimes", []):
+		errors.append("ETLP agent manifest must include Codex runtime")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("ETLP streaming manifest must remain Bytewax-first")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

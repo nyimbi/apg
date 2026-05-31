@@ -28,8 +28,12 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "etlp"
-	assert len(contract["ui"]["routes"]) >= 14
-	assert len(contract["rule_engine"]["rules"]) >= 18
+	assert contract["provides"] == ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition"]
+	assert contract["requires"] == ["mdm", "meta", "mqeb", "moni"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert len(contract["ui"]["routes"]) >= 16
+	assert len(contract["rule_engine"]["rules"]) >= 31
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
@@ -48,3 +52,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert "etlp" in model["capabilities"]
 	assert model["capabilities"]["etlp"]["runtime"]["views"] == "view_models.py"
 	assert model["capabilities"]["etlp"]["pipeline_lifecycle"]["execution"] == "ETLPExecutionRecord"
+	assert model["capabilities"]["etlp"]["approvals"]["pipeline_agent"] == "ETLPPipelineAgentRecord"
+	assert model["capabilities"]["etlp"]["streaming"]["required_processor"] == "bytewax"
+	assert "codex" in model["capabilities"]["etlp"]["agents"]["pipeline_agent_contract"]["supported_runtimes"]

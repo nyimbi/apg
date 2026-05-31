@@ -15,8 +15,10 @@ from .service import (
 	ETLPAuditEventRecord,
 	ETLPDatasourceRecord,
 	ETLPExecutionRecord,
+	ETLPLifecycleBatchRecord,
 	ETLPLifecycleService,
 	ETLPMappingRecord,
+	ETLPPipelineAgentRecord,
 	ETLPPipelineRecord,
 	ETLPPublishRecord,
 	ETLPQualityRecord,
@@ -93,6 +95,8 @@ APG_CAPABILITY_METADATA = {
 			"quality_gates",
 			"lineage_emission",
 			"retry_replay_backfill_controls",
+			"pipeline_agent_composition",
+			"lifecycle_batch_validation",
 			"adapter_boundaries"
 	]
 }
@@ -107,8 +111,9 @@ def register_capability() -> dict:
 		"display_name": "ETL/ELT Processing",
 		"description": __description__,
 		"version": __version__,
-		"dependencies": APG_CAPABILITY_METADATA["dependencies"],
+		"dependencies": contract["requires"],
 		"optional_dependencies": APG_CAPABILITY_METADATA["optional_dependencies"],
+		"api_prefix": contract["ui"]["api_prefix"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -120,7 +125,9 @@ def register_capability() -> dict:
 			"datasource_governance": "Approve and govern pipeline sources and targets",
 			"execution_controls": "Enforce approval, idempotency, retry, replay, and backfill controls",
 			"capability_rules": "Evaluate deterministic pipeline governance rules",
-			"visual_theming": "Apply pipeline-console theme tokens and components"
+			"visual_theming": "Apply pipeline-console theme tokens and components",
+			"pipeline_agent_composition": "Register first-class pipeline agents across Codex, Claude Code, opencode, Pi, and future runtime adapters",
+			"lifecycle_batch_validation": "Validate ETLP lifecycle mutation batches against Bytewax-first stream rules"
 		},
 		"endpoints": {
 			"pipelines": "/etlp/api/v1/pipelines",
@@ -128,13 +135,17 @@ def register_capability() -> dict:
 			"executions": "/etlp/api/v1/executions",
 			"datasources": "/etlp/api/v1/datasources",
 			"quality": "/etlp/api/v1/quality",
-			"lineage": "/etlp/api/v1/lineage"
+			"lineage": "/etlp/api/v1/lineage",
+			"agents": "/etlp/api/v1/agents",
+			"lifecycle": "/etlp/api/v1/lifecycle"
 		},
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]
 		},
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"permissions": APG_CAPABILITY_METADATA["permissions"]
 	}

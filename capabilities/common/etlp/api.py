@@ -1499,6 +1499,16 @@ def retire_pipeline_record(**kwargs) -> Dict[str, Any]:
 	return SERVICE.retire_pipeline(**kwargs).__dict__
 
 
+def register_pipeline_agent(**kwargs) -> Dict[str, Any]:
+	"""Register a governed pipeline agent through the lifecycle service."""
+	return SERVICE.register_pipeline_agent(**kwargs).__dict__
+
+
+def validate_etlp_lifecycle_batch(**kwargs) -> Dict[str, Any]:
+	"""Validate a Bytewax ETLP lifecycle batch."""
+	return SERVICE.validate_etlp_lifecycle_batch(**kwargs).__dict__
+
+
 def list_records(tenant_id: str = "default", record_type: str | None = None) -> List[Dict[str, Any]]:
 	"""List dependency-light ETLP lifecycle records."""
 	return SERVICE.list_records(tenant_id, record_type)
@@ -1512,6 +1522,8 @@ def list_metadata(tenant_id: str = "default") -> Dict[str, Any]:
 		"datasources": SERVICE.list_records(tenant_id, "datasources"),
 		"executions": SERVICE.list_records(tenant_id, "executions"),
 		"publish_reviews": SERVICE.list_records(tenant_id, "publish_reviews"),
+		"pipeline_agents": SERVICE.list_records(tenant_id, "pipeline_agents"),
+		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
 	}
 
 

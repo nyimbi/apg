@@ -6,7 +6,8 @@ ETLP already has a production-oriented async service, Pydantic models, FastAPI
 controller, field mapper, executable capability contract, app package evidence,
 and focused tests. It still needs a coherent generated-application lifecycle
 packet comparable to the completed KEYM, MQEB, CACH, MONI, HLTH, MDM, and META
-packets.
+packets, including first-class AI/pipeline-agent composition and Bytewax
+lifecycle batch validation.
 
 Known issues at packet start:
 
@@ -40,7 +41,10 @@ Known issues at packet start:
    - Add deterministic rules for datasource approval, schedule review, replay
      range, retry count, embedded secrets, destructive delete, publish quality,
      lineage emission, cost review, and tenant context.
-   - Expand UI routes and theme components for the full lifecycle.
+   - Add first-class pipeline-agent metadata and Bytewax lifecycle stream
+     metadata.
+   - Expand UI routes and theme components for the full lifecycle,
+     pipeline-agent roster, and lifecycle-batch monitor.
 
 4. Generated-app lifecycle service
    - Add dependency-light records for pipelines, datasources, transformations,
@@ -49,6 +53,8 @@ Known issues at packet start:
    - Add helper methods for register, approve, schedule, execute, pause,
      resume, cancel, retry, replay, backfill, assess quality, publish, and
      retire.
+   - Add helper methods for pipeline-agent registration and Bytewax
+     lifecycle-batch validation.
    - Keep `ETLPService` as the production runtime and make adapter boundaries
      explicit.
 
@@ -56,7 +62,8 @@ Known issues at packet start:
    - Add generated-app helper functions to `api.py`.
    - Add or refine view models for dashboard, pipelines, designer, field
      mapper, executions, quality, datasources, schedules, publish review,
-     lineage, adapter health, audit, and settings.
+     lineage, pipeline-agent roster, lifecycle-batch monitor, adapter health,
+     audit, and settings.
 
 6. Package evidence
    - Replace static semantic JSON with contract-derived evidence.

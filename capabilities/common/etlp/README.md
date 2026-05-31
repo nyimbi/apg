@@ -24,8 +24,15 @@ applications can invoke ETLP without needing the full production runtime.
   MDM.
 - Deterministic policy rules for tenant context, owner assignment, production
   approval, quality gates, lineage emission, and cost review.
+- First-class pipeline-agent registration for Codex, Claude Code, opencode, Pi,
+  and future APG-compatible runtimes.
+- Pipeline-agent guardrails for supported roles, declared scope, owner, purpose,
+  machine-contribution disclosure, and human approval for privileged roles.
+- Bytewax lifecycle batch validation for pipeline, datasource, mapping,
+  execution, quality, publish, replay, and pipeline-agent streams.
 - UI routes for dashboard, workbench, designer, field mapper, executions,
-  quality, datasources, and settings.
+  quality, datasources, pipeline-agent roster, lifecycle-batch monitor, and
+  settings.
 - Theme tokens and component contracts for generated application shells.
 
 ## Main Files
@@ -60,19 +67,46 @@ decision = evaluate_capability_rules({
 assert decision["decision"] == "deny"
 ```
 
-## Using the Runtime Service
+## Using the Generated-App Lifecycle Service
 
 ```python
-from capabilities.common.etlp.service import ETLPService
+from capabilities.common.etlp.service import ETLPLifecycleService
 
-service = ETLPService("tenant-data", "pipeline-owner")
+service = ETLPLifecycleService()
+
+pipeline = service.register_pipeline(
+    tenant_id="tenant-data",
+    pipeline_id="customer-sync",
+    name="Customer sync",
+    mode="elt",
+    owner="pipeline-owner",
+)
+
+agent = service.register_pipeline_agent(
+    tenant_id="tenant-data",
+    agent_id="publish-reviewer",
+    name="Publish Reviewer",
+    runtime="codex",
+    role="publish_gate_reviewer",
+    scope="customer publish readiness",
+    owner="pipeline-office",
+    purpose="review transformed output before publication",
+    human_approval_required=True,
+)
+
+batch = service.validate_etlp_lifecycle_batch(
+    tenant_id="tenant-data",
+    event_stream="bytewax",
+    mutation_count=6,
+)
+
+assert pipeline.status == "draft"
+assert agent.runtime == "codex"
+assert batch.status == "accepted"
 ```
 
-The service is designed for APG runtime injection. Generated applications should
-prefer the dependency-light lifecycle helpers that will be added in the next
-implementation pass, while production deployments can continue to use
-`ETLPService` with injected auth, audit, metadata, notification, and
-collaboration services.
+Production deployments can continue to use `ETLPService` with injected auth,
+audit, metadata, notification, and collaboration services.
 
 ## Guardrails
 
@@ -86,6 +120,9 @@ ETLP guardrails must protect:
 - Cost review for high-estimate executions.
 - Datasource approval, secret handling, retry policy, schedule review,
   backfill, replay, and destructive-delete controls as the packet is expanded.
+- Pipeline-agent runtime, role, scope, owner, purpose, contribution disclosure,
+  and privileged-role human approval.
+- Bytewax lifecycle-batch validation.
 
 ## Adapter Boundaries
 
@@ -94,6 +131,11 @@ plane. Durable execution engines, connector registries, Bytewax stream flows,
 metadata stores, lineage emitters, quality profilers, AI optimizers, and
 observability sinks should be configured as adapters that receive guardrail
 decisions from the capability.
+
+The ETLP packet intentionally does not embed SDK clients for Codex, Claude
+Code, opencode, Pi, or future agent providers. Those runtimes connect through
+adapters that preserve the APG contract, guardrail decisions, audit events, and
+human-approval requirements.
 
 ## Focused Verification
 

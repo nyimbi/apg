@@ -13,6 +13,26 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_ETLP_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_ETLP_AGENT_ROLES = [
+	"pipeline_designer_reviewer",
+	"datasource_reviewer",
+	"mapping_reviewer",
+	"quality_gate_reviewer",
+	"lineage_reviewer",
+	"execution_reviewer",
+	"publish_gate_reviewer",
+	"replay_reviewer",
+]
+PRIVILEGED_ETLP_AGENT_ROLES = [
+	"datasource_reviewer",
+	"quality_gate_reviewer",
+	"execution_reviewer",
+	"publish_gate_reviewer",
+	"replay_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped ETLP configuration defaults and schema."""
@@ -85,6 +105,42 @@ class CapabilityConfiguration:
 			"lineage_emitter": "adapter",
 			"secret_store": "adapter"
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_ETLP_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_ETLP_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_ETLP_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "etlp.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"pipeline_batch",
+				"datasource_batch",
+				"mapping_batch",
+				"execution_batch",
+				"quality_batch",
+				"publish_batch",
+				"replay_batch",
+				"pipeline_agent_batch"
+			],
+			"topics": [
+				"etlp.pipelines",
+				"etlp.datasources",
+				"etlp.mappings",
+				"etlp.executions",
+				"etlp.quality",
+				"etlp.publish",
+				"etlp.replay",
+				"etlp.agents"
+			]
+		},
 		"ui": {
 			"enable_pipeline_designer": True,
 			"enable_execution_monitor": True,
@@ -93,7 +149,9 @@ class CapabilityConfiguration:
 			"enable_publish_review": True,
 			"enable_replay_console": True,
 			"enable_adapter_health": True,
-			"enable_audit_timeline": True
+			"enable_audit_timeline": True,
+			"enable_pipeline_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True
 		},
 		"theme": {
 			"default_theme": "etlp_pipeline_console",
@@ -113,6 +171,8 @@ class CapabilityConfiguration:
 			"optimization",
 			"execution",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme"
 		],
@@ -127,6 +187,8 @@ class CapabilityConfiguration:
 			"optimization": {"type": "object"},
 			"execution": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
 		}
@@ -205,7 +267,9 @@ class CapabilityTheme:
 		"publish_review_queue": {"visual": "quality-lineage-review", "highlight": "gate-chip"},
 		"replay_console": {"visual": "bounded-time-window", "status_style": "replay-state-pill"},
 		"adapter_health_panel": {"visual": "adapter-grid", "status_indicator": "health-pill"},
-		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-pill"}
+		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-pill"},
+		"pipeline_agent_roster": {"icon": "bot", "status_indicator": "approval-state", "variant": "pipeline-agent-governance"},
+		"bytewax_lifecycle_panel": {"icon": "activity", "status_indicator": "processor-state", "variant": "pipeline-stream-lifecycle"}
 	})
 
 
@@ -233,7 +297,15 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule("retry_limit_requires_review", "Retry requests above tenant limits require review.", {"operation": "retry_execution", "retry_count_gt": 3, "retry_review_recorded": False}, {"decision": "require_review", "reason": "retry_review_required", "required_action": "record_retry_review"}),
 		CapabilityRule("replay_requires_reason", "Replay and backfill requests require a business reason.", {"operation": "replay_execution", "reason_present": False}, {"decision": "deny", "reason": "replay_reason_required", "required_action": "attach_replay_reason"}),
 		CapabilityRule("replay_window_requires_review", "Replay windows above the tenant limit require review.", {"operation": "replay_execution", "replay_window_hours_gt": 72, "replay_review_recorded": False}, {"decision": "require_review", "reason": "replay_window_review_required", "required_action": "record_replay_review"}),
-		CapabilityRule("destructive_delete_requires_review", "Destructive pipeline deletion requires impact review.", {"operation": "retire_pipeline", "impact_review_recorded": False}, {"decision": "deny", "reason": "impact_review_required", "required_action": "record_impact_review"})
+		CapabilityRule("destructive_delete_requires_review", "Destructive pipeline deletion requires impact review.", {"operation": "retire_pipeline", "impact_review_recorded": False}, {"decision": "deny", "reason": "impact_review_required", "required_action": "record_impact_review"}),
+		CapabilityRule("pipeline_agent_runtime_supported", "Pipeline agents must use a supported runtime adapter.", {"operation": "register_pipeline_agent", "agent_runtime_supported": False}, {"decision": "deny", "reason": "unsupported_pipeline_agent_runtime", "required_action": "select_supported_agent_runtime"}),
+		CapabilityRule("pipeline_agent_role_supported", "Pipeline agents must use a supported pipeline governance role.", {"operation": "register_pipeline_agent", "agent_role_supported": False}, {"decision": "deny", "reason": "unsupported_pipeline_agent_role", "required_action": "select_supported_agent_role"}),
+		CapabilityRule("pipeline_agent_requires_scope", "Pipeline agents require an explicit operating scope.", {"operation": "register_pipeline_agent", "agent_scope_present": False}, {"decision": "deny", "reason": "pipeline_agent_scope_required", "required_action": "attach_agent_scope"}),
+		CapabilityRule("pipeline_agent_requires_owner", "Pipeline agents require an accountable owner.", {"operation": "register_pipeline_agent", "agent_owner_present": False}, {"decision": "deny", "reason": "pipeline_agent_owner_required", "required_action": "attach_agent_owner"}),
+		CapabilityRule("pipeline_agent_requires_purpose", "Pipeline agents require a declared purpose.", {"operation": "register_pipeline_agent", "agent_purpose_present": False}, {"decision": "deny", "reason": "pipeline_agent_purpose_required", "required_action": "attach_agent_purpose"}),
+		CapabilityRule("pipeline_agent_requires_contribution_disclosure", "Pipeline agents must disclose machine contribution in pipeline decisions.", {"operation": "register_pipeline_agent", "contribution_disclosed": False}, {"decision": "deny", "reason": "pipeline_agent_contribution_disclosure_required", "required_action": "enable_agent_contribution_disclosure"}),
+		CapabilityRule("pipeline_agent_privileged_role_requires_human_approval", "Privileged pipeline-agent roles require human approval.", {"operation": "register_pipeline_agent", "privileged_agent_role": True, "human_approval_required": False}, {"decision": "deny", "reason": "pipeline_agent_human_approval_required", "required_action": "require_human_approval_for_agent"}),
+		CapabilityRule("bytewax_etlp_stream_required", "ETLP lifecycle batches must declare Bytewax as the pipeline lifecycle processor.", {"operation": "validate_etlp_lifecycle_batch", "event_stream_ne": "bytewax"}, {"decision": "deny", "reason": "bytewax_etlp_stream_required", "required_action": "route_batch_through_bytewax"})
 	]
 
 
@@ -252,15 +324,78 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("replay", "/etlp/replay", "ReplayConsole", "etlp:execution:replay", "Operations"),
 		CapabilityUIRoute("adapters", "/etlp/adapters", "ETLPAdapterHealth", "etlp:admin", "Administration"),
 		CapabilityUIRoute("audit", "/etlp/audit", "ETLPAuditTimeline", "etlp:audit:read", "Governance"),
+		CapabilityUIRoute("agents", "/etlp/agents", "PipelineAgentRoster", "etlp:admin", "Administration"),
+		CapabilityUIRoute("lifecycle", "/etlp/lifecycle", "ETLPLifecycleBatchMonitor", "etlp:admin", "Runtime"),
 		CapabilityUIRoute("settings", "/etlp/settings", "ETLPSettings", "etlp:pipeline:write", "Administration")
 	]
 	return {"shell": "apg_python", "view_module": "view_models.py", "api_prefix": "/etlp/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
+def agent_manifest() -> dict[str, Any]:
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_ETLP_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_ETLP_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_ETLP_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "etlp.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"pipeline_batch",
+			"datasource_batch",
+			"mapping_batch",
+			"execution_batch",
+			"quality_batch",
+			"publish_batch",
+			"replay_batch",
+			"pipeline_agent_batch"
+		],
+		"topics": [
+			"etlp.pipelines",
+			"etlp.datasources",
+			"etlp.mappings",
+			"etlp.executions",
+			"etlp.quality",
+			"etlp.publish",
+			"etlp.replay",
+			"etlp.agents"
+		],
+		"broker_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
-	return {"capability": "etlp", "display_name": "ETL/ELT Processing", "configuration": config.for_tenant(tenant_id, overrides), "configuration_schema": config.schema, "rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]}, "ui": ui_manifest(), "theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}}
+	return {
+		"capability": "etlp",
+		"display_name": "ETL/ELT Processing",
+		"provides": ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition"],
+		"requires": ["mdm", "meta", "mqeb", "moni"],
+		"configuration": config.for_tenant(tenant_id, overrides),
+		"configuration_schema": config.schema,
+		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
+		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}
+	}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
@@ -274,6 +409,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_lt"):
 			if not context.get(key[:-3], 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

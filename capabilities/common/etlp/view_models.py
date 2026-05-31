@@ -25,6 +25,7 @@ def dashboard_model(service: ETLPLifecycleService, tenant_id: str = "default") -
 			{"id": "register_datasource", "label": "Register datasource", "permission": "etlp:datasource:write"},
 			{"id": "execute_pipeline", "label": "Execute pipeline", "permission": "etlp:pipeline:execute"},
 			{"id": "publish_output", "label": "Review publish", "permission": "etlp:publish:review"},
+			{"id": "register_agent", "label": "Register agent", "permission": "etlp:admin"},
 		],
 	}
 
@@ -130,12 +131,37 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def pipeline_agent_roster_model(service: ETLPLifecycleService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "pipeline_agents"),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"columns": ["name", "runtime", "role", "owner", "purpose", "status", "human_approval_required"],
+	}
+
+
+def lifecycle_batch_model(service: ETLPLifecycleService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"rows": service.list_records(tenant_id, "lifecycle_batches"),
+		"columns": ["event_stream", "mutation_count", "accepted", "decision", "required_processor", "status"],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

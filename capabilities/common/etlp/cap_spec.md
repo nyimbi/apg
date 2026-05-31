@@ -12,12 +12,16 @@ The current packet provides:
   rule engine, UI manifest, and theme.
 - Dependency-light `ETLPLifecycleService` for generated APG applications.
 - Lifecycle records for pipelines, datasources, mappings, executions, quality
-  results, publish reviews, replay requests, and audit events.
+  results, publish reviews, replay requests, pipeline agents, lifecycle
+  batches, and audit events.
 - Guardrails for tenant context, owner assignment, supported modes,
   datasource approval, datasource type, embedded secrets, mapping schema
   validation, registered mapping endpoints, production approval, idempotency,
   publish quality, publish approval, lineage emission, cost review, retry
   review, replay reason, replay window, and destructive retirement review.
+- First-class pipeline-agent guardrails for supported runtimes, roles, scope,
+  owner, purpose, contribution disclosure, and privileged-role human approval.
+- Bytewax lifecycle-batch validation for generated applications and adapters.
 - FastAPI runtime controller with explicit adapter-boundary responses for
   persistence-backed operations that are not available without runtime storage.
 - View models for generated application screens.
@@ -46,6 +50,7 @@ Adapters must honor ETLP decisions before performing side effects:
 - Quality engine.
 - Secret store.
 - Bytewax event stream.
+- Codex, Claude Code, opencode, Pi, and future pipeline-agent runtime adapters.
 - Audit and monitoring sinks.
 
 No adapter should execute, publish, replay, retry, backfill, or destructively
@@ -67,6 +72,8 @@ ETLP exposes screens for:
 - Publish review.
 - Lineage.
 - Replay/backfill.
+- Pipeline-agent roster.
+- Bytewax lifecycle monitor.
 - Adapter health.
 - Audit timeline.
 - Settings.

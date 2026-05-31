@@ -1,5 +1,7 @@
 """Regression coverage for the ETLP executable capability contract."""
 
+import pytest
+
 from capabilities.common.etlp import register_capability
 from capabilities.common.etlp.capability_contract import (
 	evaluate_capability_rules,
@@ -11,7 +13,9 @@ from capabilities.common.etlp.view_models import (
 	dashboard_model,
 	datasource_manager_model,
 	execution_monitor_model,
+	lifecycle_batch_model,
 	pipeline_workbench_model,
+	pipeline_agent_roster_model,
 	publish_review_model,
 	replay_console_model,
 	schedule_console_model,
@@ -36,10 +40,18 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"optimization",
 		"execution",
 		"adapters",
+		"agents",
+		"streaming",
 		"ui",
 		"theme"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 21
+	assert contract["provides"] == ["pipeline_lifecycle", "data_integration_governance", "pipeline_agent_composition"]
+	assert contract["requires"] == ["mdm", "meta", "mqeb", "moni"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "publish_gate_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["broker_core_dependency_allowed"] is False
+	assert len(contract["rule_engine"]["rules"]) >= 31
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"pipelines",
@@ -54,12 +66,16 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"replay",
 		"adapters",
 		"audit",
+		"agents",
+		"lifecycle",
 		"settings"
 	}
 	assert contract["ui"]["api_prefix"] == "/etlp/api/v1"
 	assert contract["ui"]["view_module"] == "view_models.py"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "field_mapping_canvas" in contract["theme"]["components"]
+	assert "pipeline_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 
 
@@ -111,6 +127,39 @@ def test_rule_engine_enforces_pipeline_guardrails():
 	assert "replay_window_requires_review" in replay_result["matched_rules"]
 
 
+def test_rule_engine_enforces_pipeline_agent_and_bytewax_guardrails():
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_pipeline_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"agent_scope_present": False,
+		"agent_owner_present": False,
+		"agent_purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_etlp_lifecycle_batch",
+		"event_stream": "legacy_broker",
+	})
+
+	assert agent_result["decision"] == "deny"
+	assert {
+		"pipeline_agent_runtime_supported",
+		"pipeline_agent_role_supported",
+		"pipeline_agent_requires_scope",
+		"pipeline_agent_requires_owner",
+		"pipeline_agent_requires_purpose",
+		"pipeline_agent_requires_contribution_disclosure",
+		"pipeline_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert batch_result["decision"] == "deny"
+	assert "bytewax_etlp_stream_required" in batch_result["matched_rules"]
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -119,7 +168,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "etlp_pipeline_console"
 	assert registration["ui_components"]["field_mapper"] == "/etlp/field-mapper"
-	assert "metadata" in registration["dependencies"]
+	assert registration["ui_components"]["agents"] == "/etlp/agents"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "meta" in registration["dependencies"]
 
 
 def test_lifecycle_service_enforces_datasource_mapping_execution_and_publish_guardrails():
@@ -216,6 +268,34 @@ def test_lifecycle_service_enforces_datasource_mapping_execution_and_publish_gua
 		publish_approval_recorded=True,
 		review_notes="Quality and lineage accepted.",
 	)
+	with pytest.raises(PermissionError, match="pipeline_agent_human_approval_required"):
+		service.register_pipeline_agent(
+			tenant_id="tenant-data",
+			agent_id="agent-denied",
+			name="Denied Publish Agent",
+			runtime="codex",
+			role="publish_gate_reviewer",
+			scope="production publish",
+			owner="pipeline-office",
+			purpose="review publish gates",
+		)
+	assert any(event.event_type == "agent.registration_denied" for event in service.audit_events)
+	agent = service.register_pipeline_agent(
+		tenant_id="tenant-data",
+		agent_id="agent-execute",
+		name="Execution Reviewer",
+		runtime="Claude Code",
+		role="execution reviewer",
+		scope="production execution",
+		owner="pipeline-office",
+		purpose="review production execution approvals",
+		human_approval_required=True,
+	)
+	batch = service.validate_etlp_lifecycle_batch(
+		tenant_id="tenant-data",
+		event_stream="bytewax",
+		mutation_count=7,
+	)
 
 	assert denied_secret.status == "denied"
 	assert denied_secret.matched_rules == [
@@ -236,6 +316,11 @@ def test_lifecycle_service_enforces_datasource_mapping_execution_and_publish_gua
 	assert high_quality.gate_passed is True
 	assert published.status == "published"
 	assert allowed_execution.status == "published"
+	assert agent.runtime == "claude_code"
+	assert agent.role == "execution_reviewer"
+	assert batch.accepted is True
+	assert batch.required_processor == "bytewax"
+	assert service.dashboard_summary("tenant-data")["pipeline_agent_count"] == 1
 
 
 def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
@@ -281,6 +366,38 @@ def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
 		owner="ops-owner",
 		schedule_review_recorded=False,
 	)
+	with pytest.raises(PermissionError, match="unsupported_pipeline_agent_runtime"):
+		service.register_pipeline_agent(
+			tenant_id="tenant-data",
+			agent_id="bad-agent",
+			name="Bad Agent",
+			runtime="unsupported",
+			role="pipeline_designer_reviewer",
+			scope="pipeline design",
+			owner="pipeline-office",
+			purpose="review pipeline plans",
+		)
+	with pytest.raises(PermissionError, match="bytewax_etlp_stream_required"):
+		service.validate_etlp_lifecycle_batch(
+			tenant_id="tenant-data",
+			event_stream="legacy_broker",
+			mutation_count=1,
+		)
+	service.register_pipeline_agent(
+		tenant_id="tenant-data",
+		agent_id="mapping-agent",
+		name="Mapping Reviewer",
+		runtime="opencode",
+		role="mapping_reviewer",
+		scope="field mappings",
+		owner="pipeline-office",
+		purpose="review schema mappings",
+	)
+	service.validate_etlp_lifecycle_batch(
+		tenant_id="tenant-data",
+		event_stream="bytewax",
+		mutation_count=3,
+	)
 
 	assert retry.status == "pending_review"
 	assert retry.matched_rules == ["retry_limit_requires_review"]
@@ -297,5 +414,7 @@ def test_lifecycle_service_replay_retry_retire_and_view_models_are_composable():
 	assert schedule_console_model(service, "tenant-data")["rows"][0]["schedule"] == "0 2 * * *"
 	assert publish_review_model(service, "tenant-data")["columns"][0] == "created_at"
 	assert replay_console_model(service, "tenant-data")["rows"][0]["replay_type"] == "backfill"
+	assert pipeline_agent_roster_model(service, "tenant-data")["rows"][0]["role"] == "mapping_reviewer"
+	assert lifecycle_batch_model(service, "tenant-data")["streaming"]["required_processor"] == "bytewax"
 	assert adapter_health_model("tenant-data")["event_stream"] == "bytewax"
 	assert settings_model("tenant-data")["routes"]

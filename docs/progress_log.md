@@ -20973,3 +20973,65 @@ Not run to preserve battery:
   classification engines, lineage graph, search index, external APG services,
   rendered browser UI, external AI-agent runtime clients, and performance/load
   tests.
+
+### 2026-05-31 05:01 EAT
+
+ETLP pipeline-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/etlp` as the next data-platform capability
+  after META.
+- Extended the ETLP executable contract with first-class pipeline-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported pipeline-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and
+  contract-level `provides`/`requires`.
+- Added deterministic guardrails for unsupported pipeline-agent runtime,
+  unsupported pipeline-agent role, missing pipeline-agent scope, owner,
+  purpose, missing machine contribution disclosure, privileged pipeline-agent
+  registration without human approval, and non-Bytewax ETLP lifecycle batch
+  routing.
+- Added `ETLPPipelineAgentRecord`, `ETLPLifecycleBatchRecord`,
+  tenant-qualified pipeline-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, API helper payload
+  handling, pipeline-agent roster view models, and lifecycle-batch monitor view
+  models.
+- Added `/etlp/agents`, `/etlp/lifecycle`, pipeline-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`, and
+  `todo.md` so the documented packet matches the executable contract and does
+  not imply embedded external agent runtimes or broker-first processing.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/etlp/__init__.py capabilities/common/etlp/capability_contract.py capabilities/common/etlp/models.py capabilities/common/etlp/service.py capabilities/common/etlp/api.py capabilities/common/etlp/field_mapper.py capabilities/common/etlp/views.py capabilities/common/etlp/app.py capabilities/common/etlp/test_capability_contract.py capabilities/common/etlp/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/etlp/test_capability_contract.py capabilities/common/etlp/tests/test_package_contract.py`
+  passed with 8 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/etlp/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect etlp --json` passed with `ok: true`,
+  16 APG Python routes, 31 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/etlp --json`
+  passed with `ok: true`; ETLP remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/etlp --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/etlp -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "... ETLPLifecycleService ... register_pipeline_agent ... validate_etlp_lifecycle_batch ..."`
+  returned one `codex` publish-gate reviewer with owner and purpose evidence,
+  human approval required, normalized role, and `bytewax` lifecycle-batch
+  evidence.
+- Focused stale-marker scan over touched ETLP packet source, docs, tests, and
+  evidence returned no matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live connector registry, live execution engine, live Bytewax topology,
+  quality profiler, lineage emitter, secret store, external APG services,
+  rendered browser UI, external AI-agent runtime clients, and performance/load
+  tests.

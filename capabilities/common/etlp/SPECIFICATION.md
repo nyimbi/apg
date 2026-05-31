@@ -25,6 +25,8 @@ ETLP owns:
 - Cost, resource, concurrency, and production approval review gates.
 - UI view models for pipeline design and operations.
 - API/service helpers for generated APG applications.
+- First-class pipeline-agent registration and governance.
+- Bytewax lifecycle batch validation for pipeline mutation streams.
 
 ETLP integrates with:
 
@@ -36,6 +38,8 @@ ETLP integrates with:
 - `audl` for immutable audit trails.
 - `conf` for tenant configuration.
 - `cach` for pipeline metadata and planning caches.
+- AI/pipeline-agent runtimes such as Codex, Claude Code, opencode, Pi, and
+  future adapters through first-class but provider-neutral composition.
 
 ## Functional Requirements
 
@@ -96,6 +100,29 @@ ETLP must support:
 - Blocking publish when quality gate evidence is missing or failing.
 - Recording matched guardrail rules and required actions.
 
+### Pipeline-Agent Composition
+
+ETLP must support first-class AI/pipeline-agent contributors:
+
+- Register pipeline agents per tenant.
+- Require supported runtime, supported role, declared scope, owner, purpose,
+  and machine-contribution disclosure.
+- Require human approval for privileged roles that can influence datasource,
+  execution, quality, publish, or replay decisions.
+- Persist pipeline-agent records for UI display and audit evidence.
+- Surface pipeline-agent registration failures as matched guardrails.
+
+### Bytewax Lifecycle Batches
+
+ETLP must support lifecycle-batch validation:
+
+- Require lifecycle processors to declare the `bytewax` event stream.
+- Track batch status, mutation count, and matched guardrails for UI/runtime
+  evidence.
+- Keep event brokers out of the core lifecycle contract. Brokers may exist
+  behind adapters, but Bytewax is the required lifecycle processing engine for
+  this packet.
+
 ### Rule Engine
 
 The rule engine must be deterministic and side-effect free. It must evaluate
@@ -120,6 +147,11 @@ Minimum guardrails:
 - Retry count cannot exceed configured limit.
 - Destructive delete requires no running executions and impact review.
 - Secrets cannot be embedded in datasource or pipeline records.
+- Pipeline-agent runtime and role must be supported.
+- Pipeline-agent scope, owner, purpose, and machine-contribution disclosure are
+  required.
+- Privileged pipeline-agent roles require human approval.
+- ETLP lifecycle batches must use Bytewax.
 
 ### UI and Theming
 
@@ -136,6 +168,8 @@ ETLP must expose generated-application surfaces for:
 - Lineage and publish review.
 - Adapter health.
 - Audit timeline.
+- Pipeline-agent roster.
+- Lifecycle batch monitor.
 - Settings.
 
 The UI manifest must include route names, paths, components, nav groups,
@@ -146,9 +180,12 @@ execution timeline, quality gates, lineage, publish review, and adapter health.
 ## Non-Goals for This Packet
 
 - Building every physical connector.
+- Embedding Codex, Claude Code, opencode, Pi, or any other agent runtime
+  client directly in ETLP.
 - Running a live distributed execution engine.
 - Implementing Bytewax runtime flows inside the dependency-light control plane.
 - Implementing AI optimization internals.
+- Treating any broker as the core lifecycle processor.
 - Rendering browser UI.
 - Replacing the existing production-oriented `ETLPService`.
 
@@ -165,6 +202,8 @@ These remain adapter-backed until the corresponding runtime packets are built.
 - Generated applications can call dependency-light helpers for pipeline,
   datasource, mapping, execution, quality, publish, retry, replay, and retire
   workflows.
+- Generated applications can register pipeline agents and validate Bytewax
+  lifecycle batches through dependency-light helpers.
 - Focused ETLP tests cover positive and negative guardrail paths.
 - `app.py`, `semantic_model.json`, `package_manifest.json`, and
   `release_report.json` reflect current contract-derived evidence.
