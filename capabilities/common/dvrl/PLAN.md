@@ -16,6 +16,9 @@ Known packet gaps:
 - Package test used legacy generated-package naming.
 - `app.py` embedded static semantic JSON.
 - Generated applications did not have a dependency-light lifecycle service.
+- Generated applications now need first-class virtualization-agent composition
+  and explicit Bytewax lifecycle-batch guardrails aligned with MDM, META, and
+  ETLP.
 
 ## Build Sequence
 
@@ -30,19 +33,25 @@ Known packet gaps:
    - Expand deterministic guardrails for source ownership, supported source
      type, vaulted credentials, encrypted connection, source approval, schema
      refresh, virtual table ownership, classification, read-only queries,
-     parameterization, RBAC, cache sensitivity, lineage, cost, joins, result
-     limits, cache TTL, policy review, and retirement impact review.
+   parameterization, RBAC, cache sensitivity, lineage, cost, joins, result
+   limits, cache TTL, policy review, and retirement impact review.
+   - Add first-class virtualization-agent runtime/role metadata for Codex,
+     Claude Code, OpenCode, Pi, and future provider-neutral adapters.
+   - Add Bytewax streaming metadata for lifecycle batches.
 
 3. Generated-app lifecycle service
    - Add dependency-light records and methods for source, schema, virtual
      table, query, cache, policy, source retirement, and audit workflows.
+   - Add virtualization-agent records, registration guardrails, lifecycle-batch
+     records, Bytewax validation, and dashboard counts.
    - Keep the production `DVRLService` intact as the runtime surface.
 
 4. API and view models
    - Add generated-app helper functions.
    - Add view models for dashboard, source manager, schema browser, virtual
      table catalog, query workbench, federation map, cache console, policies,
-     metrics, adapter health, audit, and settings.
+     metrics, adapter health, agent roster, lifecycle batches, audit, and
+     settings.
 
 5. Package evidence and tests
    - Replace static `app.py` semantic JSON with contract-derived evidence.

@@ -14,7 +14,8 @@
     "view_models.py",
     "app.py",
     "semantic_model.json",
-    "release_report.json"
+    "release_report.json",
+    "todo.md"
   ],
   "name": "dvrl",
   "profile": "capability",

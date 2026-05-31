@@ -29,10 +29,14 @@ DVRL is intentionally split into two layers:
 - Query cache lifecycle decisions with TTL enforcement.
 - Virtualization policy review records.
 - Source retirement impact review.
+- First-class virtualization-agent records for AI and automation tools.
+- Bytewax lifecycle-batch validation before generated applications apply
+  batched DVRL state changes.
 - Audit events for every lifecycle decision.
 - Generated UI view models for dashboard, source manager, schema browser,
   virtual table catalog, query workbench, federation map, cache console,
-  policies, metrics, adapter health, audit timeline, and settings.
+  policies, metrics, adapter health, agent roster, lifecycle batch monitor,
+  audit timeline, and settings.
 - Contract-derived semantic model and publishable package metadata.
 
 ## Important Files
@@ -105,6 +109,27 @@ query = service.execute_query(
 )
 
 assert query.status == "planned"
+
+agent = service.register_virtualization_agent(
+    tenant_id="tenant-a",
+    agent_id="query-policy-agent",
+    name="Query Policy Agent",
+    runtime="codex",
+    role="query_policy_reviewer",
+    scope="restricted federated query policy recommendations",
+    owner="data-governance",
+    purpose="review query policy changes before publication",
+    human_approval_required=True,
+)
+
+batch = service.validate_dvrl_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=4,
+)
+
+assert agent.status == "active"
+assert batch.status == "accepted"
 ```
 
 ## UI Composition
@@ -141,6 +166,7 @@ the adapter surfaces in `capability_contract.py`:
 - credential vault
 - audit sink
 - Bytewax event stream runtime
+- external AI/automation runtimes such as Codex, Claude Code, OpenCode, and Pi
 
 ## Focused Verification
 

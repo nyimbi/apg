@@ -1,5 +1,36 @@
 {
-  "agents": {},
+  "agents": {
+    "dvrl_virtualization_agents": {
+      "first_class": true,
+      "privileged_roles": [
+        "source_reviewer",
+        "virtual_table_reviewer",
+        "query_policy_reviewer",
+        "cache_policy_reviewer",
+        "publish_gate_reviewer"
+      ],
+      "requires_contribution_disclosure": true,
+      "requires_owner": true,
+      "requires_purpose": true,
+      "requires_scope": true,
+      "supported_roles": [
+        "source_reviewer",
+        "schema_reviewer",
+        "virtual_table_reviewer",
+        "query_policy_reviewer",
+        "cache_policy_reviewer",
+        "lineage_reviewer",
+        "federation_reviewer",
+        "publish_gate_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Data Virtualization package-backed APG capability",
     "entity_count": 0,
@@ -20,12 +51,44 @@
         "production_runtime": "service.DVRLService",
         "query_planner": "adapter"
       },
+      "agents": {
+        "first_class": true,
+        "privileged_roles": [
+          "source_reviewer",
+          "virtual_table_reviewer",
+          "query_policy_reviewer",
+          "cache_policy_reviewer",
+          "publish_gate_reviewer"
+        ],
+        "requires_contribution_disclosure": true,
+        "requires_owner": true,
+        "requires_purpose": true,
+        "requires_scope": true,
+        "supported_roles": [
+          "source_reviewer",
+          "schema_reviewer",
+          "virtual_table_reviewer",
+          "query_policy_reviewer",
+          "cache_policy_reviewer",
+          "lineage_reviewer",
+          "federation_reviewer",
+          "publish_gate_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
+        "lifecycle_batch": "DVRLLifecycleBatchRecord",
         "policy_change": "DVRLPolicyRecord",
         "query_cost": "DVRLQueryRecord",
         "schema_refresh": "DVRLSchemaRecord",
         "source_activation": "DVRLSourceRecord",
-        "source_retirement": "DVRLSourceRecord"
+        "source_retirement": "DVRLSourceRecord",
+        "virtualization_agent": "DVRLVirtualizationAgentRecord"
       },
       "business_rules": [],
       "components": {},
@@ -41,6 +104,37 @@
           "metadata_catalog": "meta",
           "production_runtime": "service.DVRLService",
           "query_planner": "adapter"
+        },
+        "agents": {
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "privileged_roles": [
+            "source_reviewer",
+            "virtual_table_reviewer",
+            "query_policy_reviewer",
+            "cache_policy_reviewer",
+            "publish_gate_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "source_reviewer",
+            "schema_reviewer",
+            "virtual_table_reviewer",
+            "query_policy_reviewer",
+            "cache_policy_reviewer",
+            "lineage_reviewer",
+            "federation_reviewer",
+            "publish_gate_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "cache": {
           "default_ttl_seconds": 900,
@@ -92,6 +186,30 @@
             "singer_tap"
           ]
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "dvrl.lifecycle",
+          "operations": [
+            "source_batch",
+            "schema_batch",
+            "virtual_table_batch",
+            "query_batch",
+            "cache_batch",
+            "policy_batch",
+            "virtualization_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "dvrl.sources",
+            "dvrl.schemas",
+            "dvrl.virtual_tables",
+            "dvrl.queries",
+            "dvrl.cache",
+            "dvrl.policies",
+            "dvrl.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -102,10 +220,12 @@
           "enable_audit_timeline": true,
           "enable_cache_console": true,
           "enable_federation_map": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_policy_review": true,
           "enable_query_workbench": true,
           "enable_schema_browser": true,
-          "enable_source_manager": true
+          "enable_source_manager": true,
+          "enable_virtualization_agent_roster": true
         }
       },
       "erp_modules": [
@@ -115,9 +235,15 @@
       "master_data": {},
       "name": "Data Virtualization",
       "provides": [
-        "dvrl_operations"
+        "data_virtualization",
+        "federated_query_lifecycle",
+        "virtualization_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "mdm",
+        "etlp",
+        "meta"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -383,6 +509,111 @@
               "required_action": "record_source_impact_review"
             },
             "name": "source_retirement_requires_impact_review"
+          },
+          {
+            "condition": {
+              "operation": "register_virtualization_agent",
+              "unsupported_agent_runtime": true
+            },
+            "description": "Virtualization agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_agent_runtime",
+              "required_action": "choose_supported_agent_runtime"
+            },
+            "name": "virtualization_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_virtualization_agent",
+              "unsupported_agent_role": true
+            },
+            "description": "Virtualization agents must use an approved DVRL role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_agent_role",
+              "required_action": "choose_supported_agent_role"
+            },
+            "name": "virtualization_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_virtualization_agent"
+            },
+            "description": "Virtualization agents require bounded source, schema, query, or policy scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_scope_required",
+              "required_action": "define_agent_scope"
+            },
+            "name": "virtualization_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_owner_present": false,
+              "operation": "register_virtualization_agent"
+            },
+            "description": "Virtualization agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_owner_required",
+              "required_action": "assign_agent_owner"
+            },
+            "name": "virtualization_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_virtualization_agent"
+            },
+            "description": "Virtualization agents require a declared purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_purpose_required",
+              "required_action": "declare_agent_purpose"
+            },
+            "name": "virtualization_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "operation": "register_virtualization_agent"
+            },
+            "description": "Virtualization agents must disclose machine contribution before participating in DVRL decisions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "virtualization_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_virtualization_agent",
+              "privileged_agent_role": true
+            },
+            "description": "Privileged virtualization-agent roles require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "privileged_agent_human_approval_required",
+              "required_action": "record_human_approval_requirement"
+            },
+            "name": "virtualization_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_dvrl_lifecycle_batch"
+            },
+            "description": "DVRL lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_required",
+              "required_action": "route_batch_to_bytewax"
+            },
+            "name": "bytewax_dvrl_stream_required"
           }
         ],
         "type": "deterministic"
@@ -651,6 +882,111 @@
             "required_action": "record_source_impact_review"
           },
           "name": "source_retirement_requires_impact_review"
+        },
+        {
+          "condition": {
+            "operation": "register_virtualization_agent",
+            "unsupported_agent_runtime": true
+          },
+          "description": "Virtualization agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_agent_runtime",
+            "required_action": "choose_supported_agent_runtime"
+          },
+          "name": "virtualization_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_virtualization_agent",
+            "unsupported_agent_role": true
+          },
+          "description": "Virtualization agents must use an approved DVRL role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_agent_role",
+            "required_action": "choose_supported_agent_role"
+          },
+          "name": "virtualization_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_virtualization_agent"
+          },
+          "description": "Virtualization agents require bounded source, schema, query, or policy scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_scope_required",
+            "required_action": "define_agent_scope"
+          },
+          "name": "virtualization_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_owner_present": false,
+            "operation": "register_virtualization_agent"
+          },
+          "description": "Virtualization agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_owner_required",
+            "required_action": "assign_agent_owner"
+          },
+          "name": "virtualization_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_virtualization_agent"
+          },
+          "description": "Virtualization agents require a declared purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_purpose_required",
+            "required_action": "declare_agent_purpose"
+          },
+          "name": "virtualization_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "operation": "register_virtualization_agent"
+          },
+          "description": "Virtualization agents must disclose machine contribution before participating in DVRL decisions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "virtualization_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_virtualization_agent",
+            "privileged_agent_role": true
+          },
+          "description": "Privileged virtualization-agent roles require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "privileged_agent_human_approval_required",
+            "required_action": "record_human_approval_requirement"
+          },
+          "name": "virtualization_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_dvrl_lifecycle_batch"
+          },
+          "description": "DVRL lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_required",
+            "required_action": "route_batch_to_bytewax"
+          },
+          "name": "bytewax_dvrl_stream_required"
         }
       ],
       "runtime": {
@@ -664,6 +1000,11 @@
           "component": "DVRLAdapterHealth",
           "permission": "dvrl:admin",
           "route": "/dvrl/adapters"
+        },
+        "agents": {
+          "component": "DVRLVirtualizationAgentRoster",
+          "permission": "dvrl:admin",
+          "route": "/dvrl/agents"
         },
         "audit": {
           "component": "DVRLAuditTimeline",
@@ -684,6 +1025,11 @@
           "component": "FederationMap",
           "permission": "dvrl:view_lineage",
           "route": "/dvrl/federation"
+        },
+        "lifecycle": {
+          "component": "DVRLLifecycleBatchMonitor",
+          "permission": "dvrl:view_metrics",
+          "route": "/dvrl/lifecycle"
         },
         "metrics": {
           "component": "DVRLMetrics",
@@ -722,7 +1068,28 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "engine": "bytewax",
+        "lifecycle_stream": "dvrl.lifecycle",
+        "operations": [
+          "source_batch",
+          "schema_batch",
+          "virtual_table_batch",
+          "query_batch",
+          "cache_batch",
+          "policy_batch",
+          "virtualization_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "dvrl.sources",
+          "dvrl.schemas",
+          "dvrl.virtual_tables",
+          "dvrl.queries",
+          "dvrl.cache",
+          "dvrl.policies",
+          "dvrl.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
@@ -733,6 +1100,10 @@
           "audit_timeline": {
             "status_style": "decision-pill",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "status_indicator": "processor-pill",
+            "visual": "stream-batch-ledger"
           },
           "cache_result_panel": {
             "status_style": "ttl-pill",
@@ -758,6 +1129,10 @@
             "icon": "database-zap",
             "risk_style": "policy-band",
             "status_indicator": "connectivity-pill"
+          },
+          "virtualization_agent_roster": {
+            "status_indicator": "approval-pill",
+            "visual": "agent-role-grid"
           }
         },
         "name": "dvrl_federation_console",
@@ -850,6 +1225,20 @@
             "permission": "dvrl:admin"
           },
           {
+            "component": "DVRLVirtualizationAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/dvrl/agents",
+            "permission": "dvrl:admin"
+          },
+          {
+            "component": "DVRLLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/dvrl/lifecycle",
+            "permission": "dvrl:view_metrics"
+          },
+          {
             "component": "DVRLAuditTimeline",
             "name": "audit",
             "nav_group": "Governance",
@@ -874,23 +1263,78 @@
       "virtualization_lifecycle": {
         "audit": "DVRLAuditEventRecord",
         "cache": "DVRLCacheRecord",
+        "lifecycle_batch": "DVRLLifecycleBatchRecord",
         "policy": "DVRLPolicyRecord",
         "query": "DVRLQueryRecord",
         "schema": "DVRLSchemaRecord",
         "source": "DVRLSourceRecord",
-        "virtual_table": "DVRLVirtualTableRecord"
+        "virtual_table": "DVRLVirtualTableRecord",
+        "virtualization_agent": "DVRLVirtualizationAgentRecord"
       }
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "dvrl_virtualization_agents": {
+        "supported_roles": [
+          "source_reviewer",
+          "schema_reviewer",
+          "virtual_table_reviewer",
+          "query_policy_reviewer",
+          "cache_policy_reviewer",
+          "lineage_reviewer",
+          "federation_reviewer",
+          "publish_gate_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "dvrl": []
+      "dvrl": [
+        "mdm",
+        "etlp",
+        "meta"
+      ]
     }
   },
   "contracts": {
     "dvrl": {
+      "agents": {
+        "first_class": true,
+        "privileged_roles": [
+          "source_reviewer",
+          "virtual_table_reviewer",
+          "query_policy_reviewer",
+          "cache_policy_reviewer",
+          "publish_gate_reviewer"
+        ],
+        "requires_contribution_disclosure": true,
+        "requires_owner": true,
+        "requires_purpose": true,
+        "requires_scope": true,
+        "supported_roles": [
+          "source_reviewer",
+          "schema_reviewer",
+          "virtual_table_reviewer",
+          "query_policy_reviewer",
+          "cache_policy_reviewer",
+          "lineage_reviewer",
+          "federation_reviewer",
+          "publish_gate_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "audit_sink": "audl",
@@ -903,6 +1347,37 @@
           "metadata_catalog": "meta",
           "production_runtime": "service.DVRLService",
           "query_planner": "adapter"
+        },
+        "agents": {
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "privileged_roles": [
+            "source_reviewer",
+            "virtual_table_reviewer",
+            "query_policy_reviewer",
+            "cache_policy_reviewer",
+            "publish_gate_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "source_reviewer",
+            "schema_reviewer",
+            "virtual_table_reviewer",
+            "query_policy_reviewer",
+            "cache_policy_reviewer",
+            "lineage_reviewer",
+            "federation_reviewer",
+            "publish_gate_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "cache": {
           "default_ttl_seconds": 900,
@@ -954,6 +1429,30 @@
             "singer_tap"
           ]
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "dvrl.lifecycle",
+          "operations": [
+            "source_batch",
+            "schema_batch",
+            "virtual_table_batch",
+            "query_batch",
+            "cache_batch",
+            "policy_batch",
+            "virtualization_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "dvrl.sources",
+            "dvrl.schemas",
+            "dvrl.virtual_tables",
+            "dvrl.queries",
+            "dvrl.cache",
+            "dvrl.policies",
+            "dvrl.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -964,17 +1463,49 @@
           "enable_audit_timeline": true,
           "enable_cache_console": true,
           "enable_federation_map": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_policy_review": true,
           "enable_query_workbench": true,
           "enable_schema_browser": true,
-          "enable_source_manager": true
+          "enable_source_manager": true,
+          "enable_virtualization_agent_roster": true
         }
       },
       "id": "dvrl",
       "provides": [
-        "dvrl_operations"
+        "data_virtualization",
+        "federated_query_lifecycle",
+        "virtualization_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "mdm",
+        "etlp",
+        "meta"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "lifecycle_stream": "dvrl.lifecycle",
+        "operations": [
+          "source_batch",
+          "schema_batch",
+          "virtual_table_batch",
+          "query_batch",
+          "cache_batch",
+          "policy_batch",
+          "virtualization_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "dvrl.sources",
+          "dvrl.schemas",
+          "dvrl.virtual_tables",
+          "dvrl.queries",
+          "dvrl.cache",
+          "dvrl.policies",
+          "dvrl.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1007,6 +1538,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_dvrl_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_dvrl_lifecycle_batch"
+      },
+      "description": "DVRL lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_required",
+        "required_action": "route_batch_to_bytewax"
+      },
+      "name": "bytewax_dvrl_stream_required"
+    },
     "cache_ttl_requires_limit": {
       "condition": {
         "cache_ttl_seconds_gt": 3600,
@@ -1257,6 +1801,98 @@
         "required_action": "assign_virtual_table_owner"
       },
       "name": "virtual_table_requires_owner"
+    },
+    "virtualization_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_virtualization_agent",
+        "privileged_agent_role": true
+      },
+      "description": "Privileged virtualization-agent roles require human approval.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "privileged_agent_human_approval_required",
+        "required_action": "record_human_approval_requirement"
+      },
+      "name": "virtualization_agent_privileged_role_requires_human_approval"
+    },
+    "virtualization_agent_requires_contribution_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "operation": "register_virtualization_agent"
+      },
+      "description": "Virtualization agents must disclose machine contribution before participating in DVRL decisions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "virtualization_agent_requires_contribution_disclosure"
+    },
+    "virtualization_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_virtualization_agent"
+      },
+      "description": "Virtualization agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_owner_required",
+        "required_action": "assign_agent_owner"
+      },
+      "name": "virtualization_agent_requires_owner"
+    },
+    "virtualization_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_virtualization_agent"
+      },
+      "description": "Virtualization agents require a declared purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_purpose_required",
+        "required_action": "declare_agent_purpose"
+      },
+      "name": "virtualization_agent_requires_purpose"
+    },
+    "virtualization_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "operation": "register_virtualization_agent"
+      },
+      "description": "Virtualization agents require bounded source, schema, query, or policy scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "agent_scope_required",
+        "required_action": "define_agent_scope"
+      },
+      "name": "virtualization_agent_requires_scope"
+    },
+    "virtualization_agent_role_supported": {
+      "condition": {
+        "operation": "register_virtualization_agent",
+        "unsupported_agent_role": true
+      },
+      "description": "Virtualization agents must use an approved DVRL role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_agent_role",
+        "required_action": "choose_supported_agent_role"
+      },
+      "name": "virtualization_agent_role_supported"
+    },
+    "virtualization_agent_runtime_supported": {
+      "condition": {
+        "operation": "register_virtualization_agent",
+        "unsupported_agent_runtime": true
+      },
+      "description": "Virtualization agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_agent_runtime",
+        "required_action": "choose_supported_agent_runtime"
+      },
+      "name": "virtualization_agent_runtime_supported"
     },
     "write_query_blocked": {
       "condition": {

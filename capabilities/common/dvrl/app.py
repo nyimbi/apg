@@ -52,14 +52,16 @@ def semantic_model() -> dict[str, Any]:
 			"dvrl": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["dvrl_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -74,6 +76,8 @@ def semantic_model() -> dict[str, Any]:
 					"query_cost": "DVRLQueryRecord",
 					"policy_change": "DVRLPolicyRecord",
 					"source_retirement": "DVRLSourceRecord",
+					"virtualization_agent": "DVRLVirtualizationAgentRecord",
+					"lifecycle_batch": "DVRLLifecycleBatchRecord",
 				},
 				"virtualization_lifecycle": {
 					"source": "DVRLSourceRecord",
@@ -82,22 +86,23 @@ def semantic_model() -> dict[str, Any]:
 					"query": "DVRLQueryRecord",
 					"cache": "DVRLCacheRecord",
 					"policy": "DVRLPolicyRecord",
+					"virtualization_agent": "DVRLVirtualizationAgentRecord",
+					"lifecycle_batch": "DVRLLifecycleBatchRecord",
 					"audit": "DVRLAuditEventRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {
-					"engine": contract["configuration"]["adapters"]["event_stream"],
-				},
 			}
 		},
 		"contracts": {
 			"dvrl": {
 				"id": "dvrl",
 				"configuration": contract["configuration"],
-				"provides": ["dvrl_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -105,9 +110,14 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"dvrl": []},
+			"capability_dependencies": {"dvrl": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"dvrl_virtualization_agents": {
+					"supported_runtimes": contract["agents"]["supported_runtimes"],
+					"supported_roles": contract["agents"]["supported_roles"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -131,7 +141,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"dvrl_virtualization_agents": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -175,12 +187,16 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("DVRL semantic model route manifest is stale")
-	if len(rules) < 20:
+	if len(rules) < 28:
 		errors.append("DVRL semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("DVRL adapter manifest must use Bytewax for event streaming")
+	if not capability.get("agents", {}).get("first_class"):
+		errors.append("DVRL semantic model must expose first-class agent composition")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("DVRL semantic model must require Bytewax lifecycle processing")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

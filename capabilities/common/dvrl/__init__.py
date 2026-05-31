@@ -82,16 +82,21 @@ def register_capability() -> Dict[str, Any]:
 		"display_name": CAPABILITY_METADATA["display_name"],
 		"description": CAPABILITY_METADATA["description"],
 		"version": CAPABILITY_METADATA["version"],
-		"dependencies": CAPABILITY_METADATA["dependencies"]["required"],
+		"dependencies": contract["requires"],
 		"optional_dependencies": CAPABILITY_METADATA["dependencies"]["optional"],
+		"provides": contract["provides"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"data_virtualization": "Expose unified access across heterogeneous data sources",
 			"federated_queries": "Plan, execute, cache, and audit federated queries",
 			"source_governance": "Manage virtual source registration and policies",
 			"query_optimization": "Apply cost, cache, and policy-aware query planning",
+			"virtualization_agent_composition": "Register governed AI and automation agents as first-class DVRL participants",
+			"bytewax_lifecycle_batches": "Validate Bytewax-routed lifecycle batches before generated applications mutate DVRL state",
 			"capability_rules": "Evaluate deterministic virtualization governance rules",
 			"visual_theming": "Apply federation-console theme tokens and components"
 		},
@@ -101,6 +106,8 @@ def register_capability() -> Dict[str, Any]:
 			"schemas": "/dvrl/api/v1/schemas",
 			"federation": "/dvrl/api/v1/federation",
 			"cache": "/dvrl/api/v1/cache",
+			"agents": "/dvrl/api/v1/agents",
+			"lifecycle": "/dvrl/api/v1/lifecycle",
 			"metrics": "/dvrl/api/v1/metrics"
 		},
 		"ui_components": {

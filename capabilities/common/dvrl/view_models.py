@@ -25,6 +25,7 @@ def dashboard_model(service: DVRLLifecycleService, tenant_id: str = "default") -
 			{"id": "refresh_schema", "label": "Refresh schema", "permission": "dvrl:manage_sources"},
 			{"id": "publish_virtual_table", "label": "Publish virtual table", "permission": "dvrl:manage_sources"},
 			{"id": "execute_query", "label": "Plan query", "permission": "dvrl:query"},
+			{"id": "register_agent", "label": "Register agent", "permission": "dvrl:admin"},
 		],
 	}
 
@@ -103,6 +104,8 @@ def metrics_model(service: DVRLLifecycleService, tenant_id: str = "default") -> 
 			{"name": "sources", "value": summary["source_count"]},
 			{"name": "active_sources", "value": summary["active_source_count"]},
 			{"name": "queries", "value": summary["query_count"]},
+			{"name": "virtualization_agents", "value": summary["virtualization_agent_count"]},
+			{"name": "lifecycle_batches", "value": summary["lifecycle_batch_count"]},
 			{"name": "reviews", "value": summary["review_count"]},
 			{"name": "audit_events", "value": summary["audit_event_count"]},
 		],
@@ -126,6 +129,38 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 	}
 
 
+def virtualization_agent_roster_model(service: DVRLLifecycleService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "virtualization_agents"),
+		"columns": [
+			"agent_id",
+			"name",
+			"runtime",
+			"role",
+			"scope",
+			"owner",
+			"purpose",
+			"human_approval_required",
+			"status",
+		],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(service: DVRLLifecycleService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "lifecycle_batches"),
+		"columns": ["batch_id", "event_stream", "mutation_count", "accepted", "status", "matched_rules"],
+		"streaming": contract["streaming"],
+	}
+
+
 def audit_timeline_model(service: DVRLLifecycleService, tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"tenant_id": tenant_id,
@@ -140,6 +175,8 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

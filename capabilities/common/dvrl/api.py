@@ -15,10 +15,17 @@ from uuid_extensions import uuid7str
 # Real Flask-AppBuilder imports
 from flask import Flask, Blueprint, request, jsonify, g, current_app
 from flask_appbuilder import AppBuilder, BaseView, ModelView, expose, has_access
-from flask_appbuilder.api import BaseApi, expose_api
+from flask_appbuilder.api import BaseApi
+try:
+	from flask_appbuilder.api import expose_api
+except ImportError:  # pragma: no cover - Flask-AppBuilder version compatibility
+	from flask_appbuilder.api import expose as expose_api
 from flask_appbuilder.security.decorators import protect
 from flask_appbuilder.models.sqla.interface import SQLAInterface
-from flask_appbuilder.security import current_user
+try:
+	from flask_appbuilder.security import current_user
+except ImportError:  # pragma: no cover - Flask-AppBuilder version compatibility
+	from flask_login import current_user
 from flask_appbuilder.baseviews import BaseModelView
 from werkzeug.exceptions import BadRequest, Unauthorized, NotFound, InternalServerError
 import json
@@ -447,7 +454,7 @@ class DVRLAPIController(BaseApi):
 # Flask-AppBuilder Model Views for DVRL entities
 class DataSourceModelView(ModelView):
 	"""Data Source management view"""
-	datamodel = SQLAInterface()
+	datamodel = None
 	list_columns = ['name', 'type', 'status', 'created_at']
 	show_columns = ['name', 'type', 'status', 'connection_config', 'created_at', 'updated_at']
 	add_columns = ['name', 'type', 'connection_config', 'description']
@@ -473,7 +480,7 @@ class DVRLStreamView(BaseView):
 
 class VirtualTableModelView(ModelView):
 	"""Virtual Table management view"""
-	datamodel = SQLAInterface()
+	datamodel = None
 	list_columns = ['name', 'definition', 'created_at']
 
 class DVRLAdminView(BaseView):
@@ -560,6 +567,16 @@ def retire_source_record(**kwargs) -> Dict[str, Any]:
 	return SERVICE.retire_source(**kwargs).__dict__
 
 
+def register_virtualization_agent_record(**kwargs) -> Dict[str, Any]:
+	"""Register a governed virtualization agent for generated-app composition."""
+	return SERVICE.register_virtualization_agent(**kwargs).__dict__
+
+
+def validate_dvrl_lifecycle_batch_record(**kwargs) -> Dict[str, Any]:
+	"""Validate that a DVRL lifecycle batch is routed through Bytewax."""
+	return SERVICE.validate_dvrl_lifecycle_batch(**kwargs).__dict__
+
+
 def list_records(tenant_id: str = "default", record_type: str | None = None) -> List[Dict[str, Any]]:
 	"""List dependency-light DVRL lifecycle records."""
 	return SERVICE.list_records(tenant_id, record_type)
@@ -574,6 +591,8 @@ def list_metadata(tenant_id: str = "default") -> Dict[str, Any]:
 		"virtual_tables": SERVICE.list_records(tenant_id, "virtual_tables"),
 		"queries": SERVICE.list_records(tenant_id, "queries"),
 		"policies": SERVICE.list_records(tenant_id, "policies"),
+		"virtualization_agents": SERVICE.list_records(tenant_id, "virtualization_agents"),
+		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
 	}
 
 
@@ -595,6 +614,8 @@ __all__ = [
 	"cache_result_record",
 	"change_policy_record",
 	"retire_source_record",
+	"register_virtualization_agent_record",
+	"validate_dvrl_lifecycle_batch_record",
 	"list_records",
 	"list_metadata",
 ]

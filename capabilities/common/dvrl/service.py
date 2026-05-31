@@ -18,7 +18,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from uuid_extensions import uuid7str
 
 from . import _log_info, _log_error, _log_warning
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_DVRL_AGENT_ROLES,
+	SUPPORTED_DVRL_AGENT_ROLES,
+	SUPPORTED_DVRL_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	DataSource, DataSourceType, DataSourceStatus, VirtualTable,
 	FederatedQuery, QueryStatus, QueryCache, CacheLevel, 
@@ -158,17 +164,53 @@ class DVRLAuditEventRecord:
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
+@dataclass
+class DVRLVirtualizationAgentRecord:
+	agent_id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	decision: str = "allow"
+	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class DVRLLifecycleBatchRecord:
+	batch_id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
 class DVRLLifecycleService:
 	"""Dependency-light DVRL lifecycle and guardrail control plane."""
 
 	def __init__(self, tenant_id: str = "default"):
 		self.tenant_id = tenant_id
+		self._agent_runtimes = set(SUPPORTED_DVRL_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_DVRL_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_DVRL_AGENT_ROLES)
 		self.sources: dict[str, DVRLSourceRecord] = {}
 		self.schemas: dict[str, DVRLSchemaRecord] = {}
 		self.virtual_tables: dict[str, DVRLVirtualTableRecord] = {}
 		self.queries: dict[str, DVRLQueryRecord] = {}
 		self.caches: dict[str, DVRLCacheRecord] = {}
 		self.policies: dict[str, DVRLPolicyRecord] = {}
+		self.virtualization_agents: dict[str, DVRLVirtualizationAgentRecord] = {}
+		self.lifecycle_batches: dict[str, DVRLLifecycleBatchRecord] = {}
 		self.audit_events: list[DVRLAuditEventRecord] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -421,6 +463,105 @@ class DVRLLifecycleService:
 		self._audit(tenant_id, "source.retire_evaluated", source.source_id, self._require_text(actor, "actor"), decision, context)
 		return source
 
+	def register_virtualization_agent(
+		self,
+		*,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> DVRLVirtualizationAgentRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		agent_id = self._require_text(agent_id, "agent_id")
+		name = self._require_text(name, "name")
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_virtualization_agent",
+			"unsupported_agent_runtime": runtime_value not in self._agent_runtimes,
+			"unsupported_agent_role": role_value not in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		}
+		decision = evaluate_capability_rules(context)
+		if decision["decision"] == "deny":
+			self._audit(
+				tenant_id,
+				"agent.registration_denied",
+				agent_id,
+				str(owner or "system").strip() or "system",
+				decision,
+				context,
+			)
+			raise PermissionError(self._first_reason(decision))
+		record_key = self._key(tenant_id, agent_id)
+		if record_key in self.virtualization_agents:
+			raise ValueError(f"virtualization_agent_already_exists:{agent_id}")
+		record = DVRLVirtualizationAgentRecord(
+			agent_id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=self._require_text(scope, "scope"),
+			owner=self._require_text(owner, "owner"),
+			purpose=self._require_text(purpose, "purpose"),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="active" if decision["decision"] == "allow" else self._status_for_decision(decision["decision"]),
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+		)
+		self.virtualization_agents[record_key] = record
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, decision, asdict(record))
+		return record
+
+	def validate_dvrl_lifecycle_batch(
+		self,
+		*,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> DVRLLifecycleBatchRecord:
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("dvrl_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_dvrl_lifecycle_batch",
+			"event_stream": stream_value,
+		}
+		decision = evaluate_capability_rules(context)
+		accepted = decision["decision"] == "allow"
+		record = DVRLLifecycleBatchRecord(
+			batch_id=uuid7str(),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			accepted=accepted,
+			decision=decision["decision"],
+			matched_rules=list(decision["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[self._key(tenant_id, record.batch_id)] = record
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "dvrl", decision, asdict(record))
+		if not accepted:
+			raise PermissionError(self._first_reason(decision))
+		return record
+
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		tenant_id = tenant_id or self.tenant_id
 		collections: dict[str, Any] = {
@@ -430,6 +571,8 @@ class DVRLLifecycleService:
 			"queries": self.queries.values(),
 			"caches": self.caches.values(),
 			"policies": self.policies.values(),
+			"virtualization_agents": self.virtualization_agents.values(),
+			"lifecycle_batches": self.lifecycle_batches.values(),
 			"audit_events": self.audit_events,
 		}
 		if record_type:
@@ -452,7 +595,10 @@ class DVRLLifecycleService:
 			"virtual_table_count": len(self.list_records(tenant_id, "virtual_tables")),
 			"query_count": len(self.list_records(tenant_id, "queries")),
 			"cache_count": len(self.list_records(tenant_id, "caches")),
-			"review_count": sum(1 for kind in ("sources", "schemas", "queries", "policies") for row in self.list_records(tenant_id, kind) if row["status"] == "pending_review"),
+			"virtualization_agent_count": len(self.list_records(tenant_id, "virtualization_agents")),
+			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
+			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if row["status"] == "denied"),
+			"review_count": sum(1 for kind in ("sources", "schemas", "queries", "policies", "virtualization_agents") for row in self.list_records(tenant_id, kind) if row["status"] == "pending_review"),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
 
@@ -497,6 +643,17 @@ class DVRLLifecycleService:
 		if not isinstance(value, str) or not value.strip():
 			raise ValueError(f"{field_name} is required")
 		return value.strip()
+
+	@staticmethod
+	def _normalize_agent_token(value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	@staticmethod
+	def _first_reason(result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "dvrl_operation_denied"
 
 	@staticmethod
 	def _key(tenant_id: str, record_id: str) -> str:

@@ -6,6 +6,26 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_DVRL_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_DVRL_AGENT_ROLES = [
+	"source_reviewer",
+	"schema_reviewer",
+	"virtual_table_reviewer",
+	"query_policy_reviewer",
+	"cache_policy_reviewer",
+	"lineage_reviewer",
+	"federation_reviewer",
+	"publish_gate_reviewer",
+]
+PRIVILEGED_DVRL_AGENT_ROLES = [
+	"source_reviewer",
+	"virtual_table_reviewer",
+	"query_policy_reviewer",
+	"cache_policy_reviewer",
+	"publish_gate_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped DVRL configuration defaults and schema."""
@@ -66,6 +86,41 @@ class CapabilityConfiguration:
 			"audit_sink": "audl",
 			"event_stream": "bytewax",
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_DVRL_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_DVRL_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_DVRL_AGENT_ROLES,
+			"require_scope": True,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_contribution_disclosure": True,
+			"human_approval_required_for_privileged_roles": True,
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"required_processor": "bytewax",
+			"lifecycle_stream": "dvrl.lifecycle",
+			"watermark": "event_time",
+			"operations": [
+				"source_batch",
+				"schema_batch",
+				"virtual_table_batch",
+				"query_batch",
+				"cache_batch",
+				"policy_batch",
+				"virtualization_agent_batch",
+			],
+			"topics": [
+				"dvrl.sources",
+				"dvrl.schemas",
+				"dvrl.virtual_tables",
+				"dvrl.queries",
+				"dvrl.cache",
+				"dvrl.policies",
+				"dvrl.agents",
+			],
+		},
 		"ui": {
 			"enable_query_workbench": True,
 			"enable_source_manager": True,
@@ -75,6 +130,8 @@ class CapabilityConfiguration:
 			"enable_policy_review": True,
 			"enable_adapter_health": True,
 			"enable_audit_timeline": True,
+			"enable_virtualization_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True,
 		},
 		"theme": {
 			"default_theme": "dvrl_federation_console",
@@ -92,6 +149,8 @@ class CapabilityConfiguration:
 			"governance",
 			"optimization",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme",
 		],
@@ -104,6 +163,8 @@ class CapabilityConfiguration:
 			"governance": {"type": "object"},
 			"optimization": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"},
 		},
@@ -182,6 +243,8 @@ class CapabilityTheme:
 		"policy_review_queue": {"visual": "rule-decision-list", "highlight": "review-chip"},
 		"adapter_health_panel": {"visual": "adapter-grid", "status_indicator": "health-pill"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-pill"},
+		"virtualization_agent_roster": {"visual": "agent-role-grid", "status_indicator": "approval-pill"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batch-ledger", "status_indicator": "processor-pill"},
 	})
 
 
@@ -207,6 +270,14 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule("cache_ttl_requires_limit", "Query cache TTL cannot exceed tenant configuration.", {"operation": "cache_result", "cache_ttl_seconds_gt": 3600}, {"decision": "deny", "reason": "cache_ttl_limit_exceeded", "required_action": "reduce_cache_ttl"}),
 		CapabilityRule("policy_change_requires_review", "Virtualization policy changes require review.", {"operation": "change_policy", "policy_review_recorded": False}, {"decision": "require_review", "reason": "policy_review_required", "required_action": "record_policy_review"}),
 		CapabilityRule("source_retirement_requires_impact_review", "Retiring a virtual source requires impact review.", {"operation": "retire_source", "impact_review_recorded": False}, {"decision": "deny", "reason": "impact_review_required", "required_action": "record_source_impact_review"}),
+		CapabilityRule("virtualization_agent_runtime_supported", "Virtualization agents must use an approved runtime.", {"operation": "register_virtualization_agent", "unsupported_agent_runtime": True}, {"decision": "deny", "reason": "unsupported_agent_runtime", "required_action": "choose_supported_agent_runtime"}),
+		CapabilityRule("virtualization_agent_role_supported", "Virtualization agents must use an approved DVRL role.", {"operation": "register_virtualization_agent", "unsupported_agent_role": True}, {"decision": "deny", "reason": "unsupported_agent_role", "required_action": "choose_supported_agent_role"}),
+		CapabilityRule("virtualization_agent_requires_scope", "Virtualization agents require bounded source, schema, query, or policy scope.", {"operation": "register_virtualization_agent", "agent_scope_present": False}, {"decision": "deny", "reason": "agent_scope_required", "required_action": "define_agent_scope"}),
+		CapabilityRule("virtualization_agent_requires_owner", "Virtualization agents require an accountable owner.", {"operation": "register_virtualization_agent", "agent_owner_present": False}, {"decision": "deny", "reason": "agent_owner_required", "required_action": "assign_agent_owner"}),
+		CapabilityRule("virtualization_agent_requires_purpose", "Virtualization agents require a declared purpose.", {"operation": "register_virtualization_agent", "agent_purpose_present": False}, {"decision": "deny", "reason": "agent_purpose_required", "required_action": "declare_agent_purpose"}),
+		CapabilityRule("virtualization_agent_requires_contribution_disclosure", "Virtualization agents must disclose machine contribution before participating in DVRL decisions.", {"operation": "register_virtualization_agent", "agent_contribution_disclosed": False}, {"decision": "deny", "reason": "agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}),
+		CapabilityRule("virtualization_agent_privileged_role_requires_human_approval", "Privileged virtualization-agent roles require human approval.", {"operation": "register_virtualization_agent", "privileged_agent_role": True, "human_approval_required": False}, {"decision": "require_review", "reason": "privileged_agent_human_approval_required", "required_action": "record_human_approval_requirement"}),
+		CapabilityRule("bytewax_dvrl_stream_required", "DVRL lifecycle batches must be routed through Bytewax.", {"operation": "validate_dvrl_lifecycle_batch", "event_stream_ne": "bytewax"}, {"decision": "deny", "reason": "bytewax_required", "required_action": "route_batch_to_bytewax"}),
 	]
 
 
@@ -222,16 +293,56 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("cache", "/dvrl/cache", "CacheConsole", "dvrl:manage_policies", "Operations"),
 		CapabilityUIRoute("metrics", "/dvrl/metrics", "DVRLMetrics", "dvrl:view_metrics", "Operations"),
 		CapabilityUIRoute("adapters", "/dvrl/adapters", "DVRLAdapterHealth", "dvrl:admin", "Administration"),
+		CapabilityUIRoute("agents", "/dvrl/agents", "DVRLVirtualizationAgentRoster", "dvrl:admin", "Governance"),
+		CapabilityUIRoute("lifecycle", "/dvrl/lifecycle", "DVRLLifecycleBatchMonitor", "dvrl:view_metrics", "Operations"),
 		CapabilityUIRoute("audit", "/dvrl/audit", "DVRLAuditTimeline", "dvrl:view_metrics", "Governance"),
 		CapabilityUIRoute("settings", "/dvrl/settings", "DVRLSettings", "dvrl:admin", "Administration"),
 	]
 	return {"shell": "apg_python", "view_module": "view_models.py", "api_prefix": "/dvrl/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
+def agent_manifest() -> dict[str, Any]:
+	config = CapabilityConfiguration().defaults["agents"]
+	return {
+		"first_class": config["first_class"],
+		"supported_runtimes": list(config["supported_runtimes"]),
+		"supported_roles": list(config["supported_roles"]),
+		"privileged_roles": list(config["privileged_roles"]),
+		"requires_scope": config["require_scope"],
+		"requires_owner": config["require_owner"],
+		"requires_purpose": config["require_purpose"],
+		"requires_contribution_disclosure": config["require_contribution_disclosure"],
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	config = CapabilityConfiguration().defaults["streaming"]
+	return {
+		"engine": config["engine"],
+		"required_processor": config["required_processor"],
+		"lifecycle_stream": config["lifecycle_stream"],
+		"watermark": config["watermark"],
+		"operations": list(config["operations"]),
+		"topics": list(config["topics"]),
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
-	return {"capability": "dvrl", "display_name": "Data Virtualization", "configuration": config.for_tenant(tenant_id, overrides), "configuration_schema": config.schema, "rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]}, "ui": ui_manifest(), "theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}}
+	return {
+		"capability": "dvrl",
+		"display_name": "Data Virtualization",
+		"provides": ["data_virtualization", "federated_query_lifecycle", "virtualization_agent_composition"],
+		"requires": ["mdm", "etlp", "meta"],
+		"configuration": config.for_tenant(tenant_id, overrides),
+		"configuration_schema": config.schema,
+		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
+		"ui": ui_manifest(),
+		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+	}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
@@ -245,6 +356,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_lt"):
 			if not context.get(key[:-3], 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False
