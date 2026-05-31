@@ -73,7 +73,19 @@ def test_definition_publish_execution_task_approval_and_completion_lifecycle_exe
 	completed_task = service.complete_task("tenant-a", task["id"], "manager")
 	approval = service.request_approval("tenant-a", execution["id"], "purchase-123", "approver-1", "High value purchase")
 	approved = service.record_approval("tenant-a", approval["id"], "approved", "approver-1", "evidence://approval/1")
-	agent = service.register_workflow_agent("agent-1", "tenant-a", "Runtime observer", "codex", "runtime_observer", execution["id"], "workflow-admin", True)
+	agent = service.register_workflow_agent(
+		"agent-1",
+		"tenant-a",
+		"Runtime observer",
+		"codex",
+		"runtime_observer",
+		execution["id"],
+		"workflow-admin",
+		True,
+		owner_ref="workflow-admin",
+		purpose="Observe execution state and recommend safe workflow recovery actions.",
+	)
+	batch = service.validate_lifecycle_batch("tenant-a", "bytewax", 1, "workflow_agent_batch")
 	completed = service.complete_execution("tenant-a", execution["id"], "workflow-admin")
 	summary = service.dashboard_summary("tenant-a")
 
@@ -86,12 +98,16 @@ def test_definition_publish_execution_task_approval_and_completion_lifecycle_exe
 	assert approval["status"] == "pending"
 	assert approved["status"] == "approved"
 	assert agent["runtime"] == "codex"
+	assert agent["purpose"]
+	assert batch["processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert completed["status"] == "completed"
 	assert summary["definition_count"] == 1
 	assert summary["published_definition_count"] == 1
 	assert summary["completed_execution_count"] == 1
 	assert summary["pending_approval_count"] == 0
 	assert summary["agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert summary["event_count"] >= 5
 
 
@@ -255,11 +271,55 @@ def test_task_approval_compensation_agent_and_stream_guardrails():
 	assert compensated["compensation_status"] == "completed"
 
 	try:
-		service.register_workflow_agent("agent-bad", "tenant-c", "Agent", "unknown", "runtime_observer", execution["id"], "owner", True)
+		service.register_workflow_agent(
+			"agent-bad",
+			"tenant-c",
+			"Agent",
+			"unknown",
+			"runtime_observer",
+			execution["id"],
+			"owner",
+			True,
+			owner_ref="owner",
+			purpose="Observe runtime health.",
+		)
 	except PermissionError as exc:
 		assert str(exc) == "workflow_agent_runtime_not_supported"
 	else:
 		raise AssertionError("unsupported workflow agent runtime accepted")
+
+	try:
+		service.register_workflow_agent(
+			"agent-no-purpose",
+			"tenant-c",
+			"Agent",
+			"codex",
+			"runtime_observer",
+			execution["id"],
+			"owner",
+			True,
+			owner_ref="owner",
+			purpose="",
+		)
+	except PermissionError as exc:
+		assert str(exc) == "workflow_agent_purpose_required"
+	else:
+		raise AssertionError("workflow agent without purpose accepted")
+
+	review_agent = service.register_workflow_agent(
+		"agent-review",
+		"tenant-c",
+		"Process steward",
+		"codex",
+		"process_steward",
+		execution["id"],
+		"owner",
+		True,
+		owner_ref="owner",
+		purpose="Steward process changes that affect published workflow behavior.",
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
 
 	try:
 		service.validate_batch_mutation("legacy_queue")
@@ -268,6 +328,22 @@ def test_task_approval_compensation_agent_and_stream_guardrails():
 	else:
 		raise AssertionError("non-Bytewax batch mutation accepted")
 	assert service.validate_batch_mutation("bytewax")["decision"] == "allow"
+
+	try:
+		service.validate_lifecycle_batch("tenant-c", "kafka_replay", 1, "workflow_agent_batch")
+	except PermissionError as exc:
+		assert str(exc) == "bytewax_lifecycle_stream_required"
+	else:
+		raise AssertionError("non-Bytewax lifecycle batch accepted")
+
+	try:
+		service.validate_lifecycle_batch("tenant-c", "bytewax", 0, "workflow_agent_batch")
+	except PermissionError as exc:
+		assert str(exc) == "wflo_lifecycle_batch_empty"
+	else:
+		raise AssertionError("empty lifecycle batch accepted")
+
+	assert service.validate_lifecycle_batch("tenant-c", "bytewax", 2, "approval_batch")["status"] == "accepted"
 
 
 def test_api_and_view_models_expose_workflow_surfaces():
@@ -339,6 +415,15 @@ def test_api_and_view_models_expose_workflow_surfaces():
 		"scope_ref": execution["id"],
 		"registered_by": "workflow-admin",
 		"contribution_disclosed": True,
+		"owner_ref": "workflow-admin",
+		"purpose": "Observe onboarding workflow runtime and flag blocked transitions.",
+		"human_approval_required": True,
+	})
+	batch = api.validate_lifecycle_batch({
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 1,
+		"operation": "workflow_agent_batch",
 	})
 	api.complete_execution({
 		"tenant_id": "tenant-b",
@@ -356,6 +441,7 @@ def test_api_and_view_models_expose_workflow_surfaces():
 	approvals = views.approval_center_model(local_service, "tenant-b")
 	analytics = views.analytics_model(local_service, "tenant-b")
 	agents = views.agent_panel_model(local_service, "tenant-b")
+	lifecycle = views.lifecycle_batch_model(local_service, "tenant-b")
 	audit = views.audit_trail_model(local_service, "tenant-b")
 	settings = views.settings_model("tenant-b")
 
@@ -369,6 +455,8 @@ def test_api_and_view_models_expose_workflow_surfaces():
 	assert approvals["approvals"][0]["status"] == "approved"
 	assert agent["role"] == "runtime_observer"
 	assert agents["agents"][0]["runtime"] == "codex"
+	assert batch["processor"] == "bytewax"
+	assert lifecycle["batches"][0]["status"] == "accepted"
 	assert audit["audit_events"]
 	assert analytics["review_required_definitions"] == []
 	assert settings["configuration"]["tenant_id"] == "tenant-b"

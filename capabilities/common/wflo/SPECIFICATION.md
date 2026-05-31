@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`wflo` is the APG common capability for governed workflow orchestration. It lets generated applications compose tenant-scoped workflow definitions, steps, triggers, tasks, approvals, executions, events, compensation, AI workflow agents, audit events, UI screens, visual theming, and event-stream policy.
+`wflo` is the APG common capability for governed workflow orchestration. It lets generated applications compose tenant-scoped workflow definitions, steps, triggers, tasks, approvals, executions, events, compensation, first-class provider-neutral AI workflow agents, Bytewax lifecycle batches, audit events, UI screens, visual theming, and event-stream policy.
 
 ## Scope
 
@@ -14,8 +14,8 @@ The capability must support:
 - Executions that require published definitions, correlation IDs, Bytewax event stream policy, event history, state-change audit, cancellation, failure, completion, and compensation state.
 - Human task assignment, claim, completion, escalation reason, due date, and event emission.
 - Approval requests with approver and reason, plus decisions with evidence, rejection, and delegation support.
-- AI workflow agents as first-class records, with supported runtime, role, owner, scope, and visible contribution disclosure.
-- Bytewax-backed event-stream configuration for batch workflow mutations and runtime events.
+- AI workflow agents as first-class records, with stable ID, readable name, supported runtime, supported workflow-governance role, owner, purpose, scope, visible contribution disclosure, and human-review treatment for privileged roles.
+- Bytewax-backed event-stream configuration for batch workflow mutations, runtime events, and lifecycle batches across definitions, publications, executions, tasks, approvals, compensation, workflow agents, and audit.
 - UI route contracts and dependency-light view models for generated applications.
 
 ## Dependencies
@@ -41,8 +41,10 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `tasks`
 - `approvals`
 - `workflow_agents`
+- `agents`
 - `governance`
 - `observability`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -61,7 +63,8 @@ The deterministic rule engine covers:
 - completion blocking by open tasks and pending approvals
 - execution cancellation/failure reason
 - compensation plan requirement
-- AI workflow agent registration, runtime, scope, and disclosure
+- AI workflow agent stable ID, readable name, runtime, role, scope, owner, purpose, disclosure, and privileged-role human approval
+- Bytewax lifecycle batch mutation count, supported operation, and lifecycle stream enforcement
 - workflow state-change audit
 - tenant isolation
 - Bytewax batch mutation enforcement
@@ -76,6 +79,7 @@ The deterministic rule engine covers:
 - approvals
 - events
 - workflow agents
+- lifecycle batches
 - audit events
 
 The runtime enforces the same guardrails exposed by the contract rule engine and keeps live providers behind adapter boundaries.
@@ -91,6 +95,7 @@ The UI contract exposes:
 - tasks
 - approvals
 - agents
+- lifecycle
 - audit
 - analytics
 - settings
@@ -104,5 +109,7 @@ This packet does not start live event buses, schedulers, distributed executors, 
 - `README.md`, `SPECIFICATION.md`, and `PLAN.md` describe the package clearly.
 - `capability_contract.py` exposes configuration, deterministic rules, UI, theme, streaming, and adapter metadata.
 - Runtime/API/view tests prove positive lifecycle behavior and negative guardrail behavior.
+- First-class workflow-agent composition is provider-neutral across `codex`, `claude_code`, `opencode`, and `pi`; external CLIs remain behind AICR adapter contracts.
+- Lifecycle batch governance uses Bytewax metadata only and does not introduce Kafka or broker-core processing.
 - `semantic_model.json`, `package_manifest.json`, and `release_report.json` match the current contract.
 - Focused compile, pytest, implementation audit, publish-plan, stale-marker scan, and diff check pass.

@@ -4,7 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	PRIVILEGED_WFLO_AGENT_ROLES,
+	SUPPORTED_WFLO_AGENT_ROLES,
+	SUPPORTED_WFLO_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .workflow_runtime import (
 	WorkflowApprovalRecord,
 	WorkflowAuditEventRecord,
@@ -14,6 +21,7 @@ from .workflow_runtime import (
 	WorkflowExecutionRecord,
 	WorkflowStepRecord,
 	WorkflowTaskRecord,
+	WfloLifecycleBatchRecord,
 	normalize_step_type,
 	stable_id,
 	utc_now,
@@ -31,7 +39,12 @@ class WfloService:
 		self.approvals: dict[str, WorkflowApprovalRecord] = {}
 		self.events: dict[str, WorkflowEventRecord] = {}
 		self.agents: dict[str, WorkflowAgentRecord] = {}
+		self.lifecycle_batches: dict[str, WfloLifecycleBatchRecord] = {}
 		self.audit_events: dict[str, WorkflowAuditEventRecord] = {}
+		self._agent_runtimes = {self._normalize_token(value) for value in SUPPORTED_WFLO_AGENT_RUNTIMES}
+		self._agent_roles = {self._normalize_token(value) for value in SUPPORTED_WFLO_AGENT_ROLES}
+		self._privileged_agent_roles = {self._normalize_token(value) for value in PRIVILEGED_WFLO_AGENT_ROLES}
+		self._lifecycle_operations = {self._normalize_token(value) for value in DEFAULT_CONFIGURATION["streaming"]["required_operations"]}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -465,33 +478,48 @@ class WfloService:
 		scope_ref: str,
 		registered_by: str,
 		contribution_disclosed: bool,
+		owner_ref: str = "",
+		purpose: str = "",
+		human_approval_required: bool = False,
 	) -> dict[str, Any]:
-		config = DEFAULT_CONFIGURATION["workflow_agents"]
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		owner_value = str(owner_ref or "").strip()
+		purpose_value = str(purpose or "").strip()
+		approval_recorded = self._coerce_bool(human_approval_required)
 		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
-			"workflow_agent_present": True,
-			"agent_registered": bool(name and registered_by),
-			"agent_runtime_supported": runtime in config["supported_runtimes"],
-			"agent_scope_present": bool(scope_ref),
-			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_workflow_agent",
+			"agent_id_present": bool(str(agent_id or "").strip()),
+			"agent_name_present": bool(str(name or "").strip()),
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope_ref or "").strip()),
+			"agent_owner_present": bool(owner_value),
+			"agent_purpose_present": bool(purpose_value),
+			"agent_contribution_disclosed": self._coerce_bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": approval_recorded,
 			"state_change_requested": True,
 			"audit_event_recorded": True,
 		})
 		if result["decision"] == "deny":
 			self._raise_policy(result)
-		if role not in config["allowed_roles"]:
-			raise PermissionError("workflow_agent_role_not_supported")
 		record = WorkflowAgentRecord(
 			id=agent_id,
 			tenant_id=tenant_id,
 			name=name,
-			runtime=runtime,
-			role=role,
+			runtime=runtime_value,
+			role=role_value,
 			scope_ref=scope_ref,
 			registered_by=registered_by,
-			contribution_disclosed=bool(contribution_disclosed),
+			contribution_disclosed=self._coerce_bool(contribution_disclosed),
+			owner_ref=owner_value,
+			purpose=purpose_value,
+			human_approval_required=approval_recorded,
+			status="pending_review" if result["decision"] == "require_review" else "active",
 		)
-		self.agents[agent_id] = record
+		self.agents[self._tenant_key(tenant_id, agent_id)] = record
 		self._record_audit(tenant_id, "workflow_agent_registered", agent_id, f"Workflow agent registered: {name}", registered_by)
 		return record.to_dict()
 
@@ -500,6 +528,42 @@ class WfloService:
 		if result["decision"] == "deny":
 			self._raise_policy(result)
 		return result
+
+	def validate_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "workflow_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		operation_value = self._normalize_token(operation)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "validate_wflo_lifecycle_batch",
+			"event_stream": self._normalize_token(event_stream),
+			"mutation_count": int(mutation_count),
+			"lifecycle_operation_supported": operation_value in self._lifecycle_operations,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		record_id = batch_id or stable_id("wflo_lifecycle_batch", tenant_id, operation_value, len(self.lifecycle_batches))
+		record = WfloLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=self._normalize_token(event_stream),
+			operation=operation_value,
+			mutation_count=int(mutation_count),
+			status="accepted" if result["decision"] == "allow" else "review_required",
+			matched_rules=list(result["matched_rules"]),
+			required_actions=workflow_required_actions(result),
+		)
+		self.lifecycle_batches[self._tenant_key(tenant_id, record_id)] = record
+		self._record_audit(tenant_id, "wflo_lifecycle_batch_validated", record.id, f"WFLO lifecycle batch {record.status}: {operation_value}", "wflo")
+		return record.to_dict()
 
 	def create_record(
 		self,
@@ -554,6 +618,9 @@ class WfloService:
 	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.agents, tenant_id)
 
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.lifecycle_batches, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		definitions = self.list_definitions(tenant_id)
 		executions = self.list_executions(tenant_id)
@@ -570,6 +637,9 @@ class WfloService:
 			"open_task_count": sum(1 for item in tasks if item["status"] in {"open", "claimed"}),
 			"pending_approval_count": sum(1 for item in approvals if item["status"] == "pending"),
 			"agent_count": len(self.list_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] not in {"accepted", "review_required"}),
 			"cancelled_execution_count": sum(1 for item in executions if item["status"] == "cancelled"),
 			"failed_execution_count": sum(1 for item in executions if item["status"] == "failed"),
 			"event_count": len(self.list_events(tenant_id)),
@@ -599,6 +669,21 @@ class WfloService:
 	def _require_tenant(self, tenant_id: str) -> None:
 		if not str(tenant_id or "").strip():
 			self._raise_policy(self.evaluate({"tenant_context_present": False}))
+
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{str(tenant_id or '').strip()}::{str(record_id or '').strip()}"
+
+	def _normalize_token(self, value: object) -> str:
+		return str(value or "").strip().lower()
+
+	def _coerce_bool(self, value: object) -> bool:
+		if isinstance(value, bool):
+			return value
+		if value is None:
+			return False
+		if isinstance(value, str):
+			return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+		return bool(value)
 
 	def _raise_policy(self, result: dict[str, Any]) -> None:
 		reasons = ", ".join(action.get("reason", "workflow_policy_blocked") for action in result["actions"])

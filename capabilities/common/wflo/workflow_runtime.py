@@ -13,7 +13,7 @@ EXECUTION_STATUSES = {"running", "waiting_approval", "completed", "failed", "can
 TASK_STATUSES = {"open", "claimed", "completed", "escalated"}
 APPROVAL_STATUSES = {"pending", "approved", "rejected", "delegated"}
 STEP_TYPES = {"human", "automation", "approval", "ai", "event"}
-AGENT_STATUSES = {"active", "suspended"}
+AGENT_STATUSES = {"active", "pending_review", "suspended"}
 
 
 def utc_now() -> str:
@@ -186,7 +186,27 @@ class WorkflowAgentRecord:
 	scope_ref: str
 	registered_by: str
 	contribution_disclosed: bool
+	owner_ref: str
+	purpose: str
+	human_approval_required: bool = False
 	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return serialize(self)
+
+
+@dataclass(slots=True)
+class WfloLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	operation: str
+	mutation_count: int
+	processor: str = "bytewax"
+	status: str = "accepted"
+	matched_rules: list[str] = field(default_factory=list)
+	required_actions: list[str] = field(default_factory=list)
 	created_at: str = field(default_factory=utc_now)
 
 	def to_dict(self) -> dict[str, Any]:
@@ -208,6 +228,7 @@ __all__ = [
 	"WorkflowExecutionRecord",
 	"WorkflowStepRecord",
 	"WorkflowTaskRecord",
+	"WfloLifecycleBatchRecord",
 	"normalize_step_type",
 	"stable_id",
 	"utc_now",

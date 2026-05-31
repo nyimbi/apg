@@ -22973,3 +22973,75 @@ Not run to preserve battery:
   Bytewax topology, live AUTH/ENCR/AUDL/COMP/AICR/WFLO/NTFY/IDFD/DLPD/NLPC/THEM
   adapters, external AI-agent runtime clients, legal-provider certification,
   and load/performance checks.
+
+### 2026-06-01 01:23 EAT
+
+WFLO workflow-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/wflo` as the next ordered common capability
+  packet after ESGN, matching the Phase 7 development order.
+- Preserved the existing workflow-definition, publication, retirement,
+  execution, task, approval, compensation, event, audit, tenant-isolation, and
+  legacy Bytewax batch-mutation behavior.
+- Extended the executable WFLO contract with first-class workflow-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  workflow-governance roles, privileged-role metadata, AICR adapter metadata,
+  Bytewax lifecycle stream metadata, route metadata, theme components, and
+  expanded dependency evidence.
+- Added deterministic guardrails for missing workflow-agent ID, missing readable
+  name, unsupported runtime, unsupported role, missing scope, owner, purpose,
+  missing machine contribution disclosure, privileged workflow-agent
+  registration without human approval, empty lifecycle batches, unsupported
+  lifecycle operations, and non-Bytewax WFLO lifecycle batch routing.
+- Added `WfloLifecycleBatchRecord`, tenant-qualified workflow-agent storage,
+  lifecycle-batch storage, lifecycle validation, dashboard counts, lifecycle
+  batch monitor view models, API helpers, and provider-neutral workflow-agent
+  roster metadata.
+- Hardened API boolean payload parsing for runtime review, compensation
+  requests, contribution disclosure, and human approval so readable string
+  values such as `"false"` do not bypass guardrails.
+- Replaced the static embedded app semantic model with a dynamic
+  contract-derived package entrypoint and regenerated `semantic_model.json`,
+  `release_report.json`, and `package_manifest.json` from the live contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/wflo/__init__.py capabilities/common/wflo/capability_contract.py capabilities/common/wflo/models.py capabilities/common/wflo/workflow_runtime.py capabilities/common/wflo/service.py capabilities/common/wflo/api.py capabilities/common/wflo/views.py capabilities/common/wflo/app.py capabilities/common/wflo/test_capability_contract.py capabilities/common/wflo/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/wflo/test_capability_contract.py capabilities/common/wflo/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/wflo/app.py` passed the package
+  self-test.
+- `./.venv/bin/apg capabilities inspect wflo --json` passed with `ok: true`,
+  11 APG Python routes, 43 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/wflo --json`
+  passed with `ok: true`; WFLO remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/wflo --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/wflo/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/wflo/package_manifest.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/wflo/release_report.json`
+  passed.
+- Runtime smoke executed workflow definition -> publication -> execution ->
+  task claim/completion -> approval -> `codex` runtime observer -> Bytewax
+  lifecycle batch -> completion and returned
+  `published completed codex active bytewax accepted 1`.
+- Focused stale-marker scan over touched WFLO packet source, docs, tests, and
+  evidence returned only intentional no-broker-core metadata, legacy queue
+  negative tests, and a negative unsupported-operation example named
+  `kafka_replay`.
+- In-process code review found and resolved implicit workflow-agent owner
+  fallback from `registered_by`; WFLO now requires explicit `owner_ref`.
+- `git diff --check -- capabilities/common/wflo docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live distributed workflow execution, production schedulers, notification
+  delivery, script runtime execution, durable workflow database migrations,
+  browser-rendered workflow studio, durable Bytewax topology, live
+  MQEB/AUTH/AUDL/AICR/SCHD/NTFY/SCPT/COMP/THEM adapters, external AI-agent
+  runtime clients, and load/performance checks.

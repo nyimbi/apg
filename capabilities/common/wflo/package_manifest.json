@@ -1,10 +1,60 @@
 {
+  "agents": {
+    "adapter_contract": "aicr_provider_neutral_wflo_agent_adapter",
+    "first_class": true,
+    "guardrails": [
+      "supported_runtime",
+      "supported_role",
+      "stable_identifier",
+      "readable_name",
+      "explicit_scope",
+      "accountable_owner",
+      "declared_purpose",
+      "machine_contribution_disclosure",
+      "human_approval_for_privileged_roles"
+    ],
+    "privileged_roles": [
+      "step_runner",
+      "approval_advisor",
+      "compensation_planner",
+      "integration_coordinator",
+      "lifecycle_batch_reviewer",
+      "process_steward"
+    ],
+    "required_fields": [
+      "tenant_id",
+      "agent_id",
+      "name",
+      "runtime",
+      "role",
+      "scope",
+      "owner",
+      "purpose"
+    ],
+    "supported_roles": [
+      "workflow_designer",
+      "step_runner",
+      "approval_advisor",
+      "compensation_planner",
+      "runtime_observer",
+      "integration_coordinator",
+      "lifecycle_batch_reviewer",
+      "process_steward"
+    ],
+    "supported_runtimes": [
+      "codex",
+      "claude_code",
+      "opencode",
+      "pi"
+    ]
+  },
   "base_target": "python",
   "display_name": "Workflow Orchestration",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
     "models.py",
+    "workflow_runtime.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +67,32 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "streaming": {
+    "broker_core_dependency_allowed": false,
+    "engine": "bytewax",
+    "lifecycle_stream": "wflo.lifecycle",
+    "required_operations": [
+      "definition_batch",
+      "publication_batch",
+      "execution_batch",
+      "task_batch",
+      "approval_batch",
+      "compensation_batch",
+      "workflow_agent_batch",
+      "audit_batch"
+    ],
+    "required_processor": "bytewax",
+    "topics": [
+      "wflo.definitions",
+      "wflo.publications",
+      "wflo.executions",
+      "wflo.tasks",
+      "wflo.approvals",
+      "wflo.compensation",
+      "wflo.agents",
+      "wflo.audit"
+    ],
+    "watermark": "event_time"
+  },
   "version": "1.0.0"
 }

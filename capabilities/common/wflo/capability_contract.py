@@ -7,6 +7,29 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_WFLO_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_WFLO_AGENT_ROLES: list[str] = [
+	"workflow_designer",
+	"step_runner",
+	"approval_advisor",
+	"compensation_planner",
+	"runtime_observer",
+	"integration_coordinator",
+	"lifecycle_batch_reviewer",
+	"process_steward",
+]
+
+PRIVILEGED_WFLO_AGENT_ROLES: list[str] = [
+	"step_runner",
+	"approval_advisor",
+	"compensation_planner",
+	"integration_coordinator",
+	"lifecycle_batch_reviewer",
+	"process_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"definitions": {
@@ -55,8 +78,20 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"agent_registration_required": True,
 		"agent_scope_required": True,
 		"agent_contribution_disclosure_required": True,
-		"supported_runtimes": ["codex", "claude_code", "opencode", "pi"],
-		"allowed_roles": ["designer", "step_runner", "approver_assist", "compensation_planner", "runtime_observer"],
+		"supported_runtimes": SUPPORTED_WFLO_AGENT_RUNTIMES,
+		"allowed_roles": SUPPORTED_WFLO_AGENT_ROLES,
+	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_WFLO_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_WFLO_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_WFLO_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_wflo_agent_adapter",
 	},
 	"governance": {
 		"require_tenant_context": True,
@@ -73,6 +108,33 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"approval_metrics_required": True,
 		"event_stream": "bytewax",
 	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "wflo.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"definition_batch",
+			"publication_batch",
+			"execution_batch",
+			"task_batch",
+			"approval_batch",
+			"compensation_batch",
+			"workflow_agent_batch",
+			"audit_batch",
+		],
+		"topics": [
+			"wflo.definitions",
+			"wflo.publications",
+			"wflo.executions",
+			"wflo.tasks",
+			"wflo.approvals",
+			"wflo.compensation",
+			"wflo.agents",
+			"wflo.audit",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.WfloService",
 		"runtime_models": "workflow_runtime.py",
@@ -83,6 +145,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"identity": "auth",
 		"audit_sink": "audl",
 		"ai_core": "aicr",
+		"ai_orchestration": "aicr",
+		"agent_adapter": "aicr_provider_neutral_wflo_agent_adapter",
 		"scheduler": "schd",
 		"notifications": "ntfy",
 		"script_runtime": "scpt",
@@ -95,6 +159,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_task_inbox": True,
 		"enable_approval_center": True,
 		"enable_agent_panel": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_analytics": True,
 	},
@@ -114,8 +179,10 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"tasks",
 		"approvals",
 		"workflow_agents",
+		"agents",
 		"governance",
 		"observability",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -127,8 +194,10 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"tasks",
 		"approvals",
 		"workflow_agents",
+		"agents",
 		"governance",
 		"observability",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -166,10 +235,18 @@ RULES: list[dict[str, Any]] = [
 	{"name": "completion_blocks_pending_approvals", "description": "Workflow completion is blocked by pending approvals.", "condition": {"operation": "complete_execution", "pending_approvals_present": True}, "effect": {"decision": "deny", "reason": "pending_approvals_block_completion", "required_action": "resolve_pending_approvals"}},
 	{"name": "execution_state_change_requires_reason", "description": "Execution cancellation and failure require a reason.", "condition": {"operation": "change_execution_state", "state_change_reason_present": False}, "effect": {"decision": "deny", "reason": "execution_state_change_reason_required", "required_action": "record_state_change_reason"}},
 	{"name": "compensation_requires_plan", "description": "Compensation execution requires a compensation plan.", "condition": {"operation": "run_compensation", "compensation_plan_present": False}, "effect": {"decision": "deny", "reason": "compensation_plan_required", "required_action": "attach_compensation_plan"}},
-	{"name": "workflow_agent_requires_registration", "description": "AI workflow agents must be registered.", "condition": {"workflow_agent_present": True, "agent_registered": False}, "effect": {"decision": "deny", "reason": "workflow_agent_registration_required", "required_action": "register_workflow_agent"}},
-	{"name": "workflow_agent_runtime_supported", "description": "AI workflow agents must use a configured runtime.", "condition": {"workflow_agent_present": True, "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "workflow_agent_runtime_not_supported", "required_action": "choose_supported_workflow_agent_runtime"}},
-	{"name": "workflow_agent_requires_scope", "description": "AI workflow agents require workflow or execution scope.", "condition": {"workflow_agent_present": True, "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "workflow_agent_scope_required", "required_action": "set_workflow_agent_scope"}},
-	{"name": "workflow_agent_requires_disclosure", "description": "AI workflow agent contributions require disclosure.", "condition": {"workflow_agent_present": True, "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "workflow_agent_disclosure_required", "required_action": "disclose_workflow_agent"}},
+	{"name": "workflow_agent_requires_id", "description": "First-class workflow agents require stable identifiers.", "condition": {"operation": "register_workflow_agent", "agent_id_present": False}, "effect": {"decision": "deny", "reason": "workflow_agent_id_required", "required_action": "assign_workflow_agent_id"}},
+	{"name": "workflow_agent_requires_name", "description": "First-class workflow agents require readable names.", "condition": {"operation": "register_workflow_agent", "agent_name_present": False}, "effect": {"decision": "deny", "reason": "workflow_agent_name_required", "required_action": "name_workflow_agent"}},
+	{"name": "workflow_agent_runtime_supported", "description": "First-class workflow agents must use a configured provider-neutral runtime.", "condition": {"operation": "register_workflow_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "workflow_agent_runtime_not_supported", "required_action": "choose_supported_workflow_agent_runtime"}},
+	{"name": "workflow_agent_role_supported", "description": "First-class workflow agents must use supported workflow-governance roles.", "condition": {"operation": "register_workflow_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "workflow_agent_role_not_supported", "required_action": "choose_supported_workflow_agent_role"}},
+	{"name": "workflow_agent_requires_scope", "description": "First-class workflow agents require workflow definition, execution, task, approval, compensation, integration, or lifecycle scope.", "condition": {"operation": "register_workflow_agent", "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "workflow_agent_scope_required", "required_action": "set_workflow_agent_scope"}},
+	{"name": "workflow_agent_requires_owner", "description": "First-class workflow agents require an accountable owner.", "condition": {"operation": "register_workflow_agent", "agent_owner_present": False}, "effect": {"decision": "deny", "reason": "workflow_agent_owner_required", "required_action": "assign_workflow_agent_owner"}},
+	{"name": "workflow_agent_requires_purpose", "description": "First-class workflow agents require a documented workflow-governance purpose.", "condition": {"operation": "register_workflow_agent", "agent_purpose_present": False}, "effect": {"decision": "deny", "reason": "workflow_agent_purpose_required", "required_action": "document_workflow_agent_purpose"}},
+	{"name": "workflow_agent_requires_disclosure", "description": "First-class workflow agent contributions require visible machine-contribution disclosure.", "condition": {"operation": "register_workflow_agent", "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "workflow_agent_disclosure_required", "required_action": "disclose_workflow_agent"}},
+	{"name": "workflow_agent_privileged_role_requires_human_approval", "description": "Privileged workflow-agent roles require human approval evidence.", "condition": {"operation": "register_workflow_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "workflow_agent_human_approval_required", "required_action": "record_workflow_agent_human_approval"}},
+	{"name": "wflo_lifecycle_batch_requires_mutations", "description": "WFLO lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_wflo_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "wflo_lifecycle_batch_empty", "required_action": "include_wflo_lifecycle_mutations"}},
+	{"name": "wflo_lifecycle_operation_supported", "description": "WFLO lifecycle batches must use configured lifecycle operations.", "condition": {"operation": "validate_wflo_lifecycle_batch", "lifecycle_operation_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_wflo_lifecycle_operation", "required_action": "choose_supported_wflo_lifecycle_operation"}},
+	{"name": "bytewax_wflo_lifecycle_stream_required", "description": "WFLO lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_wflo_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_wflo_lifecycle_batch_to_bytewax"}},
 	{"name": "workflow_state_change_requires_audit", "description": "Workflow state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "workflow_audit_event_required", "required_action": "record_workflow_audit_event"}},
 	{"name": "cross_tenant_workflow_access_denied", "description": "Workflow records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_workflow_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_workflow_mutation_requires_bytewax", "description": "Batch workflow mutations must use Bytewax event streams.", "condition": {"operation": "batch_workflow_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
@@ -183,6 +260,7 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "tasks", "path": "/wflo/tasks", "component": "TaskInbox", "permission": "wflo:execute", "nav_group": "Runtime"},
 	{"name": "approvals", "path": "/wflo/approvals", "component": "ApprovalCenter", "permission": "wflo:approve", "nav_group": "Governance"},
 	{"name": "agents", "path": "/wflo/agents", "component": "WorkflowAgentPanel", "permission": "wflo:execute", "nav_group": "Runtime"},
+	{"name": "lifecycle", "path": "/wflo/lifecycle", "component": "WFLOLifecycleBatchMonitor", "permission": "wflo:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/wflo/audit", "component": "WorkflowAuditTrail", "permission": "wflo:audit", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/wflo/analytics", "component": "WorkflowAnalytics", "permission": "wflo:view", "nav_group": "Operations"},
 	{"name": "settings", "path": "/wflo/settings", "component": "WFLOSettings", "permission": "wflo:admin", "nav_group": "Administration"},
@@ -210,6 +288,8 @@ THEME: dict[str, Any] = {
 		"task_inbox": {"visual": "assignment-list", "status_style": "sla-chip"},
 		"approval_center": {"visual": "approval-queue", "status_style": "decision-chip"},
 		"agent_panel": {"visual": "agent-roster", "status_style": "scope-chip"},
+		"workflow_agent_roster": {"visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batch-monitor", "status_style": "processor-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "workflow-chip"},
 	},
 }
@@ -238,6 +318,13 @@ STREAMING: dict[str, Any] = {
 		"workflow_agent_registered",
 	],
 	"batch_mutation_guardrail": "batch_workflow_mutation_requires_bytewax",
+	"engine": "bytewax",
+	"lifecycle_stream": "wflo.lifecycle",
+	"watermark": "event_time",
+	"required_processor": "bytewax",
+	"required_operations": DEFAULT_CONFIGURATION["streaming"]["required_operations"],
+	"topics": DEFAULT_CONFIGURATION["streaming"]["topics"],
+	"broker_core_dependency_allowed": False,
 }
 
 
@@ -250,7 +337,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "wflo",
 		"display_name": "Workflow Orchestration",
-		"provides": ["workflow_definitions", "event_orchestration", "task_routing", "approval_flows", "execution_monitoring", "workflow_agents", "compensation_controls"],
+		"provides": ["workflow_definitions", "event_orchestration", "task_routing", "approval_flows", "execution_monitoring", "workflow_agent_composition", "compensation_controls", "bytewax_workflow_lifecycle"],
 		"requires": ["mqeb", "auth", "audl", "aicr"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
@@ -264,8 +351,23 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
-		"streaming": deepcopy(STREAMING),
+		"agents": agent_manifest(config),
+		"streaming": streaming_manifest(config),
 	}
+
+
+def agent_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return first-class provider-neutral workflow-agent composition metadata."""
+	config = config or DEFAULT_CONFIGURATION
+	return deepcopy(config["agents"])
+
+
+def streaming_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return Bytewax lifecycle metadata for workflow composition state."""
+	config = config or DEFAULT_CONFIGURATION
+	streaming = deepcopy(STREAMING)
+	streaming.update(deepcopy(config["streaming"]))
+	return streaming
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

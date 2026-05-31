@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Workflow Orchestration",
         "errors": [],
-        "route_count": 10,
-        "rule_count": 35
+        "route_count": 11,
+        "rule_count": 43,
+        "streaming_required_processor": "bytewax"
       }
     },
     "self_test": {
       "capability": "wflo",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

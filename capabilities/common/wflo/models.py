@@ -11,6 +11,7 @@ from .workflow_runtime import (
 	WorkflowExecutionRecord,
 	WorkflowStepRecord,
 	WorkflowTaskRecord,
+	WfloLifecycleBatchRecord,
 )
 
 
@@ -26,5 +27,6 @@ __all__ = [
 	"WorkflowExecutionRecord",
 	"WorkflowStepRecord",
 	"WorkflowTaskRecord",
+	"WfloLifecycleBatchRecord",
 	"WfloRecord",
 ]
