@@ -47,8 +47,8 @@ def semantic_model() -> dict[str, Any]:
 			"idfd": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["idfd_operations"],
-				"requires": ["auth", "mfau", "encr"],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
@@ -69,6 +69,7 @@ def semantic_model() -> dict[str, Any]:
 					"sensitive_claim_mapping": "FederationReview",
 					"high_risk_session": "FederationReview",
 					"certificate_rotation": "FederationReview",
+					"federation_agent": "FederationAgentRecord",
 				},
 				"federation_lifecycle": {
 					"provider": "FederationProvider",
@@ -77,24 +78,39 @@ def semantic_model() -> dict[str, Any]:
 					"session": "FederatedSession",
 					"certificate": "CertificateRecord",
 					"health": "FederationHealthReport",
+					"federation_agent": "FederationAgentRecord",
+					"lifecycle_batch": "IdfdLifecycleBatchRecord",
 					"audit": "FederationAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
+				"agents": contract["agents"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"idfd": {
 				"id": "idfd",
 				"configuration": contract["configuration"],
-				"provides": ["idfd_operations"],
-				"requires": ["auth", "mfau", "encr"],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"idfd": ["auth", "mfau", "encr"]}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"idfd": contract["requires"]},
+			"applications": {},
+			"agent_teams": {
+				"identity_federation_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
 			"capability": {"kind": "capability", "nodes": 1, "edges": 3},
@@ -111,7 +127,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"identity_federation_governance": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -149,18 +165,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "idfd" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 10:
+	if len(routes) < 13:
 		errors.append("IDFD semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 44:
 		errors.append("IDFD semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("IDFD adapter manifest must use Bytewax for event streaming")
+	if agents.get("first_class") is not True:
+		errors.append("IDFD agents must be first-class federation governance citizens")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("IDFD lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.IdfdService":
 		errors.append("IDFD generated-app runtime is missing")
 	return {

@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "idfd"
 __capability_name__ = "Identity Federation"
-__apg_dependencies__ = ["auth", "mfau", "encr"]
+__apg_dependencies__ = ["auth", "mfau", "encr", "audl", "secu", "keym", "moni", "cach"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "idfd",
@@ -34,6 +34,8 @@ capability_metadata: dict[str, Any] = {
 		"federated_sessions",
 		"certificate_rotation",
 		"federation_reviews",
+		"federation_agent_composition",
+		"bytewax_lifecycle_batches",
 		"federation_audit",
 	],
 	"permissions": ["idfd:view", "idfd:manage_providers", "idfd:manage_mappings", "idfd:rotate_keys", "idfd:review", "idfd:admin"]
@@ -50,7 +52,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "secu", "mten", "ztna", "keym", "moni", "cach"],
+		"optional_dependencies": ["mten", "ztna"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -63,6 +65,8 @@ def register_capability() -> dict[str, Any]:
 			"identity_mapping": "Map external identities, groups, and claims to APG principals",
 			"federated_sessions": "Issue, revoke, and inspect tenant-scoped federated sessions",
 			"federation_reviews": "Route stale metadata, sensitive claims, high-risk sessions, and certificate rotations to review",
+			"federation_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style federation governance agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate identity-federation lifecycle batches through Bytewax-first processor contracts",
 			"federation_audit": "Audit provider, mapping, session, certificate, and health lifecycle events",
 			"capability_rules": "Evaluate deterministic federation-governance rules",
 			"visual_theming": "Apply federation-console theme tokens and components"
@@ -77,9 +81,13 @@ def register_capability() -> dict[str, Any]:
 			"scim": "/idfd/api/v1/scim",
 			"risk": "/idfd/api/v1/risk",
 			"reviews": "/idfd/api/v1/reviews",
+			"agents": "/idfd/api/v1/agents",
+			"lifecycle": "/idfd/api/v1/lifecycle",
 			"audit": "/idfd/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

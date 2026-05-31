@@ -21,6 +21,10 @@ def dashboard_model(service: IdfdService | None = None, tenant_id: str = "defaul
 		"routes": capability_routes(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"federation_agents": service.list_federation_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 	}
 
 
@@ -100,11 +104,43 @@ def review_queue_model(service: IdfdService, tenant_id: str = "default") -> dict
 	}
 
 
+def federation_agent_roster_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	agents = service.list_federation_agents(tenant_id)
+	return {
+		"route": "/idfd/agents",
+		"component": "FederationAgentRoster",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"theme_component": "federation_agent_roster",
+	}
+
+
+def lifecycle_batch_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"route": "/idfd/lifecycle",
+		"component": "IDFDLifecycleBatchMonitor",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
+		"theme_component": "bytewax_lifecycle_panel",
+	}
+
+
 def audit_model(service: IdfdService, tenant_id: str = "default") -> dict[str, object]:
 	return {
 		"route": "/idfd/audit",
 		"events": service.list_audit_events(tenant_id),
 		"health_reports": service.list_health_reports(tenant_id),
+		"agents": service.describe(tenant_id)["agents"],
+		"streaming": service.describe(tenant_id)["streaming"],
 		"theme_component": "audit_timeline",
 	}
 
@@ -114,4 +150,6 @@ def settings_model(service: IdfdService, tenant_id: str = "default") -> dict[str
 		"route": "/idfd/settings",
 		"configuration": service.describe(tenant_id)["configuration"],
 		"theme": service.describe(tenant_id)["theme"],
+		"agents": service.describe(tenant_id)["agents"],
+		"streaming": service.describe(tenant_id)["streaming"],
 	}

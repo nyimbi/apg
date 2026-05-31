@@ -32,8 +32,10 @@ def test_idfd_contract_shape_is_valid():
 	assert contract["capability"] == "idfd"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 44
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 
 
 def test_idfd_app_entrypoint_is_publishable():
@@ -50,6 +52,8 @@ def test_idfd_app_entrypoint_is_publishable():
 	assert "idfd" in model["capabilities"]
 	assert model["capabilities"]["idfd"]["runtime"]["service"] == "service.IdfdService"
 	assert model["capabilities"]["idfd"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["idfd"]["agents"]["first_class"] is True
+	assert model["capabilities"]["idfd"]["federation_lifecycle"]["lifecycle_batch"] == "IdfdLifecycleBatchRecord"
 
 
 def test_idfd_compatibility_record_uses_provider_runtime():

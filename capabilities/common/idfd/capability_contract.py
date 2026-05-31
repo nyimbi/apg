@@ -7,6 +7,29 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_IDFD_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_IDFD_AGENT_ROLES = [
+	"provider_reviewer",
+	"protocol_reviewer",
+	"claim_mapping_reviewer",
+	"session_risk_reviewer",
+	"certificate_rotation_reviewer",
+	"scim_reviewer",
+	"privacy_reviewer",
+	"lifecycle_batch_reviewer",
+	"federation_steward",
+]
+PRIVILEGED_IDFD_AGENT_ROLES = [
+	"protocol_reviewer",
+	"session_risk_reviewer",
+	"certificate_rotation_reviewer",
+	"scim_reviewer",
+	"privacy_reviewer",
+	"lifecycle_batch_reviewer",
+	"federation_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"providers": {
@@ -52,6 +75,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"review_notes_required": True,
 		"duplicate_pending_review_blocked": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_IDFD_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_IDFD_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_IDFD_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_identity_federation_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "idfd.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"provider_batch",
+			"protocol_batch",
+			"claim_mapping_batch",
+			"session_batch",
+			"certificate_batch",
+			"scim_batch",
+			"federation_review_batch",
+			"federation_agent_batch",
+		],
+		"topics": [
+			"idfd.providers",
+			"idfd.protocols",
+			"idfd.claim_mappings",
+			"idfd.sessions",
+			"idfd.certificates",
+			"idfd.scim",
+			"idfd.reviews",
+			"idfd.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"security": {
 		"tenant_isolation_required": True,
 		"signed_metadata_required": True,
@@ -87,6 +149,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"key_management": "keym",
 		"monitoring": "moni",
 		"cache": "cach",
+		"agent_adapter": "aicr_provider_neutral_identity_federation_agent_adapter",
 	},
 	"ui": {
 		"enable_dashboard": True,
@@ -98,6 +161,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_scim_directory": True,
 		"enable_risk_console": True,
 		"enable_review_queue": True,
+		"enable_federation_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -116,6 +181,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"scim",
 		"certificates",
 		"reviews",
+		"agents",
+		"streaming",
 		"security",
 		"governance",
 		"observability",
@@ -131,6 +198,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"scim",
 		"certificates",
 		"reviews",
+		"agents",
+		"streaming",
 		"security",
 		"governance",
 		"observability",
@@ -177,6 +246,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_federation_mutation_requires_bytewax", "description": "Batch federation mutations must use Bytewax event streams.", "condition": {"operation": "batch_federation_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_federation_access_denied", "description": "Federation records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_federation_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "federation_state_change_requires_audit", "description": "Federation state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "federation_audit_event_required", "required_action": "record_federation_audit_event"}},
+	{"name": "federation_agent_runtime_supported", "description": "Identity federation agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_federation_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_federation_agent_runtime", "required_action": "choose_supported_idfd_agent_runtime"}},
+	{"name": "federation_agent_role_supported", "description": "Identity federation agents must use supported federation-governance roles.", "condition": {"operation": "register_federation_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_federation_agent_role", "required_action": "choose_supported_idfd_agent_role"}},
+	{"name": "federation_agent_requires_scope", "description": "Identity federation agents require an explicit provider, protocol, claim, session, certificate, SCIM, privacy, or lifecycle scope.", "condition": {"operation": "register_federation_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "federation_agent_scope_required", "required_action": "declare_federation_agent_scope"}},
+	{"name": "federation_agent_requires_owner", "description": "Identity federation agents require an accountable owner.", "condition": {"operation": "register_federation_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "federation_agent_owner_required", "required_action": "assign_federation_agent_owner"}},
+	{"name": "federation_agent_requires_purpose", "description": "Identity federation agents require a documented purpose.", "condition": {"operation": "register_federation_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "federation_agent_purpose_required", "required_action": "document_federation_agent_purpose"}},
+	{"name": "federation_agent_requires_contribution_disclosure", "description": "Identity federation agents must disclose machine-authored provider, protocol, claim, session, certificate, SCIM, privacy, and lifecycle-review contributions.", "condition": {"operation": "register_federation_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "federation_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "federation_agent_privileged_role_requires_human_approval", "description": "Privileged identity federation agent roles require human approval evidence.", "condition": {"operation": "register_federation_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "federation_agent_human_approval_required", "required_action": "record_human_federation_agent_approval"}},
+	{"name": "idfd_lifecycle_batch_requires_mutations", "description": "IDFD lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_idfd_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "idfd_lifecycle_batch_empty", "required_action": "include_idfd_lifecycle_mutations"}},
+	{"name": "bytewax_idfd_stream_required", "description": "IDFD lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_idfd_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_idfd_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -190,6 +268,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "scim", "path": "/idfd/scim", "component": "SCIMDirectory", "permission": "idfd:manage_providers", "nav_group": "Directory"},
 	{"name": "risk", "path": "/idfd/risk", "component": "FederationRiskConsole", "permission": "idfd:view", "nav_group": "Operations"},
 	{"name": "reviews", "path": "/idfd/reviews", "component": "FederationReviewQueue", "permission": "idfd:review", "nav_group": "Governance"},
+	{"name": "agents", "path": "/idfd/agents", "component": "FederationAgentRoster", "permission": "idfd:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/idfd/lifecycle", "component": "IDFDLifecycleBatchMonitor", "permission": "idfd:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/idfd/audit", "component": "FederationAudit", "permission": "idfd:view", "nav_group": "Governance"},
 	{"name": "settings", "path": "/idfd/settings", "component": "IDFDSettings", "permission": "idfd:admin", "nav_group": "Administration"},
 ]
@@ -219,9 +299,63 @@ THEME: dict[str, Any] = {
 		"scim_directory": {"visual": "directory-tree", "status_style": "sync-chip"},
 		"risk_console": {"visual": "risk-lanes", "status_style": "reauth-chip"},
 		"review_queue": {"visual": "decision-lane", "status_style": "review-chip"},
+		"federation_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "federation-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "identity-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class IDFD agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_IDFD_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_IDFD_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_IDFD_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_identity_federation_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the IDFD Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "idfd.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"provider_batch",
+			"protocol_batch",
+			"claim_mapping_batch",
+			"session_batch",
+			"certificate_batch",
+			"scim_batch",
+			"federation_review_batch",
+			"federation_agent_batch",
+		],
+		"topics": [
+			"idfd.providers",
+			"idfd.protocols",
+			"idfd.claim_mappings",
+			"idfd.sessions",
+			"idfd.certificates",
+			"idfd.scim",
+			"idfd.reviews",
+			"idfd.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -233,6 +367,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "idfd",
 		"display_name": "Identity Federation",
+		"provides": ["identity_federation", "federated_sso", "federation_agent_composition"],
+		"requires": ["auth", "mfau", "encr", "audl", "secu", "keym", "moni", "cach"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -244,6 +380,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

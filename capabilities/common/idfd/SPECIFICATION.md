@@ -7,6 +7,15 @@ It lets generated applications define, govern, operate, and inspect SAML, OIDC,
 LDAP, and SCIM federation without binding the generated app to one concrete
 identity-provider SDK.
 
+The current packet also makes identity-federation governance agents first-class
+citizens. Generated applications can register provider-neutral AI agents for
+provider review, protocol review, claim mapping review, session-risk review,
+certificate rotation review, SCIM review, privacy review, lifecycle batch
+review, and federation stewardship. Agent runtimes such as `codex`,
+`claude_code`, `opencode`, and `pi` remain adapter-backed; IDFD governs their
+declared role, scope, owner, purpose, contribution disclosure, and human
+approval posture.
+
 ## Scope
 
 IDFD owns:
@@ -17,6 +26,9 @@ IDFD owns:
 - Federated session issuance, revocation, risk handling, and MFA gates.
 - Certificate/key lifecycle evidence for federation signing material.
 - Health reporting and audit trails.
+- Provider-neutral federation governance agents.
+- Bytewax-first lifecycle batch validation for provider, protocol, claim,
+  session, certificate, SCIM, review, and agent mutations.
 - Contract-derived UI routes, view payloads, and theme tokens.
 - Bytewax event-stream adapter evidence for batch federation mutation.
 
@@ -31,8 +43,17 @@ IDFD does not own:
 ## Configuration
 
 The contract must expose tenant-scoped configuration sections for providers,
-protocols, claims, sessions, SCIM, certificates, reviews, security, governance,
-observability, adapters, UI, and theme.
+protocols, claims, sessions, SCIM, certificates, reviews, agents, streaming,
+security, governance, observability, adapters, UI, and theme.
+
+The `agents` section must define supported runtimes `codex`, `claude_code`,
+`opencode`, and `pi`; supported federation-governance roles; privileged roles;
+required owner, purpose, scope, contribution disclosure, and privileged-role
+human approval; and the provider-neutral AICR adapter contract.
+
+The `streaming` section must define `bytewax`, `idfd.lifecycle`, `event_time`
+watermarking, lifecycle operations, lifecycle topics, and no broker-core/Kafka
+dependency.
 
 Required adapter evidence:
 
@@ -42,6 +63,8 @@ Required adapter evidence:
 - `bytewax` for event-stream composition.
 - `auth`, `mfau`, `encr`, `audl`, `secu`, `keym`, `moni`, and `cach` as
   integration adapter points.
+- `aicr_provider_neutral_identity_federation_agent_adapter` for AI-assisted
+  federation governance agents.
 
 ## Runtime Lifecycle
 
@@ -83,18 +106,26 @@ The rule engine is deterministic and returns `allow`, `require_review`, or
 security, claim mapping, SCIM, sessions, certificates, reviews, Bytewax batch
 mutation, cross-tenant isolation, and state-change audit.
 
+Rules must also cover unsupported federation-agent runtime, unsupported role,
+missing scope, owner, purpose, missing machine-contribution disclosure,
+privileged federation-agent registration without human approval, empty
+lifecycle batches, unsupported lifecycle operations, and non-Bytewax lifecycle
+batch routing.
+
 ## UI
 
 The route manifest must include dashboard, providers, protocols, mappings,
-sessions, certificates, SCIM, risk, reviews, audit, and settings. View payloads
-must be dependency-light dictionaries suitable for generated Python apps.
+sessions, certificates, SCIM, risk, reviews, agents, lifecycle, audit, and
+settings. View payloads must be dependency-light dictionaries suitable for
+generated Python apps.
 
 ## Theming
 
 The default theme is `idfd_federation_console`. It defines compact density,
 8px radius, status color tokens, and named theme components for provider grids,
 protocol panels, mapping tables, session monitors, certificate timelines, SCIM
-directory views, risk consoles, review queues, and audit timelines.
+directory views, risk consoles, review queues, federation agent rosters,
+Bytewax lifecycle panels, and audit timelines.
 
 ## Verification Requirements
 
@@ -102,9 +133,10 @@ The focused packet is serviceable when:
 
 - The contract shape validates.
 - The package self-test passes.
-- The rule count is at least 30.
-- The route count is at least 10.
+- The rule count is at least 44.
+- The route count is at least 13.
 - Bytewax adapter evidence is present.
 - The runtime can register providers, map claims, issue sessions, register
-  certificates, report health, revoke sessions, and isolate tenants.
+  certificates, report health, revoke sessions, register federation agents,
+  validate lifecycle batches, and isolate tenants.
 - Focused IDFD tests pass without requiring full repository execution.

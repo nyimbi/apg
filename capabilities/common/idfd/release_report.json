@@ -2,10 +2,12 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Identity Federation",
         "errors": [],
-        "route_count": 11,
-        "rule_count": 35
+        "required_processor": "bytewax",
+        "route_count": 13,
+        "rule_count": 44
       }
     },
     "runtime": {

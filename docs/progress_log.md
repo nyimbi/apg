@@ -22384,3 +22384,71 @@ Not run to preserve battery:
   live BIOP/CVSN/AICR/ENCR/AUDL/CONF/MFAU adapters, rendered browser UI,
   external AI-agent runtime clients, watchlist operational approvals,
   biometric performance benchmarks, and load/performance checks.
+
+### 2026-05-31 09:18 EAT
+
+IDFD identity-federation agent composition and Bytewax lifecycle guardrail
+packet:
+
+- Selected `capabilities/common/idfd` as the next ordered capability packet
+  after FREC and preserved its existing SAML, OIDC, LDAP, SCIM, claim mapping,
+  federated session, certificate, health, audit, and tenant-isolation
+  lifecycle.
+- Extended the IDFD executable contract with first-class identity-federation
+  governance-agent metadata, supported runtimes `codex`, `claude_code`,
+  `opencode`, and `pi`, supported federation-governance roles,
+  privileged-role metadata, Bytewax lifecycle stream metadata, route metadata,
+  theme components, and contract `provides`/`requires`.
+- Added deterministic guardrails for unsupported federation-agent runtime,
+  unsupported role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged federation-agent registration without
+  human approval, empty lifecycle batches, unsupported lifecycle operations,
+  and non-Bytewax IDFD lifecycle batch routing.
+- Added `FederationAgentRecord`, `IdfdLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, federation-agent roster view
+  models, lifecycle-batch monitor view models, and API helpers.
+- Added `/idfd/agents`, `/idfd/lifecycle`, federation-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed
+  `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/idfd/__init__.py capabilities/common/idfd/capability_contract.py capabilities/common/idfd/federation_runtime.py capabilities/common/idfd/models.py capabilities/common/idfd/service.py capabilities/common/idfd/api.py capabilities/common/idfd/views.py capabilities/common/idfd/app.py capabilities/common/idfd/test_capability_contract.py capabilities/common/idfd/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/idfd/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/idfd/test_capability_contract.py capabilities/common/idfd/tests/test_package_contract.py`
+  passed with 10 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect idfd --json` passed with `ok: true`,
+  13 APG Python routes, 44 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/idfd --json`
+  passed with `ok: true`; IDFD remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/idfd --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/idfd/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/idfd/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/idfd/package_manifest.json`
+  passed.
+- Runtime smoke returned one OIDC provider, one claim mapping, one active
+  federated session, one active certificate, one active `codex` federation
+  governance agent, and one accepted `bytewax` lifecycle-batch evidence
+  record.
+- Focused stale-marker scan over touched IDFD packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial examples and
+  no-broker-core/Kafka dependency documentation.
+- `git diff --check -- capabilities/common/idfd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live SAML/OIDC/LDAP/SCIM handshakes, production identity-provider SDKs,
+  directory synchronization, certificate authority integrations, production
+  databases, durable Bytewax topology, live AUTH/MFAU/ENCR/AUDL/SECU/KEYM/MONI
+  adapters, rendered browser UI, external AI-agent runtime clients,
+  conformance certification, federation interoperability suites, and
+  load/performance checks.

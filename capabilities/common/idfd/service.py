@@ -18,8 +18,10 @@ from .models import (
 	ClaimMapping,
 	FederatedSession,
 	FederationAuditEvent,
+	FederationAgentRecord,
 	FederationHealthReport,
 	FederationProvider,
+	IdfdLifecycleBatchRecord,
 	ProviderProtocol,
 	ProviderStatus,
 	SessionStatus,
@@ -40,10 +42,17 @@ class IdfdService:
 		self._certificates: dict[StoreKey, CertificateRecord] = {}
 		self._audit_events: dict[StoreKey, FederationAuditEvent] = {}
 		self._health_reports: dict[StoreKey, FederationHealthReport] = {}
+		self._federation_agents: dict[StoreKey, FederationAgentRecord] = {}
+		self._lifecycle_batches: dict[StoreKey, IdfdLifecycleBatchRecord] = {}
 		self._counter = count(1)
 		self._metadata = MetadataFreshnessInspector()
 		self._session_issuer = FederationSessionIssuer()
 		self._health = FederationHealthInspector()
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -258,6 +267,98 @@ class IdfdService:
 		self._audit(tenant_id, "health_report_generated", reason=report_id)
 		return report.to_dict()
 
+	def register_federation_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._ensure_new(self._federation_agents, tenant_id, agent_id)
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_federation_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			reasons = ", ".join(action.get("reason", "federation_agent_denied") for action in result["actions"])
+			raise PermissionError(reasons)
+		if not str(name or "").strip():
+			raise ValueError("federation_agent_name_required")
+		agent = FederationAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._federation_agents[self._key(tenant_id, agent.id)] = agent
+		self._audit(tenant_id, "federation_agent_registered", reason=f"{runtime_value}:{role_value}", decision=result["decision"])
+		return agent.to_dict()
+
+	def validate_idfd_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "federation_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		if not str(tenant_id or "").strip():
+			self._enforce_federation_policy(tenant_id=tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("idfd_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_idfd_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_idfd_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+		})
+		accepted = result["decision"] == "allow"
+		record = IdfdLifecycleBatchRecord(
+			id=batch_id or f"idfdbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._key(tenant_id, record.id)] = record
+		self._audit(tenant_id, f"idfd_lifecycle_batch_{record.status}", reason=f"{operation_value}:{stream_value}", decision=result["decision"])
+		if result["decision"] == "deny":
+			reasons = ", ".join(action.get("reason", "idfd_lifecycle_batch_denied") for action in result["actions"])
+			raise PermissionError(reasons)
+		return record.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -303,6 +404,12 @@ class IdfdService:
 	def list_health_reports(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._health_reports, tenant_id)
 
+	def list_federation_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._federation_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self.list_providers(tenant_id)
 
@@ -325,6 +432,10 @@ class IdfdService:
 			"active_session_count": len(active_sessions),
 			"certificate_count": len(self.list_certificates(tenant_id)),
 			"stale_provider_count": len(stale),
+			"federation_agent_count": len(self.list_federation_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_federation_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"routes": len(self.describe(tenant_id)["ui"]["routes"]),
 			"theme": self.describe(tenant_id)["theme"]["name"],
@@ -400,3 +511,7 @@ class IdfdService:
 def expires_in_days(days: int) -> str:
 	"""Return an ISO timestamp used by tests and generated probes."""
 	return iso_hours_from_now(days * 24)
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
