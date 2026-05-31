@@ -1,5 +1,8 @@
 {
   "base_target": "python",
+  "capabilities": [
+    "ntfy"
+  ],
   "display_name": "Notifications and Alerts",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
@@ -15,10 +18,17 @@
     "semantic_model.json",
     "release_report.json"
   ],
+  "interfaces": {
+    "health": "/health",
+    "self_test": "/self-test",
+    "semantic_model": "/semantic-model.json"
+  },
+  "kind": "apg.generated_application",
   "name": "ntfy",
   "profile": "capability",
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "target": "python",
   "version": "1.0.0"
 }

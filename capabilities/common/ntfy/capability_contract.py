@@ -7,6 +7,32 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_NTFY_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_NTFY_AGENT_ROLES: list[str] = [
+	"channel_reviewer",
+	"template_reviewer",
+	"campaign_reviewer",
+	"delivery_reviewer",
+	"preference_reviewer",
+	"suppression_reviewer",
+	"provider_health_reviewer",
+	"alert_routing_reviewer",
+	"lifecycle_batch_reviewer",
+	"notification_steward",
+]
+
+PRIVILEGED_NTFY_AGENT_ROLES: list[str] = [
+	"campaign_reviewer",
+	"delivery_reviewer",
+	"suppression_reviewer",
+	"provider_health_reviewer",
+	"alert_routing_reviewer",
+	"lifecycle_batch_reviewer",
+	"notification_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"channels": {
@@ -65,6 +91,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"audit_required": True,
 		"event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_NTFY_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_NTFY_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_NTFY_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_notification_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "ntfy.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"channel_batch",
+			"preference_batch",
+			"template_batch",
+			"message_batch",
+			"delivery_batch",
+			"campaign_batch",
+			"suppression_batch",
+			"provider_health_batch",
+			"notification_agent_batch",
+		],
+		"topics": [
+			"ntfy.channels",
+			"ntfy.preferences",
+			"ntfy.templates",
+			"ntfy.messages",
+			"ntfy.deliveries",
+			"ntfy.campaigns",
+			"ntfy.suppression",
+			"ntfy.providers",
+			"ntfy.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "notification_runtime.NotificationRuntime",
 		"helper_runtime": "notification_runtime.py",
@@ -83,6 +150,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"machine_channel": "mchn",
 		"security": "secu",
 		"cache": "cach",
+		"agent_adapter": "aicr_provider_neutral_notification_agent_adapter",
 	},
 	"ui": {
 		"enable_notification_dashboard": True,
@@ -93,6 +161,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_channel_health": True,
 		"enable_delivery_analytics": True,
 		"enable_suppression_lists": True,
+		"enable_notification_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -112,6 +182,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -125,6 +197,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -164,6 +238,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "cross_tenant_notification_access_denied", "description": "Notification records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_notification_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "notification_state_change_requires_audit", "description": "Notification state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "notification_audit_event_required", "required_action": "record_notification_audit"}},
 	{"name": "batch_notification_mutation_requires_bytewax", "description": "Batch notification mutations must use Bytewax event streams.", "condition": {"operation": "batch_notification_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
+	{"name": "notification_agent_runtime_supported", "description": "Notification agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_notification_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_notification_agent_runtime", "required_action": "choose_supported_notification_agent_runtime"}},
+	{"name": "notification_agent_role_supported", "description": "Notification agents must use supported notification-governance roles.", "condition": {"operation": "register_notification_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_notification_agent_role", "required_action": "choose_supported_notification_agent_role"}},
+	{"name": "notification_agent_requires_scope", "description": "Notification agents require explicit channel, template, campaign, delivery, preference, suppression, provider, alert-routing, or lifecycle scope.", "condition": {"operation": "register_notification_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "notification_agent_scope_required", "required_action": "declare_notification_agent_scope"}},
+	{"name": "notification_agent_requires_owner", "description": "Notification agents require an accountable owner.", "condition": {"operation": "register_notification_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "notification_agent_owner_required", "required_action": "assign_notification_agent_owner"}},
+	{"name": "notification_agent_requires_purpose", "description": "Notification agents require a documented delivery-governance purpose.", "condition": {"operation": "register_notification_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "notification_agent_purpose_required", "required_action": "document_notification_agent_purpose"}},
+	{"name": "notification_agent_requires_contribution_disclosure", "description": "Notification agents must disclose machine-authored channel, template, campaign, delivery, suppression, routing, and lifecycle contributions.", "condition": {"operation": "register_notification_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "notification_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "notification_agent_privileged_role_requires_human_approval", "description": "Privileged notification-agent roles require human approval evidence.", "condition": {"operation": "register_notification_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "notification_agent_human_approval_required", "required_action": "record_human_notification_agent_approval"}},
+	{"name": "ntfy_lifecycle_batch_requires_mutations", "description": "NTFY lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_ntfy_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "ntfy_lifecycle_batch_empty", "required_action": "include_ntfy_lifecycle_mutations"}},
+	{"name": "bytewax_ntfy_stream_required", "description": "NTFY lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_ntfy_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_ntfy_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -176,6 +259,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "suppression", "path": "/ntfy/suppression", "component": "SuppressionLists", "permission": "ntfy:manage_campaigns", "nav_group": "Recipients"},
 	{"name": "channels", "path": "/ntfy/channels", "component": "ChannelHealth", "permission": "ntfy:admin", "nav_group": "Operations"},
 	{"name": "analytics", "path": "/ntfy/analytics", "component": "DeliveryAnalytics", "permission": "ntfy:view", "nav_group": "Operations"},
+	{"name": "agents", "path": "/ntfy/agents", "component": "NotificationAgentRoster", "permission": "ntfy:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/ntfy/lifecycle", "component": "NTFYLifecycleBatchMonitor", "permission": "ntfy:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/ntfy/audit", "component": "NotificationAuditTrail", "permission": "ntfy:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/ntfy/settings", "component": "NTFYSettings", "permission": "ntfy:admin", "nav_group": "Administration"},
 ]
@@ -204,6 +289,8 @@ THEME: dict[str, Any] = {
 		"template_studio": {"visual": "template-list", "status_style": "approval-chip"},
 		"suppression_list": {"visual": "recipient-table", "status_style": "suppression-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "delivery-chip"},
+		"notification_agent_roster": {"icon": "bot", "visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"icon": "activity", "visual": "lifecycle-batch-list", "status_style": "stream-chip"},
 	},
 }
 
@@ -229,6 +316,44 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+	}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return provider-neutral notification agent composition metadata."""
+	agents = DEFAULT_CONFIGURATION["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for NTFY composition."""
+	streaming = DEFAULT_CONFIGURATION["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"watermark": streaming["watermark"],
+		"required_processor": streaming["required_processor"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 

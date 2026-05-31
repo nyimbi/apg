@@ -47,14 +47,16 @@ def semantic_model() -> dict[str, Any]:
 			"ntfy": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["ntfy_operations"],
-				"requires": ["mqeb", "auth", "mten"],
+				"provides": ["ntfy_operations", "notification_management", "notification_agent_composition"],
+				"requires": ["mqeb", "auth", "mten", "audl", "aicr", "secu", "cach"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 				"runtime": {
 					"entrypoint": "app.py",
 					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
@@ -77,26 +79,37 @@ def semantic_model() -> dict[str, Any]:
 					"delivery": "DeliveryRecord",
 					"campaign": "CampaignRecord",
 					"audit": "NotificationAuditEventRecord",
+					"notification_agent": "NotificationAgentRecord",
+					"lifecycle_batch": "NtfyLifecycleBatchRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
 			}
 		},
 		"contracts": {
 			"ntfy": {
 				"id": "ntfy",
 				"configuration": contract["configuration"],
-				"provides": ["ntfy_operations"],
-				"requires": ["mqeb", "auth", "mten"],
+				"provides": ["ntfy_operations", "notification_management", "notification_agent_composition"],
+				"requires": ["mqeb", "auth", "mten", "audl", "aicr", "secu", "cach"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"ntfy": ["mqeb", "auth", "mten"]}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"ntfy": ["mqeb", "auth", "mten", "audl", "aicr", "secu", "cach"]},
+			"applications": {},
+			"agent_teams": {
+				"notification_delivery_team": {
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"roles": contract["agents"]["supported_roles"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 3},
+			"capability": {"kind": "capability", "nodes": 1, "edges": 7},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py", "notification_runtime.py", "package_api.py", "view_models.py", "app.py"],
@@ -110,7 +123,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"ntfy": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -154,12 +169,16 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 10:
+	if len(routes) < 12:
 		errors.append("NTFY semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 40:
 		errors.append("NTFY semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("NTFY adapter manifest must use Bytewax for event streaming")
+	if not capability.get("agents", {}).get("first_class"):
+		errors.append("NTFY semantic model must expose first-class agents")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("NTFY lifecycle streaming must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "notification_runtime.NotificationRuntime":
 		errors.append("NTFY generated-app runtime is missing")
 	return {

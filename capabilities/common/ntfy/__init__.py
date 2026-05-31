@@ -10,13 +10,13 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "ntfy"
 __capability_name__ = "Notifications and Alerts"
-__apg_dependencies__ = ["mqeb", "auth", "mten"]
+__apg_dependencies__ = ["mqeb", "auth", "mten", "audl", "aicr", "secu", "cach"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "ntfy",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware notifications, alerts, campaigns, delivery channels, preferences, and engagement analytics",
+	"description": "Tenant-aware notifications, alerts, campaigns, delivery channels, preferences, engagement analytics, and governed AI-agent composition",
 	"category": "collaboration_communication",
 	"subcategory": "notifications",
 	"vendor": "Datacraft",
@@ -33,6 +33,8 @@ capability_metadata: dict[str, Any] = {
 		"channel_health",
 		"delivery_audit",
 		"engagement_analytics",
+		"notification_agent_composition",
+		"bytewax_lifecycle_governance",
 	],
 	"permissions": ["ntfy:view", "ntfy:send", "ntfy:manage_templates", "ntfy:manage_campaigns", "ntfy:audit", "ntfy:admin"]
 }
@@ -50,7 +52,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "aicr", "colb", "mchn", "secu", "cach"],
+		"optional_dependencies": ["colb", "mchn"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -62,6 +64,8 @@ def register_capability() -> dict[str, Any]:
 			"template_governance": "Version and approve tenant notification templates",
 			"channel_health": "Track provider health, fallback routes, and channel ownership",
 			"delivery_audit": "Record notification delivery, preference, template, campaign, and channel audit events",
+			"notification_agent_composition": "Register provider-neutral notification agents with scoped roles, accountable owners, contribution disclosure, and human approval guardrails",
+			"bytewax_lifecycle_governance": "Validate notification lifecycle batches against Bytewax stream and mutation guardrails",
 			"capability_rules": "Evaluate deterministic notification-governance rules",
 			"visual_theming": "Apply notification-operations theme tokens and components"
 		},
@@ -74,9 +78,13 @@ def register_capability() -> dict[str, Any]:
 			"suppression": "/ntfy/api/v1/suppression",
 			"channels": "/ntfy/api/v1/channels",
 			"analytics": "/ntfy/api/v1/analytics",
-			"audit": "/ntfy/api/v1/audit"
+			"audit": "/ntfy/api/v1/audit",
+			"agents": "/ntfy/api/v1/agents",
+			"lifecycle": "/ntfy/api/v1/lifecycle"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

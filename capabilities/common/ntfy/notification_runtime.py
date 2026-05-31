@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from hashlib import sha1
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
 
 
 def utc_now() -> str:
@@ -191,6 +191,70 @@ class NotificationAuditEventRecord:
 		}
 
 
+@dataclass
+class NotificationAgentRecord:
+	"""First-class AI agent assigned to a governed notification scope."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool = True
+	human_approval_required: bool = False
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class NtfyLifecycleBatchRecord:
+	"""Bytewax lifecycle batch evidence for notification mutations."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
 class NotificationRuntime:
 	"""Deterministic tenant-scoped notification lifecycle used by generated apps."""
 
@@ -200,8 +264,14 @@ class NotificationRuntime:
 		self._templates: dict[str, NotificationTemplateRecord] = {}
 		self._deliveries: dict[str, DeliveryRecord] = {}
 		self._campaigns: dict[str, CampaignRecord] = {}
+		self._notification_agents: dict[str, NotificationAgentRecord] = {}
+		self._lifecycle_batches: dict[str, NtfyLifecycleBatchRecord] = {}
 		self._audit_events: list[NotificationAuditEventRecord] = []
 		self._idempotency: set[str] = set()
+		self._agent_runtimes = {_normalize_token(runtime) for runtime in DEFAULT_CONFIGURATION["agents"]["supported_runtimes"]}
+		self._agent_roles = {_normalize_token(role) for role in DEFAULT_CONFIGURATION["agents"]["supported_roles"]}
+		self._privileged_agent_roles = {_normalize_token(role) for role in DEFAULT_CONFIGURATION["agents"]["privileged_roles"]}
+		self._lifecycle_operations = {_normalize_token(operation) for operation in DEFAULT_CONFIGURATION["streaming"]["required_operations"]}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -392,6 +462,101 @@ class NotificationRuntime:
 		self._audit(tenant_id, "campaign_sent", campaign_id, campaign.owner, {"status": campaign.status, "recipient_count": len(campaign.audience)})
 		return {"campaign": campaign.to_dict(), "required_actions": required_actions, "matched_rules": list(result["matched_rules"])}
 
+	def register_notification_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record_key = self._key(tenant_id, agent_id)
+		if record_key in self._notification_agents:
+			raise ValueError(f"notification_agent_already_exists:{agent_id}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_notification_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("notification_agent_name_required")
+		agent = NotificationAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._notification_agents[record_key] = agent
+		self._audit(tenant_id, "notification_agent_registered", agent_id, owner, {**agent.to_dict(), "rule_decision": result["decision"]})
+		return agent.to_dict()
+
+	def validate_ntfy_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "notification_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("ntfy_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_ntfy_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_ntfy_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"ntfy-batch-{len(self._lifecycle_batches) + 1:06d}"
+		record = NtfyLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._key(tenant_id, record_id)] = record
+		self._audit(tenant_id, f"ntfy_lifecycle_batch_{record.status}", record_id, "bytewax", record.to_dict())
+		self._raise_if_denied(result)
+		return record.to_dict()
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		deliveries = self.list_deliveries(tenant_id)
@@ -405,6 +570,10 @@ class NotificationRuntime:
 			"delivery_count": len(deliveries),
 			"delivered_count": sum(1 for delivery in deliveries if delivery["status"] == "delivered"),
 			"review_required_count": sum(1 for delivery in deliveries if delivery["status"] == "review_required"),
+			"notification_agent_count": len(self.list_notification_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_notification_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 		}
 
 	def list_preferences(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -421,6 +590,12 @@ class NotificationRuntime:
 
 	def list_campaigns(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._tenant_sorted(self._campaigns.values(), tenant_id, "id")
+
+	def list_notification_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._notification_agents.values(), tenant_id, "name")
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._lifecycle_batches.values(), tenant_id, "created_at")
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._tenant_sorted(self._audit_events, tenant_id, "created_at")
@@ -458,3 +633,7 @@ class NotificationRuntime:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: getattr(item, sort_key))]
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

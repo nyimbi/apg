@@ -19,6 +19,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		**summary,
 	}
 
@@ -114,6 +116,31 @@ def send_campaign(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_notification_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return RUNTIME.register_notification_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return RUNTIME.validate_ntfy_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "notification_agent_batch"),
+		batch_id=payload.get("batch_id"),
+	)
+
+
 def notification_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": RUNTIME.dashboard_summary(tenant_id),
@@ -122,5 +149,7 @@ def notification_state(tenant_id: str = "default") -> dict[str, Any]:
 		"templates": RUNTIME.list_templates(tenant_id),
 		"deliveries": RUNTIME.list_deliveries(tenant_id),
 		"campaigns": RUNTIME.list_campaigns(tenant_id),
+		"notification_agents": RUNTIME.list_notification_agents(tenant_id),
+		"lifecycle_batches": RUNTIME.list_lifecycle_batches(tenant_id),
 		"audit_events": RUNTIME.list_audit_events(tenant_id),
 	}

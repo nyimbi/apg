@@ -3,7 +3,8 @@
 `ntfy` is APG's package-backed Notifications and Alerts capability. It gives
 generated applications a tenant-scoped notification runtime for recipient
 preferences, channel providers, template governance, delivery decisions,
-campaigns, audit events, UI route metadata, and visual theme metadata.
+campaigns, governed AI agents, Bytewax lifecycle batches, audit events, UI
+route metadata, and visual theme metadata.
 
 The package keeps the large existing Flask/API, FAB view, channel, analytics,
 security, geofencing, and personalization modules available as integration
@@ -23,9 +24,18 @@ packet surfaces declared in the capability contract: `notification_runtime.py`,
   provider health, enabled channels, webhook signatures, event bus evidence,
   audit evidence, idempotency, and quiet-hour review.
 - Campaign creation, approval, batch review, and send lifecycle.
+- First-class provider-neutral notification agents for `codex`, `claude_code`,
+  `opencode`, and `pi`.
+- Human-review guardrails for privileged notification roles such as campaign
+  reviewers, delivery reviewers, suppression reviewers, provider-health
+  reviewers, alert-routing reviewers, lifecycle reviewers, and notification
+  stewards.
+- Bytewax-only lifecycle batch validation for channel, preference, template,
+  message, delivery, campaign, suppression, provider-health, and
+  notification-agent mutations.
 - Hashed deterministic IDs and tenant-local record isolation.
 - UI view models for dashboard, messages, templates, campaigns, preferences,
-  channels, analytics, audit, and settings.
+  channels, analytics, agents, lifecycle batches, audit, and settings.
 - Contract-derived semantic model, package manifest, release report, and
   publish-plan support.
 
@@ -52,6 +62,10 @@ packet surfaces declared in the capability contract: `notification_runtime.py`,
 5. Record a deterministic delivery record and audit event.
 6. Create and approve campaigns for larger audiences.
 7. Route large batches or quiet-hour sends to review when required.
+8. Register scoped AI agents for delivery governance, alert routing, and
+   notification operations.
+9. Validate bulk lifecycle mutations through Bytewax before composing larger
+   applications.
 
 ## Python Usage
 
@@ -104,6 +118,50 @@ runtime.approve_campaign("tenant-a", campaign["id"], "compliance-reviewer")
 result = runtime.send_campaign("tenant-a", campaign["id"])
 ```
 
+## AI Agent Composition
+
+Notification agents are first-class records. They are not bound to one model,
+CLI, or provider. The contract accepts provider-neutral runtimes:
+
+- `codex`
+- `claude_code`
+- `opencode`
+- `pi`
+
+Every agent must declare a runtime, supported role, explicit scope, accountable
+owner, purpose, and machine-contribution disclosure. Privileged roles enter
+`pending_review` unless human approval evidence is recorded.
+
+```python
+agent = runtime.register_notification_agent(
+	"agent-steward",
+	"tenant-a",
+	"Notification Steward",
+	"codex",
+	"notification_steward",
+	"campaign:spring-launch",
+	"marketing-owner",
+	"review campaign delivery before send",
+	human_approval_required=True,
+)
+```
+
+## Bytewax Lifecycle Batches
+
+Batch mutations must use Bytewax. The local package validates stream metadata
+and records accepted or denied lifecycle-batch evidence without starting a live
+Bytewax topology.
+
+```python
+batch = runtime.validate_ntfy_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	2,
+	"notification_agent_batch",
+	"batch-agent-001",
+)
+```
+
 ## Contract And Composition
 
 ```python
@@ -122,6 +180,7 @@ Important adapters:
 - `api_helpers`: `package_api.py`
 - `view_models`: `view_models.py`
 - `event_stream`: `bytewax`
+- `agent_adapter`: `aicr_provider_neutral_notification_agent_adapter`
 - `message_bus`: `mqeb`
 - `authentication`: `auth`
 - `multi_tenancy`: `mten`
@@ -140,6 +199,8 @@ The contract exposes these route names:
 - `suppression`
 - `channels`
 - `analytics`
+- `agents`
+- `lifecycle`
 - `audit`
 - `settings`
 
@@ -148,7 +209,8 @@ The contract exposes these route names:
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/ntfy/__init__.py capabilities/common/ntfy/capability_contract.py capabilities/common/ntfy/notification_runtime.py capabilities/common/ntfy/package_api.py capabilities/common/ntfy/view_models.py capabilities/common/ntfy/app.py capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py
-./.venv/bin/python -c "from capabilities.common.ntfy import app; r=app.self_test(); print(r); assert r['passed']"
+./.venv/bin/python capabilities/common/ntfy/app.py
+./.venv/bin/apg capabilities inspect ntfy --json
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ntfy --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/ntfy --json
 ```

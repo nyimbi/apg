@@ -22649,3 +22649,70 @@ Not run to preserve battery:
   Bytewax topology, live AUDL/DLPD/ENCR/AUTH/SECU/MTEN/IDFD/ZTNA/MQEB/CACH
   adapters, rendered browser UI, external AI-agent runtime clients, compliance
   interoperability certification, and load/performance checks.
+
+### 2026-05-31 11:27 EAT
+
+NTFY notification agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/ntfy` as the next ordered capability packet
+  after COMP and preserved its existing channel, preference, template,
+  message, campaign, audit, idempotency, consent, provider-health, and
+  tenant-isolation lifecycle.
+- Extended the NTFY executable contract with first-class notification-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported notification-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and expanded
+  `provides`/`requires` evidence.
+- Added deterministic guardrails for unsupported notification-agent runtime,
+  unsupported role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged notification-agent registration without
+  human approval, empty lifecycle batches, unsupported lifecycle operations,
+  and non-Bytewax NTFY lifecycle batch routing.
+- Added `NotificationAgentRecord`, `NtfyLifecycleBatchRecord`,
+  tenant-qualified agent storage, lifecycle-batch storage, registration,
+  listing, audit events, dashboard counts, notification-agent roster view
+  models, lifecycle-batch monitor view models, and package API helpers.
+- Added `/ntfy/agents`, `/ntfy/lifecycle`, notification-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed `README.md`,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/ntfy/__init__.py capabilities/common/ntfy/capability_contract.py capabilities/common/ntfy/notification_runtime.py capabilities/common/ntfy/package_api.py capabilities/common/ntfy/view_models.py capabilities/common/ntfy/app.py capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/ntfy/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/ntfy/test_capability_contract.py capabilities/common/ntfy/tests/test_package_contract.py`
+  passed with 12 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect ntfy --json` passed with `ok: true`,
+  12 APG Python routes, 40 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/ntfy --json`
+  passed with `ok: true`; NTFY remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ntfy --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/ntfy/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/ntfy/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/ntfy/package_manifest.json`
+  passed.
+- Runtime smoke returned one delivered message, one sent campaign, one active
+  `codex` notification steward agent, and one accepted `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched NTFY packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial examples and
+  no-broker-core dependency metadata. The broader package still contains
+  legacy `todo.md`, `userguide.md`, and test-requirement references outside
+  this packet.
+- `git diff --check -- capabilities/common/ntfy docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live email, SMS, push, WebSocket, webhook, Slack, Teams, analytics,
+  personalization, provider credentials, production databases, durable Bytewax
+  topology, live MQEB/AUTH/MTEN/AUDL/AICR/SECU/CACH adapters, rendered browser
+  UI, external AI-agent runtime clients, provider deliverability
+  certification, and load/performance checks.

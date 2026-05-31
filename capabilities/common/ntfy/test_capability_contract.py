@@ -3,6 +3,7 @@
 import pytest
 
 from capabilities.common.ntfy import register_capability
+from capabilities.common.ntfy import package_api
 from capabilities.common.ntfy import view_models
 from capabilities.common.ntfy.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.ntfy.notification_runtime import NotificationRuntime
@@ -24,16 +25,24 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
 	}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "messages", "templates", "campaigns", "preferences", "suppression", "channels", "analytics", "audit", "settings"}
+	assert len(contract["rule_engine"]["rules"]) >= 40
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "messages", "templates", "campaigns", "preferences", "suppression", "channels", "analytics", "agents", "lifecycle", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/ntfy/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "channel_matrix" in contract["theme"]["components"]
+	assert "notification_agent_roster" in contract["theme"]["components"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["configuration"]["adapters"]["agent_adapter"] == "aicr_provider_neutral_notification_agent_adapter"
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "notification_agent_batch" in contract["streaming"]["required_operations"]
 
 
 def test_rule_engine_enforces_notification_guardrails():
@@ -59,6 +68,29 @@ def test_rule_engine_enforces_notification_guardrails():
 		"batch_review_recorded": False,
 	})
 	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_notification_mutation", "event_stream": "kafka"})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_notification_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+	})
+	privileged_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_notification_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"scope_present": True,
+		"owner_present": True,
+		"purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_ntfy_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -78,6 +110,19 @@ def test_rule_engine_enforces_notification_guardrails():
 	}
 	assert stream_result["decision"] == "deny"
 	assert "batch_notification_mutation_requires_bytewax" in stream_result["matched_rules"]
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"notification_agent_runtime_supported",
+		"notification_agent_role_supported",
+		"notification_agent_requires_scope",
+		"notification_agent_requires_owner",
+		"notification_agent_requires_purpose",
+		"notification_agent_requires_contribution_disclosure",
+	}
+	assert privileged_result["decision"] == "require_review"
+	assert privileged_result["matched_rules"] == ["notification_agent_privileged_role_requires_human_approval"]
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_ntfy_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -90,8 +135,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "ntfy_notification_ops"
 	assert registration["ui_components"]["campaigns"] == "/ntfy/campaigns"
 	assert registration["ui_components"]["audit"] == "/ntfy/audit"
+	assert registration["ui_components"]["agents"] == "/ntfy/agents"
 	assert "mqeb" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["lifecycle_stream"] == "ntfy.lifecycle"
 	assert "ntfy:send" in registration["permissions"]
 	assert "ntfy:audit" in registration["permissions"]
 
@@ -111,15 +159,24 @@ def test_runtime_executes_message_campaign_and_view_lifecycle():
 	campaign = runtime.create_campaign("tenant-notify", "spring", "Spring Launch", "marketing-owner", "welcome", ["user-1"], ["email"])
 	approved = runtime.approve_campaign("tenant-notify", "spring", "reviewer")
 	sent = runtime.send_campaign("tenant-notify", "spring")
+	agent = runtime.register_notification_agent("agent-steward", "tenant-notify", "Notification Steward", "codex", "notification_steward", "campaign:spring", "marketing-owner", "review campaign delivery", human_approval_required=True)
+	batch = runtime.validate_ntfy_lifecycle_batch("tenant-notify", "bytewax", 2, "notification_agent_batch", "batch-agent")
 	summary = runtime.dashboard_summary("tenant-notify")
 
 	assert delivery["status"] == "delivered"
 	assert campaign["status"] == "draft"
 	assert approved["approved"] is True
 	assert sent["campaign"]["status"] == "sent"
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert summary["delivery_count"] == 1
+	assert summary["notification_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert view_models.message_console_model(runtime, "tenant-notify")["deliveries"][0]["id"] == delivery["id"]
 	assert view_models.campaign_console_model(runtime, "tenant-notify")["sent"][0]["id"] == "spring"
+	assert view_models.notification_agent_roster_model(runtime, "tenant-notify")["active"][0]["id"] == "agent-steward"
+	assert view_models.lifecycle_batch_model(runtime, "tenant-notify")["accepted"][0]["id"] == "batch-agent"
 	assert view_models.audit_model(runtime, "tenant-notify")["audit_events"]
 
 
@@ -182,3 +239,55 @@ def test_tenant_local_records_do_not_collide():
 	assert runtime.list_preferences("tenant-beta")[0]["addresses"]["email"] == "beta@example.com"
 	assert alpha_delivery["tenant_id"] == "tenant-alpha"
 	assert beta_delivery["tenant_id"] == "tenant-beta"
+
+
+def test_runtime_and_api_enforce_notification_agent_and_lifecycle_guardrails():
+	runtime = NotificationRuntime()
+
+	with pytest.raises(PermissionError, match="unsupported_notification_agent_runtime"):
+		runtime.register_notification_agent("agent-unsupported", "tenant-notify", "Unsupported", "kafka_agent", "channel_reviewer", "channel:*", "ops", "review channel health")
+
+	with pytest.raises(PermissionError, match="notification_agent_contribution_disclosure_required"):
+		runtime.register_notification_agent("agent-undisclosed", "tenant-notify", "Undisclosed", "codex", "channel_reviewer", "channel:*", "ops", "review channels", contribution_disclosed=False)
+
+	pending = runtime.register_notification_agent(
+		"agent-campaign-reviewer",
+		"tenant-notify",
+		"Campaign Reviewer",
+		"claude_code",
+		"campaign_reviewer",
+		"campaign:*",
+		"marketing-owner",
+		"review campaign audiences",
+	)
+
+	with pytest.raises(ValueError, match="ntfy_lifecycle_batch_empty"):
+		runtime.validate_ntfy_lifecycle_batch("tenant-notify", "bytewax", 0, "campaign_batch")
+	with pytest.raises(ValueError, match="unsupported_ntfy_lifecycle_operation"):
+		runtime.validate_ntfy_lifecycle_batch("tenant-notify", "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		runtime.validate_ntfy_lifecycle_batch("tenant-notify", "kafka", 1, "campaign_batch")
+
+	package_api.RUNTIME = NotificationRuntime()
+	api_agent = package_api.register_notification_agent({
+		"id": "agent-api",
+		"tenant_id": "tenant-api",
+		"name": "API Agent",
+		"runtime": "opencode",
+		"role": "template_reviewer",
+		"scope": "template:*",
+		"owner": "template-owner",
+		"purpose": "review template drift",
+	})
+	api_batch = package_api.validate_lifecycle_batch({"tenant_id": "tenant-api", "event_stream": "bytewax", "mutation_count": 2, "operation": "template_batch", "batch_id": "batch-api"})
+	status = package_api.capability_status("tenant-api")
+	state = package_api.notification_state("tenant-api")
+
+	assert pending["status"] == "pending_review"
+	assert pending["human_approval_required"] is False
+	assert api_agent["runtime"] == "opencode"
+	assert api_batch["accepted"] is True
+	assert status["agents"]["first_class"] is True
+	assert status["lifecycle_batch_count"] == 1
+	assert state["notification_agents"][0]["id"] == "agent-api"
+	assert state["lifecycle_batches"][0]["id"] == "batch-api"

@@ -1,5 +1,56 @@
 {
-  "agents": {},
+  "agents": {
+    "ntfy": {
+      "adapter_contract": "aicr_provider_neutral_notification_agent_adapter",
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "campaign_reviewer",
+        "delivery_reviewer",
+        "suppression_reviewer",
+        "provider_health_reviewer",
+        "alert_routing_reviewer",
+        "lifecycle_batch_reviewer",
+        "notification_steward"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "channel_reviewer",
+        "template_reviewer",
+        "campaign_reviewer",
+        "delivery_reviewer",
+        "preference_reviewer",
+        "suppression_reviewer",
+        "provider_health_reviewer",
+        "alert_routing_reviewer",
+        "lifecycle_batch_reviewer",
+        "notification_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Notifications and Alerts package-backed APG capability",
     "entity_count": 0,
@@ -9,6 +60,7 @@
   "capabilities": {
     "ntfy": {
       "adapters": {
+        "agent_adapter": "aicr_provider_neutral_notification_agent_adapter",
         "ai_orchestration": "aicr",
         "api_helpers": "package_api.py",
         "audit_sink": "audl",
@@ -27,6 +79,56 @@
         "security": "secu",
         "view_models": "view_models.py"
       },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_notification_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "campaign_reviewer",
+          "delivery_reviewer",
+          "suppression_reviewer",
+          "provider_health_reviewer",
+          "alert_routing_reviewer",
+          "lifecycle_batch_reviewer",
+          "notification_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "channel_reviewer",
+          "template_reviewer",
+          "campaign_reviewer",
+          "delivery_reviewer",
+          "preference_reviewer",
+          "suppression_reviewer",
+          "provider_health_reviewer",
+          "alert_routing_reviewer",
+          "lifecycle_batch_reviewer",
+          "notification_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "campaign_approval": "CampaignApproval",
         "large_batch_review": "BatchReview",
@@ -37,6 +139,7 @@
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_notification_agent_adapter",
           "ai_orchestration": "aicr",
           "api_helpers": "package_api.py",
           "audit_sink": "audl",
@@ -54,6 +157,42 @@
           "production_views": "views.py",
           "security": "secu",
           "view_models": "view_models.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_notification_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "campaign_reviewer",
+            "delivery_reviewer",
+            "suppression_reviewer",
+            "provider_health_reviewer",
+            "alert_routing_reviewer",
+            "lifecycle_batch_reviewer",
+            "notification_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "channel_reviewer",
+            "template_reviewer",
+            "campaign_reviewer",
+            "delivery_reviewer",
+            "preference_reviewer",
+            "suppression_reviewer",
+            "provider_health_reviewer",
+            "alert_routing_reviewer",
+            "lifecycle_batch_reviewer",
+            "notification_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "campaigns": {
           "audience_required": true,
@@ -112,6 +251,35 @@
           "tenant_isolation_required": true,
           "webhook_signatures_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "ntfy.lifecycle",
+          "required_operations": [
+            "channel_batch",
+            "preference_batch",
+            "template_batch",
+            "message_batch",
+            "delivery_batch",
+            "campaign_batch",
+            "suppression_batch",
+            "provider_health_batch",
+            "notification_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "ntfy.channels",
+            "ntfy.preferences",
+            "ntfy.templates",
+            "ntfy.messages",
+            "ntfy.deliveries",
+            "ntfy.campaigns",
+            "ntfy.suppression",
+            "ntfy.providers",
+            "ntfy.agents"
+          ],
+          "watermark": "event_time"
+        },
         "templates": {
           "locale_required": true,
           "template_approval_required": true,
@@ -129,7 +297,9 @@
           "enable_campaign_console": true,
           "enable_channel_health": true,
           "enable_delivery_analytics": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_message_console": true,
+          "enable_notification_agent_roster": true,
           "enable_notification_dashboard": true,
           "enable_preference_center": true,
           "enable_settings": true,
@@ -148,16 +318,24 @@
         "campaign": "CampaignRecord",
         "channel_provider": "ChannelProviderRecord",
         "delivery": "DeliveryRecord",
+        "lifecycle_batch": "NtfyLifecycleBatchRecord",
+        "notification_agent": "NotificationAgentRecord",
         "recipient_preference": "RecipientPreferenceRecord",
         "template": "NotificationTemplateRecord"
       },
       "provides": [
-        "ntfy_operations"
+        "ntfy_operations",
+        "notification_management",
+        "notification_agent_composition"
       ],
       "requires": [
         "mqeb",
         "auth",
-        "mten"
+        "mten",
+        "audl",
+        "aicr",
+        "secu",
+        "cach"
       ],
       "rule_engine": {
         "rules": [
@@ -561,6 +739,124 @@
               "required_action": "use_bytewax_event_stream"
             },
             "name": "batch_notification_mutation_requires_bytewax"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_notification_agent"
+            },
+            "description": "Notification agents must use supported provider-neutral runtimes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_notification_agent_runtime",
+              "required_action": "choose_supported_notification_agent_runtime"
+            },
+            "name": "notification_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_notification_agent"
+            },
+            "description": "Notification agents must use supported notification-governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_notification_agent_role",
+              "required_action": "choose_supported_notification_agent_role"
+            },
+            "name": "notification_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_notification_agent",
+              "scope_present": false
+            },
+            "description": "Notification agents require explicit channel, template, campaign, delivery, preference, suppression, provider, alert-routing, or lifecycle scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_agent_scope_required",
+              "required_action": "declare_notification_agent_scope"
+            },
+            "name": "notification_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_notification_agent",
+              "owner_present": false
+            },
+            "description": "Notification agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_agent_owner_required",
+              "required_action": "assign_notification_agent_owner"
+            },
+            "name": "notification_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_notification_agent",
+              "purpose_present": false
+            },
+            "description": "Notification agents require a documented delivery-governance purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_agent_purpose_required",
+              "required_action": "document_notification_agent_purpose"
+            },
+            "name": "notification_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_notification_agent"
+            },
+            "description": "Notification agents must disclose machine-authored channel, template, campaign, delivery, suppression, routing, and lifecycle contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "notification_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "notification_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_notification_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged notification-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "notification_agent_human_approval_required",
+              "required_action": "record_human_notification_agent_approval"
+            },
+            "name": "notification_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_ntfy_lifecycle_batch"
+            },
+            "description": "NTFY lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "ntfy_lifecycle_batch_empty",
+              "required_action": "include_ntfy_lifecycle_mutations"
+            },
+            "name": "ntfy_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_ntfy_lifecycle_batch"
+            },
+            "description": "NTFY lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_ntfy_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_ntfy_stream_required"
           }
         ],
         "type": "deterministic"
@@ -966,6 +1262,124 @@
             "required_action": "use_bytewax_event_stream"
           },
           "name": "batch_notification_mutation_requires_bytewax"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_notification_agent"
+          },
+          "description": "Notification agents must use supported provider-neutral runtimes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_notification_agent_runtime",
+            "required_action": "choose_supported_notification_agent_runtime"
+          },
+          "name": "notification_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_notification_agent"
+          },
+          "description": "Notification agents must use supported notification-governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_notification_agent_role",
+            "required_action": "choose_supported_notification_agent_role"
+          },
+          "name": "notification_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_notification_agent",
+            "scope_present": false
+          },
+          "description": "Notification agents require explicit channel, template, campaign, delivery, preference, suppression, provider, alert-routing, or lifecycle scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_agent_scope_required",
+            "required_action": "declare_notification_agent_scope"
+          },
+          "name": "notification_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_notification_agent",
+            "owner_present": false
+          },
+          "description": "Notification agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_agent_owner_required",
+            "required_action": "assign_notification_agent_owner"
+          },
+          "name": "notification_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_notification_agent",
+            "purpose_present": false
+          },
+          "description": "Notification agents require a documented delivery-governance purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_agent_purpose_required",
+            "required_action": "document_notification_agent_purpose"
+          },
+          "name": "notification_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_notification_agent"
+          },
+          "description": "Notification agents must disclose machine-authored channel, template, campaign, delivery, suppression, routing, and lifecycle contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "notification_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "notification_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_notification_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged notification-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "notification_agent_human_approval_required",
+            "required_action": "record_human_notification_agent_approval"
+          },
+          "name": "notification_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_ntfy_lifecycle_batch"
+          },
+          "description": "NTFY lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "ntfy_lifecycle_batch_empty",
+            "required_action": "include_ntfy_lifecycle_mutations"
+          },
+          "name": "ntfy_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_ntfy_lifecycle_batch"
+          },
+          "description": "NTFY lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_ntfy_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_ntfy_stream_required"
         }
       ],
       "runtime": {
@@ -976,6 +1390,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "NotificationAgentRoster",
+          "permission": "ntfy:admin",
+          "route": "/ntfy/agents"
+        },
         "analytics": {
           "component": "DeliveryAnalytics",
           "permission": "ntfy:view",
@@ -1000,6 +1419,11 @@
           "component": "NTFYDashboard",
           "permission": "ntfy:view",
           "route": "/ntfy/dashboard"
+        },
+        "lifecycle": {
+          "component": "NTFYLifecycleBatchMonitor",
+          "permission": "ntfy:admin",
+          "route": "/ntfy/lifecycle"
         },
         "messages": {
           "component": "MessageConsole",
@@ -1028,13 +1452,44 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "ntfy.lifecycle",
+        "required_operations": [
+          "channel_batch",
+          "preference_batch",
+          "template_batch",
+          "message_batch",
+          "delivery_batch",
+          "campaign_batch",
+          "suppression_batch",
+          "provider_health_batch",
+          "notification_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "ntfy.channels",
+          "ntfy.preferences",
+          "ntfy.templates",
+          "ntfy.messages",
+          "ntfy.deliveries",
+          "ntfy.campaigns",
+          "ntfy.suppression",
+          "ntfy.providers",
+          "ntfy.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
           "audit_timeline": {
             "status_style": "delivery-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "icon": "activity",
+            "status_style": "stream-chip",
+            "visual": "lifecycle-batch-list"
           },
           "campaign_table": {
             "status_style": "approval-chip",
@@ -1048,6 +1503,11 @@
           "delivery_timeline": {
             "highlight": "latency-chip",
             "visual": "event-timeline"
+          },
+          "notification_agent_roster": {
+            "icon": "bot",
+            "status_style": "approval-chip",
+            "visual": "agent-roster"
           },
           "preference_panel": {
             "status_style": "consent-chip",
@@ -1138,6 +1598,20 @@
             "permission": "ntfy:view"
           },
           {
+            "component": "NotificationAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/ntfy/agents",
+            "permission": "ntfy:admin"
+          },
+          {
+            "component": "NTFYLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/ntfy/lifecycle",
+            "permission": "ntfy:admin"
+          },
+          {
             "component": "NotificationAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
@@ -1162,13 +1636,39 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "notification_delivery_team": {
+        "roles": [
+          "channel_reviewer",
+          "template_reviewer",
+          "campaign_reviewer",
+          "delivery_reviewer",
+          "preference_reviewer",
+          "suppression_reviewer",
+          "provider_health_reviewer",
+          "alert_routing_reviewer",
+          "lifecycle_batch_reviewer",
+          "notification_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ],
+        "stream": "ntfy.lifecycle"
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "ntfy": [
         "mqeb",
         "auth",
-        "mten"
+        "mten",
+        "audl",
+        "aicr",
+        "secu",
+        "cach"
       ]
     }
   },
@@ -1176,6 +1676,7 @@
     "ntfy": {
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_notification_agent_adapter",
           "ai_orchestration": "aicr",
           "api_helpers": "package_api.py",
           "audit_sink": "audl",
@@ -1193,6 +1694,42 @@
           "production_views": "views.py",
           "security": "secu",
           "view_models": "view_models.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_notification_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "campaign_reviewer",
+            "delivery_reviewer",
+            "suppression_reviewer",
+            "provider_health_reviewer",
+            "alert_routing_reviewer",
+            "lifecycle_batch_reviewer",
+            "notification_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "channel_reviewer",
+            "template_reviewer",
+            "campaign_reviewer",
+            "delivery_reviewer",
+            "preference_reviewer",
+            "suppression_reviewer",
+            "provider_health_reviewer",
+            "alert_routing_reviewer",
+            "lifecycle_batch_reviewer",
+            "notification_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "campaigns": {
           "audience_required": true,
@@ -1251,6 +1788,35 @@
           "tenant_isolation_required": true,
           "webhook_signatures_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "ntfy.lifecycle",
+          "required_operations": [
+            "channel_batch",
+            "preference_batch",
+            "template_batch",
+            "message_batch",
+            "delivery_batch",
+            "campaign_batch",
+            "suppression_batch",
+            "provider_health_batch",
+            "notification_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "ntfy.channels",
+            "ntfy.preferences",
+            "ntfy.templates",
+            "ntfy.messages",
+            "ntfy.deliveries",
+            "ntfy.campaigns",
+            "ntfy.suppression",
+            "ntfy.providers",
+            "ntfy.agents"
+          ],
+          "watermark": "event_time"
+        },
         "templates": {
           "locale_required": true,
           "template_approval_required": true,
@@ -1268,7 +1834,9 @@
           "enable_campaign_console": true,
           "enable_channel_health": true,
           "enable_delivery_analytics": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_message_console": true,
+          "enable_notification_agent_roster": true,
           "enable_notification_dashboard": true,
           "enable_preference_center": true,
           "enable_settings": true,
@@ -1278,12 +1846,18 @@
       },
       "id": "ntfy",
       "provides": [
-        "ntfy_operations"
+        "ntfy_operations",
+        "notification_management",
+        "notification_agent_composition"
       ],
       "requires": [
         "mqeb",
         "auth",
-        "mten"
+        "mten",
+        "audl",
+        "aicr",
+        "secu",
+        "cach"
       ]
     }
   },
@@ -1296,7 +1870,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 3,
+      "edges": 7,
       "kind": "capability",
       "nodes": 1
     },
@@ -1342,6 +1916,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_notification_mutation_requires_bytewax"
+    },
+    "bytewax_ntfy_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_ntfy_lifecycle_batch"
+      },
+      "description": "NTFY lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_ntfy_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_ntfy_stream_required"
     },
     "campaign_requires_approval": {
       "condition": {
@@ -1524,6 +2111,98 @@
       },
       "name": "marketing_requires_opt_in"
     },
+    "notification_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_notification_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged notification-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "notification_agent_human_approval_required",
+        "required_action": "record_human_notification_agent_approval"
+      },
+      "name": "notification_agent_privileged_role_requires_human_approval"
+    },
+    "notification_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_notification_agent"
+      },
+      "description": "Notification agents must disclose machine-authored channel, template, campaign, delivery, suppression, routing, and lifecycle contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "notification_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "notification_agent_requires_contribution_disclosure"
+    },
+    "notification_agent_requires_owner": {
+      "condition": {
+        "operation": "register_notification_agent",
+        "owner_present": false
+      },
+      "description": "Notification agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "notification_agent_owner_required",
+        "required_action": "assign_notification_agent_owner"
+      },
+      "name": "notification_agent_requires_owner"
+    },
+    "notification_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_notification_agent",
+        "purpose_present": false
+      },
+      "description": "Notification agents require a documented delivery-governance purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "notification_agent_purpose_required",
+        "required_action": "document_notification_agent_purpose"
+      },
+      "name": "notification_agent_requires_purpose"
+    },
+    "notification_agent_requires_scope": {
+      "condition": {
+        "operation": "register_notification_agent",
+        "scope_present": false
+      },
+      "description": "Notification agents require explicit channel, template, campaign, delivery, preference, suppression, provider, alert-routing, or lifecycle scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "notification_agent_scope_required",
+        "required_action": "declare_notification_agent_scope"
+      },
+      "name": "notification_agent_requires_scope"
+    },
+    "notification_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_notification_agent"
+      },
+      "description": "Notification agents must use supported notification-governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_notification_agent_role",
+        "required_action": "choose_supported_notification_agent_role"
+      },
+      "name": "notification_agent_role_supported"
+    },
+    "notification_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_notification_agent"
+      },
+      "description": "Notification agents must use supported provider-neutral runtimes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_notification_agent_runtime",
+        "required_action": "choose_supported_notification_agent_runtime"
+      },
+      "name": "notification_agent_runtime_supported"
+    },
     "notification_state_change_requires_audit": {
       "condition": {
         "audit_event_recorded": false,
@@ -1536,6 +2215,19 @@
         "required_action": "record_notification_audit"
       },
       "name": "notification_state_change_requires_audit"
+    },
+    "ntfy_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_ntfy_lifecycle_batch"
+      },
+      "description": "NTFY lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "ntfy_lifecycle_batch_empty",
+        "required_action": "include_ntfy_lifecycle_mutations"
+      },
+      "name": "ntfy_lifecycle_batch_requires_mutations"
     },
     "provider_health_required": {
       "condition": {
