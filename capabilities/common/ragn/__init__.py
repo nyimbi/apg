@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "ragn"
 __capability_name__ = "Retrieval-Augmented Generation"
-__apg_dependencies__ = ["srch", "nlpc", "aicr"]
+__apg_dependencies__ = ["srch", "nlpc", "aicr", "conf", "audl"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "ragn",
@@ -32,6 +32,8 @@ capability_metadata: dict[str, Any] = {
 		"conversation_memory",
 		"citation_governance",
 		"answer_curation",
+		"rag_agent_composition",
+		"bytewax_lifecycle_batches",
 	],
 	"permissions": [
 		"ragn:view",
@@ -67,6 +69,8 @@ def register_capability() -> dict[str, Any]:
 			"conversation_memory": "Record governed conversation turns and answer traces",
 			"citation_governance": "Attach source, document, and chunk-level citations",
 			"answer_curation": "Review low-confidence or high-risk RAG answers",
+			"rag_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style RAG agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate RAG lifecycle batches through Bytewax-first processor contracts",
 			"capability_rules": "Evaluate deterministic RAG governance rules",
 			"visual_theming": "Apply RAG studio theme tokens and components",
 		},
@@ -78,9 +82,13 @@ def register_capability() -> dict[str, Any]:
 			"generation": "/ragn/api/v1/generation",
 			"conversations": "/ragn/api/v1/conversations",
 			"curation": "/ragn/api/v1/curation",
+			"agents": "/ragn/api/v1/agents",
+			"lifecycle": "/ragn/api/v1/lifecycle",
 			"audit": "/ragn/api/v1/audit",
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

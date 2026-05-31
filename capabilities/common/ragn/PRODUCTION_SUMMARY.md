@@ -9,7 +9,8 @@ ready.
 ## Verified In This Packet
 
 - Executable `capability_contract.py` with lifecycle configuration, deterministic
-  guardrails, UI routes, adapters, and theme components.
+  guardrails, first-class RAG agents, Bytewax lifecycle batches, UI routes,
+  adapters, and theme components.
 - Import-light `rag_runtime.RagnService` for generated applications.
 - API helpers and UI view models that do not import the heavier async database
   stack.
@@ -24,6 +25,9 @@ ready.
 - SRCH/NLPC retrieval wiring.
 - AICR/MLCM model policy wiring.
 - AUTH/AUDL/MONI/CACH adapter integration.
-- Bytewax topologies for ingestion and re-indexing.
+- Durable Bytewax topologies for ingestion, re-indexing, agent events, and
+  lifecycle batches.
+- External Codex, Claude Code, opencode, and Pi adapter clients behind the
+  provider-neutral RAG-agent contract.
 - Rendered browser UI verification.
 - Performance, resilience, and retention-policy validation.

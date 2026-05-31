@@ -15,6 +15,8 @@ from capabilities.common.ragn.views import (
 	generation_model,
 	governance_model,
 	knowledge_base_model,
+	lifecycle_batch_model,
+	rag_agent_roster_model,
 	retrieval_model,
 	settings_model,
 	studio_model,
@@ -27,14 +29,24 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["capability"] == "ragn"
 	assert contract["configuration"]["tenant_id"] == "tenant-rag"
 	assert contract["configuration"]["retrieval"]["minimum_context_confidence"] == 0.8
-	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "knowledge_bases", "documents", "retrieval", "generation", "adapters", "ui", "theme"}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "studio", "knowledge_bases", "documents", "retrieval", "generation", "conversations", "citations", "curation", "governance", "audit", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "knowledge_bases", "documents", "retrieval", "generation", "agents", "streaming", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 45
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "studio", "knowledge_bases", "documents", "retrieval", "generation", "conversations", "citations", "curation", "governance", "agents", "lifecycle", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/ragn/api/v1"
+	assert contract["provides"] == ["retrieval_augmented_generation", "grounded_answering", "rag_agent_composition"]
+	assert set(contract["requires"]) >= {"srch", "nlpc", "aicr", "conf", "audl"}
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "grounding_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "ragn.lifecycle"
+	assert "rag_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "rag_runtime.RagnService"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "answer_panel" in contract["theme"]["components"]
+	assert "rag_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_rag_guardrails():
@@ -57,6 +69,23 @@ def test_rule_engine_enforces_rag_guardrails():
 		"operation": "batch_rag_mutation",
 		"event_stream": "kafka",
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_rag_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_ragn_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -72,6 +101,18 @@ def test_rule_engine_enforces_rag_guardrails():
 	}
 	assert batch_result["decision"] == "deny"
 	assert batch_result["matched_rules"] == ["batch_rag_mutation_requires_bytewax"]
+	assert agent_result["decision"] == "deny"
+	assert {
+		"rag_agent_runtime_supported",
+		"rag_agent_role_supported",
+		"rag_agent_requires_scope",
+		"rag_agent_requires_owner",
+		"rag_agent_requires_purpose",
+		"rag_agent_requires_contribution_disclosure",
+		"rag_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_ragn_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -85,8 +126,12 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["studio"] == "/ragn/studio"
 	assert "srch" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["capabilities"]["grounded_generation"]
+	assert registration["capabilities"]["rag_agent_composition"]
 	assert registration["endpoints"]["audit"] == "/ragn/api/v1/audit"
+	assert registration["endpoints"]["agents"] == "/ragn/api/v1/agents"
 	assert "ragn:query" in registration["permissions"]
 	assert "ragn:audit" in registration["permissions"]
 
@@ -143,6 +188,25 @@ def test_ragn_lifecycle_is_executable():
 		decision="approved",
 		evidence="review:travel-answer",
 	)
+	agent = service.register_rag_agent(
+		agent_id="agent-grounding",
+		tenant_id="tenant-rag",
+		name="Grounding reviewer",
+		runtime="codex",
+		role="grounding_reviewer",
+		scope="kb-policy answers",
+		owner="knowledge-steward",
+		purpose="Review generated answers for grounded evidence",
+		contribution_disclosed=True,
+		human_approval_required=True,
+	)
+	batch = service.validate_ragn_lifecycle_batch(
+		tenant_id="tenant-rag",
+		event_stream="bytewax",
+		mutation_count=3,
+		operation="rag_agent_batch",
+		batch_id="ragnbatch-travel",
+	)
 
 	assert kb["metadata"]["owner"] == "knowledge-steward"
 	assert document["status"] == "indexed"
@@ -150,9 +214,18 @@ def test_ragn_lifecycle_is_executable():
 	assert answer["metadata"]["citation_count"] == 1
 	assert turn["status"] == "recorded"
 	assert curation["status"] == "approved"
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "grounding_reviewer"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["accepted"] is True
 	assert service.dashboard_summary("tenant-rag")["citation_count"] == 1
+	assert service.dashboard_summary("tenant-rag")["rag_agent_count"] == 1
+	assert service.dashboard_summary("tenant-rag")["lifecycle_batch_count"] == 1
 	assert service.rag_package("tenant-rag")["summary"]["answer_count"] == 1
+	assert service.rag_package("tenant-rag")["rag_agents"][0]["id"] == "agent-grounding"
 	assert dashboard_model(service, "tenant-rag")["summary"]["document_count"] == 1
+	assert dashboard_model(service, "tenant-rag")["streaming"]["required_processor"] == "bytewax"
 	assert studio_model(service, "tenant-rag")["answers"][0]["id"] == "ans-travel"
 	assert knowledge_base_model(service, "tenant-rag")["knowledge_bases"][0]["id"] == "kb-policy"
 	assert document_model(service, "tenant-rag")["documents"][0]["id"] == "doc-travel"
@@ -162,8 +235,12 @@ def test_ragn_lifecycle_is_executable():
 	assert citation_model(service, "tenant-rag")["citation_count"] == 1
 	assert curation_model(service, "tenant-rag")["curations"][0]["id"] == "curate-travel"
 	assert governance_model(service, "tenant-rag")["rules"]
+	assert governance_model(service, "tenant-rag")["rag_agents"][0]["id"] == "agent-grounding"
+	assert rag_agent_roster_model(service, "tenant-rag")["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert lifecycle_batch_model(service, "tenant-rag")["required_processor"] == "bytewax"
 	assert audit_timeline_model(service, "tenant-rag")["audit_events"]
 	assert settings_model(service, "tenant-rag")["adapters"]["event_stream"] == "bytewax"
+	assert settings_model(service, "tenant-rag")["streaming"]["required_processor"] == "bytewax"
 
 
 def test_ragn_service_enforces_policy_guardrails():
@@ -269,3 +346,38 @@ def test_ragn_service_enforces_policy_guardrails():
 			model_location="external",
 			model_policy_attached=False,
 		)
+
+	with pytest.raises(PermissionError, match="unsupported_rag_agent_runtime"):
+		service.register_rag_agent(
+			agent_id="agent-unsupported",
+			tenant_id="tenant-rag",
+			name="Unsupported runtime",
+			runtime="bespoke-cli",
+			role="grounding_reviewer",
+			scope="kb-policy",
+			owner="steward",
+			purpose="Review grounding",
+		)
+
+	pending_agent = service.register_rag_agent(
+		agent_id="agent-approval",
+		tenant_id="tenant-rag",
+		name="Approval needed",
+		runtime="codex",
+		role="safety_reviewer",
+		scope="generated answers",
+		owner="steward",
+		purpose="Review safety",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	assert pending_agent["status"] == "pending_review"
+
+	with pytest.raises(ValueError, match="ragn_lifecycle_batch_empty"):
+		service.validate_ragn_lifecycle_batch("tenant-rag", "bytewax", 0)
+
+	with pytest.raises(ValueError, match="unsupported_ragn_lifecycle_operation"):
+		service.validate_ragn_lifecycle_batch("tenant-rag", "bytewax", 1, "unknown_batch")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_ragn_lifecycle_batch("tenant-rag", "kafka", 1, "rag_agent_batch")

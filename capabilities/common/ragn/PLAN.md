@@ -5,6 +5,10 @@
 - Make RAGN a coherent APG capability packet with specification, usage docs,
   executable contract, generated-app runtime, API helpers, UI models, package
   evidence, and focused verification.
+- Extend RAGN to the current APG guardrail standard: first-class AI-agent
+  composition, provider-neutral runtime manifests, Bytewax lifecycle batches,
+  deterministic governance rules, route metadata, theme components, and
+  executable state.
 - Keep generated-app imports dependency-light while preserving `service.py` as
   the heavier production adapter surface.
 - Replace stale static package evidence with metadata derived from the current
@@ -21,16 +25,23 @@
 2. Expand the executable contract:
    - Add lifecycle configuration sections for knowledge bases, documents,
      chunking, retrieval, generation, conversations, citations, curation,
-     security, governance, observability, adapters, UI, and theme.
+     security, agents, streaming, governance, observability, adapters, UI, and
+     theme.
    - Add deterministic guardrails across each lifecycle stage.
-   - Add 12 generated-app UI routes and component theme definitions.
+   - Add first-class RAG-agent guardrails for supported runtime, role, scope,
+     owner, purpose, contribution disclosure, and privileged-role approval.
+   - Add Bytewax lifecycle stream metadata for RAG lifecycle batches.
+   - Add 14 generated-app UI routes and component theme definitions.
 
 3. Wire generated-app runtime surfaces:
    - Add `rag_runtime.py` with dependency-light lifecycle records and service
      workflows.
+   - Add provider-neutral RAG-agent records, Bytewax lifecycle batch records,
+     registration, validation, listing, dashboard summaries, and audit events.
    - Point `api.py` at the generated-app runtime instead of importing the
      heavier production service stack.
-   - Replace `views.py` with dependency-light view models.
+   - Replace `views.py` with dependency-light view models, including agent
+     roster and lifecycle batch monitor models.
    - Replace `__init__.py` registration metadata with current contract-derived
      composition data.
 

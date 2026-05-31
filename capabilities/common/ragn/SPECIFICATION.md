@@ -25,6 +25,12 @@ RAGN must provide:
   turn count, review state, and audit events.
 - Citation validation requiring source, document, and chunk identifiers.
 - Answer curation with curator, decision, evidence, status, and audit events.
+- First-class RAG-agent composition for Codex, Claude Code, opencode, and Pi
+  style runtimes, with supported RAG roles, owner, purpose, bounded scope,
+  machine-contribution disclosure, privileged-role approval status, and audit
+  events.
+- Bytewax lifecycle batch validation for corpus, document, retrieval, context,
+  generation, citation, evaluation, safety, and RAG-agent batch operations.
 - Dashboard summaries, aggregate package listings, route metadata, and
   generated-app view models.
 - Deterministic rule evaluation for lifecycle and safety guardrails.
@@ -51,6 +57,11 @@ The capability configuration is tenant-scoped and contains these sections:
 - `curation`: low-confidence review, curator, evidence, and decision policy.
 - `security`: tenant isolation, restricted-source filters, prompt-injection
   scan, and unsafe answer blocking.
+- `agents`: first-class provider-neutral RAG-agent runtime, role, owner,
+  purpose, scope, contribution-disclosure, and privileged-role approval policy.
+- `streaming`: Bytewax lifecycle stream, event-time watermark, required
+  processor, allowed batch operations, stream topics, and broker-dependency
+  policy.
 - `governance`: tenant context and audit requirements.
 - `observability`: metrics, trace, audit, and Bytewax event-stream policy.
 - `adapters`: generated runtime, production runtime, HTTP API, Bytewax, SRCH,
@@ -79,6 +90,10 @@ actions. Rules cover:
 - Curation curator, decision, and evidence.
 - Bytewax requirement for batch mutation flows.
 - Cross-tenant denial and audit requirement for state changes.
+- RAG-agent supported runtime, supported role, explicit scope, accountable
+  owner, declared purpose, machine-contribution disclosure, and human approval
+  review status for privileged roles.
+- Bytewax-only RAGN lifecycle batch validation.
 
 ## UI Contract
 
@@ -94,6 +109,8 @@ RAGN exposes route metadata and view-model helpers for:
 - Citations
 - Curation
 - Governance
+- Agents
+- Lifecycle batch monitor
 - Audit
 - Settings
 

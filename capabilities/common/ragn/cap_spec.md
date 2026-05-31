@@ -8,8 +8,9 @@
 RAGN provides APG's executable retrieval-augmented generation capability:
 tenant-scoped knowledge bases, document ingestion, governed context retrieval,
 cited answer generation, conversation memory, answer curation, audit evidence,
-UI view models, deterministic guardrails, visual theming, and generated Python
-package evidence.
+first-class RAG agents, Bytewax lifecycle batches, UI view models,
+deterministic guardrails, visual theming, and generated Python package
+evidence.
 
 Authoritative companion documents:
 

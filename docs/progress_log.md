@@ -16,6 +16,70 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 08:11 EAT
+
+RAGN RAG-agent composition and Bytewax lifecycle guardrail packet:
+
+- Extended `capabilities/common/ragn/SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, `cap_spec.md`, `PRODUCTION_SUMMARY.md`, and `CHANGELOG.md` to
+  define RAGN as a first-class retrieval-augmented generation capability with
+  provider-neutral RAG agents and Bytewax lifecycle batches.
+- Added top-level RAG-agent contract metadata for Codex, Claude Code, opencode,
+  and Pi runtimes across corpus curation, retrieval review, ranking, grounding,
+  prompt context, answer quality, citation, safety, lifecycle batch, and
+  RAG-steward roles.
+- Added deterministic RAG-agent guardrails for supported runtime, supported
+  role, explicit scope, accountable owner, declared purpose, machine
+  contribution disclosure, and privileged-role human approval status.
+- Added RAGN Bytewax lifecycle stream metadata for `ragn.lifecycle`, corpus,
+  document, retrieval, context, generation, citation, evaluation, safety, and
+  RAG-agent batches, plus a rule that rejects non-Bytewax lifecycle processors.
+- Added dependency-light `RAGAgentRecord` and `RagnLifecycleBatchRecord`
+  runtime state, service registration/validation methods, API helpers,
+  generated UI models, dashboard/governance summaries, audit events,
+  semantic-model publication, and focused tests.
+- Added `/ragn/agents` and `/ragn/lifecycle` route metadata plus theme
+  components for RAG-agent rosters and Bytewax lifecycle monitoring.
+- Refreshed `semantic_model.json` and `release_report.json` from the live
+  executable app surface.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for RAGN contract, runtime, API,
+  view models, app, package init, and focused tests passed.
+- `./.venv/bin/python capabilities/common/ragn/app.py` passed package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/ragn/test_capability_contract.py
+  capabilities/common/ragn/tests/test_package_contract.py` passed with 9 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities inspect ragn --json` confirmed `ok: true`, 14
+  routes, 45 rules, Bytewax streaming, and first-class agents.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/ragn --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, no warnings, and no blocking gaps.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/ragn --json`
+  confirmed side-effect-free publish planning with no warnings.
+- JSON validation for `semantic_model.json` and `release_report.json` passed.
+- Service smoke executed knowledge base -> document -> retrieval -> answer ->
+  RAG agent -> Bytewax lifecycle batch and printed `codex active bytewax 1 1
+  1`.
+- RAGN stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline or
+  Kafka markers across the edited source, docs, and generated evidence files;
+  the remaining `kafka` strings are intentional negative-test inputs.
+- `git diff --check -- capabilities/common/ragn docs/progress_log.md` passed.
+- Local code review found no blocking issues; residual risks remain around live
+  vector stores, rendered UI, durable stores, external Codex/Claude
+  Code/OpenCode/Pi clients, live Bytewax topology, and SRCH/NLPC/AICR/CONF/AUDL
+  adapter behavior.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live vector
+  stores, durable Bytewax topology, external Codex/Claude Code/OpenCode/Pi
+  clients, SRCH/NLPC/AICR/CONF/AUDL live adapters, load checks, migration
+  checks, model-provider calls, or retrieval/generation quality benchmarks
+  during this battery-conscious slice.
+
 ### 2026-05-31 07:59 EAT
 
 KNGR knowledge-agent composition and Bytewax lifecycle guardrail packet:

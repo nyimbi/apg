@@ -9,6 +9,13 @@
   document evidence, restricted-source filtering, context confidence, citations,
   model policy, prompt-injection blocking, unsafe-answer blocking, conversation
   state, curation, Bytewax batch mutation, tenant isolation, and audit evidence.
+- Added first-class RAG-agent composition for Codex, Claude Code, opencode, and
+  Pi style runtimes with supported roles, owner, scope, purpose, contribution
+  disclosure, privileged-role approval status, route metadata, and theme
+  components.
+- Added Bytewax lifecycle stream contracts and executable lifecycle batch
+  validation for corpus, document, retrieval, context, generation, citation,
+  evaluation, safety, and RAG-agent batches.
 - Added `rag_runtime.RagnService` as the dependency-light generated-app runtime.
 - Replaced generated-app API helpers and UI view models with import-light
   surfaces.
@@ -19,5 +26,6 @@
 ## Remaining Work
 
 - Production adapter wiring remains separate from the generated-app runtime.
-- Live retrieval, generation, persistence, Bytewax, and browser UI checks are
-  not part of this battery-conscious verification slice.
+- Live retrieval, generation, persistence, durable Bytewax topologies, external
+  agent clients, and browser UI checks are not part of this battery-conscious
+  verification slice.

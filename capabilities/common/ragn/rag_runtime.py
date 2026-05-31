@@ -33,6 +33,74 @@ class RagnRecord:
 		}
 
 
+@dataclass(frozen=True)
+class RAGAgentRecord:
+	"""Provider-neutral AI agent registered for RAG governance."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"agent_id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(frozen=True)
+class RagnLifecycleBatchRecord:
+	"""Bytewax lifecycle batch validation evidence for RAG changes."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: tuple[str, ...] = ()
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"batch_id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"required_processor": self.required_processor,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
 class RagnService:
 	"""Import-light RAG lifecycle service for generated APG applications."""
 
@@ -43,7 +111,14 @@ class RagnService:
 		self._answers: dict[str, RagnRecord] = {}
 		self._conversations: dict[str, RagnRecord] = {}
 		self._curations: dict[str, RagnRecord] = {}
+		self._rag_agents: dict[str, RAGAgentRecord] = {}
+		self._lifecycle_batches: dict[str, RagnLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, RagnRecord] = {}
+		contract = get_capability_contract()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -314,6 +389,94 @@ class RagnService:
 			classification=str(metadata.get("classification") or "internal"),
 		) | {"status": status}
 
+	def register_rag_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_rag_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(agent_id or "").strip():
+			raise ValueError("rag_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("rag_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = RAGAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._rag_agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(tenant_id, record.id, "rag_agent_registered", owner, result)
+		return record.to_dict()
+
+	def validate_ragn_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "rag_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("ragn_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_ragn_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_ragn_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = RagnLifecycleBatchRecord(
+			id=batch_id or f"ragnbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(tenant_id, record.id, f"ragn_lifecycle_batch_{record.status}", "ragn", result)
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._knowledge_bases, tenant_id)
 
@@ -335,6 +498,12 @@ class RagnService:
 	def list_curations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._curations, tenant_id)
 
+	def list_rag_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._rag_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -350,6 +519,10 @@ class RagnService:
 			"answer_count": len(answers),
 			"conversation_turn_count": len(self.list_conversations(tenant_id)),
 			"curation_count": len(self.list_curations(tenant_id)),
+			"rag_agent_count": len(self.list_rag_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_rag_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"citation_count": sum(int(answer["metadata"].get("citation_count", 0)) for answer in answers),
 			"restricted_document_count": len([doc for doc in documents if doc["metadata"].get("classification") == "restricted"]),
@@ -364,6 +537,8 @@ class RagnService:
 			"answers": self.list_answers(tenant_id),
 			"conversations": self.list_conversations(tenant_id),
 			"curations": self.list_curations(tenant_id),
+			"rag_agents": self.list_rag_agents(tenant_id),
+			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
 			"audit_events": self.list_audit_events(tenant_id),
 			"summary": self.dashboard_summary(tenant_id),
 		}
@@ -393,7 +568,7 @@ class RagnService:
 			metadata={"subject_id": subject_id, "event_type": event_type, "actor": actor, "reasons": self._reasons(result)},
 		)
 
-	def _list(self, records: dict[str, RagnRecord], tenant_id: str | None = None) -> list[dict[str, Any]]:
+	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		values = list(records.values())
 		if tenant_id is not None:
 			values = [record for record in values if record.tenant_id == tenant_id]
@@ -401,3 +576,10 @@ class RagnService:
 
 	def _reasons(self, result: dict[str, Any]) -> tuple[str, ...]:
 		return tuple(action.get("reason", "ragn_policy_blocked") for action in result.get("actions", ()))
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

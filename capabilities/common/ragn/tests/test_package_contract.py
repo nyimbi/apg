@@ -30,9 +30,11 @@ def test_ragn_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "ragn"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 45
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -48,8 +50,10 @@ def test_ragn_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "ragn" in model["capabilities"]
-	assert model["capabilities"]["ragn"]["streaming"]["engine"] == "bytewax"
-	assert len(model["capabilities"]["ragn"]["ui"]["routes"]) >= 12
+	assert model["capabilities"]["ragn"]["agents"]["first_class"] is True
+	assert model["capabilities"]["ragn"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["ragn"]["rag_lifecycle"]["lifecycle_batch"] == "RagnLifecycleBatchRecord"
+	assert len(model["capabilities"]["ragn"]["ui"]["routes"]) >= 14
 
 
 def test_ragn_package_evidence_matches_entrypoint():
@@ -68,4 +72,4 @@ def test_ragn_api_imports_without_production_dependencies():
 	status = module.capability_status("tenant-test")
 
 	assert status["capability"] == "ragn"
-	assert status["rule_count"] >= 30
+	assert status["rule_count"] >= 45

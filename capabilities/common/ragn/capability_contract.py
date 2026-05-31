@@ -7,6 +7,28 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_RAGN_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_RAGN_AGENT_ROLES = [
+	"corpus_curator",
+	"retrieval_reviewer",
+	"ranking_reviewer",
+	"grounding_reviewer",
+	"prompt_context_reviewer",
+	"answer_quality_reviewer",
+	"citation_reviewer",
+	"safety_reviewer",
+	"lifecycle_batch_reviewer",
+	"rag_steward",
+]
+PRIVILEGED_RAGN_AGENT_ROLES = [
+	"ranking_reviewer",
+	"grounding_reviewer",
+	"answer_quality_reviewer",
+	"safety_reviewer",
+	"lifecycle_batch_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"knowledge_bases": {
@@ -70,6 +92,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"prompt_injection_scan_required": True,
 		"unsafe_generation_blocking": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_RAGN_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_RAGN_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_RAGN_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_rag_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "ragn.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"corpus_batch",
+			"document_batch",
+			"retrieval_batch",
+			"context_batch",
+			"generation_batch",
+			"citation_batch",
+			"evaluation_batch",
+			"safety_batch",
+			"rag_agent_batch",
+		],
+		"topics": [
+			"ragn.corpora",
+			"ragn.documents",
+			"ragn.retrievals",
+			"ragn.contexts",
+			"ragn.generations",
+			"ragn.citations",
+			"ragn.evaluations",
+			"ragn.safety",
+			"ragn.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"audit_queries": True,
@@ -112,6 +175,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_citations": True,
 		"enable_curation": True,
 		"enable_governance": True,
+		"enable_rag_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -132,6 +197,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"citations",
 		"curation",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -148,6 +215,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"citations",
 		"curation",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -195,6 +264,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_rag_mutation_requires_bytewax", "description": "Batch RAG mutations must use Bytewax event streams.", "condition": {"operation": "batch_rag_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_rag_access_denied", "description": "RAG operations may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_rag_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "rag_state_change_requires_audit", "description": "RAG state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "rag_agent_runtime_supported", "description": "RAG agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_rag_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_rag_agent_runtime", "required_action": "choose_supported_rag_agent_runtime"}},
+	{"name": "rag_agent_role_supported", "description": "RAG agents must use supported RAG-governance roles.", "condition": {"operation": "register_rag_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_rag_agent_role", "required_action": "choose_supported_rag_agent_role"}},
+	{"name": "rag_agent_requires_scope", "description": "RAG agents require an explicit bounded corpus, retrieval, or answer scope.", "condition": {"operation": "register_rag_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "rag_agent_scope_required", "required_action": "declare_rag_agent_scope"}},
+	{"name": "rag_agent_requires_owner", "description": "RAG agents require an accountable owner.", "condition": {"operation": "register_rag_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "rag_agent_owner_required", "required_action": "assign_rag_agent_owner"}},
+	{"name": "rag_agent_requires_purpose", "description": "RAG agents require a documented purpose.", "condition": {"operation": "register_rag_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "rag_agent_purpose_required", "required_action": "document_rag_agent_purpose"}},
+	{"name": "rag_agent_requires_contribution_disclosure", "description": "RAG agents must disclose machine-authored corpus, retrieval, and answer-review contributions.", "condition": {"operation": "register_rag_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "rag_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "rag_agent_privileged_role_requires_human_approval", "description": "Privileged RAG-agent roles require human approval evidence.", "condition": {"operation": "register_rag_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "rag_agent_human_approval_required", "required_action": "record_human_rag_agent_approval"}},
+	{"name": "bytewax_ragn_stream_required", "description": "RAGN lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_ragn_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_ragn_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -209,6 +286,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "citations", "path": "/ragn/citations", "component": "CitationInspector", "permission": "ragn:view", "nav_group": "Evidence"},
 	{"name": "curation", "path": "/ragn/curation", "component": "KnowledgeCuration", "permission": "ragn:curate", "nav_group": "Governance"},
 	{"name": "governance", "path": "/ragn/governance", "component": "RAGNGovernance", "permission": "ragn:govern", "nav_group": "Governance"},
+	{"name": "agents", "path": "/ragn/agents", "component": "RAGAgentRoster", "permission": "ragn:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/ragn/lifecycle", "component": "RAGNLifecycleBatchMonitor", "permission": "ragn:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/ragn/audit", "component": "RAGNAuditTimeline", "permission": "ragn:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/ragn/settings", "component": "RAGNSettings", "permission": "ragn:admin", "nav_group": "Administration"},
 ]
@@ -239,9 +318,65 @@ THEME: dict[str, Any] = {
 		"conversation_trace": {"visual": "turn-timeline", "status_style": "memory-chip"},
 		"citation_stack": {"visual": "citation-list", "status_style": "source-chip"},
 		"curation_queue": {"visual": "review-list", "threshold_style": "quality-band"},
+		"rag_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "grounding-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class RAGN agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_RAGN_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_RAGN_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_RAGN_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_rag_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the RAGN Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "ragn.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"corpus_batch",
+			"document_batch",
+			"retrieval_batch",
+			"context_batch",
+			"generation_batch",
+			"citation_batch",
+			"evaluation_batch",
+			"safety_batch",
+			"rag_agent_batch",
+		],
+		"topics": [
+			"ragn.corpora",
+			"ragn.documents",
+			"ragn.retrievals",
+			"ragn.contexts",
+			"ragn.generations",
+			"ragn.citations",
+			"ragn.evaluations",
+			"ragn.safety",
+			"ragn.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -252,6 +387,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "ragn",
 		"display_name": "Retrieval-Augmented Generation",
+		"provides": ["retrieval_augmented_generation", "grounded_answering", "rag_agent_composition"],
+		"requires": ["srch", "nlpc", "aicr", "conf", "audl"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -263,6 +400,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

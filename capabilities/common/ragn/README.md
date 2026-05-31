@@ -3,14 +3,16 @@
 RAGN provides APG's executable retrieval-augmented generation capability:
 tenant-scoped knowledge bases, document ingestion, governed context retrieval,
 cited answer generation, conversation memory, answer curation, audit evidence,
-UI view models, and package metadata for generated Python applications.
+first-class RAG agents, Bytewax lifecycle batches, UI view models, and package
+metadata for generated Python applications.
 
 Use RAGN when an application needs answers grounded in enterprise context:
 support assistants, ERP copilots, policy Q&A, operational runbooks, research
 workbenches, compliance evidence navigation, or AI-agent context packs. The
 dependency-light runtime is intentionally small, while the contract exposes
 adapter seams for search, NLP, model lifecycle, AI core, knowledge graph,
-metadata, auth, audit, cache, metrics, and Bytewax event streams.
+metadata, auth, audit, cache, metrics, provider-neutral agent runtimes, and
+Bytewax event streams.
 
 ## What RAGN Provides
 
@@ -26,10 +28,15 @@ metadata, auth, audit, cache, metrics, and Bytewax event streams.
   turn-count review, and audit events.
 - Citation validation for source, document, and chunk evidence.
 - Answer curation records with curator, decision, evidence, and audit events.
+- First-class RAG agents for Codex, Claude Code, opencode, and Pi style
+  runtimes with explicit role, owner, scope, purpose, contribution disclosure,
+  and human approval status for privileged roles.
+- Bytewax lifecycle batch validation for corpus, document, retrieval, context,
+  generation, citation, evaluation, safety, and RAG-agent operations.
 - UI route metadata and view models for dashboard, studio, knowledge bases,
   documents, retrieval, generation, conversations, citations, curation,
-  governance, audit, and settings screens.
-- Bytewax adapter evidence for batch RAG mutation flows.
+  governance, agent roster, lifecycle batch monitor, audit, and settings
+  screens.
 
 ## Runtime Surfaces
 
@@ -52,8 +59,10 @@ metadata, auth, audit, cache, metrics, and Bytewax event streams.
 5. Record conversation turns when the answer is part of a dialogue.
 6. Curate generated answers when confidence, safety, or business impact requires
    review.
-7. Inspect dashboard summaries, evidence trails, governance rules, and audit
-   events.
+7. Register provider-neutral RAG agents with bounded roles and scopes.
+8. Validate RAG lifecycle batches through Bytewax-first processor contracts.
+9. Inspect dashboard summaries, evidence trails, governance rules, agent review
+   queues, lifecycle batches, and audit events.
 
 ## Example
 
@@ -93,6 +102,23 @@ answer = service.generate_answer(
     answer_text="International travel requires manager and finance approval.",
     citations=[{"source_id": "policy-library", "document_id": doc["id"], "chunk_id": "chunk-1"}],
 )
+agent = service.register_rag_agent(
+    agent_id="agent-grounding",
+    tenant_id="tenant-a",
+    name="Grounding reviewer",
+    runtime="codex",
+    role="grounding_reviewer",
+    scope="kb-policy answers",
+    owner="knowledge-steward",
+    purpose="Review generated answers for grounded evidence",
+    human_approval_required=True,
+)
+batch = service.validate_ragn_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=3,
+    operation="rag_agent_batch",
+)
 ```
 
 ## Guardrails
@@ -104,11 +130,16 @@ access filters, generation query, retrieved context, citations, external model
 policy, conversation id, user id, citation evidence, curator, curation decision,
 curation evidence, Bytewax batch mutation, tenant isolation, or audit evidence
 for state changes. It requires review for large ingestion batches, large
-retrieval windows, low-confidence context, and long conversations.
+retrieval windows, low-confidence context, long conversations, and privileged
+RAG-agent registrations without recorded human approval. It rejects unsupported
+agent runtimes, unsupported agent roles, missing agent scope, missing owner,
+missing purpose, missing machine-contribution disclosure, non-Bytewax lifecycle
+streams, and unsupported lifecycle operations.
 
 ## Composition
 
-RAGN depends on SRCH, NLPC, and AICR. Optional adapters connect it to MLCM,
-AUTH, AUDL, CACH, KNGR, GRPH, META, MONI, and Bytewax-backed event streams.
+RAGN depends on SRCH, NLPC, AICR, CONF, and AUDL. Optional adapters connect it
+to MLCM, AUTH, CACH, KNGR, GRPH, META, MONI, and durable Bytewax topologies.
 Generated applications compose RAGN through its semantic model, UI manifest,
-API helpers, service runtime, rule engine, and theme contract.
+agent manifest, streaming manifest, API helpers, service runtime, rule engine,
+and theme contract.
