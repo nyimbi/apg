@@ -1,5 +1,44 @@
 {
-  "agents": {},
+  "agents": {
+    "imex": {
+      "approval": "human approval is required before privileged transfer agents mutate transfer state",
+      "external_runtimes_are_adapters": true,
+      "first_class": true,
+      "privileged_roles": [
+        "import_reviewer",
+        "export_reviewer",
+        "migration_reviewer",
+        "mapping_reviewer",
+        "quality_reviewer",
+        "artifact_reviewer",
+        "retention_reviewer",
+        "transfer_operator"
+      ],
+      "requires": [
+        "scope",
+        "owner",
+        "purpose",
+        "contribution_disclosure"
+      ],
+      "supported_roles": [
+        "import_reviewer",
+        "export_reviewer",
+        "migration_reviewer",
+        "mapping_reviewer",
+        "quality_reviewer",
+        "artifact_reviewer",
+        "retention_reviewer",
+        "transfer_operator",
+        "data_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Import/Export package-backed APG capability",
     "entity_count": 0,
@@ -21,12 +60,51 @@
         "pipeline_engine": "etlp",
         "production_runtime": "service.ImportExportService"
       },
+      "agents": {
+        "approval": "human approval is required before privileged transfer agents mutate transfer state",
+        "external_runtimes_are_adapters": true,
+        "first_class": true,
+        "privileged_roles": [
+          "import_reviewer",
+          "export_reviewer",
+          "migration_reviewer",
+          "mapping_reviewer",
+          "quality_reviewer",
+          "artifact_reviewer",
+          "retention_reviewer",
+          "transfer_operator"
+        ],
+        "requires": [
+          "scope",
+          "owner",
+          "purpose",
+          "contribution_disclosure"
+        ],
+        "supported_roles": [
+          "import_reviewer",
+          "export_reviewer",
+          "migration_reviewer",
+          "mapping_reviewer",
+          "quality_reviewer",
+          "artifact_reviewer",
+          "retention_reviewer",
+          "transfer_operator",
+          "data_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "capacity": "ReviewRecord",
         "destination": "ReviewRecord",
         "owner_transfer": "ReviewRecord",
         "purge": "ReviewRecord",
-        "quality": "ReviewRecord"
+        "quality": "ReviewRecord",
+        "transfer_agent_privileged_role": "TransferAgentRecord"
       },
       "business_rules": [],
       "components": {},
@@ -43,6 +121,41 @@
           "metrics_sink": "moni",
           "pipeline_engine": "etlp",
           "production_runtime": "service.ImportExportService"
+        },
+        "agents": {
+          "contribution_disclosure_required": true,
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "owner_required": true,
+          "privileged_roles": [
+            "import_reviewer",
+            "export_reviewer",
+            "migration_reviewer",
+            "mapping_reviewer",
+            "quality_reviewer",
+            "artifact_reviewer",
+            "retention_reviewer",
+            "transfer_operator"
+          ],
+          "purpose_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "import_reviewer",
+            "export_reviewer",
+            "migration_reviewer",
+            "mapping_reviewer",
+            "quality_reviewer",
+            "artifact_reviewer",
+            "retention_reviewer",
+            "transfer_operator",
+            "data_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "formats": {
           "checksum_required": true,
@@ -87,6 +200,30 @@
           "require_tenant_context": true,
           "sensitive_exports_require_encryption": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "imex.lifecycle",
+          "operations": [
+            "endpoint_batch",
+            "mapping_batch",
+            "job_batch",
+            "run_batch",
+            "artifact_batch",
+            "review_batch",
+            "transfer_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "imex.endpoints",
+            "imex.mappings",
+            "imex.jobs",
+            "imex.runs",
+            "imex.artifacts",
+            "imex.reviews",
+            "imex.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -100,9 +237,11 @@
           "enable_exports": true,
           "enable_imports": true,
           "enable_job_designer": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_mapping_workbench": true,
           "enable_retention": true,
           "enable_settings": true,
+          "enable_transfer_agent_roster": true,
           "enable_transfer_monitor": true,
           "enable_validation_console": true
         },
@@ -121,9 +260,16 @@
       "master_data": {},
       "name": "Import/Export",
       "provides": [
-        "imex_operations"
+        "import_export",
+        "bulk_transfer",
+        "transfer_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "etlp",
+        "conn",
+        "auth",
+        "audl"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -525,6 +671,111 @@
               "required_action": "record_quality_score"
             },
             "name": "completion_quality_required"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_transfer_agent"
+            },
+            "description": "Transfer agents must use a supported runtime adapter.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_transfer_agent_runtime",
+              "required_action": "choose_supported_transfer_agent_runtime"
+            },
+            "name": "transfer_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_transfer_agent"
+            },
+            "description": "Transfer agents must use a supported transfer role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_transfer_agent_role",
+              "required_action": "choose_supported_transfer_agent_role"
+            },
+            "name": "transfer_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_transfer_agent",
+              "scope_present": false
+            },
+            "description": "Transfer agents require an explicit bounded scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_agent_scope_required",
+              "required_action": "declare_transfer_agent_scope"
+            },
+            "name": "transfer_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_transfer_agent",
+              "owner_present": false
+            },
+            "description": "Transfer agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_agent_owner_required",
+              "required_action": "assign_transfer_agent_owner"
+            },
+            "name": "transfer_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_transfer_agent",
+              "purpose_present": false
+            },
+            "description": "Transfer agents require a documented purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_agent_purpose_required",
+              "required_action": "document_transfer_agent_purpose"
+            },
+            "name": "transfer_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_transfer_agent"
+            },
+            "description": "Transfer agents must disclose machine-authored transfer contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "transfer_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "transfer_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_transfer_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged transfer-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "transfer_agent_human_approval_required",
+              "required_action": "record_human_transfer_agent_approval"
+            },
+            "name": "transfer_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_imex_lifecycle_batch"
+            },
+            "description": "IMEX lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_imex_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_imex_stream_required"
           }
         ],
         "type": "deterministic"
@@ -929,6 +1180,111 @@
             "required_action": "record_quality_score"
           },
           "name": "completion_quality_required"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_transfer_agent"
+          },
+          "description": "Transfer agents must use a supported runtime adapter.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_transfer_agent_runtime",
+            "required_action": "choose_supported_transfer_agent_runtime"
+          },
+          "name": "transfer_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_transfer_agent"
+          },
+          "description": "Transfer agents must use a supported transfer role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_transfer_agent_role",
+            "required_action": "choose_supported_transfer_agent_role"
+          },
+          "name": "transfer_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_transfer_agent",
+            "scope_present": false
+          },
+          "description": "Transfer agents require an explicit bounded scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_agent_scope_required",
+            "required_action": "declare_transfer_agent_scope"
+          },
+          "name": "transfer_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_transfer_agent",
+            "owner_present": false
+          },
+          "description": "Transfer agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_agent_owner_required",
+            "required_action": "assign_transfer_agent_owner"
+          },
+          "name": "transfer_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_transfer_agent",
+            "purpose_present": false
+          },
+          "description": "Transfer agents require a documented purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_agent_purpose_required",
+            "required_action": "document_transfer_agent_purpose"
+          },
+          "name": "transfer_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_transfer_agent"
+          },
+          "description": "Transfer agents must disclose machine-authored transfer contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "transfer_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "transfer_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_transfer_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged transfer-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "transfer_agent_human_approval_required",
+            "required_action": "record_human_transfer_agent_approval"
+          },
+          "name": "transfer_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_imex_lifecycle_batch"
+          },
+          "description": "IMEX lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_imex_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_imex_stream_required"
         }
       ],
       "runtime": {
@@ -938,6 +1294,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "TransferAgentRoster",
+          "permission": "imex:admin",
+          "route": "/imex/agents"
+        },
         "approvals": {
           "component": "TransferApprovalQueue",
           "permission": "imex:approve",
@@ -978,6 +1339,11 @@
           "permission": "imex:view",
           "route": "/imex/jobs"
         },
+        "lifecycle": {
+          "component": "TransferLifecycleBatchMonitor",
+          "permission": "imex:view",
+          "route": "/imex/lifecycle"
+        },
         "mappings": {
           "component": "SchemaMappingWorkbench",
           "permission": "imex:manage",
@@ -1000,7 +1366,28 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "engine": "bytewax",
+        "lifecycle_stream": "imex.lifecycle",
+        "operations": [
+          "endpoint_batch",
+          "mapping_batch",
+          "job_batch",
+          "run_batch",
+          "artifact_batch",
+          "review_batch",
+          "transfer_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "imex.endpoints",
+          "imex.mappings",
+          "imex.jobs",
+          "imex.runs",
+          "imex.artifacts",
+          "imex.reviews",
+          "imex.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
@@ -1016,6 +1403,10 @@
             "status_style": "decision-pill",
             "visual": "event-timeline"
           },
+          "bytewax_lifecycle_panel": {
+            "status_indicator": "processor-chip",
+            "visual": "stream-batches"
+          },
           "retention_console": {
             "status_indicator": "expiry-chip",
             "visual": "policy-table"
@@ -1023,6 +1414,10 @@
           "schema_mapping_canvas": {
             "edge_style": "field-transform-line",
             "visual": "source-target-map"
+          },
+          "transfer_agent_roster": {
+            "status_indicator": "approval-chip",
+            "visual": "agent-roster"
           },
           "transfer_job_row": {
             "icon": "arrow-left-right",
@@ -1058,9 +1453,11 @@
         "audit": "TransferAuditEvent",
         "endpoint": "TransferEndpoint",
         "job": "TransferJob",
+        "lifecycle_batch": "TransferLifecycleBatchRecord",
         "mapping": "MappingProfile",
         "review": "ReviewRecord",
-        "run": "TransferRun"
+        "run": "TransferRun",
+        "transfer_agent": "TransferAgentRecord"
       },
       "ui": {
         "api_prefix": "/imex/api/v1",
@@ -1144,6 +1541,20 @@
             "permission": "imex:view"
           },
           {
+            "component": "TransferAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/imex/agents",
+            "permission": "imex:admin"
+          },
+          {
+            "component": "TransferLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/imex/lifecycle",
+            "permission": "imex:view"
+          },
+          {
             "component": "IMEXSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -1161,14 +1572,78 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "transfer_governance": {
+        "approval": "human approval is required before privileged transfer agents mutate transfer state",
+        "roles": [
+          "import_reviewer",
+          "export_reviewer",
+          "migration_reviewer",
+          "mapping_reviewer",
+          "quality_reviewer",
+          "artifact_reviewer",
+          "retention_reviewer",
+          "transfer_operator",
+          "data_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "imex": []
+      "imex": [
+        "etlp",
+        "conn",
+        "auth",
+        "audl"
+      ]
     }
   },
   "contracts": {
     "imex": {
+      "agents": {
+        "approval": "human approval is required before privileged transfer agents mutate transfer state",
+        "external_runtimes_are_adapters": true,
+        "first_class": true,
+        "privileged_roles": [
+          "import_reviewer",
+          "export_reviewer",
+          "migration_reviewer",
+          "mapping_reviewer",
+          "quality_reviewer",
+          "artifact_reviewer",
+          "retention_reviewer",
+          "transfer_operator"
+        ],
+        "requires": [
+          "scope",
+          "owner",
+          "purpose",
+          "contribution_disclosure"
+        ],
+        "supported_roles": [
+          "import_reviewer",
+          "export_reviewer",
+          "migration_reviewer",
+          "mapping_reviewer",
+          "quality_reviewer",
+          "artifact_reviewer",
+          "retention_reviewer",
+          "transfer_operator",
+          "data_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "audit_sink": "audl",
@@ -1182,6 +1657,41 @@
           "metrics_sink": "moni",
           "pipeline_engine": "etlp",
           "production_runtime": "service.ImportExportService"
+        },
+        "agents": {
+          "contribution_disclosure_required": true,
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "owner_required": true,
+          "privileged_roles": [
+            "import_reviewer",
+            "export_reviewer",
+            "migration_reviewer",
+            "mapping_reviewer",
+            "quality_reviewer",
+            "artifact_reviewer",
+            "retention_reviewer",
+            "transfer_operator"
+          ],
+          "purpose_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "import_reviewer",
+            "export_reviewer",
+            "migration_reviewer",
+            "mapping_reviewer",
+            "quality_reviewer",
+            "artifact_reviewer",
+            "retention_reviewer",
+            "transfer_operator",
+            "data_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "formats": {
           "checksum_required": true,
@@ -1226,6 +1736,30 @@
           "require_tenant_context": true,
           "sensitive_exports_require_encryption": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "imex.lifecycle",
+          "operations": [
+            "endpoint_batch",
+            "mapping_batch",
+            "job_batch",
+            "run_batch",
+            "artifact_batch",
+            "review_batch",
+            "transfer_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "imex.endpoints",
+            "imex.mappings",
+            "imex.jobs",
+            "imex.runs",
+            "imex.artifacts",
+            "imex.reviews",
+            "imex.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1239,9 +1773,11 @@
           "enable_exports": true,
           "enable_imports": true,
           "enable_job_designer": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_mapping_workbench": true,
           "enable_retention": true,
           "enable_settings": true,
+          "enable_transfer_agent_roster": true,
           "enable_transfer_monitor": true,
           "enable_validation_console": true
         },
@@ -1255,9 +1791,40 @@
       },
       "id": "imex",
       "provides": [
-        "imex_operations"
+        "import_export",
+        "bulk_transfer",
+        "transfer_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "etlp",
+        "conn",
+        "auth",
+        "audl"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "lifecycle_stream": "imex.lifecycle",
+        "operations": [
+          "endpoint_batch",
+          "mapping_batch",
+          "job_batch",
+          "run_batch",
+          "artifact_batch",
+          "review_batch",
+          "transfer_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "imex.endpoints",
+          "imex.mappings",
+          "imex.jobs",
+          "imex.runs",
+          "imex.artifacts",
+          "imex.reviews",
+          "imex.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1315,6 +1882,19 @@
         "required_action": "record_audit_evidence"
       },
       "name": "audit_evidence_required"
+    },
+    "bytewax_imex_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_imex_lifecycle_batch"
+      },
+      "description": "IMEX lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_imex_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_imex_stream_required"
     },
     "checkpointing_required": {
       "condition": {
@@ -1689,6 +2269,98 @@
         "required_action": "attach_tenant_context"
       },
       "name": "tenant_context_required"
+    },
+    "transfer_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_transfer_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged transfer-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "transfer_agent_human_approval_required",
+        "required_action": "record_human_transfer_agent_approval"
+      },
+      "name": "transfer_agent_privileged_role_requires_human_approval"
+    },
+    "transfer_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_transfer_agent"
+      },
+      "description": "Transfer agents must disclose machine-authored transfer contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "transfer_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "transfer_agent_requires_contribution_disclosure"
+    },
+    "transfer_agent_requires_owner": {
+      "condition": {
+        "operation": "register_transfer_agent",
+        "owner_present": false
+      },
+      "description": "Transfer agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "transfer_agent_owner_required",
+        "required_action": "assign_transfer_agent_owner"
+      },
+      "name": "transfer_agent_requires_owner"
+    },
+    "transfer_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_transfer_agent",
+        "purpose_present": false
+      },
+      "description": "Transfer agents require a documented purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "transfer_agent_purpose_required",
+        "required_action": "document_transfer_agent_purpose"
+      },
+      "name": "transfer_agent_requires_purpose"
+    },
+    "transfer_agent_requires_scope": {
+      "condition": {
+        "operation": "register_transfer_agent",
+        "scope_present": false
+      },
+      "description": "Transfer agents require an explicit bounded scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "transfer_agent_scope_required",
+        "required_action": "declare_transfer_agent_scope"
+      },
+      "name": "transfer_agent_requires_scope"
+    },
+    "transfer_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_transfer_agent"
+      },
+      "description": "Transfer agents must use a supported transfer role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_transfer_agent_role",
+        "required_action": "choose_supported_transfer_agent_role"
+      },
+      "name": "transfer_agent_role_supported"
+    },
+    "transfer_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_transfer_agent"
+      },
+      "description": "Transfer agents must use a supported runtime adapter.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_transfer_agent_runtime",
+        "required_action": "choose_supported_transfer_agent_runtime"
+      },
+      "name": "transfer_agent_runtime_supported"
     }
   },
   "security": {},

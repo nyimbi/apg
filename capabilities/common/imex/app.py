@@ -33,6 +33,8 @@ def semantic_model() -> dict[str, Any]:
 		}
 		for route in contract["ui"]["routes"]
 	}
+	provides = list(contract["provides"])
+	requires = list(contract["requires"])
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -47,11 +49,12 @@ def semantic_model() -> dict[str, Any]:
 			"imex": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["imex_operations"],
-				"requires": [],
+				"provides": provides,
+				"requires": requires,
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
+				"agents": contract["agents"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
@@ -69,6 +72,7 @@ def semantic_model() -> dict[str, Any]:
 					"capacity": "ReviewRecord",
 					"purge": "ReviewRecord",
 					"owner_transfer": "ReviewRecord",
+					"transfer_agent_privileged_role": "TransferAgentRecord",
 				},
 				"transfer_lifecycle": {
 					"endpoint": "TransferEndpoint",
@@ -77,24 +81,28 @@ def semantic_model() -> dict[str, Any]:
 					"run": "TransferRun",
 					"artifact": "TransferArtifact",
 					"review": "ReviewRecord",
+					"transfer_agent": "TransferAgentRecord",
+					"lifecycle_batch": "TransferLifecycleBatchRecord",
 					"audit": "TransferAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
+				"streaming": {**contract["streaming"]},
 			}
 		},
 		"contracts": {
 			"imex": {
 				"id": "imex",
 				"configuration": contract["configuration"],
-				"provides": ["imex_operations"],
-				"requires": [],
+				"provides": provides,
+				"requires": requires,
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"imex": []}, "applications": {}, "agent_teams": {}},
+		"composition": {"capability_dependencies": {"imex": requires}, "applications": {}, "agent_teams": {"transfer_governance": {"supported_runtimes": contract["agents"]["supported_runtimes"], "roles": contract["agents"]["supported_roles"], "approval": contract["agents"]["approval"]}}},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
 			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
@@ -111,7 +119,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"imex": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -155,14 +163,18 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("IMEX semantic model route manifest is stale")
-	if len(rules) < 25:
+	if len(rules) < 38:
 		errors.append("IMEX semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("IMEX adapter manifest must use Bytewax for event streaming")
 	if capability.get("runtime", {}).get("service") != "imex_runtime.py":
 		errors.append("IMEX generated-app runtime is missing")
+	if capability.get("agents", {}).get("first_class") is not True:
+		errors.append("IMEX semantic model must expose first-class transfer agents")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("IMEX lifecycle batches must require Bytewax")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

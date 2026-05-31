@@ -122,7 +122,7 @@ except ImportError:
 
     asyncpg = _FallbackAsyncPG()
 
-from models import (
+from .models import (
     ImportExportJob, JobExecution, SourceConfig, TargetConfig, SchemaMapping,
     ValidationRule, TransformationStep, ProcessingMetrics, DataQualityReport,
     Workflow, WorkflowStep, ConnectionTemplate, MonitoringAlert,

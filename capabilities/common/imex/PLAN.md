@@ -14,18 +14,23 @@ existing heavier IMEX modules instead of replacing them wholesale.
 1. Contract
    - Expand tenant configuration, adapters, UI routes, theme components, and
      deterministic guardrails.
+   - Add first-class transfer-agent and Bytewax lifecycle-batch configuration.
    - Include Bytewax as the event-stream adapter.
    - Expose `imex_runtime.ImexService` as the generated-app runtime.
 
 2. Runtime
    - Add endpoint, mapping, job, run, artifact, review, and audit records.
+   - Add transfer-agent records, lifecycle-batch records, guardrail-backed
+     registration, Bytewax validation, summaries, and audit events.
    - Implement lifecycle operations and rule enforcement.
    - Keep the runtime dependency-light for compiler-generated apps.
 
 3. API and UI
    - Preserve the existing Flask API surface.
-   - Add generated-app helper functions backed by the runtime service.
-   - Add `view_models.py` for composable UI screens.
+   - Add generated-app helper functions backed by the runtime service,
+     including transfer-agent and lifecycle-batch helpers.
+   - Add `view_models.py` for composable UI screens, including agent roster and
+     lifecycle-batch monitor views.
 
 4. Package Evidence
    - Replace static app semantics with contract-derived semantic output.
@@ -46,3 +51,4 @@ existing heavier IMEX modules instead of replacing them wholesale.
 - UI models use runtime list methods and contract configuration.
 - API helpers do not bypass the generated-app runtime.
 - Docs describe current executable behavior without overclaiming.
+- External agent runtimes and live Bytewax execution remain adapter-bound.

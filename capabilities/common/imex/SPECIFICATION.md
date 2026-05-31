@@ -19,6 +19,11 @@ The current executable packet covers:
 - Transfer execution with checkpointing and monitoring guardrails.
 - Completion with audit and quality evidence.
 - Artifact publication, retention, replay, and purge lifecycle.
+- First-class transfer-agent registrations for AI and automation tools that
+  participate in import review, export review, migration review, mapping
+  review, quality review, artifact review, retention review, transfer
+  operation, or data stewardship.
+- Bytewax lifecycle batch validation for import/export mutation streams.
 - Generated-app UI models and semantic package evidence.
 
 Out of scope for this packet:
@@ -27,6 +32,7 @@ Out of scope for this packet:
 - Live ETLP pipeline execution.
 - Live Bytewax stream processing.
 - External vault, encryption, audit, monitoring, and registry adapters.
+- External AI-agent runtime execution.
 - Browser-rendered UI verification.
 
 ## Lifecycle
@@ -38,14 +44,19 @@ Out of scope for this packet:
 5. Execute a transfer run.
 6. Complete the run with audit and quality evidence.
 7. Publish artifacts with checksum and retention policy.
-8. Replay, retry, purge, or review as needed.
+8. Register governed transfer agents with scope, owner, purpose, contribution
+   disclosure, and human approval for privileged roles.
+9. Validate lifecycle mutation batches through Bytewax before adapter side
+   effects.
+10. Replay, retry, purge, or review as needed.
 
 ## Configuration
 
 The contract defines tenant configuration for jobs, formats, validation,
 security, orchestration, observability, adapters, UI routes, and theme tokens.
 The generated-app runtime adapter is `imex_runtime.ImexService`; the event
-stream adapter is `bytewax`.
+stream adapter is `bytewax`. Agent runtimes are adapter identifiers, not
+embedded SDK commitments: `codex`, `claude_code`, `opencode`, and `pi`.
 
 ## Rules
 
@@ -55,11 +66,13 @@ mappings, PII policy, destination approval, preview validation, production
 approval, encryption, monitoring, checkpointing, quality review, quarantine,
 capacity review, retry, replay, scheduling, artifact publication, retention,
 purge review, owner transfer, ETLP plan linkage, CONN binding, audit evidence,
-and final quality evidence.
+final quality evidence, transfer-agent runtime, transfer-agent role, agent
+scope, agent owner, agent purpose, contribution disclosure, human approval for
+privileged agent roles, and Bytewax lifecycle processing.
 
 ## UI Surfaces
 
-IMEX exposes 12 generated-app UI routes:
+IMEX exposes 14 generated-app UI routes:
 
 - Dashboard
 - Jobs
@@ -72,6 +85,8 @@ IMEX exposes 12 generated-app UI routes:
 - Approvals
 - Artifacts
 - Audit
+- Agents
+- Lifecycle
 - Settings
 
 ## Acceptance Criteria

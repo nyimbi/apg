@@ -4,7 +4,13 @@ import pytest
 
 from capabilities.common.imex import ImexService, imex_capability, register_capability
 from capabilities.common.imex.capability_contract import evaluate_capability_rules, get_capability_contract
-from capabilities.common.imex.view_models import dashboard_model, job_designer_model, transfer_monitor_model
+from capabilities.common.imex.view_models import (
+	dashboard_model,
+	job_designer_model,
+	lifecycle_batch_model,
+	transfer_agent_roster_model,
+	transfer_monitor_model,
+)
 
 
 def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
@@ -22,10 +28,18 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"orchestration",
 		"observability",
 		"adapters",
+		"agents",
+		"streaming",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 38
+	assert contract["provides"] == ["import_export", "bulk_transfer", "transfer_agent_composition"]
+	assert contract["requires"] == ["etlp", "conn", "auth", "audl"]
+	assert contract["agents"]["first_class"] is True
+	assert "codex" in contract["agents"]["supported_runtimes"]
+	assert "migration_reviewer" in contract["agents"]["supported_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "imex_runtime.ImexService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -40,11 +54,14 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"approvals",
 		"artifacts",
 		"audit",
+		"agents",
+		"lifecycle",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/imex/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "artifact_browser" in contract["theme"]["components"]
+	assert "transfer_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_transfer_guardrails():
@@ -77,6 +94,39 @@ def test_rule_engine_enforces_transfer_guardrails():
 		"quality_review_required",
 		"invalid_records_require_quarantine",
 	}
+
+
+def test_rule_engine_enforces_transfer_agent_and_bytewax_guardrails():
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_transfer_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	stream_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_imex_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"transfer_agent_runtime_supported",
+		"transfer_agent_role_supported",
+		"transfer_agent_requires_scope",
+		"transfer_agent_requires_owner",
+		"transfer_agent_requires_purpose",
+		"transfer_agent_requires_contribution_disclosure",
+		"transfer_agent_privileged_role_requires_human_approval",
+	}
+	assert stream_result["decision"] == "deny"
+	assert stream_result["matched_rules"] == ["bytewax_imex_stream_required"]
 
 
 def test_imex_runtime_executes_transfer_lifecycle():
@@ -159,6 +209,57 @@ def test_imex_runtime_review_and_artifact_guardrails():
 	assert purged["status"] == "purged"
 
 
+def test_imex_runtime_governs_agents_and_lifecycle_batches():
+	service = ImexService()
+
+	with pytest.raises(PermissionError, match="unsupported_transfer_agent_runtime"):
+		service.register_transfer_agent(
+			agent_id="unknown-agent",
+			tenant_id="tenant-a",
+			name="Unknown Agent",
+			runtime="unsupported",
+			role="migration_reviewer",
+			scope="migration reviews",
+			owner="platform",
+			purpose="review transfer migrations",
+		)
+
+	pending = service.register_transfer_agent(
+		agent_id="migration-agent",
+		tenant_id="tenant-a",
+		name="Migration Agent",
+		runtime="Claude Code",
+		role="migration reviewer",
+		scope="migration reviews",
+		owner="platform",
+		purpose="review transfer migrations",
+		human_approval_required=False,
+	)
+	active = service.register_transfer_agent(
+		agent_id="data-steward",
+		tenant_id="tenant-a",
+		name="Data Steward",
+		runtime="codex",
+		role="data_steward",
+		scope="transfer metadata stewardship",
+		owner="integration-office",
+		purpose="maintain transfer metadata",
+	)
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_imex_lifecycle_batch("tenant-a", "kafka", 2)
+	batch = service.validate_imex_lifecycle_batch("tenant-a", "bytewax", 4)
+	summary = service.dashboard_summary("tenant-a")
+
+	assert pending["status"] == "pending_review"
+	assert pending["runtime"] == "claude_code"
+	assert active["status"] == "active"
+	assert batch["status"] == "accepted"
+	assert summary["transfer_agent_count"] == 2
+	assert summary["lifecycle_batch_count"] == 2
+	assert summary["denied_lifecycle_batch_count"] == 1
+
+
 def test_registration_and_ui_models_are_composable():
 	registration = register_capability()
 	service = ImexService()
@@ -166,6 +267,19 @@ def test_registration_and_ui_models_are_composable():
 	dashboard = dashboard_model(service, "tenant-a")
 	designer = job_designer_model(service, "tenant-a")
 	monitor = transfer_monitor_model(service, "tenant-a")
+	service.register_transfer_agent(
+		agent_id="data-steward",
+		tenant_id="tenant-a",
+		name="Data Steward",
+		runtime="codex",
+		role="data_steward",
+		scope="transfer metadata stewardship",
+		owner="integration-office",
+		purpose="maintain transfer metadata",
+	)
+	service.validate_imex_lifecycle_batch("tenant-a", "bytewax", 1)
+	agents = transfer_agent_roster_model(service, "tenant-a")
+	batches = lifecycle_batch_model(service, "tenant-a")
 
 	assert registration["configuration"]["tenant_id"] == "default"
 	assert registration["rule_engine"]["type"] == "deterministic"
@@ -173,7 +287,12 @@ def test_registration_and_ui_models_are_composable():
 	assert registration["theme"]["name"] == "imex_transfer_console"
 	assert registration["ui_components"]["mappings"] == "/imex/mappings"
 	assert "etlp" in registration["dependencies"]
+	assert "moni" in registration["optional_dependencies"]
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert dashboard["summary"]["endpoint_count"] == 1
 	assert "create_job" in designer["actions"]
 	assert monitor["runs"] == []
+	assert agents["agents"][0]["runtime"] == "codex"
+	assert batches["required_processor"] == "bytewax"
 	assert callable(imex_capability.health_check)

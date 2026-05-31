@@ -4,6 +4,9 @@ IMEX is the APG capability for governed import, export, and migration
 workflows. It gives generated applications a dependency-light runtime for
 building transfer jobs while preserving integration points for ETLP, CONN,
 AUTH, AUDL, MONI, KEYM, ENCR, and Bytewax.
+IMEX also treats AI and automation agents as governed transfer participants,
+so tools such as Codex, Claude Code, OpenCode, Pi, and future runtimes compose
+through policy-controlled adapters instead of untracked transfer scripts.
 
 ## What It Provides
 
@@ -18,9 +21,14 @@ AUTH, AUDL, MONI, KEYM, ENCR, and Bytewax.
 - Artifact publication with checksum and retention metadata.
 - Review queues for destination approvals, quality reviews, capacity reviews,
   purge reviews, and owner transfer.
+- First-class transfer-agent composition with supported runtimes, role
+  guardrails, bounded scope, accountable owner, purpose, contribution
+  disclosure, and human approval for privileged transfer roles.
+- Bytewax lifecycle batch validation for endpoint, mapping, job, run, artifact,
+  review, and transfer-agent mutation streams.
 - UI model functions for dashboards, job design, mappings, transfer monitor,
   validation, import/export workbenches, approvals, artifacts, audit, and
-  settings.
+  settings, plus transfer-agent roster and lifecycle-batch monitor surfaces.
 
 ## Main Files
 
@@ -87,6 +95,20 @@ run = service.execute_job(
 	approval_recorded=True,
 )
 service.complete_run("tenant-a", run["id"], records_processed=50000, quality_score=0.99)
+agent = service.register_transfer_agent(
+	"migration-agent",
+	"tenant-a",
+	"Migration Agent",
+	"codex",
+	"migration_reviewer",
+	"crm migration review",
+	"integration-office",
+	"review migration transfer evidence",
+	human_approval_required=True,
+)
+batch = service.validate_imex_lifecycle_batch("tenant-a", "bytewax", 4)
+assert agent["status"] == "active"
+assert batch["status"] == "accepted"
 ```
 
 ## Guardrails
@@ -97,6 +119,10 @@ production transfers, unencrypted sensitive exports, unmonitored large
 transfers, missing checkpoints, invalid records without quarantine, replay
 without idempotency, artifact publication without retention, and destructive
 purge without review.
+It also blocks unsupported transfer-agent runtimes, unsupported agent roles,
+missing agent scope, missing owner, missing purpose, missing contribution
+disclosure, and non-Bytewax lifecycle batches. Privileged transfer-agent roles
+require human approval evidence before mutation.
 
 ## Verification
 

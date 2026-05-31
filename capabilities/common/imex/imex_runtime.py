@@ -6,7 +6,13 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_IMEX_AGENT_ROLES,
+	SUPPORTED_IMEX_AGENT_ROLES,
+	SUPPORTED_IMEX_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 
 
 @dataclass(frozen=True)
@@ -104,16 +110,48 @@ class TransferAuditEvent:
 	created_at: str = field(default_factory=lambda: _now())
 
 
+@dataclass(frozen=True)
+class TransferAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	status: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	created_at: str = field(default_factory=lambda: _now())
+
+
+@dataclass(frozen=True)
+class TransferLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	operation: str
+	mutation_count: int
+	status: str
+	created_at: str = field(default_factory=lambda: _now())
+
+
 class ImexService:
 	"""Tenant-scoped import/export lifecycle facade for generated APG apps."""
 
 	def __init__(self) -> None:
+		self._agent_runtimes = set(SUPPORTED_IMEX_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_IMEX_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_IMEX_AGENT_ROLES)
 		self._endpoints: dict[tuple[str, str], TransferEndpoint] = {}
 		self._mappings: dict[tuple[str, str], MappingProfile] = {}
 		self._jobs: dict[tuple[str, str], TransferJob] = {}
 		self._runs: dict[tuple[str, str], TransferRun] = {}
 		self._artifacts: dict[tuple[str, str], TransferArtifact] = {}
 		self._reviews: dict[tuple[str, str], ReviewRecord] = {}
+		self._transfer_agents: dict[tuple[str, str], TransferAgentRecord] = {}
+		self._lifecycle_batches: dict[tuple[str, str], TransferLifecycleBatchRecord] = {}
 		self._events: list[TransferAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -335,9 +373,93 @@ class ImexService:
 		self._record_event(tenant_id, "artifact_purged", artifact_id, f"Purged artifact {artifact_id}.", {"actor": actor})
 		return _dump(record)
 
+	def register_transfer_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		"""Register a governed AI/automation participant for transfer work."""
+		self._enforce_tenant(tenant_id)
+		normalized_runtime = _normalize_agent_token(runtime)
+		normalized_role = _normalize_agent_token(role)
+		privileged_role = normalized_role in self._privileged_agent_roles
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_transfer_agent",
+			"agent_runtime_supported": normalized_runtime in self._agent_runtimes,
+			"agent_role_supported": normalized_role in self._agent_roles,
+			"scope_present": bool(scope),
+			"owner_present": bool(owner),
+			"purpose_present": bool(purpose),
+			"contribution_disclosed": contribution_disclosed,
+			"privileged_role": privileged_role,
+			"human_approval_required": human_approval_required,
+		})
+		if result["decision"] == "deny":
+			self._record_event(tenant_id, "transfer_agent_registration_denied", agent_id, f"Denied transfer agent {name}.", {"matched_rules": result["matched_rules"]})
+			_raise_if_blocked(result)
+		if self._tenant_key(tenant_id, agent_id) in self._transfer_agents:
+			raise ValueError(f"transfer agent already exists for tenant: {agent_id}")
+		record = TransferAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=scope,
+			owner=owner,
+			purpose=purpose,
+			status=_status_for_decision(result),
+			contribution_disclosed=contribution_disclosed,
+			human_approval_required=human_approval_required,
+		)
+		self._transfer_agents[self._tenant_key(tenant_id, agent_id)] = record
+		self._record_event(tenant_id, "transfer_agent_registered", agent_id, f"Registered transfer agent {name}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		return _dump(record)
+
+	def validate_imex_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "transfer_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Validate that import/export lifecycle mutations are processed by Bytewax."""
+		self._enforce_tenant(tenant_id)
+		normalized_stream = _normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_imex_lifecycle_batch",
+			"event_stream": normalized_stream,
+		})
+		resolved_batch_id = batch_id or f"{operation}:{len(self._lifecycle_batches) + 1}"
+		record = TransferLifecycleBatchRecord(
+			id=resolved_batch_id,
+			tenant_id=tenant_id,
+			event_stream=normalized_stream,
+			operation=operation,
+			mutation_count=mutation_count,
+			status="denied" if result["decision"] == "deny" else "accepted",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, resolved_batch_id)] = record
+		self._record_event(tenant_id, "imex_lifecycle_batch_validated", resolved_batch_id, f"Validated IMEX lifecycle batch through {normalized_stream}.", {"matched_rules": result["matched_rules"], "status": record.status})
+		if result["decision"] == "deny":
+			_raise_if_blocked(result)
+		return _dump(record)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		jobs = [job for job in self._jobs.values() if job.tenant_id == tenant_id]
 		runs = [run for run in self._runs.values() if run.tenant_id == tenant_id]
+		lifecycle_batches = [batch for batch in self._lifecycle_batches.values() if batch.tenant_id == tenant_id]
 		return {
 			"tenant_id": tenant_id,
 			"endpoint_count": len([endpoint for endpoint in self._endpoints.values() if endpoint.tenant_id == tenant_id]),
@@ -347,6 +469,9 @@ class ImexService:
 			"completed_run_count": len([run for run in runs if run.status == "completed"]),
 			"artifact_count": len([artifact for artifact in self._artifacts.values() if artifact.tenant_id == tenant_id]),
 			"pending_review_count": len([review for review in self._reviews.values() if review.tenant_id == tenant_id and review.status == "pending"]),
+			"transfer_agent_count": len([agent for agent in self._transfer_agents.values() if agent.tenant_id == tenant_id]),
+			"lifecycle_batch_count": len(lifecycle_batches),
+			"denied_lifecycle_batch_count": len([batch for batch in lifecycle_batches if batch.status == "denied"]),
 			"audit_event_count": len([event for event in self._events if event.tenant_id == tenant_id]),
 		}
 
@@ -367,6 +492,12 @@ class ImexService:
 
 	def list_reviews(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._reviews, tenant_id)
+
+	def list_transfer_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._transfer_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return [_dump(event) for event in self._events if tenant_id is None or event.tenant_id == tenant_id]
@@ -415,6 +546,14 @@ def _dump(record: Any) -> dict[str, Any]:
 def _raise_if_blocked(result: dict[str, Any]) -> None:
 	reasons = [action.get("reason", "imex_guardrail_failed") for action in result.get("actions", [])]
 	raise PermissionError(",".join(reasons) or "imex_guardrail_failed")
+
+
+def _normalize_agent_token(value: str) -> str:
+	return value.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _status_for_decision(result: dict[str, Any]) -> str:
+	return "pending_review" if result["decision"] == "require_review" else "active"
 
 
 def _now() -> str:

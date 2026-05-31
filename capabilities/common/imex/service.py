@@ -28,15 +28,15 @@ from contextlib import asynccontextmanager
 
 from uuid_extensions import uuid7str
 
-from models import (
+from .models import (
     ImportExportJob, JobExecution, SourceConfig, TargetConfig, SchemaMapping,
     ValidationRule, TransformationStep, ProcessingMetrics, DataQualityReport,
     Workflow, WorkflowStep, ConnectionTemplate, MonitoringAlert,
     JobStatus, JobType, DataFormat, SourceType, ValidationLevel,
     ErrorHandlingStrategy, ProcessingPriority
 )
-from database import DatabaseManager, DatabaseConfig, TransactionContext, DatabaseError
-from ai_intelligence import AIIntelligenceEngine, SchemaAnalysisResult, QualityAssessment
+from .database import DatabaseManager, DatabaseConfig, TransactionContext, DatabaseError
+from .ai_intelligence import AIIntelligenceEngine, SchemaAnalysisResult, QualityAssessment
 
 logger = logging.getLogger(__name__)
 

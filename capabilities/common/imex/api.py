@@ -87,15 +87,15 @@ from pydantic import BaseModel, Field, ValidationError
 from uuid_extensions import uuid7str
 from typing import Any, Dict, List, Optional
 
-from models import (
+from .models import (
     ImportExportJob, JobExecution, SourceConfig, TargetConfig, SchemaMapping,
     ValidationRule, TransformationStep, ProcessingMetrics, DataQualityReport,
     JobStatus, JobType, DataFormat, SourceType, ValidationLevel,
     ErrorHandlingStrategy, ProcessingPriority
 )
-from service import ImportExportService
-from database import DatabaseManager, DatabaseConfig
-from ai_intelligence import AIIntelligenceEngine
+from .service import ImportExportService
+from .database import DatabaseManager, DatabaseConfig
+from .ai_intelligence import AIIntelligenceEngine
 
 logger = logging.getLogger(__name__)
 generated_imex_service = ImexService()
@@ -1021,6 +1021,31 @@ def publish_generated_artifact(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def register_generated_transfer_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.register_transfer_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_imex_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return generated_imex_service.validate_imex_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload["event_stream"]),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "transfer_agent_batch"),
+		batch_id=payload.get("id"),
+	)
+
+
 def list_generated_jobs(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return generated_imex_service.list_jobs(tenant_id)
 
@@ -1031,6 +1056,14 @@ def list_generated_runs(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 
 def list_generated_artifacts(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return generated_imex_service.list_artifacts(tenant_id)
+
+
+def list_generated_transfer_agents(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_imex_service.list_transfer_agents(tenant_id)
+
+
+def list_generated_lifecycle_batches(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_imex_service.list_lifecycle_batches(tenant_id)
 
 
 def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:

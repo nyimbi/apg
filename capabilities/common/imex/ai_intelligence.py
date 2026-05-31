@@ -40,7 +40,7 @@ except ImportError:
     NUMPY_PANDAS_AVAILABLE = False
     logging.warning("NumPy/Pandas not available - using built-in statistics")
 
-from models import DataFormat, SourceType
+from .models import DataFormat, SourceType
 
 logger = logging.getLogger(__name__)
 

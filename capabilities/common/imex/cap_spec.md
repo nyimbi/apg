@@ -9,7 +9,8 @@ control plane for compiler-generated applications.
 - Display name: `Import/Export`
 - Generated runtime: `imex_runtime.ImexService`
 - Event stream adapter: `bytewax`
-- Primary dependencies: `etlp`, `conn`, `auth`, `audl`, `moni`, `keym`, `encr`
+- Primary dependencies: `etlp`, `conn`, `auth`, `audl`
+- Optional adapters: `moni`, `keym`, `encr`
 
 ## Executable Surface
 
@@ -29,7 +30,9 @@ control plane for compiler-generated applications.
 5. Execute a run.
 6. Complete the run.
 7. Publish retained artifacts.
-8. Replay or purge with guardrails.
+8. Register governed transfer agents.
+9. Validate lifecycle batches through Bytewax.
+10. Replay or purge with guardrails.
 
 ## Guardrails
 
@@ -39,4 +42,6 @@ checksums, mapping evidence, PII policy, destination approval, preview
 validation, production approval, encryption, monitoring, checkpointing, quality,
 quarantine, capacity, retry/replay, schedules, artifacts, retention, purge,
 owner transfer, ETLP plan linkage, CONN binding, audit, and final quality
-evidence.
+evidence. It also governs transfer-agent runtime, role, scope, owner, purpose,
+contribution disclosure, privileged-role approval, and Bytewax lifecycle-batch
+processing.

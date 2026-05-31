@@ -28,9 +28,13 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "imex"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["provides"] == ["import_export", "bulk_transfer", "transfer_agent_composition"]
+	assert contract["requires"] == ["etlp", "conn", "auth", "audl"]
 
 
 def test_app_entrypoint_is_publishable():
@@ -46,3 +50,6 @@ def test_app_entrypoint_is_publishable():
 	assert model["format"] == "apg.semantic-model.v1"
 	assert model["capabilities"]["imex"]["runtime"]["service"] == "imex_runtime.py"
 	assert model["capabilities"]["imex"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["imex"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["imex"]["agents"]["first_class"] is True
+	assert model["capabilities"]["imex"]["transfer_lifecycle"]["transfer_agent"] == "TransferAgentRecord"

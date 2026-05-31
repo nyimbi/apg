@@ -6,6 +6,30 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_IMEX_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_IMEX_AGENT_ROLES = [
+	"import_reviewer",
+	"export_reviewer",
+	"migration_reviewer",
+	"mapping_reviewer",
+	"quality_reviewer",
+	"artifact_reviewer",
+	"retention_reviewer",
+	"transfer_operator",
+	"data_steward",
+]
+PRIVILEGED_IMEX_AGENT_ROLES = [
+	"import_reviewer",
+	"export_reviewer",
+	"migration_reviewer",
+	"mapping_reviewer",
+	"quality_reviewer",
+	"artifact_reviewer",
+	"retention_reviewer",
+	"transfer_operator",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped IMEX configuration defaults and schema."""
@@ -68,6 +92,41 @@ class CapabilityConfiguration:
 			"key_vault": "keym",
 			"encryption_provider": "encr",
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_IMEX_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_IMEX_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_IMEX_AGENT_ROLES,
+			"scope_required": True,
+			"owner_required": True,
+			"purpose_required": True,
+			"contribution_disclosure_required": True,
+			"human_approval_required_for_privileged_roles": True,
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"required_processor": "bytewax",
+			"lifecycle_stream": "imex.lifecycle",
+			"watermark": "event_time",
+			"operations": [
+				"endpoint_batch",
+				"mapping_batch",
+				"job_batch",
+				"run_batch",
+				"artifact_batch",
+				"review_batch",
+				"transfer_agent_batch",
+			],
+			"topics": [
+				"imex.endpoints",
+				"imex.mappings",
+				"imex.jobs",
+				"imex.runs",
+				"imex.artifacts",
+				"imex.reviews",
+				"imex.agents",
+			],
+		},
 		"ui": {
 			"enable_dashboard": True,
 			"enable_job_designer": True,
@@ -80,6 +139,8 @@ class CapabilityConfiguration:
 			"enable_artifacts": True,
 			"enable_retention": True,
 			"enable_audit": True,
+			"enable_transfer_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True,
 			"enable_settings": True,
 		},
 		"theme": {
@@ -98,6 +159,8 @@ class CapabilityConfiguration:
 			"orchestration",
 			"observability",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme",
 		],
@@ -110,6 +173,8 @@ class CapabilityConfiguration:
 			"orchestration": {"type": "object"},
 			"observability": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"},
 		},
@@ -196,6 +261,8 @@ class CapabilityTheme:
 		"artifact_browser": {"visual": "file-grid", "status_indicator": "retention-chip"},
 		"retention_console": {"visual": "policy-table", "status_indicator": "expiry-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-pill"},
+		"transfer_agent_roster": {"visual": "agent-roster", "status_indicator": "approval-chip"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batches", "status_indicator": "processor-chip"},
 	})
 
 
@@ -232,6 +299,14 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule("connector_binding_required", "Endpoint-backed transfers require CONN connection binding.", {"operation": "create_job", "connector_binding_present": False}, {"decision": "deny", "reason": "connector_binding_required", "required_action": "attach_conn_binding"}),
 		CapabilityRule("audit_evidence_required", "Executed transfers require audit evidence.", {"operation": "complete_run", "audit_evidence_present": False}, {"decision": "deny", "reason": "audit_evidence_required", "required_action": "record_audit_evidence"}),
 		CapabilityRule("completion_quality_required", "Completed transfers require final quality score.", {"operation": "complete_run", "quality_score_present": False}, {"decision": "deny", "reason": "quality_score_required", "required_action": "record_quality_score"}),
+		CapabilityRule("transfer_agent_runtime_supported", "Transfer agents must use a supported runtime adapter.", {"operation": "register_transfer_agent", "agent_runtime_supported": False}, {"decision": "deny", "reason": "unsupported_transfer_agent_runtime", "required_action": "choose_supported_transfer_agent_runtime"}),
+		CapabilityRule("transfer_agent_role_supported", "Transfer agents must use a supported transfer role.", {"operation": "register_transfer_agent", "agent_role_supported": False}, {"decision": "deny", "reason": "unsupported_transfer_agent_role", "required_action": "choose_supported_transfer_agent_role"}),
+		CapabilityRule("transfer_agent_requires_scope", "Transfer agents require an explicit bounded scope.", {"operation": "register_transfer_agent", "scope_present": False}, {"decision": "deny", "reason": "transfer_agent_scope_required", "required_action": "declare_transfer_agent_scope"}),
+		CapabilityRule("transfer_agent_requires_owner", "Transfer agents require an accountable owner.", {"operation": "register_transfer_agent", "owner_present": False}, {"decision": "deny", "reason": "transfer_agent_owner_required", "required_action": "assign_transfer_agent_owner"}),
+		CapabilityRule("transfer_agent_requires_purpose", "Transfer agents require a documented purpose.", {"operation": "register_transfer_agent", "purpose_present": False}, {"decision": "deny", "reason": "transfer_agent_purpose_required", "required_action": "document_transfer_agent_purpose"}),
+		CapabilityRule("transfer_agent_requires_contribution_disclosure", "Transfer agents must disclose machine-authored transfer contributions.", {"operation": "register_transfer_agent", "contribution_disclosed": False}, {"decision": "deny", "reason": "transfer_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}),
+		CapabilityRule("transfer_agent_privileged_role_requires_human_approval", "Privileged transfer-agent roles require human approval evidence.", {"operation": "register_transfer_agent", "privileged_role": True, "human_approval_required": False}, {"decision": "require_review", "reason": "transfer_agent_human_approval_required", "required_action": "record_human_transfer_agent_approval"}),
+		CapabilityRule("bytewax_imex_stream_required", "IMEX lifecycle batches must be routed through Bytewax.", {"operation": "validate_imex_lifecycle_batch", "event_stream_ne": "bytewax"}, {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_imex_lifecycle_batch_to_bytewax"}),
 	]
 
 
@@ -249,16 +324,71 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("approvals", "/imex/approvals", "TransferApprovalQueue", "imex:approve", "Governance"),
 		CapabilityUIRoute("artifacts", "/imex/artifacts", "TransferArtifacts", "imex:view", "Operations"),
 		CapabilityUIRoute("audit", "/imex/audit", "TransferAuditTimeline", "imex:view", "Governance"),
+		CapabilityUIRoute("agents", "/imex/agents", "TransferAgentRoster", "imex:admin", "Governance"),
+		CapabilityUIRoute("lifecycle", "/imex/lifecycle", "TransferLifecycleBatchMonitor", "imex:view", "Operations"),
 		CapabilityUIRoute("settings", "/imex/settings", "IMEXSettings", "imex:admin", "Administration"),
 	]
 	return {"shell": "apg_python", "view_module": "view_models.py", "api_prefix": "/imex/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class transfer-agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_IMEX_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_IMEX_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_IMEX_AGENT_ROLES),
+		"requires": ["scope", "owner", "purpose", "contribution_disclosure"],
+		"approval": "human approval is required before privileged transfer agents mutate transfer state",
+		"external_runtimes_are_adapters": True,
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return IMEX lifecycle streaming metadata."""
+	return {
+		"engine": "bytewax",
+		"required_processor": "bytewax",
+		"lifecycle_stream": "imex.lifecycle",
+		"watermark": "event_time",
+		"operations": [
+			"endpoint_batch",
+			"mapping_batch",
+			"job_batch",
+			"run_batch",
+			"artifact_batch",
+			"review_batch",
+			"transfer_agent_batch",
+		],
+		"topics": [
+			"imex.endpoints",
+			"imex.mappings",
+			"imex.jobs",
+			"imex.runs",
+			"imex.artifacts",
+			"imex.reviews",
+			"imex.agents",
+		],
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable IMEX capability contract."""
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
-	return {"capability": "imex", "display_name": "Import/Export", "configuration": config.for_tenant(tenant_id, overrides), "configuration_schema": config.schema, "rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]}, "ui": ui_manifest(), "theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}}
+	return {
+		"capability": "imex",
+		"display_name": "Import/Export",
+		"provides": ["import_export", "bulk_transfer", "transfer_agent_composition"],
+		"requires": ["etlp", "conn", "auth", "audl"],
+		"configuration": config.for_tenant(tenant_id, overrides),
+		"configuration_schema": config.schema,
+		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+		"ui": ui_manifest(),
+		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
+	}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
@@ -273,6 +403,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_gt"):
 			if not context.get(key[:-3], 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

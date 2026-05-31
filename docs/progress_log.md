@@ -21290,3 +21290,68 @@ Not run to preserve battery:
   adapters, live APG gateway/registry integration, live Bytewax topology,
   rendered frontend/browser UI, external AI-agent runtime clients, and
   performance/load tests.
+
+### 2026-05-31 06:04 EAT
+
+IMEX transfer-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/imex` as the next data/integration capability
+  after CONN.
+- Extended the IMEX executable contract with first-class transfer-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported transfer-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and
+  contract-level `provides`/`requires`.
+- Added deterministic guardrails for unsupported transfer-agent runtime,
+  unsupported transfer-agent role, missing agent scope, owner, purpose, missing
+  machine contribution disclosure, privileged transfer-agent registration
+  without human approval, and non-Bytewax IMEX lifecycle batch routing.
+- Added `TransferAgentRecord`, `TransferLifecycleBatchRecord`,
+  tenant-qualified transfer-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, API helper payload
+  handling, transfer-agent roster view models, and lifecycle-batch monitor view
+  models.
+- Added `/imex/agents`, `/imex/lifecycle`, transfer-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Fixed package-relative imports in `api.py`, `service.py`, `database.py`, and
+  `ai_intelligence.py` so the IMEX API helper surface imports as a package.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/imex/__init__.py capabilities/common/imex/capability_contract.py capabilities/common/imex/imex_runtime.py capabilities/common/imex/api.py capabilities/common/imex/view_models.py capabilities/common/imex/app.py capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/imex/test_capability_contract.py capabilities/common/imex/tests/test_package_contract.py`
+  passed with 10 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/imex/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect imex --json` passed with `ok: true`,
+  14 APG Python routes, 38 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/imex --json`
+  passed with `ok: true`; IMEX remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/imex --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/imex -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "import capabilities.common.imex.api as api; print(api.capability_status()['capability'])"`
+  imported `api.py` successfully and returned `imex`.
+- `./.venv/bin/python -c "... ImexService ... register_transfer_agent ... validate_imex_lifecycle_batch ..."`
+  returned one `codex` migration reviewer with owner and purpose evidence,
+  human approval required, normalized role, and `bytewax` lifecycle-batch
+  evidence.
+- Focused stale-marker scan over touched IMEX packet source, docs, tests, and
+  evidence returned no matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live physical file transfer, live ETLP pipelines, live CONN source/target
+  connectors, live vault/encryption/audit/monitoring adapters, live Bytewax
+  topology, rendered browser UI, external AI-agent runtime clients, and
+  performance/load tests.
