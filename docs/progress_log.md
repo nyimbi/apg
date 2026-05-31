@@ -22175,3 +22175,72 @@ Not run to preserve battery:
   approval workflows, durable Bytewax topology, live KNGR/META/NLPC/GRPH/SRCH/
   AICR/CONF/AUTH/AUDL adapters, rendered browser UI, external AI-agent runtime
   clients, and performance/load/semantic-quality benchmarks.
+
+### 2026-05-31 08:44 EAT
+
+MFAU MFA-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/mfau` as the next ordered capability packet
+  after ONTO and preserved its adaptive authentication, enrollment, method,
+  device-trust, risk, challenge, recovery, backup-code, biometric, policy, and
+  audit lifecycle.
+- Extended the MFAU executable contract with first-class MFA security-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported MFA governance roles, privileged-role metadata, Bytewax lifecycle
+  stream metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported MFA-agent runtime,
+  unsupported MFA-agent role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged MFA-agent registration without human
+  approval, empty lifecycle batches, unsupported lifecycle operations, and
+  non-Bytewax MFAU lifecycle batch routing.
+- Added `MfauAgentRecord`, `MfauLifecycleBatchRecord`, tenant-qualified agent
+  storage, lifecycle-batch storage, registration, listing, audit events,
+  dashboard counts, MFA security-agent roster view models, and lifecycle-batch
+  monitor view models.
+- Added `/mfau/agents`, `/mfau/lifecycle`, MFA security-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract while keeping `package_manifest.json` in the APG
+  package-manifest shape required by publish-plan.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes, identity providers, factor providers, biometric services,
+  notification services, and durable Bytewax topologies behind adapter
+  boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/mfau/capability_contract.py capabilities/common/mfau/mfa_runtime.py capabilities/common/mfau/api.py capabilities/common/mfau/views.py capabilities/common/mfau/app.py capabilities/common/mfau/__init__.py capabilities/common/mfau/test_capability_contract.py capabilities/common/mfau/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/mfau/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/mfau/test_capability_contract.py capabilities/common/mfau/tests/test_package_contract.py`
+  passed with 8 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect mfau --json` passed with `ok: true`,
+  16 APG Python routes, 48 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/mfau --json`
+  passed with `ok: true`; MFAU remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mfau --json`
+  passed with `side_effect_free: true`.
+- `./.venv/bin/python -m json.tool capabilities/common/mfau/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/mfau/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/mfau/package_manifest.json`
+  passed.
+- `./.venv/bin/python -c "... MfauService ... register_mfa_agent ... validate_mfa_lifecycle_batch ..."`
+  returned one `codex` active MFA security agent and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched MFAU packet source, docs, tests, and
+  evidence returned only intentional Bytewax-not-Kafka documentation and
+  Kafka-denial tests.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live identity providers, factor providers, biometric services, notification
+  services, durable Bytewax topology, live AUTH/SECU/ENCR/AICR/CONF/AUDL
+  adapters, rendered browser UI, external AI-agent runtime clients, load
+  checks, migrations, authenticator interoperability, and risk-model quality
+  benchmarks.

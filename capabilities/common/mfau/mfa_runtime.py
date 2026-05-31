@@ -31,6 +31,51 @@ class MfauRecord:
 		return asdict(self)
 
 
+@dataclass
+class MfauAgentRecord:
+	"""Provider-neutral AI agent registered for MFA security governance."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def as_dict(self) -> dict[str, Any]:
+		data = asdict(self)
+		data["agent_id"] = self.id
+		return data
+
+
+@dataclass
+class MfauLifecycleBatchRecord:
+	"""Bytewax lifecycle batch validation evidence for MFA changes."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+	def as_dict(self) -> dict[str, Any]:
+		data = asdict(self)
+		data["batch_id"] = self.id
+		return data
+
+
 class MfauGuardrailError(ValueError):
 	"""Raised when an MFAU rule denies or requires review for an operation."""
 
@@ -53,7 +98,13 @@ class MfauService:
 		self._recoveries: dict[str, dict[str, Any]] = {}
 		self._backup_codes: dict[str, dict[str, Any]] = {}
 		self._policies: dict[str, dict[str, Any]] = {}
+		self._mfa_agents: dict[str, dict[str, Any]] = {}
+		self._lifecycle_batches: dict[str, dict[str, Any]] = {}
 		self._audit_events: list[dict[str, Any]] = []
+		self._agent_runtimes = set(self.contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(self.contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(self.contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(self.contract["streaming"]["required_operations"])
 
 	def describe(self) -> dict[str, Any]:
 		return {
@@ -61,6 +112,8 @@ class MfauService:
 			"display_name": self.contract["display_name"],
 			"routes": self.contract["ui"]["routes"],
 			"adapters": self.configuration["adapters"],
+			"agents": self.contract["agents"],
+			"streaming": self.contract["streaming"],
 			"rule_count": len(self.contract["rule_engine"]["rules"]),
 		}
 
@@ -412,6 +465,92 @@ class MfauService:
 		self._audit(tenant_id, "policy_changed", policy_id, audit_event_recorded=audit_event_recorded)
 		return record
 
+	def register_mfa_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self._raise_if_denied({
+			"operation": "register_mfa_agent",
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if not str(agent_id or "").strip():
+			raise ValueError("mfa_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("mfa_agent_name_required")
+		record = MfauAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		).as_dict()
+		self._mfa_agents[self._tenant_record_key(tenant_id, record["id"])] = record
+		self._audit(tenant_id, "mfa_agent_registered", record["id"], audit_event_recorded=True, decision=result["decision"], matched_rules=result["matched_rules"])
+		return record
+
+	def validate_mfa_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "mfa_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("mfa_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_mfa_lifecycle_operation:{operation_value}")
+		result = evaluate_capability_rules({
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "validate_mfa_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = MfauLifecycleBatchRecord(
+			id=batch_id or f"mfabatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		).as_dict()
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record["id"])] = record
+		self._audit(tenant_id, f"mfa_lifecycle_batch_{record['status']}", record["id"], audit_event_recorded=True, decision=result["decision"], matched_rules=result["matched_rules"])
+		if not accepted:
+			raise MfauGuardrailError(result)
+		return record
+
 	def list_profiles(self, tenant_id: str) -> list[dict[str, Any]]:
 		return self._tenant_records(self._profiles, tenant_id)
 
@@ -436,6 +575,12 @@ class MfauService:
 	def list_policies(self, tenant_id: str) -> list[dict[str, Any]]:
 		return self._tenant_records(self._policies, tenant_id)
 
+	def list_mfa_agents(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._mfa_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str) -> list[dict[str, Any]]:
+		return self._tenant_records(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str) -> list[dict[str, Any]]:
 		return [event for event in self._audit_events if event["tenant_id"] == tenant_id]
 
@@ -453,6 +598,10 @@ class MfauService:
 			"recovery_count": len(self.list_recoveries(tenant_id)),
 			"backup_code_set_count": len(self.list_backup_code_sets(tenant_id)),
 			"policy_count": len(self.list_policies(tenant_id)),
+			"mfa_agent_count": len(self.list_mfa_agents(tenant_id)),
+			"pending_agent_review_count": len([item for item in self.list_mfa_agents(tenant_id) if item["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([item for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -468,6 +617,8 @@ class MfauService:
 			"recoveries": self.list_recoveries(tenant_id),
 			"backup_codes": self.list_backup_code_sets(tenant_id),
 			"policies": self.list_policies(tenant_id),
+			"mfa_agents": self.list_mfa_agents(tenant_id),
+			"lifecycle_batches": self.list_lifecycle_batches(tenant_id),
 			"audit_events": self.list_audit_events(tenant_id),
 		}
 
@@ -479,6 +630,9 @@ class MfauService:
 
 	def _tenant_records(self, records: dict[str, dict[str, Any]], tenant_id: str) -> list[dict[str, Any]]:
 		return [record for record in records.values() if record["tenant_id"] == tenant_id]
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
 
 	def _get_tenant_record(self, records: dict[str, dict[str, Any]], record_id: str, tenant_id: str) -> dict[str, Any]:
 		record = records[record_id]
@@ -522,3 +676,7 @@ class MfauService:
 	def _backup_code_value(code_set_id: str, user_id: str, index: int) -> str:
 		digest = sha256(f"{code_set_id}:{user_id}:{index}".encode("utf-8")).hexdigest()
 		return f"{digest[:4]}-{digest[4:8]}"
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

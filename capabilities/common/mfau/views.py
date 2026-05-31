@@ -14,6 +14,8 @@ def route_manifest(tenant_id: str = "default") -> dict[str, Any]:
 		"capability": "mfau",
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"api_prefix": contract["ui"]["api_prefix"],
 	}
 
@@ -23,6 +25,9 @@ def dashboard_model(service: MfauService, tenant_id: str) -> dict[str, Any]:
 		"component": "MFAUDashboard",
 		"summary": service.dashboard_summary(tenant_id),
 		"recent_audit_events": service.list_audit_events(tenant_id)[-10:],
+		"mfa_agents": service.list_mfa_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"streaming": service.contract["streaming"],
 		"theme_component": "factor_stack",
 	}
 
@@ -125,7 +130,37 @@ def governance_model(service: MfauService, tenant_id: str) -> dict[str, Any]:
 		"component": "MFAUGovernance",
 		"configuration": service.configuration["governance"],
 		"adapters": service.configuration["adapters"],
+		"agents": service.contract["agents"],
+		"streaming": service.contract["streaming"],
+		"mfa_agents": service.list_mfa_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_event_count": len(service.list_audit_events(tenant_id)),
+	}
+
+
+def mfa_agent_roster_model(service: MfauService, tenant_id: str) -> dict[str, Any]:
+	agents = service.list_mfa_agents(tenant_id)
+	return {
+		"component": "MFASecurityAgentRoster",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": service.contract["agents"]["supported_runtimes"],
+		"supported_roles": service.contract["agents"]["supported_roles"],
+		"privileged_roles": service.contract["agents"]["privileged_roles"],
+		"theme_component": "mfa_agent_roster",
+	}
+
+
+def lifecycle_batch_model(service: MfauService, tenant_id: str) -> dict[str, Any]:
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"component": "MFAULifecycleBatchMonitor",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": service.contract["streaming"]["required_processor"],
+		"required_operations": service.contract["streaming"]["required_operations"],
+		"topics": service.contract["streaming"]["topics"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 
@@ -142,5 +177,7 @@ def settings_model(service: MfauService, tenant_id: str) -> dict[str, Any]:
 		"component": "MFAUSettings",
 		"tenant_id": tenant_id,
 		"configuration": service.configuration,
+		"agents": service.contract["agents"],
+		"streaming": service.contract["streaming"],
 		"route_manifest": route_manifest(tenant_id),
 	}

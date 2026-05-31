@@ -30,8 +30,10 @@ def test_package_contract_shape_is_valid():
 	assert contract["capability"] == "mfau"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["tokens"]["border.radius"]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 48
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 
 
 def test_package_app_entrypoint_is_publishable():
@@ -47,5 +49,7 @@ def test_package_app_entrypoint_is_publishable():
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "mfau" in model["capabilities"]
 	assert model["capabilities"]["mfau"]["runtime"]["service"] == "mfa_runtime.MfauService"
-	assert model["capabilities"]["mfau"]["streaming"]["engine"] == "bytewax"
-	assert len(model["capabilities"]["mfau"]["rules"]) >= 30
+	assert model["capabilities"]["mfau"]["agents"]["first_class"] is True
+	assert model["capabilities"]["mfau"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["mfau"]["mfa_lifecycle"]["lifecycle_batch"] == "MfauLifecycleBatchRecord"
+	assert len(model["capabilities"]["mfau"]["rules"]) >= 48

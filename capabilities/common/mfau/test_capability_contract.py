@@ -9,7 +9,9 @@ from capabilities.common.mfau.api import (
 	create_service,
 	enroll_method_endpoint,
 	health,
+	register_mfa_agent_endpoint,
 	register_profile_endpoint,
+	validate_mfa_lifecycle_batch_endpoint,
 )
 from capabilities.common.mfau.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.mfau.mfa_runtime import MfauGuardrailError, MfauService
@@ -22,7 +24,9 @@ from capabilities.common.mfau.views import (
 	device_trust_model,
 	enrollment_wizard_model,
 	governance_model,
+	lifecycle_batch_model,
 	method_registry_model,
+	mfa_agent_roster_model,
 	policy_studio_model,
 	profile_registry_model,
 	recovery_center_model,
@@ -38,13 +42,23 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["capability"] == "mfau"
 	assert contract["configuration"]["tenant_id"] == "tenant-auth"
 	assert contract["configuration"]["risk"]["high_risk_threshold"] == 0.8
-	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "profiles", "methods", "enrollment", "challenge", "risk", "devices", "recovery", "backup_codes", "policies", "biometrics", "security", "governance", "observability", "adapters", "ui", "theme"}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "profiles", "methods", "enrollment", "challenges", "risk", "devices", "recovery", "backup_codes", "policies", "biometrics", "governance", "audit", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "profiles", "methods", "enrollment", "challenge", "risk", "devices", "recovery", "backup_codes", "policies", "biometrics", "agents", "streaming", "security", "governance", "observability", "adapters", "ui", "theme"}
+	assert len(contract["rule_engine"]["rules"]) >= 48
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "profiles", "methods", "enrollment", "challenges", "risk", "devices", "recovery", "backup_codes", "policies", "biometrics", "governance", "agents", "lifecycle", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/mfau/api/v1"
+	assert contract["provides"] == ["multi_factor_authentication", "adaptive_authentication", "mfa_agent_composition"]
+	assert set(contract["requires"]) >= {"auth", "secu", "encr", "aicr", "conf", "audl"}
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "policy_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "mfau.lifecycle"
+	assert "mfa_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "risk_meter" in contract["theme"]["components"]
+	assert "mfa_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_adaptive_mfa_guardrails():
@@ -86,6 +100,30 @@ def test_rule_engine_enforces_adaptive_mfa_guardrails():
 		"operation": "batch_mfa_mutation",
 		"event_stream": "kafka",
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_mfa_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_mfa_lifecycle_batch",
+		"event_stream": "kafka",
+		"mutation_count": 1,
+	})
+	empty_batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_mfa_lifecycle_batch",
+		"event_stream": "bytewax",
+		"mutation_count": 0,
+	})
 	policy_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "change_policy",
@@ -115,6 +153,20 @@ def test_rule_engine_enforces_adaptive_mfa_guardrails():
 	}
 	assert batch_result["decision"] == "deny"
 	assert batch_result["matched_rules"] == ["batch_mfa_mutation_requires_bytewax"]
+	assert agent_result["decision"] == "deny"
+	assert {
+		"mfa_agent_runtime_supported",
+		"mfa_agent_role_supported",
+		"mfa_agent_requires_scope",
+		"mfa_agent_requires_owner",
+		"mfa_agent_requires_purpose",
+		"mfa_agent_requires_contribution_disclosure",
+		"mfa_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_mfa_stream_required"]
+	assert empty_batch_result["decision"] == "deny"
+	assert empty_batch_result["matched_rules"] == ["mfa_lifecycle_batch_requires_mutations"]
 	assert policy_result["decision"] == "deny"
 	assert policy_result["matched_rules"] == ["policy_change_requires_audit", "mfa_state_change_requires_audit"]
 	assert device_result["decision"] == "require_review"
@@ -132,6 +184,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["enrollment"] == "/mfau/enrollment"
 	assert "auth" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert registration["capabilities"]["mfa_agent_composition"]
+	assert registration["endpoints"]["agents"] == "/mfau/api/v1/agents"
 	assert registration["endpoints"]["audit"] == "/mfau/api/v1/audit"
 	assert "mfau:challenge" in registration["permissions"]
 	assert "mfau:audit" in registration["permissions"]
@@ -201,6 +257,25 @@ def test_mfau_lifecycle_is_executable():
 		tenant_id=tenant_id,
 		name="Strong MFA",
 	)
+	agent = service.register_mfa_agent(
+		agent_id="agent-risk-review",
+		tenant_id=tenant_id,
+		name="Risk reviewer",
+		runtime="codex",
+		role="risk_reviewer",
+		scope="high-risk MFA challenge review",
+		owner="security-team",
+		purpose="Review adaptive MFA challenge decisions",
+		contribution_disclosed=True,
+		human_approval_required=True,
+	)
+	batch = service.validate_mfa_lifecycle_batch(
+		tenant_id=tenant_id,
+		event_stream="bytewax",
+		mutation_count=3,
+		operation="mfa_agent_batch",
+		batch_id="mfabatch-risk",
+	)
 
 	assert profile["metadata"]["policy_id"] == "standard-mfa"
 	assert method["metadata"]["phishing_resistant"] is True
@@ -209,6 +284,11 @@ def test_mfau_lifecycle_is_executable():
 	assert recovery["status"] == "approved"
 	assert service.list_backup_code_sets(tenant_id)[0]["metadata"]["remaining"] == 2
 	assert policy["metadata"]["name"] == "Strong MFA"
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "risk_reviewer"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
+	assert batch["accepted"] is True
 
 	summary = service.dashboard_summary(tenant_id)
 	assert summary["profile_count"] == 1
@@ -216,9 +296,12 @@ def test_mfau_lifecycle_is_executable():
 	assert summary["completed_challenge_count"] == 1
 	assert summary["recovery_count"] == 1
 	assert summary["policy_count"] == 1
+	assert summary["mfa_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert summary["audit_event_count"] >= 8
 
 	assert dashboard_model(service, tenant_id)["summary"]["profile_count"] == 1
+	assert dashboard_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert profile_registry_model(service, tenant_id)["profiles"][0]["id"] == "profile-alice"
 	assert method_registry_model(service, tenant_id)["methods"][0]["id"] == "method-alice-webauthn"
 	assert enrollment_wizard_model(service, tenant_id)["steps"][0] == "select_user"
@@ -230,8 +313,12 @@ def test_mfau_lifecycle_is_executable():
 	assert policy_studio_model(service, tenant_id)["policies"][0]["id"] == "policy-strong"
 	assert biometric_consent_model(service, tenant_id)["requirements"]["consent_required"] is True
 	assert governance_model(service, tenant_id)["adapters"]["event_stream"] == "bytewax"
+	assert governance_model(service, tenant_id)["mfa_agents"][0]["id"] == "agent-risk-review"
+	assert mfa_agent_roster_model(service, tenant_id)["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert lifecycle_batch_model(service, tenant_id)["required_processor"] == "bytewax"
 	assert audit_timeline_model(service, tenant_id)["events"]
 	assert settings_model(service, tenant_id)["route_manifest"]["capability"] == "mfau"
+	assert settings_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert route_manifest(tenant_id)["api_prefix"] == "/mfau/api/v1"
 
 
@@ -269,6 +356,43 @@ def test_runtime_rejects_guardrail_violations():
 		)
 	assert "policy_change_requires_audit" in policy_error.value.result["matched_rules"]
 
+	with pytest.raises(MfauGuardrailError) as agent_error:
+		service.register_mfa_agent(
+			agent_id="agent-unsupported",
+			tenant_id=tenant_id,
+			name="Unsupported runtime",
+			runtime="bespoke-cli",
+			role="risk_reviewer",
+			scope="risk reviews",
+			owner="security",
+			purpose="Review MFA risk",
+		)
+	assert "mfa_agent_runtime_supported" in agent_error.value.result["matched_rules"]
+
+	pending_agent = service.register_mfa_agent(
+		agent_id="agent-policy",
+		tenant_id=tenant_id,
+		name="Policy reviewer",
+		runtime="codex",
+		role="policy_reviewer",
+		scope="MFA policy changes",
+		owner="security",
+		purpose="Review policy changes",
+		contribution_disclosed=True,
+		human_approval_required=False,
+	)
+	assert pending_agent["status"] == "pending_review"
+
+	with pytest.raises(ValueError, match="mfa_lifecycle_batch_empty"):
+		service.validate_mfa_lifecycle_batch(tenant_id, "bytewax", 0)
+
+	with pytest.raises(ValueError, match="unsupported_mfa_lifecycle_operation"):
+		service.validate_mfa_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+
+	with pytest.raises(MfauGuardrailError) as stream_error:
+		service.validate_mfa_lifecycle_batch(tenant_id, "kafka", 1, "mfa_agent_batch")
+	assert "bytewax_mfa_stream_required" in stream_error.value.result["matched_rules"]
+
 
 def test_api_helpers_wrap_runtime_operations():
 	service = create_service()
@@ -302,9 +426,30 @@ def test_api_helpers_wrap_runtime_operations():
 		"method_id": "method-api",
 		"assessment_id": risk["id"],
 	})
+	agent_response = register_mfa_agent_endpoint(service, {
+		"agent_id": "agent-api",
+		"tenant_id": tenant_id,
+		"name": "API risk reviewer",
+		"runtime": "codex",
+		"role": "risk_reviewer",
+		"scope": "api auth risk",
+		"owner": "security",
+		"purpose": "Review API authentication risk",
+		"human_approval_required": True,
+	})
+	lifecycle_response = validate_mfa_lifecycle_batch_endpoint(service, {
+		"batch_id": "batch-api",
+		"tenant_id": tenant_id,
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "mfa_agent_batch",
+	})
 
 	assert profile_response["ok"] is True
 	assert device_response["ok"] is True
 	assert method_response["ok"] is True
 	assert challenge_response["ok"] is True
+	assert agent_response["ok"] is True
+	assert lifecycle_response["ok"] is True
 	assert health(service, tenant_id)["summary"]["challenge_count"] == 1
+	assert health(service, tenant_id)["streaming"]["required_processor"] == "bytewax"

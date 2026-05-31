@@ -23,12 +23,14 @@ MFAU makes multi-factor authentication a first-class APG capability. It must let
 8. Generate backup codes and enforce single-use code consumption.
 9. Disable or rotate methods only when safety prerequisites are met.
 10. Change MFA policies only with audit evidence.
-11. Deny cross-tenant access.
-12. Route batch MFA mutation through Bytewax.
+11. Register first-class MFA security agents for enrollment, risk, challenge, recovery, policy, device-trust, and biometric review.
+12. Validate Bytewax lifecycle batches for profile, method, device, risk, challenge, recovery, backup-code, policy, biometric, and agent changes.
+13. Deny cross-tenant access.
+14. Route batch MFA mutation through Bytewax.
 
 ## Configuration
 
-The capability contract must define configuration sections for tenant context, profiles, methods, enrollment, challenges, risk, devices, recovery, backup codes, policies, biometrics, security, governance, observability, adapters, UI, and theme.
+The capability contract must define configuration sections for tenant context, profiles, methods, enrollment, challenges, risk, devices, recovery, backup codes, policies, biometrics, agents, streaming, security, governance, observability, adapters, UI, and theme.
 
 Required adapters:
 
@@ -46,6 +48,8 @@ Required adapters:
 - `computer_vision`: `cvsn`
 - `cache`: `cach`
 - `metrics_sink`: `moni`
+
+External AI-agent runtimes such as Codex, Claude Code, opencode, and Pi are adapter concerns. MFAU owns the provider-neutral agent registration contract, bounded scope, accountable owner, purpose, machine-contribution disclosure, and privileged-role human-review gates.
 
 ## Rule Engine
 
@@ -75,6 +79,8 @@ The minimum rule coverage is:
 - policy audit
 - external risk signals
 - Bytewax batch mutation
+- MFA security-agent runtime, role, scope, owner, purpose, contribution-disclosure, and privileged-role review
+- Bytewax lifecycle batch processor and operation gates
 - cross-tenant denial
 - state-change audit
 
@@ -117,10 +123,12 @@ The UI must expose route metadata for:
 - policies
 - biometrics
 - governance
+- agents
+- lifecycle
 - audit
 - settings
 
-Each route must include a path, component, permission, and navigation group. Theme components must cover factor stacks, profile cards, method cards, challenge panels, risk meters, device trust, enrollment, recovery, backup codes, policy editing, biometric consent, and audit timelines.
+Each route must include a path, component, permission, and navigation group. Theme components must cover factor stacks, profile cards, method cards, challenge panels, risk meters, device trust, enrollment, recovery, backup codes, policy editing, biometric consent, MFA security-agent rosters, Bytewax lifecycle panels, and audit timelines.
 
 ## Security and Governance Requirements
 
@@ -132,11 +140,13 @@ Each route must include a path, component, permission, and navigation group. The
 - Recovery actions require verified channels and audit evidence.
 - Admin-assisted recovery requires approval.
 - Batch state changes use Bytewax.
+- MFA security agents are first-class but provider-neutral; external runtime clients plug in through AICR.
+- Lifecycle batches are Bytewax-first and must not require Kafka or broker-core coupling.
 
 ## Acceptance Criteria
 
-- The capability contract exposes at least 30 rules and at least 12 UI routes.
+- The capability contract exposes at least 48 rules, at least 16 UI routes, first-class MFA security agents, and Bytewax lifecycle metadata.
 - The generated semantic model is built from the live contract.
 - `app.self_test()` fails if routes, rules, adapters, or runtime metadata become stale.
-- Focused tests exercise the contract, rule engine, runtime lifecycle, API helpers, UI helpers, and package entrypoint.
+- Focused tests exercise the contract, rule engine, runtime lifecycle, agent guardrails, lifecycle batches, API helpers, UI helpers, and package entrypoint.
 - Capability documentation explains usage, configuration, UI composition, and integration boundaries.

@@ -3,6 +3,7 @@
 ## Scope
 
 Build MFAU as a coherent lifecycle and guardrail packet: specification, contract, deterministic runtime, dependency-light API helpers, dependency-light UI helpers, semantic model, package metadata, tests, and progress log.
+This packet extends that surface with first-class MFA security-agent composition and Bytewax lifecycle-batch validation while keeping live identity providers, factor providers, biometric services, notification services, and AI-agent runtimes behind adapters.
 
 ## Steps
 
@@ -13,17 +14,20 @@ Build MFAU as a coherent lifecycle and guardrail packet: specification, contract
 
 2. Complete the executable contract.
    - Ensure configuration covers profiles, methods, enrollment, challenge, risk, devices, recovery, backup codes, policies, biometrics, governance, observability, adapters, UI, and theme.
+   - Add first-class agent and streaming sections for provider-neutral security assistants and Bytewax lifecycle batches.
    - Keep Bytewax as the event-stream adapter.
    - Keep rules deterministic and compatible with generated apps.
 
 3. Implement generated-app runtime.
    - Add `MfauService` for tenant-scoped profile, method, device, risk, challenge, recovery, backup code, policy, and audit operations.
+   - Add security-agent and lifecycle-batch records with tenant-qualified storage, audit evidence, list helpers, package output, and dashboard counts.
    - Reject unsafe operations through the rule engine.
    - Return serializable dictionaries for compiler output and example apps.
 
 4. Implement dependency-light API and UI surfaces.
    - Replace framework-bound API code with helper functions that can be wrapped by generated apps.
    - Replace framework-bound views with UI model helper functions that expose route-ready data.
+   - Add agent registration, lifecycle validation, agent roster, and lifecycle monitor helpers.
 
 5. Build package metadata from the live contract.
    - Update `app.py` to construct semantic model data dynamically.
@@ -45,3 +49,4 @@ Build MFAU as a coherent lifecycle and guardrail packet: specification, contract
 - UI helpers do not depend on Flask-AppBuilder.
 - Package metadata is derived from the live contract.
 - Tests cover the packet rather than isolated lines.
+- Agent runtimes remain provider-neutral and lifecycle batches remain Bytewax-first.

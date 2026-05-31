@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "mfau"
 __capability_name__ = "Multi-Factor Authentication"
-__apg_dependencies__ = ["auth", "secu", "encr"]
+__apg_dependencies__ = ["auth", "secu", "encr", "aicr", "conf", "audl"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "mfau",
@@ -35,6 +35,8 @@ capability_metadata: dict[str, Any] = {
 		"backup_codes",
 		"policy_management",
 		"phishing_resistant_auth",
+		"mfa_agent_composition",
+		"bytewax_lifecycle_batches",
 	],
 	"permissions": [
 		"mfau:view",
@@ -62,7 +64,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "ntfy", "cvsn", "biop", "cach", "moni"],
+		"optional_dependencies": ["ntfy", "cvsn", "biop", "cach", "moni"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -76,6 +78,8 @@ def register_capability() -> dict[str, Any]:
 			"recovery_governance": "Govern recovery channels, backup methods, and escalation flows",
 			"backup_codes": "Generate and consume single-use backup code sets",
 			"policy_management": "Manage MFA policy changes with audit evidence",
+			"mfa_agent_composition": "Compose Codex, Claude Code, opencode, and Pi style MFA security agents behind provider-neutral guardrails",
+			"bytewax_lifecycle_batches": "Validate MFA lifecycle batches through Bytewax-first processor contracts",
 			"capability_rules": "Evaluate deterministic MFA governance rules",
 			"visual_theming": "Apply adaptive-auth console theme tokens and components"
 		},
@@ -91,9 +95,13 @@ def register_capability() -> dict[str, Any]:
 			"backup_codes": "/mfau/api/v1/backup-codes",
 			"policies": "/mfau/api/v1/policies",
 			"biometrics": "/mfau/api/v1/biometrics",
+			"agents": "/mfau/api/v1/agents",
+			"lifecycle": "/mfau/api/v1/lifecycle",
 			"audit": "/mfau/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],

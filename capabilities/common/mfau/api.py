@@ -20,6 +20,8 @@ def health(service: MfauService, tenant_id: str = "default") -> dict[str, Any]:
 		"capability": "mfau",
 		"tenant_id": tenant_id,
 		"rule_count": service.describe()["rule_count"],
+		"agents": service.describe()["agents"],
+		"streaming": service.describe()["streaming"],
 		"summary": summary,
 	}
 
@@ -138,6 +140,31 @@ def policy_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, 
 		tenant_id=payload["tenant_id"],
 		name=payload["name"],
 		audit_event_recorded=payload.get("audit_event_recorded", True),
+	))
+
+
+def register_mfa_agent_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.register_mfa_agent(
+		agent_id=payload["agent_id"],
+		tenant_id=payload["tenant_id"],
+		name=payload["name"],
+		runtime=payload["runtime"],
+		role=payload["role"],
+		scope=payload["scope"],
+		owner=payload["owner"],
+		purpose=payload["purpose"],
+		contribution_disclosed=payload.get("contribution_disclosed", True),
+		human_approval_required=payload.get("human_approval_required", False),
+	))
+
+
+def validate_mfa_lifecycle_batch_endpoint(service: MfauService, payload: dict[str, Any]) -> dict[str, Any]:
+	return _wrap(lambda: service.validate_mfa_lifecycle_batch(
+		tenant_id=payload["tenant_id"],
+		event_stream=payload.get("event_stream", "bytewax"),
+		mutation_count=payload.get("mutation_count", 1),
+		operation=payload.get("operation", "mfa_agent_batch"),
+		batch_id=payload.get("batch_id"),
 	))
 
 

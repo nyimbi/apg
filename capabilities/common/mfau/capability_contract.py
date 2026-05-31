@@ -7,6 +7,30 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_MFA_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_MFA_AGENT_ROLES = [
+	"enrollment_reviewer",
+	"risk_reviewer",
+	"challenge_reviewer",
+	"device_trust_reviewer",
+	"recovery_reviewer",
+	"policy_reviewer",
+	"biometric_reviewer",
+	"backup_code_reviewer",
+	"lifecycle_batch_reviewer",
+	"mfa_security_steward",
+]
+PRIVILEGED_MFA_AGENT_ROLES = [
+	"risk_reviewer",
+	"challenge_reviewer",
+	"recovery_reviewer",
+	"policy_reviewer",
+	"biometric_reviewer",
+	"lifecycle_batch_reviewer",
+	"mfa_security_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"profiles": {
@@ -71,6 +95,49 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"template_encryption_required": True,
 		"liveness_check_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_MFA_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_MFA_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_MFA_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_mfa_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "mfau.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"profile_batch",
+			"method_batch",
+			"device_batch",
+			"risk_batch",
+			"challenge_batch",
+			"recovery_batch",
+			"backup_code_batch",
+			"policy_batch",
+			"biometric_batch",
+			"mfa_agent_batch",
+		],
+		"topics": [
+			"mfau.profiles",
+			"mfau.methods",
+			"mfau.devices",
+			"mfau.risk",
+			"mfau.challenges",
+			"mfau.recovery",
+			"mfau.backup_codes",
+			"mfau.policies",
+			"mfau.biometrics",
+			"mfau.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"security": {
 		"cross_tenant_access_allowed": False,
 		"rbac_required": True,
@@ -120,6 +187,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_backup_codes": True,
 		"enable_policies": True,
 		"enable_governance": True,
+		"enable_mfa_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -141,6 +210,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"backup_codes",
 		"policies",
 		"biometrics",
+		"agents",
+		"streaming",
 		"security",
 		"governance",
 		"observability",
@@ -159,6 +230,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"backup_codes",
 		"policies",
 		"biometrics",
+		"agents",
+		"streaming",
 		"security",
 		"governance",
 		"observability",
@@ -209,6 +282,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_mfa_mutation_requires_bytewax", "description": "Batch MFA mutations must use Bytewax event streams.", "condition": {"operation": "batch_mfa_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_mfa_access_denied", "description": "MFA operations may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_mfa_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "mfa_state_change_requires_audit", "description": "MFA state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "mfa_agent_runtime_supported", "description": "MFA security agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_mfa_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_mfa_agent_runtime", "required_action": "choose_supported_mfa_agent_runtime"}},
+	{"name": "mfa_agent_role_supported", "description": "MFA security agents must use supported security governance roles.", "condition": {"operation": "register_mfa_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_mfa_agent_role", "required_action": "choose_supported_mfa_agent_role"}},
+	{"name": "mfa_agent_requires_scope", "description": "MFA security agents require an explicit bounded enrollment, risk, challenge, device, recovery, policy, biometric, backup-code, or lifecycle scope.", "condition": {"operation": "register_mfa_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "mfa_agent_scope_required", "required_action": "declare_mfa_agent_scope"}},
+	{"name": "mfa_agent_requires_owner", "description": "MFA security agents require an accountable owner.", "condition": {"operation": "register_mfa_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "mfa_agent_owner_required", "required_action": "assign_mfa_agent_owner"}},
+	{"name": "mfa_agent_requires_purpose", "description": "MFA security agents require a documented purpose.", "condition": {"operation": "register_mfa_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "mfa_agent_purpose_required", "required_action": "document_mfa_agent_purpose"}},
+	{"name": "mfa_agent_requires_contribution_disclosure", "description": "MFA security agents must disclose machine-authored authentication, risk, recovery, and policy-review contributions.", "condition": {"operation": "register_mfa_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "mfa_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "mfa_agent_privileged_role_requires_human_approval", "description": "Privileged MFA security-agent roles require human approval evidence.", "condition": {"operation": "register_mfa_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "mfa_agent_human_approval_required", "required_action": "record_human_mfa_agent_approval"}},
+	{"name": "mfa_lifecycle_batch_requires_mutations", "description": "MFAU lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_mfa_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "mfa_lifecycle_batch_empty", "required_action": "include_mfa_lifecycle_mutations"}},
+	{"name": "bytewax_mfa_stream_required", "description": "MFAU lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_mfa_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_mfa_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -225,6 +307,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "policies", "path": "/mfau/policies", "component": "MFAPolicyStudio", "permission": "mfau:admin", "nav_group": "Governance"},
 	{"name": "biometrics", "path": "/mfau/biometrics", "component": "MFABiometricConsent", "permission": "mfau:manage_methods", "nav_group": "Methods"},
 	{"name": "governance", "path": "/mfau/governance", "component": "MFAUGovernance", "permission": "mfau:admin", "nav_group": "Governance"},
+	{"name": "agents", "path": "/mfau/agents", "component": "MFASecurityAgentRoster", "permission": "mfau:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/mfau/lifecycle", "component": "MFAULifecycleBatchMonitor", "permission": "mfau:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/mfau/audit", "component": "MFAAuditTrail", "permission": "mfau:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/mfau/settings", "component": "MFAUSettings", "permission": "mfau:admin", "nav_group": "Administration"},
 ]
@@ -257,9 +341,67 @@ THEME: dict[str, Any] = {
 		"backup_code_panel": {"visual": "single-use-code-list", "status_style": "remaining-chip"},
 		"policy_editor": {"visual": "policy-rule-builder", "status_style": "audit-chip"},
 		"biometric_consent": {"visual": "consent-evidence-panel", "status_style": "consent-chip"},
+		"mfa_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "assurance-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "security-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class MFAU agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_MFA_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_MFA_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_MFA_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_mfa_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the MFAU Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "mfau.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"profile_batch",
+			"method_batch",
+			"device_batch",
+			"risk_batch",
+			"challenge_batch",
+			"recovery_batch",
+			"backup_code_batch",
+			"policy_batch",
+			"biometric_batch",
+			"mfa_agent_batch",
+		],
+		"topics": [
+			"mfau.profiles",
+			"mfau.methods",
+			"mfau.devices",
+			"mfau.risk",
+			"mfau.challenges",
+			"mfau.recovery",
+			"mfau.backup_codes",
+			"mfau.policies",
+			"mfau.biometrics",
+			"mfau.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -271,6 +413,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mfau",
 		"display_name": "Multi-Factor Authentication",
+		"provides": ["multi_factor_authentication", "adaptive_authentication", "mfa_agent_composition"],
+		"requires": ["auth", "secu", "encr", "aicr", "conf", "audl"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -282,6 +426,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 
