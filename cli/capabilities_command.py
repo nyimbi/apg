@@ -24,6 +24,7 @@ from compiler.capability_publish import (
 from compiler.capability_operability import audit_capability_operability
 from compiler.capability_materializer import materialize_capability_packages
 from compiler.capability_implementation import audit_capability_implementation
+from compiler.capability_lifecycle import audit_capability_lifecycle
 
 
 CAPABILITY_SCAFFOLD_FORMAT = "apg.capability-scaffold-report.v1"
@@ -1070,6 +1071,33 @@ def implementation_audit(strict: bool, root: Path | None, as_json: bool) -> None
 			f"{summary['mixed_implementation_count']} mixed, "
 			f"{summary['contract_only_count']} contract-only, "
 			f"{summary['materialized_baseline_count']} materialized baseline package(s)"
+		)
+		for warning in report["warnings"][:10]:
+			click.echo(f"  warning: {warning}")
+		if len(report["warnings"]) > 10:
+			click.echo(f"  ... {len(report['warnings']) - 10} more warning(s)")
+		for error in report["errors"]:
+			click.echo(f"  error: {error}")
+	if not report["ok"]:
+		raise click.exceptions.Exit(1)
+
+
+@capabilities.command(name="lifecycle-audit")
+@click.option("--root", type=click.Path(path_type=Path), default=None, help="Capability root directory to audit")
+@click.option("--json", "as_json", is_flag=True, help="Emit apg.capability-lifecycle-audit.v1 JSON")
+def lifecycle_audit(root: Path | None, as_json: bool) -> None:
+	"""Audit capability specification, plan, implementation, test, release, and review evidence."""
+	report = audit_capability_lifecycle(root=root)
+	if as_json:
+		click.echo(json.dumps(report, indent=2, sort_keys=True))
+	else:
+		summary = report["summary"]
+		status = "OK" if report["ok"] else "FAILED"
+		click.echo(
+			f"Capability lifecycle audit {status}: "
+			f"{summary['complete_lifecycle_count']}/{summary['capability_count']} complete, "
+			f"{summary['test_surface_count']} test surface(s), "
+			f"{summary['release_evidence_count']} release evidence record(s)"
 		)
 		for warning in report["warnings"][:10]:
 			click.echo(f"  warning: {warning}")

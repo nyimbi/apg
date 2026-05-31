@@ -198,6 +198,11 @@ APG currently has an executable compiler path:
   packages from mixed packages, contract-only packages, and packages that still
   contain materialized baseline service/model/API/view markers; add `--strict`
   when those implementation gaps should block a capacity-readiness gate;
+- capability lifecycle evidence can be audited with
+  `apg capabilities lifecycle-audit --json`, which emits
+  `apg.capability-lifecycle-audit.v1` by checking specification, plan, README,
+  cap spec, implementation artifacts, focused tests, release evidence, and
+  code-review readiness for every registered package;
 - new package-backed capability skeletons can be created with
   `apg capabilities scaffold <domain> <code> --name ... --json`, which emits
   `apg.capability-scaffold-report.v1` and writes a valid spec-backed contract,
@@ -1244,6 +1249,7 @@ apg capabilities contracts --json
 apg capabilities validate-contracts
 apg capabilities audit --json
 apg capabilities implementation-audit --json
+apg capabilities lifecycle-audit --json
 apg capabilities materialize-packages --json
 apg capabilities list
 ```
@@ -1261,6 +1267,10 @@ should report zero package gaps. `apg capabilities implementation-audit
 --json` is the next depth gate: it reports which complete packages are still
 materialized baselines, mixed implementations, contract-only packages, and
 which packages have domain-specific implementation files.
+`apg capabilities lifecycle-audit --json` is the methodical-cycle gate: it
+proves that registered packages have specification, plan, README, cap spec,
+implementation artifacts, focused tests, release evidence, and code-review
+readiness before a full capability-development milestone is claimed.
 `apg capabilities publish-plan <package-dir> --json`
 emits `apg.capability-publish-report.v1`: it loads the package entrypoint,
 validates the manifest, proves the manifest is publishable, returns the catalog

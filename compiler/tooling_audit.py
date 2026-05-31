@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 from compiler.baseline import build_compiler_baseline_report
 from compiler.capability_implementation import audit_capability_implementation
+from compiler.capability_lifecycle import audit_capability_lifecycle
 from compiler.capability_operability import audit_capability_operability
 from compiler.diagnostics import audit_diagnostic_fixtures
 from compiler.doctor import build_doctor_report
@@ -64,7 +65,7 @@ REQUIRED_TOP_LEVEL_COMMANDS = [
 ]
 
 REQUIRED_COMMAND_GROUPS = {
-	"capabilities": ["audit", "catalog", "contracts", "evaluate-rules", "implementation-audit", "inspect", "list", "materialize-packages", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
+	"capabilities": ["audit", "catalog", "contracts", "evaluate-rules", "implementation-audit", "inspect", "lifecycle-audit", "list", "materialize-packages", "publish-apply", "publish-plan", "scaffold", "validate-contracts"],
 	"deployment": ["verify"],
 	"docs": ["audit"],
 	"hygiene": ["audit"],
@@ -125,6 +126,7 @@ def _fixture_audits() -> list[FixtureAudit]:
 		("graph", "apg.graph-fixture-audit.v1", audit_graph_fixtures),
 		("capability_operability", "apg.capability-operability-audit.v1", audit_capability_operability),
 		("capability_implementation", "apg.capability-implementation-audit.v1", audit_capability_implementation),
+		("capability_lifecycle", "apg.capability-lifecycle-audit.v1", audit_capability_lifecycle),
 		("compiler_baseline", "apg.compiler-baseline-report.v1", audit_compiler_baseline),
 		("repository_hygiene", "apg.repository-hygiene-audit.v1", audit_repository_hygiene),
 		("doctor", "apg.doctor-report.v1", build_doctor_report),

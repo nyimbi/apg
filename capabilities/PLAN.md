@@ -15,6 +15,7 @@ Baseline commands:
 ./.venv/bin/apg capabilities list --json
 ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities lifecycle-audit --json
 ./.venv/bin/apg tooling audit --json
 ```
 
@@ -124,6 +125,7 @@ been reviewed through this cycle and the repository still passes:
 ```bash
 ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities lifecycle-audit --json
 ./.venv/bin/apg tooling audit --json
 ./.venv/bin/apg docs audit --json
 ```

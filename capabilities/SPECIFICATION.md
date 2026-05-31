@@ -135,6 +135,7 @@ Repository-wide capability readiness requires:
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities lifecycle-audit --json
 ./.venv/bin/apg tooling audit --json
 ```
 
@@ -143,6 +144,9 @@ The repository target is:
 - 109/109 contracts valid and operable;
 - 109/109 package artifacts complete;
 - 109/109 packages classified as domain-specific;
+- 109/109 packages passing lifecycle evidence for specification, plan, README,
+  cap spec, implementation artifacts, focused tests, release evidence, and
+  code-review readiness;
 - 0 materialized-baseline packages;
 - 0 mixed or contract-only packages;
 - 0 package gaps, errors, or warnings.

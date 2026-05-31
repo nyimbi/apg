@@ -23355,3 +23355,66 @@ Known gaps:
   hygiene slice.
 - Existing dependency deprecation warnings from SQLAlchemy and Pydantic remain
   outside this slice.
+
+### 2026-06-01 02:28 EAT
+
+Capability lifecycle audit guardrail slice:
+
+- Added `apg capabilities lifecycle-audit --json` so APG can prove the
+  methodical capability-development cycle across registered packages instead
+  of relying on prose or manual inspection.
+- The lifecycle audit checks each capability for `SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, `cap_spec.md`, implementation artifacts, focused test files,
+  release/self-test evidence, semantic model evidence, package manifest
+  evidence, rule count, route count, theme tokens, and configuration schema
+  readiness.
+- Wired the lifecycle audit into the aggregate tooling audit as the
+  `capability_lifecycle` surface.
+- Updated capability catalog docs and contributor/tooling guidance to use the
+  lifecycle audit as the SPECIFICATION -> PLAN -> implementation -> review
+  readiness gate.
+- Added CLI and tooling regression coverage for the new report format and
+  aggregate surface.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile compiler/capability_lifecycle.py cli/capabilities_command.py compiler/tooling_audit.py tests/test_cli_capability_operability.py tests/test_tooling_audit.py`
+  passed.
+- `./.venv/bin/apg capabilities lifecycle-audit --json` passed with
+  `ok: true`, 109 capabilities, 109 complete lifecycle records, 109
+  specifications, 109 plans, 109 READMEs, 109 implementation records, 109 test
+  surfaces, 109 release-evidence records, 109 code-review-ready records,
+  0 warnings, and 0 errors.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/accs --json`
+  passed for the package-scoped mode with one complete lifecycle record.
+- `./.venv/bin/pytest -q tests/test_cli_capability_operability.py tests/test_tooling_audit.py`
+  passed with 10 tests.
+- `./.venv/bin/apg docs audit --json` passed with 15 required docs, 61 valid
+  local links, 49 documented command groups, and 0 violations.
+- `./.venv/bin/apg tooling audit --json` passed all 21 tooling surfaces,
+  including the new `capability_lifecycle` surface, repository hygiene,
+  compiler baseline, docs, capability operability, and capability
+  implementation.
+- `git diff --check` passed.
+
+Code review:
+
+- Reviewed the audit contract against the user-requested lifecycle sequence.
+  The new command does not claim live provider, rendered UI, or performance
+  readiness; it proves the repository evidence needed to know every capability
+  has the required development-cycle artifacts and review-ready contract
+  surfaces.
+- Reviewed CLI and tooling integration for stable JSON format names and
+  subcommand discoverability.
+- Attempted to spawn a separate review agent, but the session already had the
+  maximum open agent thread slots from prior shutdown agents; completed a
+  direct review instead.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live adapters,
+  live Bytewax topology, or performance checks during this battery-conscious
+  guardrail slice.
+- The `code_review_ready` lifecycle field proves review readiness from package
+  evidence and contract surfaces; it is not a substitute for human or agent
+  review of every future behavior change.

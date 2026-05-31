@@ -25,6 +25,7 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 		"semantic_model",
 		"graph",
 		"capability_implementation",
+		"capability_lifecycle",
 		"capability_operability",
 		"compiler_baseline",
 		"repository_hygiene",
@@ -42,9 +43,11 @@ def test_tooling_audit_covers_fixture_cli_ide_and_studio_surfaces():
 		assert surfaces[surface_name]["format_ok"] is True
 	assert surfaces["capability_operability"]["summary"]["inoperable_contract_count"] == 0
 	assert surfaces["capability_implementation"]["summary"]["capability_count"] >= 100
+	assert surfaces["capability_lifecycle"]["summary"]["complete_lifecycle_count"] >= 100
+	assert surfaces["capability_lifecycle"]["summary"]["incomplete_lifecycle_count"] == 0
 	assert surfaces["compiler_baseline"]["summary"]["passed_examples"] == 20
 	assert surfaces["compiler_baseline"]["summary"]["failed_examples"] == 0
-	assert report["summary"]["surface_count"] == 20
+	assert report["summary"]["surface_count"] == 21
 	assert report["summary"]["blocking_gap_count"] == 0
 
 

@@ -92,6 +92,7 @@ Use this exact sequence:
    ```bash
    ./.venv/bin/pytest -q capabilities/<domain>/<code>/test_capability_contract.py capabilities/<domain>/<code>/tests
    ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/<domain>/<code> --json
    ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
    ```
 
@@ -767,9 +768,11 @@ Run:
 ```bash
 ./.venv/bin/apg capabilities implementation-audit --json
 ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
+./.venv/bin/apg capabilities lifecycle-audit --json
 ```
 
-Use the audit output as the burn-down board for package depth.
+Use the audit output as the burn-down board for package depth and methodical
+specification/plan/implementation/review evidence.
 
 ## From Capacity To Package Backlog
 

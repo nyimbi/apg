@@ -470,6 +470,7 @@ These commands are the fastest way to orient yourself:
 | Which capabilities exist? | `./.venv/bin/apg capabilities list --json` |
 | What does one capability expose? | `./.venv/bin/apg capabilities inspect capabilities/<domain>/<code> --json` |
 | Which packages need implementation depth? | `./.venv/bin/apg capabilities implementation-audit --json` |
+| Has the capability lifecycle evidence been completed? | `./.venv/bin/apg capabilities lifecycle-audit --json` |
 | Is one package publishable? | `./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json` |
 | Are docs navigable and commands known? | `./.venv/bin/apg docs audit --json` |
 | Are tooling contracts healthy? | `./.venv/bin/apg tooling audit --json` |
@@ -493,6 +494,7 @@ Use this routine before deepening a package:
 
    ```bash
    ./.venv/bin/apg capabilities implementation-audit --root capabilities/<domain>/<code> --json
+   ./.venv/bin/apg capabilities lifecycle-audit --root capabilities/<domain>/<code> --json
    ./.venv/bin/apg capabilities publish-plan capabilities/<domain>/<code> --json
    ```
 

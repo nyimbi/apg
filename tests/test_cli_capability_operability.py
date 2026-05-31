@@ -124,3 +124,27 @@ def test_capabilities_audit_executes_all_contract_rule_surfaces_as_json():
 	probes = {probe["name"]: probe for probe in records["composition_events"]["rule_probes"]}
 	assert {"read_allowed", "write_without_tenant", "high_risk_without_review"} <= set(probes)
 	assert all(probe["ok"] for probe in probes.values())
+
+
+def test_capabilities_lifecycle_audit_proves_development_cycle_as_json():
+	result = CliRunner().invoke(cli, ["capabilities", "lifecycle-audit", "--json"])
+
+	assert result.exit_code == 0, result.output
+	payload = json.loads(result.output)
+
+	assert payload["format"] == "apg.capability-lifecycle-audit.v1"
+	assert payload["ok"] is True
+	assert payload["summary"]["capability_count"] >= 100
+	assert payload["summary"]["complete_lifecycle_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["incomplete_lifecycle_count"] == 0
+	assert payload["summary"]["specification_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["plan_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["readme_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["implementation_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["test_surface_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["release_evidence_count"] == payload["summary"]["capability_count"]
+	assert payload["summary"]["code_review_ready_count"] == payload["summary"]["capability_count"]
+	records = {record["capability"]: record for record in payload["records"]}
+	assert records["composition_events"]["development_cycle"]["specification"] is True
+	assert records["composition_events"]["development_cycle"]["plan"] is True
+	assert records["composition_events"]["development_cycle"]["code_review_ready"] is True

@@ -18,6 +18,7 @@ Use the local CLI as the source of truth:
 ./.venv/bin/apg capabilities evaluate-rules <capability_id> --context-json '{}' --json
 ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities lifecycle-audit --json
 ```
 
 ## Current Registry Snapshot
@@ -202,6 +203,13 @@ Audit implementation depth:
 ./.venv/bin/apg capabilities implementation-audit --json
 ```
 
+Audit lifecycle evidence for the requested SPECIFICATION -> PLAN ->
+implementation -> review/readiness cycle:
+
+```bash
+./.venv/bin/apg capabilities lifecycle-audit --json
+```
+
 Build a side-effect-free publish plan for one package:
 
 ```bash
@@ -225,6 +233,7 @@ Run broader catalog proof after shared infrastructure or registry changes:
 ./.venv/bin/apg capabilities validate-contracts --json
 ./.venv/bin/apg capabilities audit --strict-package-artifacts --json
 ./.venv/bin/apg capabilities implementation-audit --json
+./.venv/bin/apg capabilities lifecycle-audit --json
 ```
 
 ## AI Agent Composition Standard
