@@ -22833,3 +22833,72 @@ Not run to preserve battery:
   Bytewax topology, live COLB/MQEB/CVSN/AUTH/MTEN/AUDL/AICR/NTFY/NLPC/THEM
   adapters, rendered browser UI, external AI-agent runtime clients, media
   interoperability certification, and load/performance checks.
+
+### 2026-06-01 00:58 EAT
+
+HELP support-knowledge agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/help` as the next ordered common capability
+  packet after VIDC.
+- Preserved the existing source registry, article authoring, publication,
+  cited answer, search, feedback, localization, curation, audit, dashboard,
+  tenant-isolation, and Bytewax batch-mutation behavior.
+- Extended the executable HELP contract with first-class help-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  help-governance roles, privileged-role metadata, AICR adapter metadata,
+  Bytewax lifecycle stream metadata, route metadata, theme components, and
+  expanded dependency evidence.
+- Added deterministic guardrails for missing help-agent ID, missing readable
+  name, unsupported runtime, unsupported role, missing scope, owner, purpose,
+  missing machine contribution disclosure, privileged help-agent registration
+  without human approval, empty lifecycle batches, unsupported lifecycle
+  operations, and non-Bytewax HELP lifecycle batch routing.
+- Added `HelpAgentRecord`, `HelpLifecycleBatchRecord`, tenant-qualified
+  help-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, help-agent roster view models, lifecycle-batch
+  monitor view models, and API helpers.
+- Hardened API boolean payload parsing so readable string values such as
+  `"false"` cannot bypass help-agent disclosure or approval guardrails.
+- Added `/help/agents` and `/help/lifecycle` composition routes, help-agent
+  roster theme metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed `README.md`,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/help/__init__.py capabilities/common/help/capability_contract.py capabilities/common/help/models.py capabilities/common/help/help_runtime.py capabilities/common/help/service.py capabilities/common/help/api.py capabilities/common/help/views.py capabilities/common/help/app.py capabilities/common/help/test_capability_contract.py capabilities/common/help/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/help/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/help/test_capability_contract.py capabilities/common/help/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect help --json` passed with `ok: true`,
+  13 APG Python routes, 41 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/help --json`
+  passed with `ok: true`; HELP remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/help --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/help/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/help/package_manifest.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/help/release_report.json`
+  passed.
+- Runtime smoke returned an unblocked cited answer, one active `codex`
+  knowledge-steward agent, and one accepted `bytewax` lifecycle-batch evidence
+  record.
+- Focused stale-marker scan over touched HELP packet source, docs, tests, and
+  evidence returned only intentional no-broker-core metadata and a negative
+  unsupported-operation example named `kafka_replay`.
+- In-process code review found and resolved missing help-agent ID/name contract
+  guardrails plus unsafe API string-boolean parsing.
+- `git diff --check -- capabilities/common/help docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live RAG/search providers, production databases, durable Bytewax topology,
+  live RAGN/SRCH/NLPC/AUTH/AUDL/AICR/NTFY/CHAT/THEM adapters, rendered browser
+  UI, external AI-agent runtime clients, provider interoperability checks, and
+  load/performance checks.

@@ -1,6 +1,6 @@
 # Help and Knowledge Base Capability
 
-`help` provides APG's common capability for tenant-scoped help centers and governed support knowledge. It composes source registration, article authoring, publication approval, localization, cited answer generation, feedback curation, audit events, UI routes, visual theming, and Bytewax event-stream guardrails into a generated-application packet that runs without live search or RAG infrastructure.
+`help` provides APG's common capability for tenant-scoped help centers and governed support knowledge. It composes source registration, article authoring, publication approval, localization, cited answer generation, feedback curation, first-class provider-neutral help agents, audit events, UI routes, visual theming, and Bytewax lifecycle guardrails into a generated-application packet that runs without live search or RAG infrastructure.
 
 ## What It Provides
 
@@ -10,8 +10,9 @@
 - Localization records with supported locale, translator, source locale, and fallback locale controls.
 - Feedback capture with rating bounds and curation review for low support ratings.
 - Curation items with reviewer and evidence requirements.
+- First-class help agents with runtime, role, scope, owner, purpose, contribution-disclosure, and privileged-role approval guardrails.
+- Bytewax lifecycle stream metadata for source, article, answer, search, feedback, localization, curation, help-agent, and audit batches.
 - Audit events for source, article, answer, localization, feedback, and curation state changes.
-- Bytewax enforcement for batch help mutations.
 - Dependency-light API helpers, UI view models, package manifest, semantic model, and release evidence.
 
 ## Runtime Shape
@@ -29,6 +30,8 @@ Primary methods:
 - `localize_article(...)`
 - `record_feedback(...)`
 - `close_curation_item(...)`
+- `register_help_agent(...)`
+- `validate_help_lifecycle_batch(...)`
 - `dashboard_summary(...)`
 
 ## Configuration And Rules
@@ -87,6 +90,18 @@ article = service.create_article(
 )
 service.publish_article(article["id"], "tenant-1", "publisher-1", True)
 answer = service.generate_answer("answer-1", "tenant-1", "How do I reset my password?")
+service.register_help_agent(
+    "tenant-1",
+    "help-agent-1",
+    "Knowledge Steward",
+    "codex",
+    "knowledge_steward",
+    article["id"],
+    "publisher-1",
+    "Govern article, answer, curation, and safety lifecycle evidence.",
+    human_approval_required=True,
+)
+service.validate_help_lifecycle_batch("tenant-1", "bytewax", 2, "help_agent_batch")
 ```
 
 Use `register_capability()` to expose the full APG registration payload to the composition engine.

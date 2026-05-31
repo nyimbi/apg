@@ -7,6 +7,31 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_HELP_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_HELP_AGENT_ROLES: list[str] = [
+	"source_reviewer",
+	"article_reviewer",
+	"answer_reviewer",
+	"search_reviewer",
+	"feedback_reviewer",
+	"localization_reviewer",
+	"curation_reviewer",
+	"safety_reviewer",
+	"lifecycle_batch_reviewer",
+	"knowledge_steward",
+]
+
+PRIVILEGED_HELP_AGENT_ROLES: list[str] = [
+	"source_reviewer",
+	"article_reviewer",
+	"answer_reviewer",
+	"safety_reviewer",
+	"lifecycle_batch_reviewer",
+	"knowledge_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"content": {
@@ -69,6 +94,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"deflection_metrics_required": True,
 		"event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_HELP_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_HELP_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_HELP_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "help.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"source_batch",
+			"article_batch",
+			"answer_batch",
+			"search_batch",
+			"feedback_batch",
+			"localization_batch",
+			"curation_batch",
+			"help_agent_batch",
+			"audit_batch",
+		],
+		"topics": [
+			"help.sources",
+			"help.articles",
+			"help.answers",
+			"help.search",
+			"help.feedback",
+			"help.localizations",
+			"help.curation",
+			"help.agents",
+			"help.audit",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.HelpService",
 		"runtime_helpers": "help_runtime.py",
@@ -83,6 +149,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"notification": "ntfy",
 		"chat": "chat",
 		"theme": "them",
+		"ai_orchestration": "aicr",
+		"agent_adapter": "aicr_provider_neutral_help_agent_adapter",
 	},
 	"ui": {
 		"enable_help_center": True,
@@ -92,6 +160,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_source_registry": True,
 		"enable_localization_workbench": True,
 		"enable_curation_queue": True,
+		"enable_help_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_analytics": True,
 	},
@@ -110,6 +180,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"localization",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -123,6 +195,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"localization",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -154,8 +228,20 @@ RULES: list[dict[str, Any]] = [
 	{"name": "localization_requires_supported_locale", "description": "Article localization must use a supported locale.", "condition": {"operation": "localize_article", "locale_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_locale", "required_action": "choose_supported_locale"}},
 	{"name": "localization_requires_translator", "description": "Article localization requires an accountable translator.", "condition": {"operation": "localize_article", "translator_assigned": False}, "effect": {"decision": "deny", "reason": "translator_required", "required_action": "assign_translator"}},
 	{"name": "localization_requires_fallback", "description": "Localized help needs a fallback locale.", "condition": {"operation": "localize_article", "fallback_locale_configured": False}, "effect": {"decision": "require_review", "reason": "fallback_locale_required", "required_action": "configure_fallback_locale"}},
-	{"name": "curation_requires_reviewer", "description": "Curation decisions require a reviewer.", "condition": {"operation": "close_curation_item", "reviewer_present": False}, "effect": {"decision": "deny", "reason": "curation_reviewer_required", "required_action": "assign_curation_reviewer"}},
-	{"name": "curation_requires_evidence", "description": "Curation decisions require evidence.", "condition": {"operation": "close_curation_item", "curation_evidence_present": False}, "effect": {"decision": "deny", "reason": "curation_evidence_required", "required_action": "attach_curation_evidence"}},
+		{"name": "curation_requires_reviewer", "description": "Curation decisions require a reviewer.", "condition": {"operation": "close_curation_item", "reviewer_present": False}, "effect": {"decision": "deny", "reason": "curation_reviewer_required", "required_action": "assign_curation_reviewer"}},
+		{"name": "curation_requires_evidence", "description": "Curation decisions require evidence.", "condition": {"operation": "close_curation_item", "curation_evidence_present": False}, "effect": {"decision": "deny", "reason": "curation_evidence_required", "required_action": "attach_curation_evidence"}},
+		{"name": "help_agent_requires_id", "description": "First-class help agents require stable identifiers.", "condition": {"operation": "register_help_agent", "agent_id_present": False}, "effect": {"decision": "deny", "reason": "help_agent_id_required", "required_action": "assign_help_agent_id"}},
+		{"name": "help_agent_requires_name", "description": "First-class help agents require readable names.", "condition": {"operation": "register_help_agent", "agent_name_present": False}, "effect": {"decision": "deny", "reason": "help_agent_name_required", "required_action": "name_help_agent"}},
+		{"name": "help_agent_runtime_supported", "description": "First-class help agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_help_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_help_agent_runtime", "required_action": "choose_supported_help_agent_runtime"}},
+		{"name": "help_agent_role_supported", "description": "First-class help agents must use supported help-governance roles.", "condition": {"operation": "register_help_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_help_agent_role", "required_action": "choose_supported_help_agent_role"}},
+	{"name": "help_agent_requires_scope", "description": "First-class help agents require explicit source, article, answer, search, feedback, localization, curation, safety, or lifecycle scope.", "condition": {"operation": "register_help_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "help_agent_scope_required", "required_action": "declare_help_agent_scope"}},
+	{"name": "help_agent_requires_owner", "description": "First-class help agents require an accountable owner.", "condition": {"operation": "register_help_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "help_agent_owner_required", "required_action": "assign_help_agent_owner"}},
+	{"name": "help_agent_requires_purpose", "description": "First-class help agents require a documented knowledge-governance purpose.", "condition": {"operation": "register_help_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "help_agent_purpose_required", "required_action": "document_help_agent_purpose"}},
+	{"name": "help_agent_requires_contribution_disclosure", "description": "First-class help agents must disclose machine-authored source, article, answer, feedback, localization, curation, and lifecycle contributions.", "condition": {"operation": "register_help_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "help_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "help_agent_privileged_role_requires_human_approval", "description": "Privileged help-agent roles require human approval evidence.", "condition": {"operation": "register_help_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "help_agent_human_approval_required", "required_action": "record_human_help_agent_approval"}},
+	{"name": "help_lifecycle_batch_requires_mutations", "description": "HELP lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_help_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "help_lifecycle_batch_empty", "required_action": "include_help_lifecycle_mutations"}},
+	{"name": "help_lifecycle_operation_supported", "description": "HELP lifecycle batches must use configured lifecycle operations.", "condition": {"operation": "validate_help_lifecycle_batch", "lifecycle_operation_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_help_lifecycle_operation", "required_action": "choose_supported_help_lifecycle_operation"}},
+	{"name": "bytewax_help_stream_required", "description": "HELP lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_help_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_help_lifecycle_batch_to_bytewax"}},
 	{"name": "help_state_change_requires_audit", "description": "Help state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "help_audit_event_required", "required_action": "record_help_audit_event"}},
 	{"name": "cross_tenant_help_access_denied", "description": "Help records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_help_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_help_mutation_requires_bytewax", "description": "Batch help mutations must use Bytewax event streams.", "condition": {"operation": "batch_help_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
@@ -170,6 +256,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "answers", "path": "/help/answers", "component": "AnswerConsole", "permission": "help:ask", "nav_group": "Assistant"},
 	{"name": "localization", "path": "/help/localization", "component": "LocalizationWorkbench", "permission": "help:edit_articles", "nav_group": "Authoring"},
 	{"name": "curation", "path": "/help/curation", "component": "CurationQueue", "permission": "help:publish", "nav_group": "Governance"},
+	{"name": "agents", "path": "/help/agents", "component": "HelpAgentRoster", "permission": "help:publish", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/help/lifecycle", "component": "HELPLifecycleBatchMonitor", "permission": "help:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/help/audit", "component": "HelpAuditTrail", "permission": "help:audit", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/help/analytics", "component": "SupportAnalytics", "permission": "help:view", "nav_group": "Operations"},
 	{"name": "settings", "path": "/help/settings", "component": "HELPSettings", "permission": "help:admin", "nav_group": "Administration"},
@@ -197,6 +285,8 @@ THEME: dict[str, Any] = {
 		"localization_workbench": {"visual": "locale-grid", "status_style": "locale-chip"},
 		"curation_queue": {"visual": "review-list", "status_style": "approval-chip"},
 		"feedback_table": {"visual": "feedback-grid", "status_style": "sentiment-chip"},
+		"help_agent_roster": {"icon": "bot", "visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"icon": "activity", "visual": "lifecycle-batch-list", "status_style": "stream-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "help-chip"},
 	},
 }
@@ -223,6 +313,46 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
+		"agents": agent_manifest(config),
+		"streaming": streaming_manifest(config),
+	}
+
+
+def agent_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return provider-neutral help-agent composition metadata."""
+	agents = (config or DEFAULT_CONFIGURATION)["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"stable_identifier",
+			"readable_name",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for help composition."""
+	streaming = (config or DEFAULT_CONFIGURATION)["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"watermark": streaming["watermark"],
+		"required_processor": streaming["required_processor"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 

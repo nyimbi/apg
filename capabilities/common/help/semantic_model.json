@@ -1,5 +1,57 @@
 {
-  "agents": {},
+  "agents": {
+    "help": {
+      "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "stable_identifier",
+        "readable_name",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "source_reviewer",
+        "article_reviewer",
+        "answer_reviewer",
+        "safety_reviewer",
+        "lifecycle_batch_reviewer",
+        "knowledge_steward"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "source_reviewer",
+        "article_reviewer",
+        "answer_reviewer",
+        "search_reviewer",
+        "feedback_reviewer",
+        "localization_reviewer",
+        "curation_reviewer",
+        "safety_reviewer",
+        "lifecycle_batch_reviewer",
+        "knowledge_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Help and Knowledge Base package-backed APG capability",
     "entity_count": 0,
@@ -8,11 +60,86 @@
   },
   "capabilities": {
     "help": {
-      "approvals": {},
+      "adapters": {
+        "agent_adapter": "aicr_provider_neutral_help_agent_adapter",
+        "ai_orchestration": "aicr",
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "chat": "chat",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.HelpService",
+        "identity": "auth",
+        "natural_language": "nlpc",
+        "notification": "ntfy",
+        "retrieval_augmented_generation": "ragn",
+        "runtime_helpers": "help_runtime.py",
+        "search": "srch",
+        "theme": "them",
+        "view_models": "views.py"
+      },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "stable_identifier",
+          "readable_name",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "source_reviewer",
+          "article_reviewer",
+          "answer_reviewer",
+          "safety_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "source_reviewer",
+          "article_reviewer",
+          "answer_reviewer",
+          "search_reviewer",
+          "feedback_reviewer",
+          "localization_reviewer",
+          "curation_reviewer",
+          "safety_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "answer_confidence_review": "AnswerConfidenceReview",
+        "privileged_help_agent_review": "HelpAgentHumanApprovalReview",
+        "publication_approval": "KnowledgePublicationApproval",
+        "source_approval": "HelpSourceApproval"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_help_agent_adapter",
+          "ai_orchestration": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
           "chat": "chat",
@@ -26,6 +153,41 @@
           "search": "srch",
           "theme": "them",
           "view_models": "views.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "source_reviewer",
+            "article_reviewer",
+            "answer_reviewer",
+            "safety_reviewer",
+            "lifecycle_batch_reviewer",
+            "knowledge_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "source_reviewer",
+            "article_reviewer",
+            "answer_reviewer",
+            "search_reviewer",
+            "feedback_reviewer",
+            "localization_reviewer",
+            "curation_reviewer",
+            "safety_reviewer",
+            "lifecycle_batch_reviewer",
+            "knowledge_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "answers": {
           "citations_required": true,
@@ -97,6 +259,35 @@
           "source_owner_required": true,
           "source_uri_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "help.lifecycle",
+          "required_operations": [
+            "source_batch",
+            "article_batch",
+            "answer_batch",
+            "search_batch",
+            "feedback_batch",
+            "localization_batch",
+            "curation_batch",
+            "help_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "help.sources",
+            "help.articles",
+            "help.answers",
+            "help.search",
+            "help.feedback",
+            "help.localizations",
+            "help.curation",
+            "help.agents",
+            "help.audit"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -109,7 +300,9 @@
           "enable_article_library": true,
           "enable_audit": true,
           "enable_curation_queue": true,
+          "enable_help_agent_roster": true,
           "enable_help_center": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_localization_workbench": true,
           "enable_source_registry": true
         }
@@ -117,13 +310,33 @@
       "erp_modules": [
         "common"
       ],
+      "help_lifecycle": {
+        "answer": "HelpAnswer",
+        "article": "HelpArticle",
+        "audit": "HelpAuditEvent",
+        "curation": "HelpCurationItem",
+        "feedback": "HelpFeedback",
+        "help_agent": "HelpAgentRecord",
+        "lifecycle_batch": "HelpLifecycleBatchRecord",
+        "localization": "HelpLocalization",
+        "source": "HelpSource"
+      },
       "i18n": {},
       "master_data": {},
       "name": "Help and Knowledge Base",
       "provides": [
-        "help_operations"
+        "help_operations",
+        "support_knowledge",
+        "help_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "ragn",
+        "srch",
+        "nlpc",
+        "auth",
+        "audl",
+        "aicr"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -463,6 +676,163 @@
               "required_action": "attach_curation_evidence"
             },
             "name": "curation_requires_evidence"
+          },
+          {
+            "condition": {
+              "agent_id_present": false,
+              "operation": "register_help_agent"
+            },
+            "description": "First-class help agents require stable identifiers.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_agent_id_required",
+              "required_action": "assign_help_agent_id"
+            },
+            "name": "help_agent_requires_id"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_help_agent"
+            },
+            "description": "First-class help agents require readable names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_agent_name_required",
+              "required_action": "name_help_agent"
+            },
+            "name": "help_agent_requires_name"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_help_agent"
+            },
+            "description": "First-class help agents must use supported provider-neutral runtimes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_help_agent_runtime",
+              "required_action": "choose_supported_help_agent_runtime"
+            },
+            "name": "help_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_help_agent"
+            },
+            "description": "First-class help agents must use supported help-governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_help_agent_role",
+              "required_action": "choose_supported_help_agent_role"
+            },
+            "name": "help_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_help_agent",
+              "scope_present": false
+            },
+            "description": "First-class help agents require explicit source, article, answer, search, feedback, localization, curation, safety, or lifecycle scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_agent_scope_required",
+              "required_action": "declare_help_agent_scope"
+            },
+            "name": "help_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_help_agent",
+              "owner_present": false
+            },
+            "description": "First-class help agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_agent_owner_required",
+              "required_action": "assign_help_agent_owner"
+            },
+            "name": "help_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_help_agent",
+              "purpose_present": false
+            },
+            "description": "First-class help agents require a documented knowledge-governance purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_agent_purpose_required",
+              "required_action": "document_help_agent_purpose"
+            },
+            "name": "help_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_help_agent"
+            },
+            "description": "First-class help agents must disclose machine-authored source, article, answer, feedback, localization, curation, and lifecycle contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "help_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_help_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged help-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "help_agent_human_approval_required",
+              "required_action": "record_human_help_agent_approval"
+            },
+            "name": "help_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_help_lifecycle_batch"
+            },
+            "description": "HELP lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "help_lifecycle_batch_empty",
+              "required_action": "include_help_lifecycle_mutations"
+            },
+            "name": "help_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "lifecycle_operation_supported": false,
+              "operation": "validate_help_lifecycle_batch"
+            },
+            "description": "HELP lifecycle batches must use configured lifecycle operations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_help_lifecycle_operation",
+              "required_action": "choose_supported_help_lifecycle_operation"
+            },
+            "name": "help_lifecycle_operation_supported"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_help_lifecycle_batch"
+            },
+            "description": "HELP lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_help_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_help_stream_required"
           },
           {
             "condition": {
@@ -846,6 +1216,163 @@
         },
         {
           "condition": {
+            "agent_id_present": false,
+            "operation": "register_help_agent"
+          },
+          "description": "First-class help agents require stable identifiers.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_agent_id_required",
+            "required_action": "assign_help_agent_id"
+          },
+          "name": "help_agent_requires_id"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_help_agent"
+          },
+          "description": "First-class help agents require readable names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_agent_name_required",
+            "required_action": "name_help_agent"
+          },
+          "name": "help_agent_requires_name"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_help_agent"
+          },
+          "description": "First-class help agents must use supported provider-neutral runtimes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_help_agent_runtime",
+            "required_action": "choose_supported_help_agent_runtime"
+          },
+          "name": "help_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_help_agent"
+          },
+          "description": "First-class help agents must use supported help-governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_help_agent_role",
+            "required_action": "choose_supported_help_agent_role"
+          },
+          "name": "help_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_help_agent",
+            "scope_present": false
+          },
+          "description": "First-class help agents require explicit source, article, answer, search, feedback, localization, curation, safety, or lifecycle scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_agent_scope_required",
+            "required_action": "declare_help_agent_scope"
+          },
+          "name": "help_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_help_agent",
+            "owner_present": false
+          },
+          "description": "First-class help agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_agent_owner_required",
+            "required_action": "assign_help_agent_owner"
+          },
+          "name": "help_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_help_agent",
+            "purpose_present": false
+          },
+          "description": "First-class help agents require a documented knowledge-governance purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_agent_purpose_required",
+            "required_action": "document_help_agent_purpose"
+          },
+          "name": "help_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_help_agent"
+          },
+          "description": "First-class help agents must disclose machine-authored source, article, answer, feedback, localization, curation, and lifecycle contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "help_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_help_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged help-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "help_agent_human_approval_required",
+            "required_action": "record_human_help_agent_approval"
+          },
+          "name": "help_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_help_lifecycle_batch"
+          },
+          "description": "HELP lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "help_lifecycle_batch_empty",
+            "required_action": "include_help_lifecycle_mutations"
+          },
+          "name": "help_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "lifecycle_operation_supported": false,
+            "operation": "validate_help_lifecycle_batch"
+          },
+          "description": "HELP lifecycle batches must use configured lifecycle operations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_help_lifecycle_operation",
+            "required_action": "choose_supported_help_lifecycle_operation"
+          },
+          "name": "help_lifecycle_operation_supported"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_help_lifecycle_batch"
+          },
+          "description": "HELP lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_help_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_help_stream_required"
+        },
+        {
+          "condition": {
             "audit_event_recorded": false,
             "state_change_requested": true
           },
@@ -886,10 +1413,16 @@
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helpers": "help_runtime.py",
+        "service": "service.HelpService",
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "HelpAgentRoster",
+          "permission": "help:publish",
+          "route": "/help/agents"
+        },
         "analytics": {
           "component": "SupportAnalytics",
           "permission": "help:view",
@@ -930,6 +1463,11 @@
           "permission": "help:view",
           "route": "/help/home"
         },
+        "lifecycle": {
+          "component": "HELPLifecycleBatchMonitor",
+          "permission": "help:admin",
+          "route": "/help/lifecycle"
+        },
         "localization": {
           "component": "LocalizationWorkbench",
           "permission": "help:edit_articles",
@@ -946,7 +1484,35 @@
           "route": "/help/sources"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "help.lifecycle",
+        "required_operations": [
+          "source_batch",
+          "article_batch",
+          "answer_batch",
+          "search_batch",
+          "feedback_batch",
+          "localization_batch",
+          "curation_batch",
+          "help_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "help.sources",
+          "help.articles",
+          "help.answers",
+          "help.search",
+          "help.feedback",
+          "help.localizations",
+          "help.curation",
+          "help.agents",
+          "help.audit"
+        ],
+        "watermark": "event_time"
+      },
       "theme": {
         "components": {
           "answer_panel": {
@@ -962,6 +1528,11 @@
             "status_style": "help-chip",
             "visual": "event-timeline"
           },
+          "bytewax_lifecycle_panel": {
+            "icon": "activity",
+            "status_style": "stream-chip",
+            "visual": "lifecycle-batch-list"
+          },
           "curation_queue": {
             "status_style": "approval-chip",
             "visual": "review-list"
@@ -969,6 +1540,11 @@
           "feedback_table": {
             "status_style": "sentiment-chip",
             "visual": "feedback-grid"
+          },
+          "help_agent_roster": {
+            "icon": "bot",
+            "status_style": "approval-chip",
+            "visual": "agent-roster"
           },
           "localization_workbench": {
             "status_style": "locale-chip",
@@ -1055,6 +1631,20 @@
             "permission": "help:publish"
           },
           {
+            "component": "HelpAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/help/agents",
+            "permission": "help:publish"
+          },
+          {
+            "component": "HELPLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/help/lifecycle",
+            "permission": "help:admin"
+          },
+          {
             "component": "HelpAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
@@ -1086,16 +1676,98 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "support_knowledge_governance": {
+        "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+        "roles": [
+          "source_reviewer",
+          "article_reviewer",
+          "answer_reviewer",
+          "search_reviewer",
+          "feedback_reviewer",
+          "localization_reviewer",
+          "curation_reviewer",
+          "safety_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "help": []
+      "help": [
+        "ragn",
+        "srch",
+        "nlpc",
+        "auth",
+        "audl",
+        "aicr"
+      ]
     }
   },
   "contracts": {
     "help": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "stable_identifier",
+          "readable_name",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "source_reviewer",
+          "article_reviewer",
+          "answer_reviewer",
+          "safety_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "source_reviewer",
+          "article_reviewer",
+          "answer_reviewer",
+          "search_reviewer",
+          "feedback_reviewer",
+          "localization_reviewer",
+          "curation_reviewer",
+          "safety_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_help_agent_adapter",
+          "ai_orchestration": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
           "chat": "chat",
@@ -1109,6 +1781,41 @@
           "search": "srch",
           "theme": "them",
           "view_models": "views.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "source_reviewer",
+            "article_reviewer",
+            "answer_reviewer",
+            "safety_reviewer",
+            "lifecycle_batch_reviewer",
+            "knowledge_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "source_reviewer",
+            "article_reviewer",
+            "answer_reviewer",
+            "search_reviewer",
+            "feedback_reviewer",
+            "localization_reviewer",
+            "curation_reviewer",
+            "safety_reviewer",
+            "lifecycle_batch_reviewer",
+            "knowledge_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "answers": {
           "citations_required": true,
@@ -1180,6 +1887,35 @@
           "source_owner_required": true,
           "source_uri_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "help.lifecycle",
+          "required_operations": [
+            "source_batch",
+            "article_batch",
+            "answer_batch",
+            "search_batch",
+            "feedback_batch",
+            "localization_batch",
+            "curation_batch",
+            "help_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "help.sources",
+            "help.articles",
+            "help.answers",
+            "help.search",
+            "help.feedback",
+            "help.localizations",
+            "help.curation",
+            "help.agents",
+            "help.audit"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1192,16 +1928,56 @@
           "enable_article_library": true,
           "enable_audit": true,
           "enable_curation_queue": true,
+          "enable_help_agent_roster": true,
           "enable_help_center": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_localization_workbench": true,
           "enable_source_registry": true
         }
       },
       "id": "help",
       "provides": [
-        "help_operations"
+        "help_operations",
+        "support_knowledge",
+        "help_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "ragn",
+        "srch",
+        "nlpc",
+        "auth",
+        "audl",
+        "aicr"
+      ],
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "help.lifecycle",
+        "required_operations": [
+          "source_batch",
+          "article_batch",
+          "answer_batch",
+          "search_batch",
+          "feedback_batch",
+          "localization_batch",
+          "curation_batch",
+          "help_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "help.sources",
+          "help.articles",
+          "help.answers",
+          "help.search",
+          "help.feedback",
+          "help.localizations",
+          "help.curation",
+          "help.agents",
+          "help.audit"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1213,7 +1989,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 6,
       "kind": "capability",
       "nodes": 1
     },
@@ -1325,6 +2101,19 @@
       },
       "name": "batch_help_mutation_requires_bytewax"
     },
+    "bytewax_help_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_help_lifecycle_batch"
+      },
+      "description": "HELP lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_help_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_help_stream_required"
+    },
     "cross_tenant_help_access_denied": {
       "condition": {
         "cross_tenant_access": true
@@ -1401,6 +2190,150 @@
         "required_action": "identify_feedback_user"
       },
       "name": "feedback_requires_user"
+    },
+    "help_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_help_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged help-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "help_agent_human_approval_required",
+        "required_action": "record_human_help_agent_approval"
+      },
+      "name": "help_agent_privileged_role_requires_human_approval"
+    },
+    "help_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_help_agent"
+      },
+      "description": "First-class help agents must disclose machine-authored source, article, answer, feedback, localization, curation, and lifecycle contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "help_agent_requires_contribution_disclosure"
+    },
+    "help_agent_requires_id": {
+      "condition": {
+        "agent_id_present": false,
+        "operation": "register_help_agent"
+      },
+      "description": "First-class help agents require stable identifiers.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_agent_id_required",
+        "required_action": "assign_help_agent_id"
+      },
+      "name": "help_agent_requires_id"
+    },
+    "help_agent_requires_name": {
+      "condition": {
+        "agent_name_present": false,
+        "operation": "register_help_agent"
+      },
+      "description": "First-class help agents require readable names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_agent_name_required",
+        "required_action": "name_help_agent"
+      },
+      "name": "help_agent_requires_name"
+    },
+    "help_agent_requires_owner": {
+      "condition": {
+        "operation": "register_help_agent",
+        "owner_present": false
+      },
+      "description": "First-class help agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_agent_owner_required",
+        "required_action": "assign_help_agent_owner"
+      },
+      "name": "help_agent_requires_owner"
+    },
+    "help_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_help_agent",
+        "purpose_present": false
+      },
+      "description": "First-class help agents require a documented knowledge-governance purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_agent_purpose_required",
+        "required_action": "document_help_agent_purpose"
+      },
+      "name": "help_agent_requires_purpose"
+    },
+    "help_agent_requires_scope": {
+      "condition": {
+        "operation": "register_help_agent",
+        "scope_present": false
+      },
+      "description": "First-class help agents require explicit source, article, answer, search, feedback, localization, curation, safety, or lifecycle scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_agent_scope_required",
+        "required_action": "declare_help_agent_scope"
+      },
+      "name": "help_agent_requires_scope"
+    },
+    "help_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_help_agent"
+      },
+      "description": "First-class help agents must use supported help-governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_help_agent_role",
+        "required_action": "choose_supported_help_agent_role"
+      },
+      "name": "help_agent_role_supported"
+    },
+    "help_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_help_agent"
+      },
+      "description": "First-class help agents must use supported provider-neutral runtimes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_help_agent_runtime",
+        "required_action": "choose_supported_help_agent_runtime"
+      },
+      "name": "help_agent_runtime_supported"
+    },
+    "help_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_help_lifecycle_batch"
+      },
+      "description": "HELP lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "help_lifecycle_batch_empty",
+        "required_action": "include_help_lifecycle_mutations"
+      },
+      "name": "help_lifecycle_batch_requires_mutations"
+    },
+    "help_lifecycle_operation_supported": {
+      "condition": {
+        "lifecycle_operation_supported": false,
+        "operation": "validate_help_lifecycle_batch"
+      },
+      "description": "HELP lifecycle batches must use configured lifecycle operations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_help_lifecycle_operation",
+        "required_action": "choose_supported_help_lifecycle_operation"
+      },
+      "name": "help_lifecycle_operation_supported"
     },
     "help_state_change_requires_audit": {
       "condition": {
@@ -1613,7 +2546,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "help_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.help": {

@@ -2,7 +2,7 @@
 
 ## Objective
 
-Bring `help` to the current APG capability-packet standard: readable local documentation, a complete executable contract, a dependency-light runtime, UI/theming metadata, deterministic guardrails, generated package evidence, and focused verification.
+Bring `help` to the current APG capability-packet standard: readable local documentation, a complete executable contract, a dependency-light runtime, first-class provider-neutral help agents, Bytewax lifecycle governance, UI/theming metadata, deterministic guardrails, generated package evidence, and focused verification.
 
 ## Implementation Packets
 
@@ -12,18 +12,18 @@ Bring `help` to the current APG capability-packet standard: readable local docum
    - Keep `cap_spec.md` as a compatibility pointer to the current docs and runtime.
 
 2. Expand the executable contract.
-   - Add source, feedback, localization, observability, adapter, and Bytewax event-stream configuration.
-   - Expand deterministic rules for sources, articles, answers, search, feedback, localization, curation, audit, tenant isolation, and batch mutations.
-   - Add source, localization, and audit UI routes plus theme components.
+   - Add source, feedback, localization, first-class help-agent, observability, adapter, and Bytewax lifecycle-stream configuration.
+   - Expand deterministic rules for sources, articles, answers, search, feedback, localization, curation, agents, audit, tenant isolation, and lifecycle-batch mutations.
+   - Add source, localization, agent, lifecycle, and audit UI routes plus theme components.
 
 3. Strengthen runtime behavior.
-   - Extend `HelpService` with source records, localization records, curation closing, and audit events.
+   - Extend `HelpService` with source records, localization records, curation closing, first-class help-agent records, lifecycle-batch records, and audit events.
    - Enforce source approval, title/body ownership, publication approval, answer citation, RBAC, rating, localization, curation, and Bytewax guardrails.
    - Keep all behavior dependency-light and deterministic.
 
 4. Align composition surfaces.
-   - Update API helpers for source, localization, and curation operations.
-   - Update view models for source registry, localization, audit, and settings screens.
+   - Update API helpers for source, localization, curation, help-agent, and lifecycle-batch operations.
+   - Update view models for source registry, localization, agents, lifecycle, audit, and settings screens.
    - Update registration metadata and permissions.
 
 5. Refresh package evidence.
@@ -40,7 +40,7 @@ Bring `help` to the current APG capability-packet standard: readable local docum
 
 - Contract tests prove configuration, rule count, routes, theme, registration, and Bytewax controls.
 - Runtime tests prove source, article, publication, search, answer, localization, feedback, curation, audit, and dashboard behavior.
-- Guardrail tests prove tenant, owner, source, publication, RBAC, citation, rating, localization, curation, and Bytewax denial behavior.
+- Guardrail tests prove tenant, owner, source, publication, RBAC, citation, rating, localization, curation, first-class help-agent controls, and Bytewax denial behavior.
 - API/view tests prove generated applications can compose the capability without private implementation knowledge.
 
 ## Review Checklist
@@ -50,7 +50,8 @@ Bring `help` to the current APG capability-packet standard: readable local docum
 - Guardrails in the contract are enforced by runtime methods where applicable.
 - Cited answers cannot be generated without approved sources.
 - Low feedback opens curation, and curation closure requires reviewer and evidence.
-- Bytewax is the only configured batch event-stream adapter.
+- First-class help agents have runtime, role, scope, owner, purpose, disclosure, and approval guardrails.
+- Bytewax is the only configured lifecycle event-stream adapter.
 - UI routes and theme components cover every major lifecycle surface.
 
 ## Out Of Scope

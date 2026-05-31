@@ -5,7 +5,14 @@ from __future__ import annotations
 from itertools import count
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	PRIVILEGED_HELP_AGENT_ROLES,
+	SUPPORTED_HELP_AGENT_ROLES,
+	SUPPORTED_HELP_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .help_runtime import HelpAnswerComposer, HelpFreshnessInspector, HelpSearchIndex
 from .models import (
 	ArticleStatus,
@@ -13,8 +20,10 @@ from .models import (
 	HelpAnswer,
 	HelpArticle,
 	HelpAuditEvent,
+	HelpAgentRecord,
 	HelpCurationItem,
 	HelpFeedback,
+	HelpLifecycleBatchRecord,
 	HelpLocalization,
 	HelpSource,
 	utc_now_iso,
@@ -31,11 +40,20 @@ class HelpService:
 		self._feedback: dict[str, HelpFeedback] = {}
 		self._localizations: dict[str, HelpLocalization] = {}
 		self._curation: dict[str, HelpCurationItem] = {}
+		self._help_agents: dict[str, HelpAgentRecord] = {}
+		self._lifecycle_batches: dict[str, HelpLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, HelpAuditEvent] = {}
 		self._counter = count(1)
 		self._search_index = HelpSearchIndex()
 		self._answer_composer = HelpAnswerComposer()
 		self._freshness_inspector = HelpFreshnessInspector()
+		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_HELP_AGENT_RUNTIMES}
+		self._agent_roles = {_normalize_token(item) for item in SUPPORTED_HELP_AGENT_ROLES}
+		self._privileged_agent_roles = {_normalize_token(item) for item in PRIVILEGED_HELP_AGENT_ROLES}
+		self._lifecycle_operations = {
+			_normalize_token(item)
+			for item in get_capability_contract()["streaming"]["required_operations"]
+		}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -353,6 +371,102 @@ class HelpService:
 			self._open_curation_item(tenant_id, article.id, "freshness_review")
 		return self.list_curation_items(tenant_id)
 
+	def register_help_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		agent_id_value = str(agent_id or "").strip()
+		name_value = str(name or "").strip()
+		record_key = self._tenant_key(tenant_id, agent_id_value)
+		if record_key in self._help_agents:
+			raise ValueError(f"help_agent_already_exists:{agent_id_value}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "register_help_agent",
+			"agent_id_present": bool(agent_id_value),
+			"agent_name_present": bool(name_value),
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		record = HelpAgentRecord(
+			id=agent_id_value,
+			tenant_id=tenant_id,
+			name=name_value,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._help_agents[record_key] = record
+		self._record_event(tenant_id, "help_agent_registered", agent_id, f"Help agent registered: {record.name}", record.owner)
+		return record.to_dict()
+
+	def validate_help_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "help_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "validate_help_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+			"lifecycle_operation_supported": operation_value in self._lifecycle_operations,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"help-batch-{len(self._lifecycle_batches) + 1:06d}"
+		record = HelpLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record_id)] = record
+		self._record_event(tenant_id, f"help_lifecycle_batch_{record.status}", record_id, f"HELP lifecycle batch {record.status}: {operation_value}", "bytewax")
+		if result["decision"] == "deny":
+			self._raise_policy(result)
+		return record.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -392,12 +506,18 @@ class HelpService:
 	def list_curation_items(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._curation, tenant_id)
 
+	def list_help_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._help_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
 	def list_records(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		records: list[dict[str, Any]] = []
-		for store in (self._sources, self._articles, self._answers, self._feedback, self._localizations, self._curation, self._audit_events):
+		for store in (self._sources, self._articles, self._answers, self._feedback, self._localizations, self._curation, self._help_agents, self._lifecycle_batches, self._audit_events):
 			records.extend(self._list(store, tenant_id))
 		return sorted(records, key=lambda item: (item["kind"], item["id"]))
 
@@ -408,6 +528,8 @@ class HelpService:
 		sources = self.list_sources(tenant_id)
 		localizations = self.list_localizations(tenant_id)
 		curation = self.list_curation_items(tenant_id)
+		agents = self.list_help_agents(tenant_id)
+		lifecycle_batches = self.list_lifecycle_batches(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"source_count": len(sources),
@@ -419,8 +541,20 @@ class HelpService:
 			"feedback_count": len(feedback),
 			"localization_count": len(localizations),
 			"open_curation_count": len([item for item in curation if item["status"] == "open"]),
+			"help_agent_count": len(agents),
+			"pending_help_agent_review_count": len([agent for agent in agents if agent["status"] == "pending_review"]),
+			"lifecycle_batch_count": len(lifecycle_batches),
+			"denied_lifecycle_batch_count": len([batch for batch in lifecycle_batches if batch["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
+
+	def _raise_policy(self, result: dict[str, Any]) -> None:
+		reasons = ", ".join(action.get("reason", "help_policy_blocked") for action in result["actions"])
+		raise PermissionError(reasons or "help_policy_blocked")
+
+	def _require_tenant(self, tenant_id: str) -> None:
+		if not str(tenant_id or "").strip():
+			self._raise_policy(self.evaluate({"tenant_context_present": False}))
 
 	def _enforce_help_policy(
 		self,
@@ -554,8 +688,15 @@ class HelpService:
 		self._audit_events[event_id] = event
 		return event.to_dict()
 
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
+
 	def _list(self, store: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = list(store.values())
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: item.id)]
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

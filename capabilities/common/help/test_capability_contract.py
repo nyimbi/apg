@@ -11,7 +11,9 @@ from capabilities.common.help.views import (
 	audit_model,
 	curation_queue_model,
 	dashboard_model,
+	help_agent_roster_model,
 	help_center_model,
+	lifecycle_batch_model,
 	localization_workbench_model,
 	settings_model,
 	source_registry_model,
@@ -25,15 +27,22 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["capability"] == "help"
 	assert contract["configuration"]["tenant_id"] == "tenant-help"
 	assert contract["configuration"]["content"]["freshness_review_days"] == 45
-	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "content", "sources", "answers", "search", "feedback", "localization", "governance", "observability", "adapters", "ui", "theme"}
+	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "content", "sources", "answers", "search", "feedback", "localization", "governance", "observability", "agents", "streaming", "adapters", "ui", "theme"}
 	assert contract["configuration"]["governance"]["batch_event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["retrieval_augmented_generation"] == "ragn"
-	assert len(contract["rule_engine"]["rules"]) >= 29
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "home", "articles", "editor", "sources", "answers", "localization", "curation", "audit", "analytics", "settings"}
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "knowledge_steward" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["streaming"]["lifecycle_stream"] == "help.lifecycle"
+	assert len(contract["rule_engine"]["rules"]) >= 41
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "home", "articles", "editor", "sources", "answers", "localization", "curation", "agents", "lifecycle", "audit", "analytics", "settings"}
 	assert contract["ui"]["api_prefix"] == "/help/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "answer_panel" in contract["theme"]["components"]
 	assert "source_registry" in contract["theme"]["components"]
+	assert "help_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_help_guardrails():
@@ -86,6 +95,47 @@ def test_rule_engine_enforces_help_guardrails():
 	assert publish_result["matched_rules"] == ["publication_requires_approval"]
 	assert answer_result["matched_rules"] == ["answer_requires_citations"]
 
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_help_agent",
+		"agent_id_present": False,
+		"agent_name_present": False,
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"help_agent_runtime_supported",
+		"help_agent_role_supported",
+		"help_agent_requires_id",
+		"help_agent_requires_name",
+		"help_agent_requires_scope",
+		"help_agent_requires_owner",
+		"help_agent_requires_purpose",
+		"help_agent_requires_contribution_disclosure",
+		"help_agent_privileged_role_requires_human_approval",
+	}
+
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_help_lifecycle_batch",
+		"event_stream": "legacy_bus",
+		"mutation_count": 0,
+		"lifecycle_operation_supported": False,
+	})
+	assert batch_result["decision"] == "deny"
+	assert set(batch_result["matched_rules"]) == {
+		"help_lifecycle_batch_requires_mutations",
+		"help_lifecycle_operation_supported",
+		"bytewax_help_stream_required",
+	}
+
 
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
@@ -97,6 +147,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "help_support_knowledge"
 	assert registration["ui_components"]["answers"] == "/help/answers"
 	assert registration["ui_components"]["sources"] == "/help/sources"
+	assert registration["ui_components"]["agents"] == "/help/agents"
+	assert registration["ui_components"]["lifecycle"] == "/help/lifecycle"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert "ragn" in registration["dependencies"]
 	assert "help:ask" in registration["permissions"]
 
@@ -149,6 +203,18 @@ def test_help_lifecycle_is_executable():
 	)
 	curation = service.list_curation_items("tenant-help")[0]
 	closed_curation = service.close_curation_item(curation["id"], "tenant-help", "reviewer-1", ["feedback reviewed"])
+	agent = service.register_help_agent(
+		tenant_id="tenant-help",
+		agent_id="help-agent-1",
+		name="Knowledge Steward",
+		runtime="codex",
+		role="knowledge_steward",
+		scope=article["id"],
+		owner="publisher-1",
+		purpose="Govern article, answer, curation, and safety lifecycle evidence.",
+		human_approval_required=True,
+	)
+	batch = service.validate_help_lifecycle_batch("tenant-help", "bytewax", 3, "help_agent_batch")
 	summary = service.dashboard_summary("tenant-help")
 
 	assert source["approved"] is False
@@ -161,6 +227,8 @@ def test_help_lifecycle_is_executable():
 	assert localization["locale"] == "fr"
 	assert feedback["requires_review"] is True
 	assert closed_curation["status"] == "closed"
+	assert agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert summary == {
 		"tenant_id": "tenant-help",
 		"source_count": 1,
@@ -172,7 +240,11 @@ def test_help_lifecycle_is_executable():
 		"feedback_count": 1,
 		"localization_count": 1,
 		"open_curation_count": 0,
-		"audit_event_count": 8,
+		"help_agent_count": 1,
+		"pending_help_agent_review_count": 0,
+		"lifecycle_batch_count": 1,
+		"denied_lifecycle_batch_count": 0,
+		"audit_event_count": 10,
 	}
 	assert dashboard_model(service, "tenant-help")["summary"] == summary
 	assert help_center_model(service, "tenant-help")["articles"][0]["id"] == "article-password"
@@ -181,6 +253,8 @@ def test_help_lifecycle_is_executable():
 	assert answer_console_model(service, "tenant-help")["requires_citations"] is True
 	assert localization_workbench_model(service, "tenant-help")["localizations"][0]["locale"] == "fr"
 	assert curation_queue_model(service, "tenant-help")["curation_items"]
+	assert help_agent_roster_model(service, "tenant-help")["active"][0]["name"] == "Knowledge Steward"
+	assert lifecycle_batch_model(service, "tenant-help")["accepted"][0]["operation"] == "help_agent_batch"
 	assert audit_model(service, "tenant-help")["event_stream"] == "bytewax"
 	assert support_analytics_model(service, "tenant-help")["summary"] == summary
 	assert settings_model("tenant-help")["configuration"]["tenant_id"] == "tenant-help"
@@ -258,6 +332,22 @@ def test_help_service_enforces_policy_guardrails():
 	with pytest.raises(PermissionError, match="curation_reviewer_required"):
 		curation = service.freshness_queue("tenant-help")[0]
 		service.close_curation_item(curation["id"], "tenant-help", "", ["evidence"])
+	with pytest.raises(PermissionError, match="unsupported_help_agent_runtime"):
+		service.register_help_agent("tenant-help", "bad-agent", "Bad Agent", "unknown", "answer_reviewer", "article-restricted", "owner", "Review answers.")
+	with pytest.raises(PermissionError, match="help_agent_id_required"):
+		service.register_help_agent("tenant-help", "", "Missing ID", "codex", "answer_reviewer", "article-restricted", "owner", "Review answers.")
+	with pytest.raises(PermissionError, match="help_agent_name_required"):
+		service.register_help_agent("tenant-help", "missing-name-agent", "", "codex", "answer_reviewer", "article-restricted", "owner", "Review answers.")
+	with pytest.raises(PermissionError, match="help_agent_contribution_disclosure_required"):
+		service.register_help_agent("tenant-help", "undisclosed-agent", "Undisclosed Agent", "codex", "answer_reviewer", "article-restricted", "owner", "Review answers.", contribution_disclosed=False)
+	pending = service.register_help_agent("tenant-help", "pending-agent", "Pending Agent", "codex", "knowledge_steward", "article-restricted", "owner", "Govern privileged help evidence.")
+	assert pending["status"] == "pending_review"
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_help_lifecycle_batch("tenant-help", "legacy_bus", 2, "help_agent_batch")
+	with pytest.raises(PermissionError, match="help_lifecycle_batch_empty"):
+		service.validate_help_lifecycle_batch("tenant-help", "bytewax", 0, "help_agent_batch")
+	with pytest.raises(PermissionError, match="unsupported_help_lifecycle_operation"):
+		service.validate_help_lifecycle_batch("tenant-help", "bytewax", 1, "kafka_replay")
 
 	rule_result = service.evaluate({
 		"tenant_context_present": True,

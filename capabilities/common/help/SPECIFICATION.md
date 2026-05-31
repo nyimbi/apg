@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`help` is the APG common capability for governed support knowledge. It lets generated applications compose tenant-scoped source registries, help articles, article publication workflows, cited assisted answers, localization, feedback review, curation, audit trails, analytics, UI screens, visual theming, and event-stream policy.
+`help` is the APG common capability for governed support knowledge. It lets generated applications compose tenant-scoped source registries, help articles, article publication workflows, cited assisted answers, localization, feedback review, curation, first-class provider-neutral help agents, audit trails, analytics, UI screens, visual theming, and Bytewax lifecycle policy.
 
 ## Scope
 
@@ -15,7 +15,10 @@ The capability must support:
 - Localization with supported locale, translator, source locale, fallback locale, and translated article body.
 - Feedback with user identity, rating bounds, low-rating curation review, and article/answer references.
 - Curation decisions with reviewer and evidence.
-- Bytewax-backed event-stream configuration for batch help mutations.
+- First-class help agents for source review, article review, answer review, search review, feedback review, localization review, curation review, safety review, lifecycle-batch review, and knowledge stewardship.
+- Provider-neutral agent runtimes `codex`, `claude_code`, `opencode`, and `pi` through an AICR adapter contract, without invoking external agent clients from the package runtime.
+- Privileged help-agent roles that require human approval evidence and remain in `pending_review` without it.
+- Bytewax-backed lifecycle stream configuration for source, article, answer, search, feedback, localization, curation, help-agent, and audit batches.
 - UI route contracts and dependency-light view models for generated applications.
 
 ## Dependencies
@@ -42,6 +45,8 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `localization`
 - `governance`
 - `observability`
+- `agents`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -58,9 +63,10 @@ The deterministic rule engine covers:
 - feedback user, rating bounds, and low-rating review
 - localization supported locale, translator, and fallback locale
 - curation reviewer and evidence
+- first-class help-agent runtime, role, scope, owner, purpose, disclosure, and privileged-role approval
 - state-change audit evidence
 - cross-tenant access denial
-- Bytewax batch mutation enforcement
+- Bytewax lifecycle-batch mutation, operation, and stream enforcement
 
 ## Runtime
 
@@ -72,6 +78,8 @@ The deterministic rule engine covers:
 - feedback
 - localizations
 - curation items
+- first-class help agents
+- lifecycle batches
 - audit events
 
 The runtime enforces the same guardrails exposed by the contract rule engine where the package can do so without live provider dependencies.
@@ -88,6 +96,8 @@ The UI contract exposes:
 - answers
 - localization
 - curation
+- agents
+- lifecycle
 - audit
 - analytics
 - settings

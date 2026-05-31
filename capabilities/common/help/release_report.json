@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Help and Knowledge Base",
         "errors": [],
-        "route_count": 11,
-        "rule_count": 29
+        "route_count": 13,
+        "rule_count": 41,
+        "streaming_required_processor": "bytewax"
       }
     },
     "self_test": {
       "capability": "help",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

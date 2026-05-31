@@ -10,13 +10,13 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "help"
 __capability_name__ = "Help and Knowledge Base"
-__apg_dependencies__ = ["ragn", "srch", "nlpc"]
+__apg_dependencies__ = ["ragn", "srch", "nlpc", "auth", "audl", "aicr"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "help",
 	"version": __version__,
 	"display_name": __capability_name__,
-	"description": "Tenant-aware help center, source registry, knowledge articles, cited answers, localization, curation, audit, and support analytics",
+	"description": "Tenant-aware help center, source registry, knowledge articles, cited answers, localization, curation, first-class help agents, Bytewax lifecycle governance, audit, and support analytics",
 	"category": "collaboration_communication",
 	"subcategory": "help_knowledge_base",
 	"vendor": "Datacraft",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["help_center", "source_registry", "knowledge_articles", "assisted_answers", "article_localization", "content_curation", "support_analytics"],
+	"provides": ["help_center", "source_registry", "knowledge_articles", "assisted_answers", "article_localization", "content_curation", "support_analytics", "help_agent_composition", "bytewax_lifecycle_governance"],
 	"permissions": ["help:view", "help:ask", "help:edit_articles", "help:publish", "help:audit", "help:admin"]
 }
 
@@ -39,7 +39,7 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["auth", "audl", "chat", "ntfy", "them"],
+		"optional_dependencies": ["chat", "ntfy", "mten", "secu", "cach", "them"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
@@ -50,6 +50,8 @@ def register_capability() -> dict[str, Any]:
 			"assisted_answers": "Generate cited answers from approved help sources",
 			"article_localization": "Manage translated article variants with fallback locale controls",
 			"content_curation": "Review article quality, feedback, freshness, and ownership",
+			"help_agent_composition": "Register provider-neutral first-class help agents with scope, owner, purpose, disclosure, and approval guardrails",
+			"bytewax_lifecycle_governance": "Validate help source, article, answer, search, feedback, localization, curation, agent, and audit lifecycle batches through Bytewax stream metadata",
 			"capability_rules": "Evaluate deterministic help-center governance rules",
 			"visual_theming": "Apply support-knowledge theme tokens and components"
 		},
@@ -61,11 +63,15 @@ def register_capability() -> dict[str, Any]:
 			"feedback": "/help/api/v1/feedback",
 			"localization": "/help/api/v1/localization",
 			"curation": "/help/api/v1/curation",
+			"agents": "/help/api/v1/agents",
+			"lifecycle": "/help/api/v1/lifecycle",
 			"audit": "/help/api/v1/audit"
 		},
 		"ui_components": {route["name"]: route["path"] for route in contract["ui"]["routes"]},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"permissions": capability_metadata["permissions"]
 	}
 

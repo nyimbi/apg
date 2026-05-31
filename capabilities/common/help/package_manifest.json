@@ -1,10 +1,62 @@
 {
+  "agents": {
+    "adapter_contract": "aicr_provider_neutral_help_agent_adapter",
+    "first_class": true,
+    "guardrails": [
+      "supported_runtime",
+      "supported_role",
+      "stable_identifier",
+      "readable_name",
+      "explicit_scope",
+      "accountable_owner",
+      "declared_purpose",
+      "machine_contribution_disclosure",
+      "human_approval_for_privileged_roles"
+    ],
+    "privileged_roles": [
+      "source_reviewer",
+      "article_reviewer",
+      "answer_reviewer",
+      "safety_reviewer",
+      "lifecycle_batch_reviewer",
+      "knowledge_steward"
+    ],
+    "required_fields": [
+      "tenant_id",
+      "agent_id",
+      "name",
+      "runtime",
+      "role",
+      "scope",
+      "owner",
+      "purpose"
+    ],
+    "supported_roles": [
+      "source_reviewer",
+      "article_reviewer",
+      "answer_reviewer",
+      "search_reviewer",
+      "feedback_reviewer",
+      "localization_reviewer",
+      "curation_reviewer",
+      "safety_reviewer",
+      "lifecycle_batch_reviewer",
+      "knowledge_steward"
+    ],
+    "supported_runtimes": [
+      "codex",
+      "claude_code",
+      "opencode",
+      "pi"
+    ]
+  },
   "base_target": "python",
   "display_name": "Help and Knowledge Base",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
     "models.py",
+    "help_runtime.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +69,34 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "streaming": {
+    "broker_core_dependency_allowed": false,
+    "engine": "bytewax",
+    "lifecycle_stream": "help.lifecycle",
+    "required_operations": [
+      "source_batch",
+      "article_batch",
+      "answer_batch",
+      "search_batch",
+      "feedback_batch",
+      "localization_batch",
+      "curation_batch",
+      "help_agent_batch",
+      "audit_batch"
+    ],
+    "required_processor": "bytewax",
+    "topics": [
+      "help.sources",
+      "help.articles",
+      "help.answers",
+      "help.search",
+      "help.feedback",
+      "help.localizations",
+      "help.curation",
+      "help.agents",
+      "help.audit"
+    ],
+    "watermark": "event_time"
+  },
   "version": "1.0.0"
 }

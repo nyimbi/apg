@@ -19,6 +19,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		**summary,
 	}
 
@@ -50,10 +52,10 @@ def create_article(payload: dict[str, Any]) -> dict[str, Any]:
 		body=str(payload["body"]),
 		owner_id=str(payload["owner_id"]),
 		topics=list(payload.get("topics") or []),
-		locale=str(payload.get("locale") or "en"),
-		visibility=str(payload.get("visibility") or "internal"),
-		source_ids=list(payload.get("source_ids") or []),
-		source_approval_recorded=bool(payload.get("source_approval_recorded", True)),
+			locale=str(payload.get("locale") or "en"),
+			visibility=str(payload.get("visibility") or "internal"),
+			source_ids=list(payload.get("source_ids") or []),
+			source_approval_recorded=_payload_bool(payload, "source_approval_recorded", True),
 	)
 
 
@@ -62,33 +64,33 @@ def publish_article(payload: dict[str, Any]) -> dict[str, Any]:
 		article_id=str(payload["id"]),
 		tenant_id=str(payload.get("tenant_id") or "default"),
 		approver_id=str(payload["approver_id"]),
-		publication_approved=bool(payload.get("publication_approved", True)),
-		rbac_filter_applied=bool(payload.get("rbac_filter_applied", True)),
-		freshness_review_recorded=bool(payload.get("freshness_review_recorded", True)),
+		publication_approved=_payload_bool(payload, "publication_approved", True),
+		rbac_filter_applied=_payload_bool(payload, "rbac_filter_applied", True),
+		freshness_review_recorded=_payload_bool(payload, "freshness_review_recorded", True),
 		article_age_days=int(payload.get("article_age_days") or 0),
 	)
 
 
 def search_articles(payload: dict[str, Any]) -> list[dict[str, Any]]:
 	return SERVICE.search_articles(
-		tenant_id=str(payload.get("tenant_id") or "default"),
-		query=str(payload["query"]),
-		locale=payload.get("locale"),
-		rbac_filter_applied=bool(payload.get("rbac_filter_applied", True)),
-		include_restricted=bool(payload.get("include_restricted", False)),
+			tenant_id=str(payload.get("tenant_id") or "default"),
+			query=str(payload["query"]),
+			locale=payload.get("locale"),
+			rbac_filter_applied=_payload_bool(payload, "rbac_filter_applied", True),
+			include_restricted=_payload_bool(payload, "include_restricted", False),
 		limit=int(payload.get("limit") or 5),
 	)
 
 
 def generate_answer(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.generate_answer(
-		answer_id=str(payload["id"]),
-		tenant_id=str(payload.get("tenant_id") or "default"),
-		query=str(payload["query"]),
-		locale=payload.get("locale"),
-		rbac_filter_applied=bool(payload.get("rbac_filter_applied", True)),
-		include_restricted=bool(payload.get("include_restricted", False)),
-		minimum_confidence=payload.get("minimum_confidence"),
+			answer_id=str(payload["id"]),
+			tenant_id=str(payload.get("tenant_id") or "default"),
+			query=str(payload["query"]),
+			locale=payload.get("locale"),
+			rbac_filter_applied=_payload_bool(payload, "rbac_filter_applied", True),
+			include_restricted=_payload_bool(payload, "include_restricted", False),
+			minimum_confidence=payload.get("minimum_confidence"),
 	)
 
 
@@ -128,6 +130,31 @@ def close_curation_item(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_help_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_help_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+			role=str(payload["role"]),
+			scope=str(payload["scope"]),
+			owner=str(payload["owner"]),
+			purpose=str(payload["purpose"]),
+			contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+			human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_help_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "help_agent_batch"),
+		batch_id=payload.get("batch_id"),
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -149,6 +176,8 @@ def help_state(tenant_id: str = "default") -> dict[str, Any]:
 		"feedback": SERVICE.list_feedback(tenant_id),
 		"localizations": SERVICE.list_localizations(tenant_id),
 		"curation": SERVICE.list_curation_items(tenant_id),
+		"help_agents": SERVICE.list_help_agents(tenant_id),
+		"lifecycle_batches": SERVICE.list_lifecycle_batches(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}
@@ -156,3 +185,16 @@ def help_state(tenant_id: str = "default") -> dict[str, Any]:
 
 def dashboard_summary(tenant_id: str | None = None) -> dict[str, Any]:
 	return SERVICE.dashboard_summary(tenant_id)
+
+
+def _payload_bool(payload: dict[str, Any], key: str, default: bool) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, bool):
+		return value
+	if isinstance(value, str):
+		normalized = value.strip().lower()
+		if normalized in {"1", "true", "yes", "y", "on"}:
+			return True
+		if normalized in {"0", "false", "no", "n", "off"}:
+			return False
+	return bool(value)
