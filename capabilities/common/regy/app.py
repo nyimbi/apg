@@ -33,6 +33,8 @@ def semantic_model() -> dict[str, Any]:
 		}
 		for route in contract["ui"]["routes"]
 	}
+	provides = list(contract["provides"])
+	requires = list(contract["requires"])
 	return {
 		"format": "apg.semantic-model.v1",
 		"ok": True,
@@ -52,11 +54,12 @@ def semantic_model() -> dict[str, Any]:
 			"regy": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["regy_operations"],
-				"requires": [],
+				"provides": provides,
+				"requires": requires,
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
+				"agents": contract["agents"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
@@ -73,6 +76,7 @@ def semantic_model() -> dict[str, Any]:
 					"compatibility_review": "RegistryReviewRecord",
 					"discovery_limit_review": "RegistryReviewRecord",
 					"service_retirement": "RegistryServiceRecord",
+					"registry_agent_privileged_role": "RegistryAgentRecord",
 				},
 				"registry_lifecycle": {
 					"service": "RegistryServiceRecord",
@@ -80,13 +84,15 @@ def semantic_model() -> dict[str, Any]:
 					"version": "RegistryVersionRecord",
 					"gateway_publication": "RegistryGatewayPublication",
 					"review": "RegistryReviewRecord",
+					"registry_agent": "RegistryAgentRecord",
+					"lifecycle_batch": "RegistryLifecycleBatchRecord",
 					"audit": "RegistryAuditEvent",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
 				"streaming": {
-					"engine": contract["configuration"]["adapters"]["event_stream"],
+					**contract["streaming"],
 				},
 			}
 		},
@@ -94,8 +100,10 @@ def semantic_model() -> dict[str, Any]:
 			"regy": {
 				"id": "regy",
 				"configuration": contract["configuration"],
-				"provides": ["regy_operations"],
-				"requires": [],
+				"provides": provides,
+				"requires": requires,
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -103,9 +111,15 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"regy": []},
+			"capability_dependencies": {"regy": requires},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"registry_governance": {
+					"supported_runtimes": contract["agents"]["supported_runtimes"],
+					"roles": contract["agents"]["supported_roles"],
+					"approval": contract["agents"]["approval"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -129,7 +143,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"regy": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -173,14 +189,18 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("REGY semantic model route manifest is stale")
-	if len(rules) < 20:
+	if len(rules) < 33:
 		errors.append("REGY semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("REGY adapter manifest must use Bytewax for event streaming")
 	if capability.get("runtime", {}).get("service") != "registry_runtime.py":
 		errors.append("REGY generated-app runtime is missing")
+	if capability.get("agents", {}).get("first_class") is not True:
+		errors.append("REGY semantic model must expose first-class registry agents")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("REGY lifecycle batches must require Bytewax")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

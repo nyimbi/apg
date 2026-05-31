@@ -19,6 +19,10 @@ Known gaps addressed by this packet:
   `view_models.py` convention.
 - Package evidence and tests did not cover instances, discovery review,
   gateway publication, retirement, adapter metadata, or Bytewax streaming.
+- Registry agents were not first-class citizens with supported runtimes, role
+  guardrails, ownership, scope, purpose, contribution disclosure, approval
+  state, UI, or audit evidence.
+- Lifecycle mutation batches did not have executable Bytewax validation.
 
 ## Build Sequence
 
@@ -31,19 +35,24 @@ Known gaps addressed by this packet:
 2. Contract expansion
    - Add service, instance, contract, discovery, health, routing, governance,
      observability, adapter, UI, and theme configuration.
-   - Expand deterministic guardrails to at least 20 registry lifecycle rules.
+   - Add first-class registry-agent and Bytewax lifecycle-batch configuration.
+   - Expand deterministic guardrails to at least 33 registry lifecycle rules.
 
 3. Dependency-light lifecycle service
    - Add `registry_runtime.RegistryService` for service registration, instance
      registration, discovery, version governance, gateway publication, health
      overrides, retirement, summaries, and audit events.
+   - Add registry-agent records, lifecycle-batch records, guardrail-backed
+     registration, Bytewax validation, summaries, and audit events.
    - Keep production registry, service-mesh, gateway, cache, and monitoring
      behavior behind adapter boundaries.
 
 4. API and UI
    - Keep the existing Flask REST API intact.
-   - Add generated-app API helper functions.
-   - Add `view_models.py` for generated application UIs.
+   - Add generated-app API helper functions for services, agents, and lifecycle
+     batches.
+   - Add `view_models.py` surfaces for generated application UIs, including
+     agent roster and lifecycle-batch monitor views.
 
 5. Package evidence and tests
    - Replace static app semantic JSON with contract-derived evidence.

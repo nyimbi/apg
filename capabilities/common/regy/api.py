@@ -762,8 +762,8 @@ class RegistryReadiness(Resource):
 				'error': str(e)
 			}, 503
 
-# WebSocket Support for Real-time Updates (Placeholder)
-# In production, this would integrate with APG real_time_collaboration
+# WebSocket support for adapter-bound real-time updates.
+# Production adapters bind these routes to APG real_time_collaboration when enabled.
 
 @api.route('/ws/health')
 class HealthWebSocket(Resource):
@@ -941,6 +941,33 @@ def retire_generated_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def register_generated_registry_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Register a governed registry agent through the generated-app control plane."""
+	return generated_registry_service.register_registry_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_regy_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
+	"""Validate a REGY lifecycle batch before adapter side effects."""
+	return generated_registry_service.validate_regy_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload["event_stream"]),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "registry_agent_batch"),
+		batch_id=payload.get("id"),
+	)
+
+
 def list_generated_services(tenant_id: str | None = None) -> List[Dict[str, Any]]:
 	return generated_registry_service.list_services(tenant_id)
 
@@ -953,6 +980,14 @@ def list_generated_audit_events(tenant_id: str | None = None) -> List[Dict[str, 
 	return generated_registry_service.list_audit_events(tenant_id)
 
 
+def list_generated_registry_agents(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_registry_service.list_registry_agents(tenant_id)
+
+
+def list_generated_lifecycle_batches(tenant_id: str | None = None) -> List[Dict[str, Any]]:
+	return generated_registry_service.list_lifecycle_batches(tenant_id)
+
+
 def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
 	value = payload.get(key, default)
 	if isinstance(value, str):
@@ -960,5 +995,23 @@ def _payload_bool(payload: Dict[str, Any], key: str, default: bool) -> bool:
 	return bool(value)
 
 
-# Export the blueprint for APG integration
-__all__ = ['registry_bp', 'api', 'capability_status']
+# Export the blueprint and generated-app helpers for APG integration
+__all__ = [
+	'registry_bp',
+	'api',
+	'capability_status',
+	'register_generated_service',
+	'register_generated_instance',
+	'discover_generated_services',
+	'record_generated_version',
+	'publish_generated_service',
+	'transfer_generated_owner',
+	'retire_generated_service',
+	'register_generated_registry_agent',
+	'validate_regy_lifecycle_batch',
+	'list_generated_services',
+	'list_generated_instances',
+	'list_generated_registry_agents',
+	'list_generated_lifecycle_batches',
+	'list_generated_audit_events',
+]

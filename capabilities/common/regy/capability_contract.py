@@ -6,6 +6,28 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_REGY_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_REGY_AGENT_ROLES = [
+	"registration_reviewer",
+	"contract_reviewer",
+	"discovery_reviewer",
+	"health_reviewer",
+	"gateway_sync_reviewer",
+	"owner_transfer_reviewer",
+	"retirement_reviewer",
+	"catalog_steward",
+]
+PRIVILEGED_REGY_AGENT_ROLES = [
+	"registration_reviewer",
+	"contract_reviewer",
+	"discovery_reviewer",
+	"health_reviewer",
+	"gateway_sync_reviewer",
+	"owner_transfer_reviewer",
+	"retirement_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped REGY configuration defaults and schema."""
@@ -82,6 +104,41 @@ class CapabilityConfiguration:
 			"event_stream": "bytewax",
 			"cache_store": "cach",
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_REGY_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_REGY_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_REGY_AGENT_ROLES,
+			"scope_required": True,
+			"owner_required": True,
+			"purpose_required": True,
+			"contribution_disclosure_required": True,
+			"human_approval_required_for_privileged_roles": True,
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"required_processor": "bytewax",
+			"lifecycle_stream": "regy.lifecycle",
+			"watermark": "event_time",
+			"operations": [
+				"service_batch",
+				"instance_batch",
+				"version_batch",
+				"discovery_batch",
+				"gateway_publication_batch",
+				"review_batch",
+				"registry_agent_batch",
+			],
+			"topics": [
+				"regy.services",
+				"regy.instances",
+				"regy.versions",
+				"regy.discovery",
+				"regy.gateway_publications",
+				"regy.reviews",
+				"regy.agents",
+			],
+		},
 		"ui": {
 			"enable_service_catalog": True,
 			"enable_registration_console": True,
@@ -93,6 +150,8 @@ class CapabilityConfiguration:
 			"enable_gateway_sync": True,
 			"enable_retirement_reviews": True,
 			"enable_audit_timeline": True,
+			"enable_registry_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True,
 			"enable_settings": True,
 		},
 		"theme": {
@@ -113,6 +172,8 @@ class CapabilityConfiguration:
 			"governance",
 			"observability",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme",
 		],
@@ -127,6 +188,8 @@ class CapabilityConfiguration:
 			"governance": {"type": "object"},
 			"observability": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"},
 		},
@@ -215,6 +278,8 @@ class CapabilityTheme:
 		"gateway_sync_panel": {"visual": "gateway-link", "status_indicator": "publish-chip"},
 		"retirement_review_panel": {"visual": "impact-list", "status_indicator": "retirement-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-pill"},
+		"registry_agent_roster": {"visual": "agent-roster", "status_indicator": "approval-chip"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batches", "status_indicator": "processor-chip"},
 	})
 
 
@@ -246,6 +311,14 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule("service_retirement_requires_impact_review", "Retiring a service requires impact review.", {"operation": "retire_service", "impact_review_recorded": False}, {"decision": "deny", "reason": "impact_review_required", "required_action": "record_retirement_impact_review"}),
 		CapabilityRule("service_retirement_requires_gateway_unpublish", "Retiring a service requires gateway unpublish evidence.", {"operation": "retire_service", "gateway_unpublish_recorded": False}, {"decision": "deny", "reason": "gateway_unpublish_required", "required_action": "record_gateway_unpublish"}),
 		CapabilityRule("production_requires_tracing", "Production services require trace propagation evidence.", {"operation": "register_service", "environment": "production", "trace_propagation_configured": False}, {"decision": "deny", "reason": "trace_propagation_required", "required_action": "configure_trace_propagation"}),
+		CapabilityRule("registry_agent_runtime_supported", "Registry agents must use a supported runtime adapter.", {"operation": "register_registry_agent", "agent_runtime_supported": False}, {"decision": "deny", "reason": "unsupported_registry_agent_runtime", "required_action": "choose_supported_registry_agent_runtime"}),
+		CapabilityRule("registry_agent_role_supported", "Registry agents must use a supported registry role.", {"operation": "register_registry_agent", "agent_role_supported": False}, {"decision": "deny", "reason": "unsupported_registry_agent_role", "required_action": "choose_supported_registry_agent_role"}),
+		CapabilityRule("registry_agent_requires_scope", "Registry agents require an explicit bounded scope.", {"operation": "register_registry_agent", "scope_present": False}, {"decision": "deny", "reason": "registry_agent_scope_required", "required_action": "declare_registry_agent_scope"}),
+		CapabilityRule("registry_agent_requires_owner", "Registry agents require an accountable owner.", {"operation": "register_registry_agent", "owner_present": False}, {"decision": "deny", "reason": "registry_agent_owner_required", "required_action": "assign_registry_agent_owner"}),
+		CapabilityRule("registry_agent_requires_purpose", "Registry agents require a documented purpose.", {"operation": "register_registry_agent", "purpose_present": False}, {"decision": "deny", "reason": "registry_agent_purpose_required", "required_action": "document_registry_agent_purpose"}),
+		CapabilityRule("registry_agent_requires_contribution_disclosure", "Registry agents must disclose machine-authored registry contributions.", {"operation": "register_registry_agent", "contribution_disclosed": False}, {"decision": "deny", "reason": "registry_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}),
+		CapabilityRule("registry_agent_privileged_role_requires_human_approval", "Privileged registry-agent roles require human approval evidence.", {"operation": "register_registry_agent", "privileged_role": True, "human_approval_required": False}, {"decision": "require_review", "reason": "registry_agent_human_approval_required", "required_action": "record_human_registry_agent_approval"}),
+		CapabilityRule("bytewax_regy_stream_required", "REGY lifecycle batches must be routed through Bytewax.", {"operation": "validate_regy_lifecycle_batch", "event_stream_ne": "bytewax"}, {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_regy_lifecycle_batch_to_bytewax"}),
 	]
 
 
@@ -263,16 +336,71 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("gateway_sync", "/regy/gateway-sync", "GatewaySyncPanel", "registry:update_service", "Integration"),
 		CapabilityUIRoute("retirements", "/regy/retirements", "RetirementReviewPanel", "registry:deregister_service", "Governance"),
 		CapabilityUIRoute("audit", "/regy/audit", "RegistryAuditTimeline", "registry:view_events", "Governance"),
+		CapabilityUIRoute("agents", "/regy/agents", "RegistryAgentRoster", "registry:update_service", "Governance"),
+		CapabilityUIRoute("lifecycle", "/regy/lifecycle", "RegistryLifecycleBatchMonitor", "registry:view_events", "Operations"),
 		CapabilityUIRoute("settings", "/regy/settings", "RegistrySettings", "registry:update_service", "Administration"),
 	]
 	return {"shell": "apg_python", "view_module": "view_models.py", "api_prefix": "/api/regy/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class registry-agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_REGY_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_REGY_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_REGY_AGENT_ROLES),
+		"requires": ["scope", "owner", "purpose", "contribution_disclosure"],
+		"approval": "human approval is required before privileged registry agents mutate registry state",
+		"external_runtimes_are_adapters": True,
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return REGY lifecycle streaming metadata."""
+	return {
+		"engine": "bytewax",
+		"required_processor": "bytewax",
+		"lifecycle_stream": "regy.lifecycle",
+		"watermark": "event_time",
+		"operations": [
+			"service_batch",
+			"instance_batch",
+			"version_batch",
+			"discovery_batch",
+			"gateway_publication_batch",
+			"review_batch",
+			"registry_agent_batch",
+		],
+		"topics": [
+			"regy.services",
+			"regy.instances",
+			"regy.versions",
+			"regy.discovery",
+			"regy.gateway_publications",
+			"regy.reviews",
+			"regy.agents",
+		],
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable REGY capability contract."""
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
-	return {"capability": "regy", "display_name": "API/Service Registry", "configuration": config.for_tenant(tenant_id, overrides), "configuration_schema": config.schema, "rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]}, "ui": ui_manifest(), "theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}}
+	return {
+		"capability": "regy",
+		"display_name": "API/Service Registry",
+		"provides": ["service_registry", "service_discovery", "registry_agent_composition"],
+		"requires": ["apig", "auth", "conf"],
+		"configuration": config.for_tenant(tenant_id, overrides),
+		"configuration_schema": config.schema,
+		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+		"ui": ui_manifest(),
+		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
+	}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
@@ -287,6 +415,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_lt"):
 			if not context.get(key[:-3], 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

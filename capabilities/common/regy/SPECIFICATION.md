@@ -9,9 +9,9 @@ gateway publication, retirement, and audit evidence.
 
 REGY must be useful without booting a service mesh, Kubernetes cluster,
 external registry, cache backend, Bytewax worker, gateway, monitoring backend,
-or APG auth stack. Those systems remain adapter boundaries. The
-dependency-light lifecycle service must still make registry decisions
-executable and auditable.
+APG auth stack, or external AI-agent runtime. Those systems remain adapter
+boundaries. The dependency-light lifecycle service must still make registry
+decisions executable and auditable.
 
 ## Scope
 
@@ -24,6 +24,11 @@ REGY owns:
 - production registration, compatibility, discovery-limit, owner-transfer, and
   retirement review records;
 - gateway publication eligibility;
+- first-class registry-agent registrations for AI and automation tools that
+  participate in service registration, contract review, discovery review,
+  health review, gateway sync, owner transfer, retirement review, or catalog
+  stewardship;
+- Bytewax lifecycle batch validation for registry mutation streams;
 - registry audit events;
 - generated application API helpers, UI view models, theme tokens, and package
   evidence.
@@ -37,6 +42,8 @@ REGY integrates with:
 - `apig` for gateway publication and route synchronization;
 - `cach` for discovery and health caches;
 - Bytewax-backed streams for registry lifecycle events.
+- external AI and automation runtimes such as Codex, Claude Code, OpenCode,
+  Pi, and future tools through governed adapter boundaries.
 
 ## Functional Requirements
 
@@ -79,14 +86,36 @@ REGY must retire services only after impact review and gateway unpublish
 evidence are recorded. Retirement produces audit evidence and keeps historical
 registry records visible.
 
+### Registry-Agent Lifecycle
+
+REGY must model AI and automation agents as first-class registry participants.
+Agent registration requires a supported runtime, supported role, bounded scope,
+accountable owner, documented purpose, and machine-contribution disclosure.
+Privileged roles such as registration reviewer, contract reviewer, discovery
+reviewer, health reviewer, gateway sync reviewer, owner transfer reviewer, and
+retirement reviewer require human approval evidence before they can mutate
+registry state.
+
+Supported runtimes are adapter identifiers, not embedded SDK commitments:
+`codex`, `claude_code`, `opencode`, and `pi`. Future runtimes can be added by
+extending the contract and adapter policy while preserving the same guardrail
+shape.
+
+### Bytewax Lifecycle Batches
+
+REGY must validate lifecycle mutation batches before adapter side effects.
+Accepted lifecycle batches must use Bytewax as the required processor. Non-
+Bytewax batches are recorded as denied evidence and blocked.
+
 ### UI and Theme
 
 REGY must expose generated UI models for dashboard, services, registration,
 instances, discovery, health, versions, contract reviews, gateway sync,
-retirements, audit, and settings. Theme metadata must include compact registry
-components for catalog rows, registration forms, discovery results, instance
-tables, health timelines, version matrices, contract reviews, gateway sync,
-retirement reviews, and audit timelines.
+retirements, audit, registry-agent roster, lifecycle-batch monitor, and
+settings. Theme metadata must include compact registry components for catalog
+rows, registration forms, discovery results, instance tables, health timelines,
+version matrices, contract reviews, gateway sync, retirement reviews, audit
+timelines, registry-agent rosters, and Bytewax lifecycle panels.
 
 ## Guardrails
 
@@ -97,13 +126,16 @@ registration review, instance endpoint, health probe, region, weight,
 cross-tenant discovery, high discovery limits, gateway publication,
 healthy-instance requirements, routing metadata, breaking changes,
 deprecation, manual health overrides, owner transfer, retirement impact, gateway
-unpublish, and production tracing.
+unpublish, production tracing, registry-agent runtime, registry-agent role,
+agent scope, agent owner, agent purpose, contribution disclosure, human
+approval for privileged agent roles, and Bytewax lifecycle processing.
 
 ## Adapter Boundaries
 
 The dependency-light control plane must not execute live registry, gateway,
-service mesh, monitor, audit sink, cache, or Bytewax operations. Those adapters
-must treat REGY decisions as the source of truth before performing side effects.
+service mesh, monitor, audit sink, cache, external AI runtime, or Bytewax
+operations. Those adapters must treat REGY decisions as the source of truth
+before performing side effects.
 
 ## Acceptance Criteria
 
@@ -111,7 +143,7 @@ must treat REGY decisions as the source of truth before performing side effects.
   behavior and adapter boundaries.
 - Contract exposes configuration, rules, adapters, UI, theme, and package
   evidence for service, instance, discovery, version, publication, retirement,
-  and audit workflows.
+  registry-agent, lifecycle-batch, and audit workflows.
 - Generated apps can use a dependency-light service for registry lifecycle
   workflows without optional production dependencies.
 - Focused tests cover positive and negative guardrail paths.

@@ -1,5 +1,42 @@
 {
-  "agents": {},
+  "agents": {
+    "regy": {
+      "approval": "human approval is required before privileged registry agents mutate registry state",
+      "external_runtimes_are_adapters": true,
+      "first_class": true,
+      "privileged_roles": [
+        "registration_reviewer",
+        "contract_reviewer",
+        "discovery_reviewer",
+        "health_reviewer",
+        "gateway_sync_reviewer",
+        "owner_transfer_reviewer",
+        "retirement_reviewer"
+      ],
+      "requires": [
+        "scope",
+        "owner",
+        "purpose",
+        "contribution_disclosure"
+      ],
+      "supported_roles": [
+        "registration_reviewer",
+        "contract_reviewer",
+        "discovery_reviewer",
+        "health_reviewer",
+        "gateway_sync_reviewer",
+        "owner_transfer_reviewer",
+        "retirement_reviewer",
+        "catalog_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "API/Service Registry package-backed APG capability",
     "entity_count": 0,
@@ -20,10 +57,47 @@
         "production_runtime": "service.ServiceRegistryService",
         "service_discovery": "conf"
       },
+      "agents": {
+        "approval": "human approval is required before privileged registry agents mutate registry state",
+        "external_runtimes_are_adapters": true,
+        "first_class": true,
+        "privileged_roles": [
+          "registration_reviewer",
+          "contract_reviewer",
+          "discovery_reviewer",
+          "health_reviewer",
+          "gateway_sync_reviewer",
+          "owner_transfer_reviewer",
+          "retirement_reviewer"
+        ],
+        "requires": [
+          "scope",
+          "owner",
+          "purpose",
+          "contribution_disclosure"
+        ],
+        "supported_roles": [
+          "registration_reviewer",
+          "contract_reviewer",
+          "discovery_reviewer",
+          "health_reviewer",
+          "gateway_sync_reviewer",
+          "owner_transfer_reviewer",
+          "retirement_reviewer",
+          "catalog_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "compatibility_review": "RegistryReviewRecord",
         "discovery_limit_review": "RegistryReviewRecord",
         "production_registration": "RegistryReviewRecord",
+        "registry_agent_privileged_role": "RegistryAgentRecord",
         "service_retirement": "RegistryServiceRecord"
       },
       "business_rules": [],
@@ -40,6 +114,39 @@
           "metrics_sink": "moni",
           "production_runtime": "service.ServiceRegistryService",
           "service_discovery": "conf"
+        },
+        "agents": {
+          "contribution_disclosure_required": true,
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "owner_required": true,
+          "privileged_roles": [
+            "registration_reviewer",
+            "contract_reviewer",
+            "discovery_reviewer",
+            "health_reviewer",
+            "gateway_sync_reviewer",
+            "owner_transfer_reviewer",
+            "retirement_reviewer"
+          ],
+          "purpose_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "registration_reviewer",
+            "contract_reviewer",
+            "discovery_reviewer",
+            "health_reviewer",
+            "gateway_sync_reviewer",
+            "owner_transfer_reviewer",
+            "retirement_reviewer",
+            "catalog_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "contracts": {
           "breaking_change_review_required": true,
@@ -117,6 +224,30 @@
             "failover"
           ]
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "regy.lifecycle",
+          "operations": [
+            "service_batch",
+            "instance_batch",
+            "version_batch",
+            "discovery_batch",
+            "gateway_publication_batch",
+            "review_batch",
+            "registry_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "regy.services",
+            "regy.instances",
+            "regy.versions",
+            "regy.discovery",
+            "regy.gateway_publications",
+            "regy.reviews",
+            "regy.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -129,7 +260,9 @@
           "enable_gateway_sync": true,
           "enable_health_dashboard": true,
           "enable_instance_manager": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_registration_console": true,
+          "enable_registry_agent_roster": true,
           "enable_retirement_reviews": true,
           "enable_service_catalog": true,
           "enable_settings": true,
@@ -143,17 +276,25 @@
       "master_data": {},
       "name": "API/Service Registry",
       "provides": [
-        "regy_operations"
+        "service_registry",
+        "service_discovery",
+        "registry_agent_composition"
       ],
       "registry_lifecycle": {
         "audit": "RegistryAuditEvent",
         "gateway_publication": "RegistryGatewayPublication",
         "instance": "RegistryInstanceRecord",
+        "lifecycle_batch": "RegistryLifecycleBatchRecord",
+        "registry_agent": "RegistryAgentRecord",
         "review": "RegistryReviewRecord",
         "service": "RegistryServiceRecord",
         "version": "RegistryVersionRecord"
       },
-      "requires": [],
+      "requires": [
+        "apig",
+        "auth",
+        "conf"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -483,6 +624,111 @@
               "required_action": "configure_trace_propagation"
             },
             "name": "production_requires_tracing"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_registry_agent"
+            },
+            "description": "Registry agents must use a supported runtime adapter.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_registry_agent_runtime",
+              "required_action": "choose_supported_registry_agent_runtime"
+            },
+            "name": "registry_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_registry_agent"
+            },
+            "description": "Registry agents must use a supported registry role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_registry_agent_role",
+              "required_action": "choose_supported_registry_agent_role"
+            },
+            "name": "registry_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_registry_agent",
+              "scope_present": false
+            },
+            "description": "Registry agents require an explicit bounded scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registry_agent_scope_required",
+              "required_action": "declare_registry_agent_scope"
+            },
+            "name": "registry_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_registry_agent",
+              "owner_present": false
+            },
+            "description": "Registry agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registry_agent_owner_required",
+              "required_action": "assign_registry_agent_owner"
+            },
+            "name": "registry_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_registry_agent",
+              "purpose_present": false
+            },
+            "description": "Registry agents require a documented purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registry_agent_purpose_required",
+              "required_action": "document_registry_agent_purpose"
+            },
+            "name": "registry_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_registry_agent"
+            },
+            "description": "Registry agents must disclose machine-authored registry contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "registry_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "registry_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_registry_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged registry-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "registry_agent_human_approval_required",
+              "required_action": "record_human_registry_agent_approval"
+            },
+            "name": "registry_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_regy_lifecycle_batch"
+            },
+            "description": "REGY lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_regy_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_regy_stream_required"
           }
         ],
         "type": "deterministic"
@@ -815,6 +1061,111 @@
             "required_action": "configure_trace_propagation"
           },
           "name": "production_requires_tracing"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_registry_agent"
+          },
+          "description": "Registry agents must use a supported runtime adapter.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_registry_agent_runtime",
+            "required_action": "choose_supported_registry_agent_runtime"
+          },
+          "name": "registry_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_registry_agent"
+          },
+          "description": "Registry agents must use a supported registry role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_registry_agent_role",
+            "required_action": "choose_supported_registry_agent_role"
+          },
+          "name": "registry_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_registry_agent",
+            "scope_present": false
+          },
+          "description": "Registry agents require an explicit bounded scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registry_agent_scope_required",
+            "required_action": "declare_registry_agent_scope"
+          },
+          "name": "registry_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_registry_agent",
+            "owner_present": false
+          },
+          "description": "Registry agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registry_agent_owner_required",
+            "required_action": "assign_registry_agent_owner"
+          },
+          "name": "registry_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_registry_agent",
+            "purpose_present": false
+          },
+          "description": "Registry agents require a documented purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registry_agent_purpose_required",
+            "required_action": "document_registry_agent_purpose"
+          },
+          "name": "registry_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_registry_agent"
+          },
+          "description": "Registry agents must disclose machine-authored registry contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "registry_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "registry_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_registry_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged registry-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "registry_agent_human_approval_required",
+            "required_action": "record_human_registry_agent_approval"
+          },
+          "name": "registry_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_regy_lifecycle_batch"
+          },
+          "description": "REGY lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_regy_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_regy_stream_required"
         }
       ],
       "runtime": {
@@ -824,6 +1175,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "RegistryAgentRoster",
+          "permission": "registry:update_service",
+          "route": "/regy/agents"
+        },
         "audit": {
           "component": "RegistryAuditTimeline",
           "permission": "registry:view_events",
@@ -859,6 +1215,11 @@
           "permission": "registry:update_service",
           "route": "/regy/instances"
         },
+        "lifecycle": {
+          "component": "RegistryLifecycleBatchMonitor",
+          "permission": "registry:view_events",
+          "route": "/regy/lifecycle"
+        },
         "register": {
           "component": "ServiceRegistrationConsole",
           "permission": "registry:register_service",
@@ -886,13 +1247,38 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "engine": "bytewax",
+        "lifecycle_stream": "regy.lifecycle",
+        "operations": [
+          "service_batch",
+          "instance_batch",
+          "version_batch",
+          "discovery_batch",
+          "gateway_publication_batch",
+          "review_batch",
+          "registry_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "regy.services",
+          "regy.instances",
+          "regy.versions",
+          "regy.discovery",
+          "regy.gateway_publications",
+          "regy.reviews",
+          "regy.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
           "audit_timeline": {
             "status_style": "decision-pill",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "status_indicator": "processor-chip",
+            "visual": "stream-batches"
           },
           "contract_review_queue": {
             "highlight": "schema-chip",
@@ -917,6 +1303,10 @@
           "registration_console": {
             "status_indicator": "guardrail-chip",
             "visual": "service-form"
+          },
+          "registry_agent_roster": {
+            "status_indicator": "approval-chip",
+            "visual": "agent-roster"
           },
           "retirement_review_panel": {
             "status_indicator": "retirement-chip",
@@ -1029,6 +1419,20 @@
             "permission": "registry:view_events"
           },
           {
+            "component": "RegistryAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/regy/agents",
+            "permission": "registry:update_service"
+          },
+          {
+            "component": "RegistryLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/regy/lifecycle",
+            "permission": "registry:view_events"
+          },
+          {
             "component": "RegistrySettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -1046,14 +1450,74 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "registry_governance": {
+        "approval": "human approval is required before privileged registry agents mutate registry state",
+        "roles": [
+          "registration_reviewer",
+          "contract_reviewer",
+          "discovery_reviewer",
+          "health_reviewer",
+          "gateway_sync_reviewer",
+          "owner_transfer_reviewer",
+          "retirement_reviewer",
+          "catalog_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "regy": []
+      "regy": [
+        "apig",
+        "auth",
+        "conf"
+      ]
     }
   },
   "contracts": {
     "regy": {
+      "agents": {
+        "approval": "human approval is required before privileged registry agents mutate registry state",
+        "external_runtimes_are_adapters": true,
+        "first_class": true,
+        "privileged_roles": [
+          "registration_reviewer",
+          "contract_reviewer",
+          "discovery_reviewer",
+          "health_reviewer",
+          "gateway_sync_reviewer",
+          "owner_transfer_reviewer",
+          "retirement_reviewer"
+        ],
+        "requires": [
+          "scope",
+          "owner",
+          "purpose",
+          "contribution_disclosure"
+        ],
+        "supported_roles": [
+          "registration_reviewer",
+          "contract_reviewer",
+          "discovery_reviewer",
+          "health_reviewer",
+          "gateway_sync_reviewer",
+          "owner_transfer_reviewer",
+          "retirement_reviewer",
+          "catalog_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "audit_sink": "audl",
@@ -1066,6 +1530,39 @@
           "metrics_sink": "moni",
           "production_runtime": "service.ServiceRegistryService",
           "service_discovery": "conf"
+        },
+        "agents": {
+          "contribution_disclosure_required": true,
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "owner_required": true,
+          "privileged_roles": [
+            "registration_reviewer",
+            "contract_reviewer",
+            "discovery_reviewer",
+            "health_reviewer",
+            "gateway_sync_reviewer",
+            "owner_transfer_reviewer",
+            "retirement_reviewer"
+          ],
+          "purpose_required": true,
+          "scope_required": true,
+          "supported_roles": [
+            "registration_reviewer",
+            "contract_reviewer",
+            "discovery_reviewer",
+            "health_reviewer",
+            "gateway_sync_reviewer",
+            "owner_transfer_reviewer",
+            "retirement_reviewer",
+            "catalog_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "contracts": {
           "breaking_change_review_required": true,
@@ -1143,6 +1640,30 @@
             "failover"
           ]
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "regy.lifecycle",
+          "operations": [
+            "service_batch",
+            "instance_batch",
+            "version_batch",
+            "discovery_batch",
+            "gateway_publication_batch",
+            "review_batch",
+            "registry_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "regy.services",
+            "regy.instances",
+            "regy.versions",
+            "regy.discovery",
+            "regy.gateway_publications",
+            "regy.reviews",
+            "regy.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1155,7 +1676,9 @@
           "enable_gateway_sync": true,
           "enable_health_dashboard": true,
           "enable_instance_manager": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_registration_console": true,
+          "enable_registry_agent_roster": true,
           "enable_retirement_reviews": true,
           "enable_service_catalog": true,
           "enable_settings": true,
@@ -1164,9 +1687,39 @@
       },
       "id": "regy",
       "provides": [
-        "regy_operations"
+        "service_registry",
+        "service_discovery",
+        "registry_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "apig",
+        "auth",
+        "conf"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "lifecycle_stream": "regy.lifecycle",
+        "operations": [
+          "service_batch",
+          "instance_batch",
+          "version_batch",
+          "discovery_batch",
+          "gateway_publication_batch",
+          "review_batch",
+          "registry_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "regy.services",
+          "regy.instances",
+          "regy.versions",
+          "regy.discovery",
+          "regy.gateway_publications",
+          "regy.reviews",
+          "regy.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1212,6 +1765,19 @@
         "required_action": "record_compatibility_review"
       },
       "name": "breaking_change_requires_review"
+    },
+    "bytewax_regy_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_regy_lifecycle_batch"
+      },
+      "description": "REGY lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_regy_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_regy_stream_required"
     },
     "deprecation_requires_future_eol": {
       "condition": {
@@ -1436,6 +2002,98 @@
         "required_action": "configure_trace_propagation"
       },
       "name": "production_requires_tracing"
+    },
+    "registry_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_registry_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged registry-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "registry_agent_human_approval_required",
+        "required_action": "record_human_registry_agent_approval"
+      },
+      "name": "registry_agent_privileged_role_requires_human_approval"
+    },
+    "registry_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_registry_agent"
+      },
+      "description": "Registry agents must disclose machine-authored registry contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registry_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "registry_agent_requires_contribution_disclosure"
+    },
+    "registry_agent_requires_owner": {
+      "condition": {
+        "operation": "register_registry_agent",
+        "owner_present": false
+      },
+      "description": "Registry agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registry_agent_owner_required",
+        "required_action": "assign_registry_agent_owner"
+      },
+      "name": "registry_agent_requires_owner"
+    },
+    "registry_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_registry_agent",
+        "purpose_present": false
+      },
+      "description": "Registry agents require a documented purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registry_agent_purpose_required",
+        "required_action": "document_registry_agent_purpose"
+      },
+      "name": "registry_agent_requires_purpose"
+    },
+    "registry_agent_requires_scope": {
+      "condition": {
+        "operation": "register_registry_agent",
+        "scope_present": false
+      },
+      "description": "Registry agents require an explicit bounded scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "registry_agent_scope_required",
+        "required_action": "declare_registry_agent_scope"
+      },
+      "name": "registry_agent_requires_scope"
+    },
+    "registry_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_registry_agent"
+      },
+      "description": "Registry agents must use a supported registry role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_registry_agent_role",
+        "required_action": "choose_supported_registry_agent_role"
+      },
+      "name": "registry_agent_role_supported"
+    },
+    "registry_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_registry_agent"
+      },
+      "description": "Registry agents must use a supported runtime adapter.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_registry_agent_runtime",
+        "required_action": "choose_supported_registry_agent_runtime"
+      },
+      "name": "registry_agent_runtime_supported"
     },
     "service_registration_requires_api_version": {
       "condition": {

@@ -28,13 +28,17 @@ def test_registry_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "regy"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 20
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 33
 	assert contract["theme"]["tokens"]["border.radius"]
 	assert contract["configuration"]["registration"]["health_endpoint_required"] is True
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "registry_runtime.RegistryService"
 	assert contract["rule_engine"]["type"] == "deterministic"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert contract["provides"] == ["service_registry", "service_discovery", "registry_agent_composition"]
+	assert contract["requires"] == ["apig", "auth", "conf"]
 
 
 def test_registry_app_entrypoint_is_publishable():
@@ -54,4 +58,7 @@ def test_registry_app_entrypoint_is_publishable():
 	assert model["capabilities"]["regy"]["runtime"]["service"] == "registry_runtime.py"
 	assert model["capabilities"]["regy"]["runtime"]["views"] == "view_models.py"
 	assert model["capabilities"]["regy"]["registry_lifecycle"]["service"] == "RegistryServiceRecord"
+	assert model["capabilities"]["regy"]["registry_lifecycle"]["registry_agent"] == "RegistryAgentRecord"
 	assert model["capabilities"]["regy"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["regy"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["regy"]["agents"]["first_class"] is True

@@ -2,7 +2,8 @@
 
 REGY provides APG applications with a governed registry control plane for
 service registration, instance registration, service discovery, version
-governance, gateway publication, retirement, and audit evidence.
+governance, gateway publication, first-class registry-agent composition,
+Bytewax lifecycle batches, retirement, and audit evidence.
 
 ## Runtime Shape
 
@@ -23,8 +24,12 @@ governance, gateway publication, retirement, and audit evidence.
 4. Record versions and compatibility evidence for contract changes.
 5. Publish only healthy registered services with routing metadata to gateway
    adapters.
-6. Retire services only after impact review and gateway unpublish evidence.
-7. Emit audit events for lifecycle decisions.
+6. Register governed AI and automation agents with runtime, role, scope, owner,
+   purpose, contribution disclosure, and human approval for privileged roles.
+7. Validate registry lifecycle mutation batches through Bytewax before adapter
+   side effects.
+8. Retire services only after impact review and gateway unpublish evidence.
+9. Emit audit events for lifecycle decisions.
 
 ## Guardrails
 
@@ -33,13 +38,17 @@ version, schema, unique name, instance endpoint, health probe, allowed region,
 positive weight, gateway registration, healthy instance, routing metadata,
 migration notes, future EOL date, health override incident reference,
 retirement impact review, gateway unpublish evidence, and production tracing.
+They also deny unsupported registry-agent runtimes, unsupported agent roles,
+missing agent scope, missing owner, missing purpose, missing contribution
+disclosure, and non-Bytewax registry lifecycle batches.
 
 REGY guardrails require review for production registrations, high discovery
-limits, breaking changes, and owner transfers.
+limits, breaking changes, owner transfers, and privileged registry-agent roles
+that lack human approval evidence.
 
 ## Adapter Boundaries
 
 Generated-app REGY does not run a live service mesh, APG gateway, cache,
-monitoring backend, audit sink, or Bytewax worker. Production adapters for
-`auth`, `conf`, `moni`, `audl`, `apig`, `cach`, and Bytewax must honor REGY
-decisions before side effects.
+monitoring backend, audit sink, external AI runtime, or Bytewax worker.
+Production adapters for `auth`, `conf`, `moni`, `audl`, `apig`, `cach`,
+agent runtimes, and Bytewax must honor REGY decisions before side effects.

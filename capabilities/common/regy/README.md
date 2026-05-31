@@ -4,6 +4,9 @@ REGY is APG's governed API and service registry. It lets generated
 applications register services and instances, discover healthy endpoints,
 govern API versions, publish registry evidence to gateway adapters, retire
 services with impact evidence, and expose audit-ready registry decisions.
+REGY also treats AI and automation agents as governed registry participants,
+so tools such as Codex, Claude Code, OpenCode, Pi, and future runtimes compose
+through policy-controlled adapters instead of informal side channels.
 
 REGY is intentionally split into two layers:
 
@@ -28,11 +31,15 @@ REGY is intentionally split into two layers:
 - Gateway publication guardrails for registered services, healthy instances,
   and routing metadata.
 - Retirement guardrails requiring impact review and gateway unpublish evidence.
+- First-class registry-agent composition with supported runtimes, role
+  guardrails, bounded scope, accountable owner, purpose, contribution
+  disclosure, and human approval for privileged registry roles.
+- Bytewax lifecycle batch validation for registry mutation streams.
 - Deterministic rule decisions that return `allow`, `deny`, or
   `require_review`.
 - UI view models for dashboard, catalog, registration, discovery, instances,
   health, versions, contract reviews, gateway sync, retirements, audit, and
-  settings.
+  settings, plus registry-agent roster and lifecycle-batch monitor surfaces.
 - Contract-derived semantic model, package manifest, and release evidence.
 
 ## Important Files
@@ -88,26 +95,54 @@ publication = registry.publish_to_gateway(
 )
 
 assert publication["status"] == "published"
+
+agent = registry.register_registry_agent(
+    agent_id="catalog-agent",
+    tenant_id="tenant-a",
+    name="Catalog Agent",
+    runtime="codex",
+    role="catalog_steward",
+    scope="catalog hygiene",
+    owner="registry-office",
+    purpose="maintain service catalog metadata",
+)
+
+batch = registry.validate_regy_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=4,
+)
+
+assert agent["status"] == "active"
+assert batch["status"] == "accepted"
 ```
 
 ## UI Composition
 
 ```python
 from capabilities.common.regy.registry_runtime import RegistryService
-from capabilities.common.regy.view_models import dashboard_model, service_catalog_model
+from capabilities.common.regy.view_models import (
+    dashboard_model,
+    lifecycle_batch_model,
+    registry_agent_roster_model,
+    service_catalog_model,
+)
 
 registry = RegistryService()
 dashboard = dashboard_model(registry, "tenant-a")
 catalog = service_catalog_model(registry, "tenant-a")
+agents = registry_agent_roster_model(registry, "tenant-a")
+lifecycle = lifecycle_batch_model(registry, "tenant-a")
 ```
 
 ## Production Runtime Boundary
 
 The generated-app control plane does not run a live service mesh, ingress
-controller, cache cluster, Bytewax flow, APG gateway, external monitor, or
-audit sink. Production deployments bind adapters for auth, configuration,
-monitoring, audit, cache, gateway synchronization, and Bytewax event streaming.
-Those adapters must honor REGY guardrail decisions before side effects.
+controller, cache cluster, Bytewax worker, APG gateway, external monitor,
+audit sink, or vendor-specific agent runtime. Production deployments bind
+adapters for auth, configuration, monitoring, audit, cache, gateway
+synchronization, external AI runtimes, and Bytewax event streaming. Those
+adapters must honor REGY guardrail decisions before side effects.
 
 ## Focused Verification
 

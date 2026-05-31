@@ -24,7 +24,8 @@ __capability_name__ = "Registry (regy)"
 __capability_description__ = "API/Service Registry with intelligent service discovery"
 __apg_capability_id__ = "regy"
 __apg_capability_type__ = "integration"
-__apg_dependencies__ = ["auth", "conf", "moni", "audl", "apig", "cach"]
+__apg_dependencies__ = ["apig", "auth", "conf"]
+__apg_optional_dependencies__ = ["moni", "audl", "cach"]
 
 # APG Capability Metadata for Composition Engine
 APG_CAPABILITY_METADATA = {
@@ -34,21 +35,18 @@ APG_CAPABILITY_METADATA = {
 	"version": __version__,
 	"type": "integration",
 	"category": "service_management",
-	"dependencies": [
-		"auth",      # Authentication and RBAC
-		"conf",      # Configuration management
-		"moni",      # Monitoring and observability
-		"audl",      # Audit logging
-		"apig",      # API Gateway integration
-		"cach"       # Discovery cache adapters
-	],
+	"dependencies": __apg_dependencies__,
+	"optional_dependencies": __apg_optional_dependencies__,
 	"provides": [
+		"service_registry",
 		"service_discovery",
 		"service_registration",
 		"health_monitoring",
 		"load_balancing",
 		"circuit_breaking",
-		"api_versioning"
+		"api_versioning",
+		"registry_agent_composition",
+		"bytewax_lifecycle_batches"
 	],
 	"integration_points": {
 		"auth": ["service_authentication", "rbac_policies"],
@@ -62,7 +60,9 @@ APG_CAPABILITY_METADATA = {
 		"health": "/api/regy/v1/health",
 		"metrics": "/api/regy/v1/metrics",
 		"discovery": "/api/regy/v1/discover",
-		"registration": "/api/regy/v1/register"
+		"registration": "/api/regy/v1/register",
+		"agents": "/api/regy/v1/agents",
+		"lifecycle": "/api/regy/v1/lifecycle"
 	},
 	"ui_integration": {
 		"menu_items": [
@@ -99,11 +99,14 @@ def register_capability() -> dict:
 		"display_name": "API/Service Registry",
 		"description": __capability_description__,
 		"version": __version__,
-		"dependencies": APG_CAPABILITY_METADATA["dependencies"],
-		"optional_dependencies": [],
+		"dependencies": contract["requires"],
+		"optional_dependencies": APG_CAPABILITY_METADATA["optional_dependencies"],
+		"provides": contract["provides"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"service_registration": "Register tenant-scoped services and API contracts",
 			"service_discovery": "Discover healthy service instances for callers and gateway sync",
@@ -113,6 +116,8 @@ def register_capability() -> dict:
 			"gateway_publication": "Publish healthy registered services to API gateway adapters",
 			"retirement_governance": "Retire services only with impact and gateway unpublish evidence",
 			"capability_rules": "Evaluate deterministic registry governance rules",
+			"registry_agent_composition": "Govern AI and automation agents that review or mutate registry state",
+			"bytewax_lifecycle_batches": "Validate registry lifecycle mutation batches through Bytewax",
 			"visual_theming": "Apply service-catalog theme tokens and components"
 		},
 		"endpoints": {
@@ -123,7 +128,9 @@ def register_capability() -> dict:
 			"health": "/api/regy/v1/health",
 			"versions": "/api/regy/v1/versions",
 			"contracts": "/api/regy/v1/contracts",
-			"gateway_sync": "/api/regy/v1/gateway-sync"
+			"gateway_sync": "/api/regy/v1/gateway-sync",
+			"agents": "/api/regy/v1/agents",
+			"lifecycle": "/api/regy/v1/lifecycle"
 		},
 		"ui_components": {
 			route["name"]: route["path"]

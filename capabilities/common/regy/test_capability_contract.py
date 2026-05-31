@@ -11,6 +11,8 @@ from capabilities.common.regy.registry_runtime import RegistryService
 from capabilities.common.regy.view_models import (
 	dashboard_model,
 	discovery_console_model,
+	lifecycle_batch_model,
+	registry_agent_roster_model,
 	service_catalog_model,
 )
 
@@ -32,10 +34,18 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"governance",
 		"observability",
 		"adapters",
+		"agents",
+		"streaming",
 		"ui",
 		"theme",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 20
+	assert len(contract["rule_engine"]["rules"]) >= 33
+	assert contract["provides"] == ["service_registry", "service_discovery", "registry_agent_composition"]
+	assert contract["requires"] == ["apig", "auth", "conf"]
+	assert contract["agents"]["first_class"] is True
+	assert "codex" in contract["agents"]["supported_runtimes"]
+	assert "contract_reviewer" in contract["agents"]["supported_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "registry_runtime.RegistryService"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
@@ -50,11 +60,14 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 		"gateway_sync",
 		"retirements",
 		"audit",
+		"agents",
+		"lifecycle",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/api/regy/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "gateway_sync_panel" in contract["theme"]["components"]
+	assert "registry_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_registry_guardrails():
@@ -82,6 +95,39 @@ def test_rule_engine_enforces_registry_guardrails():
 		"production_registration_requires_review",
 		"production_requires_tracing",
 	}
+
+
+def test_rule_engine_enforces_registry_agent_and_bytewax_guardrails():
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_registry_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	stream_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_regy_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"registry_agent_runtime_supported",
+		"registry_agent_role_supported",
+		"registry_agent_requires_scope",
+		"registry_agent_requires_owner",
+		"registry_agent_requires_purpose",
+		"registry_agent_requires_contribution_disclosure",
+		"registry_agent_privileged_role_requires_human_approval",
+	}
+	assert stream_result["decision"] == "deny"
+	assert stream_result["matched_rules"] == ["bytewax_regy_stream_required"]
 
 
 def test_registry_runtime_registers_discovers_and_publishes_services():
@@ -199,6 +245,57 @@ def test_registry_runtime_records_reviews_and_retirement_evidence():
 	assert retired["status"] == "retired"
 
 
+def test_registry_runtime_governs_agents_and_lifecycle_batches():
+	registry = RegistryService()
+
+	with pytest.raises(PermissionError, match="unsupported_registry_agent_runtime"):
+		registry.register_registry_agent(
+			agent_id="unknown-agent",
+			tenant_id="tenant-a",
+			name="Unknown Agent",
+			runtime="unsupported",
+			role="contract_reviewer",
+			scope="service contracts",
+			owner="platform",
+			purpose="review registry contracts",
+		)
+
+	pending = registry.register_registry_agent(
+		agent_id="contract-agent",
+		tenant_id="tenant-a",
+		name="Contract Agent",
+		runtime="Claude Code",
+		role="contract reviewer",
+		scope="service contracts",
+		owner="platform",
+		purpose="review registry contracts",
+		human_approval_required=False,
+	)
+	active = registry.register_registry_agent(
+		agent_id="catalog-agent",
+		tenant_id="tenant-a",
+		name="Catalog Agent",
+		runtime="codex",
+		role="catalog_steward",
+		scope="catalog hygiene",
+		owner="registry-office",
+		purpose="maintain service catalog metadata",
+	)
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		registry.validate_regy_lifecycle_batch("tenant-a", "kafka", 2)
+	batch = registry.validate_regy_lifecycle_batch("tenant-a", "bytewax", 4)
+	summary = registry.registry_summary("tenant-a")
+
+	assert pending["status"] == "pending_review"
+	assert pending["runtime"] == "claude_code"
+	assert active["status"] == "active"
+	assert batch["status"] == "accepted"
+	assert summary["registry_agent_count"] == 2
+	assert summary["lifecycle_batch_count"] == 2
+	assert summary["denied_lifecycle_batch_count"] == 1
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -208,7 +305,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "regy_service_catalog"
 	assert registration["ui_components"]["discovery"] == "/regy/discovery"
 	assert "apig" in registration["dependencies"]
-	assert "cach" in registration["dependencies"]
+	assert "auth" in registration["dependencies"]
+	assert "cach" in registration["optional_dependencies"]
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 
 
 def test_generated_ui_models_are_composable():
@@ -228,7 +328,22 @@ def test_generated_ui_models_are_composable():
 	dashboard = dashboard_model(registry, "tenant-a")
 	catalog = service_catalog_model(registry, "tenant-a")
 	discovery = discovery_console_model(registry, "tenant-a")
+	registry.register_registry_agent(
+		agent_id="catalog-agent",
+		tenant_id="tenant-a",
+		name="Catalog Agent",
+		runtime="codex",
+		role="catalog_steward",
+		scope="catalog hygiene",
+		owner="registry-office",
+		purpose="maintain service catalog metadata",
+	)
+	registry.validate_regy_lifecycle_batch("tenant-a", "bytewax", 1)
+	agents = registry_agent_roster_model(registry, "tenant-a")
+	batches = lifecycle_batch_model(registry, "tenant-a")
 
 	assert dashboard["summary"]["service_count"] == 1
 	assert catalog["services"][0]["name"] == "orders"
 	assert discovery["defaults"]["service_discovery_enabled"] is True
+	assert agents["agents"][0]["runtime"] == "codex"
+	assert batches["required_processor"] == "bytewax"
