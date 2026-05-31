@@ -12,7 +12,8 @@ The capability must support:
 - Realtime sessions with secure transport, protocol health, event bus evidence, recording-retention controls, and participant membership checks.
 - Shared artifacts with artifact policy, version history, DLP checks, duplicate-ID protection, annotations, and decision records.
 - Presence and cursor state for active sessions.
-- AI collaborators with registration, workspace scope, and contribution disclosure.
+- First-class AI collaborators and governance agents with supported runtimes, supported roles, explicit scope, accountable owner, declared purpose, contribution disclosure, and human approval evidence for privileged roles.
+- Bytewax lifecycle batch validation for workspace, session, artifact, annotation, decision, presence, protocol, guest-access, and collaboration-agent mutation streams.
 - UI route contracts and dependency-light view models.
 - Bytewax-backed event-stream configuration for batch collaboration mutations.
 
@@ -43,6 +44,8 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `governance`
 - `retention`
 - `observability`
+- `agents`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -60,6 +63,8 @@ The deterministic rule engine covers:
 - decision annotation, owner, and evidence checks
 - workspace export approval
 - AI collaborator registration, scope, and disclosure checks
+- first-class collaboration-agent runtime, role, scope, owner, purpose, contribution-disclosure, and privileged-role approval checks
+- Bytewax lifecycle batch operation and mutation-count checks
 - audit evidence
 - cross-tenant access denial
 - Bytewax batch mutation enforcement
@@ -74,6 +79,8 @@ The deterministic rule engine covers:
 - annotations
 - decisions
 - presence
+- collaboration agents
+- lifecycle batch records
 - audit events
 
 The runtime uses tenant-qualified keys so public IDs can repeat across tenants.
@@ -81,6 +88,14 @@ The runtime uses tenant-qualified keys so public IDs can repeat across tenants.
 ## Production Boundary
 
 Existing production-oriented files remain in the package, including `production_app.py`, `service.py`, `api.py`, `views.py`, WebRTC, WebSocket, and protocol managers. The generated runtime does not start servers or require these integrations.
+
+## AI-Agent Composition
+
+AI collaborators are first-class application components. Generated applications may compose Codex, Claude Code, OpenCode, Pi, or later runtimes through the provider-neutral `aicr_provider_neutral_collaboration_agent_adapter`, but the runtime must validate supported runtime, supported role, explicit scope, accountable owner, declared purpose, contribution disclosure, tenant context, and privileged-role approval state before accepting the agent as active.
+
+## Lifecycle Composition
+
+COLB lifecycle batches must be routed through Bytewax. The `streaming` manifest declares `colb.lifecycle`, `event_time` watermarking, the required `bytewax` processor, supported operations, and topic names for durable integration. The dependency-light runtime validates lifecycle batches without starting a live Bytewax worker.
 
 ## UI
 
@@ -94,6 +109,7 @@ The UI contract exposes:
 - annotations
 - decisions
 - agents
+- lifecycle
 - protocols
 - analytics
 - audit

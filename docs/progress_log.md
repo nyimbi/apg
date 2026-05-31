@@ -19413,9 +19413,9 @@ Not run to preserve battery:
 - External NTFY, MQEB, AUTH, MTEN, AUDL, NLPC, AICR, COLB, SECU, or CACH
   adapters.
 
-### 2026-05-30 13:43 EAT
+### 2026-05-31 11:47 EAT
 
-COLB lifecycle and guardrail packet:
+COLB first-class agent composition and Bytewax lifecycle guardrail packet:
 
 - Selected `capabilities/common/colb` as the next common capability after CHAT.
 - Added local `README.md`, `SPECIFICATION.md`, and `PLAN.md`, and replaced
@@ -19425,9 +19425,15 @@ COLB lifecycle and guardrail packet:
   generated-application entrypoint.
 - Expanded the executable COLB contract to cover workspaces, realtime sessions,
   shared artifacts, annotations, decision records, presence, protocol health,
-  AI collaborators, security, governance, retention, observability, Bytewax
-  event streaming, APG adapters, UI routes, and visual theme tokens.
-- Expanded deterministic guardrails to 36 rules covering tenant context,
+  AI collaborators, first-class provider-neutral collaboration agents,
+  security, governance, retention, observability, Bytewax lifecycle streaming,
+  APG adapters, UI routes, and visual theme tokens.
+- Added top-level `agents` and `streaming` manifests for provider-neutral
+  runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  collaboration-governance roles, privileged-role metadata, adapter contract
+  metadata, `colb.lifecycle`, required Bytewax processor evidence, lifecycle
+  operations, and lifecycle topics.
+- Expanded deterministic guardrails to 45 rules covering tenant context,
   workspace owner/name/participant/retention/external-policy/external-expiry
   and large-workspace review, session workspace/owner/owner-membership/active
   workspace/secure transport/protocol health/event bus/recording retention and
@@ -19449,29 +19455,48 @@ COLB lifecycle and guardrail packet:
 - Renamed the focused package test away from stale package-test terminology and
   expanded coverage for API helpers, view models, tenant-local IDs, session
   owner membership, external collaboration, protocol health, artifact DLP,
-  decisions, duplicate artifact IDs, AI collaborator controls, large-workspace
-  review, and publishability.
+  decisions, duplicate artifact IDs, AI collaborator controls, collaboration
+  agent runtime/role/scope/owner/purpose/disclosure/approval controls,
+  lifecycle batch validation, large-workspace review, and publishability.
+- Added `CollaborationAgentRecord`, `ColbLifecycleBatchRecord`,
+  tenant-qualified collaboration-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, collaboration-agent
+  roster view models, lifecycle monitor view models, and package API helpers.
+- Added `/colb/lifecycle`, collaboration-agent roster theme metadata, and
+  Bytewax lifecycle panel theme metadata.
 
 Battery-conscious verification:
 
-- `./.venv/bin/python -m py_compile capabilities/common/colb/__init__.py capabilities/common/colb/capability_contract.py capabilities/common/colb/collaboration_runtime.py capabilities/common/colb/package_api.py capabilities/common/colb/view_models.py capabilities/common/colb/app.py capabilities/common/colb/production_app.py capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py` passed.
+- `./.venv/bin/python -m py_compile capabilities/common/colb/__init__.py capabilities/common/colb/capability_contract.py capabilities/common/colb/collaboration_runtime.py capabilities/common/colb/package_api.py capabilities/common/colb/view_models.py capabilities/common/colb/app.py capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py` passed.
 - `./.venv/bin/pytest -q capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py` passed with 10 tests and only unrelated shared-module deprecation warnings.
-- `./.venv/bin/python -c "... app.self_test() ..."` returned `passed: true`, no errors, and COLB capability evidence.
+- `./.venv/bin/python capabilities/common/colb/app.py` passed the package self-test.
+- `./.venv/bin/apg capabilities inspect colb --json` passed with `ok: true`,
+  13 APG Python routes, 45 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
 - `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/colb --json` passed with `ok: true`; COLB remains `domain_specific`, with 0 baseline markers, 0 errors, and 0 warnings.
-- `./.venv/bin/apg capabilities publish-plan capabilities/common/colb --json` passed with 12 UI routes, 36 deterministic rules, Bytewax adapter evidence, side-effect-free package evidence, and no publish warnings.
-- `rg -n -e "World-class" -e "world-class" -e "WORLD_CLASS" -e "Revolutionary" -e "revolutionary" -e "10x" -e "Gartner" -e "Magic Quadrant" -e "mock data" -e "mock calculation" -e "materialized" -e "Materialized" -e "placeholder" capabilities/common/colb/README.md capabilities/common/colb/SPECIFICATION.md capabilities/common/colb/PLAN.md capabilities/common/colb/cap_spec.md capabilities/common/colb/__init__.py capabilities/common/colb/capability_contract.py capabilities/common/colb/collaboration_runtime.py capabilities/common/colb/package_api.py capabilities/common/colb/view_models.py capabilities/common/colb/app.py capabilities/common/colb/production_app.py capabilities/common/colb/test_capability_contract.py capabilities/common/colb/tests/test_package_contract.py capabilities/common/colb/package_manifest.json capabilities/common/colb/release_report.json capabilities/common/colb/semantic_model.json` returned no primary-slice stale markers.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/colb --json` passed with side-effect-free package evidence and no publish warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/colb/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/colb/package_manifest.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/colb/release_report.json`
+  passed.
+- Runtime smoke executed workspace creation, session start/join, artifact share,
+  active `codex` collaboration-steward registration, and accepted `bytewax`
+  lifecycle-batch validation, returning `codex active bytewax accepted 1 1`.
+- Focused stale-marker scan over touched COLB packet source, docs, tests, and
+  evidence returned no primary-slice stale markers.
 - `git diff --check -- capabilities/common/colb docs/progress_log.md` passed.
 
 Not run to preserve battery:
 
 - Full repository pytest suite.
 - Live FastAPI/WebRTC/WebSocket servers, MQTT/gRPC/RTMP/SIP/XMPP transports,
-  databases, DLP services, external AI-agent CLIs, browser-rendered UI behavior,
-  session recording, protocol interoperability, and load/performance benchmarks.
+  databases, DLP services, external Codex/Claude Code/OpenCode/Pi runtime
+  clients, browser-rendered UI behavior, session recording, protocol
+  interoperability, and load/performance benchmarks.
 - Persistent database migrations.
-- Live Bytewax stream execution.
-- External CHAT, NTFY, AUTH, MQEB, MTEN, AUDL, WFLO, VIDC, NLPC, SECU, or CACH
-  adapters.
+- Durable Bytewax topology and live stream execution.
+- External CHAT, NTFY, AUTH, MQEB, MTEN, AUDL, AICR, WFLO, VIDC, NLPC, SECU,
+  or CACH adapters.
 
 ### 2026-05-30 14:22 EAT
 

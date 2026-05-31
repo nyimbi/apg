@@ -42,14 +42,16 @@ def semantic_model() -> dict[str, Any]:
 			"colb": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["colb_operations"],
-				"requires": ["chat", "ntfy", "auth"],
+				"provides": ["colb_operations", "collaboration_workspaces", "collaboration_agent_composition"],
+				"requires": ["chat", "ntfy", "auth", "mqeb", "mten", "audl", "aicr"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 				"runtime": {
 					"entrypoint": "app.py",
 					"service": contract["configuration"]["adapters"]["generated_app_runtime"],
@@ -66,6 +68,8 @@ def semantic_model() -> dict[str, Any]:
 					"decision": "DecisionRecord",
 					"presence": "PresenceRecord",
 					"audit": "CollaborationAuditEventRecord",
+					"agent": "CollaborationAgentRecord",
+					"lifecycle_batch": "ColbLifecycleBatchRecord",
 				},
 				"agent_collaboration": contract["configuration"]["ai_agents"],
 				"adapters": contract["configuration"]["adapters"],
@@ -78,19 +82,30 @@ def semantic_model() -> dict[str, Any]:
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
 			}
 		},
 		"contracts": {
 			"colb": {
 				"id": "colb",
 				"configuration": contract["configuration"],
-				"provides": ["colb_operations"],
-				"requires": ["chat", "ntfy", "auth"],
+				"provides": ["colb_operations", "collaboration_workspaces", "collaboration_agent_composition"],
+				"requires": ["chat", "ntfy", "auth", "mqeb", "mten", "audl", "aicr"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"colb": ["chat", "ntfy", "auth"]}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"colb": ["chat", "ntfy", "auth", "mqeb", "mten", "audl", "aicr"]},
+			"applications": {},
+			"agent_teams": {
+				"collaboration_governance": {
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"roles": contract["agents"]["supported_roles"],
+					"adapter_contract": contract["agents"]["adapter_contract"],
+				}
+			},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {"capability": {"kind": "capability", "nodes": 1, "edges": 3}, "package": {"kind": "package", "nodes": 2, "edges": 1}},
 		"source_files": ["capability_contract.py", "collaboration_runtime.py", "package_api.py", "view_models.py", "app.py"],
@@ -104,7 +119,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"colb": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -144,12 +159,16 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 13:
 		errors.append("COLB semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 40:
 		errors.append("COLB semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("COLB adapter manifest must use Bytewax for event streaming")
+	if not capability.get("agents", {}).get("first_class"):
+		errors.append("COLB semantic model must expose first-class agents")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("COLB lifecycle streaming must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "collaboration_runtime.CollaborationRuntime":
 		errors.append("COLB generated-app runtime is missing")
 	return {

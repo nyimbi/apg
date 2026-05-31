@@ -18,6 +18,8 @@ def capability_status(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"route_count": len(contract["ui"]["routes"]),
 		"rule_count": len(contract["rule_engine"]["rules"]),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		**RUNTIME.dashboard_summary(tenant_id),
 	}
 
@@ -87,6 +89,31 @@ def update_presence(payload: dict[str, Any]) -> dict[str, Any]:
 	return RUNTIME.update_presence(str(payload.get("tenant_id") or "default"), str(payload["session_id"]), str(payload["participant_id"]), str(payload.get("status") or "online"), dict(payload.get("cursor") or {}))
 
 
+def register_collaboration_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return RUNTIME.register_collaboration_agent(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		agent_id=str(payload["id"]),
+		name=str(payload["name"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return RUNTIME.validate_colb_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "collaboration_agent_batch"),
+		batch_id=payload.get("batch_id"),
+	)
+
+
 def collaboration_state(tenant_id: str = "default") -> dict[str, Any]:
 	return {
 		"summary": RUNTIME.dashboard_summary(tenant_id),
@@ -96,5 +123,7 @@ def collaboration_state(tenant_id: str = "default") -> dict[str, Any]:
 		"annotations": RUNTIME.list_annotations(tenant_id),
 		"decisions": RUNTIME.list_decisions(tenant_id),
 		"presence": RUNTIME.list_presence(tenant_id),
+		"collaboration_agents": RUNTIME.list_collaboration_agents(tenant_id),
+		"lifecycle_batches": RUNTIME.list_lifecycle_batches(tenant_id),
 		"audit_events": RUNTIME.list_audit_events(tenant_id),
 	}

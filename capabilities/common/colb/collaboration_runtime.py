@@ -7,7 +7,13 @@ from datetime import datetime, timezone
 from hashlib import sha1
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_COLB_AGENT_ROLES,
+	SUPPORTED_COLB_AGENT_ROLES,
+	SUPPORTED_COLB_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 
 
 def utc_now() -> str:
@@ -188,6 +194,66 @@ class CollaborationAuditEventRecord:
 		}
 
 
+@dataclass
+class CollaborationAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool = True
+	human_approval_required: bool = False
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass
+class ColbLifecycleBatchRecord:
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
 class CollaborationRuntime:
 	"""Deterministic tenant-scoped collaboration lifecycle used by generated apps."""
 
@@ -199,6 +265,15 @@ class CollaborationRuntime:
 		self._decisions: dict[str, DecisionRecord] = {}
 		self._presence: dict[str, PresenceRecord] = {}
 		self._audit_events: list[CollaborationAuditEventRecord] = []
+		self._collaboration_agents: dict[str, CollaborationAgentRecord] = {}
+		self._lifecycle_batches: dict[str, ColbLifecycleBatchRecord] = {}
+		self._agent_runtimes = {_normalize_token(item) for item in SUPPORTED_COLB_AGENT_RUNTIMES}
+		self._agent_roles = {_normalize_token(item) for item in SUPPORTED_COLB_AGENT_ROLES}
+		self._privileged_agent_roles = {_normalize_token(item) for item in PRIVILEGED_COLB_AGENT_ROLES}
+		self._lifecycle_operations = {
+			_normalize_token(item)
+			for item in get_capability_contract()["streaming"]["required_operations"]
+		}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -408,8 +483,107 @@ class CollaborationRuntime:
 			"annotation_count": len(self.list_annotations(tenant_id)),
 			"decision_count": len(self.list_decisions(tenant_id)),
 			"presence_count": len(self.list_presence(tenant_id)),
+			"collaboration_agent_count": len(self.list_collaboration_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_collaboration_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
+
+	def register_collaboration_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		record_key = self._key(tenant_id, agent_id)
+		if record_key in self._collaboration_agents:
+			raise ValueError(f"collaboration_agent_already_exists:{agent_id}")
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_collaboration_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("collaboration_agent_name_required")
+		record = CollaborationAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._collaboration_agents[record_key] = record
+		self._audit(tenant_id, "collaboration_agent_registered", agent_id, record.owner, {**record.to_dict(), "rule_decision": result["decision"]})
+		return record.to_dict()
+
+	def validate_colb_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "collaboration_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("colb_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_colb_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_colb_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		accepted = result["decision"] == "allow"
+		record_id = batch_id or f"colb-batch-{len(self._lifecycle_batches) + 1:06d}"
+		record = ColbLifecycleBatchRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._key(tenant_id, record_id)] = record
+		self._audit(tenant_id, f"colb_lifecycle_batch_{record.status}", record_id, "bytewax", record.to_dict())
+		self._raise_if_denied(result)
+		return record.to_dict()
 
 	def list_workspaces(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._tenant_sorted(self._workspaces.values(), tenant_id, "id")
@@ -431,6 +605,12 @@ class CollaborationRuntime:
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._tenant_sorted(self._audit_events, tenant_id, "created_at")
+
+	def list_collaboration_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._collaboration_agents.values(), tenant_id, "id")
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._tenant_sorted(self._lifecycle_batches.values(), tenant_id, "id")
 
 	def _require_tenant(self, tenant_id: str) -> None:
 		self._raise_if_denied(self.evaluate({"tenant_context_present": bool(tenant_id)}))
@@ -465,3 +645,7 @@ class CollaborationRuntime:
 		if tenant_id is not None:
 			items = [item for item in items if item.tenant_id == tenant_id]
 		return [item.to_dict() for item in sorted(items, key=lambda item: getattr(item, sort_key))]
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

@@ -8,7 +8,8 @@
 - Realtime collaboration sessions with secure transport, protocol health, event-bus evidence, recording-retention checks, and participant membership controls.
 - Shared artifacts with artifact policy, version history, DLP checks for external sharing, duplicate-ID protection, annotations, and auditable decisions.
 - Presence state for active sessions and collaborator cursors.
-- AI collaborator guardrails for registered, scoped, disclosed contributions across runtimes such as Codex, Claude Code, OpenCode, and Pi.
+- First-class AI-agent composition for registered, scoped, owned, purpose-bound, disclosed collaboration agents across runtimes such as Codex, Claude Code, OpenCode, and Pi.
+- Bytewax lifecycle batch validation for workspace, session, artifact, annotation, decision, presence, protocol, guest-access, and collaboration-agent mutations.
 - Protocol adapter metadata for WebSocket, WebRTC, MQTT, gRPC, production services, and Bytewax event streams.
 - Dependency-light generated runtime, API helpers, UI view models, package manifest, semantic model, and release evidence.
 
@@ -26,6 +27,8 @@ Primary methods:
 - `add_annotation(...)`
 - `record_decision(...)`
 - `update_presence(...)`
+- `register_collaboration_agent(...)`
+- `validate_colb_lifecycle_batch(...)`
 - `dashboard_summary(...)`
 
 Production integration files such as `production_app.py`, `service.py`, `api.py`, `views.py`, and the protocol managers remain available for heavier deployments.
@@ -43,6 +46,17 @@ Production integration files such as `production_app.py`, `service.py`, `api.py`
 
 The event stream adapter is Bytewax. Batch collaboration mutations must use Bytewax; Kafka is intentionally not part of the packet.
 
+## Agent And Lifecycle Composition
+
+COLB treats AI collaborators as first-class application citizens. The top-level `agents` manifest defines:
+
+- supported runtimes: `codex`, `claude_code`, `opencode`, and `pi`
+- supported roles for workspace, session, artifact, annotation, decision, presence, protocol, guest-access, lifecycle, and collaboration-steward review
+- privileged roles that require human approval evidence before activation
+- a provider-neutral adapter contract: `aicr_provider_neutral_collaboration_agent_adapter`
+
+The top-level `streaming` manifest defines the `colb.lifecycle` stream, `event_time` watermark, required `bytewax` processor, supported lifecycle operations, and topics. `validate_colb_lifecycle_batch(...)` rejects empty, unsupported, or non-Bytewax lifecycle batches before generated applications treat them as accepted collaboration state.
+
 ## UI Surfaces
 
 The generated package exposes route contracts for:
@@ -55,6 +69,7 @@ The generated package exposes route contracts for:
 - annotations
 - decisions
 - agents
+- lifecycle
 - protocols
 - analytics
 - audit
@@ -81,6 +96,23 @@ session = runtime.start_session(
     "session-1",
     workspace["id"],
     "owner",
+)
+agent = runtime.register_collaboration_agent(
+    "tenant-1",
+    "agent-1",
+    "Workspace Steward",
+    "codex",
+    "collaboration_steward",
+    "workspace:workspace-1",
+    "owner",
+    "review collaboration lifecycle",
+    human_approval_required=True,
+)
+batch = runtime.validate_colb_lifecycle_batch(
+    "tenant-1",
+    "bytewax",
+    2,
+    "collaboration_agent_batch",
 )
 ```
 

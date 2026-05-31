@@ -25,6 +25,8 @@ def dashboard_model(runtime: CollaborationRuntime | None = None, tenant_id: str 
 		"annotations": runtime.list_annotations(tenant_id),
 		"decisions": runtime.list_decisions(tenant_id),
 		"presence": runtime.list_presence(tenant_id),
+		"collaboration_agents": runtime.list_collaboration_agents(tenant_id),
+		"lifecycle_batches": runtime.list_lifecycle_batches(tenant_id),
 		"audit_events": runtime.list_audit_events(tenant_id),
 		"theme": contract["theme"],
 	}
@@ -68,6 +70,42 @@ def agent_model(tenant_id: str = "default") -> dict[str, object]:
 			"agent_contribution_disclosure_required",
 		],
 		"theme": contract["theme"]["components"]["agent_panel"],
+	}
+
+
+def collaboration_agent_roster_model(runtime: CollaborationRuntime | None = None, tenant_id: str = "default") -> dict[str, object]:
+	runtime = runtime or CollaborationRuntime()
+	contract = runtime.describe(tenant_id)
+	agents = runtime.list_collaboration_agents(tenant_id)
+	return {
+		"route": "/colb/agents",
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"active": [agent for agent in agents if agent["status"] == "active"],
+		"pending_review": [agent for agent in agents if agent["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"actions": ["register_collaboration_agent", "record_human_collaboration_agent_approval"],
+		"theme_component": "collaboration_agent_roster",
+	}
+
+
+def lifecycle_batch_model(runtime: CollaborationRuntime | None = None, tenant_id: str = "default") -> dict[str, object]:
+	runtime = runtime or CollaborationRuntime()
+	contract = runtime.describe(tenant_id)
+	batches = runtime.list_lifecycle_batches(tenant_id)
+	return {
+		"route": "/colb/lifecycle",
+		"tenant_id": tenant_id,
+		"lifecycle_stream": contract["streaming"]["lifecycle_stream"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"batches": batches,
+		"accepted": [batch for batch in batches if batch["status"] == "accepted"],
+		"denied": [batch for batch in batches if batch["status"] == "denied"],
+		"actions": ["validate_lifecycle_batch", "inspect_bytewax_lifecycle"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 

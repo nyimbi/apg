@@ -35,14 +35,18 @@ def test_package_contract_shape_and_entrypoint_are_publishable():
 	model = app_module.semantic_model()
 
 	assert contract["capability"] == "colb"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 13
+	assert len(contract["rule_engine"]["rules"]) >= 44
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert self_test["passed"] is True
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
-	assert model["capabilities"]["colb"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["colb"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["colb"]["agents"]["first_class"] is True
+	assert model["capabilities"]["colb"]["collaboration_lifecycle"]["lifecycle_batch"] == "ColbLifecycleBatchRecord"
 	assert model["capabilities"]["colb"]["runtime"]["service"] == "collaboration_runtime.CollaborationRuntime"
 
 
@@ -55,13 +59,19 @@ def test_package_api_executes_collaboration_lifecycle():
 	artifact = package_api.share_artifact({"tenant_id": "tenant-api", "artifact_id": "api-artifact", "workspace_id": workspace["id"], "name": "API Artifact", "owner": "owner", "artifact_type": "document"})
 	annotation = package_api.add_annotation({"tenant_id": "tenant-api", "annotation_id": "api-annotation", "artifact_id": artifact["id"], "author": "member", "body": "Looks good"})
 	decision = package_api.record_decision({"tenant_id": "tenant-api", "decision_id": "api-decision", "annotation_id": annotation["id"], "owner": "owner", "decision": "Approved", "evidence": ["ticket"]})
+	agent = package_api.register_collaboration_agent({"tenant_id": "tenant-api", "id": "api-agent", "name": "API Agent", "runtime": "codex", "role": "workspace_reviewer", "scope": "workspace:api-workspace", "owner": "owner", "purpose": "review workspace health"})
+	batch = package_api.validate_lifecycle_batch({"tenant_id": "tenant-api", "event_stream": "bytewax", "mutation_count": 2, "operation": "collaboration_agent_batch", "batch_id": "batch-api"})
 	state = package_api.collaboration_state("tenant-api")
 
 	assert workspace["status"] == "active"
 	assert session["status"] == "active"
 	assert presence["status"] == "online"
 	assert decision["decision"] == "Approved"
+	assert agent["status"] == "active"
+	assert batch["status"] == "accepted"
 	assert state["summary"]["workspace_count"] == 1
+	assert state["summary"]["collaboration_agent_count"] == 1
+	assert state["summary"]["lifecycle_batch_count"] == 1
 	assert state["audit_events"]
 
 
@@ -74,12 +84,16 @@ def test_view_models_match_runtime_state():
 	runtime.share_artifact("tenant-view", "view-artifact", "view-workspace", "Artifact", "owner", "document")
 	runtime.add_annotation("tenant-view", "view-annotation", "view-artifact", "member", "Comment")
 	runtime.record_decision("tenant-view", "view-decision", "view-annotation", "owner", "Approved", ["ticket"])
+	runtime.register_collaboration_agent("tenant-view", "view-agent", "View Agent", "codex", "artifact_reviewer", "artifact:*", "owner", "review artifacts", human_approval_required=True)
+	runtime.validate_colb_lifecycle_batch("tenant-view", "bytewax", 1, "artifact_batch", "view-batch")
 
 	dashboard = view_models.dashboard_model(runtime, "tenant-view")
 	workspaces = view_models.workspace_model(runtime, "tenant-view")
 	sessions = view_models.session_model(runtime, "tenant-view")
 	artifacts = view_models.artifact_model(runtime, "tenant-view")
 	agents = view_models.agent_model("tenant-view")
+	roster = view_models.collaboration_agent_roster_model(runtime, "tenant-view")
+	lifecycle = view_models.lifecycle_batch_model(runtime, "tenant-view")
 	analytics = view_models.analytics_model(runtime, "tenant-view")
 	audit = view_models.audit_model(runtime, "tenant-view")
 	settings = view_models.settings_model("tenant-view")
@@ -89,6 +103,9 @@ def test_view_models_match_runtime_state():
 	assert sessions["presence"][0]["participant_id"] == "member"
 	assert artifacts["decisions"][0]["id"] == "view-decision"
 	assert agents["enabled"] is True
+	assert roster["active"][0]["id"] == "view-agent"
+	assert lifecycle["accepted"][0]["id"] == "view-batch"
+	assert lifecycle["required_processor"] == "bytewax"
 	assert analytics["artifact_density"] == 1.0
 	assert audit["audit_events"]
 	assert settings["theme"]["name"] == "colb_collaboration_workspace"
