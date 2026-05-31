@@ -16,8 +16,14 @@ models; and publish audit evidence through deterministic guardrails.
 - Model registration and release with MLCM linkage, model-card evidence,
   evaluation evidence, approval evidence, and audit events.
 - Pipeline registration with owner, model reference, version, and enabled tasks.
+- First-class AI vision-agent composition for `codex`, `claude_code`,
+  `opencode`, and `pi`, with role, scope, owner, purpose, contribution
+  disclosure, and privileged-role review guardrails.
+- Bytewax lifecycle batch validation for asset, job, pipeline, model, quality,
+  safety, biometric, and vision-agent mutations.
 - UI view models for dashboard, assets, documents, images, video, quality,
-  safety, similarity search, review, models, governance, and audit.
+  safety, similarity search, review, models, agents, lifecycle batches,
+  governance, and audit.
 - Adapter configuration for AICR, MLCM, CONF, AUTH, AUDL, MONI, SRCH, object
   storage, and Bytewax event streaming.
 
@@ -75,6 +81,23 @@ job = service.run_job(
 	inspection_plan_attached=True,
 	defect_taxonomy_attached=True,
 )
+agent = service.register_vision_agent(
+	"agent-001",
+	"tenant-a",
+	"Line Camera Steward",
+	"codex",
+	"vision_steward",
+	"line-camera asset and pipeline review",
+	"vision-ops",
+	"govern visual inspection changes",
+)
+batch = service.validate_cvsn_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	1,
+	"vision_agent_batch",
+	"batch-001",
+)
 ```
 
 ## Guardrails
@@ -91,7 +114,25 @@ without async queueing, batches over configured limits, long video clips, video
 analytics without sampling policy, model registration without MLCM linkage or
 model card, model release without evaluation or approval, cross-tenant
 processing, state changes without audit evidence, and non-Bytewax vision event
-streams.
+streams. AI vision-agent guardrails also block unsupported runtimes,
+unsupported roles, missing scope, missing owner, missing purpose, missing
+machine-contribution disclosure, and route privileged roles through pending
+human review when approval evidence is absent. Lifecycle mutation batches are
+accepted only through the declared Bytewax processor contract.
+
+## AI Agent Composition
+
+CVSN treats AI agents as first-class APG citizens. Generated applications can
+compose vision agents from multiple rapidly changing tool runtimes without
+binding business logic to a single provider. The current executable contract
+supports `codex`, `claude_code`, `opencode`, and `pi`; roles include asset,
+OCR, detection, quality, safety, biometric, model-release, pipeline, and vision
+steward responsibilities. Privileged roles are stored as `pending_review` until
+human approval evidence is recorded.
+
+The runtime deliberately stores only provider-neutral metadata. Live CLI/API
+invocation, credential management, and remote agent orchestration belong behind
+the AICR adapter boundary.
 
 ## Focused Verification
 

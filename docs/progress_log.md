@@ -21610,3 +21610,64 @@ Not run to preserve battery:
 - Live NLP model inference, live Bytewax topology, live AICR/MLCM/CONF/AUDL/
   MONI/AUTH/SRCH adapters, rendered browser UI, external AI-agent runtime
   clients, and performance/load/quality benchmark tests.
+
+### 2026-05-31 07:05 EAT
+
+CVSN vision-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/cvsn` as the next ordered AI capability after
+  NLPC.
+- Extended the CVSN executable contract with first-class vision-agent metadata,
+  supported runtimes `codex`, `claude_code`, `opencode`, and `pi`, supported
+  visual-governance roles, privileged-role metadata, Bytewax lifecycle stream
+  metadata, route metadata, theme components, and contract `provides`/
+  `requires`.
+- Added deterministic guardrails for unsupported vision-agent runtime,
+  unsupported vision-agent role, missing agent scope, owner, purpose, missing
+  machine contribution disclosure, privileged vision-agent registration without
+  human approval, and non-Bytewax CVSN lifecycle batch routing.
+- Added `VisionAgentRecord`, `CvsnLifecycleBatchRecord`, tenant-qualified
+  vision-agent storage, lifecycle-batch storage, registration, listing, audit
+  events, dashboard counts, vision-agent roster view models, and
+  lifecycle-batch monitor view models.
+- Added `/cvsn/agents`, `/cvsn/lifecycle`, vision-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/cvsn/__init__.py capabilities/common/cvsn/capability_contract.py capabilities/common/cvsn/cvsn_runtime.py capabilities/common/cvsn/view_models.py capabilities/common/cvsn/app.py capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/cvsn/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/python -m json.tool capabilities/common/cvsn/semantic_model.json`
+  passed.
+- `./.venv/bin/python -m json.tool capabilities/common/cvsn/release_report.json`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/cvsn/tests/test_capability_contract.py capabilities/common/cvsn/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect cvsn --json` passed with `ok: true`,
+  15 APG Python routes, 38 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/cvsn --json`
+  passed with `ok: true`; CVSN remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/cvsn --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -c "... CvsnService ... register_vision_agent ... validate_cvsn_lifecycle_batch ..."`
+  returned one `codex` active vision steward and one `bytewax` lifecycle-batch
+  evidence record.
+- Focused stale-marker scan over touched CVSN packet source, docs, tests, and
+  evidence returned only intentional Kafka-denial tests.
+- `git diff --check -- capabilities/common/cvsn docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live OpenCV/YOLO/OCR inference, live Bytewax topology, live AICR/MLCM/CONF/
+  AUTH/AUDL/MONI/STOR/SRCH adapters, rendered browser UI, external AI-agent
+  runtime clients, and performance/load/accuracy benchmark tests.

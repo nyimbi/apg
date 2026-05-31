@@ -358,6 +358,8 @@ def get_capability_info() -> Dict[str, Any]:
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"ui_manifest": contract["ui"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"]
 	}
 
@@ -371,12 +373,14 @@ def register_capability() -> Dict[str, Any]:
 		"display_name": CAPABILITY_METADATA["capability_name"],
 		"description": CAPABILITY_METADATA["capability_description"],
 		"version": CAPABILITY_METADATA["version"],
-		"dependencies": ["aicr", "mlcm", "conf", "auth", "audl", "moni"],
+		"dependencies": contract["requires"] + ["audl", "moni"],
 		"optional_dependencies": ["stor", "srch", "cach", "mqeb"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"asset_ingestion": "Register tenant-scoped visual assets with source, MIME, size, and digest evidence",
 			"document_ocr": "Extract deterministic text evidence from tenant-scoped document assets",
@@ -386,6 +390,8 @@ def register_capability() -> Dict[str, Any]:
 			"video_analytics": "Process governed video clips with sampling-policy evidence",
 			"model_management": "Register and release vision models through MLCM linkage",
 			"pipeline_management": "Register versioned vision pipelines with owner and model evidence",
+			"vision_agent_composition": "Register provider-neutral AI vision agents with runtime, role, scope, owner, purpose, disclosure, and human-review guardrails",
+			"lifecycle_batch_governance": "Validate CVSN lifecycle mutations through Bytewax-only batch contracts",
 			"capability_rules": "Evaluate deterministic computer-vision governance rules",
 			"visual_theming": "Apply industrial vision-console theme tokens and components"
 		},
@@ -398,6 +404,8 @@ def register_capability() -> Dict[str, Any]:
 			"safety": "/cvsn/api/v1/safety",
 			"similarity": "/cvsn/api/v1/similarity",
 			"models": "/cvsn/api/v1/models",
+			"agents": "/cvsn/api/v1/agents",
+			"lifecycle": "/cvsn/api/v1/lifecycle",
 			"audit": "/cvsn/api/v1/audit"
 		},
 		"ui_components": {

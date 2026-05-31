@@ -6,6 +6,27 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_CVSN_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_CVSN_AGENT_ROLES = [
+	"asset_reviewer",
+	"ocr_reviewer",
+	"detection_reviewer",
+	"quality_reviewer",
+	"safety_reviewer",
+	"biometric_reviewer",
+	"model_release_reviewer",
+	"pipeline_reviewer",
+	"vision_steward",
+]
+PRIVILEGED_CVSN_AGENT_ROLES = [
+	"quality_reviewer",
+	"safety_reviewer",
+	"biometric_reviewer",
+	"model_release_reviewer",
+	"pipeline_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"processing": {
@@ -76,6 +97,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"release_approval_required": True,
 		"model_card_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_CVSN_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_CVSN_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_CVSN_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_vision_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "cvsn.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"asset_batch",
+			"vision_job_batch",
+			"pipeline_batch",
+			"model_batch",
+			"quality_event_batch",
+			"safety_event_batch",
+			"biometric_event_batch",
+			"vision_agent_batch",
+		],
+		"topics": [
+			"cvsn.assets",
+			"cvsn.jobs",
+			"cvsn.pipelines",
+			"cvsn.models",
+			"cvsn.quality",
+			"cvsn.safety",
+			"cvsn.biometric",
+			"cvsn.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"auth_required": True,
@@ -115,6 +175,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_similarity_search": True,
 		"enable_model_registry": True,
 		"enable_review_console": True,
+		"enable_vision_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit_timeline": True,
 		"enable_governance": True,
 		"enable_settings": True,
@@ -136,6 +198,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"safety",
 		"privacy",
 		"model_registry",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -152,6 +216,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"safety",
 		"privacy",
 		"model_registry",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -192,6 +258,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "cross_tenant_processing_denied", "description": "Cross-tenant vision processing is denied by default.", "condition": {"cross_tenant_processing": True}, "effect": {"decision": "deny", "reason": "cross_tenant_processing_denied", "required_action": "use_tenant_scoped_asset"}},
 	{"name": "state_change_requires_audit", "description": "Vision processing state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
 	{"name": "vision_events_require_bytewax", "description": "Vision event streams must use Bytewax.", "condition": {"operation": "configure_vision_events", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
+	{"name": "vision_agent_runtime_supported", "description": "Vision agents must use supported runtimes.", "condition": {"operation": "register_vision_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_vision_agent_runtime", "required_action": "choose_supported_vision_agent_runtime"}},
+	{"name": "vision_agent_role_supported", "description": "Vision agents must use supported visual-intelligence roles.", "condition": {"operation": "register_vision_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_vision_agent_role", "required_action": "choose_supported_vision_agent_role"}},
+	{"name": "vision_agent_requires_scope", "description": "Vision agents require an explicit bounded scope.", "condition": {"operation": "register_vision_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "vision_agent_scope_required", "required_action": "declare_vision_agent_scope"}},
+	{"name": "vision_agent_requires_owner", "description": "Vision agents require an accountable owner.", "condition": {"operation": "register_vision_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "vision_agent_owner_required", "required_action": "assign_vision_agent_owner"}},
+	{"name": "vision_agent_requires_purpose", "description": "Vision agents require a documented purpose.", "condition": {"operation": "register_vision_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "vision_agent_purpose_required", "required_action": "document_vision_agent_purpose"}},
+	{"name": "vision_agent_requires_contribution_disclosure", "description": "Vision agents must disclose machine-authored visual-intelligence contributions.", "condition": {"operation": "register_vision_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "vision_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "vision_agent_privileged_role_requires_human_approval", "description": "Privileged vision-agent roles require human approval evidence.", "condition": {"operation": "register_vision_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "vision_agent_human_approval_required", "required_action": "record_human_vision_agent_approval"}},
+	{"name": "bytewax_cvsn_stream_required", "description": "CVSN lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_cvsn_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_cvsn_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -206,6 +280,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "similarity", "path": "/cvsn/similarity", "component": "VisualSimilaritySearch", "permission": "cv:object_detection", "nav_group": "Search"},
 	{"name": "review", "path": "/cvsn/review", "component": "VisionReviewConsole", "permission": "cv:review", "nav_group": "Governance"},
 	{"name": "models", "path": "/cvsn/models", "component": "VisionModelRegistry", "permission": "cv:model_management", "nav_group": "Administration"},
+	{"name": "agents", "path": "/cvsn/agents", "component": "VisionAgentRoster", "permission": "cv:review", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/cvsn/lifecycle", "component": "CVSNLifecycleBatchMonitor", "permission": "cv:admin", "nav_group": "Operations"},
 	{"name": "governance", "path": "/cvsn/governance", "component": "VisionGovernance", "permission": "cv:admin", "nav_group": "Governance"},
 	{"name": "audit", "path": "/cvsn/audit", "component": "VisionAuditTimeline", "permission": "cv:reports", "nav_group": "Governance"},
 	{"name": "settings", "path": "/cvsn/settings", "component": "VisionSettings", "permission": "cv:admin", "nav_group": "Administration"},
@@ -235,9 +311,63 @@ THEME: dict[str, Any] = {
 		"quality_defect_marker": {"stroke": "color.danger", "severity_style": "defect-chip"},
 		"video_timeline": {"visual": "frame-strip", "alert_style": "event-marker"},
 		"model_card": {"visual": "evaluation-summary", "status_style": "release-chip"},
+		"vision_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class CVSN agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_CVSN_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_CVSN_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_CVSN_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_vision_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the CVSN Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "cvsn.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"asset_batch",
+			"vision_job_batch",
+			"pipeline_batch",
+			"model_batch",
+			"quality_event_batch",
+			"safety_event_batch",
+			"biometric_event_batch",
+			"vision_agent_batch",
+		],
+		"topics": [
+			"cvsn.assets",
+			"cvsn.jobs",
+			"cvsn.pipelines",
+			"cvsn.models",
+			"cvsn.quality",
+			"cvsn.safety",
+			"cvsn.biometric",
+			"cvsn.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -249,6 +379,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "cvsn",
 		"display_name": "Computer Vision",
+		"provides": ["computer_vision", "visual_intelligence", "vision_agent_composition"],
+		"requires": ["aicr", "mlcm", "conf", "auth"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -260,6 +392,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

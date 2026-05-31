@@ -22,6 +22,9 @@ def dashboard_model(service: CvsnService | None = None, tenant_id: str = "defaul
 		"routes": capability_routes(tenant_id),
 		"recent_assets": service.list_assets(tenant_id)[-10:],
 		"recent_jobs": service.list_jobs(tenant_id)[-10:],
+		"vision_agents": service.list_vision_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
 
@@ -133,6 +136,10 @@ def governance_model(service: CvsnService | None = None, tenant_id: str = "defau
 		"tenant_id": tenant_id,
 		"route": "/cvsn/governance",
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
+		"vision_agents": service.list_vision_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"audit_events": service.list_audit_events(tenant_id),
 	}
@@ -144,4 +151,34 @@ def audit_timeline_model(service: CvsnService | None = None, tenant_id: str = "d
 		"tenant_id": tenant_id,
 		"route": "/cvsn/audit",
 		"audit_events": service.list_audit_events(tenant_id),
+	}
+
+
+def vision_agent_roster_model(service: CvsnService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or CvsnService()
+	contract = service.describe(tenant_id)
+	agents = service.list_vision_agents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/cvsn/agents",
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(service: CvsnService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or CvsnService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/cvsn/lifecycle",
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
 	}

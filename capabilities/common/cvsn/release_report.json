@@ -1,16 +1,25 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 9,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "Computer Vision",
         "errors": [],
-        "route_count": 13,
-        "rule_count": 30
+        "route_count": 15,
+        "rule_count": 38
       }
     },
     "runtime": {
+      "api": "api.py",
+      "entrypoint": "app.py",
       "event_stream": "bytewax",
-      "generated_app_runtime": "cvsn_runtime.CvsnService"
+      "generated_app_runtime": "cvsn_runtime.CvsnService",
+      "production_runtime": "service.CVProcessingService",
+      "views": "view_models.py"
     },
     "self_test": {
       "capability": "cvsn",
@@ -27,6 +36,11 @@
     "semantic_model": {
       "capability": "cvsn",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "lifecycle_stream": "cvsn.lifecycle",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",
