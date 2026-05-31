@@ -3,8 +3,8 @@
 HLTH is APG's tenant-scoped health checks and diagnostics capability. It gives
 generated applications a dependency-light control plane for registering
 components, recording health checks, maintaining baselines, opening alerts and
-incidents, reviewing remediation, gating deployments, and publishing UI/theme
-metadata.
+incidents, reviewing remediation, gating deployments, composing health AI
+agents, validating Bytewax lifecycle batches, and publishing UI/theme metadata.
 
 The current packet can be composed without starting ML engines, Kubernetes
 watchers, external observability backends, notification systems, ticketing
@@ -26,6 +26,10 @@ runtime adapters that must honor HLTH guardrail decisions.
   independent reviewer evidence.
 - Deployment gate decisions that block release while critical incidents remain
   unresolved unless explicitly waived.
+- First-class health-agent registration for Codex, Claude Code, opencode, Pi,
+  and future runtime adapters.
+- Bytewax-first lifecycle batch validation for component, check, baseline,
+  prediction, incident, and health-agent mutations.
 - Generated-application view models for health dashboards and operations
   screens.
 - Theme tokens and component metadata for health consoles.
@@ -55,6 +59,8 @@ from capabilities.common.hlth.api import (
     request_remediation,
     decide_remediation,
     evaluate_deployment_gate,
+    register_health_agent,
+    validate_health_lifecycle_batch,
 )
 
 component = register_component_record(
@@ -117,6 +123,24 @@ gate = evaluate_deployment_gate(
     tenant_id="tenant-a",
     deployment_id="orders-2026-05-30",
 )
+
+agent = register_health_agent(
+    tenant_id="tenant-a",
+    agent_id="gate-agent",
+    name="Deployment Gate Reviewer",
+    runtime="claude code",
+    role="deployment gate reviewer",
+    scope="orders production health gates",
+    owner="sre-lead",
+    purpose="review critical deployment gates",
+    human_approval_required=True,
+)
+
+batch = validate_health_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=6,
+)
 ```
 
 ## Rule Evaluation
@@ -135,14 +159,34 @@ assert decision["decision"] == "deny"
 assert "component_must_be_registered" in decision["matched_rules"]
 ```
 
+Bytewax is mandatory for lifecycle batches:
+
+```python
+decision = evaluate_capability_rules({
+    "tenant_context_present": True,
+    "operation": "validate_health_lifecycle_batch",
+    "event_stream": "legacy_broker",
+})
+
+assert decision["decision"] == "deny"
+assert "bytewax_health_stream_required" in decision["matched_rules"]
+```
+
 ## View Models
 
 ```python
 from capabilities.common.hlth.api import SERVICE
-from capabilities.common.hlth.view_models import dashboard_model, incident_model
+from capabilities.common.hlth.view_models import (
+    dashboard_model,
+    incident_model,
+    health_agent_roster_model,
+    lifecycle_batch_model,
+)
 
 dashboard = dashboard_model(SERVICE, tenant_id="tenant-a")
 incidents = incident_model(SERVICE, tenant_id="tenant-a")
+agents = health_agent_roster_model(SERVICE, tenant_id="tenant-a")
+lifecycle = lifecycle_batch_model(SERVICE, tenant_id="tenant-a")
 ```
 
 ## Adapter Boundary
@@ -159,6 +203,10 @@ Production adapters should:
 6. Treat HLTH remediation approvals as control-plane decisions, not execution.
 7. Keep ML predictions, live probes, and discovery engines behind adapters that
    can be disabled or reviewed.
+8. Treat HLTH health-agent registrations as governance records, not embedded
+   runtime clients.
+9. Route lifecycle mutation batches through Bytewax and preserve the
+   `hlth.lifecycle` event-time contract.
 
 ## Verification
 

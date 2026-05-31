@@ -6,7 +6,8 @@ HLTH provides APG applications with a tenant-scoped health checks and
 diagnostics control plane. It defines how generated applications register
 components, record health checks, maintain health baselines, request
 predictions, open alerts and incidents, approve remediation actions, evaluate
-deployment gates, and expose operable UI surfaces.
+deployment gates, compose health AI agents, validate lifecycle batches through
+Bytewax, and expose operable UI surfaces.
 
 The capability is split into two layers:
 
@@ -17,6 +18,11 @@ The capability is split into two layers:
   feeds, ML engines, metrics stores, ticketing systems, notification systems,
   remediation runners, deployment systems, and APG audit/notification
   integrations.
+
+HLTH also makes health and reliability AI agents first-class APG citizens.
+Agents can be implemented by fast-moving runtimes such as Codex, Claude Code,
+opencode, Pi, or later adapters, while HLTH owns tenant-scoped registration,
+scope, purpose, human approval, contribution disclosure, and audit rules.
 
 ## Capability Outcomes
 
@@ -45,6 +51,10 @@ HLTH must let a generated application:
     gates, reports, audit, adapters, and settings.
 14. Publish semantic-model and release evidence from the live capability
     contract rather than stale embedded JSON.
+15. Register first-class health agents with supported runtime, role, owner,
+    scope, purpose, contribution-disclosure, and privileged-role approval.
+16. Validate health lifecycle mutation batches through a Bytewax-first stream
+    contract.
 
 ## Functional Scope
 
@@ -93,6 +103,31 @@ production approval, independent reviewer, and review notes.
 Deployment gates evaluate unresolved critical incidents for a tenant and return
 `allow`, `deny`, or `require_review`. Waivers must be explicit and auditable.
 
+### Health Agent Lifecycle
+
+Health agent records define AI-assisted reliability contributors that can be
+composed into generated applications. Each agent stores tenant, agent ID, name,
+runtime, role, operating scope, accountable owner, purpose, contribution
+disclosure, human-approval requirement, status, and timestamp.
+
+Supported runtimes in this packet are `codex`, `claude_code`, `opencode`, and
+`pi`. Supported roles are `component_health_reviewer`, `baseline_reviewer`,
+`prediction_reviewer`, `incident_reviewer`, `remediation_reviewer`,
+`deployment_gate_reviewer`, and `dependency_map_reviewer`.
+
+Privileged roles are `prediction_reviewer`, `incident_reviewer`,
+`remediation_reviewer`, and `deployment_gate_reviewer`. They require explicit
+human approval before registration.
+
+### Bytewax Lifecycle Stream
+
+HLTH lifecycle batches represent bulk mutations that affect components, health
+checks, baselines, predictions, incidents, or health-agent records. The
+executable contract requires Bytewax as the lifecycle processor, uses
+`hlth.lifecycle` as the lifecycle stream name, and covers `hlth.components`,
+`hlth.checks`, `hlth.baselines`, `hlth.predictions`, `hlth.incidents`, and
+`hlth.agents` topics.
+
 ## Rules
 
 The rule engine is deterministic. It returns `allow`, `deny`, or
@@ -118,6 +153,10 @@ Baseline rules:
 - remediation review notes are required
 - unresolved critical incidents block deployment
 - deployment waivers require review evidence
+- health-agent runtimes and roles must be supported
+- health agents require scope, owner, purpose, and contribution disclosure
+- privileged health-agent roles require human approval
+- health lifecycle batches must declare Bytewax as the processor
 
 ## UI and Theming
 
@@ -139,6 +178,8 @@ Required screens:
 - reports
 - audit
 - adapters
+- agents
+- lifecycle
 - settings
 
 ## Integration Boundaries
@@ -166,6 +207,10 @@ Adapters bind them at runtime.
   contract.
 - HLTH does not make benchmark or accuracy claims without named runtime
   backends and measured evidence.
+- HLTH does not embed Codex, Claude Code, opencode, Pi, or any other AI runtime;
+  it defines the first-class APG composition contract those adapters must honor.
+- HLTH does not use a broker as its core lifecycle stream dependency; Bytewax is
+  the required processor for this packet.
 
 ## Acceptance Criteria
 
@@ -178,10 +223,12 @@ The HLTH packet is serviceable when:
 - `service.py` includes a dependency-light `HlthService` that can register
   components, record health checks, create baselines, request predictions,
   create alerts/incidents, request and decide remediation, evaluate deployment
-  gates, and list audit evidence.
+  gates, register health agents, validate Bytewax lifecycle batches, and list
+  audit evidence.
 - `api.py` exposes callable helpers over `HlthService`.
 - `view_models.py` exposes generated-application view models.
 - `app.py`, `semantic_model.json`, and `release_report.json` are derived from
   current contract evidence.
-- Focused package tests prove the rule engine, lifecycle service, view models,
-  semantic model, and publish-plan path.
+- Focused package tests prove the rule engine, lifecycle service, health-agent
+  guardrails, Bytewax lifecycle guardrail, view models, semantic model, and
+  publish-plan path.

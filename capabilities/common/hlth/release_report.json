@@ -1,11 +1,16 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 7,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "Health Checks and Diagnostics",
         "errors": [],
-        "route_count": 13,
-        "rule_count": 20
+        "route_count": 15,
+        "rule_count": 28
       }
     },
     "runtime": {
@@ -29,6 +34,10 @@
     "semantic_model": {
       "capability": "hlth",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

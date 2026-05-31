@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_HLTH_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_HLTH_AGENT_ROLES = [
+	"component_health_reviewer",
+	"baseline_reviewer",
+	"prediction_reviewer",
+	"incident_reviewer",
+	"remediation_reviewer",
+	"deployment_gate_reviewer",
+	"dependency_map_reviewer",
+]
+PRIVILEGED_HLTH_AGENT_ROLES = [
+	"prediction_reviewer",
+	"incident_reviewer",
+	"remediation_reviewer",
+	"deployment_gate_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped HLTH configuration defaults and schema."""
@@ -75,6 +93,38 @@ class CapabilityConfiguration:
 			"deployment_gate_adapter": "adapter",
 			"prediction_engine": "adapter"
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_HLTH_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_HLTH_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_HLTH_AGENT_ROLES,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "hlth.lifecycle",
+			"watermark": "event_time",
+			"required_operations": [
+				"component_batch",
+				"health_check_batch",
+				"baseline_batch",
+				"prediction_batch",
+				"incident_batch",
+				"health_agent_batch"
+			],
+			"topics": [
+				"hlth.components",
+				"hlth.checks",
+				"hlth.baselines",
+				"hlth.predictions",
+				"hlth.incidents",
+				"hlth.agents"
+			]
+		},
 		"security": {
 			"require_tenant_context": True,
 			"record_lifecycle_audit": True,
@@ -91,7 +141,9 @@ class CapabilityConfiguration:
 			"enable_remediation_console": True,
 			"enable_deployment_gates": True,
 			"enable_adapter_health": True,
-			"enable_audit_timeline": True
+			"enable_audit_timeline": True,
+			"enable_health_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True
 		},
 		"theme": {
 			"default_theme": "hlth_health_console",
@@ -110,6 +162,8 @@ class CapabilityConfiguration:
 			"incidents",
 			"deployment_gates",
 			"adapters",
+			"agents",
+			"streaming",
 			"security",
 			"ui",
 			"theme"
@@ -124,6 +178,8 @@ class CapabilityConfiguration:
 			"incidents": {"type": "object"},
 			"deployment_gates": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"security": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"}
@@ -254,6 +310,16 @@ class CapabilityTheme:
 		"audit_decision_timeline": {
 			"visual": "decision-timeline",
 			"highlight": "matched-rule-chip"
+		},
+		"health_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-state",
+			"variant": "agent-governance"
+		},
+		"bytewax_lifecycle_panel": {
+			"icon": "activity",
+			"status_indicator": "processor-state",
+			"variant": "stream-lifecycle"
 		}
 	})
 
@@ -460,6 +526,86 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "deployment_waiver_review_required",
 				"required_action": "record_deployment_waiver_review"
 			}
+		),
+		CapabilityRule(
+			name="health_agent_runtime_supported",
+			description="Health agents must use a supported runtime adapter.",
+			condition={"operation": "register_health_agent", "agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_health_agent_runtime",
+				"required_action": "select_supported_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="health_agent_role_supported",
+			description="Health agents must use a supported reliability governance role.",
+			condition={"operation": "register_health_agent", "agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "unsupported_health_agent_role",
+				"required_action": "select_supported_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="health_agent_requires_scope",
+			description="Health agents require an explicit operating scope.",
+			condition={"operation": "register_health_agent", "agent_scope_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "health_agent_scope_required",
+				"required_action": "attach_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="health_agent_requires_owner",
+			description="Health agents require an accountable owner.",
+			condition={"operation": "register_health_agent", "agent_owner_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "health_agent_owner_required",
+				"required_action": "attach_agent_owner"
+			}
+		),
+		CapabilityRule(
+			name="health_agent_requires_purpose",
+			description="Health agents require a declared purpose.",
+			condition={"operation": "register_health_agent", "agent_purpose_present": False},
+			effect={
+				"decision": "deny",
+				"reason": "health_agent_purpose_required",
+				"required_action": "attach_agent_purpose"
+			}
+		),
+		CapabilityRule(
+			name="health_agent_requires_contribution_disclosure",
+			description="Health agents must disclose machine contribution in reliability decisions.",
+			condition={"operation": "register_health_agent", "contribution_disclosed": False},
+			effect={
+				"decision": "deny",
+				"reason": "health_agent_contribution_disclosure_required",
+				"required_action": "enable_agent_contribution_disclosure"
+			}
+		),
+		CapabilityRule(
+			name="health_agent_privileged_role_requires_human_approval",
+			description="Privileged health-agent roles require human approval.",
+			condition={"operation": "register_health_agent", "privileged_agent_role": True, "human_approval_required": False},
+			effect={
+				"decision": "deny",
+				"reason": "health_agent_human_approval_required",
+				"required_action": "require_human_approval_for_agent"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_health_stream_required",
+			description="HLTH lifecycle batches must declare Bytewax as the health lifecycle processor.",
+			condition={"operation": "validate_health_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_health_stream_required",
+				"required_action": "route_batch_through_bytewax"
+			}
 		)
 	]
 
@@ -479,6 +625,8 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("reports", "/hlth/reports", "HealthReportStudio", "health.reports.generate", "Reports"),
 		CapabilityUIRoute("audit", "/hlth/audit", "HealthAuditTimeline", "health.admin", "Governance"),
 		CapabilityUIRoute("adapters", "/hlth/adapters", "HealthAdapterHealth", "health.admin", "Runtime"),
+		CapabilityUIRoute("agents", "/hlth/agents", "HealthAgentRoster", "health.admin", "Administration"),
+		CapabilityUIRoute("lifecycle", "/hlth/lifecycle", "HealthLifecycleBatchMonitor", "health.admin", "Runtime"),
 		CapabilityUIRoute("settings", "/hlth/settings", "HealthSettings", "health.admin", "Administration")
 	]
 	return {
@@ -491,6 +639,53 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class HLTH agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_HLTH_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_HLTH_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_HLTH_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return HLTH lifecycle stream-processing contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "hlth.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"component_batch",
+			"health_check_batch",
+			"baseline_batch",
+			"prediction_batch",
+			"incident_batch",
+			"health_agent_batch"
+		],
+		"topics": [
+			"hlth.components",
+			"hlth.checks",
+			"hlth.baselines",
+			"hlth.predictions",
+			"hlth.incidents",
+			"hlth.agents"
+		],
+		"broker_core_dependency_allowed": False
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable HLTH capability contract."""
 	config = CapabilityConfiguration()
@@ -498,6 +693,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "hlth",
 		"display_name": "Health Checks and Diagnostics",
+		"provides": ["health_governance", "diagnostic_lifecycle", "health_agent_composition"],
+		"requires": ["moni", "mqeb", "conf"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -505,6 +702,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"rules": [rule.__dict__ for rule in default_rules()]
 		},
 		"ui": ui_manifest(),
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": {
 			"name": theme.name,
 			"tokens": theme.tokens,
@@ -527,6 +726,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		elif key.endswith("_lt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

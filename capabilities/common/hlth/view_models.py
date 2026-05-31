@@ -26,6 +26,7 @@ def dashboard_model(service: HlthService, tenant_id: str = "default") -> dict[st
 			{"id": "record_check", "label": "Record check", "permission": "health.manage"},
 			{"id": "review_remediation", "label": "Review remediation", "permission": "health.remediate"},
 			{"id": "evaluate_gate", "label": "Evaluate gate", "permission": "health.deployments.review"},
+			{"id": "register_agent", "label": "Register agent", "permission": "health.admin"},
 		],
 	}
 
@@ -102,7 +103,7 @@ def report_model(service: HlthService, tenant_id: str = "default") -> dict[str, 
 	return {
 		"tenant_id": tenant_id,
 		"summary": summary,
-		"sections": ["components", "checks", "incidents", "remediation", "deployment_gates"],
+		"sections": ["components", "checks", "incidents", "remediation", "deployment_gates", "health_agents", "lifecycle_batches"],
 	}
 
 
@@ -115,6 +116,31 @@ def adapter_health_model(tenant_id: str = "default") -> dict[str, Any]:
 		"remediation_executor": adapters["remediation_executor"],
 		"deployment_gate_adapter": adapters["deployment_gate_adapter"],
 		"prediction_engine": adapters["prediction_engine"],
+	}
+
+
+def health_agent_roster_model(service: HlthService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return first-class health-agent roster state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_records(tenant_id, "health_agents"),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"columns": ["name", "runtime", "role", "owner", "purpose", "status", "human_approval_required"],
+	}
+
+
+def lifecycle_batch_model(service: HlthService, tenant_id: str = "default") -> dict[str, Any]:
+	"""Return Bytewax lifecycle-batch monitor state."""
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"streaming": contract["streaming"],
+		"rows": service.list_records(tenant_id, "lifecycle_batches"),
+		"columns": ["event_stream", "mutation_count", "accepted", "decision", "required_processor", "status"],
 	}
 
 
@@ -132,6 +158,8 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

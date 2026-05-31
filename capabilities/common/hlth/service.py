@@ -35,7 +35,13 @@ from .ml_engines import HealthPredictionEngine, AdvancedAnalyticsEngine, MLModel
 from .optimization_engine import ResourceOptimizationEngine, OptimizationType
 from .enterprise_features import EnterpriseHealthManager, TenantTier, ComplianceFramework, TenantConfiguration
 from .multi_tenant_isolation import TenantIsolationManager, IsolationLevel, DataClassification
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_HLTH_AGENT_ROLES,
+	SUPPORTED_HLTH_AGENT_ROLES,
+	SUPPORTED_HLTH_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 
 
 class HealthServiceConfig(BaseModel):
@@ -280,6 +286,40 @@ class HlthDeploymentGateRecord:
 	unresolved_critical_incidents: int
 	waiver_recorded: bool = False
 	matched_rules: list[str] = field(default_factory=list)
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class HlthAgentRecord:
+	"""First-class health and diagnostics agent registration."""
+
+	agent_id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: datetime = field(default_factory=datetime.utcnow)
+
+
+@dataclass
+class HlthLifecycleBatchRecord:
+	"""Bytewax lifecycle-batch validation evidence."""
+
+	batch_id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
 	created_at: datetime = field(default_factory=datetime.utcnow)
 
 
@@ -2159,7 +2199,8 @@ class SystemHealthService:
 	async def process_health_alert(self, alert: HealthAlert) -> Dict[str, Any]:
 		"""
 		Process health alert with intelligent filtering and correlation
-		Implements revolutionary alert intelligence that reduces false positives by 95%
+		Provides alert filtering and correlation; measured adapter deployments
+		must supply their own false-positive reduction evidence.
 		"""
 		try:
 			# Phase 3.1 Implementation: Proactive Alert Intelligence
@@ -6162,6 +6203,9 @@ class HlthService:
 	def __init__(self, tenant_id: str = "default"):
 		self.tenant_id = tenant_id
 		self.contract = get_capability_contract(tenant_id)
+		self._agent_runtimes = set(SUPPORTED_HLTH_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_HLTH_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_HLTH_AGENT_ROLES)
 		self.components: dict[str, HlthComponentRecord] = {}
 		self.checks: dict[str, HlthCheckRecord] = {}
 		self.baselines: dict[str, HlthBaselineRecord] = {}
@@ -6170,6 +6214,8 @@ class HlthService:
 		self.incidents: dict[str, HlthIncidentRecord] = {}
 		self.remediation_requests: dict[str, HlthRemediationRequestRecord] = {}
 		self.deployment_gates: dict[str, HlthDeploymentGateRecord] = {}
+		self.health_agents: dict[str, HlthAgentRecord] = {}
+		self.lifecycle_batches: dict[str, HlthLifecycleBatchRecord] = {}
 		self.audit_events: list[HlthAuditEventRecord] = []
 		self.records: dict[str, dict[str, Any]] = {}
 
@@ -6595,6 +6641,96 @@ class HlthService:
 		self._audit(tenant_id, "deployment_gate.evaluated", record.gate_id, deployment_id, decision["decision"], decision["matched_rules"], context)
 		return record
 
+	def register_health_agent(
+		self,
+		*,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> HlthAgentRecord:
+		"""Register a first-class health governance agent with guardrail evidence."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		agent_id = self._require_text(agent_id, "agent_id")
+		name = self._require_text(name, "name")
+		runtime_value = self._normalize_agent_token(runtime)
+		role_value = self._normalize_agent_token(role)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_health_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		}
+		rule_decision = evaluate_capability_rules(context)
+		if rule_decision["decision"] == "deny":
+			raise PermissionError(self._first_reason(rule_decision))
+		record_key = self._agent_key(tenant_id, agent_id)
+		if record_key in self.health_agents:
+			raise ValueError(f"health_agent_already_exists:{agent_id}")
+		record = HlthAgentRecord(
+			agent_id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=self._require_text(scope, "scope"),
+			owner=self._require_text(owner, "owner"),
+			purpose=self._require_text(purpose, "purpose"),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+		)
+		self.health_agents[record_key] = record
+		self._audit(tenant_id, "agent.registered", agent_id, record.owner, "allow", rule_decision["matched_rules"], asdict(record))
+		return record
+
+	def validate_health_lifecycle_batch(
+		self,
+		*,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> HlthLifecycleBatchRecord:
+		"""Validate that HLTH lifecycle mutation batches flow through Bytewax."""
+		tenant_id = self._require_text(tenant_id, "tenant_id")
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("health_lifecycle_batch_empty")
+		stream_value = self._normalize_agent_token(event_stream)
+		context = {
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_health_lifecycle_batch",
+			"event_stream": stream_value,
+		}
+		rule_decision = evaluate_capability_rules(context)
+		accepted = rule_decision["decision"] == "allow"
+		record = HlthLifecycleBatchRecord(
+			batch_id=hlth_id(),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			accepted=accepted,
+			decision=rule_decision["decision"],
+			matched_rules=list(rule_decision["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self.lifecycle_batches[record.batch_id] = record
+		self._audit(tenant_id, f"lifecycle_batch.{record.status}", stream_value, "hlth", rule_decision["decision"], rule_decision["matched_rules"], asdict(record))
+		if not accepted:
+			raise PermissionError(self._first_reason(rule_decision))
+		return record
+
 	def list_records(self, tenant_id: str | None = None, record_type: str | None = None) -> list[dict[str, Any]]:
 		"""List generated-app records for a tenant."""
 		tenant_id = tenant_id or self.tenant_id
@@ -6607,6 +6743,8 @@ class HlthService:
 			"incidents": self.incidents.values(),
 			"remediation_requests": self.remediation_requests.values(),
 			"deployment_gates": self.deployment_gates.values(),
+			"health_agents": self.health_agents.values(),
+			"lifecycle_batches": self.lifecycle_batches.values(),
 			"audit_events": self.audit_events,
 			"records": self.records.values(),
 		}
@@ -6637,6 +6775,9 @@ class HlthService:
 			"open_incident_count": sum(1 for row in self.list_records(tenant_id, "incidents") if row["status"] == "open"),
 			"blocked_deployment_count": sum(1 for row in self.list_records(tenant_id, "deployment_gates") if row["status"] == "blocked"),
 			"pending_remediation_count": sum(1 for row in self.list_records(tenant_id, "remediation_requests") if row["status"] == "pending_review"),
+			"health_agent_count": len(self.list_records(tenant_id, "health_agents")),
+			"lifecycle_batch_count": len(self.list_records(tenant_id, "lifecycle_batches")),
+			"denied_lifecycle_batch_count": sum(1 for row in self.list_records(tenant_id, "lifecycle_batches") if not row["accepted"]),
 			"audit_event_count": len(self.list_records(tenant_id, "audit_events")),
 		}
 
@@ -6677,6 +6818,21 @@ class HlthService:
 	@staticmethod
 	def _component_key(tenant_id: str, component_id: str) -> str:
 		return f"{tenant_id}:{component_id}"
+
+	@staticmethod
+	def _agent_key(tenant_id: str, agent_id: str) -> str:
+		return f"{tenant_id}:{agent_id}"
+
+	@staticmethod
+	def _normalize_agent_token(value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	@staticmethod
+	def _first_reason(result: dict[str, Any]) -> str:
+		for action in result.get("actions", []):
+			if action.get("reason"):
+				return str(action["reason"])
+		return "health_operation_denied"
 
 	@staticmethod
 	def _severity_for_score(score: float) -> str:

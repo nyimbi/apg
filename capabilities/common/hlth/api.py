@@ -27,7 +27,9 @@ from .service import (
 	HlthCheckRecord,
 	HlthComponentRecord,
 	HlthDeploymentGateRecord,
+	HlthAgentRecord,
 	HlthIncidentRecord,
+	HlthLifecycleBatchRecord,
 	HlthPredictionRecord,
 	HlthRemediationRequestRecord,
 	HlthService,
@@ -86,6 +88,14 @@ def evaluate_deployment_gate(**kwargs: Any) -> HlthDeploymentGateRecord:
 	return SERVICE.evaluate_deployment_gate(**kwargs)
 
 
+def register_health_agent(**kwargs: Any) -> HlthAgentRecord:
+	return SERVICE.register_health_agent(**kwargs)
+
+
+def validate_health_lifecycle_batch(**kwargs: Any) -> HlthLifecycleBatchRecord:
+	return SERVICE.validate_health_lifecycle_batch(**kwargs)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -110,12 +120,14 @@ def list_health(tenant_id: str | None = None) -> dict[str, Any]:
 		"incidents": SERVICE.list_records(tenant_id, "incidents"),
 		"remediation_requests": SERVICE.list_records(tenant_id, "remediation_requests"),
 		"deployment_gates": SERVICE.list_records(tenant_id, "deployment_gates"),
+		"health_agents": SERVICE.list_records(tenant_id, "health_agents"),
+		"lifecycle_batches": SERVICE.list_records(tenant_id, "lifecycle_batches"),
 		"audit_events": SERVICE.list_records(tenant_id, "audit_events"),
 	}
 
 
-# Create Flask Blueprint
-health_api_bp = Blueprint('health_api', __name__, url_prefix='/api/v1/health')
+# Create Flask Blueprint for the legacy REST resources.
+health_api_bp = Blueprint('health_api', __name__, url_prefix='/hlth/api/v1')
 api = Api(health_api_bp)
 
 

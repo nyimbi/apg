@@ -18,7 +18,9 @@ from .service import (
 	HlthCheckRecord,
 	HlthComponentRecord,
 	HlthDeploymentGateRecord,
+	HlthAgentRecord,
 	HlthIncidentRecord,
+	HlthLifecycleBatchRecord,
 	HlthPredictionRecord,
 	HlthRemediationRequestRecord,
 	HlthService,
@@ -49,18 +51,18 @@ CAPABILITY_METADATA = {
 	'load_order': 10,  # Load after monitoring (MONI) and other core capabilities
 	'dependencies': [
 		'moni',  # Monitoring and Observability - primary data source
+		'mqeb',  # Message Queue - health event streaming
+		'conf'   # Configuration - health policy management
+	],
+	'optional_dependencies': [
 		'auth',  # Authentication and RBAC - dashboard security
 		'audl',  # Audit Logging - complete health event auditing
 		'ntfy',  # Notifications - health alert delivery
 		'mten',  # Multi-tenancy - tenant-isolated health management
-		'conf'   # Configuration - health policy management
-	],
-	'optional_dependencies': [
 		'aicr',  # AI Orchestration - ML-powered health prediction
 		'pred',  # Predictive Analytics - failure forecasting
 		'colb',  # Collaboration - team incident response
-		'cach',  # Caching - health data optimization
-		'mqeb'   # Message Queue - health event streaming
+		'cach'  # Caching - health data optimization
 	],
 	
 	# Blueprint and API Configuration
@@ -72,20 +74,20 @@ CAPABILITY_METADATA = {
 	
 	# API Endpoints
 	'api_endpoints': [
-		'/health/assessment',     # Real-time health scoring
-		'/health/alerts',         # Alert management
-		'/health/reports',        # Health analytics and reports
-		'/health/remediation',    # Automated remediation actions
-		'/health/config',         # Health policy management
-		'/health/predictions',    # ML-powered predictions
-		'/health/components',     # Component discovery and status
-		'/health/incidents',      # Incident tracking
-		'/health/baselines',      # Health baseline management
-		'/health/dashboard'       # Health dashboard data
+		'/hlth/api/v1/assessment',     # Real-time health scoring
+		'/hlth/api/v1/alerts',         # Alert management
+		'/hlth/api/v1/reports',        # Health analytics and reports
+		'/hlth/api/v1/remediation',    # Automated remediation actions
+		'/hlth/api/v1/config',         # Health policy management
+		'/hlth/api/v1/predictions',    # ML-powered predictions
+		'/hlth/api/v1/components',     # Component discovery and status
+		'/hlth/api/v1/incidents',      # Incident tracking
+		'/hlth/api/v1/baselines',      # Health baseline management
+		'/hlth/api/v1/dashboard'       # Health dashboard data
 	],
 	
 	# Health Check Configuration
-	'health_check_endpoint': '/health/api/status',
+	'health_check_endpoint': '/hlth/api/v1/status',
 	'health_check_interval_seconds': 30,
 	'health_check_timeout_seconds': 10,
 	
@@ -113,6 +115,8 @@ CAPABILITY_METADATA = {
 		'critical_alert_and_incident_governance',
 		'remediation_review',
 		'deployment_gate_decisions',
+		'health_agent_composition',
+		'lifecycle_batch_validation',
 		'generated_application_view_models',
 		'health_console_theming',
 		'adapter_boundaries'
@@ -129,6 +133,8 @@ CAPABILITY_METADATA = {
 		'health.baseline.updated',
 		'health.prediction.generated',
 		'health.incident.created',
+		'health.agent.registered',
+		'health.lifecycle_batch.accepted',
 		'health.report.generated'
 	],
 	
@@ -517,6 +523,7 @@ def register_capability() -> Dict[str, Any]:
 		'version': CAPABILITY_METADATA['version'],
 		'dependencies': CAPABILITY_METADATA['dependencies'],
 		'optional_dependencies': CAPABILITY_METADATA['optional_dependencies'],
+		'api_prefix': contract['ui']['api_prefix'],
 		'configuration': contract['configuration'],
 		'configuration_schema': contract['configuration_schema'],
 		'rule_engine': contract['rule_engine'],
@@ -530,7 +537,9 @@ def register_capability() -> Dict[str, Any]:
 			'deployment_gates': 'Block or allow deployments based on unresolved critical incidents',
 			'autonomous_remediation': 'Coordinate approved health remediation workflows',
 			'capability_rules': 'Evaluate deterministic health governance rules',
-			'visual_theming': 'Apply health-console theme tokens and components'
+			'visual_theming': 'Apply health-console theme tokens and components',
+			'health_agent_composition': 'Register first-class health agents across Codex, Claude Code, opencode, Pi, and future runtime adapters',
+			'lifecycle_batch_validation': 'Validate health lifecycle mutation batches against Bytewax-first stream rules'
 		},
 		'endpoints': {
 			'assessment': '/hlth/api/v1/assessment',
@@ -544,13 +553,17 @@ def register_capability() -> Dict[str, Any]:
 			'deployment_gates': '/hlth/api/v1/deployment-gates',
 			'reports': '/hlth/api/v1/reports',
 			'audit': '/hlth/api/v1/audit',
-			'adapters': '/hlth/api/v1/adapters'
+			'adapters': '/hlth/api/v1/adapters',
+			'agents': '/hlth/api/v1/agents',
+			'lifecycle': '/hlth/api/v1/lifecycle'
 		},
 		'ui_components': {
 			route['name']: route['path']
 			for route in contract['ui']['routes']
 		},
 		'ui_manifest': contract['ui'],
+		'agents': contract['agents'],
+		'streaming': contract['streaming'],
 		'theme': contract['theme'],
 		'permissions': CAPABILITY_METADATA['permissions']
 	}
@@ -568,6 +581,8 @@ def get_capability_info() -> Dict[str, Any]:
 			'Critical alert and incident ownership',
 			'Runbook-backed remediation review',
 			'Deployment gate decisions',
+			'First-class health-agent composition',
+			'Bytewax-first health lifecycle batch validation',
 			'Backend-neutral health adapter boundaries'
 		]
 	}
@@ -657,6 +672,8 @@ __all__ = [
 	'HlthIncidentRecord',
 	'HlthRemediationRequestRecord',
 	'HlthDeploymentGateRecord',
+	'HlthAgentRecord',
+	'HlthLifecycleBatchRecord',
 	'HlthAuditEventRecord',
 	'get_capability_contract',
 	'evaluate_capability_rules'

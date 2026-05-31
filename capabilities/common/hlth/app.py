@@ -52,13 +52,17 @@ def semantic_model() -> dict[str, Any]:
 			"hlth": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["hlth_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
+				"agents": {
+					"health_agent_contract": contract["agents"],
+				},
+				"streaming": contract["streaming"],
 				"theme": contract["theme"],
 				"runtime": {
 					"api": "api.py",
@@ -71,6 +75,7 @@ def semantic_model() -> dict[str, Any]:
 				"approvals": {
 					"remediation": "HlthRemediationRequestRecord",
 					"deployment_gate": "HlthDeploymentGateRecord",
+					"health_agent": "HlthAgentRecord",
 				},
 				"health_lifecycle": {
 					"component": "HlthComponentRecord",
@@ -79,20 +84,22 @@ def semantic_model() -> dict[str, Any]:
 					"prediction": "HlthPredictionRecord",
 					"alert": "HlthAlertRecord",
 					"incident": "HlthIncidentRecord",
+					"lifecycle_batch": "HlthLifecycleBatchRecord",
 					"audit": "HlthAuditEventRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
 			}
 		},
 		"contracts": {
 			"hlth": {
 				"id": "hlth",
 				"configuration": contract["configuration"],
-				"provides": ["hlth_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -100,9 +107,15 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"hlth": []},
+			"capability_dependencies": {"hlth": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"hlth_reliability_governance": {
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"stream": contract["streaming"]["lifecycle_stream"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
@@ -126,7 +139,9 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {
+			"health_agents": contract["agents"],
+		},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -164,18 +179,24 @@ def self_test() -> dict[str, Any]:
 	routes = capability.get("ui", {}).get("routes", [])
 	rules = capability.get("rule_engine", {}).get("rules", [])
 	adapters = capability.get("adapters", {})
+	agents = capability.get("agents", {}).get("health_agent_contract", {})
+	streaming = capability.get("streaming", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "hlth" not in model.get("capabilities", {}):
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 13:
+	if len(routes) < 15:
 		errors.append("HLTH semantic model route manifest is stale")
-	if len(rules) < 18:
+	if len(rules) < 26:
 		errors.append("HLTH semantic model rule manifest is stale")
 	if "moni" not in adapters.get("supported_probe_sources", []):
 		errors.append("HLTH adapter manifest must include MONI probe source boundary")
+	if "codex" not in agents.get("supported_runtimes", []):
+		errors.append("HLTH agent manifest must include Codex runtime")
+	if streaming.get("required_processor") != "bytewax":
+		errors.append("HLTH streaming manifest must remain Bytewax-first")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

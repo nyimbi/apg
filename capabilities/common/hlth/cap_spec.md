@@ -4,7 +4,8 @@ HLTH provides APG applications with a tenant-scoped health checks and
 diagnostics control plane. It focuses on executable composition contracts:
 component registration, health check records, baselines, predictions, alerts,
 incidents, remediation review, deployment gates, rules, generated-application UI
-metadata, and adapter boundaries.
+metadata, health-agent composition, Bytewax lifecycle validation, and adapter
+boundaries.
 
 ## Current Executable Scope
 
@@ -16,6 +17,9 @@ metadata, and adapter boundaries.
 - Request and decide remediation with runbook, production approval,
   independent reviewer, and notes evidence.
 - Evaluate deployment gates against unresolved critical incidents.
+- Register first-class health agents with runtime, role, scope, owner, purpose,
+  contribution-disclosure, and human-approval evidence.
+- Validate lifecycle mutation batches through a Bytewax-first stream contract.
 - Publish deterministic rules, UI routes, theme components, semantic model, and
   release evidence.
 
@@ -30,10 +34,13 @@ dependency-light package:
 - ML model training and live prediction engines
 - production persistence, retention, and compliance stores
 - rendered dashboards and browser runtime shells
+- Codex, Claude Code, opencode, Pi, and future AI runtime clients
+- durable Bytewax topologies and stream processors
 
 Adapters must not bypass tenant context, component registration, alert route,
 incident ownership, baseline review, prediction confidence, remediation review,
-or deployment gate rules.
+deployment gate rules, health-agent guardrails, or Bytewax lifecycle batch
+validation.
 
 ## Proof Commands
 
