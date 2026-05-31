@@ -44,6 +44,8 @@ RULES: list[dict[str, Any]] = [
 	{"name": "media_requires_captions", "description": "Media content requires captions or transcripts.", "condition": {"media_content_present": True, "captions_available": False}, "effect": {"decision": "deny", "reason": "captions_required", "required_action": "add_captions_or_transcript"}},
 	{"name": "critical_issue_requires_review", "description": "Critical accessibility issues require formal review.", "condition": {"issue_severity": "critical", "review_recorded": False}, "effect": {"decision": "require_review", "reason": "critical_accessibility_review_required", "required_action": "review_critical_issue"}},
 	{"name": "finding_closure_requires_resolution", "description": "Finding closure requires resolution evidence.", "condition": {"operation": "close_finding", "resolution_evidence_present": False}, "effect": {"decision": "deny", "reason": "resolution_evidence_required", "required_action": "attach_resolution_evidence"}},
+	{"name": "accessibility_exception_requires_expiry", "description": "Accessibility exceptions require an active expiry date.", "condition": {"operation": "record_accessibility_exception", "exception_expiry_present": False}, "effect": {"decision": "deny", "reason": "accessibility_exception_expiry_required", "required_action": "set_accessibility_exception_expiry"}},
+	{"name": "accessibility_exception_requires_compensating_controls", "description": "Accessibility exceptions require compensating controls.", "condition": {"operation": "record_accessibility_exception", "compensating_controls_present": False}, "effect": {"decision": "deny", "reason": "accessibility_exception_compensating_controls_required", "required_action": "attach_compensating_controls"}},
 	{"name": "accessibility_agent_requires_registration", "description": "AI accessibility agents must be registered.", "condition": {"accessibility_agent_present": True, "agent_registered": False}, "effect": {"decision": "deny", "reason": "accessibility_agent_registration_required", "required_action": "register_accessibility_agent"}},
 	{"name": "accessibility_agent_runtime_supported", "description": "AI accessibility agents must use a supported runtime.", "condition": {"accessibility_agent_present": True, "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "accessibility_agent_runtime_not_supported", "required_action": "choose_supported_accessibility_agent_runtime"}},
 	{"name": "accessibility_agent_role_supported", "description": "AI accessibility agents must use a supported role.", "condition": {"accessibility_agent_present": True, "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "accessibility_agent_role_not_supported", "required_action": "choose_supported_accessibility_agent_role"}},
@@ -59,6 +61,7 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "audits", "path": "/accs/audits", "component": "AuditConsole", "permission": "accs:audit", "nav_group": "Audits"},
 	{"name": "findings", "path": "/accs/findings", "component": "FindingsBoard", "permission": "accs:view", "nav_group": "Audits"},
 	{"name": "remediation", "path": "/accs/remediation", "component": "RemediationQueue", "permission": "accs:remediate", "nav_group": "Remediation"},
+	{"name": "exceptions", "path": "/accs/exceptions", "component": "AccessibilityExceptionBoard", "permission": "accs:review", "nav_group": "Governance"},
 	{"name": "assistive", "path": "/accs/assistive", "component": "AssistivePreview", "permission": "accs:audit", "nav_group": "Assistive"},
 	{"name": "media", "path": "/accs/media", "component": "MediaAccessibility", "permission": "accs:remediate", "nav_group": "Content"},
 	{"name": "compliance", "path": "/accs/compliance", "component": "AccessibilityCompliance", "permission": "accs:manage_standards", "nav_group": "Governance"},
@@ -71,14 +74,14 @@ UI_ROUTES: list[dict[str, str]] = [
 THEME: dict[str, Any] = {
 	"name": "accs_accessibility_ops",
 	"tokens": {"color.primary": "#22543D", "color.accent": "#3182CE", "color.success": "#2F855A", "color.warning": "#B7791F", "color.danger": "#C53030", "surface.canvas": "#F7F8FA", "surface.panel": "#FFFFFF", "text.primary": "#172033", "text.secondary": "#52606D", "border.radius": "8px", "density": "compact"},
-	"components": {"audit_score": {"icon": "badge-check", "status_indicator": "score-pill", "risk_style": "severity-band"}, "finding_board": {"visual": "kanban-list", "highlight": "blocked-chip"}, "assistive_preview": {"visual": "semantic-tree", "status_style": "label-chip"}, "compliance_panel": {"visual": "standard-matrix", "status_style": "evidence-chip"}, "agent_panel": {"icon": "bot", "status_style": "scope-chip"}, "audit_timeline": {"icon": "list-checks", "status_style": "governance-chip"}}
+	"components": {"audit_score": {"icon": "badge-check", "status_indicator": "score-pill", "risk_style": "severity-band"}, "finding_board": {"visual": "kanban-list", "highlight": "blocked-chip"}, "exception_board": {"visual": "expiry-list", "status_style": "risk-acceptance-chip"}, "assistive_preview": {"visual": "semantic-tree", "status_style": "label-chip"}, "compliance_panel": {"visual": "standard-matrix", "status_style": "evidence-chip"}, "agent_panel": {"icon": "bot", "status_style": "scope-chip"}, "audit_timeline": {"icon": "list-checks", "status_style": "governance-chip"}}
 }
 
 STREAMING: dict[str, Any] = {
 	"processor": "bytewax",
 	"topic": "apg.accs.lifecycle",
-	"state": ["standards", "targets", "audits", "findings", "remediations", "reviews", "accessibility_agents", "audit_events"],
-	"events": ["standard_registered", "target_registered", "audit_completed", "finding_recorded", "remediation_updated", "finding_review_recorded", "finding_closed", "accessibility_agent_registered"],
+	"state": ["standards", "targets", "audits", "findings", "remediations", "reviews", "accessibility_exceptions", "accessibility_agents", "audit_events"],
+	"events": ["standard_registered", "target_registered", "audit_completed", "finding_recorded", "remediation_updated", "finding_review_recorded", "finding_closed", "accessibility_exception_recorded", "accessibility_agent_registered"],
 	"batch_mutation_guardrail": "batch_accessibility_mutation_requires_bytewax",
 }
 
@@ -88,7 +91,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	config["tenant_id"] = tenant_id
 	if overrides:
 		_deep_merge(config, overrides)
-	return {"capability": "accs", "display_name": "Accessibility Services", "provides": ["accessibility_audits", "remediation_workflows", "assistive_metadata", "media_accessibility", "standards_governance", "accessibility_agents"], "requires": ["them", "i18n", "nlpc"], "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "view_module": config["adapters"]["view_models"], "api_prefix": "/accs/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME), "streaming": deepcopy(STREAMING)}
+	return {"capability": "accs", "display_name": "Accessibility Services", "provides": ["accessibility_audits", "remediation_workflows", "accessibility_exceptions", "assistive_metadata", "media_accessibility", "standards_governance", "accessibility_agents"], "requires": ["them", "i18n", "nlpc"], "configuration": config, "configuration_schema": CONFIGURATION_SCHEMA, "rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)}, "ui": {"shell": "apg_python", "view_module": config["adapters"]["view_models"], "api_prefix": "/accs/api/v1", "routes": deepcopy(UI_ROUTES), "template_roots": ["templates/", "static/"], "requires_theme": True}, "theme": deepcopy(THEME), "streaming": deepcopy(STREAMING)}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

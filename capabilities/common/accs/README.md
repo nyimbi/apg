@@ -4,8 +4,8 @@ ACCS makes accessibility governance an executable APG capability. It gives
 generated applications a tenant-scoped way to register accessibility standards,
 register UI/content/media targets, run deterministic audits, record findings,
 assign remediation work, require formal review for critical findings, register
-AI accessibility agents, validate publication readiness, and expose operational
-views for accessibility teams.
+AI accessibility agents, record approved temporary exceptions, validate
+publication readiness, and expose operational views for accessibility teams.
 
 The package is dependency-light by design. It does not call browser scanners,
 assistive-technology providers, captioning engines, external AI tools, or
@@ -24,14 +24,18 @@ local lifecycle, rules, and generated application contract are proven.
   state, closure evidence, and audit events.
 - Critical-finding review workflow that blocks closure until an approved
   formal review exists.
+- Accessibility exception workflow with approver, reason, active expiry, and
+  compensating controls for unresolved findings that cannot be remediated
+  before release.
 - Publication validation that applies the same deterministic rules used by
-  generated packages.
+  generated packages and distinguishes clean readiness from
+  `publishable_with_exception` release governance.
 - First-class AI accessibility-agent registration for Codex, Claude Code,
   OpenCode, Pi, and future runtimes.
 - Bytewax lifecycle stream metadata for batch accessibility mutation and
   package composition.
 - UI/view-model surfaces for dashboards, audit console, findings board,
-  remediation queue, review queue, agent panel, audit trail, analytics,
+  remediation queue, exception board, agent panel, audit trail, analytics,
   assistive preview, compliance evidence, and settings.
 - Visual theme tokens for compact accessibility operations screens.
 
@@ -44,10 +48,12 @@ local lifecycle, rules, and generated application contract are proven.
 5. Route critical findings to formal review.
 6. Close findings only when approved review and resolution evidence are
    present.
-7. Validate publication readiness before release.
-8. Register scoped accessibility agents when AI assistance contributes to
+7. Record a temporary exception only when an approved risk owner provides a
+   reason, future expiry, and compensating controls.
+8. Validate publication readiness before release.
+9. Register scoped accessibility agents when AI assistance contributes to
    audit, remediation, standards, caption, or release-review work.
-9. Compose ACCS screens, theme, rules, and Bytewax stream metadata into the
+10. Compose ACCS screens, theme, rules, and Bytewax stream metadata into the
    generated application.
 
 ## Runtime Example
@@ -91,6 +97,29 @@ service.close_finding(
 )
 ```
 
+## Exception Example
+
+```python
+# Record this on an open finding instead of closing it.
+open_finding_id = audit["finding_ids"][0]
+
+service.record_accessibility_exception(
+    exception_id="release-exception-1",
+    tenant_id="tenant-a",
+    finding_id=open_finding_id,
+    approver="accessibility-director",
+    reason="Brand palette update is scheduled after the release freeze.",
+    expires_on="2099-12-31",
+    compensating_controls=[
+        "high contrast mode enabled",
+        "support team release note published",
+    ],
+)
+
+publication = service.validate_publication("checkout", tenant_id="tenant-a")
+assert publication["publishable_with_exception"] is True
+```
+
 ## Agent Example
 
 ```python
@@ -118,8 +147,8 @@ roles are `audit_reviewer`, `remediation_planner`, `caption_reviewer`,
   observability, adapter, UI, and theme settings.
 - `rule_engine`: deterministic guardrails for tenant context, audit standards,
   remediation ownership, contrast, captions, critical review, finding closure,
-  agent registration, tenant isolation, audit evidence, and Bytewax batch
-  mutation.
+  exception expiry, compensating controls, agent registration, tenant isolation,
+  audit evidence, and Bytewax batch mutation.
 - `ui`: APG Python route metadata and view-model module.
 - `theme`: accessibility operations tokens and component metadata.
 - `streaming`: Bytewax processor, topic, state collections, lifecycle events,

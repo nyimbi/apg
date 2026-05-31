@@ -26,6 +26,7 @@ def dashboard_model(
 		"findings": service.list_findings(tenant_id),
 		"remediations": service.list_remediations(tenant_id),
 		"reviews": service.list_reviews(tenant_id),
+		"accessibility_exceptions": service.list_accessibility_exceptions(tenant_id),
 		"accessibility_agents": service.list_accessibility_agents(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
@@ -68,6 +69,7 @@ def remediation_queue_model(
 	return {
 		"remediations": service.list_remediations(tenant_id),
 		"reviews": service.list_reviews(tenant_id),
+		"accessibility_exceptions": service.list_accessibility_exceptions(tenant_id),
 		"actions": ["assign", "start", "record_review", "close"],
 		"required_fields": ["owner", "status", "review_recorded"],
 	}
@@ -104,7 +106,21 @@ def compliance_evidence_model(
 		"audits": service.list_audits(tenant_id),
 		"findings": service.list_findings(tenant_id),
 		"reviews": service.list_reviews(tenant_id),
+		"accessibility_exceptions": service.list_accessibility_exceptions(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
+	}
+
+
+def accessibility_exceptions_model(
+	service: AccsService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or AccsService()
+	return {
+		"accessibility_exceptions": service.list_accessibility_exceptions(tenant_id),
+		"open_findings": [item for item in service.list_findings(tenant_id) if item["status"] != "closed"],
+		"actions": ["record_exception", "review_expiry", "revoke"],
+		"required_fields": ["approver", "reason", "expires_on", "compensating_controls"],
 	}
 
 
@@ -138,6 +154,7 @@ def audit_trail_model(
 			"remediation_updated",
 			"finding_review_recorded",
 			"finding_closed",
+			"accessibility_exception_recorded",
 			"accessibility_agent_registered",
 		],
 	}
@@ -153,6 +170,7 @@ def analytics_model(
 		"summary": summary,
 		"closure_rate": _safe_ratio(summary["finding_count"] - summary["open_finding_count"], summary["finding_count"]),
 		"review_rate": _safe_ratio(summary["review_count"], summary["critical_or_high_count"]),
+		"exception_rate": _safe_ratio(summary["exception_count"], summary["open_finding_count"]),
 		"agent_coverage": _safe_ratio(summary["accessibility_agent_count"], max(summary["target_count"], 1)),
 	}
 

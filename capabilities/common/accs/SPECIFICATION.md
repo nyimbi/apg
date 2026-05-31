@@ -48,6 +48,8 @@ The package owns these records:
   evidence, owner, status, and review state.
 - `RemediationTask`: tracked work item for resolving a finding.
 - `AccessibilityReview`: formal decision record for critical findings.
+- `AccessibilityException`: approved, expiring temporary exception with
+  compensating controls for unresolved findings.
 - `AccessibilityAuditEvent`: tenant-scoped event emitted for important state
   changes.
 - `AccessibilityAgent`: tenant-scoped AI-agent registration for audit review,
@@ -64,14 +66,16 @@ The primary lifecycle is:
 5. Create remediation tasks automatically.
 6. Require an approved formal review for critical findings before closure.
 7. Close findings only with resolution evidence.
-8. Validate publication readiness with the same rule engine exposed by the
+8. Record temporary exceptions only with approver, reason, active expiry, and
+   compensating controls.
+9. Validate publication readiness with the same rule engine exposed by the
    public contract.
-9. Register scoped AI accessibility agents when agent assistance contributes to
+10. Register scoped AI accessibility agents when agent assistance contributes to
    audit, remediation, content, standards, or release-review work.
-10. Validate Bytewax-backed batch accessibility mutation metadata.
-11. Expose dashboards, audit consoles, finding boards, remediation queues,
-   assistive previews, agent panels, audit trails, analytics, settings, and
-   compliance evidence.
+11. Validate Bytewax-backed batch accessibility mutation metadata.
+12. Expose dashboards, audit consoles, finding boards, remediation queues,
+   exception boards, assistive previews, agent panels, audit trails, analytics,
+   settings, and compliance evidence.
 
 ## Rules And Guardrails
 
@@ -86,6 +90,10 @@ The contract rules are executable guardrails:
   formal review before closure.
 - `finding_closure_requires_resolution`: finding closure requires resolution
   evidence.
+- `accessibility_exception_requires_expiry`: accessibility exceptions require
+  an active expiry date.
+- `accessibility_exception_requires_compensating_controls`: accessibility
+  exceptions require compensating controls.
 - `accessibility_agent_requires_registration`: AI accessibility agents must be
   registered before contributing.
 - `accessibility_agent_runtime_supported`: AI accessibility agents must use a
@@ -113,6 +121,7 @@ ACCS exposes route and view-model surfaces for:
 - audit console;
 - findings board;
 - remediation queue;
+- exception board;
 - assistive preview;
 - media accessibility;
 - compliance evidence;
@@ -122,8 +131,9 @@ ACCS exposes route and view-model surfaces for:
 - settings.
 
 The `accs_accessibility_ops` theme must expose semantic tokens and component
-metadata for score pills, severity bands, finding boards, compliance evidence,
-semantic-tree previews, agent panels, and audit timelines.
+metadata for score pills, severity bands, finding boards, exception boards,
+compliance evidence, semantic-tree previews, agent panels, and audit
+timelines.
 
 ## Adapter Boundaries
 

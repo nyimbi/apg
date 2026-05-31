@@ -23418,3 +23418,73 @@ Known gaps:
 - The `code_review_ready` lifecycle field proves review readiness from package
   evidence and contract surfaces; it is not a substitute for human or agent
   review of every future behavior change.
+
+### 2026-06-01 02:43 EAT
+
+ACCS accessibility exception governance slice:
+
+- Added an `AccessibilityException` runtime model so ACCS can record approved,
+  expiring temporary risk acceptances for unresolved accessibility findings.
+- Added service/API/view behavior for recording and listing exceptions,
+  including approver, reason, expiry, compensating controls, status, audit
+  events, compliance summaries, and exception-board view data.
+- Extended publication validation to report open findings, active exceptions,
+  and `publishable_with_exception` when every open target finding has an
+  approved active exception.
+- Extended the ACCS contract with exception guardrail rules, the
+  `/accs/exceptions` UI route, `exception_board` theme metadata,
+  `accessibility_exceptions` provided/state surfaces, and the
+  `accessibility_exception_recorded` Bytewax lifecycle event.
+- Replaced the ACCS `cap_spec.md` compatibility pointer with a real capability
+  packet and aligned `SPECIFICATION.md`, `PLAN.md`, `README.md`,
+  `semantic_model.json`, `release_report.json`, and `app.py` with the
+  executable exception behavior.
+
+Focused verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/accs/__init__.py capabilities/common/accs/models.py capabilities/common/accs/accessibility_engine.py capabilities/common/accs/service.py capabilities/common/accs/api.py capabilities/common/accs/views.py capabilities/common/accs/capability_contract.py capabilities/common/accs/app.py capabilities/common/accs/test_capability_contract.py capabilities/common/accs/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/accs/test_capability_contract.py capabilities/common/accs/tests/test_package_contract.py`
+  passed with 14 tests and 10 pre-existing dependency deprecation warnings.
+- `./.venv/bin/python -c "from capabilities.common.accs import app; r=app.self_test(); print(r); assert r['passed']"`
+  passed.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/accs --json`
+  passed with one domain-specific ACCS implementation, 0 warnings, and 0
+  errors.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/accs --json`
+  passed and showed `accessibility_exceptions`, 17 rules, 12 routes, and the
+  exception route/theme/Bytewax event surfaces.
+- `./.venv/bin/apg capabilities lifecycle-audit --root capabilities/common/accs --json`
+  passed with one complete lifecycle record, 17 rules, 12 routes, and 0
+  warnings/errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed globally with 109 operable contracts, 109 complete packages, 0 package
+  gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` passed all 21 tooling surfaces.
+- `git diff --check -- capabilities/common/accs docs/progress_log.md` passed.
+
+Code review:
+
+- Reviewed tenant scoping: exceptions are keyed by tenant and finding, cannot
+  be recorded against another tenant's finding, and tenant-filtered list calls
+  power the publication and view models.
+- Reviewed rule enforcement: missing expiry and missing compensating controls
+  fail through the deterministic rule engine; expired or non-ISO dates are
+  rejected before an exception is persisted.
+- Reviewed lifecycle semantics: exceptions do not close findings and
+  `publishable_with_exception` remains separate from clean `publishable`
+  readiness.
+- Reviewed evidence drift: generated semantic and release evidence now matches
+  the 17-rule, 12-route contract.
+- Attempted to spawn a separate review agent, but the session still had the
+  maximum open agent thread slots from prior shutdown agents; completed a
+  direct review instead.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live scanners,
+  live assistive-technology adapters, external AI CLIs, durable persistence,
+  performance checks, or a live Bytewax topology during this
+  battery-conscious capability slice.
+- Existing SQLAlchemy and Pydantic deprecation warnings surfaced by focused
+  tests remain outside this slice.

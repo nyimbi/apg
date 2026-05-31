@@ -103,6 +103,19 @@ def close_finding(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def record_accessibility_exception(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.record_accessibility_exception(
+		exception_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		finding_id=str(payload["finding_id"]),
+		approver=str(payload["approver"]),
+		reason=str(payload.get("reason") or ""),
+		expires_on=str(payload.get("expires_on") or ""),
+		compensating_controls=tuple(payload.get("compensating_controls") or ()),
+		status=str(payload.get("status") or "approved"),
+	)
+
+
 def register_accessibility_agent(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.register_accessibility_agent(
 		agent_id=str(payload["id"]),
@@ -160,6 +173,10 @@ def list_remediations(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_reviews(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_reviews(tenant_id)
+
+
+def list_accessibility_exceptions(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_accessibility_exceptions(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

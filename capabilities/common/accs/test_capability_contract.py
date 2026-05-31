@@ -16,10 +16,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["configuration"]["standards"]["default_standard"] == "EN-301-549"
 	assert contract["configuration_schema"]["required"] == ["tenant_id", "standards", "audits", "assistive", "accessibility_agents", "governance", "observability", "adapters", "ui", "theme"]
 	assert contract["configuration"]["accessibility_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
-	assert set(contract["provides"]) >= {"accessibility_audits", "remediation_workflows", "accessibility_agents"}
+	assert set(contract["provides"]) >= {"accessibility_audits", "remediation_workflows", "accessibility_exceptions", "accessibility_agents"}
 	assert contract["requires"] == ["them", "i18n", "nlpc"]
 	assert contract["streaming"]["processor"] == "bytewax"
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "audits", "findings", "remediation", "assistive", "media", "compliance", "agents", "audit", "analytics", "settings"}
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "audits", "findings", "remediation", "exceptions", "assistive", "media", "compliance", "agents", "audit", "analytics", "settings"}
 	assert contract["theme"]["name"] == "accs_accessibility_ops"
 
 
@@ -27,12 +27,15 @@ def test_rule_engine_enforces_accs_guardrails():
 	result = evaluate_capability_rules({"tenant_context_present": False, "operation": "start_audit", "standard_selected": False, "violation_detected": True, "remediation_owner_assigned": False, "published_ui": True, "contrast_passed": False, "media_content_present": True, "captions_available": False, "issue_severity": "critical", "review_recorded": False})
 	review_result = evaluate_capability_rules({"tenant_context_present": True, "issue_severity": "critical", "review_recorded": False})
 	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_accessibility_mutation", "event_stream": "memory"})
+	exception_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "record_accessibility_exception", "exception_expiry_present": False, "compensating_controls_present": False})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {"tenant_context_required", "audit_requires_standard", "violation_requires_remediation_owner", "published_ui_requires_contrast", "media_requires_captions", "critical_issue_requires_review"}
 	assert review_result["decision"] == "require_review"
 	assert batch_result["decision"] == "deny"
 	assert batch_result["matched_rules"] == ["batch_accessibility_mutation_requires_bytewax"]
+	assert exception_result["decision"] == "deny"
+	assert set(exception_result["matched_rules"]) == {"accessibility_exception_requires_expiry", "accessibility_exception_requires_compensating_controls"}
 
 
 def test_registration_includes_full_capability_contract():
@@ -42,6 +45,7 @@ def test_registration_includes_full_capability_contract():
 	assert "nlpc" in registration["dependencies"]
 	assert "bytewax" in registration["optional_dependencies"]
 	assert registration["ui_components"]["remediation"] == "/accs/remediation"
+	assert registration["ui_components"]["exceptions"] == "/accs/exceptions"
 	assert registration["ui_components"]["agents"] == "/accs/agents"
 	assert registration["streaming"]["processor"] == "bytewax"
 	assert "accs:remediate" in registration["permissions"]
@@ -214,6 +218,89 @@ def test_critical_finding_closure_enforces_tenant_and_resolution_guardrails():
 		service.close_finding(finding["id"], tenant_id="tenant-accs", resolution="")
 
 
+def test_accessibility_exception_lifecycle_and_publication_readiness():
+	service = AccsService()
+	service.register_target(
+		target_id="release-page",
+		tenant_id="tenant-exception",
+		surface="Release Page",
+		route="/release",
+		owner="release-owner",
+		published_ui=True,
+		contrast_ratio=3.7,
+	)
+	audit = service.run_audit(
+		audit_id="release-audit",
+		tenant_id="tenant-exception",
+		standard_id="wcag_2_2_aa",
+		target_ids=["release-page"],
+		remediation_owner="accessibility-lead",
+	)
+	finding_id = audit["finding_ids"][0]
+
+	with pytest.raises(PermissionError, match="accessibility_exception_expiry_required"):
+		service.record_accessibility_exception(
+			exception_id="exception-missing-expiry",
+			tenant_id="tenant-exception",
+			finding_id=finding_id,
+			approver="accessibility-director",
+			reason="Awaiting brand palette release.",
+			expires_on="",
+			compensating_controls=["high contrast mode enabled"],
+		)
+	with pytest.raises(PermissionError, match="accessibility_exception_compensating_controls_required"):
+		service.record_accessibility_exception(
+			exception_id="exception-missing-controls",
+			tenant_id="tenant-exception",
+			finding_id=finding_id,
+			approver="accessibility-director",
+			reason="Awaiting brand palette release.",
+			expires_on="2099-12-31",
+			compensating_controls=[],
+		)
+	with pytest.raises(PermissionError, match="accessibility_exception_expired"):
+		service.record_accessibility_exception(
+			exception_id="exception-expired",
+			tenant_id="tenant-exception",
+			finding_id=finding_id,
+			approver="accessibility-director",
+			reason="Expired risk acceptance.",
+			expires_on="2000-01-01",
+			compensating_controls=["manual support path enabled"],
+		)
+	with pytest.raises(KeyError, match="unknown accessibility finding for tenant"):
+		service.record_accessibility_exception(
+			exception_id="exception-cross-tenant",
+			tenant_id="tenant-other",
+			finding_id=finding_id,
+			approver="accessibility-director",
+			reason="Wrong tenant should not see this finding.",
+			expires_on="2099-12-31",
+			compensating_controls=["manual support path enabled"],
+		)
+
+	exception = service.record_accessibility_exception(
+		exception_id="exception-1",
+		tenant_id="tenant-exception",
+		finding_id=finding_id,
+		approver="accessibility-director",
+		reason="Brand palette fix is scheduled after release freeze.",
+		expires_on="2099-12-31",
+		compensating_controls=["high contrast mode enabled", "support team release note published"],
+	)
+	report = service.validate_publication("release-page", tenant_id="tenant-exception")
+	exceptions_model = views.accessibility_exceptions_model(service, "tenant-exception")
+	evidence = views.compliance_evidence_model(service, "tenant-exception")
+
+	assert exception["status"] == "approved"
+	assert report["publishable"] is False
+	assert report["publishable_with_exception"] is True
+	assert report["active_exceptions"][0]["id"] == "exception-1"
+	assert exceptions_model["accessibility_exceptions"][0]["finding_id"] == finding_id
+	assert evidence["summary"]["exception_count"] == 1
+	assert "accessibility_exception_recorded" in {event["event_type"] for event in evidence["audit_events"]}
+
+
 def test_accessibility_agents_tenant_scope_and_bytewax_guardrail():
 	service = AccsService()
 	service.register_target(
@@ -309,6 +396,36 @@ def test_api_helpers_expose_review_and_closure_lifecycle():
 	assert review["reviewer"] == "api-reviewer"
 	assert closed["status"] == "closed"
 	assert api.list_reviews(target["tenant_id"])[0]["finding_id"] == audit["finding_ids"][0]
+
+
+def test_api_helpers_expose_accessibility_exceptions():
+	target = api.register_target({
+		"id": "api-exception-target",
+		"tenant_id": "tenant-api-exception",
+		"surface": "API Exception Target",
+		"route": "/exception",
+		"owner": "api-owner",
+		"published_ui": True,
+		"contrast_ratio": 3.5,
+	})
+	audit = api.run_audit({
+		"id": "api-exception-audit",
+		"tenant_id": target["tenant_id"],
+		"target_ids": [target["id"]],
+		"remediation_owner": "api-accessibility-lead",
+	})
+	exception = api.record_accessibility_exception({
+		"id": "api-exception",
+		"tenant_id": target["tenant_id"],
+		"finding_id": audit["finding_ids"][0],
+		"approver": "api-approver",
+		"reason": "Temporary release acceptance.",
+		"expires_on": "2099-12-31",
+		"compensating_controls": ["release note", "support escalation"],
+	})
+
+	assert exception["approver"] == "api-approver"
+	assert api.list_accessibility_exceptions(target["tenant_id"])[0]["id"] == "api-exception"
 
 
 def test_api_helpers_expose_accessibility_agents():

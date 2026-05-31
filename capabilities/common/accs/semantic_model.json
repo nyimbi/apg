@@ -101,6 +101,7 @@
       "provides": [
         "accessibility_audits",
         "remediation_workflows",
+        "accessibility_exceptions",
         "assistive_metadata",
         "media_accessibility",
         "standards_governance",
@@ -202,6 +203,32 @@
               "required_action": "attach_resolution_evidence"
             },
             "name": "finding_closure_requires_resolution"
+          },
+          {
+            "condition": {
+              "exception_expiry_present": false,
+              "operation": "record_accessibility_exception"
+            },
+            "description": "Accessibility exceptions require an active expiry date.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_exception_expiry_required",
+              "required_action": "set_accessibility_exception_expiry"
+            },
+            "name": "accessibility_exception_requires_expiry"
+          },
+          {
+            "condition": {
+              "compensating_controls_present": false,
+              "operation": "record_accessibility_exception"
+            },
+            "description": "Accessibility exceptions require compensating controls.",
+            "effect": {
+              "decision": "deny",
+              "reason": "accessibility_exception_compensating_controls_required",
+              "required_action": "attach_compensating_controls"
+            },
+            "name": "accessibility_exception_requires_compensating_controls"
           },
           {
             "condition": {
@@ -402,6 +429,32 @@
         },
         {
           "condition": {
+            "exception_expiry_present": false,
+            "operation": "record_accessibility_exception"
+          },
+          "description": "Accessibility exceptions require an active expiry date.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_exception_expiry_required",
+            "required_action": "set_accessibility_exception_expiry"
+          },
+          "name": "accessibility_exception_requires_expiry"
+        },
+        {
+          "condition": {
+            "compensating_controls_present": false,
+            "operation": "record_accessibility_exception"
+          },
+          "description": "Accessibility exceptions require compensating controls.",
+          "effect": {
+            "decision": "deny",
+            "reason": "accessibility_exception_compensating_controls_required",
+            "required_action": "attach_compensating_controls"
+          },
+          "name": "accessibility_exception_requires_compensating_controls"
+        },
+        {
+          "condition": {
             "accessibility_agent_present": true,
             "agent_registered": false
           },
@@ -546,6 +599,11 @@
           "permission": "accs:view",
           "route": "/accs/dashboard"
         },
+        "exceptions": {
+          "component": "AccessibilityExceptionBoard",
+          "permission": "accs:review",
+          "route": "/accs/exceptions"
+        },
         "findings": {
           "component": "FindingsBoard",
           "permission": "accs:view",
@@ -577,6 +635,7 @@
           "remediation_updated",
           "finding_review_recorded",
           "finding_closed",
+          "accessibility_exception_recorded",
           "accessibility_agent_registered"
         ],
         "processor": "bytewax",
@@ -587,6 +646,7 @@
           "findings",
           "remediations",
           "reviews",
+          "accessibility_exceptions",
           "accessibility_agents",
           "audit_events"
         ],
@@ -614,6 +674,10 @@
           "compliance_panel": {
             "status_style": "evidence-chip",
             "visual": "standard-matrix"
+          },
+          "exception_board": {
+            "status_style": "risk-acceptance-chip",
+            "visual": "expiry-list"
           },
           "finding_board": {
             "highlight": "blocked-chip",
@@ -666,6 +730,13 @@
             "nav_group": "Remediation",
             "path": "/accs/remediation",
             "permission": "accs:remediate"
+          },
+          {
+            "component": "AccessibilityExceptionBoard",
+            "name": "exceptions",
+            "nav_group": "Governance",
+            "path": "/accs/exceptions",
+            "permission": "accs:review"
           },
           {
             "component": "AssistivePreview",
@@ -824,6 +895,7 @@
       "provides": [
         "accessibility_audits",
         "remediation_workflows",
+        "accessibility_exceptions",
         "assistive_metadata",
         "media_accessibility",
         "standards_governance",
@@ -930,6 +1002,32 @@
         "required_action": "choose_supported_accessibility_agent_runtime"
       },
       "name": "accessibility_agent_runtime_supported"
+    },
+    "accessibility_exception_requires_compensating_controls": {
+      "condition": {
+        "compensating_controls_present": false,
+        "operation": "record_accessibility_exception"
+      },
+      "description": "Accessibility exceptions require compensating controls.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_exception_compensating_controls_required",
+        "required_action": "attach_compensating_controls"
+      },
+      "name": "accessibility_exception_requires_compensating_controls"
+    },
+    "accessibility_exception_requires_expiry": {
+      "condition": {
+        "exception_expiry_present": false,
+        "operation": "record_accessibility_exception"
+      },
+      "description": "Accessibility exceptions require an active expiry date.",
+      "effect": {
+        "decision": "deny",
+        "reason": "accessibility_exception_expiry_required",
+        "required_action": "set_accessibility_exception_expiry"
+      },
+      "name": "accessibility_exception_requires_expiry"
     },
     "accs_state_change_requires_audit": {
       "condition": {

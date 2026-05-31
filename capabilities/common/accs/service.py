@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 from .accessibility_engine import AccessibilityAuditEngine
@@ -15,6 +16,7 @@ from .models import (
 	AccessibilityAgent,
 	AccessibilityAudit,
 	AccessibilityAuditEvent,
+	AccessibilityException,
 	AccessibilityFinding,
 	AccessibilityReview,
 	AccessibilityStandard,
@@ -33,6 +35,7 @@ class AccsService:
 		self._remediations: dict[str, RemediationTask] = {}
 		self._audits: dict[str, AccessibilityAudit] = {}
 		self._reviews: dict[str, AccessibilityReview] = {}
+		self._exceptions: dict[str, AccessibilityException] = {}
 		self._agents: dict[str, AccessibilityAgent] = {}
 		self._events: list[AccessibilityAuditEvent] = []
 		self._engine = AccessibilityAuditEngine()
@@ -428,6 +431,65 @@ class AccsService:
 		)
 		return closed.to_dict()
 
+	def record_accessibility_exception(
+		self,
+		exception_id: str,
+		tenant_id: str,
+		finding_id: str,
+		approver: str,
+		reason: str,
+		expires_on: str,
+		compensating_controls: list[str] | tuple[str, ...],
+		status: str = "approved",
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		key = self._key(tenant_id, finding_id)
+		finding = self._findings.get(key)
+		if finding is None or finding.tenant_id != tenant_id:
+			raise KeyError(f"unknown accessibility finding for tenant: {finding_id}")
+		if finding.status == "closed":
+			raise ValueError("accessibility exceptions cannot be recorded for closed findings")
+		if not approver:
+			raise ValueError("exception approver is required")
+		if not reason:
+			raise ValueError("exception reason is required")
+		if status not in {"approved", "revoked"}:
+			raise ValueError("exception status must be approved or revoked")
+		self._enforce_exception_policy(expires_on, compensating_controls)
+		exception_key = self._key(tenant_id, exception_id)
+		if exception_key in self._exceptions:
+			raise ValueError(f"duplicate accessibility exception for tenant: {exception_id}")
+		exception = AccessibilityException(
+			id=exception_id,
+			tenant_id=tenant_id,
+			finding_id=finding_id,
+			approver=approver,
+			reason=reason,
+			expires_on=expires_on,
+			compensating_controls=tuple(compensating_controls),
+			status=status,
+		)
+		self._exceptions[exception_key] = exception
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="accessibility_exception_recorded",
+			subject_id=finding_id,
+			message=f"Recorded accessibility exception {exception_id} for finding {finding_id}.",
+			evidence={
+				"exception_id": exception_id,
+				"expires_on": expires_on,
+				"status": status,
+				"compensating_control_count": len(compensating_controls),
+			},
+		)
+		return exception.to_dict()
+
+	def list_accessibility_exceptions(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		exceptions = list(self._exceptions.values())
+		if tenant_id is not None:
+			exceptions = [item for item in exceptions if item.tenant_id == tenant_id]
+		return [item.to_dict() for item in sorted(exceptions, key=lambda item: item.id)]
+
 	def register_accessibility_agent(
 		self,
 		agent_id: str,
@@ -540,9 +602,28 @@ class AccsService:
 			"media_content_present": target.media_content_present,
 			"captions_available": target.captions_available,
 		})
+		open_findings = [
+			item for item in self.list_findings(target.tenant_id)
+			if item["target_id"] == target.id and item["status"] != "closed"
+		]
+		active_exceptions = [
+			item for item in self.list_accessibility_exceptions(target.tenant_id)
+			if item["status"] == "approved"
+			and self._exception_is_active(item["expires_on"])
+			and item["finding_id"] in {finding["id"] for finding in open_findings}
+		]
+		exception_finding_ids = {item["finding_id"] for item in active_exceptions}
+		publishable_with_exception = (
+			result["decision"] != "allow"
+			and bool(open_findings)
+			and all(finding["id"] in exception_finding_ids for finding in open_findings)
+		)
 		return {
 			"target": target.to_dict(),
 			"publishable": result["decision"] == "allow",
+			"publishable_with_exception": publishable_with_exception,
+			"open_findings": open_findings,
+			"active_exceptions": active_exceptions,
 			"rule_result": result,
 		}
 
@@ -559,6 +640,7 @@ class AccsService:
 			"open_finding_count": len(open_findings),
 			"remediation_count": len(remediations),
 			"review_count": len(self.list_reviews(tenant_id)),
+			"exception_count": len(self.list_accessibility_exceptions(tenant_id)),
 			"accessibility_agent_count": len(self.list_accessibility_agents(tenant_id)),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 			"critical_or_high_count": self._engine.summarize_findings(findings)["critical_or_high_count"],
@@ -595,6 +677,21 @@ class AccsService:
 		_raise_if_denied(result)
 		return result["decision"] == "require_review"
 
+	def _enforce_exception_policy(
+		self,
+		expires_on: str,
+		compensating_controls: list[str] | tuple[str, ...],
+	) -> None:
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "record_accessibility_exception",
+			"exception_expiry_present": bool(expires_on),
+			"compensating_controls_present": bool(compensating_controls),
+		})
+		_raise_if_blocked(result)
+		if not self._exception_is_active(expires_on):
+			raise PermissionError("accessibility_exception_expired")
+
 	def _record_event(
 		self,
 		tenant_id: str,
@@ -622,6 +719,12 @@ class AccsService:
 		if not reviews:
 			return finding.review_recorded
 		return any(review.decision == "approved" for review in reviews)
+
+	def _exception_is_active(self, expires_on: str) -> bool:
+		try:
+			return date.fromisoformat(expires_on) >= date.today()
+		except ValueError:
+			raise ValueError("exception expiry must be an ISO date")
 
 	def _key(self, tenant_id: str, record_id: str) -> str:
 		return f"{tenant_id}:{record_id}"

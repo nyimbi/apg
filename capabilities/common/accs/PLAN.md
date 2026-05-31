@@ -5,14 +5,30 @@
 ACCS is a domain-specific accessibility governance package with deterministic
 models, service behavior, API helpers, view models, contract rules, theme
 metadata, generated package evidence, and focused tests. The critical-finding
-review and closure lifecycle is implemented. This packet brings ACCS up to the
-current common-capability standard by adding local README coverage, first-class
-AI accessibility agents, Bytewax lifecycle metadata, tenant-safe stores, and
-expanded verification evidence.
+review, closure, AI-agent, Bytewax batch, and tenant-scope lifecycles are
+implemented. The current packet deepens release governance by adding
+approved, expiring accessibility exceptions with compensating controls.
+
+## Packet: Accessibility Exception Governance
+
+Deliver a focused lifecycle packet:
+
+- add an `AccessibilityException` runtime model;
+- add contract rules requiring expiry and compensating controls for
+  accessibility exceptions;
+- expose exception registration and listing from service and API helpers;
+- surface exceptions in remediation, compliance, analytics, and a dedicated
+  exception-board view model;
+- make publication validation report active exceptions and
+  `publishable_with_exception` when every open target finding has an approved,
+  active exception;
+- refresh the package specification, README, `cap_spec.md`, semantic model,
+  package manifest, release evidence, tests, and progress log;
+- run focused ACCS proof plus catalog lifecycle/publish gates.
 
 ## Packet: Accessibility Agent And Tenant Guardrail Lifecycle
 
-Deliver a focused lifecycle packet:
+Completed lifecycle packet:
 
 - add local README coverage for operators and generated-app composers;
 - add first-class accessibility-agent configuration, supported runtimes, and
@@ -34,18 +50,20 @@ Deliver a focused lifecycle packet:
 
 ## Implementation Steps
 
-1. Extend `capability_contract.py` with agent configuration, Bytewax streaming,
-   provides/requires metadata, new UI routes, and guardrails.
-2. Extend `models.py` with `AccessibilityAgent`.
-3. Harden `service.py` with tenant-qualified keys, agent registration, event
-   emission, and batch mutation validation.
-4. Extend `api.py` and `views.py` to expose the new lifecycle surfaces.
-5. Add `README.md` and align `SPECIFICATION.md`/`cap_spec.md` with current
-   behavior.
-6. Regenerate `app.py`, `semantic_model.json`, `release_report.json`, and
-   `package_manifest.json`.
+1. Extend `models.py` with `AccessibilityException`.
+2. Extend `capability_contract.py` with exception guardrails, UI route,
+   theme component, provided surface, state, and lifecycle event metadata.
+3. Extend `service.py` with tenant-scoped exception recording, expiry and
+   compensating-control enforcement, publication-readiness exception
+   reporting, compliance summaries, and audit events.
+4. Extend `api.py` and `views.py` to expose exception registration, listing,
+   dashboard/remediation/compliance/analytics data, and the exception board.
+5. Align `SPECIFICATION.md`, `README.md`, and `cap_spec.md` with executable
+   exception behavior.
+6. Regenerate `app.py`, `semantic_model.json`, and `release_report.json`.
 7. Run focused ACCS compile, tests, self-test, implementation audit,
-   publish-plan, semantic-model, stale-marker, and diff checks.
+   publish-plan, lifecycle audit, strict package artifact audit, tooling audit
+   if battery allows, and diff checks.
 
 ## Review Checklist
 
@@ -59,3 +77,7 @@ Deliver a focused lifecycle packet:
 - View models expose routes, rules, agents, audit events, analytics,
   streaming, and theme state.
 - Provider integrations remain adapter boundaries, not local dependencies.
+- Accessibility exceptions cannot bypass expiry, approver, reason, or
+  compensating-control evidence.
+- Publication readiness distinguishes clean publication from temporary
+  `publishable_with_exception` release governance.

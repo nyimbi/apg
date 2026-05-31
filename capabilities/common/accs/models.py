@@ -168,6 +168,32 @@ class AccessibilityReview:
 
 
 @dataclass(frozen=True)
+class AccessibilityException:
+	"""Approved temporary exception for an unresolved accessibility finding."""
+
+	id: str
+	tenant_id: str
+	finding_id: str
+	approver: str
+	reason: str
+	expires_on: str
+	compensating_controls: tuple[str, ...]
+	status: str = "approved"
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"finding_id": self.finding_id,
+			"approver": self.approver,
+			"reason": self.reason,
+			"expires_on": self.expires_on,
+			"compensating_controls": list(self.compensating_controls),
+			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
 class AccessibilityAuditEvent:
 	"""Tenant-scoped evidence event for ACCS lifecycle changes."""
 
