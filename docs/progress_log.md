@@ -23188,3 +23188,58 @@ Not run to preserve battery:
   migrations; browser-rendered script workbench; durable Bytewax topology; live
   WFLO/SECU/AUTH/AUDL/AICR/SCHD/NCOD/MONI/THEM adapters; external AI-agent
   runtime clients; and load/performance checks.
+
+### 2026-06-01 02:18 EAT
+
+Top-level capability catalog README hardening slice:
+
+- Rewrote `capabilities/README.md` as the operator and contributor guide for
+  the executable APG capability catalog.
+- Documented the current registry snapshot: 109 valid capability contracts and
+  109 domain-specific capability packages according to the focused
+  implementation audit.
+- Added category coverage for common, composition, finance, HCM, CKM, GRC, CRM,
+  EAM, ECD, fintech, integration, intelligence, PDE, and SCM capability groups.
+- Documented how generated APG applications use capability contracts at
+  compile time, package API/service surfaces at runtime, and UI/rule/theme
+  metadata during screen composition.
+- Added focused CLI usage for list, inspect, rule evaluation, package artifact
+  audit, implementation audit, publish-plan, compile, and smoke-test flows.
+- Added first-class AI-agent composition standards for provider-neutral
+  `codex`, `claude_code`, `opencode`, and `pi` runtimes behind AICR adapter
+  contracts.
+- Added the Bytewax lifecycle standard and explicitly warned against
+  broker-specific or Kafka-coupled lifecycle processing in capability
+  contracts.
+- Added the standard per-capability development cycle: read, specify, plan,
+  implement, review, verify, record, commit, and push.
+- Added parallel-development rules, review questions, troubleshooting guidance,
+  and an honest completion target for the full capability-development goal.
+- Added a current-state caveat that strict package-artifact operability audit
+  confirms complete package artifact sets but still reports rule-probe result
+  shape failures in a subset of industry and finance packages.
+
+Focused verification:
+
+- `git diff --check -- capabilities/README.md` passed.
+- `./.venv/bin/apg capabilities validate-contracts --json` passed with 109
+  valid contracts and 0 errors.
+- `./.venv/bin/apg capabilities implementation-audit --json` passed with
+  `ok: true`, 109 domain-specific packages, 0 materialized baselines, 0 mixed
+  packages, 0 contract-only packages, and 0 warnings.
+- `./.venv/bin/apg docs audit --json` passed with 15 required docs present, 61
+  local links valid, 49 documented commands recognized, and 0 violations.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json` did
+  not pass: it reported complete package artifacts for all 109 packages but 39
+  pre-existing rule-probe shape errors across 13 industry/finance packages
+  (`arc_accounts_receivable`, `cbm_cash_management`,
+  `chr_employee_data_management`, `ecd_esg`, `fintech_gateway`,
+  `glr_general_ledger`, `grc_doc`, `grc_rcm`, `int_api`, `pay_payroll`,
+  `pde_pim`, `scm_ven`, and `tat_time_attendance`).
+
+Known gaps:
+
+- This slice did not fix the 13 strict operability-audit packages listed above.
+- Did not run full repository tests, rendered UI checks, live adapters, live
+  Bytewax topology, package-specific tests, or performance checks because this
+  was a documentation/control-plane slice under the battery-conscious policy.
