@@ -18,6 +18,8 @@ def capability_status(service: ScptService | None = None, tenant_id: str = "defa
 		"summary": service.dashboard_summary(tenant_id),
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 	}
 
 
@@ -70,11 +72,20 @@ def retire_script(service: ScptService, **payload: Any) -> dict[str, Any]:
 
 
 def register_scripting_agent(service: ScptService, **payload: Any) -> dict[str, Any]:
-	return service.register_scripting_agent(**payload)
+	normalized_payload = dict(payload)
+	if "contribution_disclosed" in payload:
+		normalized_payload["contribution_disclosed"] = _payload_bool(payload, "contribution_disclosed")
+	if "human_approval_required" in payload:
+		normalized_payload["human_approval_required"] = _payload_bool(payload, "human_approval_required")
+	return service.register_scripting_agent(**normalized_payload)
 
 
 def validate_batch_mutation(service: ScptService, event_stream: str) -> dict[str, Any]:
 	return service.validate_batch_mutation(event_stream)
+
+
+def validate_lifecycle_batch(service: ScptService, **payload: Any) -> dict[str, Any]:
+	return service.validate_lifecycle_batch(**payload)
 
 
 def create_record(service: ScptService, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
@@ -97,5 +108,20 @@ def list_agents(service: ScptService, tenant_id: str | None = None) -> list[dict
 	return service.list_agents(tenant_id)
 
 
+def list_lifecycle_batches(service: ScptService, tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return service.list_lifecycle_batches(tenant_id)
+
+
 def audit_events(service: ScptService, tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return service.audit_events(tenant_id)
+
+
+def _payload_bool(payload: dict[str, Any], key: str, default: bool = False) -> bool:
+	value = payload.get(key, default)
+	if isinstance(value, bool):
+		return value
+	if value is None:
+		return False
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+	return bool(value)

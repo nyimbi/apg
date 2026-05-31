@@ -1,5 +1,38 @@
 {
-  "agents": {},
+  "agents": {
+    "scpt": {
+      "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+      "first_class": true,
+      "privileged_roles": [
+        "author",
+        "reviewer",
+        "policy_advisor",
+        "runtime_triage",
+        "lifecycle_batch_reviewer",
+        "script_steward"
+      ],
+      "require_contribution_disclosure": true,
+      "require_human_approval_for_privileged_roles": true,
+      "require_owner": true,
+      "require_purpose": true,
+      "require_scope": true,
+      "supported_roles": [
+        "author",
+        "reviewer",
+        "policy_advisor",
+        "test_generator",
+        "runtime_triage",
+        "lifecycle_batch_reviewer",
+        "script_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Custom Scripting Engine package-backed APG capability",
     "entity_count": 0,
@@ -8,11 +41,65 @@
   },
   "capabilities": {
     "scpt": {
-      "approvals": {},
+      "adapters": {
+        "agent_adapter": "aicr_provider_neutral_scpt_agent_adapter",
+        "ai_core": "aicr",
+        "api_helpers": "api.py",
+        "audit_sink": "audl",
+        "event_stream": "bytewax",
+        "generated_app_runtime": "service.ScptService",
+        "identity": "auth",
+        "monitoring": "moni",
+        "no_code_builder": "ncod",
+        "runtime_helpers": "script_runtime.py",
+        "scheduler": "schd",
+        "security": "secu",
+        "theme": "them",
+        "view_models": "views.py",
+        "workflow": "wflo"
+      },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+        "first_class": true,
+        "privileged_roles": [
+          "author",
+          "reviewer",
+          "policy_advisor",
+          "runtime_triage",
+          "lifecycle_batch_reviewer",
+          "script_steward"
+        ],
+        "require_contribution_disclosure": true,
+        "require_human_approval_for_privileged_roles": true,
+        "require_owner": true,
+        "require_purpose": true,
+        "require_scope": true,
+        "supported_roles": [
+          "author",
+          "reviewer",
+          "policy_advisor",
+          "test_generator",
+          "runtime_triage",
+          "lifecycle_batch_reviewer",
+          "script_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "dangerous_permission_approval": "DangerousPermissionApproval",
+        "privileged_scripting_agent_review": "ScriptingAgentHumanApprovalReview",
+        "script_publish_review": "ScriptPublishReview"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_scpt_agent_adapter",
           "ai_core": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
@@ -27,6 +114,38 @@
           "theme": "them",
           "view_models": "views.py",
           "workflow": "wflo"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "author",
+            "reviewer",
+            "policy_advisor",
+            "runtime_triage",
+            "lifecycle_batch_reviewer",
+            "script_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "author",
+            "reviewer",
+            "policy_advisor",
+            "test_generator",
+            "runtime_triage",
+            "lifecycle_batch_reviewer",
+            "script_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "executions": {
           "cancel_reason_required": true,
@@ -85,7 +204,9 @@
             "reviewer",
             "policy_advisor",
             "test_generator",
-            "runtime_triage"
+            "runtime_triage",
+            "lifecycle_batch_reviewer",
+            "script_steward"
           ],
           "supported_runtimes": [
             "codex",
@@ -110,6 +231,31 @@
           "versioning_enabled": true,
           "workflow_binding_policy_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "scpt.lifecycle",
+          "required_operations": [
+            "package_policy_batch",
+            "sandbox_batch",
+            "script_batch",
+            "approval_batch",
+            "execution_batch",
+            "scripting_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "scpt.packages",
+            "scpt.sandboxes",
+            "scpt.scripts",
+            "scpt.approvals",
+            "scpt.executions",
+            "scpt.agents",
+            "scpt.audit"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -120,6 +266,7 @@
           "enable_analytics": true,
           "enable_audit": true,
           "enable_execution_console": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_package_policy": true,
           "enable_sandbox_monitor": true,
           "enable_script_workbench": true
@@ -137,14 +284,16 @@
         "workflow_extensions",
         "package_policy",
         "script_execution",
-        "scripting_agents",
-        "script_governance"
+        "scripting_agent_composition",
+        "script_governance",
+        "bytewax_script_lifecycle"
       ],
       "requires": [
         "wflo",
         "secu",
         "auth",
-        "audl"
+        "audl",
+        "aicr"
       ],
       "rule_engine": {
         "rules": [
@@ -557,23 +706,36 @@
           },
           {
             "condition": {
-              "agent_registered": false,
-              "scripting_agent_present": true
+              "agent_id_present": false,
+              "operation": "register_scripting_agent"
             },
-            "description": "AI scripting agents must be registered.",
+            "description": "First-class scripting agents require stable identifiers.",
             "effect": {
               "decision": "deny",
-              "reason": "scripting_agent_registration_required",
-              "required_action": "register_scripting_agent"
+              "reason": "scripting_agent_id_required",
+              "required_action": "assign_scripting_agent_id"
             },
-            "name": "scripting_agent_requires_registration"
+            "name": "scripting_agent_requires_id"
+          },
+          {
+            "condition": {
+              "agent_name_present": false,
+              "operation": "register_scripting_agent"
+            },
+            "description": "First-class scripting agents require readable names.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scripting_agent_name_required",
+              "required_action": "name_scripting_agent"
+            },
+            "name": "scripting_agent_requires_name"
           },
           {
             "condition": {
               "agent_runtime_supported": false,
-              "scripting_agent_present": true
+              "operation": "register_scripting_agent"
             },
-            "description": "AI scripting agents must use a configured runtime.",
+            "description": "First-class scripting agents must use a configured provider-neutral runtime.",
             "effect": {
               "decision": "deny",
               "reason": "scripting_agent_runtime_not_supported",
@@ -583,10 +745,23 @@
           },
           {
             "condition": {
-              "agent_scope_present": false,
-              "scripting_agent_present": true
+              "agent_role_supported": false,
+              "operation": "register_scripting_agent"
             },
-            "description": "AI scripting agents require script, sandbox, package, or execution scope.",
+            "description": "First-class scripting agents must use supported scripting-governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scripting_agent_role_not_supported",
+              "required_action": "choose_supported_scripting_agent_role"
+            },
+            "name": "scripting_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_scripting_agent"
+            },
+            "description": "First-class scripting agents require script, sandbox, package, execution, approval, or lifecycle scope.",
             "effect": {
               "decision": "deny",
               "reason": "scripting_agent_scope_required",
@@ -596,16 +771,95 @@
           },
           {
             "condition": {
-              "agent_contribution_disclosed": false,
-              "scripting_agent_present": true
+              "agent_owner_present": false,
+              "operation": "register_scripting_agent"
             },
-            "description": "AI scripting agent contributions require disclosure.",
+            "description": "First-class scripting agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scripting_agent_owner_required",
+              "required_action": "assign_scripting_agent_owner"
+            },
+            "name": "scripting_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_scripting_agent"
+            },
+            "description": "First-class scripting agents require a documented scripting-governance purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scripting_agent_purpose_required",
+              "required_action": "document_scripting_agent_purpose"
+            },
+            "name": "scripting_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "operation": "register_scripting_agent"
+            },
+            "description": "First-class scripting agent contributions require visible machine-contribution disclosure.",
             "effect": {
               "decision": "deny",
               "reason": "scripting_agent_disclosure_required",
               "required_action": "disclose_scripting_agent"
             },
             "name": "scripting_agent_requires_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_scripting_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged scripting-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "scripting_agent_human_approval_required",
+              "required_action": "record_scripting_agent_human_approval"
+            },
+            "name": "scripting_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_scpt_lifecycle_batch"
+            },
+            "description": "SCPT lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "scpt_lifecycle_batch_empty",
+              "required_action": "include_scpt_lifecycle_mutations"
+            },
+            "name": "scpt_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "lifecycle_operation_supported": false,
+              "operation": "validate_scpt_lifecycle_batch"
+            },
+            "description": "SCPT lifecycle batches must use configured lifecycle operations.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_scpt_lifecycle_operation",
+              "required_action": "choose_supported_scpt_lifecycle_operation"
+            },
+            "name": "scpt_lifecycle_operation_supported"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_scpt_lifecycle_batch"
+            },
+            "description": "SCPT lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_scpt_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_scpt_lifecycle_stream_required"
           },
           {
             "condition": {
@@ -1058,23 +1312,36 @@
         },
         {
           "condition": {
-            "agent_registered": false,
-            "scripting_agent_present": true
+            "agent_id_present": false,
+            "operation": "register_scripting_agent"
           },
-          "description": "AI scripting agents must be registered.",
+          "description": "First-class scripting agents require stable identifiers.",
           "effect": {
             "decision": "deny",
-            "reason": "scripting_agent_registration_required",
-            "required_action": "register_scripting_agent"
+            "reason": "scripting_agent_id_required",
+            "required_action": "assign_scripting_agent_id"
           },
-          "name": "scripting_agent_requires_registration"
+          "name": "scripting_agent_requires_id"
+        },
+        {
+          "condition": {
+            "agent_name_present": false,
+            "operation": "register_scripting_agent"
+          },
+          "description": "First-class scripting agents require readable names.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scripting_agent_name_required",
+            "required_action": "name_scripting_agent"
+          },
+          "name": "scripting_agent_requires_name"
         },
         {
           "condition": {
             "agent_runtime_supported": false,
-            "scripting_agent_present": true
+            "operation": "register_scripting_agent"
           },
-          "description": "AI scripting agents must use a configured runtime.",
+          "description": "First-class scripting agents must use a configured provider-neutral runtime.",
           "effect": {
             "decision": "deny",
             "reason": "scripting_agent_runtime_not_supported",
@@ -1084,10 +1351,23 @@
         },
         {
           "condition": {
-            "agent_scope_present": false,
-            "scripting_agent_present": true
+            "agent_role_supported": false,
+            "operation": "register_scripting_agent"
           },
-          "description": "AI scripting agents require script, sandbox, package, or execution scope.",
+          "description": "First-class scripting agents must use supported scripting-governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scripting_agent_role_not_supported",
+            "required_action": "choose_supported_scripting_agent_role"
+          },
+          "name": "scripting_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_scripting_agent"
+          },
+          "description": "First-class scripting agents require script, sandbox, package, execution, approval, or lifecycle scope.",
           "effect": {
             "decision": "deny",
             "reason": "scripting_agent_scope_required",
@@ -1097,16 +1377,95 @@
         },
         {
           "condition": {
-            "agent_contribution_disclosed": false,
-            "scripting_agent_present": true
+            "agent_owner_present": false,
+            "operation": "register_scripting_agent"
           },
-          "description": "AI scripting agent contributions require disclosure.",
+          "description": "First-class scripting agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scripting_agent_owner_required",
+            "required_action": "assign_scripting_agent_owner"
+          },
+          "name": "scripting_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_scripting_agent"
+          },
+          "description": "First-class scripting agents require a documented scripting-governance purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scripting_agent_purpose_required",
+            "required_action": "document_scripting_agent_purpose"
+          },
+          "name": "scripting_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "operation": "register_scripting_agent"
+          },
+          "description": "First-class scripting agent contributions require visible machine-contribution disclosure.",
           "effect": {
             "decision": "deny",
             "reason": "scripting_agent_disclosure_required",
             "required_action": "disclose_scripting_agent"
           },
           "name": "scripting_agent_requires_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_scripting_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged scripting-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "scripting_agent_human_approval_required",
+            "required_action": "record_scripting_agent_human_approval"
+          },
+          "name": "scripting_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_scpt_lifecycle_batch"
+          },
+          "description": "SCPT lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "scpt_lifecycle_batch_empty",
+            "required_action": "include_scpt_lifecycle_mutations"
+          },
+          "name": "scpt_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "lifecycle_operation_supported": false,
+            "operation": "validate_scpt_lifecycle_batch"
+          },
+          "description": "SCPT lifecycle batches must use configured lifecycle operations.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_scpt_lifecycle_operation",
+            "required_action": "choose_supported_scpt_lifecycle_operation"
+          },
+          "name": "scpt_lifecycle_operation_supported"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_scpt_lifecycle_batch"
+          },
+          "description": "SCPT lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_scpt_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_scpt_lifecycle_stream_required"
         },
         {
           "condition": {
@@ -1150,7 +1509,8 @@
       "runtime": {
         "api": "api.py",
         "entrypoint": "app.py",
-        "service": "service.py",
+        "helpers": "script_runtime.py",
+        "service": "service.ScptService",
         "views": "views.py"
       },
       "screens": {
@@ -1184,6 +1544,11 @@
           "permission": "scpt:execute",
           "route": "/scpt/executions"
         },
+        "lifecycle": {
+          "component": "SCPTLifecycleBatchMonitor",
+          "permission": "scpt:admin",
+          "route": "/scpt/lifecycle"
+        },
         "packages": {
           "component": "PackagePolicy",
           "permission": "scpt:approve",
@@ -1210,8 +1575,20 @@
           "route": "/scpt/workbench"
         }
       },
+      "script_lifecycle": {
+        "approval": "ScriptApproval",
+        "audit": "ScptAuditEvent",
+        "execution": "ScriptExecution",
+        "lifecycle_batch": "ScptLifecycleBatch",
+        "package_policy": "ScriptPackagePolicy",
+        "sandbox": "ScriptSandbox",
+        "script": "ScriptDefinition",
+        "scripting_agent": "ScriptingAgent"
+      },
       "streaming": {
         "batch_mutation_guardrail": "batch_script_mutation_requires_bytewax",
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
         "events": [
           "package_policy_created",
           "sandbox_created",
@@ -1227,7 +1604,18 @@
           "script_execution_cancelled",
           "scripting_agent_registered"
         ],
+        "lifecycle_stream": "scpt.lifecycle",
         "processor": "bytewax",
+        "required_operations": [
+          "package_policy_batch",
+          "sandbox_batch",
+          "script_batch",
+          "approval_batch",
+          "execution_batch",
+          "scripting_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
         "state": [
           "package_policies",
           "sandboxes",
@@ -1236,7 +1624,17 @@
           "executions",
           "scripting_agents"
         ],
-        "topic": "apg.scpt.lifecycle"
+        "topic": "apg.scpt.lifecycle",
+        "topics": [
+          "scpt.packages",
+          "scpt.sandboxes",
+          "scpt.scripts",
+          "scpt.approvals",
+          "scpt.executions",
+          "scpt.agents",
+          "scpt.audit"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
@@ -1247,6 +1645,10 @@
           "audit_timeline": {
             "status_style": "script-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "status_style": "processor-chip",
+            "visual": "stream-batch-monitor"
           },
           "execution_log": {
             "highlight": "runtime-chip",
@@ -1264,6 +1666,10 @@
             "icon": "code-2",
             "risk_style": "permission-band",
             "status_indicator": "script-pill"
+          },
+          "scripting_agent_roster": {
+            "status_style": "approval-chip",
+            "visual": "agent-roster"
           }
         },
         "name": "scpt_script_workbench",
@@ -1342,6 +1748,13 @@
             "permission": "scpt:write"
           },
           {
+            "component": "SCPTLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/scpt/lifecycle",
+            "permission": "scpt:admin"
+          },
+          {
             "component": "ScriptAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
@@ -1373,21 +1786,74 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "scripting_governance": {
+        "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+        "roles": [
+          "author",
+          "reviewer",
+          "policy_advisor",
+          "test_generator",
+          "runtime_triage",
+          "lifecycle_batch_reviewer",
+          "script_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "scpt": [
         "wflo",
         "secu",
         "auth",
-        "audl"
+        "audl",
+        "aicr"
       ]
     }
   },
   "contracts": {
     "scpt": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+        "first_class": true,
+        "privileged_roles": [
+          "author",
+          "reviewer",
+          "policy_advisor",
+          "runtime_triage",
+          "lifecycle_batch_reviewer",
+          "script_steward"
+        ],
+        "require_contribution_disclosure": true,
+        "require_human_approval_for_privileged_roles": true,
+        "require_owner": true,
+        "require_purpose": true,
+        "require_scope": true,
+        "supported_roles": [
+          "author",
+          "reviewer",
+          "policy_advisor",
+          "test_generator",
+          "runtime_triage",
+          "lifecycle_batch_reviewer",
+          "script_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_scpt_agent_adapter",
           "ai_core": "aicr",
           "api_helpers": "api.py",
           "audit_sink": "audl",
@@ -1402,6 +1868,38 @@
           "theme": "them",
           "view_models": "views.py",
           "workflow": "wflo"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "author",
+            "reviewer",
+            "policy_advisor",
+            "runtime_triage",
+            "lifecycle_batch_reviewer",
+            "script_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "author",
+            "reviewer",
+            "policy_advisor",
+            "test_generator",
+            "runtime_triage",
+            "lifecycle_batch_reviewer",
+            "script_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "executions": {
           "cancel_reason_required": true,
@@ -1460,7 +1958,9 @@
             "reviewer",
             "policy_advisor",
             "test_generator",
-            "runtime_triage"
+            "runtime_triage",
+            "lifecycle_batch_reviewer",
+            "script_steward"
           ],
           "supported_runtimes": [
             "codex",
@@ -1485,6 +1985,31 @@
           "versioning_enabled": true,
           "workflow_binding_policy_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "scpt.lifecycle",
+          "required_operations": [
+            "package_policy_batch",
+            "sandbox_batch",
+            "script_batch",
+            "approval_batch",
+            "execution_batch",
+            "scripting_agent_batch",
+            "audit_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "scpt.packages",
+            "scpt.sandboxes",
+            "scpt.scripts",
+            "scpt.approvals",
+            "scpt.executions",
+            "scpt.agents",
+            "scpt.audit"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1495,6 +2020,7 @@
           "enable_analytics": true,
           "enable_audit": true,
           "enable_execution_console": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_package_policy": true,
           "enable_sandbox_monitor": true,
           "enable_script_workbench": true
@@ -1507,15 +2033,68 @@
         "workflow_extensions",
         "package_policy",
         "script_execution",
-        "scripting_agents",
-        "script_governance"
+        "scripting_agent_composition",
+        "script_governance",
+        "bytewax_script_lifecycle"
       ],
       "requires": [
         "wflo",
         "secu",
         "auth",
-        "audl"
-      ]
+        "audl",
+        "aicr"
+      ],
+      "streaming": {
+        "batch_mutation_guardrail": "batch_script_mutation_requires_bytewax",
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "events": [
+          "package_policy_created",
+          "sandbox_created",
+          "sandbox_state_changed",
+          "script_created",
+          "script_reviewed",
+          "script_approved",
+          "script_published",
+          "script_retired",
+          "workflow_bound",
+          "script_execution_started",
+          "script_execution_completed",
+          "script_execution_cancelled",
+          "scripting_agent_registered"
+        ],
+        "lifecycle_stream": "scpt.lifecycle",
+        "processor": "bytewax",
+        "required_operations": [
+          "package_policy_batch",
+          "sandbox_batch",
+          "script_batch",
+          "approval_batch",
+          "execution_batch",
+          "scripting_agent_batch",
+          "audit_batch"
+        ],
+        "required_processor": "bytewax",
+        "state": [
+          "package_policies",
+          "sandboxes",
+          "scripts",
+          "approvals",
+          "executions",
+          "scripting_agents"
+        ],
+        "topic": "apg.scpt.lifecycle",
+        "topics": [
+          "scpt.packages",
+          "scpt.sandboxes",
+          "scpt.scripts",
+          "scpt.approvals",
+          "scpt.executions",
+          "scpt.agents",
+          "scpt.audit"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1527,7 +2106,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 4,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -1560,6 +2139,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_script_mutation_requires_bytewax"
+    },
+    "bytewax_scpt_lifecycle_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_scpt_lifecycle_batch"
+      },
+      "description": "SCPT lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_scpt_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_scpt_lifecycle_stream_required"
     },
     "cross_tenant_script_access_denied": {
       "condition": {
@@ -1850,6 +2442,32 @@
       },
       "name": "sandbox_retirement_requires_reason"
     },
+    "scpt_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_scpt_lifecycle_batch"
+      },
+      "description": "SCPT lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scpt_lifecycle_batch_empty",
+        "required_action": "include_scpt_lifecycle_mutations"
+      },
+      "name": "scpt_lifecycle_batch_requires_mutations"
+    },
+    "scpt_lifecycle_operation_supported": {
+      "condition": {
+        "lifecycle_operation_supported": false,
+        "operation": "validate_scpt_lifecycle_batch"
+      },
+      "description": "SCPT lifecycle batches must use configured lifecycle operations.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_scpt_lifecycle_operation",
+        "required_action": "choose_supported_scpt_lifecycle_operation"
+      },
+      "name": "scpt_lifecycle_operation_supported"
+    },
     "script_blocked_import_denied": {
       "condition": {
         "blocked_import_detected": true,
@@ -1954,12 +2572,26 @@
       },
       "name": "script_state_change_requires_audit"
     },
+    "scripting_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_scripting_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged scripting-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "scripting_agent_human_approval_required",
+        "required_action": "record_scripting_agent_human_approval"
+      },
+      "name": "scripting_agent_privileged_role_requires_human_approval"
+    },
     "scripting_agent_requires_disclosure": {
       "condition": {
         "agent_contribution_disclosed": false,
-        "scripting_agent_present": true
+        "operation": "register_scripting_agent"
       },
-      "description": "AI scripting agent contributions require disclosure.",
+      "description": "First-class scripting agent contributions require visible machine-contribution disclosure.",
       "effect": {
         "decision": "deny",
         "reason": "scripting_agent_disclosure_required",
@@ -1967,25 +2599,64 @@
       },
       "name": "scripting_agent_requires_disclosure"
     },
-    "scripting_agent_requires_registration": {
+    "scripting_agent_requires_id": {
       "condition": {
-        "agent_registered": false,
-        "scripting_agent_present": true
+        "agent_id_present": false,
+        "operation": "register_scripting_agent"
       },
-      "description": "AI scripting agents must be registered.",
+      "description": "First-class scripting agents require stable identifiers.",
       "effect": {
         "decision": "deny",
-        "reason": "scripting_agent_registration_required",
-        "required_action": "register_scripting_agent"
+        "reason": "scripting_agent_id_required",
+        "required_action": "assign_scripting_agent_id"
       },
-      "name": "scripting_agent_requires_registration"
+      "name": "scripting_agent_requires_id"
+    },
+    "scripting_agent_requires_name": {
+      "condition": {
+        "agent_name_present": false,
+        "operation": "register_scripting_agent"
+      },
+      "description": "First-class scripting agents require readable names.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scripting_agent_name_required",
+        "required_action": "name_scripting_agent"
+      },
+      "name": "scripting_agent_requires_name"
+    },
+    "scripting_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_scripting_agent"
+      },
+      "description": "First-class scripting agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scripting_agent_owner_required",
+        "required_action": "assign_scripting_agent_owner"
+      },
+      "name": "scripting_agent_requires_owner"
+    },
+    "scripting_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_scripting_agent"
+      },
+      "description": "First-class scripting agents require a documented scripting-governance purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scripting_agent_purpose_required",
+        "required_action": "document_scripting_agent_purpose"
+      },
+      "name": "scripting_agent_requires_purpose"
     },
     "scripting_agent_requires_scope": {
       "condition": {
         "agent_scope_present": false,
-        "scripting_agent_present": true
+        "operation": "register_scripting_agent"
       },
-      "description": "AI scripting agents require script, sandbox, package, or execution scope.",
+      "description": "First-class scripting agents require script, sandbox, package, execution, approval, or lifecycle scope.",
       "effect": {
         "decision": "deny",
         "reason": "scripting_agent_scope_required",
@@ -1993,12 +2664,25 @@
       },
       "name": "scripting_agent_requires_scope"
     },
+    "scripting_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_scripting_agent"
+      },
+      "description": "First-class scripting agents must use supported scripting-governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "scripting_agent_role_not_supported",
+        "required_action": "choose_supported_scripting_agent_role"
+      },
+      "name": "scripting_agent_role_supported"
+    },
     "scripting_agent_runtime_supported": {
       "condition": {
         "agent_runtime_supported": false,
-        "scripting_agent_present": true
+        "operation": "register_scripting_agent"
       },
-      "description": "AI scripting agents must use a configured runtime.",
+      "description": "First-class scripting agents must use a configured provider-neutral runtime.",
       "effect": {
         "decision": "deny",
         "reason": "scripting_agent_runtime_not_supported",
@@ -2048,7 +2732,13 @@
   },
   "security": {},
   "source_files": [
-    "capability_contract.py"
+    "capability_contract.py",
+    "models.py",
+    "script_runtime.py",
+    "service.py",
+    "api.py",
+    "views.py",
+    "app.py"
   ],
   "symbols": {
     "capability.scpt": {

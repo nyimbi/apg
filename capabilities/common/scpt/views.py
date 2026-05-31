@@ -18,6 +18,7 @@ def dashboard_model(service: ScptService, tenant_id: str = "default") -> dict[st
 		"title": "Custom Scripting Engine",
 		"summary": service.dashboard_summary(tenant_id),
 		"streaming": contract["streaming"],
+		"agents": contract["agents"],
 		"routes": contract["ui"]["routes"],
 		"theme": contract["theme"],
 	}
@@ -75,10 +76,26 @@ def scripting_agent_panel_model(service: ScptService, tenant_id: str = "default"
 	contract = get_capability_contract(tenant_id)
 	return {
 		"agents": service.list_agents(tenant_id),
-		"supported_runtimes": contract["configuration"]["scripting_agents"]["supported_runtimes"],
-		"allowed_roles": contract["configuration"]["scripting_agents"]["allowed_roles"],
-		"guardrails": ["scripting_agent_registration_required", "scripting_agent_runtime_not_supported", "scripting_agent_scope_required", "scripting_agent_disclosure_required"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"guardrails": ["scripting_agent_id_required", "scripting_agent_name_required", "scripting_agent_runtime_not_supported", "scripting_agent_role_not_supported", "scripting_agent_scope_required", "scripting_agent_owner_required", "scripting_agent_purpose_required", "scripting_agent_disclosure_required", "scripting_agent_human_approval_required"],
+		"required_controls": ["registered_by", "owner_ref", "purpose", "scope_ref", "contribution_disclosed", "human_approval_required"],
+		"theme_component": contract["theme"]["components"]["scripting_agent_roster"],
 		"actions": ["register_scripting_agent"],
+	}
+
+
+def lifecycle_batch_model(service: ScptService, tenant_id: str = "default") -> dict[str, Any]:
+	contract = get_capability_contract(tenant_id)
+	return {
+		"batches": service.list_lifecycle_batches(tenant_id),
+		"streaming": contract["streaming"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"guardrails": ["scpt_lifecycle_batch_empty", "unsupported_scpt_lifecycle_operation", "bytewax_lifecycle_stream_required"],
+		"theme_component": contract["theme"]["components"]["bytewax_lifecycle_panel"],
+		"actions": ["validate_lifecycle_batch"],
 	}
 
 
@@ -108,6 +125,7 @@ def settings_model(service: ScptService, tenant_id: str = "default") -> dict[str
 	return {
 		"configuration": contract["configuration"],
 		"rules": contract["rule_engine"]["rules"],
+		"agents": contract["agents"],
 		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"permissions": ["scpt:view", "scpt:write", "scpt:execute", "scpt:approve", "scpt:audit", "scpt:admin"],

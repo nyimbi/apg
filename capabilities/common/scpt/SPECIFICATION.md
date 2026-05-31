@@ -5,8 +5,8 @@
 `scpt` is the APG common capability for governed scripting and workflow
 extension. It lets generated applications compose tenant-scoped script
 definitions, package policies, sandboxes, approvals, deterministic execution
-records, AI scripting agents, audit events, UI screens, visual theming, and
-Bytewax event-stream policy.
+records, first-class scripting agents, Bytewax lifecycle batches, audit events,
+UI screens, visual theming, and Bytewax event-stream policy.
 
 ## Scope
 
@@ -26,10 +26,13 @@ The capability must support:
 - Execution records with requested actor, Bytewax event stream, input/output,
   logs, status, runtime, memory, timeout flag, cancellation reason, completion
   evidence, start timestamp, and completion timestamp.
-- AI scripting agents as first-class records, with supported runtime, role,
-  scope, registration actor, status, and visible contribution disclosure.
-- Bytewax-backed event-stream configuration for runtime events and batch script
-  mutations.
+- AI scripting agents as first-class records, with stable ID, readable name,
+  supported provider-neutral runtime, supported role, owner, purpose, scope,
+  registration actor, status, human-review treatment for privileged roles, and
+  visible contribution disclosure.
+- Bytewax-backed event-stream configuration for runtime events, batch script
+  mutations, and lifecycle batches across package policies, sandboxes, scripts,
+  approvals, executions, scripting agents, and audit.
 - UI route contracts and dependency-light view models for generated
   applications.
 
@@ -55,8 +58,10 @@ The authoritative configuration lives in `capability_contract.py` and includes:
 - `packages`
 - `executions`
 - `scripting_agents`
+- `agents`
 - `governance`
 - `observability`
+- `streaming`
 - `adapters`
 - `ui`
 - `theme`
@@ -76,8 +81,10 @@ The deterministic rule engine covers:
 - requesting actor, Bytewax stream, execution audit, runtime/memory counters,
   timeout status, cancellation reason, and completion evidence
 - dangerous permission approval and network policy
-- AI scripting agent registration, runtime, scope, role, and contribution
-  disclosure
+- scripting-agent stable ID, readable name, runtime, role, scope, owner,
+  purpose, contribution disclosure, and privileged-role human approval
+- Bytewax lifecycle batch mutation count, supported operation, and lifecycle
+  stream enforcement
 - scripting state-change audit
 - tenant isolation
 - Bytewax batch mutation enforcement
@@ -93,6 +100,7 @@ deterministic in-memory state for:
 - approvals
 - executions
 - scripting agents
+- lifecycle batches
 - audit events
 
 The runtime enforces the same guardrails exposed by the contract rule engine
@@ -110,6 +118,7 @@ The UI contract exposes:
 - packages
 - approvals
 - agents
+- lifecycle
 - audit
 - analytics
 - settings
@@ -128,6 +137,11 @@ behind the APG composition layer.
   theme, streaming, and adapter metadata.
 - Runtime/API/view tests prove positive lifecycle behavior and negative
   guardrail behavior.
+- First-class scripting-agent composition is provider-neutral across `codex`,
+  `claude_code`, `opencode`, and `pi`; external clients remain behind AICR
+  adapter contracts.
+- Lifecycle batch governance uses Bytewax metadata only and does not introduce
+  Kafka or broker-core processing.
 - `semantic_model.json`, `package_manifest.json`, and `release_report.json`
   match the current contract.
 - Focused compile, pytest, self-test, implementation audit, publish-plan,

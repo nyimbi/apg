@@ -4,9 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import DEFAULT_CONFIGURATION, evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	DEFAULT_CONFIGURATION,
+	PRIVILEGED_SCPT_AGENT_ROLES,
+	SUPPORTED_SCPT_AGENT_ROLES,
+	SUPPORTED_SCPT_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	ScptAuditEvent,
+	ScptLifecycleBatch,
 	ScriptApproval,
 	ScriptDefinition,
 	ScriptExecution,
@@ -41,7 +49,12 @@ class ScptService:
 		self._approvals: dict[str, ScriptApproval] = {}
 		self._executions: dict[str, ScriptExecution] = {}
 		self._agents: dict[str, ScriptingAgent] = {}
+		self._lifecycle_batches: dict[str, ScptLifecycleBatch] = {}
 		self._audit_events: list[ScptAuditEvent] = []
+		self._agent_runtimes = {self._normalize_token(value) for value in SUPPORTED_SCPT_AGENT_RUNTIMES}
+		self._agent_roles = {self._normalize_token(value) for value in SUPPORTED_SCPT_AGENT_ROLES}
+		self._privileged_agent_roles = {self._normalize_token(value) for value in PRIVILEGED_SCPT_AGENT_ROLES}
+		self._lifecycle_operations = {self._normalize_token(value) for value in DEFAULT_CONFIGURATION["streaming"]["required_operations"]}
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -228,6 +241,13 @@ class ScptService:
 			raise PermissionError("script_reviewer_required")
 		if not str(reason or "").strip():
 			raise PermissionError("script_review_reason_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
 		script.review_status = "approved"
 		script.reviewed_by = reviewer
 		script.review_reason = reason
@@ -243,6 +263,13 @@ class ScptService:
 			raise PermissionError("script_approver_required")
 		if not reason:
 			raise PermissionError("script_approval_reason_required")
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
 		approval = ScriptApproval(
 			id=stable_id("apr", tenant_id, script_id, approver, reason),
 			tenant_id=tenant_id,
@@ -470,36 +497,51 @@ class ScptService:
 		scope_ref: str,
 		registered_by: str,
 		contribution_disclosed: bool,
+		owner_ref: str = "",
+		purpose: str = "",
+		human_approval_required: bool = False,
 	) -> dict[str, Any]:
-		config = DEFAULT_CONFIGURATION["scripting_agents"]
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		owner_value = str(owner_ref or "").strip()
+		purpose_value = str(purpose or "").strip()
+		approval_recorded = self._coerce_bool(human_approval_required)
 		result = self.evaluate({
-			"tenant_context_present": bool(tenant_id),
-			"scripting_agent_present": True,
-			"agent_registered": bool(name and registered_by),
-			"agent_runtime_supported": runtime in config["supported_runtimes"],
+			"tenant_context_present": bool(str(tenant_id or "").strip()),
+			"operation": "register_scripting_agent",
+			"agent_id_present": bool(str(agent_id or "").strip()),
+			"agent_name_present": bool(str(name or "").strip()),
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
 			"agent_scope_present": bool(str(scope_ref or "").strip()),
-			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"agent_owner_present": bool(owner_value),
+			"agent_purpose_present": bool(purpose_value),
+			"agent_contribution_disclosed": self._coerce_bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": approval_recorded,
 			"state_change_requested": True,
 			"audit_event_recorded": True,
 		})
 		if result["decision"] == "deny":
 			self._raise_policy_result(result)
-		if role not in config["allowed_roles"]:
-			raise PermissionError("scripting_agent_role_not_supported")
 		if not self._scope_exists_for_tenant(tenant_id, scope_ref):
 			raise KeyError("scripting_agent_scope_not_found")
 		agent = ScriptingAgent(
 			id=agent_id,
 			tenant_id=tenant_id,
 			name=name,
-			runtime=runtime,
-			role=role,
+			runtime=runtime_value,
+			role=role_value,
 			scope_ref=scope_ref,
 			registered_by=registered_by,
-			contribution_disclosed=bool(contribution_disclosed),
+			contribution_disclosed=self._coerce_bool(contribution_disclosed),
+			owner_ref=owner_value,
+			purpose=purpose_value,
+			human_approval_required=approval_recorded,
+			status="pending_review" if result["decision"] == "require_review" else "active",
 			created_at=utc_now(),
 		)
-		self._agents[agent.id] = agent
+		self._agents[self._tenant_key(tenant_id, agent.id)] = agent
 		self._record_event(tenant_id, "scripting_agent_registered", agent.id, f"Scripting agent {name} registered.", registered_by)
 		return agent.to_dict()
 
@@ -508,6 +550,43 @@ class ScptService:
 		if result["decision"] == "deny":
 			self._raise_policy_result(result)
 		return result
+
+	def validate_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "scripting_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		operation_value = self._normalize_token(operation)
+		result = self.evaluate({
+			"tenant_context_present": True,
+			"operation": "validate_scpt_lifecycle_batch",
+			"event_stream": self._normalize_token(event_stream),
+			"mutation_count": int(mutation_count),
+			"lifecycle_operation_supported": operation_value in self._lifecycle_operations,
+			"state_change_requested": True,
+			"audit_event_recorded": True,
+		})
+		if result["decision"] == "deny":
+			self._raise_policy_result(result)
+		record_id = batch_id or stable_id("scpt_lifecycle_batch", tenant_id, operation_value, len(self._lifecycle_batches))
+		batch = ScptLifecycleBatch(
+			id=record_id,
+			tenant_id=tenant_id,
+			event_stream=self._normalize_token(event_stream),
+			operation=operation_value,
+			mutation_count=int(mutation_count),
+			status="accepted" if result["decision"] == "allow" else "review_required",
+			matched_rules=list(result["matched_rules"]),
+			required_actions=self._required_actions(result),
+			created_at=utc_now(),
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record_id)] = batch
+		self._record_event(tenant_id, "scpt_lifecycle_batch_validated", batch.id, f"SCPT lifecycle batch {batch.status}: {operation_value}", "scpt")
+		return batch.to_dict()
 
 	def create_record(
 		self,
@@ -558,6 +637,9 @@ class ScptService:
 	def list_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._agents, tenant_id)
 
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
 		if tenant_id is not None:
@@ -577,6 +659,9 @@ class ScptService:
 			"succeeded_execution_count": sum(1 for item in executions if item["status"] == "succeeded"),
 			"failed_execution_count": sum(1 for item in executions if item["status"] == "failed"),
 			"agent_count": len(self.list_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] not in {"accepted", "review_required"}),
 		}
 
 	def _require_tenant(self, tenant_id: str) -> None:
@@ -589,6 +674,28 @@ class ScptService:
 			raise KeyError(missing_reason)
 		return item
 
+	def _tenant_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{str(tenant_id or '').strip()}::{str(record_id or '').strip()}"
+
+	def _normalize_token(self, value: object) -> str:
+		return str(value or "").strip().lower()
+
+	def _coerce_bool(self, value: object) -> bool:
+		if isinstance(value, bool):
+			return value
+		if value is None:
+			return False
+		if isinstance(value, str):
+			return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+		return bool(value)
+
+	def _required_actions(self, result: dict[str, Any]) -> list[str]:
+		return [
+			str(action["required_action"])
+			for action in result.get("actions", [])
+			if action.get("required_action")
+		]
+
 	def _raise_policy(self, context: dict[str, Any]) -> None:
 		result = self.evaluate(context)
 		self._raise_policy_result(result)
@@ -597,8 +704,10 @@ class ScptService:
 		raise PermissionError(summarize_decision(result))
 
 	def _scope_exists_for_tenant(self, tenant_id: str, scope_ref: str) -> bool:
-		for store in (self._package_policies, self._sandboxes, self._scripts, self._approvals, self._executions):
+		for store in (self._package_policies, self._sandboxes, self._scripts, self._approvals, self._executions, self._lifecycle_batches):
 			item = store.get(scope_ref)
+			if item is None:
+				item = store.get(self._tenant_key(tenant_id, scope_ref))
 			if item is not None:
 				return item.tenant_id == tenant_id
 		return False

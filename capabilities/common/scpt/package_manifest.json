@@ -1,10 +1,59 @@
 {
+  "agents": {
+    "adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
+    "first_class": true,
+    "guardrails": [
+      "supported_runtime",
+      "supported_role",
+      "stable_identifier",
+      "readable_name",
+      "explicit_scope",
+      "accountable_owner",
+      "declared_purpose",
+      "machine_contribution_disclosure",
+      "human_approval_for_privileged_roles"
+    ],
+    "privileged_roles": [
+      "author",
+      "reviewer",
+      "policy_advisor",
+      "runtime_triage",
+      "lifecycle_batch_reviewer",
+      "script_steward"
+    ],
+    "required_fields": [
+      "tenant_id",
+      "agent_id",
+      "name",
+      "runtime",
+      "role",
+      "scope",
+      "owner",
+      "purpose"
+    ],
+    "supported_roles": [
+      "author",
+      "reviewer",
+      "policy_advisor",
+      "test_generator",
+      "runtime_triage",
+      "lifecycle_batch_reviewer",
+      "script_steward"
+    ],
+    "supported_runtimes": [
+      "codex",
+      "claude_code",
+      "opencode",
+      "pi"
+    ]
+  },
   "base_target": "python",
   "display_name": "Custom Scripting Engine",
   "format": "apg.package-manifest.v1",
   "generated_artifacts": [
     "cap_spec.md",
     "models.py",
+    "script_runtime.py",
     "service.py",
     "api.py",
     "views.py",
@@ -17,5 +66,56 @@
   "profile_artifacts": [
     "package_manifest.json"
   ],
+  "streaming": {
+    "batch_mutation_guardrail": "batch_script_mutation_requires_bytewax",
+    "broker_core_dependency_allowed": false,
+    "engine": "bytewax",
+    "events": [
+      "package_policy_created",
+      "sandbox_created",
+      "sandbox_state_changed",
+      "script_created",
+      "script_reviewed",
+      "script_approved",
+      "script_published",
+      "script_retired",
+      "workflow_bound",
+      "script_execution_started",
+      "script_execution_completed",
+      "script_execution_cancelled",
+      "scripting_agent_registered"
+    ],
+    "lifecycle_stream": "scpt.lifecycle",
+    "processor": "bytewax",
+    "required_operations": [
+      "package_policy_batch",
+      "sandbox_batch",
+      "script_batch",
+      "approval_batch",
+      "execution_batch",
+      "scripting_agent_batch",
+      "audit_batch"
+    ],
+    "required_processor": "bytewax",
+    "state": [
+      "package_policies",
+      "sandboxes",
+      "scripts",
+      "approvals",
+      "executions",
+      "scripting_agents"
+    ],
+    "topic": "apg.scpt.lifecycle",
+    "topics": [
+      "scpt.packages",
+      "scpt.sandboxes",
+      "scpt.scripts",
+      "scpt.approvals",
+      "scpt.executions",
+      "scpt.agents",
+      "scpt.audit"
+    ],
+    "watermark": "event_time"
+  },
   "version": "1.0.0"
 }

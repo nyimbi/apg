@@ -23116,3 +23116,75 @@ Not run to preserve battery:
   notification delivery, monitoring dashboards, browser-rendered scheduler UI,
   durable Bytewax topology, live WFLO/MQEB/MONI/AUDL/AICR/NTFY/CACH/COMP/THEM
   adapters, external AI-agent runtime clients, and load/performance checks.
+
+### 2026-06-01 01:50 EAT
+
+SCPT scripting-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/scpt` as the next ordered common capability
+  packet after SCHD.
+- Preserved the existing package-policy, sandbox, script-definition, review,
+  approval, publication, workflow binding, execution, cancellation, retirement,
+  audit, tenant-isolation, and legacy Bytewax batch-mutation behavior.
+- Extended the executable SCPT contract with first-class scripting-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  scripting-governance roles, privileged-role metadata, AICR adapter metadata,
+  Bytewax lifecycle stream metadata, lifecycle route metadata, lifecycle theme
+  components, and expanded dependency evidence.
+- Added deterministic guardrails for missing scripting-agent ID, missing
+  readable name, unsupported runtime, unsupported role, missing scope, owner,
+  purpose, missing machine-contribution disclosure, privileged scripting-agent
+  registration without human approval, empty lifecycle batches, unsupported
+  lifecycle operations, and non-Bytewax SCPT lifecycle batch routing.
+- Added `ScptLifecycleBatch`, tenant-qualified scripting-agent storage,
+  lifecycle-batch storage, lifecycle validation, dashboard counts, lifecycle
+  batch monitor view models, API helpers, and provider-neutral scripting-agent
+  roster metadata.
+- Hardened API boolean payload parsing for contribution disclosure and human
+  approval without mutating caller payloads.
+- Replaced the static embedded app semantic model with a dynamic
+  contract-derived package entrypoint and regenerated `semantic_model.json`,
+  `release_report.json`, and `package_manifest.json` from the live contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/scpt/__init__.py capabilities/common/scpt/capability_contract.py capabilities/common/scpt/models.py capabilities/common/scpt/script_runtime.py capabilities/common/scpt/service.py capabilities/common/scpt/api.py capabilities/common/scpt/views.py capabilities/common/scpt/app.py capabilities/common/scpt/test_capability_contract.py capabilities/common/scpt/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/scpt/test_capability_contract.py capabilities/common/scpt/tests/test_package_contract.py`
+  passed with 8 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/scpt/app.py` passed the package
+  self-test.
+- `./.venv/bin/apg capabilities inspect scpt --json` passed with `ok: true`,
+  12 APG Python routes, 46 deterministic rules, first-class agents, and
+  Bytewax lifecycle streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/scpt --json`
+  passed with `ok: true`; SCPT remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/scpt --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/scpt/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/scpt/package_manifest.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/scpt/release_report.json`
+  passed.
+- Runtime smoke executed package policy -> sandbox -> script definition ->
+  review -> publication -> workflow binding -> execution -> completion ->
+  `codex` script reviewer -> Bytewax lifecycle batch -> `codex`
+  lifecycle-batch reviewer and returned
+  `published succeeded codex active bytewax accepted active 1`.
+- Focused stale-marker scan over touched SCPT packet source, docs, tests, and
+  evidence returned only intentional no-broker-core metadata, legacy queue
+  negative tests, and a negative unsupported stream example named
+  `kafka_replay`.
+- In-process code review found and resolved missing audit-rule evaluation on
+  script review and script approval transitions.
+- `git diff --check -- capabilities/common/scpt docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live Python, JavaScript, APG, WASM, or container execution; package
+  installation and vulnerability scanning; durable execution databases and
+  migrations; browser-rendered script workbench; durable Bytewax topology; live
+  WFLO/SECU/AUTH/AUDL/AICR/SCHD/NCOD/MONI/THEM adapters; external AI-agent
+  runtime clients; and load/performance checks.

@@ -7,6 +7,28 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_SCPT_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_SCPT_AGENT_ROLES: list[str] = [
+	"author",
+	"reviewer",
+	"policy_advisor",
+	"test_generator",
+	"runtime_triage",
+	"lifecycle_batch_reviewer",
+	"script_steward",
+]
+
+PRIVILEGED_SCPT_AGENT_ROLES: list[str] = [
+	"author",
+	"reviewer",
+	"policy_advisor",
+	"runtime_triage",
+	"lifecycle_batch_reviewer",
+	"script_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"scripts": {
@@ -55,8 +77,20 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"agent_registration_required": True,
 		"agent_scope_required": True,
 		"agent_contribution_disclosure_required": True,
-		"supported_runtimes": ["codex", "claude_code", "opencode", "pi"],
-		"allowed_roles": ["author", "reviewer", "policy_advisor", "test_generator", "runtime_triage"],
+		"supported_runtimes": SUPPORTED_SCPT_AGENT_RUNTIMES,
+		"allowed_roles": SUPPORTED_SCPT_AGENT_ROLES,
+	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_SCPT_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_SCPT_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_SCPT_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_scpt_agent_adapter",
 	},
 	"governance": {
 		"require_tenant_context": True,
@@ -72,6 +106,31 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"sandbox_metrics_required": True,
 		"event_stream": "bytewax",
 	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "scpt.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"package_policy_batch",
+			"sandbox_batch",
+			"script_batch",
+			"approval_batch",
+			"execution_batch",
+			"scripting_agent_batch",
+			"audit_batch",
+		],
+		"topics": [
+			"scpt.packages",
+			"scpt.sandboxes",
+			"scpt.scripts",
+			"scpt.approvals",
+			"scpt.executions",
+			"scpt.agents",
+			"scpt.audit",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.ScptService",
 		"runtime_helpers": "script_runtime.py",
@@ -85,6 +144,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"scheduler": "schd",
 		"no_code_builder": "ncod",
 		"ai_core": "aicr",
+		"agent_adapter": "aicr_provider_neutral_scpt_agent_adapter",
 		"monitoring": "moni",
 		"theme": "them",
 	},
@@ -94,6 +154,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_sandbox_monitor": True,
 		"enable_package_policy": True,
 		"enable_agent_panel": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_analytics": True,
 	},
@@ -112,8 +173,10 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"packages",
 		"executions",
 		"scripting_agents",
+		"agents",
 		"governance",
 		"observability",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -124,8 +187,10 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"packages",
 		"executions",
 		"scripting_agents",
+		"agents",
 		"governance",
 		"observability",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -166,10 +231,18 @@ RULES: list[dict[str, Any]] = [
 	{"name": "execution_metrics_must_be_non_negative", "description": "Execution metrics must be non-negative.", "condition": {"operation": "complete_execution", "execution_metrics_valid": False}, "effect": {"decision": "deny", "reason": "execution_metrics_must_be_non_negative", "required_action": "correct_execution_metrics"}},
 	{"name": "execution_cancel_requires_reason", "description": "Execution cancellation requires a reason.", "condition": {"operation": "cancel_execution", "cancel_reason_present": False}, "effect": {"decision": "deny", "reason": "execution_cancel_reason_required", "required_action": "record_cancel_reason"}},
 	{"name": "script_retirement_requires_reason", "description": "Script retirement requires a reason.", "condition": {"operation": "retire_script", "retirement_reason_present": False}, "effect": {"decision": "deny", "reason": "script_retirement_reason_required", "required_action": "record_retirement_reason"}},
-	{"name": "scripting_agent_requires_registration", "description": "AI scripting agents must be registered.", "condition": {"scripting_agent_present": True, "agent_registered": False}, "effect": {"decision": "deny", "reason": "scripting_agent_registration_required", "required_action": "register_scripting_agent"}},
-	{"name": "scripting_agent_runtime_supported", "description": "AI scripting agents must use a configured runtime.", "condition": {"scripting_agent_present": True, "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "scripting_agent_runtime_not_supported", "required_action": "choose_supported_scripting_agent_runtime"}},
-	{"name": "scripting_agent_requires_scope", "description": "AI scripting agents require script, sandbox, package, or execution scope.", "condition": {"scripting_agent_present": True, "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "scripting_agent_scope_required", "required_action": "set_scripting_agent_scope"}},
-	{"name": "scripting_agent_requires_disclosure", "description": "AI scripting agent contributions require disclosure.", "condition": {"scripting_agent_present": True, "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "scripting_agent_disclosure_required", "required_action": "disclose_scripting_agent"}},
+	{"name": "scripting_agent_requires_id", "description": "First-class scripting agents require stable identifiers.", "condition": {"operation": "register_scripting_agent", "agent_id_present": False}, "effect": {"decision": "deny", "reason": "scripting_agent_id_required", "required_action": "assign_scripting_agent_id"}},
+	{"name": "scripting_agent_requires_name", "description": "First-class scripting agents require readable names.", "condition": {"operation": "register_scripting_agent", "agent_name_present": False}, "effect": {"decision": "deny", "reason": "scripting_agent_name_required", "required_action": "name_scripting_agent"}},
+	{"name": "scripting_agent_runtime_supported", "description": "First-class scripting agents must use a configured provider-neutral runtime.", "condition": {"operation": "register_scripting_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "scripting_agent_runtime_not_supported", "required_action": "choose_supported_scripting_agent_runtime"}},
+	{"name": "scripting_agent_role_supported", "description": "First-class scripting agents must use supported scripting-governance roles.", "condition": {"operation": "register_scripting_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "scripting_agent_role_not_supported", "required_action": "choose_supported_scripting_agent_role"}},
+	{"name": "scripting_agent_requires_scope", "description": "First-class scripting agents require script, sandbox, package, execution, approval, or lifecycle scope.", "condition": {"operation": "register_scripting_agent", "agent_scope_present": False}, "effect": {"decision": "deny", "reason": "scripting_agent_scope_required", "required_action": "set_scripting_agent_scope"}},
+	{"name": "scripting_agent_requires_owner", "description": "First-class scripting agents require an accountable owner.", "condition": {"operation": "register_scripting_agent", "agent_owner_present": False}, "effect": {"decision": "deny", "reason": "scripting_agent_owner_required", "required_action": "assign_scripting_agent_owner"}},
+	{"name": "scripting_agent_requires_purpose", "description": "First-class scripting agents require a documented scripting-governance purpose.", "condition": {"operation": "register_scripting_agent", "agent_purpose_present": False}, "effect": {"decision": "deny", "reason": "scripting_agent_purpose_required", "required_action": "document_scripting_agent_purpose"}},
+	{"name": "scripting_agent_requires_disclosure", "description": "First-class scripting agent contributions require visible machine-contribution disclosure.", "condition": {"operation": "register_scripting_agent", "agent_contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "scripting_agent_disclosure_required", "required_action": "disclose_scripting_agent"}},
+	{"name": "scripting_agent_privileged_role_requires_human_approval", "description": "Privileged scripting-agent roles require human approval evidence.", "condition": {"operation": "register_scripting_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "scripting_agent_human_approval_required", "required_action": "record_scripting_agent_human_approval"}},
+	{"name": "scpt_lifecycle_batch_requires_mutations", "description": "SCPT lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_scpt_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "scpt_lifecycle_batch_empty", "required_action": "include_scpt_lifecycle_mutations"}},
+	{"name": "scpt_lifecycle_operation_supported", "description": "SCPT lifecycle batches must use configured lifecycle operations.", "condition": {"operation": "validate_scpt_lifecycle_batch", "lifecycle_operation_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_scpt_lifecycle_operation", "required_action": "choose_supported_scpt_lifecycle_operation"}},
+	{"name": "bytewax_scpt_lifecycle_stream_required", "description": "SCPT lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_scpt_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_scpt_lifecycle_batch_to_bytewax"}},
 	{"name": "script_state_change_requires_audit", "description": "Script, sandbox, and execution state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "scripting_audit_event_required", "required_action": "record_scripting_audit_event"}},
 	{"name": "cross_tenant_script_access_denied", "description": "Scripting records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_script_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "batch_script_mutation_requires_bytewax", "description": "Batch script mutations must use Bytewax event streams.", "condition": {"operation": "batch_script_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
@@ -184,6 +257,7 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "packages", "path": "/scpt/packages", "component": "PackagePolicy", "permission": "scpt:approve", "nav_group": "Governance"},
 	{"name": "approvals", "path": "/scpt/approvals", "component": "ScriptApprovals", "permission": "scpt:approve", "nav_group": "Governance"},
 	{"name": "agents", "path": "/scpt/agents", "component": "ScriptingAgentPanel", "permission": "scpt:write", "nav_group": "Scripts"},
+	{"name": "lifecycle", "path": "/scpt/lifecycle", "component": "SCPTLifecycleBatchMonitor", "permission": "scpt:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/scpt/audit", "component": "ScriptAuditTrail", "permission": "scpt:audit", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/scpt/analytics", "component": "ScriptAnalytics", "permission": "scpt:view", "nav_group": "Operations"},
 	{"name": "settings", "path": "/scpt/settings", "component": "SCPTSettings", "permission": "scpt:admin", "nav_group": "Administration"},
@@ -210,6 +284,8 @@ THEME: dict[str, Any] = {
 		"sandbox_monitor": {"visual": "resource-meter", "status_style": "isolation-chip"},
 		"package_policy": {"visual": "allowlist-table", "status_style": "approval-chip"},
 		"agent_panel": {"visual": "agent-roster", "status_style": "scope-chip"},
+		"scripting_agent_roster": {"visual": "agent-roster", "status_style": "approval-chip"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batch-monitor", "status_style": "processor-chip"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "script-chip"},
 	},
 }
@@ -234,6 +310,13 @@ STREAMING: dict[str, Any] = {
 		"scripting_agent_registered",
 	],
 	"batch_mutation_guardrail": "batch_script_mutation_requires_bytewax",
+	"engine": "bytewax",
+	"lifecycle_stream": "scpt.lifecycle",
+	"watermark": "event_time",
+	"required_processor": "bytewax",
+	"required_operations": DEFAULT_CONFIGURATION["streaming"]["required_operations"],
+	"topics": DEFAULT_CONFIGURATION["streaming"]["topics"],
+	"broker_core_dependency_allowed": False,
 }
 
 
@@ -246,8 +329,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "scpt",
 		"display_name": "Custom Scripting Engine",
-		"provides": ["script_registry", "secure_sandbox", "workflow_extensions", "package_policy", "script_execution", "scripting_agents", "script_governance"],
-		"requires": ["wflo", "secu", "auth", "audl"],
+		"provides": ["script_registry", "secure_sandbox", "workflow_extensions", "package_policy", "script_execution", "scripting_agent_composition", "script_governance", "bytewax_script_lifecycle"],
+		"requires": ["wflo", "secu", "auth", "audl", "aicr"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -260,8 +343,23 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
-		"streaming": deepcopy(STREAMING),
+		"agents": agent_manifest(config),
+		"streaming": streaming_manifest(config),
 	}
+
+
+def agent_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return first-class provider-neutral scripting-agent composition metadata."""
+	config = config or DEFAULT_CONFIGURATION
+	return deepcopy(config["agents"])
+
+
+def streaming_manifest(config: dict[str, Any] | None = None) -> dict[str, Any]:
+	"""Return Bytewax lifecycle metadata for scripting composition state."""
+	config = config or DEFAULT_CONFIGURATION
+	streaming = deepcopy(STREAMING)
+	streaming.update(deepcopy(config["streaming"]))
+	return streaming
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:

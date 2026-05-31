@@ -34,8 +34,10 @@ def test_scpt_contract_shape_is_valid():
 	assert contract["configuration"]["scripts"]["allowed_languages"] == ["python", "javascript", "apg"]
 	assert contract["configuration"]["sandbox"]["sandbox_required"] is True
 	assert contract["configuration"]["packages"]["dangerous_import_blocking"] is True
-	assert contract["configuration"]["scripting_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["ui"]["routes"]
 	assert contract["theme"]["name"] == "scpt_script_workbench"
 
@@ -54,6 +56,7 @@ def test_scpt_app_entrypoint_is_publishable():
 	assert "scpt" in model["capabilities"]
 	assert "dangerous_permission_requires_approval" in model["rules"]
 	assert model["capabilities"]["scpt"]["theme"]["name"] == "scpt_script_workbench"
+	assert model["capabilities"]["scpt"]["agents"]["first_class"] is True
 
 
 def test_scpt_lifecycle_executes_with_guardrails():
@@ -77,7 +80,20 @@ def test_scpt_lifecycle_executes_with_guardrails():
 	bound = service.bind_workflow(tenant_id, script["id"], "wflo:on_customer_created", "automation-owner")
 	execution = service.execute_script(tenant_id, script["id"], sandbox["id"], "workflow-runner", {"customer_id": "C-1"})
 	completed = service.complete_execution(tenant_id, execution["id"], output={"normalized": True}, runtime_seconds=0.01, memory_mb=32)
-	agent = service.register_scripting_agent("agent-scpt", tenant_id, "Codex Reviewer", "codex", "reviewer", script["id"], "platform-owner", True)
+	agent = service.register_scripting_agent(
+		"agent-scpt",
+		tenant_id,
+		"Codex Reviewer",
+		"codex",
+		"reviewer",
+		script["id"],
+		"platform-owner",
+		True,
+		owner_ref="platform-owner",
+		purpose="Review generated scripts and flag publication risks.",
+		human_approval_required=True,
+	)
+	batch = service.validate_lifecycle_batch(tenant_id, "bytewax", 1, "scripting_agent_batch")
 	summary = service.dashboard_summary(tenant_id)
 
 	assert published["state"] == "published"
@@ -86,10 +102,14 @@ def test_scpt_lifecycle_executes_with_guardrails():
 	assert completed["status"] == "succeeded"
 	assert completed["event_stream"] == "bytewax"
 	assert agent["runtime"] == "codex"
+	assert agent["purpose"]
+	assert batch["processor"] == "bytewax"
+	assert batch["status"] == "accepted"
 	assert service.list_scripts(tenant_id)[0]["tags"] == ["transform", "workflow"]
 	assert summary["script_count"] == 1
 	assert summary["succeeded_execution_count"] == 1
 	assert summary["agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 	assert service.audit_events(tenant_id)
 
 
@@ -143,10 +163,87 @@ def test_scpt_policy_failures_are_enforced():
 		service.change_sandbox_state(tenant_id, sandbox["id"], "blocked", "owner", "")
 
 	with pytest.raises(PermissionError, match="scripting_agent_runtime_not_supported"):
-		service.register_scripting_agent("agent-bad", tenant_id, "Bad Agent", "unknown", "reviewer", script["id"], "owner", True)
+		service.register_scripting_agent(
+			"agent-bad",
+			tenant_id,
+			"Bad Agent",
+			"unknown",
+			"reviewer",
+			script["id"],
+			"owner",
+			True,
+			owner_ref="owner",
+			purpose="Review scripts.",
+		)
+
+	with pytest.raises(PermissionError, match="scripting_agent_owner_required"):
+		service.register_scripting_agent(
+			"agent-no-owner",
+			tenant_id,
+			"No Owner",
+			"codex",
+			"reviewer",
+			script["id"],
+			"owner",
+			True,
+			owner_ref="",
+			purpose="Review scripts.",
+		)
+
+	with pytest.raises(PermissionError, match="scripting_agent_purpose_required"):
+		service.register_scripting_agent(
+			"agent-no-purpose",
+			tenant_id,
+			"No Purpose",
+			"codex",
+			"reviewer",
+			script["id"],
+			"owner",
+			True,
+			owner_ref="owner",
+			purpose="",
+		)
+
+	review_agent = service.register_scripting_agent(
+		"agent-review",
+		tenant_id,
+		"Script Steward",
+		"codex",
+		"script_steward",
+		script["id"],
+		"owner",
+		True,
+		owner_ref="owner",
+		purpose="Steward script lifecycle changes with operator review.",
+		human_approval_required=False,
+	)
+	assert review_agent["status"] == "pending_review"
 
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_batch_mutation("legacy_bus")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_lifecycle_batch(tenant_id, "kafka_replay", 1, "scripting_agent_batch")
+
+	with pytest.raises(PermissionError, match="scpt_lifecycle_batch_empty"):
+		service.validate_lifecycle_batch(tenant_id, "bytewax", 0, "scripting_agent_batch")
+
+	accepted_batch = service.validate_lifecycle_batch(tenant_id, "bytewax", 2, "script_batch")
+	lifecycle_agent = service.register_scripting_agent(
+		"agent-lifecycle",
+		tenant_id,
+		"Lifecycle Reviewer",
+		"codex",
+		"lifecycle_batch_reviewer",
+		accepted_batch["id"],
+		"owner",
+		True,
+		owner_ref="owner",
+		purpose="Review accepted SCPT lifecycle batches before promotion.",
+		human_approval_required=True,
+	)
+	assert accepted_batch["status"] == "accepted"
+	assert lifecycle_agent["status"] == "active"
 
 
 def test_scpt_view_models_expose_composable_surfaces():
@@ -156,6 +253,7 @@ def test_scpt_view_models_expose_composable_surfaces():
 		audit_trail_model,
 		dashboard_model,
 		execution_console_model,
+		lifecycle_batch_model,
 		package_policy_model,
 		sandbox_monitor_model,
 		script_registry_model,
@@ -173,7 +271,20 @@ def test_scpt_view_models_expose_composable_surfaces():
 	service.publish_script(tenant_id, reviewed["id"], "owner")
 	execution = service.execute_script(tenant_id, script["id"], sandbox["id"], "owner")
 	service.complete_execution(tenant_id, execution["id"])
-	service.register_scripting_agent("agent-view", tenant_id, "Codex Reviewer", "codex", "reviewer", script["id"], "owner", True)
+	agent = service.register_scripting_agent(
+		"agent-view",
+		tenant_id,
+		"Codex Reviewer",
+		"codex",
+		"reviewer",
+		script["id"],
+		"owner",
+		"true",
+		owner_ref="owner",
+		purpose="Review generated scripts before publication.",
+		human_approval_required="true",
+	)
+	batch = service.validate_lifecycle_batch(tenant_id, "bytewax", 1, "scripting_agent_batch")
 
 	assert dashboard_model(service, tenant_id)["summary"]["script_count"] == 1
 	assert workbench_model(service, tenant_id)["actions"] == ["create_script", "request_script_review", "approve_script", "publish_script", "bind_workflow", "retire_script"]
@@ -182,7 +293,11 @@ def test_scpt_view_models_expose_composable_surfaces():
 	assert sandbox_monitor_model(service, tenant_id)["sandboxes"][0]["state"] == "ready"
 	assert package_policy_model(service, tenant_id)["package_policies"][0]["name"] == "stdlib"
 	assert scripting_agent_panel_model(service, tenant_id)["agents"][0]["runtime"] == "codex"
+	assert scripting_agent_panel_model(service, tenant_id)["privileged_roles"]
+	assert lifecycle_batch_model(service, tenant_id)["batches"][0]["status"] == "accepted"
 	assert audit_trail_model(service, tenant_id)["streaming_topic"] == "apg.scpt.lifecycle"
 	assert analytics_model(service, tenant_id)["execution_health"]["succeeded"] == 1
 	assert approvals_model(service, tenant_id)["pending_scripts"] == []
 	assert settings_model(service, tenant_id)["theme"]["name"] == "scpt_script_workbench"
+	assert agent["contribution_disclosed"] is True
+	assert batch["processor"] == "bytewax"
