@@ -91,7 +91,7 @@ and scope boundaries.
 
 APIG must validate lifecycle batches before generated applications apply
 batched upstream, consumer, route, policy, traffic, deployment, or agent
-changes. The accepted lifecycle processor is Bytewax. Kafka-first or
+changes. The accepted lifecycle processor is Bytewax. Broker-specific queue-first or
 broker-first processing is outside the APIG packet boundary unless routed
 through a Bytewax adapter that preserves event-time ordering, audit evidence,
 and deterministic rule decisions.

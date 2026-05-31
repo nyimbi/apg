@@ -31,13 +31,13 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"theme"
 	]
 	assert contract["configuration"]["operation_governance"]["bytewax_first_runtime"] is True
-	assert contract["configuration"]["operation_governance"]["kafka_core_dependency_allowed"] is False
+	assert contract["configuration"]["operation_governance"]["broker_core_dependency_allowed"] is False
 	assert contract["agents"]["first_class"] is True
 	assert "codex" in contract["agents"]["supported_runtimes"]
 	assert "claude_code" in contract["agents"]["supported_runtimes"]
 	assert "bytewax_topology_reviewer" in contract["agents"]["privileged_roles"]
 	assert contract["streaming"]["engine"] == "bytewax"
-	assert contract["streaming"]["kafka_core_dependency_allowed"] is False
+	assert contract["streaming"]["broker_core_dependency_allowed"] is False
 	assert len(contract["rule_engine"]["rules"]) >= 22
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",

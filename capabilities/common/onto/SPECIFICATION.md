@@ -46,7 +46,7 @@ The contract includes explicit sections for:
 - `theme`
 
 `observability.event_stream` and `adapters.event_stream` are `bytewax`.
-`streaming.required_processor` is also `bytewax`; Kafka or broker-core coupling is outside the ONTO generated-app contract.
+`streaming.required_processor` is also `bytewax`; broker-specific queue or broker-core coupling is outside the ONTO generated-app contract.
 
 ## Runtime Records
 

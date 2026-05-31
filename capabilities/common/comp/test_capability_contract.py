@@ -64,7 +64,7 @@ def test_rule_engine_enforces_compliance_guardrails():
 		"escalation_recorded": False,
 	})
 	report_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "publish_report", "approval_recorded": False, "attestation_recorded": False})
-	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_compliance_mutation", "event_stream": "kafka"})
+	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_compliance_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_compliance_agent",
@@ -87,7 +87,7 @@ def test_rule_engine_enforces_compliance_guardrails():
 		"privileged_role": True,
 		"human_approval_required": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_comp_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_comp_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -249,7 +249,7 @@ def test_service_and_api_enforce_compliance_agent_and_lifecycle_guardrails():
 	service = CompService()
 
 	with pytest.raises(PermissionError, match="unsupported_compliance_agent_runtime"):
-		service.register_compliance_agent("agent-unsupported", "tenant-comp", "Unsupported", "kafka_agent", "framework_reviewer", "framework:*", "owner", "review frameworks")
+		service.register_compliance_agent("agent-unsupported", "tenant-comp", "Unsupported", "legacy_agent", "framework_reviewer", "framework:*", "owner", "review frameworks")
 
 	with pytest.raises(PermissionError, match="compliance_agent_contribution_disclosure_required"):
 		service.register_compliance_agent("agent-undisclosed", "tenant-comp", "Undisclosed", "codex", "framework_reviewer", "framework:*", "owner", "review frameworks", contribution_disclosed=False)
@@ -270,7 +270,7 @@ def test_service_and_api_enforce_compliance_agent_and_lifecycle_guardrails():
 	with pytest.raises(ValueError, match="unsupported_comp_lifecycle_operation"):
 		service.validate_comp_lifecycle_batch("tenant-comp", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_comp_lifecycle_batch("tenant-comp", "kafka", 1, "report_batch")
+		service.validate_comp_lifecycle_batch("tenant-comp", "legacy_queue", 1, "report_batch")
 
 	api.SERVICE = CompService()
 	api_agent = api.register_compliance_agent({

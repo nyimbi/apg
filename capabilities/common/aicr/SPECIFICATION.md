@@ -86,7 +86,7 @@ disclosure are blocked.
 AICR lifecycle mutation batches must use Bytewax as the required processor.
 The executable packet validates `model_batch`, `prompt_batch`,
 `inference_batch`, `evaluation_batch`, `safety_batch`, `routing_batch`, and
-`ai_agent_batch` operations. Non-Bytewax streams are denied and audited. Kafka
+`ai_agent_batch` operations. Non-Bytewax streams are denied and audited. Broker-specific queue
 is deliberately not a core requirement for this packet.
 
 ## Rules

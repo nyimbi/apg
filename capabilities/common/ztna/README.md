@@ -195,7 +195,7 @@ ZTNA lifecycle batches are explicit Bytewax-governed records. The generated
 runtime accepts `identity_batch`, `device_posture_batch`, `resource_batch`,
 `access_request_batch`, `session_batch`, `review_batch`, `policy_batch`, and
 `ztna_agent_batch` only when they contain mutations and declare
-`event_stream="bytewax"`. Kafka or broker-core routing is intentionally denied.
+`event_stream="bytewax"`. Broker-specific queue or broker-core routing is intentionally denied.
 
 ## UI Surfaces
 

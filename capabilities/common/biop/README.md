@@ -125,7 +125,7 @@ service.decide_match_review(
 
 BIOP agents are composition records, not hardwired tool clients. The contract supports `codex`, `claude_code`, `opencode`, and `pi` runtimes through the `aicr_provider_neutral_biometric_agent_adapter` boundary. Unsupported runtimes, unsupported roles, missing scope, missing owner, missing purpose, and missing machine-contribution disclosure are denied. Privileged roles without human approval are retained as `pending_review`.
 
-Lifecycle batches are Bytewax-first. A Kafka-routed batch is intentionally denied:
+Lifecycle batches are Bytewax-first. A broker-specific queue-routed batch is intentionally denied:
 
 ```python
 from capabilities.common.biop.capability_contract import evaluate_capability_rules
@@ -133,7 +133,7 @@ from capabilities.common.biop.capability_contract import evaluate_capability_rul
 result = evaluate_capability_rules({
     "tenant_context_present": True,
     "operation": "validate_biop_lifecycle_batch",
-    "event_stream": "kafka",
+    "event_stream": "legacy_queue",
     "mutation_count": 1,
 })
 

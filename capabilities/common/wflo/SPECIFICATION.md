@@ -110,6 +110,6 @@ This packet does not start live event buses, schedulers, distributed executors, 
 - `capability_contract.py` exposes configuration, deterministic rules, UI, theme, streaming, and adapter metadata.
 - Runtime/API/view tests prove positive lifecycle behavior and negative guardrail behavior.
 - First-class workflow-agent composition is provider-neutral across `codex`, `claude_code`, `opencode`, and `pi`; external CLIs remain behind AICR adapter contracts.
-- Lifecycle batch governance uses Bytewax metadata only and does not introduce Kafka or broker-core processing.
+- Lifecycle batch governance uses Bytewax metadata only and does not introduce broker-specific queue or broker-core processing.
 - `semantic_model.json`, `package_manifest.json`, and `release_report.json` match the current contract.
 - Focused compile, pytest, implementation audit, publish-plan, stale-marker scan, and diff check pass.

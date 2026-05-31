@@ -313,7 +313,7 @@ def test_video_guardrails_require_tenant_host_guest_policy_consent_encryption_an
 		raise AssertionError("empty VIDC lifecycle batch was accepted")
 
 	try:
-		service.validate_vidc_lifecycle_batch("tenant-a", "bytewax", 1, "kafka_replay")
+		service.validate_vidc_lifecycle_batch("tenant-a", "bytewax", 1, "legacy_replay")
 	except PermissionError as exc:
 		assert str(exc) == "unsupported_vidc_lifecycle_operation"
 	else:

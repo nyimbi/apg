@@ -52,7 +52,7 @@ required owner, purpose, scope, contribution disclosure, and privileged-role
 human approval; and the provider-neutral AICR adapter contract.
 
 The `streaming` section must define `bytewax`, `idfd.lifecycle`, `event_time`
-watermarking, lifecycle operations, lifecycle topics, and no broker-core/Kafka
+watermarking, lifecycle operations, lifecycle topics, and no broker-core/broker-specific queue
 dependency.
 
 Required adapter evidence:

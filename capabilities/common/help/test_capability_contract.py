@@ -347,7 +347,7 @@ def test_help_service_enforces_policy_guardrails():
 	with pytest.raises(PermissionError, match="help_lifecycle_batch_empty"):
 		service.validate_help_lifecycle_batch("tenant-help", "bytewax", 0, "help_agent_batch")
 	with pytest.raises(PermissionError, match="unsupported_help_lifecycle_operation"):
-		service.validate_help_lifecycle_batch("tenant-help", "bytewax", 1, "kafka_replay")
+		service.validate_help_lifecycle_batch("tenant-help", "bytewax", 1, "legacy_replay")
 
 	rule_result = service.evaluate({
 		"tenant_context_present": True,

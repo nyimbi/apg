@@ -96,7 +96,7 @@ def test_rule_engine_denies_unsafe_vision_workloads():
 	stream_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "configure_vision_events",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	bytewax_result = evaluate_capability_rules({
 		"tenant_context_present": True,
@@ -118,7 +118,7 @@ def test_rule_engine_denies_unsafe_vision_workloads():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_cvsn_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert result["decision"] == "deny"
@@ -372,7 +372,7 @@ def test_cvsn_service_enforces_agent_and_lifecycle_guardrails():
 	with pytest.raises(ValueError, match="unsupported_cvsn_lifecycle_operation"):
 		service.validate_cvsn_lifecycle_batch("tenant-vision", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_cvsn_lifecycle_batch("tenant-vision", "kafka", 1)
+		service.validate_cvsn_lifecycle_batch("tenant-vision", "legacy_queue", 1)
 
 	assert service.list_lifecycle_batches("tenant-vision")[0]["status"] == "denied"
 	assert service.dashboard_summary("tenant-vision")["denied_lifecycle_batch_count"] == 1

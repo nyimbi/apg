@@ -74,7 +74,7 @@ class CapabilityConfiguration:
 		},
 		"operation_governance": {
 			"bytewax_first_runtime": True,
-			"kafka_core_dependency_allowed": False,
+			"broker_core_dependency_allowed": False,
 			"require_independent_quota_review": True,
 			"require_independent_replay_review": True,
 			"record_delivery_audit": True
@@ -588,7 +588,7 @@ def streaming_manifest() -> dict[str, Any]:
 			"mqeb.replays",
 			"mqeb.agents"
 		],
-		"kafka_core_dependency_allowed": False
+		"broker_core_dependency_allowed": False
 	}
 
 

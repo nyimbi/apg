@@ -53,7 +53,7 @@
   "capabilities": {
     "mqeb": {
       "adapters": {
-        "kafka_core_dependency_allowed": false,
+        "broker_core_dependency_allowed": false,
         "preferred_stream_runtime": "bytewax"
       },
       "agents": {
@@ -163,7 +163,7 @@
         },
         "operation_governance": {
           "bytewax_first_runtime": true,
-          "kafka_core_dependency_allowed": false,
+          "broker_core_dependency_allowed": false,
           "record_delivery_audit": true,
           "require_independent_quota_review": true,
           "require_independent_replay_review": true
@@ -921,7 +921,7 @@
       },
       "streaming": {
         "engine": "bytewax",
-        "kafka_core_dependency_allowed": false,
+        "broker_core_dependency_allowed": false,
         "lifecycle_stream": "mqeb.lifecycle",
         "required_operations": [
           "event_fabric_batch",
@@ -1251,7 +1251,7 @@
         },
         "operation_governance": {
           "bytewax_first_runtime": true,
-          "kafka_core_dependency_allowed": false,
+          "broker_core_dependency_allowed": false,
           "record_delivery_audit": true,
           "require_independent_quota_review": true,
           "require_independent_replay_review": true
@@ -1321,7 +1321,7 @@
       ],
       "streaming": {
         "engine": "bytewax",
-        "kafka_core_dependency_allowed": false,
+        "broker_core_dependency_allowed": false,
         "lifecycle_stream": "mqeb.lifecycle",
         "required_operations": [
           "event_fabric_batch",

@@ -154,7 +154,7 @@ from capabilities.common.idfd.capability_contract import evaluate_capability_rul
 result = evaluate_capability_rules({
     "tenant_context_present": True,
     "operation": "batch_federation_mutation",
-    "event_stream": "kafka",
+    "event_stream": "legacy_queue",
 })
 assert result["decision"] == "deny"
 ```

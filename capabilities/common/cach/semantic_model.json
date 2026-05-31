@@ -967,7 +967,7 @@
       },
       "streaming": {
         "engine": "bytewax",
-        "kafka_core_dependency_allowed": false,
+        "broker_core_dependency_allowed": false,
         "lifecycle_stream": "cach.lifecycle",
         "required_operations": [
           "cache_policy_batch",
@@ -1378,7 +1378,7 @@
       ],
       "streaming": {
         "engine": "bytewax",
-        "kafka_core_dependency_allowed": false,
+        "broker_core_dependency_allowed": false,
         "lifecycle_stream": "cach.lifecycle",
         "required_operations": [
           "cache_policy_batch",

@@ -50,7 +50,7 @@ The coherent lifecycle packet is:
   lifecycle, audit, and settings.
 - The theme must provide privacy-mesh console tokens and component hints.
 - Package evidence must be generated from the current contract.
-- Bytewax must be the event-stream adapter; Kafka is intentionally not used.
+- Bytewax must be the event-stream adapter; broker-specific queue is intentionally not used.
 - Agent composition must remain provider-neutral through the AICR adapter
   contract, with current runtime codes for `codex`, `claude_code`,
   `opencode`, and `pi`.

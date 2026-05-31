@@ -87,7 +87,7 @@ and scope boundaries.
 
 DVRL must validate lifecycle batches before generated applications apply
 batched source, schema, virtual table, query, cache, policy, or agent changes.
-The accepted lifecycle processor is Bytewax. Kafka-first or broker-first
+The accepted lifecycle processor is Bytewax. Broker-specific queue-first or broker-first
 processing is outside the DVRL packet boundary unless routed through a Bytewax
 adapter that preserves event-time ordering, audit evidence, and deterministic
 rule decisions.

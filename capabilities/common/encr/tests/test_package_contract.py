@@ -270,7 +270,7 @@ def test_guardrails_fail_closed_for_crypto_operations_reviews_and_rotations():
 			"review crypto exceptions",
 		)
 	with pytest.raises(PermissionError, match="bytewax_crypto_stream_required"):
-		service.validate_crypto_lifecycle_batch("tenant-a", "kafka", 1)
+		service.validate_crypto_lifecycle_batch("tenant-a", "legacy_queue", 1)
 	with pytest.raises(ValueError, match="crypto_lifecycle_batch_empty"):
 		service.validate_crypto_lifecycle_batch("tenant-a", "bytewax", 0)
 

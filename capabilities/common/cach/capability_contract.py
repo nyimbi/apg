@@ -605,7 +605,7 @@ def streaming_manifest() -> dict[str, Any]:
 			"cach.evictions",
 			"cach.agents"
 		],
-		"kafka_core_dependency_allowed": False
+		"broker_core_dependency_allowed": False
 	}
 
 

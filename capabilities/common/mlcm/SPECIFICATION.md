@@ -45,7 +45,7 @@ The coherent lifecycle packet is:
 - The theme must provide model-operations console tokens and component hints.
 - The package evidence must be generated from the current contract, not copied
   static JSON.
-- Bytewax must be the event-stream adapter; Kafka is intentionally not used.
+- Bytewax must be the event-stream adapter; broker-specific queue is intentionally not used.
 
 ## Runtime Requirements
 

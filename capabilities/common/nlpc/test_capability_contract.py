@@ -388,6 +388,6 @@ def test_nlpc_service_enforces_policy_guardrails():
 	assert agent["role"] == "pii_reviewer"
 	assert agent["status"] == "pending_review"
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_nlpc_lifecycle_batch("tenant-text", "kafka", 1)
+		service.validate_nlpc_lifecycle_batch("tenant-text", "legacy_queue", 1)
 	batch = service.validate_nlpc_lifecycle_batch("tenant-text", "bytewax", 1, "language_registry_batch")
 	assert batch["accepted"] is True

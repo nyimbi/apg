@@ -230,7 +230,7 @@ def test_keym_guardrails_fail_closed():
 			"review key export approvals",
 		)
 	with pytest.raises(PermissionError, match="bytewax_key_stream_required"):
-		service.validate_key_lifecycle_batch("tenant-a", "kafka", 1)
+		service.validate_key_lifecycle_batch("tenant-a", "legacy_queue", 1)
 	with pytest.raises(ValueError, match="key_lifecycle_batch_empty"):
 		service.validate_key_lifecycle_batch("tenant-a", "bytewax", 0)
 

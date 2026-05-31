@@ -111,7 +111,7 @@ def test_rule_engine_enforces_graph_guardrails():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_grph_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert result["decision"] == "deny"
@@ -398,7 +398,7 @@ def test_graph_agent_and_lifecycle_guardrails_execute():
 		service.validate_grph_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_grph_lifecycle_batch(tenant_id, "kafka", 1)
+		service.validate_grph_lifecycle_batch(tenant_id, "legacy_queue", 1)
 
 	assert service.dashboard_summary(tenant_id)["denied_lifecycle_batch_count"] == 1
 

@@ -120,7 +120,7 @@ def test_rule_engine_enforces_key_governance_guardrails():
 		(
 			{
 				"operation": "validate_key_lifecycle_batch",
-				"event_stream": "kafka",
+				"event_stream": "legacy_queue",
 			},
 			"bytewax_key_stream_required",
 		),

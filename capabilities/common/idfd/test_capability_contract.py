@@ -62,7 +62,7 @@ def test_rule_engine_enforces_federation_guardrails():
 		"metadata_refresh_completed": False,
 	})
 	oidc_result = evaluate_capability_rules({"tenant_context_present": True, "protocol": "oidc", "redirect_allowlist_configured": False, "pkce_required": False})
-	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_federation_mutation", "event_stream": "kafka"})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_federation_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_federation_agent",
@@ -75,7 +75,7 @@ def test_rule_engine_enforces_federation_guardrails():
 		"privileged_role": True,
 		"human_approval_required": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_idfd_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_idfd_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 	empty_lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_idfd_lifecycle_batch", "event_stream": "bytewax", "mutation_count": 0})
 
 	assert result["decision"] == "deny"
@@ -200,7 +200,7 @@ def test_idfd_service_enforces_policy_guardrails():
 	with pytest.raises(ValueError, match="unsupported_idfd_lifecycle_operation"):
 		service.validate_idfd_lifecycle_batch("tenant-sso", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_idfd_lifecycle_batch("tenant-sso", "kafka", 1, "federation_agent_batch")
+		service.validate_idfd_lifecycle_batch("tenant-sso", "legacy_queue", 1, "federation_agent_batch")
 
 
 def test_idfd_runtime_isolates_same_record_ids_by_tenant():

@@ -98,7 +98,7 @@ def test_rule_engine_enforces_adaptive_mfa_guardrails():
 	batch_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "batch_mfa_mutation",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
@@ -115,7 +115,7 @@ def test_rule_engine_enforces_adaptive_mfa_guardrails():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_mfa_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 		"mutation_count": 1,
 	})
 	empty_batch_result = evaluate_capability_rules({
@@ -390,7 +390,7 @@ def test_runtime_rejects_guardrail_violations():
 		service.validate_mfa_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
 
 	with pytest.raises(MfauGuardrailError) as stream_error:
-		service.validate_mfa_lifecycle_batch(tenant_id, "kafka", 1, "mfa_agent_batch")
+		service.validate_mfa_lifecycle_batch(tenant_id, "legacy_queue", 1, "mfa_agent_batch")
 	assert "bytewax_mfa_stream_required" in stream_error.value.result["matched_rules"]
 
 

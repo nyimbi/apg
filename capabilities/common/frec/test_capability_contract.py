@@ -58,7 +58,7 @@ def test_rule_engine_enforces_face_recognition_guardrails():
 	identify_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "identify_face", "watchlist_policy_attached": False})
 	auth_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "authenticate_face", "liveness_passed": False, "liveness_score": 0.2, "spoof_detected": True})
 	emotion_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "analyze_emotion", "emotion_analysis_requested": True, "approved_purpose_recorded": False})
-	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_face_mutation", "event_stream": "kafka"})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_face_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_facial_recognition_agent",
@@ -71,7 +71,7 @@ def test_rule_engine_enforces_face_recognition_guardrails():
 		"privileged_role": True,
 		"human_approval_required": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_frec_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_frec_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 	empty_lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_frec_lifecycle_batch", "event_stream": "bytewax", "mutation_count": 0})
 
 	assert result["decision"] == "deny"
@@ -178,7 +178,7 @@ def test_frec_runtime_rejects_guardrail_violations():
 	with pytest.raises(ValueError, match="unsupported_frec_lifecycle_operation"):
 		service.validate_frec_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
 	with pytest.raises(FrecGuardrailError) as lifecycle_error:
-		service.validate_frec_lifecycle_batch(tenant_id, "kafka", 1, "facial_recognition_agent_batch")
+		service.validate_frec_lifecycle_batch(tenant_id, "legacy_queue", 1, "facial_recognition_agent_batch")
 	assert "bytewax_frec_stream_required" in lifecycle_error.value.result["matched_rules"]
 
 

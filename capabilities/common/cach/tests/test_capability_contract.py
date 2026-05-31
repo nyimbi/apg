@@ -46,7 +46,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert "codex" in contract["agents"]["supported_runtimes"]
 	assert "eviction_reviewer" in contract["agents"]["privileged_roles"]
 	assert contract["streaming"]["engine"] == "bytewax"
-	assert contract["streaming"]["kafka_core_dependency_allowed"] is False
+	assert contract["streaming"]["broker_core_dependency_allowed"] is False
 	assert len(contract["rule_engine"]["rules"]) >= 24
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",

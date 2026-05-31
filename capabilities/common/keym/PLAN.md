@@ -42,6 +42,6 @@ models, rule/contract evidence, tests, and publish proof.
 - Do not allow AI agents to operate without owner, purpose, scope, and
   contribution disclosure.
 - Do not allow privileged key-agent roles without explicit human approval.
-- Do not accept key lifecycle batch mutations from Kafka or any non-Bytewax
+- Do not accept key lifecycle batch mutations from broker-specific queue or any non-Bytewax
   stream.
 - Keep live HSM/KMS/vault/blockchain/AI integrations behind adapters.

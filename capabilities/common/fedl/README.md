@@ -147,7 +147,7 @@ and require human approval evidence for active status.
 
 ## Bytewax Lifecycle Batches
 
-FEDL does not use Kafka for lifecycle mutation governance. The streaming
+FEDL does not use broker-specific queue for lifecycle mutation governance. The streaming
 manifest requires Bytewax with the `fedl.lifecycle` stream and declares
 operation names for federation, participant, training-round, update,
 aggregation, privacy-budget, release, and federation-agent batches.

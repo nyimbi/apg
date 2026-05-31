@@ -85,7 +85,7 @@ def semantic_model() -> dict[str, Any]:
 				},
 				"adapters": {
 					"preferred_stream_runtime": "bytewax",
-					"kafka_core_dependency_allowed": False,
+					"broker_core_dependency_allowed": False,
 				},
 				"i18n": {},
 				"master_data": {},
@@ -190,7 +190,7 @@ def self_test() -> dict[str, Any]:
 		errors.append("MQEB semantic model route manifest is stale")
 	if len(rules) < 22:
 		errors.append("MQEB semantic model rule manifest is stale")
-	if adapters.get("preferred_stream_runtime") != "bytewax" or adapters.get("kafka_core_dependency_allowed") is not False:
+	if adapters.get("preferred_stream_runtime") != "bytewax" or adapters.get("broker_core_dependency_allowed") is not False:
 		errors.append("MQEB adapter manifest must remain Bytewax-first")
 	if agents.get("first_class") is not True:
 		errors.append("MQEB event agents must remain first-class")

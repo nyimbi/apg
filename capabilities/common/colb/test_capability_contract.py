@@ -83,7 +83,7 @@ def test_rule_engine_enforces_collaboration_guardrails():
 		"ai_contribution_disclosed": False,
 		"duplicate_artifact_id": True,
 	})
-	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_collaboration_mutation", "event_stream": "kafka"})
+	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_collaboration_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_collaboration_agent",
@@ -96,7 +96,7 @@ def test_rule_engine_enforces_collaboration_guardrails():
 		"privileged_role": True,
 		"human_approval_required": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_colb_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_colb_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -214,7 +214,7 @@ def test_runtime_enforces_workspace_session_artifact_decision_and_agent_guardrai
 		runtime.add_annotation("tenant-collab", "decision-annotation", "decision-artifact", "analyst", "Decide")
 		runtime.record_decision("tenant-collab", "bad-decision", "decision-annotation", "owner", "Approved", [])
 	with pytest.raises(PermissionError, match="unsupported_collaboration_agent_runtime"):
-		runtime.register_collaboration_agent("tenant-collab", "agent-unsupported", "Unsupported", "kafka_agent", "workspace_reviewer", "workspace:*", "ops", "review workspaces")
+		runtime.register_collaboration_agent("tenant-collab", "agent-unsupported", "Unsupported", "legacy_agent", "workspace_reviewer", "workspace:*", "ops", "review workspaces")
 	with pytest.raises(PermissionError, match="collaboration_agent_contribution_disclosure_required"):
 		runtime.register_collaboration_agent("tenant-collab", "agent-undisclosed", "Undisclosed", "codex", "workspace_reviewer", "workspace:*", "ops", "review workspaces", contribution_disclosed=False)
 	pending = runtime.register_collaboration_agent("tenant-collab", "agent-pending", "Pending", "codex", "collaboration_steward", "workspace:*", "ops", "review workspaces")
@@ -223,7 +223,7 @@ def test_runtime_enforces_workspace_session_artifact_decision_and_agent_guardrai
 	with pytest.raises(ValueError, match="unsupported_colb_lifecycle_operation"):
 		runtime.validate_colb_lifecycle_batch("tenant-collab", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		runtime.validate_colb_lifecycle_batch("tenant-collab", "kafka", 1, "collaboration_agent_batch")
+		runtime.validate_colb_lifecycle_batch("tenant-collab", "legacy_queue", 1, "collaboration_agent_batch")
 
 	agent_result = runtime.evaluate({"tenant_context_present": True, "ai_agent_participant": True, "agent_registered": False, "agent_scope_present": False, "ai_contribution_disclosed": False})
 	assert agent_result["decision"] == "deny"

@@ -28,7 +28,7 @@ honor these decisions before side effects.
 
 **Decision**: The REGY adapter manifest names Bytewax for event streaming.
 
-**Rationale**: APG should avoid Kafka for this platform direction and keep
+**Rationale**: APG should avoid broker-specific queue for this platform direction and keep
 registry lifecycle events routed through Bytewax-compatible flows.
 
 **Impact**: Production stream work belongs in adapters; generated-app runtime

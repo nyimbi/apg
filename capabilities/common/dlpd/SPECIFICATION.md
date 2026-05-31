@@ -45,7 +45,7 @@ Required adapter evidence:
   and `cach` as integration adapter points.
 - Provider-neutral DLP agent adapter evidence through
   `aicr_provider_neutral_dlp_agent_adapter`.
-- Bytewax lifecycle stream metadata through `dlpd.lifecycle`; Kafka and
+- Bytewax lifecycle stream metadata through `dlpd.lifecycle`; broker-specific queue and
   broker-core coupling are not allowed.
 
 ## Runtime Lifecycle

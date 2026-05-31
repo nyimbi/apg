@@ -23309,3 +23309,49 @@ Known gaps:
   registry slice.
 - Did not attempt to clear the broader repository-hygiene streaming-runtime
   text backlog in this slice.
+
+### 2026-06-01 02:16 EAT
+
+Bytewax-native repository hygiene cleanup slice:
+
+- Cleared the remaining product-specific streaming-runtime text backlog that
+  kept `apg tooling audit --json` red after the strict capability audit was
+  stabilized.
+- Reworded capability specifications, plans, READMEs, decision logs, tests,
+  semantic models, and MQEB runtime metadata so APG describes Bytewax-first
+  lifecycle processing without naming a broker-specific platform as the core
+  event fabric.
+- Preserved negative rule-engine coverage by using neutral `legacy_queue`
+  fixtures for non-Bytewax stream inputs.
+- Renamed capability metadata flags from the product-specific
+  `kafka_core_dependency_allowed` shape to the framework-neutral
+  `broker_core_dependency_allowed` shape where this slice touched capability
+  artifacts.
+- Reviewed representative changed packets (`mqeb`, `fedl`, `mlcm`, and `cach`)
+  to ensure the mechanical cleanup still expresses the intended Bytewax-first
+  guardrail.
+
+Focused verification:
+
+- `git diff --check` passed.
+- `./.venv/bin/python -m py_compile` over changed Python files passed.
+- `./.venv/bin/apg hygiene audit --json` passed with 17 repository hygiene
+  checks, 0 failing checks, and 0 violations.
+- `./.venv/bin/apg capabilities validate-contracts --json` passed with 109
+  valid contracts and 0 errors.
+- `./.venv/bin/apg capabilities audit --strict-package-artifacts --json`
+  passed with `ok: true`, 109 operable contracts, 109 complete packages,
+  0 package gaps, 0 warnings, and 0 errors.
+- `./.venv/bin/apg tooling audit --json` passed all 20 tooling surfaces,
+  including repository hygiene, compiler baseline, docs, capability
+  operability, and capability implementation.
+- `./.venv/bin/pytest -q capabilities/common/mqeb/tests/test_capability_contract.py capabilities/common/mqeb/tests/test_package_contract.py capabilities/common/fedl/test_capability_contract.py capabilities/common/mlcm/test_capability_contract.py capabilities/common/cach/tests/test_capability_contract.py`
+  passed with 33 tests and 10 pre-existing dependency deprecation warnings.
+
+Known gaps:
+
+- Did not run the full repository test suite, rendered UI checks, live adapters,
+  live Bytewax topology, or performance checks during this battery-conscious
+  hygiene slice.
+- Existing dependency deprecation warnings from SQLAlchemy and Pydantic remain
+  outside this slice.

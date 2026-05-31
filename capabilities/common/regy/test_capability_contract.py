@@ -113,7 +113,7 @@ def test_rule_engine_enforces_registry_agent_and_bytewax_guardrails():
 	stream_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_regy_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert agent_result["decision"] == "deny"
@@ -283,7 +283,7 @@ def test_registry_runtime_governs_agents_and_lifecycle_batches():
 	)
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		registry.validate_regy_lifecycle_batch("tenant-a", "kafka", 2)
+		registry.validate_regy_lifecycle_batch("tenant-a", "legacy_queue", 2)
 	batch = registry.validate_regy_lifecycle_batch("tenant-a", "bytewax", 4)
 	summary = registry.registry_summary("tenant-a")
 

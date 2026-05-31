@@ -40,7 +40,7 @@ and publish proof.
 - Do not allow AI agents to operate without owner, purpose, scope, and
   contribution disclosure.
 - Do not allow privileged crypto-agent roles without explicit human approval.
-- Do not accept crypto lifecycle batch mutations from Kafka or any non-Bytewax
+- Do not accept crypto lifecycle batch mutations from broker-specific queue or any non-Bytewax
   stream.
 - Keep live KMS/HSM/KEYM/post-quantum/ZK/homomorphic providers behind adapters.
 - Keep generated semantic evidence derived from the live contract.

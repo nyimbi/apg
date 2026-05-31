@@ -70,7 +70,7 @@ def test_rule_engine_enforces_ontology_guardrails():
 	batch_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "batch_ontology_mutation",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
@@ -87,7 +87,7 @@ def test_rule_engine_enforces_ontology_guardrails():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_onto_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	mapping_result = evaluate_capability_rules({
 		"tenant_context_present": True,
@@ -515,4 +515,4 @@ def test_onto_service_enforces_policy_guardrails():
 		service.validate_onto_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_onto_lifecycle_batch(tenant_id, "kafka", 1, "ontology_agent_batch")
+		service.validate_onto_lifecycle_batch(tenant_id, "legacy_queue", 1, "ontology_agent_batch")

@@ -36,7 +36,7 @@ UI view models, contract evidence, tests, and publish proof.
 
 ## Review Risks
 
-- Do not introduce Kafka as MQEB's core dependency; Bytewax is the preferred
+- Do not introduce broker-specific queue as MQEB's core dependency; Bytewax is the preferred
   event-flow runtime boundary.
 - Do not trust caller-supplied booleans for quota exception, replay approval,
   dead-letter state, or delivery completion.

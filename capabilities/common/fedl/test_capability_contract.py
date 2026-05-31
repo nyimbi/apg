@@ -107,7 +107,7 @@ def test_rule_engine_enforces_federated_learning_guardrails():
 	stream_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "configure_round_events",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	assert stream_result["matched_rules"] == ["bytewax_stream_required_for_round_events"]
 	agent_result = evaluate_capability_rules({
@@ -145,7 +145,7 @@ def test_rule_engine_enforces_federated_learning_guardrails():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_fedl_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	assert lifecycle_result["matched_rules"] == ["bytewax_fedl_stream_required"]
 
@@ -356,7 +356,7 @@ def test_fedl_service_enforces_policy_guardrails():
 	assert agent["role"] == "privacy_reviewer"
 	assert agent["status"] == "pending_review"
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_fedl_lifecycle_batch("tenant-fed", "kafka", 1)
+		service.validate_fedl_lifecycle_batch("tenant-fed", "legacy_queue", 1)
 	batch = service.validate_fedl_lifecycle_batch("tenant-fed", "bytewax", 1, "privacy_budget_batch")
 	assert batch["accepted"] is True
 

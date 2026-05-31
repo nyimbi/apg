@@ -209,7 +209,7 @@ def test_schd_policy_failures_are_enforced():
 		service.validate_batch_mutation("legacy_bus")
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_lifecycle_batch(tenant_id, "kafka_replay", 1, "scheduler_agent_batch")
+		service.validate_lifecycle_batch(tenant_id, "legacy_replay", 1, "scheduler_agent_batch")
 
 	with pytest.raises(PermissionError, match="schd_lifecycle_batch_empty"):
 		service.validate_lifecycle_batch(tenant_id, "bytewax", 0, "scheduler_agent_batch")

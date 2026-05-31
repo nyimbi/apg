@@ -24,5 +24,5 @@ application UI contract.
 
 Decision: use `bytewax` as the event stream adapter in the APIG contract.
 
-Rationale: APG's current architecture direction is Bytewax rather than Kafka
+Rationale: APG's current architecture direction is Bytewax rather than broker-specific queue
 for capability event flows.

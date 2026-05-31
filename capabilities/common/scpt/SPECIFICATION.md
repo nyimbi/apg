@@ -141,7 +141,7 @@ behind the APG composition layer.
   `claude_code`, `opencode`, and `pi`; external clients remain behind AICR
   adapter contracts.
 - Lifecycle batch governance uses Bytewax metadata only and does not introduce
-  Kafka or broker-core processing.
+  broker-specific queue or broker-core processing.
 - `semantic_model.json`, `package_manifest.json`, and `release_report.json`
   match the current contract.
 - Focused compile, pytest, self-test, implementation audit, publish-plan,

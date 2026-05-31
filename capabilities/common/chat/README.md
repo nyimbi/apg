@@ -48,7 +48,7 @@ API helpers in `api.py` wrap the same runtime for generated applications.
 - theme tokens
 - APG adapter map
 
-The contract declares Bytewax as the event-stream adapter. Batch chat mutations must use Bytewax; Kafka is intentionally not part of this packet.
+The contract declares Bytewax as the event-stream adapter. Batch chat mutations must use Bytewax; broker-specific queue is intentionally not part of this packet.
 
 ## Agent And Lifecycle Composition
 

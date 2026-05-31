@@ -152,7 +152,7 @@ def test_agent_and_lifecycle_api_guardrails_are_publishable():
 			"id": "agent-bad",
 			"tenant_id": "tenant-agent",
 			"name": "Bad Agent",
-			"runtime": "kafka_agent",
+			"runtime": "legacy_agent",
 			"role": "framework_reviewer",
 			"scope": "framework:*",
 			"owner": "compliance-owner",

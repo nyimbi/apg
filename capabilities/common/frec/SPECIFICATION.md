@@ -32,7 +32,7 @@ The contract must include configuration sections for consent, recognition, enrol
 The contract must also include:
 
 - `agents`: first-class provider-neutral facial-recognition governance agents with supported runtimes `codex`, `claude_code`, `opencode`, and `pi`; supported roles; privileged roles; required owner, purpose, scope, contribution disclosure, and privileged-role human approval.
-- `streaming`: Bytewax lifecycle metadata with `frec.lifecycle`, `event_time` watermarking, Bytewax as required processor, FREC lifecycle batch operations, FREC topics, and no broker-core/Kafka dependency.
+- `streaming`: Bytewax lifecycle metadata with `frec.lifecycle`, `event_time` watermarking, Bytewax as required processor, FREC lifecycle batch operations, FREC topics, and no broker-core/broker-specific queue dependency.
 
 Required adapters:
 

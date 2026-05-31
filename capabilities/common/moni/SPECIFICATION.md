@@ -103,7 +103,7 @@ MONI lifecycle batches represent bulk mutations that affect metrics, alerts,
 incidents, SLOs, or monitoring-agent records. The executable contract requires
 Bytewax as the lifecycle processor, uses `moni.lifecycle` as the lifecycle
 stream name, and covers the `moni.metrics`, `moni.alerts`, `moni.incidents`,
-`moni.slos`, and `moni.agents` topics. Non-Bytewax broker declarations are not
+`moni.slos`, and `moni.agents` topics. Non-Bytewax deployment endpoint declarations are not
 accepted as core lifecycle processors for this packet.
 
 ### Rules

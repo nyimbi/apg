@@ -86,7 +86,7 @@ def test_rule_engine_enforces_chat_guardrails():
 		"member_count": 8000,
 		"access_review_recorded": False,
 	})
-	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_chat_mutation", "event_stream": "kafka"})
+	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_chat_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_chat_agent",
@@ -99,7 +99,7 @@ def test_rule_engine_enforces_chat_guardrails():
 		"privileged_role": True,
 		"human_approval_required": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_chat_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_chat_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -250,7 +250,7 @@ def test_service_enforces_room_message_agent_and_moderation_guardrails():
 	with pytest.raises(PermissionError, match="typing_room_membership_required"):
 		service.update_presence("tenant-chat", "outsider", "online", room_id="moderated-room", typing=True)
 	with pytest.raises(PermissionError, match="unsupported_chat_agent_runtime"):
-		service.register_chat_agent("agent-unsupported", "tenant-chat", "Unsupported", "kafka_agent", "room_reviewer", "room:*", "ops", "review rooms")
+		service.register_chat_agent("agent-unsupported", "tenant-chat", "Unsupported", "legacy_agent", "room_reviewer", "room:*", "ops", "review rooms")
 	with pytest.raises(PermissionError, match="chat_agent_contribution_disclosure_required"):
 		service.register_chat_agent("agent-undisclosed", "tenant-chat", "Undisclosed", "codex", "room_reviewer", "room:*", "ops", "review rooms", contribution_disclosed=False)
 	pending = service.register_chat_agent("agent-pending", "tenant-chat", "Pending", "codex", "chat_steward", "room:*", "ops", "review rooms")
@@ -259,7 +259,7 @@ def test_service_enforces_room_message_agent_and_moderation_guardrails():
 	with pytest.raises(ValueError, match="unsupported_chat_lifecycle_operation"):
 		service.validate_chat_lifecycle_batch("tenant-chat", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_chat_lifecycle_batch("tenant-chat", "kafka", 1, "chat_agent_batch")
+		service.validate_chat_lifecycle_batch("tenant-chat", "legacy_queue", 1, "chat_agent_batch")
 
 	reviewed = service.review_moderation("mod:000001", reviewer="moderator", decision="rejected", tenant_id="tenant-chat")
 	approved_message = service.send_message("approved-message", "tenant-chat", "moderated-room", "member", "contains restricted credential", moderation_completed=True)

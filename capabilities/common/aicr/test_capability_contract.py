@@ -111,7 +111,7 @@ def test_rule_engine_enforces_first_class_agent_and_bytewax_guardrails():
 	batch_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_aicr_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert agent_result["decision"] == "deny"
@@ -236,7 +236,7 @@ def test_service_blocks_provider_model_workflow_and_agent_guardrail_gaps():
 	with pytest.raises(PermissionError, match="ai_agent_scope_required"):
 		service.register_ai_agent("agent", "tenant-ai", "Agent", "codex", "model_steward", "", "owner", "purpose")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_aicr_lifecycle_batch("tenant-ai", "kafka", 1)
+		service.validate_aicr_lifecycle_batch("tenant-ai", "legacy_queue", 1)
 
 
 def test_privileged_ai_agent_without_human_approval_is_pending_review():

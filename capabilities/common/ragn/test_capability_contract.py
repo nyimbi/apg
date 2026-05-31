@@ -67,7 +67,7 @@ def test_rule_engine_enforces_rag_guardrails():
 	batch_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "batch_rag_mutation",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
@@ -84,7 +84,7 @@ def test_rule_engine_enforces_rag_guardrails():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_ragn_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert result["decision"] == "deny"
@@ -380,4 +380,4 @@ def test_ragn_service_enforces_policy_guardrails():
 		service.validate_ragn_lifecycle_batch("tenant-rag", "bytewax", 1, "unknown_batch")
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_ragn_lifecycle_batch("tenant-rag", "kafka", 1, "rag_agent_batch")
+		service.validate_ragn_lifecycle_batch("tenant-rag", "legacy_queue", 1, "rag_agent_batch")

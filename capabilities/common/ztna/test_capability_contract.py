@@ -88,7 +88,7 @@ def test_rule_engine_requires_bytewax_for_batch_zero_trust_mutations():
 	result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "batch_ztna_mutation",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert result["decision"] == "deny"
@@ -107,7 +107,7 @@ def test_rule_engine_requires_bytewax_for_batch_zero_trust_mutations():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_ztna_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 		"mutation_count": 1,
 	})
 
@@ -234,13 +234,13 @@ def test_zero_trust_agents_and_lifecycle_batches_are_first_class_runtime_surface
 	assert pending["status"] == "pending_review"
 
 	with pytest.raises(PermissionError, match="unsupported_ztna_agent_runtime"):
-		service.register_zero_trust_agent("agent-unsupported", tenant_id, "Unsupported", "kafka_agent", "policy_reviewer", "policy:*", "owner", "review policies")
+		service.register_zero_trust_agent("agent-unsupported", tenant_id, "Unsupported", "legacy_agent", "policy_reviewer", "policy:*", "owner", "review policies")
 	with pytest.raises(ValueError, match="ztna_lifecycle_batch_empty"):
 		service.validate_ztna_lifecycle_batch(tenant_id, "bytewax", 0, "policy_batch")
 	with pytest.raises(ValueError, match="unsupported_ztna_lifecycle_operation"):
 		service.validate_ztna_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_ztna_lifecycle_batch(tenant_id, "kafka", 1, "policy_batch")
+		service.validate_ztna_lifecycle_batch(tenant_id, "legacy_queue", 1, "policy_batch")
 
 	api_agent = api.register_zero_trust_agent({
 		"id": "api-agent",

@@ -141,7 +141,7 @@ Each route must include a path, component, permission, and navigation group. The
 - Admin-assisted recovery requires approval.
 - Batch state changes use Bytewax.
 - MFA security agents are first-class but provider-neutral; external runtime clients plug in through AICR.
-- Lifecycle batches are Bytewax-first and must not require Kafka or broker-core coupling.
+- Lifecycle batches are Bytewax-first and must not require broker-specific queue or broker-core coupling.
 
 ## Acceptance Criteria
 

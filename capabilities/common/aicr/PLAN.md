@@ -52,7 +52,7 @@ compose AI services before live provider adapters are wired in.
 - Agent runtimes have explicit supported-runtime and tool-policy guardrails.
 - First-class AI agents have explicit supported-runtime, supported-role, scope,
   owner, purpose, disclosure, and privileged approval guardrails.
-- AICR lifecycle batches require Bytewax and reject Kafka or other broker-first
+- AICR lifecycle batches require Bytewax and reject broker-specific queue or other broker-first
   streams.
 - Contract, runtime, semantic model, release report, and tests agree.
 - Docs describe current executable behavior without overclaiming.

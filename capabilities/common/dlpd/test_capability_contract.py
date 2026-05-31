@@ -65,7 +65,7 @@ def test_rule_engine_enforces_dlp_guardrails():
 		"export_record_count": 20000,
 		"review_recorded": False,
 	})
-	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_dlp_mutation", "event_stream": "kafka"})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_dlp_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_dlp_agent",
@@ -76,7 +76,7 @@ def test_rule_engine_enforces_dlp_guardrails():
 		"purpose_present": False,
 		"contribution_disclosed": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_dlpd_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_dlpd_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -186,7 +186,7 @@ def test_service_enforces_dlp_guardrails():
 	with pytest.raises(PermissionError, match="classification_label_required"):
 		service.inspect_egress("insp-unlabeled", "tenant-dlp", "pol-chat", "chat", "user-1", "external-room", "alice@example.com", auto_classify=False)
 	with pytest.raises(PermissionError, match="unsupported_dlp_agent_runtime"):
-		service.register_dlp_agent("agent-unsupported", "tenant-dlp", "Unsupported", "kafka_agent", "policy_reviewer", "policy:pol-chat", "owner", "review policies")
+		service.register_dlp_agent("agent-unsupported", "tenant-dlp", "Unsupported", "legacy_agent", "policy_reviewer", "policy:pol-chat", "owner", "review policies")
 
 	pending = service.register_dlp_agent("agent-pending", "tenant-dlp", "Privacy Reviewer", "claude_code", "privacy_reviewer", "tenant:tenant-dlp", "privacy-office", "review sensitive data movement")
 	assert pending["status"] == "pending_review"
@@ -196,7 +196,7 @@ def test_service_enforces_dlp_guardrails():
 	with pytest.raises(ValueError, match="unsupported_dlpd_lifecycle_operation"):
 		service.validate_dlpd_lifecycle_batch("tenant-dlp", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_dlpd_lifecycle_batch("tenant-dlp", "kafka", 1, "policy_batch")
+		service.validate_dlpd_lifecycle_batch("tenant-dlp", "legacy_queue", 1, "policy_batch")
 
 
 def test_large_export_review_and_high_severity_block_rules_are_executable():

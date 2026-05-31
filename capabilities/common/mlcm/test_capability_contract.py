@@ -98,7 +98,7 @@ def test_rule_engine_enforces_model_lifecycle_guardrails():
 	stream_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "configure_monitoring",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert deployment_result["decision"] == "deny"
@@ -129,7 +129,7 @@ def test_rule_engine_enforces_lifecycle_agent_and_bytewax_guardrails():
 	batch_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_mlcm_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert agent_result["decision"] == "deny"
@@ -334,7 +334,7 @@ def test_mlcm_service_enforces_policy_guardrails():
 		)
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_mlcm_lifecycle_batch(tenant_id, "kafka", 1)
+		service.validate_mlcm_lifecycle_batch(tenant_id, "legacy_queue", 1)
 
 	service.register_model(
 		model_id="guardrail-model",

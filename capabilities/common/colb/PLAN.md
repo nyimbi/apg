@@ -43,5 +43,5 @@
 - First-class collaboration agents require supported runtimes, supported roles, explicit scopes, accountable owners, declared purposes, contribution disclosure, and approval review for privileged roles.
 - Lifecycle batches require Bytewax, supported operations, non-empty mutation counts, audit, and tenant context.
 - Package evidence agrees with the live contract.
-- No Kafka dependency is introduced.
+- No broker-specific queue dependency is introduced.
 - Focused verification passes without live infrastructure.

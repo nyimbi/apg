@@ -358,7 +358,7 @@ def test_envelope_cancellation_rejection_agent_and_batch_guardrails():
 	with pytest.raises(PermissionError, match="esgn_lifecycle_batch_empty"):
 		service.validate_lifecycle_batch("tenant-sign", "bytewax", 0, "signing_agent_batch")
 	with pytest.raises(PermissionError, match="unsupported_esgn_lifecycle_operation"):
-		service.validate_lifecycle_batch("tenant-sign", "bytewax", 1, "kafka_replay")
+		service.validate_lifecycle_batch("tenant-sign", "bytewax", 1, "legacy_replay")
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
 		service.validate_batch_mutation("legacy_queue")
 	assert service.validate_batch_mutation("bytewax")["decision"] == "allow"

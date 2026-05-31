@@ -19,7 +19,7 @@ Implement one coherent dependency-light biometric governance lifecycle packet:
 - Do not add new dependencies.
 - Do not build sensor integrations, model inference, HSM encryption, or production web routes.
 - Do not build runtime-specific Codex, Claude Code, opencode, or Pi clients; keep them behind AICR adapters.
-- Do not introduce Kafka or broker-core lifecycle dependencies; BIOP lifecycle batches are Bytewax-first.
+- Do not introduce broker-specific queue or broker-core lifecycle dependencies; BIOP lifecycle batches are Bytewax-first.
 - Do not run full repository test suites while battery is constrained.
 
 ## Implementation Steps

@@ -35,7 +35,7 @@ def test_contract_shape_is_valid():
 	assert len(contract["ui"]["routes"]) >= 14
 	assert len(contract["rule_engine"]["rules"]) >= 22
 	assert contract["configuration"]["operation_governance"]["bytewax_first_runtime"] is True
-	assert contract["configuration"]["operation_governance"]["kafka_core_dependency_allowed"] is False
+	assert contract["configuration"]["operation_governance"]["broker_core_dependency_allowed"] is False
 	assert contract["agents"]["first_class"] is True
 	assert contract["streaming"]["engine"] == "bytewax"
 

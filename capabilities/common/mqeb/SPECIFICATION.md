@@ -9,8 +9,8 @@ operational state, and connect to streaming infrastructure without binding the
 package runtime directly to a live broker.
 
 MQEB must use **Bytewax as the preferred stream-processing and event-flow
-runtime boundary**. It must not introduce Kafka as the platform dependency for
-this capability. Kafka-compatible bridges can be future adapters, but the
+runtime boundary**. It must not introduce broker-specific queue as the platform dependency for
+this capability. Broker-specific queue-compatible bridges can be future adapters, but the
 first-class APG event fabric is APG package state plus Bytewax-oriented
 pipelines.
 
@@ -144,7 +144,7 @@ contract:
 - schema registry and metadata management;
 - SIEM, SOAR, DLP, GRC, notification, and incident-response systems;
 - cloud queue/event services only as adapters, not as the MQEB core dependency;
-- Kafka bridge only as optional compatibility, not as the primary APG event
+- broker-specific queue bridge only as optional compatibility, not as the primary APG event
   fabric.
 
 ## Current Implementation Baseline

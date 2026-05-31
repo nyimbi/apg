@@ -7,7 +7,7 @@ evaluation, first-class event-agent composition, Bytewax lifecycle validation,
 UI view models, and publishable package evidence for generated APG applications.
 
 MQEB is **Bytewax-first**. Bytewax workers and dataflows are the preferred
-runtime boundary for stream processing. Kafka may be supported later through an
+runtime boundary for stream processing. Broker-specific queue may be supported later through an
 optional compatibility bridge, but it is not the MQEB core dependency.
 
 ## What This Package Provides
@@ -176,7 +176,7 @@ Production integrations should sit behind adapters that honor MQEB decisions:
 - schema registries and metadata services;
 - SIEM, SOAR, DLP, GRC, notification, and incident-response systems;
 - cloud queue/event services;
-- optional Kafka compatibility bridge.
+- optional broker-specific queue compatibility bridge.
 
 ## Focused Proof
 

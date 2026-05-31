@@ -130,7 +130,7 @@ def test_rule_engine_enforces_virtualization_guardrails():
 	stream_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_dvrl_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 	assert agent_result["decision"] == "deny"
 	assert set(agent_result["matched_rules"]) >= {
@@ -396,7 +396,7 @@ def test_lifecycle_service_enforces_source_schema_query_cache_and_policy_guardra
 	try:
 		service.validate_dvrl_lifecycle_batch(
 			tenant_id=tenant_id,
-			event_stream="kafka",
+			event_stream="legacy_queue",
 			mutation_count=3,
 		)
 	except PermissionError as exc:

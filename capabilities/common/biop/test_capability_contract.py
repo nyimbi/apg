@@ -89,7 +89,7 @@ def test_rule_engine_enforces_biometric_guardrails():
 	auth_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "authenticate", "liveness_passed": False})
 	match_review_result = evaluate_capability_rules({"operation": "approve_match_review", "match_reviewer_same_as_requester": True})
 	privacy_review_result = evaluate_capability_rules({"operation": "approve_privacy_review", "privacy_reviewer_same_as_requester": True})
-	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_biometric_mutation", "event_stream": "kafka"})
+	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_biometric_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_biometric_agent",
@@ -103,7 +103,7 @@ def test_rule_engine_enforces_biometric_guardrails():
 	lifecycle_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_biop_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 		"mutation_count": 1,
 	})
 	empty_lifecycle_result = evaluate_capability_rules({
@@ -323,7 +323,7 @@ def test_service_enforces_biometric_guardrails():
 	with pytest.raises(ValueError, match="unsupported_biop_lifecycle_operation"):
 		service.validate_biop_lifecycle_batch("tenant-bio", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_biop_lifecycle_batch("tenant-bio", "kafka", 1, "biometric_agent_batch")
+		service.validate_biop_lifecycle_batch("tenant-bio", "legacy_queue", 1, "biometric_agent_batch")
 	with pytest.raises(PermissionError, match="biometric_template_quality_too_low"):
 		service.enroll_template(
 			template_id="template-low-quality",

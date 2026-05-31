@@ -112,7 +112,7 @@ def test_rule_engine_enforces_transfer_agent_and_bytewax_guardrails():
 	stream_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "validate_imex_lifecycle_batch",
-		"event_stream": "kafka",
+		"event_stream": "legacy_queue",
 	})
 
 	assert agent_result["decision"] == "deny"
@@ -247,7 +247,7 @@ def test_imex_runtime_governs_agents_and_lifecycle_batches():
 	)
 
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		service.validate_imex_lifecycle_batch("tenant-a", "kafka", 2)
+		service.validate_imex_lifecycle_batch("tenant-a", "legacy_queue", 2)
 	batch = service.validate_imex_lifecycle_batch("tenant-a", "bytewax", 4)
 	summary = service.dashboard_summary("tenant-a")
 

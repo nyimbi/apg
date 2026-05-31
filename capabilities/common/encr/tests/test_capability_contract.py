@@ -140,7 +140,7 @@ def test_rule_engine_enforces_crypto_guardrails():
 		(
 			{
 				"operation": "validate_crypto_lifecycle_batch",
-				"event_stream": "kafka",
+				"event_stream": "legacy_queue",
 			},
 			"bytewax_crypto_stream_required",
 		),

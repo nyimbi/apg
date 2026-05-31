@@ -67,7 +67,7 @@ def test_rule_engine_enforces_notification_guardrails():
 		"recipient_count": 7000,
 		"batch_review_recorded": False,
 	})
-	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_notification_mutation", "event_stream": "kafka"})
+	stream_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_notification_mutation", "event_stream": "legacy_queue"})
 	agent_result = evaluate_capability_rules({
 		"tenant_context_present": True,
 		"operation": "register_notification_agent",
@@ -90,7 +90,7 @@ def test_rule_engine_enforces_notification_guardrails():
 		"privileged_role": True,
 		"human_approval_required": False,
 	})
-	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_ntfy_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_ntfy_lifecycle_batch", "event_stream": "legacy_queue", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -245,7 +245,7 @@ def test_runtime_and_api_enforce_notification_agent_and_lifecycle_guardrails():
 	runtime = NotificationRuntime()
 
 	with pytest.raises(PermissionError, match="unsupported_notification_agent_runtime"):
-		runtime.register_notification_agent("agent-unsupported", "tenant-notify", "Unsupported", "kafka_agent", "channel_reviewer", "channel:*", "ops", "review channel health")
+		runtime.register_notification_agent("agent-unsupported", "tenant-notify", "Unsupported", "legacy_agent", "channel_reviewer", "channel:*", "ops", "review channel health")
 
 	with pytest.raises(PermissionError, match="notification_agent_contribution_disclosure_required"):
 		runtime.register_notification_agent("agent-undisclosed", "tenant-notify", "Undisclosed", "codex", "channel_reviewer", "channel:*", "ops", "review channels", contribution_disclosed=False)
@@ -266,7 +266,7 @@ def test_runtime_and_api_enforce_notification_agent_and_lifecycle_guardrails():
 	with pytest.raises(ValueError, match="unsupported_ntfy_lifecycle_operation"):
 		runtime.validate_ntfy_lifecycle_batch("tenant-notify", "bytewax", 1, "unknown_batch")
 	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
-		runtime.validate_ntfy_lifecycle_batch("tenant-notify", "kafka", 1, "campaign_batch")
+		runtime.validate_ntfy_lifecycle_batch("tenant-notify", "legacy_queue", 1, "campaign_batch")
 
 	package_api.RUNTIME = NotificationRuntime()
 	api_agent = package_api.register_notification_agent({

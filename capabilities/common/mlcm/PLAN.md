@@ -31,7 +31,7 @@
 - Bytewax appears in adapters and package streaming metadata.
 - Model lifecycle agents have supported-runtime, supported-role, scope, owner,
   purpose, disclosure, and privileged approval guardrails.
-- Lifecycle batches require Bytewax and reject Kafka or other broker-first
+- Lifecycle batches require Bytewax and reject broker-specific queue or other broker-first
   streams.
 - `MlcmService` remains dependency-light and tenant-scoped.
 - Retirement and rollback behavior does not permit cross-model or serving-risk

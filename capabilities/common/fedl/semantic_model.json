@@ -691,7 +691,7 @@
           },
           {
             "condition": {
-              "event_stream": "kafka",
+              "event_stream": "legacy_queue",
               "operation": "configure_round_events"
             },
             "description": "Federated round event streams must use Bytewax.",
@@ -1189,7 +1189,7 @@
         },
         {
           "condition": {
-            "event_stream": "kafka",
+            "event_stream": "legacy_queue",
             "operation": "configure_round_events"
           },
           "description": "Federated round event streams must use Bytewax.",
@@ -1950,7 +1950,7 @@
     },
     "bytewax_stream_required_for_round_events": {
       "condition": {
-        "event_stream": "kafka",
+        "event_stream": "legacy_queue",
         "operation": "configure_round_events"
       },
       "description": "Federated round event streams must use Bytewax.",

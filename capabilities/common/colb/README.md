@@ -44,7 +44,7 @@ Production integration files such as `production_app.py`, `service.py`, `api.py`
 - theme tokens
 - APG adapter map
 
-The event stream adapter is Bytewax. Batch collaboration mutations must use Bytewax; Kafka is intentionally not part of the packet.
+The event stream adapter is Bytewax. Batch collaboration mutations must use Bytewax; broker-specific queue is intentionally not part of the packet.
 
 ## Agent And Lifecycle Composition
 

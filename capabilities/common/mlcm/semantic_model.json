@@ -746,7 +746,7 @@
           },
           {
             "condition": {
-              "event_stream": "kafka",
+              "event_stream": "legacy_queue",
               "operation": "configure_monitoring"
             },
             "description": "Monitoring event flows must use Bytewax.",
@@ -1314,7 +1314,7 @@
         },
         {
           "condition": {
-            "event_stream": "kafka",
+            "event_stream": "legacy_queue",
             "operation": "configure_monitoring"
           },
           "description": "Monitoring event flows must use Bytewax.",
@@ -2100,7 +2100,7 @@
     },
     "bytewax_stream_required_for_monitoring": {
       "condition": {
-        "event_stream": "kafka",
+        "event_stream": "legacy_queue",
         "operation": "configure_monitoring"
       },
       "description": "Monitoring event flows must use Bytewax.",

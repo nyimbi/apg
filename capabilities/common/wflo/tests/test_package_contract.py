@@ -330,7 +330,7 @@ def test_task_approval_compensation_agent_and_stream_guardrails():
 	assert service.validate_batch_mutation("bytewax")["decision"] == "allow"
 
 	try:
-		service.validate_lifecycle_batch("tenant-c", "kafka_replay", 1, "workflow_agent_batch")
+		service.validate_lifecycle_batch("tenant-c", "legacy_replay", 1, "workflow_agent_batch")
 	except PermissionError as exc:
 		assert str(exc) == "bytewax_lifecycle_stream_required"
 	else:

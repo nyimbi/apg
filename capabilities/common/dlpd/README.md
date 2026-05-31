@@ -140,7 +140,7 @@ DLPD lifecycle batches are explicit Bytewax-governed records. The generated
 runtime accepts `policy_batch`, `classifier_batch`, `inspection_batch`,
 `quarantine_batch`, `incident_batch`, `review_batch`, and `dlp_agent_batch`
 operations only when they contain mutations and declare `event_stream="bytewax"`.
-Kafka or broker-core routing is intentionally denied for this packet.
+broker-specific queue or broker-core routing is intentionally denied for this packet.
 
 ## Screens
 

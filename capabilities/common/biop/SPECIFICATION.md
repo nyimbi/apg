@@ -17,7 +17,7 @@ BIOP exposes these composable application components:
 - Cross-border biometric processing privacy review queue with independent reviewer decision and notes.
 - Template vault, retirement, and revocation state for privacy and security operations.
 - First-class biometric governance agents for consent, enrollment, template-vault, liveness, match, privacy, retention, and lifecycle-batch review.
-- Bytewax-first lifecycle batch validation for generated biometric mutation streams without Kafka or broker-core coupling.
+- Bytewax-first lifecycle batch validation for generated biometric mutation streams without broker-specific queue or broker-core coupling.
 - Audit event stream for consent, enrollment, verification, review, revocation, and retirement evidence.
 - Dashboard and workbench view models that generated applications can render directly.
 

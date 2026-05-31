@@ -81,7 +81,7 @@ generated evidence, review, and progress log entry.
 - API helpers expose all service controls needed by generated apps.
 - View models cover every declared route family.
 - Provider-neutral agent runtimes stay behind the AICR adapter contract.
-- Lifecycle batches stay Bytewax-first and do not introduce Kafka or
+- Lifecycle batches stay Bytewax-first and do not introduce broker-specific queue or
   broker-core coupling.
 - Docs describe current behavior, not planned provider integrations.
 - Stale-marker scan has no primary-slice hits.
