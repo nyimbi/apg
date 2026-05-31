@@ -216,6 +216,8 @@ def register_capability() -> Dict[str, Any]:
 			"export_dual_control": "Govern key export through package-backed dual-control approvals",
 			"rotation_exception_review": "Govern overdue rotation exceptions with independent review",
 			"compromise_response": "Block compromised keys until rotation evidence is recorded",
+			"key_agent_composition": "Register accountable AI agents for key governance workflows",
+			"bytewax_lifecycle_streaming": "Require Bytewax for key lifecycle batch mutations",
 			"audit_and_compliance": "Expose immutable key access audit and compliance surfaces",
 			"capability_rules": "Evaluate deterministic key-governance rules",
 			"visual_theming": "Apply vault-console theme tokens and components"
@@ -228,6 +230,7 @@ def register_capability() -> Dict[str, Any]:
 			"compromise": "/keym/api/v1/compromise",
 			"policies": "/keym/api/v1/policies",
 			"hsm": "/keym/api/v1/hsm",
+			"agents": "/keym/api/v1/agents",
 			"audit": "/keym/api/v1/audit",
 			"analytics": "/keym/api/v1/analytics"
 		},
@@ -237,6 +240,8 @@ def register_capability() -> Dict[str, Any]:
 		},
 		"ui_manifest": contract["ui"],
 		"theme": contract["theme"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"permissions": CAPABILITY_METADATA["composition"]["permissions"]
 	}
 

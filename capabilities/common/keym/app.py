@@ -52,14 +52,15 @@ def semantic_model() -> dict[str, Any]:
 			"keym": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["keym_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
+				"agents": contract["agents"],
 				"runtime": {
 					"api": "api.py",
 					"entrypoint": "app.py",
@@ -72,18 +73,21 @@ def semantic_model() -> dict[str, Any]:
 					"export": "ExportApprovalRecord",
 					"rotation_exception": "RotationExceptionRecord",
 					"rotation": "KeyRotationRecord",
+					"key_agent": "KeymAgentRecord",
 				},
 				"i18n": {},
 				"master_data": {},
-				"streaming": {},
+				"streaming": contract["streaming"],
 			}
 		},
 		"contracts": {
 			"keym": {
 				"id": "keym",
 				"configuration": contract["configuration"],
-				"provides": ["keym_operations"],
-				"requires": [],
+				"provides": contract["provides"],
+				"requires": contract["requires"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {
@@ -91,16 +95,23 @@ def semantic_model() -> dict[str, Any]:
 			for rule in contract["rule_engine"]["rules"]
 		},
 		"composition": {
-			"capability_dependencies": {"keym": []},
+			"capability_dependencies": {"keym": contract["requires"]},
 			"applications": {},
-			"agent_teams": {},
+			"agent_teams": {
+				"keym_key_governance": {
+					"capability": "keym",
+					"roles": contract["agents"]["supported_roles"],
+					"runtimes": contract["agents"]["supported_runtimes"],
+					"guardrails": contract["agents"]["guardrails"],
+				}
+			},
 		},
 		"deployment": {
 			"source": "capability_contract.py",
 			"target": "python",
 		},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 0},
+			"capability": {"kind": "capability", "nodes": 1, "edges": len(contract["requires"])},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py"],
@@ -117,7 +128,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"keym_agent_contract": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -153,6 +164,8 @@ def self_test() -> dict[str, Any]:
 	errors: list[str] = []
 	routes = model.get("capabilities", {}).get("keym", {}).get("ui", {}).get("routes", [])
 	approvals = model.get("capabilities", {}).get("keym", {}).get("approvals", {})
+	streaming = model.get("capabilities", {}).get("keym", {}).get("streaming", {})
+	agents = model.get("capabilities", {}).get("keym", {}).get("agents", {})
 	if model.get("format") != "apg.semantic-model.v1":
 		errors.append("semantic model format mismatch")
 	if "keym" not in model.get("capabilities", {}):
@@ -161,8 +174,12 @@ def self_test() -> dict[str, Any]:
 		errors.append("component manifest semantic model interface mismatch")
 	if len(routes) < 11:
 		errors.append("KEYM semantic model route manifest is stale")
-	if "export" not in approvals or "rotation_exception" not in approvals:
+	if "export" not in approvals or "rotation_exception" not in approvals or "key_agent" not in approvals:
 		errors.append("KEYM semantic model approval manifest is stale")
+	if streaming.get("engine") != "bytewax":
+		errors.append("KEYM semantic model streaming manifest is stale")
+	if not agents.get("first_class"):
+		errors.append("KEYM semantic model agent manifest is stale")
 	return {
 		"passed": not errors,
 		"status": "ok" if not errors else "failed",

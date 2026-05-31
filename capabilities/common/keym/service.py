@@ -166,20 +166,50 @@ class KeymAuditEventRecord:
 		return asdict(self)
 
 
+@dataclass(slots=True)
+class KeymAgentRecord:
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	policy_ref: str | None = None
+	status: str = "active"
+	registered_at: str = field(default_factory=_utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return asdict(self)
+
+
 class KeymService:
 	"""Dependency-light KEYM service for generated APG applications."""
 
 	def __init__(self) -> None:
-		from .capability_contract import evaluate_capability_rules, get_capability_contract
+		from .capability_contract import (
+			PRIVILEGED_KEYM_AGENT_ROLES,
+			SUPPORTED_KEYM_AGENT_ROLES,
+			SUPPORTED_KEYM_AGENT_RUNTIMES,
+			evaluate_capability_rules,
+			get_capability_contract,
+		)
 
 		self._evaluate_rules = evaluate_capability_rules
 		self._get_contract = get_capability_contract
+		self._agent_runtimes = set(SUPPORTED_KEYM_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_KEYM_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_KEYM_AGENT_ROLES)
 		self.keys: dict[str, ManagedKeyRecord] = {}
 		self.operations: dict[str, KeyOperationRecord] = {}
 		self.export_approvals: dict[str, ExportApprovalRecord] = {}
 		self.rotation_exceptions: dict[str, RotationExceptionRecord] = {}
 		self.rotations: dict[str, KeyRotationRecord] = {}
 		self.audit_events: dict[str, KeymAuditEventRecord] = {}
+		self.key_agents: dict[str, KeymAgentRecord] = {}
 
 	def describe(self, tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 		return self._get_contract(tenant_id, overrides)
@@ -457,6 +487,82 @@ class KeymService:
 		self._record_event(tenant_id, "managed_key_compromised", key.id, evidence, actor, "high")
 		return key.to_dict()
 
+	def register_key_agent(
+		self,
+		tenant_id: str,
+		agent_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+		policy_ref: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		if not str(agent_id or "").strip():
+			raise ValueError("key_agent_id_required")
+		if not str(name or "").strip():
+			raise ValueError("key_agent_name_required")
+		if not str(owner or "").strip():
+			raise ValueError("key_agent_owner_required")
+		if not str(purpose or "").strip():
+			raise ValueError("key_agent_purpose_required")
+		normalized_runtime = self._normalize_agent_token(runtime)
+		normalized_role = self._normalize_agent_token(role)
+		result = self.evaluate({
+			"operation": "register_key_agent",
+			"key_agent_runtime_supported": normalized_runtime in self._agent_runtimes,
+			"key_agent_role_supported": normalized_role in self._agent_roles,
+			"key_agent_scope_attached": bool(str(scope or "").strip()),
+			"key_agent_privileged_role": normalized_role in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		if not contribution_disclosed:
+			raise PermissionError("key_agent_contribution_disclosure_required")
+		record_id = _stable_id("keym_agent", tenant_id, agent_id)
+		if record_id in self.key_agents:
+			raise ValueError(f"key_agent_already_exists:{agent_id}")
+		record = KeymAgentRecord(
+			id=record_id,
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=normalized_runtime,
+			role=normalized_role,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=True,
+			human_approval_required=bool(human_approval_required),
+			policy_ref=str(policy_ref).strip() if policy_ref else None,
+		)
+		self.key_agents[record.id] = record
+		self._record_event(tenant_id, "key_agent_registered", record.id, f"Key agent registered: {record.name}", owner, "medium")
+		return record.to_dict()
+
+	def validate_key_lifecycle_batch(self, tenant_id: str, event_stream: str, mutation_count: int) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		stream = self._normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"operation": "validate_key_lifecycle_batch",
+			"event_stream": stream,
+		})
+		if result["decision"] == "deny":
+			raise PermissionError(self._first_reason(result))
+		if mutation_count < 1:
+			raise ValueError("key_lifecycle_batch_empty")
+		return {
+			"tenant_id": tenant_id,
+			"event_stream": stream,
+			"mutation_count": int(mutation_count),
+			"accepted": True,
+			"required_processor": "bytewax",
+		}
+
 	def create_record(self, record_id: str, tenant_id: str, metadata: dict[str, Any] | None = None, status: str = "active") -> dict[str, Any]:
 		metadata = dict(metadata or {})
 		return self.create_managed_key(
@@ -493,12 +599,16 @@ class KeymService:
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self.audit_events, tenant_id)
 
+	def list_key_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self.key_agents, tenant_id)
+
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		operations = self.list_operations(tenant_id)
 		return {
 			"tenant_id": tenant_id,
 			"key_count": len(self.list_keys(tenant_id)),
 			"operation_count": len(operations),
+			"key_agent_count": len(self.list_key_agents(tenant_id)),
 			"denied_operation_count": sum(1 for item in operations if item["status"] == "denied"),
 			"review_required_count": sum(1 for item in operations if item["status"] == "review_required"),
 			"pending_export_approval_count": sum(1 for item in self.list_export_approvals(tenant_id) if item["status"] == "pending"),
@@ -586,6 +696,9 @@ class KeymService:
 			if action.get("reason"):
 				return str(action["reason"])
 		return "key_operation_denied"
+
+	def _normalize_agent_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 	def _list(self, records: dict[str, Any], tenant_id: str | None = None) -> list[dict[str, Any]]:
 		items = [record.to_dict() for record in records.values()]

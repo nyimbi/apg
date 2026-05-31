@@ -68,6 +68,7 @@ def capability_status(tenant_id: str = "default") -> Dict[str, Any]:
 		"rule_count": len(contract["rule_engine"]["rules"]),
 		"key_count": summary["key_count"],
 		"operation_count": summary["operation_count"],
+		"key_agent_count": summary["key_agent_count"],
 		"denied_operation_count": summary["denied_operation_count"],
 		"review_required_count": summary["review_required_count"],
 		"pending_export_approval_count": summary["pending_export_approval_count"],
@@ -169,6 +170,30 @@ def mark_key_compromised(payload: Dict[str, Any]) -> Dict[str, Any]:
 	)
 
 
+def register_key_agent(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.register_key_agent(
+		tenant_id=_required_tenant_id(payload),
+		agent_id=str(payload["id"]),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or ""),
+		role=str(payload.get("role") or ""),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+		policy_ref=payload.get("policy_ref"),
+	)
+
+
+def validate_key_lifecycle_batch(payload: Dict[str, Any]) -> Dict[str, Any]:
+	return SERVICE.validate_key_lifecycle_batch(
+		tenant_id=_required_tenant_id(payload),
+		event_stream=str(payload.get("event_stream") or ""),
+		mutation_count=int(payload.get("mutation_count") or 0),
+	)
+
+
 def create_record(payload: Dict[str, Any]) -> Dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -189,6 +214,7 @@ def list_key_posture(tenant_id: str = "default") -> Dict[str, Any]:
 		"export_approvals": SERVICE.list_export_approvals(tenant_id),
 		"rotation_exceptions": SERVICE.list_rotation_exceptions(tenant_id),
 		"rotations": SERVICE.list_rotations(tenant_id),
+		"key_agents": SERVICE.list_key_agents(tenant_id),
 		"audit_events": SERVICE.list_audit_events(tenant_id),
 		"summary": SERVICE.dashboard_summary(tenant_id),
 	}

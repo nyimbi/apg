@@ -1,5 +1,39 @@
 {
-  "agents": {},
+  "agents": {
+    "keym_agent_contract": {
+      "first_class": true,
+      "guardrails": [
+        "runtime_supported",
+        "role_supported",
+        "scope_required",
+        "owner_required",
+        "purpose_required",
+        "human_approval_for_privileged_roles",
+        "contribution_disclosure_required"
+      ],
+      "privileged_roles": [
+        "compromise_responder",
+        "export_reviewer",
+        "hsm_attestation_reviewer",
+        "rotation_exception_reviewer"
+      ],
+      "supported_roles": [
+        "key_policy_reviewer",
+        "key_lifecycle_reviewer",
+        "key_custody_reviewer",
+        "export_reviewer",
+        "rotation_exception_reviewer",
+        "compromise_responder",
+        "hsm_attestation_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Key Management package-backed APG capability",
     "entity_count": 0,
@@ -8,8 +42,42 @@
   },
   "capabilities": {
     "keym": {
+      "agents": {
+        "first_class": true,
+        "guardrails": [
+          "runtime_supported",
+          "role_supported",
+          "scope_required",
+          "owner_required",
+          "purpose_required",
+          "human_approval_for_privileged_roles",
+          "contribution_disclosure_required"
+        ],
+        "privileged_roles": [
+          "compromise_responder",
+          "export_reviewer",
+          "hsm_attestation_reviewer",
+          "rotation_exception_reviewer"
+        ],
+        "supported_roles": [
+          "key_policy_reviewer",
+          "key_lifecycle_reviewer",
+          "key_custody_reviewer",
+          "export_reviewer",
+          "rotation_exception_reviewer",
+          "compromise_responder",
+          "hsm_attestation_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "export": "ExportApprovalRecord",
+        "key_agent": "KeymAgentRecord",
         "rotation": "KeyRotationRecord",
         "rotation_exception": "RotationExceptionRecord"
       },
@@ -21,6 +89,35 @@
           "require_dual_control_for_export": true,
           "require_policy_for_key_creation": true,
           "require_tenant_context": true
+        },
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "compromise_responder",
+            "export_reviewer",
+            "hsm_attestation_reviewer",
+            "rotation_exception_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_declared_purpose": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_scope": true,
+          "supported_roles": [
+            "key_policy_reviewer",
+            "key_lifecycle_reviewer",
+            "key_custody_reviewer",
+            "export_reviewer",
+            "rotation_exception_reviewer",
+            "compromise_responder",
+            "hsm_attestation_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "automation": {
           "ai_lifecycle_recommendations": true,
@@ -61,6 +158,23 @@
           "require_independent_rotation_exception_review": true,
           "require_rotation_evidence": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "keym.lifecycle",
+          "required_operations": [
+            "key_lifecycle_batch",
+            "key_rotation_batch",
+            "key_agent_batch"
+          ],
+          "topics": [
+            "keym.keys",
+            "keym.operations",
+            "keym.approvals",
+            "keym.rotations",
+            "keym.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -83,9 +197,17 @@
       "master_data": {},
       "name": "Key Management",
       "provides": [
-        "keym_operations"
+        "keym_operations",
+        "key_lifecycle_governance",
+        "key_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "conf",
+        "auth",
+        "audl",
+        "mten",
+        "secu"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -227,6 +349,72 @@
               "required_action": "attach_key_rotation_evidence"
             },
             "name": "rotation_completion_requires_evidence"
+          },
+          {
+            "condition": {
+              "key_agent_runtime_supported": false,
+              "operation": "register_key_agent"
+            },
+            "description": "Key-management agents must use an approved APG agent runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_agent_runtime_not_supported",
+              "required_action": "select_supported_key_agent_runtime"
+            },
+            "name": "key_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "key_agent_role_supported": false,
+              "operation": "register_key_agent"
+            },
+            "description": "Key-management agents must use an approved KEYM composition role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_agent_role_not_supported",
+              "required_action": "select_supported_key_agent_role"
+            },
+            "name": "key_agent_role_supported"
+          },
+          {
+            "condition": {
+              "key_agent_scope_attached": false,
+              "operation": "register_key_agent"
+            },
+            "description": "Key-management agents require a declared operating scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_agent_scope_required",
+              "required_action": "attach_key_agent_scope"
+            },
+            "name": "key_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "key_agent_privileged_role": true,
+              "operation": "register_key_agent"
+            },
+            "description": "Privileged key-management agent roles require human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "key_agent_privileged_role_requires_human_approval",
+              "required_action": "require_human_key_approval"
+            },
+            "name": "key_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_key_lifecycle_batch"
+            },
+            "description": "Key lifecycle batch mutations must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_key_stream_required",
+              "required_action": "route_key_lifecycle_through_bytewax"
+            },
+            "name": "bytewax_key_stream_required"
           }
         ],
         "type": "deterministic"
@@ -371,6 +559,72 @@
             "required_action": "attach_key_rotation_evidence"
           },
           "name": "rotation_completion_requires_evidence"
+        },
+        {
+          "condition": {
+            "key_agent_runtime_supported": false,
+            "operation": "register_key_agent"
+          },
+          "description": "Key-management agents must use an approved APG agent runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_agent_runtime_not_supported",
+            "required_action": "select_supported_key_agent_runtime"
+          },
+          "name": "key_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "key_agent_role_supported": false,
+            "operation": "register_key_agent"
+          },
+          "description": "Key-management agents must use an approved KEYM composition role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_agent_role_not_supported",
+            "required_action": "select_supported_key_agent_role"
+          },
+          "name": "key_agent_role_supported"
+        },
+        {
+          "condition": {
+            "key_agent_scope_attached": false,
+            "operation": "register_key_agent"
+          },
+          "description": "Key-management agents require a declared operating scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_agent_scope_required",
+            "required_action": "attach_key_agent_scope"
+          },
+          "name": "key_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "key_agent_privileged_role": true,
+            "operation": "register_key_agent"
+          },
+          "description": "Privileged key-management agent roles require human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "key_agent_privileged_role_requires_human_approval",
+            "required_action": "require_human_key_approval"
+          },
+          "name": "key_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_key_lifecycle_batch"
+          },
+          "description": "Key lifecycle batch mutations must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_key_stream_required",
+            "required_action": "route_key_lifecycle_through_bytewax"
+          },
+          "name": "bytewax_key_stream_required"
         }
       ],
       "runtime": {
@@ -380,6 +634,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "KeyAgentRoster",
+          "permission": "keym.admin",
+          "route": "/keym/agents"
+        },
         "analytics": {
           "component": "SecurityAnalyticsView",
           "permission": "keym.admin",
@@ -436,9 +695,48 @@
           "route": "/keym/settings"
         }
       },
-      "streaming": {},
+      "streaming": {
+        "engine": "bytewax",
+        "events": [
+          "managed_key_created",
+          "key_operation_allowed",
+          "key_operation_denied",
+          "export_approval_decided",
+          "rotation_exception_decided",
+          "key_rotation_completed",
+          "managed_key_compromised",
+          "key_agent_registered"
+        ],
+        "lifecycle_stream": "keym.lifecycle",
+        "required_operations": [
+          "key_lifecycle_batch",
+          "key_rotation_batch",
+          "key_agent_batch"
+        ],
+        "state": [
+          "keys",
+          "operations",
+          "export_approvals",
+          "rotation_exceptions",
+          "rotations",
+          "key_agents"
+        ],
+        "topics": [
+          "keym.keys",
+          "keym.operations",
+          "keym.approvals",
+          "keym.rotations",
+          "keym.agents"
+        ],
+        "watermark": "event_time"
+      },
       "theme": {
         "components": {
+          "bytewax_stream_indicator": {
+            "icon": "activity",
+            "status_indicator": "stream-health",
+            "variant": "streaming"
+          },
           "compromise_response_panel": {
             "icon": "shield-x",
             "status_indicator": "danger-rail",
@@ -452,6 +750,11 @@
           "hsm_attestation_panel": {
             "status_style": "seal-chip",
             "visual": "signed-attestation-stack"
+          },
+          "key_agent_roster": {
+            "icon": "bot",
+            "status_indicator": "approval-chip",
+            "variant": "agent-governance"
           },
           "key_audit_timeline": {
             "icon": "scroll-text",
@@ -567,6 +870,13 @@
             "permission": "keym.admin"
           },
           {
+            "component": "KeyAgentRoster",
+            "name": "agents",
+            "nav_group": "Administration",
+            "path": "/keym/agents",
+            "permission": "keym.admin"
+          },
+          {
             "component": "KeyManagementSettings",
             "name": "settings",
             "nav_group": "Administration",
@@ -584,20 +894,116 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "keym_key_governance": {
+        "capability": "keym",
+        "guardrails": [
+          "runtime_supported",
+          "role_supported",
+          "scope_required",
+          "owner_required",
+          "purpose_required",
+          "human_approval_for_privileged_roles",
+          "contribution_disclosure_required"
+        ],
+        "roles": [
+          "key_policy_reviewer",
+          "key_lifecycle_reviewer",
+          "key_custody_reviewer",
+          "export_reviewer",
+          "rotation_exception_reviewer",
+          "compromise_responder",
+          "hsm_attestation_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "keym": []
+      "keym": [
+        "conf",
+        "auth",
+        "audl",
+        "mten",
+        "secu"
+      ]
     }
   },
   "contracts": {
     "keym": {
+      "agents": {
+        "first_class": true,
+        "guardrails": [
+          "runtime_supported",
+          "role_supported",
+          "scope_required",
+          "owner_required",
+          "purpose_required",
+          "human_approval_for_privileged_roles",
+          "contribution_disclosure_required"
+        ],
+        "privileged_roles": [
+          "compromise_responder",
+          "export_reviewer",
+          "hsm_attestation_reviewer",
+          "rotation_exception_reviewer"
+        ],
+        "supported_roles": [
+          "key_policy_reviewer",
+          "key_lifecycle_reviewer",
+          "key_custody_reviewer",
+          "export_reviewer",
+          "rotation_exception_reviewer",
+          "compromise_responder",
+          "hsm_attestation_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "access": {
           "max_failed_attempts": 3,
           "require_dual_control_for_export": true,
           "require_policy_for_key_creation": true,
           "require_tenant_context": true
+        },
+        "agents": {
+          "first_class": true,
+          "privileged_roles": [
+            "compromise_responder",
+            "export_reviewer",
+            "hsm_attestation_reviewer",
+            "rotation_exception_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_declared_purpose": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_scope": true,
+          "supported_roles": [
+            "key_policy_reviewer",
+            "key_lifecycle_reviewer",
+            "key_custody_reviewer",
+            "export_reviewer",
+            "rotation_exception_reviewer",
+            "compromise_responder",
+            "hsm_attestation_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "automation": {
           "ai_lifecycle_recommendations": true,
@@ -638,6 +1044,23 @@
           "require_independent_rotation_exception_review": true,
           "require_rotation_evidence": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "keym.lifecycle",
+          "required_operations": [
+            "key_lifecycle_batch",
+            "key_rotation_batch",
+            "key_agent_batch"
+          ],
+          "topics": [
+            "keym.keys",
+            "keym.operations",
+            "keym.approvals",
+            "keym.rotations",
+            "keym.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -655,9 +1078,52 @@
       },
       "id": "keym",
       "provides": [
-        "keym_operations"
+        "keym_operations",
+        "key_lifecycle_governance",
+        "key_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "conf",
+        "auth",
+        "audl",
+        "mten",
+        "secu"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "events": [
+          "managed_key_created",
+          "key_operation_allowed",
+          "key_operation_denied",
+          "export_approval_decided",
+          "rotation_exception_decided",
+          "key_rotation_completed",
+          "managed_key_compromised",
+          "key_agent_registered"
+        ],
+        "lifecycle_stream": "keym.lifecycle",
+        "required_operations": [
+          "key_lifecycle_batch",
+          "key_rotation_batch",
+          "key_agent_batch"
+        ],
+        "state": [
+          "keys",
+          "operations",
+          "export_approvals",
+          "rotation_exceptions",
+          "rotations",
+          "key_agents"
+        ],
+        "topics": [
+          "keym.keys",
+          "keym.operations",
+          "keym.approvals",
+          "keym.rotations",
+          "keym.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -669,7 +1135,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 0,
+      "edges": 5,
       "kind": "capability",
       "nodes": 1
     },
@@ -690,6 +1156,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_key_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_key_lifecycle_batch"
+      },
+      "description": "Key lifecycle batch mutations must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_key_stream_required",
+        "required_action": "route_key_lifecycle_through_bytewax"
+      },
+      "name": "bytewax_key_stream_required"
+    },
     "compromised_key_blocks_use": {
       "condition": {
         "key_status": "compromised",
@@ -741,6 +1220,59 @@
         "required_action": "record_dual_control_approval"
       },
       "name": "export_requires_dual_control"
+    },
+    "key_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "key_agent_privileged_role": true,
+        "operation": "register_key_agent"
+      },
+      "description": "Privileged key-management agent roles require human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_agent_privileged_role_requires_human_approval",
+        "required_action": "require_human_key_approval"
+      },
+      "name": "key_agent_privileged_role_requires_human_approval"
+    },
+    "key_agent_requires_scope": {
+      "condition": {
+        "key_agent_scope_attached": false,
+        "operation": "register_key_agent"
+      },
+      "description": "Key-management agents require a declared operating scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_agent_scope_required",
+        "required_action": "attach_key_agent_scope"
+      },
+      "name": "key_agent_requires_scope"
+    },
+    "key_agent_role_supported": {
+      "condition": {
+        "key_agent_role_supported": false,
+        "operation": "register_key_agent"
+      },
+      "description": "Key-management agents must use an approved KEYM composition role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_agent_role_not_supported",
+        "required_action": "select_supported_key_agent_role"
+      },
+      "name": "key_agent_role_supported"
+    },
+    "key_agent_runtime_supported": {
+      "condition": {
+        "key_agent_runtime_supported": false,
+        "operation": "register_key_agent"
+      },
+      "description": "Key-management agents must use an approved APG agent runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "key_agent_runtime_not_supported",
+        "required_action": "select_supported_key_agent_runtime"
+      },
+      "name": "key_agent_runtime_supported"
     },
     "key_creation_requires_policy": {
       "condition": {

@@ -25,7 +25,9 @@ def dashboard_model(service: KeymService | None = None, tenant_id: str = "defaul
 		"export_approvals": service.list_export_approvals(tenant_id),
 		"rotation_exceptions": service.list_rotation_exceptions(tenant_id),
 		"rotations": service.list_rotations(tenant_id),
+		"key_agents": service.list_key_agents(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -111,11 +113,38 @@ def analytics_model(service: KeymService | None = None, tenant_id: str = "defaul
 	}
 
 
+def key_agents_model(service: KeymService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or api.SERVICE
+	contract = service.describe(tenant_id)
+	agents = contract["agents"]
+	return {
+		"route": "/keym/agents",
+		"tenant_id": tenant_id,
+		"key_agents": service.list_key_agents(tenant_id),
+		"supported_runtimes": agents["supported_runtimes"],
+		"supported_roles": agents["supported_roles"],
+		"privileged_roles": agents["privileged_roles"],
+		"guardrails": agents["guardrails"],
+		"required_fields": [
+			"id",
+			"name",
+			"runtime",
+			"role",
+			"scope",
+			"owner",
+			"purpose",
+			"contribution_disclosed",
+		],
+	}
+
+
 def settings_model(tenant_id: str = "default") -> dict[str, object]:
 	contract = get_capability_contract(tenant_id)
 	return {
 		"route": "/keym/settings",
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}

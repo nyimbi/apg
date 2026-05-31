@@ -25,6 +25,11 @@ and package evidence.
   evidence.
 - **Rotation exception**: independent review for continued use when a key is
   overdue for rotation.
+- **Key agent**: an accountable first-class AI agent that can review key
+  policy, lifecycle posture, custody, export, rotation exception,
+  compromise-response, or HSM attestation workflows.
+- **Key lifecycle stream**: the Bytewax-backed event stream that must carry
+  grouped key lifecycle mutations into generated APG applications.
 - **Audit event**: package evidence for key lifecycle and guardrail events.
 
 ## Functional Requirements
@@ -40,9 +45,16 @@ and package evidence.
 7. Export approval and rotation exception decisions must require an independent
    reviewer and reviewer notes.
 8. Rotation completion must require actor and evidence.
-9. API helpers and UI view models must expose the package lifecycle state for
+9. Key agents must use supported APG runtimes: `codex`, `claude_code`,
+   `opencode`, or `pi`.
+10. Key agents must declare supported KEYM roles, owner, purpose, operating
+    scope, and contribution disclosure.
+11. Privileged key-agent roles must require human approval.
+12. Key lifecycle batch mutations must use Bytewax and be rejected when routed
+    through any other stream engine.
+13. API helpers and UI view models must expose the package lifecycle state for
    generated APG applications.
-10. `app.py`, `semantic_model.json`, `release_report.json`, and
+14. `app.py`, `semantic_model.json`, `release_report.json`, and
     `package_manifest.json` must reflect the live capability contract.
 
 ## Adapter Boundaries
@@ -58,7 +70,8 @@ Production integrations belong behind adapters that preserve the same contract:
 
 ## Current Lifecycle Packet
 
-This slice adds the executable key lifecycle governance packet:
+This slice maintains the executable key lifecycle governance packet and extends
+it with first-class key-agent composition:
 
 - create governed keys;
 - evaluate key operations;
@@ -66,8 +79,12 @@ This slice adds the executable key lifecycle governance packet:
 - request and decide rotation exceptions;
 - schedule and complete rotations with evidence;
 - mark compromised keys and enforce fail-closed use denial;
-- expose inventory, approvals, rotations, compromise, audit, and analytics
-  view models with contract-derived semantic evidence.
+- register key agents with runtime, role, owner, purpose, scope, disclosure, and
+  privileged human-approval evidence;
+- validate Bytewax key lifecycle batches before accepting grouped mutation work;
+- expose inventory, approvals, rotations, compromise, key-agent roster, audit,
+  streaming metadata, and analytics view models with contract-derived semantic
+  evidence.
 
 ## Focused Proof
 

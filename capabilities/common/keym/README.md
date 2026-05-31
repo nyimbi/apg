@@ -21,6 +21,9 @@ evidence, compromise response, UI view models, and package proof.
 - Rotation scheduling and completion with evidence.
 - Compromise response that blocks cryptographic use until rotation evidence is
   recorded.
+- First-class key-agent composition for policy, lifecycle, custody, export,
+  rotation-exception, compromise-response, and HSM-attestation review.
+- Bytewax lifecycle stream enforcement for grouped key mutations.
 - API helpers and UI view models for generated applications.
 - Contract, theme, semantic model, and release evidence for APG composition
   tooling.
@@ -89,6 +92,33 @@ completed = service.complete_rotation(
 )
 ```
 
+Register accountable key agents before allowing AI participation in KEYM
+governance workflows:
+
+```python
+agent = service.register_key_agent(
+	tenant_id="tenant-a",
+	agent_id="compromise-agent",
+	name="Compromise Reviewer",
+	runtime="opencode",
+	role="compromise-responder",
+	scope="compromised key response review",
+	owner="secops",
+	purpose="review key compromise evidence and rotation readiness",
+	human_approval_required=True,
+)
+```
+
+Batch lifecycle mutations must be accepted through Bytewax:
+
+```python
+batch = service.validate_key_lifecycle_batch(
+	tenant_id="tenant-a",
+	event_stream="bytewax",
+	mutation_count=4,
+)
+```
+
 ## API Helpers
 
 `api.py` exposes:
@@ -103,6 +133,8 @@ completed = service.complete_rotation(
 - `schedule_rotation`
 - `complete_rotation`
 - `mark_key_compromised`
+- `register_key_agent`
+- `validate_key_lifecycle_batch`
 - `list_key_posture`
 
 ## UI View Models
@@ -118,7 +150,22 @@ completed = service.complete_rotation(
 - compromise console
 - audit timeline
 - analytics
+- key-agent roster
 - settings
+
+## Agent Guardrails
+
+Supported runtimes are `codex`, `claude_code`, `opencode`, and `pi`. Supported
+roles are `key_policy_reviewer`, `key_lifecycle_reviewer`,
+`key_custody_reviewer`, `export_reviewer`,
+`rotation_exception_reviewer`, `compromise_responder`, and
+`hsm_attestation_reviewer`. Privileged roles require human approval:
+`export_reviewer`, `rotation_exception_reviewer`, `compromise_responder`, and
+`hsm_attestation_reviewer`.
+
+Every key agent must declare owner, purpose, scope, and contribution
+disclosure. The service rejects unsupported runtimes, unsupported roles, missing
+scope, missing disclosure, and privileged registrations without human approval.
 
 ## Adapter Boundaries
 

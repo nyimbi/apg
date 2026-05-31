@@ -31,8 +31,10 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"operation_governance",
 		"ui",
 		"theme",
+		"agents",
+		"streaming",
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["rule_engine"]["rules"]) >= 14
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"inventory",
@@ -44,6 +46,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"hsm",
 		"audit",
 		"analytics",
+		"agents",
 		"settings",
 	}
 	assert contract["ui"]["api_prefix"] == "/keym/api/v1"
@@ -54,7 +57,12 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"rotation_exception_queue",
 		"compromise_response_panel",
 		"key_audit_timeline",
+		"key_agent_roster",
+		"bytewax_stream_indicator",
 	} <= set(contract["theme"]["components"])
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["engine"] == "bytewax"
 
 
 def test_rule_engine_enforces_key_governance_guardrails():
@@ -87,6 +95,35 @@ def test_rule_engine_enforces_key_governance_guardrails():
 		({"reviewer_same_as_requester": True, "review_notes_attached": True}, "independent_reviewer_required"),
 		({"reviewer_same_as_requester": False, "review_notes_attached": False}, "review_notes_required"),
 		({"operation": "complete_rotation", "key_rotation_evidence_attached": False}, "key_rotation_evidence_required"),
+		(
+			{
+				"operation": "register_key_agent",
+				"key_agent_runtime_supported": False,
+				"key_agent_role_supported": True,
+				"key_agent_scope_attached": True,
+				"key_agent_privileged_role": False,
+				"human_approval_required": False,
+			},
+			"key_agent_runtime_not_supported",
+		),
+		(
+			{
+				"operation": "register_key_agent",
+				"key_agent_runtime_supported": True,
+				"key_agent_role_supported": True,
+				"key_agent_scope_attached": True,
+				"key_agent_privileged_role": True,
+				"human_approval_required": False,
+			},
+			"key_agent_privileged_role_requires_human_approval",
+		),
+		(
+			{
+				"operation": "validate_key_lifecycle_batch",
+				"event_stream": "kafka",
+			},
+			"bytewax_key_stream_required",
+		),
 	],
 )
 def test_rule_engine_enforces_review_and_rotation_guardrails(context, reason):
@@ -106,6 +143,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["inventory"] == "/keym/keys"
 	assert registration["ui_components"]["export_approvals"] == "/keym/export-approvals"
 	assert registration["ui_components"]["rotation_exceptions"] == "/keym/rotation-exceptions"
+	assert registration["ui_components"]["agents"] == "/keym/agents"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["engine"] == "bytewax"
 	assert "secu" in registration["dependencies"]
 	assert "keym.approve_export" in registration["permissions"]
 	assert "keym.respond_compromise" in registration["permissions"]

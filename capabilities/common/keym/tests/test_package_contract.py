@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import importlib.util
+import json
 import sys
 
 import pytest
@@ -32,8 +33,10 @@ def test_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "keym"
-	assert len(contract["ui"]["routes"]) >= 11
-	assert len(contract["rule_engine"]["rules"]) >= 9
+	assert len(contract["ui"]["routes"]) >= 12
+	assert len(contract["rule_engine"]["rules"]) >= 14
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["engine"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -43,16 +46,24 @@ def test_app_entrypoint_is_publishable():
 	self_test = module.self_test()
 	manifest = module.component_manifest()
 	model = module.semantic_model()
+	committed_model = json.loads((PACKAGE_DIR / "semantic_model.json").read_text())
+	committed_report = json.loads((PACKAGE_DIR / "release_report.json").read_text())
 	capability = model["capabilities"]["keym"]
 
 	assert self_test["passed"] is True
+	assert committed_model == model
+	assert committed_report["ok"] is True
+	assert committed_report["evidence"]["contracts"]["capability_contract"]["rule_count"] >= 14
 	assert manifest["kind"] == "apg.generated_application"
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "keym" in model["capabilities"]
-	assert len(capability["ui"]["routes"]) >= 11
+	assert len(capability["ui"]["routes"]) >= 12
 	assert capability["approvals"]["export"] == "ExportApprovalRecord"
 	assert capability["approvals"]["rotation_exception"] == "RotationExceptionRecord"
+	assert capability["approvals"]["key_agent"] == "KeymAgentRecord"
+	assert capability["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert capability["streaming"]["engine"] == "bytewax"
 
 
 def test_key_lifecycle_records_export_rotation_compromise_and_audit_state():
@@ -113,6 +124,18 @@ def test_key_lifecycle_records_export_rotation_compromise_and_audit_state():
 	completed = service.complete_rotation("tenant-a", rotation["id"], "key-admin", "audit://keym/old-data/rotation")
 	compromised = service.mark_key_compromised("tenant-a", key["id"], "soc", "audit://keym/finance-root/compromise")
 	compromised_denied = service.evaluate_key_operation("tenant-a", "use-compromised", key["id"], "use_key")
+	agent = service.register_key_agent(
+		tenant_id="tenant-a",
+		agent_id="compromise-agent",
+		name="Compromise Reviewer",
+		runtime="opencode",
+		role="compromise-responder",
+		scope="compromised key response review",
+		owner="secops",
+		purpose="review key compromise evidence and rotation readiness",
+		human_approval_required=True,
+	)
+	batch = service.validate_key_lifecycle_batch("tenant-a", "ByteWax", 4)
 	summary = service.dashboard_summary("tenant-a")
 
 	assert use_allowed["status"] == "allowed"
@@ -125,7 +148,12 @@ def test_key_lifecycle_records_export_rotation_compromise_and_audit_state():
 	assert completed["status"] == "completed"
 	assert compromised["status"] == "compromised"
 	assert compromised_denied["status"] == "denied"
+	assert agent["runtime"] == "opencode"
+	assert agent["role"] == "compromise_responder"
+	assert batch["event_stream"] == "bytewax"
+	assert batch["accepted"] is True
 	assert summary["key_count"] == 2
+	assert summary["key_agent_count"] == 1
 	assert summary["compromised_key_count"] == 1
 	assert {event["event_type"] for event in service.list_audit_events("tenant-a")} >= {
 		"managed_key_created",
@@ -136,6 +164,7 @@ def test_key_lifecycle_records_export_rotation_compromise_and_audit_state():
 		"key_rotation_scheduled",
 		"key_rotation_completed",
 		"managed_key_compromised",
+		"key_agent_registered",
 	}
 
 
@@ -189,6 +218,21 @@ def test_keym_guardrails_fail_closed():
 	destroyed_denied = service.evaluate_key_operation("tenant-a", "destroyed-use", destroyed["id"], "use_key")
 	with pytest.raises(PermissionError, match="key_destroyed"):
 		service.schedule_rotation("tenant-a", "destroyed-rotation", destroyed["id"], "secops", "Replacement required.")
+	with pytest.raises(PermissionError, match="key_agent_privileged_role_requires_human_approval"):
+		service.register_key_agent(
+			"tenant-a",
+			"agent-denied",
+			"Agent Denied",
+			"codex",
+			"export_reviewer",
+			"wrapped export review",
+			"secops",
+			"review key export approvals",
+		)
+	with pytest.raises(PermissionError, match="bytewax_key_stream_required"):
+		service.validate_key_lifecycle_batch("tenant-a", "kafka", 1)
+	with pytest.raises(ValueError, match="key_lifecycle_batch_empty"):
+		service.validate_key_lifecycle_batch("tenant-a", "bytewax", 0)
 
 	assert export_denied["status"] == "denied"
 	assert overdue["status"] == "review_required"
@@ -251,6 +295,22 @@ def test_api_and_view_models_expose_key_posture_surfaces():
 		"key_id": key["id"],
 		"operation": "use_key",
 	})
+	agent = api.register_key_agent({
+		"tenant_id": "tenant-b",
+		"id": "policy-agent",
+		"name": "Policy Agent",
+		"runtime": "claude-code",
+		"role": "key-policy-reviewer",
+		"scope": "key policy change review",
+		"owner": "secops",
+		"purpose": "review generated key policy changes",
+		"contribution_disclosed": True,
+	})
+	batch = api.validate_key_lifecycle_batch({
+		"tenant_id": "tenant-b",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+	})
 
 	status = api.capability_status("tenant-b")
 	posture = api.list_key_posture("tenant-b")
@@ -263,12 +323,17 @@ def test_api_and_view_models_expose_key_posture_surfaces():
 	compromise = view_models.compromise_console_model(tenant_id="tenant-b")
 	audit = view_models.audit_timeline_model(tenant_id="tenant-b")
 	analytics = view_models.analytics_model(tenant_id="tenant-b")
+	agents = view_models.key_agents_model(tenant_id="tenant-b")
 	settings = view_models.settings_model("tenant-b")
 
 	assert status["key_count"] == 1
+	assert status["key_agent_count"] == 1
 	assert status["compromised_key_count"] == 1
 	assert posture["summary"]["operation_count"] == 1
+	assert posture["key_agents"][0]["id"] == agent["id"]
+	assert batch["required_processor"] == "bytewax"
 	assert dashboard["summary"]["key_count"] == 1
+	assert dashboard["streaming"]["engine"] == "bytewax"
 	assert inventory["key_classes"][-1] == "wrapping"
 	assert lifecycle["rotations"][0]["status"] == "completed"
 	assert export_approvals["export_approvals"][0]["status"] == "approved"
@@ -277,4 +342,8 @@ def test_api_and_view_models_expose_key_posture_surfaces():
 	assert compromise["compromised_keys"][0]["status"] == "compromised"
 	assert audit["events"]
 	assert analytics["summary"]["compromised_key_count"] == 1
+	assert agents["key_agents"][0]["runtime"] == "claude_code"
+	assert "export_reviewer" in agents["privileged_roles"]
+	assert settings["agents"]["first_class"] is True
+	assert settings["streaming"]["lifecycle_stream"] == "keym.lifecycle"
 	assert settings["theme"]["name"] == "keym_vault_console"

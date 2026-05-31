@@ -13,6 +13,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_KEYM_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_KEYM_AGENT_ROLES = [
+	"key_policy_reviewer",
+	"key_lifecycle_reviewer",
+	"key_custody_reviewer",
+	"export_reviewer",
+	"rotation_exception_reviewer",
+	"compromise_responder",
+	"hsm_attestation_reviewer",
+]
+PRIVILEGED_KEYM_AGENT_ROLES = {
+	"export_reviewer",
+	"rotation_exception_reviewer",
+	"compromise_responder",
+	"hsm_attestation_reviewer",
+}
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped KEYM configuration defaults and schema."""
@@ -70,6 +88,34 @@ class CapabilityConfiguration:
 		"theme": {
 			"default_theme": "keym_vault_console",
 			"allow_tenant_overrides": True
+		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_KEYM_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_KEYM_AGENT_ROLES,
+			"privileged_roles": sorted(PRIVILEGED_KEYM_AGENT_ROLES),
+			"require_owner": True,
+			"require_declared_purpose": True,
+			"require_scope": True,
+			"require_contribution_disclosure": True,
+			"require_human_approval_for_privileged_roles": True
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"lifecycle_stream": "keym.lifecycle",
+			"required_operations": [
+				"key_lifecycle_batch",
+				"key_rotation_batch",
+				"key_agent_batch"
+			],
+			"topics": [
+				"keym.keys",
+				"keym.operations",
+				"keym.approvals",
+				"keym.rotations",
+				"keym.agents"
+			],
+			"watermark": "event_time"
 		}
 	})
 	schema: dict[str, Any] = field(default_factory=lambda: {
@@ -84,7 +130,9 @@ class CapabilityConfiguration:
 			"automation",
 			"operation_governance",
 			"ui",
-			"theme"
+			"theme",
+			"agents",
+			"streaming"
 		],
 		"properties": {
 			"tenant_id": {"type": "string", "minLength": 1},
@@ -96,7 +144,9 @@ class CapabilityConfiguration:
 			"automation": {"type": "object"},
 			"operation_governance": {"type": "object"},
 			"ui": {"type": "object"},
-			"theme": {"type": "object"}
+			"theme": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"}
 		}
 	})
 
@@ -216,6 +266,16 @@ class CapabilityTheme:
 			"icon": "scroll-text",
 			"line_style": "segmented",
 			"variant": "evidence"
+		},
+		"key_agent_roster": {
+			"icon": "bot",
+			"status_indicator": "approval-chip",
+			"variant": "agent-governance"
+		},
+		"bytewax_stream_indicator": {
+			"icon": "activity",
+			"status_indicator": "stream-health",
+			"variant": "streaming"
 		}
 	})
 
@@ -332,6 +392,60 @@ def default_rules() -> list[CapabilityRule]:
 				"reason": "key_rotation_evidence_required",
 				"required_action": "attach_key_rotation_evidence"
 			}
+		),
+		CapabilityRule(
+			name="key_agent_runtime_supported",
+			description="Key-management agents must use an approved APG agent runtime.",
+			condition={"operation": "register_key_agent", "key_agent_runtime_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_agent_runtime_not_supported",
+				"required_action": "select_supported_key_agent_runtime"
+			}
+		),
+		CapabilityRule(
+			name="key_agent_role_supported",
+			description="Key-management agents must use an approved KEYM composition role.",
+			condition={"operation": "register_key_agent", "key_agent_role_supported": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_agent_role_not_supported",
+				"required_action": "select_supported_key_agent_role"
+			}
+		),
+		CapabilityRule(
+			name="key_agent_requires_scope",
+			description="Key-management agents require a declared operating scope.",
+			condition={"operation": "register_key_agent", "key_agent_scope_attached": False},
+			effect={
+				"decision": "deny",
+				"reason": "key_agent_scope_required",
+				"required_action": "attach_key_agent_scope"
+			}
+		),
+		CapabilityRule(
+			name="key_agent_privileged_role_requires_human_approval",
+			description="Privileged key-management agent roles require human approval.",
+			condition={
+				"operation": "register_key_agent",
+				"key_agent_privileged_role": True,
+				"human_approval_required": False
+			},
+			effect={
+				"decision": "deny",
+				"reason": "key_agent_privileged_role_requires_human_approval",
+				"required_action": "require_human_key_approval"
+			}
+		),
+		CapabilityRule(
+			name="bytewax_key_stream_required",
+			description="Key lifecycle batch mutations must be routed through Bytewax.",
+			condition={"operation": "validate_key_lifecycle_batch", "event_stream_ne": "bytewax"},
+			effect={
+				"decision": "deny",
+				"reason": "bytewax_key_stream_required",
+				"required_action": "route_key_lifecycle_through_bytewax"
+			}
 		)
 	]
 
@@ -349,6 +463,7 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("hsm", "/keym/hsm", "HSMConsole", "keym.manage_hsm", "Security"),
 		CapabilityUIRoute("audit", "/keym/audit", "AuditLogsView", "keym.view_audit_logs", "Governance"),
 		CapabilityUIRoute("analytics", "/keym/analytics", "SecurityAnalyticsView", "keym.admin", "Intelligence"),
+		CapabilityUIRoute("agents", "/keym/agents", "KeyAgentRoster", "keym.admin", "Administration"),
 		CapabilityUIRoute("settings", "/keym/settings", "KeyManagementSettings", "keym.admin", "Administration")
 	]
 	return {
@@ -361,6 +476,64 @@ def ui_manifest() -> dict[str, Any]:
 	}
 
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return KEYM first-class AI agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_KEYM_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_KEYM_AGENT_ROLES),
+		"privileged_roles": sorted(PRIVILEGED_KEYM_AGENT_ROLES),
+		"guardrails": [
+			"runtime_supported",
+			"role_supported",
+			"scope_required",
+			"owner_required",
+			"purpose_required",
+			"human_approval_for_privileged_roles",
+			"contribution_disclosure_required"
+		]
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return KEYM Bytewax lifecycle stream metadata."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "keym.lifecycle",
+		"required_operations": [
+			"key_lifecycle_batch",
+			"key_rotation_batch",
+			"key_agent_batch"
+		],
+		"topics": [
+			"keym.keys",
+			"keym.operations",
+			"keym.approvals",
+			"keym.rotations",
+			"keym.agents"
+		],
+		"state": [
+			"keys",
+			"operations",
+			"export_approvals",
+			"rotation_exceptions",
+			"rotations",
+			"key_agents"
+		],
+		"events": [
+			"managed_key_created",
+			"key_operation_allowed",
+			"key_operation_denied",
+			"export_approval_decided",
+			"rotation_exception_decided",
+			"key_rotation_completed",
+			"managed_key_compromised",
+			"key_agent_registered"
+		],
+		"watermark": "event_time"
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	"""Return the complete executable KEYM capability contract."""
 	config = CapabilityConfiguration()
@@ -368,6 +541,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "keym",
 		"display_name": "Key Management",
+		"provides": ["keym_operations", "key_lifecycle_governance", "key_agent_composition"],
+		"requires": ["conf", "auth", "audl", "mten", "secu"],
 		"configuration": config.for_tenant(tenant_id, overrides),
 		"configuration_schema": config.schema,
 		"rule_engine": {
@@ -379,7 +554,9 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"name": theme.name,
 			"tokens": theme.tokens,
 			"components": theme.components
-		}
+		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest()
 	}
 
 
@@ -393,6 +570,10 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 		if key.endswith("_gt"):
 			field_name = key[:-3]
 			if not context.get(field_name, 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			field_name = key[:-3]
+			if context.get(field_name) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False
