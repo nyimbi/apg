@@ -1,5 +1,54 @@
 {
-  "agents": {},
+  "agents": {
+    "kngr_semantic_governance": {
+      "adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "relationship_reviewer",
+        "reasoning_reviewer",
+        "curation_reviewer",
+        "publication_reviewer",
+        "lifecycle_batch_reviewer"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "source_curator",
+        "entity_resolution_reviewer",
+        "relationship_reviewer",
+        "enrichment_reviewer",
+        "reasoning_reviewer",
+        "curation_reviewer",
+        "publication_reviewer",
+        "ontology_alignment_reviewer",
+        "lifecycle_batch_reviewer",
+        "knowledge_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Knowledge Graph package-backed APG capability",
     "entity_count": 0,
@@ -25,8 +74,57 @@
         "production_runtime": "service.KngrService",
         "search": "srch"
       },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "relationship_reviewer",
+          "reasoning_reviewer",
+          "curation_reviewer",
+          "publication_reviewer",
+          "lifecycle_batch_reviewer"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "source_curator",
+          "entity_resolution_reviewer",
+          "relationship_reviewer",
+          "enrichment_reviewer",
+          "reasoning_reviewer",
+          "curation_reviewer",
+          "publication_reviewer",
+          "ontology_alignment_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "deep_reasoning": "ReasoningPath",
+        "knowledge_agent": "KnowledgeAgentRecord",
         "low_confidence_enrichment": "SemanticEnrichment",
         "low_confidence_entity": "KnowledgeEntity",
         "low_confidence_relationship": "KnowledgeRelationship",
@@ -52,6 +150,40 @@
           "ontology": "onto",
           "production_runtime": "service.KngrService",
           "search": "srch"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "relationship_reviewer",
+            "reasoning_reviewer",
+            "curation_reviewer",
+            "publication_reviewer",
+            "lifecycle_batch_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "source_curator",
+            "entity_resolution_reviewer",
+            "relationship_reviewer",
+            "enrichment_reviewer",
+            "reasoning_reviewer",
+            "curation_reviewer",
+            "publication_reviewer",
+            "ontology_alignment_reviewer",
+            "lifecycle_batch_reviewer",
+            "knowledge_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "curation": {
           "allowed_decisions": [
@@ -129,6 +261,33 @@
           "registered_sources_required": true,
           "source_uri_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "kngr.lifecycle",
+          "required_operations": [
+            "source_batch",
+            "entity_batch",
+            "relationship_batch",
+            "enrichment_batch",
+            "reasoning_batch",
+            "curation_batch",
+            "publication_batch",
+            "knowledge_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "kngr.sources",
+            "kngr.entities",
+            "kngr.relationships",
+            "kngr.enrichments",
+            "kngr.reasoning",
+            "kngr.curation",
+            "kngr.publications",
+            "kngr.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -142,6 +301,8 @@
           "enable_entity_browser": true,
           "enable_entity_curation": true,
           "enable_governance": true,
+          "enable_knowledge_agent_roster": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_publication_console": true,
           "enable_reasoning_paths": true,
           "enable_relationship_browser": true,
@@ -158,6 +319,8 @@
         "curation": "CurationRecord",
         "enrichment": "SemanticEnrichment",
         "entity": "KnowledgeEntity",
+        "knowledge_agent": "KnowledgeAgentRecord",
+        "lifecycle_batch": "KngrLifecycleBatchRecord",
         "publication": "GraphPublication",
         "reasoning": "ReasoningPath",
         "relationship": "KnowledgeRelationship",
@@ -166,9 +329,19 @@
       "master_data": {},
       "name": "Knowledge Graph",
       "provides": [
-        "kngr_operations"
+        "knowledge_graph",
+        "semantic_context",
+        "knowledge_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "grph",
+        "nlpc",
+        "meta",
+        "srch",
+        "onto",
+        "aicr",
+        "conf"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -667,6 +840,111 @@
               "required_action": "record_audit_event"
             },
             "name": "graph_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_knowledge_agent"
+            },
+            "description": "Knowledge agents must use supported runtimes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_knowledge_agent_runtime",
+              "required_action": "choose_supported_knowledge_agent_runtime"
+            },
+            "name": "knowledge_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_knowledge_agent"
+            },
+            "description": "Knowledge agents must use supported knowledge-governance roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_knowledge_agent_role",
+              "required_action": "choose_supported_knowledge_agent_role"
+            },
+            "name": "knowledge_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_knowledge_agent",
+              "scope_present": false
+            },
+            "description": "Knowledge agents require an explicit bounded graph scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_agent_scope_required",
+              "required_action": "declare_knowledge_agent_scope"
+            },
+            "name": "knowledge_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_knowledge_agent",
+              "owner_present": false
+            },
+            "description": "Knowledge agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_agent_owner_required",
+              "required_action": "assign_knowledge_agent_owner"
+            },
+            "name": "knowledge_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_knowledge_agent",
+              "purpose_present": false
+            },
+            "description": "Knowledge agents require a documented purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_agent_purpose_required",
+              "required_action": "document_knowledge_agent_purpose"
+            },
+            "name": "knowledge_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_knowledge_agent"
+            },
+            "description": "Knowledge agents must disclose machine-authored knowledge-graph contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "knowledge_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "knowledge_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_knowledge_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged knowledge-agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "knowledge_agent_human_approval_required",
+              "required_action": "record_human_knowledge_agent_approval"
+            },
+            "name": "knowledge_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_kngr_lifecycle_batch"
+            },
+            "description": "KNGR lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_kngr_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_kngr_stream_required"
           }
         ],
         "type": "deterministic"
@@ -1168,6 +1446,111 @@
             "required_action": "record_audit_event"
           },
           "name": "graph_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_knowledge_agent"
+          },
+          "description": "Knowledge agents must use supported runtimes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_knowledge_agent_runtime",
+            "required_action": "choose_supported_knowledge_agent_runtime"
+          },
+          "name": "knowledge_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_knowledge_agent"
+          },
+          "description": "Knowledge agents must use supported knowledge-governance roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_knowledge_agent_role",
+            "required_action": "choose_supported_knowledge_agent_role"
+          },
+          "name": "knowledge_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_knowledge_agent",
+            "scope_present": false
+          },
+          "description": "Knowledge agents require an explicit bounded graph scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_agent_scope_required",
+            "required_action": "declare_knowledge_agent_scope"
+          },
+          "name": "knowledge_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_knowledge_agent",
+            "owner_present": false
+          },
+          "description": "Knowledge agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_agent_owner_required",
+            "required_action": "assign_knowledge_agent_owner"
+          },
+          "name": "knowledge_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_knowledge_agent",
+            "purpose_present": false
+          },
+          "description": "Knowledge agents require a documented purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_agent_purpose_required",
+            "required_action": "document_knowledge_agent_purpose"
+          },
+          "name": "knowledge_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_knowledge_agent"
+          },
+          "description": "Knowledge agents must disclose machine-authored knowledge-graph contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "knowledge_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "knowledge_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_knowledge_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged knowledge-agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "knowledge_agent_human_approval_required",
+            "required_action": "record_human_knowledge_agent_approval"
+          },
+          "name": "knowledge_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_kngr_lifecycle_batch"
+          },
+          "description": "KNGR lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_kngr_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_kngr_stream_required"
         }
       ],
       "runtime": {
@@ -1178,6 +1561,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "KnowledgeAgentRoster",
+          "permission": "kngr:govern",
+          "route": "/kngr/agents"
+        },
         "audit": {
           "component": "KnowledgeAuditTimeline",
           "permission": "kngr:audit",
@@ -1213,6 +1601,11 @@
           "permission": "kngr:govern",
           "route": "/kngr/governance"
         },
+        "lifecycle": {
+          "component": "KNGRLifecycleBatchMonitor",
+          "permission": "kngr:admin",
+          "route": "/kngr/lifecycle"
+        },
         "publication": {
           "component": "GraphPublicationConsole",
           "permission": "kngr:publish",
@@ -1240,13 +1633,42 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "kngr.lifecycle",
+        "required_operations": [
+          "source_batch",
+          "entity_batch",
+          "relationship_batch",
+          "enrichment_batch",
+          "reasoning_batch",
+          "curation_batch",
+          "publication_batch",
+          "knowledge_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "kngr.sources",
+          "kngr.entities",
+          "kngr.relationships",
+          "kngr.enrichments",
+          "kngr.reasoning",
+          "kngr.curation",
+          "kngr.publications",
+          "kngr.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
           "audit_timeline": {
             "status_style": "evidence-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "icon": "git-branch",
+            "risk_style": "processor-band",
+            "status_indicator": "stream-chip"
           },
           "context_panel": {
             "status_style": "source-pill",
@@ -1264,6 +1686,11 @@
             "icon": "badge",
             "risk_style": "confidence-band",
             "status_indicator": "curation-pill"
+          },
+          "knowledge_agent_roster": {
+            "icon": "bot",
+            "risk_style": "semantic-scope-band",
+            "status_indicator": "agent-approval-chip"
           },
           "publication_card": {
             "status_style": "release-chip",
@@ -1378,6 +1805,20 @@
             "permission": "kngr:govern"
           },
           {
+            "component": "KnowledgeAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/kngr/agents",
+            "permission": "kngr:govern"
+          },
+          {
+            "component": "KNGRLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/kngr/lifecycle",
+            "permission": "kngr:admin"
+          },
+          {
             "component": "KnowledgeAuditTimeline",
             "name": "audit",
             "nav_group": "Governance",
@@ -1402,14 +1843,92 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "kngr_semantic_governance": {
+        "roles": [
+          "source_curator",
+          "entity_resolution_reviewer",
+          "relationship_reviewer",
+          "enrichment_reviewer",
+          "reasoning_reviewer",
+          "curation_reviewer",
+          "publication_reviewer",
+          "ontology_alignment_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ],
+        "stream": "kngr.lifecycle"
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "kngr": []
+      "kngr": [
+        "grph",
+        "nlpc",
+        "meta",
+        "srch",
+        "onto",
+        "aicr",
+        "conf"
+      ]
     }
   },
   "contracts": {
     "kngr": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "relationship_reviewer",
+          "reasoning_reviewer",
+          "curation_reviewer",
+          "publication_reviewer",
+          "lifecycle_batch_reviewer"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "source_curator",
+          "entity_resolution_reviewer",
+          "relationship_reviewer",
+          "enrichment_reviewer",
+          "reasoning_reviewer",
+          "curation_reviewer",
+          "publication_reviewer",
+          "ontology_alignment_reviewer",
+          "lifecycle_batch_reviewer",
+          "knowledge_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "ai_core": "aicr",
@@ -1427,6 +1946,40 @@
           "ontology": "onto",
           "production_runtime": "service.KngrService",
           "search": "srch"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "relationship_reviewer",
+            "reasoning_reviewer",
+            "curation_reviewer",
+            "publication_reviewer",
+            "lifecycle_batch_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "source_curator",
+            "entity_resolution_reviewer",
+            "relationship_reviewer",
+            "enrichment_reviewer",
+            "reasoning_reviewer",
+            "curation_reviewer",
+            "publication_reviewer",
+            "ontology_alignment_reviewer",
+            "lifecycle_batch_reviewer",
+            "knowledge_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "curation": {
           "allowed_decisions": [
@@ -1504,6 +2057,33 @@
           "registered_sources_required": true,
           "source_uri_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "kngr.lifecycle",
+          "required_operations": [
+            "source_batch",
+            "entity_batch",
+            "relationship_batch",
+            "enrichment_batch",
+            "reasoning_batch",
+            "curation_batch",
+            "publication_batch",
+            "knowledge_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "kngr.sources",
+            "kngr.entities",
+            "kngr.relationships",
+            "kngr.enrichments",
+            "kngr.reasoning",
+            "kngr.curation",
+            "kngr.publications",
+            "kngr.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1517,6 +2097,8 @@
           "enable_entity_browser": true,
           "enable_entity_curation": true,
           "enable_governance": true,
+          "enable_knowledge_agent_roster": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_publication_console": true,
           "enable_reasoning_paths": true,
           "enable_relationship_browser": true,
@@ -1526,9 +2108,46 @@
       },
       "id": "kngr",
       "provides": [
-        "kngr_operations"
+        "knowledge_graph",
+        "semantic_context",
+        "knowledge_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "grph",
+        "nlpc",
+        "meta",
+        "srch",
+        "onto",
+        "aicr",
+        "conf"
+      ],
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "kngr.lifecycle",
+        "required_operations": [
+          "source_batch",
+          "entity_batch",
+          "relationship_batch",
+          "enrichment_batch",
+          "reasoning_batch",
+          "curation_batch",
+          "publication_batch",
+          "knowledge_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "kngr.sources",
+          "kngr.entities",
+          "kngr.relationships",
+          "kngr.enrichments",
+          "kngr.reasoning",
+          "kngr.curation",
+          "kngr.publications",
+          "kngr.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1573,6 +2192,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_knowledge_mutation_requires_bytewax"
+    },
+    "bytewax_kngr_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_kngr_lifecycle_batch"
+      },
+      "description": "KNGR lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_kngr_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_kngr_stream_required"
     },
     "cross_tenant_graph_access_denied": {
       "condition": {
@@ -1743,6 +2375,98 @@
         "required_action": "record_audit_event"
       },
       "name": "graph_state_change_requires_audit"
+    },
+    "knowledge_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_knowledge_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged knowledge-agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "knowledge_agent_human_approval_required",
+        "required_action": "record_human_knowledge_agent_approval"
+      },
+      "name": "knowledge_agent_privileged_role_requires_human_approval"
+    },
+    "knowledge_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_knowledge_agent"
+      },
+      "description": "Knowledge agents must disclose machine-authored knowledge-graph contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "knowledge_agent_requires_contribution_disclosure"
+    },
+    "knowledge_agent_requires_owner": {
+      "condition": {
+        "operation": "register_knowledge_agent",
+        "owner_present": false
+      },
+      "description": "Knowledge agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_agent_owner_required",
+        "required_action": "assign_knowledge_agent_owner"
+      },
+      "name": "knowledge_agent_requires_owner"
+    },
+    "knowledge_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_knowledge_agent",
+        "purpose_present": false
+      },
+      "description": "Knowledge agents require a documented purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_agent_purpose_required",
+        "required_action": "document_knowledge_agent_purpose"
+      },
+      "name": "knowledge_agent_requires_purpose"
+    },
+    "knowledge_agent_requires_scope": {
+      "condition": {
+        "operation": "register_knowledge_agent",
+        "scope_present": false
+      },
+      "description": "Knowledge agents require an explicit bounded graph scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "knowledge_agent_scope_required",
+        "required_action": "declare_knowledge_agent_scope"
+      },
+      "name": "knowledge_agent_requires_scope"
+    },
+    "knowledge_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_knowledge_agent"
+      },
+      "description": "Knowledge agents must use supported knowledge-governance roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_knowledge_agent_role",
+        "required_action": "choose_supported_knowledge_agent_role"
+      },
+      "name": "knowledge_agent_role_supported"
+    },
+    "knowledge_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_knowledge_agent"
+      },
+      "description": "Knowledge agents must use supported runtimes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_knowledge_agent_runtime",
+        "required_action": "choose_supported_knowledge_agent_runtime"
+      },
+      "name": "knowledge_agent_runtime_supported"
     },
     "publication_requires_entities": {
       "condition": {
@@ -2062,6 +2786,7 @@
   "security": {},
   "source_files": [
     "capability_contract.py",
+    "models.py",
     "service.py",
     "knowledge_runtime.py",
     "views.py"

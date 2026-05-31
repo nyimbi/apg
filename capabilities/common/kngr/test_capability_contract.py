@@ -2,6 +2,7 @@
 
 import pytest
 
+from capabilities.common.kngr import api
 from capabilities.common.kngr import register_capability
 from capabilities.common.kngr.capability_contract import evaluate_capability_rules, get_capability_contract
 from capabilities.common.kngr.service import KngrService
@@ -13,6 +14,8 @@ from capabilities.common.kngr.views import (
 	enrichment_console_model,
 	entity_browser_model,
 	governance_model,
+	knowledge_agent_roster_model,
+	lifecycle_batch_model,
 	publication_model,
 	reasoning_paths_model,
 	relationship_browser_model,
@@ -28,14 +31,23 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["configuration"]["tenant_id"] == "tenant-knowledge"
 	assert contract["configuration"]["reasoning"]["max_reasoning_depth"] == 3
 	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "sources", "entities", "relationships", "reasoning", "adapters", "ui", "theme"}
-	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "sources", "entities", "relationships", "enrichment", "curation", "publication", "reasoning", "context", "governance", "audit", "settings"}
+	assert set(contract["configuration_schema"]["required"]) >= {"agents", "streaming"}
+	assert len(contract["rule_engine"]["rules"]) >= 45
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "sources", "entities", "relationships", "enrichment", "curation", "publication", "reasoning", "context", "governance", "agents", "lifecycle", "audit", "settings"}
+	assert contract["provides"] == ["knowledge_graph", "semantic_context", "knowledge_agent_composition"]
+	assert contract["requires"] == ["grph", "nlpc", "meta", "srch", "onto", "aicr", "conf"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "publication_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "knowledge_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["ui"]["api_prefix"] == "/kngr/api/v1"
 	assert contract["ui"]["view_module"] == "views.py"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.KngrService"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "semantic_graph" in contract["theme"]["components"]
+	assert "knowledge_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_knowledge_graph_guardrails():
@@ -54,6 +66,23 @@ def test_rule_engine_enforces_knowledge_graph_guardrails():
 		"operation": "publish_graph",
 		"curation_recorded": False
 	})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_knowledge_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_kngr_lifecycle_batch",
+		"event_stream": "kafka",
+	})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) == {
@@ -63,6 +92,18 @@ def test_rule_engine_enforces_knowledge_graph_guardrails():
 	}
 	assert publish_result["decision"] == "deny"
 	assert publish_result["matched_rules"] == ["uncurated_public_graph_blocked"]
+	assert agent_result["decision"] == "deny"
+	assert {
+		"knowledge_agent_runtime_supported",
+		"knowledge_agent_role_supported",
+		"knowledge_agent_requires_scope",
+		"knowledge_agent_requires_owner",
+		"knowledge_agent_requires_purpose",
+		"knowledge_agent_requires_contribution_disclosure",
+		"knowledge_agent_privileged_role_requires_human_approval",
+	} <= set(agent_result["matched_rules"])
+	assert lifecycle_result["decision"] == "deny"
+	assert lifecycle_result["matched_rules"] == ["bytewax_kngr_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -74,9 +115,16 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_manifest"]["requires_theme"] is True
 	assert registration["theme"]["name"] == "kngr_semantic_console"
 	assert registration["ui_components"]["reasoning"] == "/kngr/reasoning"
+	assert registration["ui_components"]["agents"] == "/kngr/agents"
+	assert registration["ui_components"]["lifecycle"] == "/kngr/lifecycle"
 	assert "grph" in registration["dependencies"]
+	assert "aicr" in registration["dependencies"]
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["capabilities"]["graph_publication"]
+	assert registration["capabilities"]["knowledge_agent_composition"]
+	assert registration["capabilities"]["knowledge_lifecycle_batches"]
 	assert registration["endpoints"]["audit"] == "/kngr/api/v1/audit"
 	assert "kngr:reason" in registration["permissions"]
 	assert "kngr:audit" in registration["permissions"]
@@ -168,6 +216,23 @@ def test_kngr_lifecycle_is_executable():
 		published_by="knowledge-steward",
 		curation_recorded=True,
 	)
+	agent = service.register_knowledge_agent(
+		agent_id="knowledge-agent-1",
+		tenant_id="tenant-knowledge",
+		name="Knowledge Steward",
+		runtime="codex",
+		role="knowledge_steward",
+		scope="source entity relationship enrichment reasoning curation publication review",
+		owner="knowledge-platform",
+		purpose="govern curated procurement knowledge graph construction",
+	)
+	batch = service.validate_kngr_lifecycle_batch(
+		tenant_id="tenant-knowledge",
+		event_stream="bytewax",
+		mutation_count=4,
+		operation="knowledge_agent_batch",
+		batch_id="kngr-batch-001",
+	)
 
 	assert request["curation_status"] == "draft"
 	assert relationship["status"] == "active"
@@ -175,7 +240,12 @@ def test_kngr_lifecycle_is_executable():
 	assert reasoning["reasoning_depth"] == 1
 	assert curation["decision"] == "approved"
 	assert publication["status"] == "published"
+	assert agent["runtime"] == "codex"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
 	assert service.dashboard_summary("tenant-knowledge")["entity_count"] == 2
+	assert service.dashboard_summary("tenant-knowledge")["knowledge_agent_count"] == 1
+	assert service.dashboard_summary("tenant-knowledge")["lifecycle_batch_count"] == 1
 	assert service.context_neighborhood("tenant-knowledge", request["id"])["neighbor_count"] == 1
 	assert dashboard_model(service, "tenant-knowledge")["summary"]["publication_count"] == 1
 	assert entity_browser_model(service, "tenant-knowledge")["relationships"][0]["predicate"] == "uses_supplier"
@@ -186,10 +256,15 @@ def test_kngr_lifecycle_is_executable():
 	assert reasoning_paths_model(service, "tenant-knowledge")["reasoning_paths"][0]["id"] == "path-request-supplier"
 	assert context_explorer_model(service, "tenant-knowledge", request["id"])["neighborhood"]["relationship_count"] == 1
 	assert governance_model(service, "tenant-knowledge")["publications"][0]["id"] == "pub-procurement"
+	assert governance_model(service, "tenant-knowledge")["agents"]["first_class"] is True
+	assert knowledge_agent_roster_model(service, "tenant-knowledge")["agents"][0]["id"] == "knowledge-agent-1"
+	assert lifecycle_batch_model(service, "tenant-knowledge")["batches"][0]["id"] == "kngr-batch-001"
 	assert publication_model(service, "tenant-knowledge")["publications"][0]["id"] == "pub-procurement"
 	assert audit_timeline_model(service, "tenant-knowledge")["audit_events"]
 	assert settings_model(service, "tenant-knowledge")["adapters"]["event_stream"] == "bytewax"
+	assert settings_model(service, "tenant-knowledge")["streaming"]["required_processor"] == "bytewax"
 	assert service.list_knowledge_graph("tenant-knowledge")["summary"]["publication_count"] == 1
+	assert service.list_knowledge_graph("tenant-knowledge")["summary"]["knowledge_agent_count"] == 1
 	assert service.list_knowledge_graph()["summary"]["entity_count"] == 2
 	assert len(service.list_audit_events("tenant-knowledge")) >= 8
 
@@ -355,3 +430,114 @@ def test_kngr_service_enforces_policy_guardrails():
 
 	with pytest.raises(KeyError, match="knowledge_entity_not_found"):
 		service.context_neighborhood("another-tenant", entity_a["id"])
+
+
+def test_knowledge_agent_and_lifecycle_guardrails_execute():
+	service = KngrService()
+	tenant_id = "tenant-agents"
+
+	with pytest.raises(PermissionError, match="unsupported_knowledge_agent_runtime"):
+		service.register_knowledge_agent(
+			"agent-bad-runtime",
+			tenant_id,
+			"Bad Runtime",
+			"unknown",
+			"knowledge_steward",
+			"entity review",
+			"owner",
+			"purpose",
+		)
+
+	with pytest.raises(PermissionError, match="knowledge_agent_scope_required"):
+		service.register_knowledge_agent("agent-no-scope", tenant_id, "No Scope", "codex", "knowledge_steward", "", "owner", "purpose")
+
+	with pytest.raises(PermissionError, match="knowledge_agent_contribution_disclosure_required"):
+		service.register_knowledge_agent(
+			"agent-no-disclosure",
+			tenant_id,
+			"No Disclosure",
+			"codex",
+			"knowledge_steward",
+			"entity review",
+			"owner",
+			"purpose",
+			contribution_disclosed=False,
+		)
+
+	agent = service.register_knowledge_agent(
+		"agent-privileged",
+		tenant_id,
+		"Privileged Agent",
+		"claude-code",
+		"publication reviewer",
+		"publication and reasoning decisions",
+		"owner",
+		"review privileged knowledge graph decisions",
+		human_approval_required=False,
+	)
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "publication_reviewer"
+	assert agent["status"] == "pending_review"
+	assert service.dashboard_summary(tenant_id)["pending_agent_review_count"] == 1
+
+	with pytest.raises(ValueError, match="kngr_lifecycle_batch_empty"):
+		service.validate_kngr_lifecycle_batch(tenant_id, "bytewax", 0)
+
+	with pytest.raises(ValueError, match="unsupported_kngr_lifecycle_operation"):
+		service.validate_kngr_lifecycle_batch(tenant_id, "bytewax", 1, "unknown_batch")
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_kngr_lifecycle_batch(tenant_id, "kafka", 1)
+
+	assert service.dashboard_summary(tenant_id)["denied_lifecycle_batch_count"] == 1
+
+
+def test_api_helpers_expose_agent_and_lifecycle_surfaces():
+	local_service = KngrService()
+	api.SERVICE = local_service
+
+	source = api.register_source({
+		"id": "src-api",
+		"tenant_id": "tenant-api",
+		"name": "API source",
+		"source_uri": "meta://api",
+		"owner": "steward",
+		"evidence_refs": ["meta:api"],
+		"confidence_score": 0.9,
+	})
+	entity = api.resolve_entity({
+		"id": "entity-api",
+		"tenant_id": "tenant-api",
+		"canonical_label": "API Entity",
+		"entity_type": "concept",
+		"source_id": source["id"],
+		"source_evidence_refs": ["doc:api"],
+	})
+	agent = api.register_knowledge_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api",
+		"name": "API Knowledge Agent",
+		"runtime": "opencode",
+		"role": "enrichment_reviewer",
+		"scope": "semantic enrichment review",
+		"owner": "steward",
+		"purpose": "review semantic enrichment quality",
+	})
+	batch = api.validate_kngr_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-api",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "entity_batch",
+	})
+	status = api.capability_status("tenant-api")
+	graph = api.list_knowledge_graph("tenant-api")
+
+	assert entity["id"] == "entity-api"
+	assert agent["id"] == "api-agent"
+	assert batch["status"] == "accepted"
+	assert api.list_knowledge_agents("tenant-api")[0]["id"] == "api-agent"
+	assert api.list_lifecycle_batches("tenant-api")[0]["id"] == "api-batch"
+	assert status["agent_count"] == 1
+	assert status["lifecycle_batch_count"] == 1
+	assert graph["summary"]["knowledge_agent_count"] == 1

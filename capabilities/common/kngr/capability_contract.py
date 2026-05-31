@@ -7,6 +7,28 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_KNGR_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_KNGR_AGENT_ROLES = [
+	"source_curator",
+	"entity_resolution_reviewer",
+	"relationship_reviewer",
+	"enrichment_reviewer",
+	"reasoning_reviewer",
+	"curation_reviewer",
+	"publication_reviewer",
+	"ontology_alignment_reviewer",
+	"lifecycle_batch_reviewer",
+	"knowledge_steward",
+]
+PRIVILEGED_KNGR_AGENT_ROLES = [
+	"relationship_reviewer",
+	"reasoning_reviewer",
+	"curation_reviewer",
+	"publication_reviewer",
+	"lifecycle_batch_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"sources": {
@@ -66,6 +88,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"rbac_filter_required": True,
 		"public_graph_requires_curation": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_KNGR_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_KNGR_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_KNGR_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "kngr.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"source_batch",
+			"entity_batch",
+			"relationship_batch",
+			"enrichment_batch",
+			"reasoning_batch",
+			"curation_batch",
+			"publication_batch",
+			"knowledge_agent_batch",
+		],
+		"topics": [
+			"kngr.sources",
+			"kngr.entities",
+			"kngr.relationships",
+			"kngr.enrichments",
+			"kngr.reasoning",
+			"kngr.curation",
+			"kngr.publications",
+			"kngr.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"audit_source_registration": True,
@@ -109,6 +170,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_entity_curation": True,
 		"enable_publication_console": True,
 		"enable_governance": True,
+		"enable_knowledge_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -128,6 +191,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"curation",
 		"publication",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -143,6 +208,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"curation",
 		"publication",
 		"security",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -191,6 +258,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_knowledge_mutation_requires_bytewax", "description": "Batch knowledge graph mutations must use Bytewax event streams.", "condition": {"operation": "batch_knowledge_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_graph_access_denied", "description": "Knowledge graph operations may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_graph_access_denied", "required_action": "use_tenant_local_graph"}},
 	{"name": "graph_state_change_requires_audit", "description": "Knowledge graph state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
+	{"name": "knowledge_agent_runtime_supported", "description": "Knowledge agents must use supported runtimes.", "condition": {"operation": "register_knowledge_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_knowledge_agent_runtime", "required_action": "choose_supported_knowledge_agent_runtime"}},
+	{"name": "knowledge_agent_role_supported", "description": "Knowledge agents must use supported knowledge-governance roles.", "condition": {"operation": "register_knowledge_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_knowledge_agent_role", "required_action": "choose_supported_knowledge_agent_role"}},
+	{"name": "knowledge_agent_requires_scope", "description": "Knowledge agents require an explicit bounded graph scope.", "condition": {"operation": "register_knowledge_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "knowledge_agent_scope_required", "required_action": "declare_knowledge_agent_scope"}},
+	{"name": "knowledge_agent_requires_owner", "description": "Knowledge agents require an accountable owner.", "condition": {"operation": "register_knowledge_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "knowledge_agent_owner_required", "required_action": "assign_knowledge_agent_owner"}},
+	{"name": "knowledge_agent_requires_purpose", "description": "Knowledge agents require a documented purpose.", "condition": {"operation": "register_knowledge_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "knowledge_agent_purpose_required", "required_action": "document_knowledge_agent_purpose"}},
+	{"name": "knowledge_agent_requires_contribution_disclosure", "description": "Knowledge agents must disclose machine-authored knowledge-graph contributions.", "condition": {"operation": "register_knowledge_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "knowledge_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "knowledge_agent_privileged_role_requires_human_approval", "description": "Privileged knowledge-agent roles require human approval evidence.", "condition": {"operation": "register_knowledge_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "knowledge_agent_human_approval_required", "required_action": "record_human_knowledge_agent_approval"}},
+	{"name": "bytewax_kngr_stream_required", "description": "KNGR lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_kngr_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_kngr_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -205,6 +280,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "curation", "path": "/kngr/curation", "component": "EntityCuration", "permission": "kngr:curate", "nav_group": "Curation"},
 	{"name": "publication", "path": "/kngr/publication", "component": "GraphPublicationConsole", "permission": "kngr:publish", "nav_group": "Publication"},
 	{"name": "governance", "path": "/kngr/governance", "component": "KnowledgeGovernance", "permission": "kngr:govern", "nav_group": "Governance"},
+	{"name": "agents", "path": "/kngr/agents", "component": "KnowledgeAgentRoster", "permission": "kngr:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/kngr/lifecycle", "component": "KNGRLifecycleBatchMonitor", "permission": "kngr:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/kngr/audit", "component": "KnowledgeAuditTimeline", "permission": "kngr:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/kngr/settings", "component": "KNGRSettings", "permission": "kngr:admin", "nav_group": "Administration"},
 ]
@@ -235,9 +312,63 @@ THEME: dict[str, Any] = {
 		"curation_queue": {"visual": "review-list", "status_style": "decision-chip"},
 		"publication_card": {"visual": "snapshot-summary", "status_style": "release-chip"},
 		"context_panel": {"visual": "neighborhood-list", "status_style": "source-pill"},
+		"knowledge_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "semantic-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class KNGR agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_KNGR_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_KNGR_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_KNGR_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_knowledge_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the KNGR Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "kngr.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"source_batch",
+			"entity_batch",
+			"relationship_batch",
+			"enrichment_batch",
+			"reasoning_batch",
+			"curation_batch",
+			"publication_batch",
+			"knowledge_agent_batch",
+		],
+		"topics": [
+			"kngr.sources",
+			"kngr.entities",
+			"kngr.relationships",
+			"kngr.enrichments",
+			"kngr.reasoning",
+			"kngr.curation",
+			"kngr.publications",
+			"kngr.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -248,6 +379,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "kngr",
 		"display_name": "Knowledge Graph",
+		"provides": ["knowledge_graph", "semantic_context", "knowledge_agent_composition"],
+		"requires": ["grph", "nlpc", "meta", "srch", "onto", "aicr", "conf"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -259,6 +392,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 

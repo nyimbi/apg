@@ -25,6 +25,10 @@ KNGR must provide:
 - Curation decisions with curator, allowed decision, evidence, notes, and entity
   curation-state updates.
 - Publication snapshots for curated entity and relationship sets.
+- First-class AI knowledge-agent composition for Codex, Claude Code, opencode,
+  Pi, and future provider-neutral runtimes.
+- Bytewax-only lifecycle batch governance for source, entity, relationship,
+  enrichment, reasoning, curation, publication, and knowledge-agent batches.
 - Dashboard summaries, graph listings, context neighborhoods, route metadata,
   and generated-app view models.
 - Deterministic rule evaluation for all high-risk lifecycle operations.
@@ -46,6 +50,10 @@ The capability configuration is tenant-scoped and contains these sections:
 - `curation`: curator, allowed decisions, and evidence policy.
 - `publication`: publication name, publisher, curation, and entity-count policy.
 - `security`: tenant isolation and public graph restrictions.
+- `agents`: first-class knowledge-agent runtime, role, scope, owner, purpose,
+  contribution-disclosure, and human-approval requirements.
+- `streaming`: Bytewax lifecycle stream, required processor, lifecycle
+  operations, and knowledge event topics.
 - `governance`: audit requirements for source, entity, relationship,
   enrichment, reasoning, and publication state changes.
 - `observability`: metrics, trace, audit, and Bytewax event-stream policy.
@@ -71,6 +79,11 @@ cover:
 - Curation curator, decision, allowed value, and evidence.
 - Publication name, publisher, curation, and entity count.
 - Bytewax requirement for batch knowledge mutations.
+- Knowledge-agent supported runtime and role checks.
+- Knowledge-agent explicit scope, owner, purpose, and contribution-disclosure
+  checks.
+- Human review for privileged knowledge-agent roles.
+- Bytewax-only knowledge lifecycle batch checks.
 - Cross-tenant denial and audit requirement for state changes.
 
 ## UI Contract
@@ -87,6 +100,8 @@ KNGR exposes route metadata and view-model helpers for:
 - Curation
 - Publication
 - Governance
+- Agents
+- Lifecycle
 - Audit
 - Settings
 
@@ -108,6 +123,6 @@ engine.
 ## Non-Goals
 
 This packet does not implement a persistent graph database, vector index,
-ontology editor, live Bytewax topology, browser-rendered UI, or external AI
-agent provider integration. It defines the executable APG capability surface and
-adapter seams that those systems attach to.
+ontology editor, live Bytewax topology, browser-rendered UI, external AI-agent
+CLI invocation, or external AI provider integration. It defines the executable
+APG capability surface and adapter seams that those systems attach to.

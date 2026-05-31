@@ -2,8 +2,9 @@
 
 KNGR provides APG's executable knowledge-graph capability: tenant-scoped source
 registration, entity resolution, evidence-backed relationship linking, semantic
-enrichment, bounded reasoning paths, curation, publication, audit evidence, UI
-view models, and package metadata for generated Python applications.
+enrichment, bounded reasoning paths, curation, publication, first-class
+knowledge-agent composition, Bytewax lifecycle batch governance, audit evidence,
+UI view models, and package metadata for generated Python applications.
 
 Use KNGR when an application needs a curated semantic layer over business facts:
 ERP master data, procurement context, customer context, regulatory evidence,
@@ -27,6 +28,10 @@ adapters.
   and publication eligibility.
 - Curated graph publication snapshots for generated applications and downstream
   agents.
+- Provider-neutral AI knowledge-agent registration for Codex, Claude Code,
+  opencode, Pi, and future runtimes.
+- Bytewax-only lifecycle batch validation for source, entity, relationship,
+  enrichment, reasoning, curation, publication, and knowledge-agent changes.
 - UI route metadata and view models for source, entity, relationship,
   enrichment, reasoning, context, curation, publication, governance, audit, and
   settings screens.
@@ -56,7 +61,11 @@ adapters.
 5. Build bounded reasoning paths over relationships with evidence links.
 6. Curate entities with explicit reviewer identity, decision, and evidence.
 7. Publish curated graph snapshots for generated applications.
-8. Inspect dashboard, context neighborhoods, governance rules, and audit events.
+8. Register knowledge agents for source, entity, relationship, enrichment,
+   reasoning, curation, publication, and lifecycle governance.
+9. Validate lifecycle batches through Bytewax processor policy.
+10. Inspect dashboard, context neighborhoods, governance rules, and audit
+   events.
 
 ## Example
 
@@ -110,6 +119,22 @@ service.curate_entity(
     decision="approved",
     evidence_links=["review:curation-1"],
 )
+agent = service.register_knowledge_agent(
+    agent_id="knowledge-steward-agent",
+    tenant_id="tenant-a",
+    name="Knowledge Steward Agent",
+    runtime="codex",
+    role="knowledge_steward",
+    scope="procurement entity and relationship review",
+    owner="knowledge-platform",
+    purpose="review curated procurement graph quality",
+)
+batch = service.validate_kngr_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=1,
+    operation="knowledge_agent_batch",
+)
 ```
 
 ## Guardrails
@@ -120,12 +145,17 @@ relationship endpoints, predicates, reasoning queries, curation decisions,
 publication names, publishers, or curated publication entities. It requires
 review for low-confidence source, entity, relationship, and enrichment records,
 as well as deep reasoning paths. Batch knowledge mutations must use Bytewax.
-Cross-tenant access and unaudited graph state changes are blocked.
+Cross-tenant access and unaudited graph state changes are blocked. KNGR denies
+knowledge-agent registrations that use unsupported runtimes or roles, omit
+scope, owner, or purpose, or hide machine contribution. Privileged
+knowledge-agent roles enter review until human approval evidence is recorded.
+Lifecycle batches that are not routed through Bytewax are denied.
 
 ## Composition
 
-KNGR depends on GRPH, NLPC, META, SRCH, and ONTO for graph structure, semantic
-processing, metadata, discovery, and vocabulary context. Optional adapters
-connect it to AICR, AUTH, AUDL, MONI, CACH, and Bytewax-backed event streams.
-Generated applications compose KNGR through the semantic model, UI manifest,
-API helpers, service runtime, rule engine, and theme contract.
+KNGR depends on GRPH, NLPC, META, SRCH, ONTO, AICR, and CONF for graph
+structure, semantic processing, metadata, discovery, vocabulary, AI-agent, and
+configuration context. Optional adapters connect it to AUTH, AUDL, MONI, CACH,
+and Bytewax-backed event streams. Generated applications compose KNGR through
+the semantic model, UI manifest, API helpers, first-class agent manifest,
+streaming manifest, service runtime, rule engine, and theme contract.

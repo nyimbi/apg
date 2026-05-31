@@ -7,9 +7,10 @@
 
 KNGR provides APG's executable knowledge-graph capability: tenant-scoped source
 registration, entity resolution, evidence-backed relationship linking, semantic
-enrichment, bounded reasoning paths, curation, publication, audit evidence, UI
-view models, deterministic guardrails, visual theming, and generated Python
-package evidence.
+enrichment, bounded reasoning paths, curation, publication, first-class
+knowledge-agent composition, Bytewax lifecycle batch governance, audit
+evidence, UI view models, deterministic guardrails, visual theming, and
+generated Python package evidence.
 
 Authoritative companion documents:
 

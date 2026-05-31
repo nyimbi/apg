@@ -10,7 +10,7 @@ from .capability_contract import evaluate_capability_rules, get_capability_contr
 __version__ = "1.0.0"
 __capability_id__ = "kngr"
 __capability_name__ = "Knowledge Graph"
-__apg_dependencies__ = ["grph", "nlpc", "meta", "srch", "onto"]
+__apg_dependencies__ = ["grph", "nlpc", "meta", "srch", "onto", "aicr", "conf"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "kngr",
@@ -24,7 +24,7 @@ capability_metadata: dict[str, Any] = {
 	"license": "Commercial",
 	"created_at": datetime.now(timezone.utc),
 	"dependencies": __apg_dependencies__,
-	"provides": ["source_registration", "entity_resolution", "relationship_linking", "semantic_enrichment", "knowledge_graphs", "reasoning_paths", "contextual_relationships", "graph_publication", "audit_evidence"],
+	"provides": ["source_registration", "entity_resolution", "relationship_linking", "semantic_enrichment", "knowledge_graphs", "reasoning_paths", "contextual_relationships", "graph_publication", "knowledge_agent_composition", "knowledge_lifecycle_batches", "audit_evidence"],
 	"permissions": ["kngr:view", "kngr:source", "kngr:query", "kngr:enrich", "kngr:curate", "kngr:publish", "kngr:reason", "kngr:govern", "kngr:audit", "kngr:admin"]
 }
 
@@ -43,6 +43,8 @@ def register_capability() -> dict[str, Any]:
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"source_registration": "Register tenant-scoped source assets with evidence and confidence",
 			"entity_resolution": "Resolve entities into curated graph identities",
@@ -51,6 +53,8 @@ def register_capability() -> dict[str, Any]:
 			"knowledge_graphs": "Build tenant-scoped knowledge graphs over graph data",
 			"reasoning_paths": "Expose bounded reasoning paths and contextual neighborhoods",
 			"graph_publication": "Publish curated graph snapshots for generated applications",
+			"knowledge_agent_composition": "Register provider-neutral AI knowledge agents with runtime, role, scope, owner, purpose, disclosure, and human-review guardrails",
+			"knowledge_lifecycle_batches": "Validate knowledge graph lifecycle batches against Bytewax-only lifecycle stream policy",
 			"audit_evidence": "Capture audit events for knowledge source, entity, relationship, reasoning, and publication operations",
 			"capability_rules": "Evaluate deterministic knowledge-graph governance rules",
 			"visual_theming": "Apply knowledge-graph theme tokens and components"
@@ -64,6 +68,8 @@ def register_capability() -> dict[str, Any]:
 			"curation": "/kngr/api/v1/curation",
 			"context": "/kngr/api/v1/context",
 			"publication": "/kngr/api/v1/publication",
+			"agents": "/kngr/api/v1/agents",
+			"lifecycle": "/kngr/api/v1/lifecycle",
 			"audit": "/kngr/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],

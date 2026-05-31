@@ -8,6 +8,8 @@
 - Keep the generated Python target dependency-light while exposing clear
   adapter boundaries for graph storage, NLP, ontology, search, metadata,
   governance, audit, metrics, cache, auth, AI-core, and Bytewax.
+- Make AI knowledge agents first-class citizens through provider-neutral
+  metadata, guardrails, API helpers, UI models, and package evidence.
 - Preserve the existing service API shape where practical so generated
   applications can keep using KNGR while the contract becomes more complete.
 
@@ -25,15 +27,20 @@
    - Add lifecycle configuration sections for sources, entities,
      relationships, enrichment, reasoning, curation, publication, security,
      governance, observability, adapters, UI, and theme.
-   - Add deterministic guardrails across every lifecycle stage.
-   - Add route metadata for all expected generated-app screens.
+	- Add deterministic guardrails across every lifecycle stage.
+	- Add first-class knowledge-agent composition metadata for Codex, Claude
+	  Code, opencode, Pi, and future provider-neutral runtimes.
+	- Add Bytewax lifecycle stream metadata and processor guardrails.
+	- Add route metadata for all expected generated-app screens.
    - Add theme components for every screen family.
 
 3. Wire runtime surfaces:
    - Apply the expanded rules inside `KngrService`.
-   - Keep source/entity/relationship/enrichment/reasoning/curation/publication
-     workflows dependency-light and tenant-scoped.
-   - Add aggregate graph listing and richer UI view models.
+	- Keep source/entity/relationship/enrichment/reasoning/curation/publication
+	  workflows dependency-light and tenant-scoped.
+	- Add provider-neutral knowledge-agent registration state.
+	- Add Bytewax lifecycle batch validation state.
+	- Add aggregate graph listing and richer UI view models.
    - Expose review fields through API helpers.
 
 4. Refresh package evidence:
@@ -44,8 +51,10 @@
 5. Verify and review:
    - Run targeted `py_compile` on KNGR modules and tests.
    - Run focused KNGR pytest files only.
-   - Run APG implementation audit and publish-plan for KNGR.
-   - Search for stale package markers and overclaim language in KNGR files.
+	- Run APG implementation audit and publish-plan for KNGR.
+	- Run a service smoke for source -> entity -> knowledge agent -> Bytewax
+	  lifecycle batch.
+	- Search for stale package markers and overclaim language in KNGR files.
    - Run `git diff --check` for KNGR and the progress log.
 
 ## Battery-Conscious Verification

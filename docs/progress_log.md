@@ -16,6 +16,68 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 07:59 EAT
+
+KNGR knowledge-agent composition and Bytewax lifecycle guardrail packet:
+
+- Extended `capabilities/common/kngr/SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, and `cap_spec.md` to define KNGR as a first-class semantic
+  knowledge graph capability with provider-neutral knowledge agents and Bytewax
+  lifecycle batches.
+- Added top-level knowledge-agent contract metadata for Codex, Claude Code,
+  opencode, and Pi runtimes across source curation, entity resolution,
+  relationship review, enrichment, reasoning, curation, publication, ontology
+  alignment, lifecycle batch, and knowledge-steward roles.
+- Added deterministic knowledge-agent guardrails for supported runtime,
+  supported role, explicit scope, accountable owner, declared purpose, machine
+  contribution disclosure, and privileged-role human approval status.
+- Added KNGR Bytewax lifecycle stream metadata for `kngr.lifecycle`, source,
+  entity, relationship, enrichment, reasoning, curation, publication, and
+  knowledge-agent batches, plus a rule that rejects non-Bytewax lifecycle
+  processors.
+- Added dependency-light `KnowledgeAgentRecord` and
+  `KngrLifecycleBatchRecord` runtime state, service registration/validation
+  methods, API helpers, generated UI models, dashboard/governance summaries,
+  audit events, semantic-model publication, and focused tests.
+- Added `/kngr/agents` and `/kngr/lifecycle` route metadata plus theme
+  components for knowledge-agent rosters and Bytewax lifecycle monitoring.
+- Refreshed `semantic_model.json` and `release_report.json` from the live
+  executable app surface.
+
+Battery-conscious verification:
+
+- Focused `./.venv/bin/python -m py_compile` for KNGR contract, models,
+  knowledge runtime, service, API, view models, app, package init, and focused
+  tests passed.
+- `./.venv/bin/python capabilities/common/kngr/app.py` passed package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/kngr/test_capability_contract.py
+  capabilities/common/kngr/tests/test_package_contract.py` passed with 11
+  tests and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `./.venv/bin/apg capabilities inspect kngr --json` confirmed `ok: true`, 14
+  routes, 46 rules, Bytewax streaming, and first-class agents.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/kngr --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, no warnings, and no blocking gaps.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/kngr --json`
+  confirmed side-effect-free publish planning with no warnings.
+- Service smoke executed source -> entity -> knowledge agent -> Bytewax
+  lifecycle batch and printed `codex active bytewax 1`.
+- KNGR stale-marker scan returned no TODO/FIXME/placeholder/stub/baseline
+  matches across the capability packet.
+- `git diff --check -- capabilities/common/kngr docs/progress_log.md` passed.
+- Local code review found no blocking issues; residual risks remain around live
+  graph stores, rendered UI, durable stores, external agent clients, ontology
+  mapping, and live Bytewax topology.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live graph
+  stores, durable Bytewax topology, external Codex/Claude Code/OpenCode/Pi
+  clients, GRPH/NLPC/META/SRCH/ONTO/AICR/CONF live adapters, load checks,
+  migration checks, ontology-alignment checks, or reasoning-performance
+  benchmarks during this battery-conscious slice.
+
 ### 2026-05-31 07:10 EAT
 
 GRPH graph-agent composition and Bytewax lifecycle guardrail packet:

@@ -29,9 +29,11 @@ def test_kngr_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "kngr"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 14
+	assert len(contract["rule_engine"]["rules"]) >= 45
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -47,8 +49,11 @@ def test_kngr_app_entrypoint_is_publishable():
 	assert manifest["target"] == "python"
 	assert model["format"] == "apg.semantic-model.v1"
 	assert "kngr" in model["capabilities"]
-	assert model["capabilities"]["kngr"]["streaming"]["engine"] == "bytewax"
-	assert len(model["capabilities"]["kngr"]["ui"]["routes"]) >= 12
+	assert model["capabilities"]["kngr"]["agents"]["first_class"] is True
+	assert model["capabilities"]["kngr"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["kngr"]["knowledge_lifecycle"]["lifecycle_batch"] == "KngrLifecycleBatchRecord"
+	assert model["composition"]["capability_dependencies"]["kngr"] == ["grph", "nlpc", "meta", "srch", "onto", "aicr", "conf"]
+	assert len(model["capabilities"]["kngr"]["ui"]["routes"]) >= 14
 
 
 def test_kngr_package_evidence_matches_entrypoint():
@@ -59,6 +64,10 @@ def test_kngr_package_evidence_matches_entrypoint():
 	assert (PACKAGE_DIR / "SPECIFICATION.md").exists()
 	assert (PACKAGE_DIR / "PLAN.md").exists()
 	assert module.semantic_model() == json.loads(semantic_json)
+	report = json.loads((PACKAGE_DIR / "release_report.json").read_text())
+	assert report["ok"] is True
+	assert report["evidence"]["agents"]["first_class"] is True
+	assert report["evidence"]["streaming"]["required_processor"] == "bytewax"
 
 
 def test_kngr_compatibility_record_uses_knowledge_runtime():
