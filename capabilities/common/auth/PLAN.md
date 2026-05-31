@@ -24,7 +24,8 @@ Deliver a focused lifecycle and guardrail packet:
 - add first-class AI security-agent configuration for Codex, Claude Code,
   OpenCode, and Pi style runtimes;
 - require security-agent registration, supported runtime, supported role,
-  explicit scope, and contribution disclosure;
+  explicit scope, owner, purpose, contribution disclosure, and human approval
+  for privileged roles;
 - add `AuthSecurityAgent` model state;
 - add service, API-helper, and view-model methods for security-agent
   registration and listing;
@@ -42,7 +43,8 @@ Deliver a focused lifecycle and guardrail packet:
    observability, adapter, UI, theme, provides/requires, and Bytewax stream
    metadata.
 2. Extend the rule engine with security-agent registration/runtime/role/scope/
-   disclosure guardrails and Bytewax batch mutation enforcement.
+   disclosure/privileged-approval guardrails and Bytewax batch mutation
+   enforcement.
 3. Add `AuthSecurityAgent` to `models.py`.
 4. Extend `AuthService` with tenant-qualified security-agent state,
    registration, listing, dashboard counts, token normalization, and batch
@@ -67,6 +69,8 @@ Deliver a focused lifecycle and guardrail packet:
 - Unsupported agent roles fail closed.
 - Missing security-agent scope fails closed.
 - Undisclosed security-agent contribution fails closed.
+- Privileged security-agent role registration fails closed without human
+  approval required.
 - Batch AUTH mutation fails unless `event_stream` is `bytewax`.
 - Tenant-qualified state remains intact for identity, role, approval,
   assignment, session, access, privacy, security-agent, and audit records.
@@ -74,7 +78,8 @@ Deliver a focused lifecycle and guardrail packet:
 - View models expose dashboard, agent, audit, analytics, settings, and stream
   state.
 - Generated semantic model exposes the current route names, provides/requires
-  metadata, security-agent configuration, and Bytewax stream metadata.
+  metadata, first-class security-agent composition metadata, and Bytewax stream
+  metadata.
 - Production JWT, biometric, behavioral, cryptographic, federation, and web
   stacks remain adapter boundaries.
 

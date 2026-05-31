@@ -62,7 +62,8 @@ AUTH owns these package-level records:
 - `AuthPrivacyBudgetApproval`: independent approval request and decision for
   privacy-budget exhaustion overrides.
 - `AuthSecurityAgent`: governed AI security-agent registration with tenant,
-  runtime, role, scope, disclosure, policy, and status evidence.
+  runtime, role, owner, purpose, scope, disclosure, human approval, policy, and
+  status evidence.
 - `AuthAuditEvent`: tenant-scoped governance event for identity, role, session,
   access, privacy, and approval lifecycle changes.
 
@@ -92,7 +93,8 @@ The focused lifecycle is:
    role, session, decision,
    privacy, approval, and audit state.
 11. Register security agents only when they use a supported runtime, supported
-    role, explicit scope, registration state, and contribution disclosure.
+    role, accountable owner, declared purpose, explicit scope, registration
+    state, contribution disclosure, and human approval for privileged roles.
 12. Validate batch AUTH mutation intent against the Bytewax lifecycle stream.
 13. Emit tenant-scoped audit events for identity, role, approval, assignment,
     session, access, privacy, and revocation lifecycle changes.
@@ -125,6 +127,8 @@ The contract rules are executable guardrails:
   operating scope.
 - `security_agent_requires_disclosure`: AI-assisted contributions must be
   disclosed.
+- `security_agent_privileged_role_requires_human_approval`: privileged AI
+  security-agent roles require explicit human approval.
 - `auth_state_change_requires_audit`: AUTH lifecycle state changes require
   audit evidence.
 - `batch_auth_mutation_requires_bytewax`: batch AUTH mutation intent must use
@@ -184,13 +188,20 @@ Generated applications must display agent scope and contribution disclosure in
 review surfaces so human approvers can distinguish agent-assisted summaries
 from direct reviewer decisions.
 
+The capability contract also publishes an `agents` manifest with
+`first_class: true`, supported runtimes, supported roles, privileged roles,
+composition points, and guardrails. This is the APG composition surface for
+Codex, Claude Code, OpenCode, Pi, and future approved agent runtimes.
+
 ## Streaming
 
 AUTH publishes Bytewax lifecycle stream metadata through the capability
 contract and generated semantic model:
 
-- processor: `bytewax`;
+- engine and processor: `bytewax`;
 - topic: `apg.auth.lifecycle`;
+- topics: `auth.identities`, `auth.roles`, `auth.sessions`, `auth.privacy`,
+  and `auth.agents`;
 - state collections: identities, roles, role approvals, assignments, sessions,
   access decisions, privacy queries, privacy approvals, security agents, and
   audit events;
@@ -235,7 +246,9 @@ Local package tests must not require those systems.
 - Tenant-qualified state allows duplicate IDs across tenants without collision.
 - API helpers and view models expose the same lifecycle state.
 - Security agents can be registered with supported runtime, supported role,
-  scope, disclosure, and policy evidence.
+  owner, purpose, scope, disclosure, human approval, and policy evidence.
+- Privileged security-agent roles fail closed when human approval is not
+  required.
 - Unsupported security-agent runtime, missing scope, or undisclosed agent
   contribution fails closed.
 - Batch AUTH mutation validation accepts Bytewax and denies other stream

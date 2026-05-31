@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import Any
 
 from .capability_contract import (
+	PRIVILEGED_SECURITY_AGENT_ROLES,
 	SUPPORTED_SECURITY_AGENT_ROLES,
 	SUPPORTED_SECURITY_AGENT_RUNTIMES,
 	evaluate_capability_rules,
@@ -556,6 +557,9 @@ class AuthService:
 		scope: str,
 		registered: bool = True,
 		contribution_disclosed: bool = True,
+		owner: str | None = None,
+		purpose: str | None = None,
+		human_approval_required: bool = True,
 		policy_ref: str | None = None,
 		status: str = "active",
 	) -> dict[str, Any]:
@@ -570,11 +574,19 @@ class AuthService:
 			"agent_role_supported": normalized_role in SUPPORTED_SECURITY_AGENT_ROLES,
 			"agent_scope_present": bool(scope),
 			"agent_contribution_disclosed": contribution_disclosed,
+			"agent_privileged_role": normalized_role in PRIVILEGED_SECURITY_AGENT_ROLES,
+			"human_approval_required": human_approval_required,
 		})
 		self._raise_if_denied(result)
 		self._ensure_new(self._security_agents, tenant_id, agent_id, "security agent")
 		if not name:
 			raise ValueError("security_agent_name_required")
+		if not owner:
+			raise ValueError("security_agent_owner_required")
+		if not purpose:
+			raise ValueError("security_agent_purpose_required")
+		agent_owner = str(owner)
+		agent_purpose = str(purpose)
 		agent = AuthSecurityAgent(
 			id=agent_id,
 			tenant_id=tenant_id,
@@ -584,6 +596,9 @@ class AuthService:
 			scope=scope,
 			registered=registered,
 			contribution_disclosed=contribution_disclosed,
+			owner=agent_owner,
+			purpose=agent_purpose,
+			human_approval_required=human_approval_required,
 			policy_ref=policy_ref,
 			status=status,
 		)
@@ -595,7 +610,14 @@ class AuthService:
 			actor="system",
 			decision=result["decision"],
 			reasons=self._reasons(result),
-			metadata={"runtime": agent.runtime, "role": agent.role, "scope": scope},
+			metadata={
+				"runtime": agent.runtime,
+				"role": agent.role,
+				"scope": scope,
+				"owner": agent_owner,
+				"purpose": agent_purpose,
+				"human_approval_required": human_approval_required,
+			},
 		)
 		return agent.to_dict()
 
@@ -612,13 +634,13 @@ class AuthService:
 		result = self.evaluate({
 			"tenant_context_present": bool(tenant_id),
 			"requested_operation": "batch_auth_mutation",
-			"event_stream": event_stream,
+			"event_stream": _normalize_token(event_stream),
 			"mutation_count": mutation_count,
 		})
 		self._raise_if_denied(result)
 		return {
 			"tenant_id": tenant_id,
-			"event_stream": event_stream,
+			"event_stream": _normalize_token(event_stream),
 			"mutation_count": mutation_count,
 			"accepted": True,
 			"rule_result": result,

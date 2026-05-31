@@ -1,5 +1,42 @@
 {
-  "agents": {},
+  "agents": {
+    "auth_security_agent_contract": {
+      "composition_points": [
+        "identity_review",
+        "role_review",
+        "session_review",
+        "privacy_budget_review",
+        "federation_review"
+      ],
+      "first_class": true,
+      "guardrails": [
+        "security_agent_requires_registration",
+        "security_agent_runtime_supported",
+        "security_agent_role_supported",
+        "security_agent_requires_scope",
+        "security_agent_requires_disclosure",
+        "security_agent_privileged_role_requires_human_approval"
+      ],
+      "privileged_roles": [
+        "federation_reviewer",
+        "privacy_reviewer",
+        "role_reviewer"
+      ],
+      "supported_roles": [
+        "identity_reviewer",
+        "role_reviewer",
+        "session_reviewer",
+        "privacy_reviewer",
+        "federation_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Authentication & RBAC package-backed APG capability",
     "entity_count": 0,
@@ -8,7 +45,47 @@
   },
   "capabilities": {
     "auth": {
-      "approvals": {},
+      "agents": {
+        "composition_points": [
+          "identity_review",
+          "role_review",
+          "session_review",
+          "privacy_budget_review",
+          "federation_review"
+        ],
+        "first_class": true,
+        "guardrails": [
+          "security_agent_requires_registration",
+          "security_agent_runtime_supported",
+          "security_agent_role_supported",
+          "security_agent_requires_scope",
+          "security_agent_requires_disclosure",
+          "security_agent_privileged_role_requires_human_approval"
+        ],
+        "privileged_roles": [
+          "federation_reviewer",
+          "privacy_reviewer",
+          "role_reviewer"
+        ],
+        "supported_roles": [
+          "identity_reviewer",
+          "role_reviewer",
+          "session_reviewer",
+          "privacy_reviewer",
+          "federation_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
+      "approvals": {
+        "privacy_budget": "AuthPrivacyBudgetApproval",
+        "role_assignment": "AuthRoleAssignmentApproval",
+        "security_agent": "AuthSecurityAgent"
+      },
       "business_rules": [],
       "components": {},
       "configuration": {
@@ -75,6 +152,12 @@
             "privacy_reviewer",
             "federation_reviewer"
           ],
+          "privileged_roles": [
+            "federation_reviewer",
+            "privacy_reviewer",
+            "role_reviewer"
+          ],
+          "privileged_roles_require_human_approval": true,
           "supported_runtimes": [
             "codex",
             "claude_code",
@@ -309,6 +392,20 @@
           },
           {
             "condition": {
+              "agent_privileged_role": true,
+              "human_approval_required": false,
+              "security_agent_present": true
+            },
+            "description": "Privileged AI security-agent roles require explicit human approval.",
+            "effect": {
+              "decision": "deny",
+              "reason": "security_agent_human_approval_required",
+              "required_action": "enable_human_approval_for_privileged_security_agent"
+            },
+            "name": "security_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
               "audit_event_recorded": false,
               "state_change_requested": true
             },
@@ -521,6 +618,20 @@
         },
         {
           "condition": {
+            "agent_privileged_role": true,
+            "human_approval_required": false,
+            "security_agent_present": true
+          },
+          "description": "Privileged AI security-agent roles require explicit human approval.",
+          "effect": {
+            "decision": "deny",
+            "reason": "security_agent_human_approval_required",
+            "required_action": "enable_human_approval_for_privileged_security_agent"
+          },
+          "name": "security_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
             "audit_event_recorded": false,
             "state_change_requested": true
           },
@@ -548,8 +659,10 @@
       ],
       "runtime": {
         "api": "api.py",
+        "api_helpers": "api_helpers.py",
         "entrypoint": "app.py",
         "service": "service.py",
+        "view_models": "view_models.py",
         "views": "views.py"
       },
       "screens": {
@@ -661,6 +774,7 @@
       },
       "streaming": {
         "batch_mutation_guardrail": "batch_auth_mutation_requires_bytewax",
+        "engine": "bytewax",
         "events": [
           "identity_registered",
           "role_defined",
@@ -675,6 +789,10 @@
           "privacy_query_evaluated",
           "security_agent_registered"
         ],
+        "guardrails": [
+          "batch_auth_mutation_requires_bytewax"
+        ],
+        "lifecycle_stream": "apg.auth.lifecycle",
         "processor": "bytewax",
         "state": [
           "identities",
@@ -688,7 +806,15 @@
           "security_agents",
           "audit_events"
         ],
-        "topic": "apg.auth.lifecycle"
+        "topic": "apg.auth.lifecycle",
+        "topics": [
+          "auth.identities",
+          "auth.roles",
+          "auth.sessions",
+          "auth.privacy",
+          "auth.agents"
+        ],
+        "watermark_field": "event_time"
       },
       "theme": {
         "components": {
@@ -699,6 +825,10 @@
           "audit_timeline": {
             "icon": "list-checks",
             "status_style": "governance-chip"
+          },
+          "bytewax_stream_indicator": {
+            "icon": "activity",
+            "status_style": "stream-chip"
           },
           "identity_signal_card": {
             "icon": "shield-lock",
@@ -727,7 +857,7 @@
           },
           "security_agent_panel": {
             "icon": "bot",
-            "status_style": "scope-chip"
+            "status_style": "approval-scope-chip"
           },
           "session_trust_badge": {
             "icon": "fingerprint",
@@ -736,7 +866,7 @@
         },
         "name": "auth_trust_fabric",
         "tokens": {
-          "border.radius": "12px",
+          "border.radius": "8px",
           "color.accent": "#0F8B8D",
           "color.danger": "#C05621",
           "color.primary": "#12344D",
@@ -910,7 +1040,32 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "auth_security_review": {
+        "capability": "auth",
+        "guardrails": [
+          "security_agent_requires_registration",
+          "security_agent_runtime_supported",
+          "security_agent_role_supported",
+          "security_agent_requires_scope",
+          "security_agent_requires_disclosure",
+          "security_agent_privileged_role_requires_human_approval"
+        ],
+        "roles": [
+          "identity_reviewer",
+          "role_reviewer",
+          "session_reviewer",
+          "privacy_reviewer",
+          "federation_reviewer"
+        ],
+        "runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "auth": [
@@ -987,6 +1142,12 @@
             "privacy_reviewer",
             "federation_reviewer"
           ],
+          "privileged_roles": [
+            "federation_reviewer",
+            "privacy_reviewer",
+            "role_reviewer"
+          ],
+          "privileged_roles_require_human_approval": true,
           "supported_runtimes": [
             "codex",
             "claude_code",
@@ -1191,6 +1352,20 @@
         "required_action": "route_to_independent_reviewer"
       },
       "name": "role_assignment_approval_requires_independent_reviewer"
+    },
+    "security_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "agent_privileged_role": true,
+        "human_approval_required": false,
+        "security_agent_present": true
+      },
+      "description": "Privileged AI security-agent roles require explicit human approval.",
+      "effect": {
+        "decision": "deny",
+        "reason": "security_agent_human_approval_required",
+        "required_action": "enable_human_approval_for_privileged_security_agent"
+      },
+      "name": "security_agent_privileged_role_requires_human_approval"
     },
     "security_agent_requires_disclosure": {
       "condition": {

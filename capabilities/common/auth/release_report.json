@@ -2,15 +2,24 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agent_contract": true,
         "display_name": "Authentication & RBAC",
         "errors": [],
         "route_count": 21,
-        "rule_count": 16
+        "rule_count": 17,
+        "stream_engine": "bytewax"
       }
     },
     "self_test": {
       "capability": "auth",
+      "errors": [],
       "passed": true,
+      "routes": [
+        "/health",
+        "/self-test",
+        "/component.json",
+        "/semantic-model.json"
+      ],
       "status": "ok"
     },
     "semantic_model": {

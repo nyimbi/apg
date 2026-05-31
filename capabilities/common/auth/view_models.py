@@ -147,8 +147,19 @@ def security_agents_model(
 		"agents": service.list_security_agents(tenant_id),
 		"supported_runtimes": contract["configuration"]["security_agents"]["supported_runtimes"],
 		"allowed_roles": contract["configuration"]["security_agents"]["allowed_roles"],
-		"actions": ["register", "scope", "review_contribution", "deactivate"],
-		"required_fields": ["name", "runtime", "role", "scope", "contribution_disclosed"],
+		"privileged_roles": contract["configuration"]["security_agents"]["privileged_roles"],
+		"guardrails": contract["agents"]["guardrails"],
+		"actions": ["register", "scope", "review_contribution", "approve_privileged_role", "deactivate"],
+		"required_fields": [
+			"name",
+			"runtime",
+			"role",
+			"scope",
+			"owner",
+			"purpose",
+			"contribution_disclosed",
+			"human_approval_required",
+		],
 	}
 
 

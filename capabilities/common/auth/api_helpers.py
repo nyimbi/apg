@@ -164,6 +164,9 @@ def register_security_agent(payload: dict[str, Any]) -> dict[str, Any]:
 		scope=str(payload.get("scope") or ""),
 		registered=_payload_bool(payload, "registered", True),
 		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		owner=str(payload.get("owner") or "security-governance"),
+		purpose=str(payload.get("purpose") or "auth workflow assistance"),
+		human_approval_required=_payload_bool(payload, "human_approval_required", True),
 		policy_ref=str(payload["policy_ref"]) if payload.get("policy_ref") else None,
 		status=str(payload.get("status") or "active"),
 	)

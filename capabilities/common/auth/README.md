@@ -26,7 +26,8 @@ audit surfaces.
   federation trust, tenant membership, risk level, and inferred privileged
   tiers.
 - Security-agent registration for `codex`, `claude_code`, `opencode`, and `pi`
-  runtimes with explicit role, scope, disclosure, and policy evidence.
+  runtimes with explicit role, owner, purpose, scope, disclosure, approval, and
+  policy evidence.
 - Bytewax lifecycle stream metadata for batch AUTH mutation and generated
   application composition.
 - API-helper and view-model modules for generated APG Python applications.
@@ -60,10 +61,10 @@ service = AuthService()
 tenant_id = "tenant-auth"
 
 identity = service.register_identity(
-    identity_id="alice",
+    user_id="alice",
     tenant_id=tenant_id,
-    username="alice",
     email="alice@example.com",
+    display_name="Alice Admin",
     mfa_enabled=True,
     tenant_memberships=[tenant_id],
     privacy_budget=3.0,
@@ -110,8 +111,8 @@ assert assignment["role_id"] == "admin"
 
 AUTH treats AI security agents as governed participants, not hidden automation.
 Agents must declare a supported runtime, supported role, explicit scope,
-registration state, and contribution disclosure before they can appear in AUTH
-review workflows.
+registration state, accountable owner, purpose, human approval posture, and
+contribution disclosure before they can appear in AUTH review workflows.
 
 ```python
 agent = service.register_security_agent(
@@ -121,13 +122,20 @@ agent = service.register_security_agent(
     runtime="claude-code",
     role="role-reviewer",
     scope="Summarize privileged role requests for human reviewers.",
+    owner="auth-security",
+    purpose="Prepare role-request evidence summaries.",
+    human_approval_required=True,
     contribution_disclosed=True,
     policy_ref="auth-agent-policy",
 )
 
 assert agent["runtime"] == "claude_code"
 assert agent["role"] == "role_reviewer"
+assert agent["human_approval_required"] is True
 ```
+
+Privileged agent roles, including `role_reviewer`, `privacy_reviewer`, and
+`federation_reviewer`, fail closed when `human_approval_required` is false.
 
 ## Bytewax Guardrail
 
@@ -156,8 +164,11 @@ service.validate_batch_auth_mutation(
   approval, security-agent, audit, tenant, and Bytewax lifecycle decisions.
 - `ui`: route metadata for generated APG Python applications.
 - `theme`: visual tokens and component metadata.
-- `streaming`: Bytewax processor, topic, state collections, lifecycle events,
-  and batch mutation guardrail.
+- `agents`: first-class security-agent composition metadata, supported
+  runtimes, supported roles, privileged roles, composition points, and
+  guardrails.
+- `streaming`: Bytewax engine, processor, topics, state collections, lifecycle
+  events, and batch mutation guardrail.
 
 ## Verification
 

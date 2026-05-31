@@ -82,7 +82,11 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"theme"
 	]
 	assert contract["streaming"]["processor"] == "bytewax"
+	assert contract["streaming"]["engine"] == "bytewax"
 	assert contract["configuration"]["security_agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["configuration"]["security_agents"]["privileged_roles_require_human_approval"] is True
+	assert contract["agents"]["first_class"] is True
+	assert "security_agent_privileged_role_requires_human_approval" in contract["agents"]["guardrails"]
 	assert set(contract["provides"]) >= {"identity_registry", "role_governance", "security_agents"}
 	assert contract["requires"] == ["audl", "mten", "keym", "secu"]
 	assert len(contract["rule_engine"]["rules"]) >= 9
@@ -105,7 +109,7 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"metrics"
 	}
 	assert contract["ui"]["api_prefix"] == "/api"
-	assert contract["theme"]["tokens"]["border.radius"] == "12px"
+	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "risk_posture_meter" in contract["theme"]["components"]
 	assert "role_approval_queue" in contract["theme"]["components"]
 	assert "privacy_approval_queue" in contract["theme"]["components"]
@@ -442,6 +446,9 @@ def test_auth_security_agents_and_bytewax_guardrails():
 		role="role-reviewer",
 		scope="privileged role review summaries",
 		contribution_disclosed=True,
+		owner="auth-security",
+		purpose="summarize role evidence for reviewers",
+		human_approval_required=True,
 		policy_ref="auth-agent-policy",
 	)
 	batch = service.validate_batch_auth_mutation(
@@ -456,9 +463,14 @@ def test_auth_security_agents_and_bytewax_guardrails():
 
 	assert agent["runtime"] == "claude_code"
 	assert agent["role"] == "role_reviewer"
+	assert agent["owner"] == "auth-security"
+	assert agent["purpose"] == "summarize role evidence for reviewers"
+	assert agent["human_approval_required"] is True
 	assert batch["accepted"] is True
 	assert dashboard["security_agents"][0]["id"] == "security-agent-1"
 	assert agents["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "role_reviewer" in agents["privileged_roles"]
+	assert "security_agent_privileged_role_requires_human_approval" in agents["guardrails"]
 	assert analytics["summary"]["security_agent_count"] == 1
 	assert settings["streaming"]["processor"] == "bytewax"
 
@@ -470,6 +482,28 @@ def test_auth_security_agents_and_bytewax_guardrails():
 			runtime="unsupported",
 			role="role_reviewer",
 			scope="role review",
+		)
+
+	with pytest.raises(ValueError, match="security_agent_owner_required"):
+		service.register_security_agent(
+			agent_id="missing-owner",
+			tenant_id="tenant-auth-agent",
+			name="Missing Owner",
+			runtime="codex",
+			role="identity_reviewer",
+			scope="identity review",
+			purpose="identity review evidence",
+		)
+
+	with pytest.raises(PermissionError, match="security_agent_human_approval_required"):
+		service.register_security_agent(
+			agent_id="unapproved-privileged-agent",
+			tenant_id="tenant-auth-agent",
+			name="Unapproved Privileged Agent",
+			runtime="codex",
+			role="privacy_reviewer",
+			scope="privacy budget review",
+			human_approval_required=False,
 		)
 
 	with pytest.raises(PermissionError, match="bytewax_event_stream_required"):
@@ -596,6 +630,8 @@ def test_api_helpers_expose_security_agents_and_batch_guardrail():
 		"role": "identity_reviewer",
 		"scope": "identity risk review",
 		"contribution_disclosed": True,
+		"owner": "api-security",
+		"purpose": "identity review support",
 	})
 	batch = api_helpers.validate_batch_auth_mutation({
 		"tenant_id": "tenant-api-security-agent",
@@ -604,6 +640,8 @@ def test_api_helpers_expose_security_agents_and_batch_guardrail():
 	})
 
 	assert agent["runtime"] == "opencode"
+	assert agent["owner"] == "api-security"
+	assert agent["purpose"] == "identity review support"
 	assert api_helpers.list_security_agents("tenant-api-security-agent")[0]["id"] == "api-security-agent"
 	assert batch["accepted"] is True
 

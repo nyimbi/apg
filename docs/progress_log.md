@@ -20379,3 +20379,60 @@ Not run to preserve battery:
   billing systems, analytics engines, AI optimization providers, rendered
   browser UI, persistent storage, live Bytewax stream execution, and
   performance/load tests.
+
+### 2026-05-31 04:18 EAT
+
+AUTH security-agent lifecycle and Bytewax guardrail packet:
+
+- Selected `capabilities/common/auth` as the next common foundation capability
+  after CONF, AUDL, and MTEN.
+- Added first-class AUTH security-agent composition metadata to the executable
+  contract, generated app semantic model, package evidence, view models,
+  specification, plan, and README.
+- Added supported AUTH agent runtimes `codex`, `claude_code`, `opencode`, and
+  `pi`, with roles for identity, role, session, privacy, and federation review.
+- Added privileged AUTH agent roles for role, privacy, and federation review,
+  and a deterministic guardrail that denies privileged agent registration when
+  human approval is not required.
+- Extended `AuthSecurityAgent`, `AuthService`, and `api_helpers.py` with
+  accountable owner, declared purpose, human approval posture, policy evidence,
+  runtime normalization, role normalization, listing, audit metadata, and API
+  helper payload handling.
+- Replaced the stale serialized `app.py` semantic model with a dynamic
+  contract-backed package entrypoint and regenerated `semantic_model.json` and
+  `release_report.json` from the live contract.
+- Added Bytewax lifecycle metadata with `engine`, `processor`, lifecycle
+  stream, topics, watermark field, state collections, events, and the batch
+  mutation guardrail.
+- Aligned the AUTH theme radius token to the 8px package UI standard and added
+  security-agent and Bytewax stream component metadata.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/auth/models.py capabilities/common/auth/service.py capabilities/common/auth/api_helpers.py capabilities/common/auth/view_models.py capabilities/common/auth/capability_contract.py capabilities/common/auth/app.py capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/auth/tests/test_capability_contract.py capabilities/common/auth/tests/test_package_contract.py`
+  passed with 13 tests and only unrelated shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/auth/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect auth --json` passed with `ok: true`,
+  21 APG Python routes, 17 deterministic rules, 8px theme radius, and Bytewax
+  streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/auth --json`
+  passed with `ok: true`; AUTH remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/auth --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/auth -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "... AuthService ... register_security_agent ... validate_batch_auth_mutation ..."`
+  returned one `pi` privacy-review agent with owner evidence, human approval
+  required, normalized role, and `bytewax` stream evidence.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live identity providers, production JWT/session stores, biometric capture,
+  behavioral ML engines, cryptographic providers, federated mesh services,
+  rendered browser UI, persistent storage, live Bytewax stream execution, and
+  performance/load tests.

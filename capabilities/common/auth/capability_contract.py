@@ -15,6 +15,7 @@ from typing import Any
 
 SUPPORTED_SECURITY_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
 SUPPORTED_SECURITY_AGENT_ROLES = ["identity_reviewer", "role_reviewer", "session_reviewer", "privacy_reviewer", "federation_reviewer"]
+PRIVILEGED_SECURITY_AGENT_ROLES = {"role_reviewer", "privacy_reviewer", "federation_reviewer"}
 
 
 @dataclass(frozen=True)
@@ -61,7 +62,9 @@ class CapabilityConfiguration:
 			"agent_scope_required": True,
 			"agent_contribution_disclosure_required": True,
 			"supported_runtimes": SUPPORTED_SECURITY_AGENT_RUNTIMES,
-			"allowed_roles": SUPPORTED_SECURITY_AGENT_ROLES
+			"allowed_roles": SUPPORTED_SECURITY_AGENT_ROLES,
+			"privileged_roles": sorted(PRIVILEGED_SECURITY_AGENT_ROLES),
+			"privileged_roles_require_human_approval": True
 		},
 		"governance": {
 			"tenant_isolation_required": True,
@@ -210,7 +213,7 @@ class CapabilityTheme:
 		"surface.panel": "#FFFFFF",
 		"text.primary": "#102A43",
 		"text.secondary": "#486581",
-		"border.radius": "12px",
+		"border.radius": "8px",
 		"density": "comfortable"
 	})
 	components: dict[str, dict[str, str]] = field(default_factory=lambda: {
@@ -249,7 +252,11 @@ class CapabilityTheme:
 		},
 		"security_agent_panel": {
 			"icon": "bot",
-			"status_style": "scope-chip"
+			"status_style": "approval-scope-chip"
+		},
+		"bytewax_stream_indicator": {
+			"icon": "activity",
+			"status_style": "stream-chip"
 		},
 		"audit_timeline": {
 			"icon": "list-checks",
@@ -402,6 +409,20 @@ def default_rules() -> list[CapabilityRule]:
 			}
 		),
 		CapabilityRule(
+			name="security_agent_privileged_role_requires_human_approval",
+			description="Privileged AI security-agent roles require explicit human approval.",
+			condition={
+				"security_agent_present": True,
+				"agent_privileged_role": True,
+				"human_approval_required": False
+			},
+			effect={
+				"decision": "deny",
+				"reason": "security_agent_human_approval_required",
+				"required_action": "enable_human_approval_for_privileged_security_agent"
+			}
+		),
+		CapabilityRule(
 			name="auth_state_change_requires_audit",
 			description="AUTH lifecycle state changes require audit evidence.",
 			condition={"state_change_requested": True, "audit_event_recorded": False},
@@ -458,11 +479,39 @@ def ui_manifest() -> dict[str, Any]:
 		"requires_theme": True
 	}
 
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class AUTH security-agent composition metadata."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_SECURITY_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_SECURITY_AGENT_ROLES),
+		"privileged_roles": sorted(PRIVILEGED_SECURITY_AGENT_ROLES),
+		"composition_points": [
+			"identity_review",
+			"role_review",
+			"session_review",
+			"privacy_budget_review",
+			"federation_review"
+		],
+		"guardrails": [
+			"security_agent_requires_registration",
+			"security_agent_runtime_supported",
+			"security_agent_role_supported",
+			"security_agent_requires_scope",
+			"security_agent_requires_disclosure",
+			"security_agent_privileged_role_requires_human_approval"
+		]
+	}
+
 def streaming_manifest() -> dict[str, Any]:
 	"""Return Bytewax lifecycle stream metadata for AUTH."""
 	return {
+		"engine": "bytewax",
 		"processor": "bytewax",
+		"lifecycle_stream": "apg.auth.lifecycle",
 		"topic": "apg.auth.lifecycle",
+		"topics": ["auth.identities", "auth.roles", "auth.sessions", "auth.privacy", "auth.agents"],
+		"watermark_field": "event_time",
 		"state": [
 			"identities",
 			"roles",
@@ -489,7 +538,10 @@ def streaming_manifest() -> dict[str, Any]:
 			"privacy_query_evaluated",
 			"security_agent_registered"
 		],
-		"batch_mutation_guardrail": "batch_auth_mutation_requires_bytewax"
+		"batch_mutation_guardrail": "batch_auth_mutation_requires_bytewax",
+		"guardrails": [
+			"batch_auth_mutation_requires_bytewax"
+		]
 	}
 
 
@@ -521,6 +573,7 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"tokens": theme.tokens,
 			"components": theme.components
 		},
+		"agents": agent_manifest(),
 		"streaming": streaming_manifest()
 	}
 

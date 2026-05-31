@@ -6,7 +6,8 @@ Use:
 
 - `README.md` for package usage and generated-application composition notes.
 - `SPECIFICATION.md` for the normative functional contract, lifecycle,
-  rules, UI, configuration, adapter boundaries, and acceptance gates.
+  rules, AI security-agent composition, UI, configuration, adapter boundaries,
+  and acceptance gates.
 - `PLAN.md` for the current implementation and review plan.
 
 Focused proof commands:

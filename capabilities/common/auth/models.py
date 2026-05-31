@@ -282,6 +282,9 @@ class AuthSecurityAgent:
 	scope: str
 	registered: bool
 	contribution_disclosed: bool
+	owner: str
+	purpose: str
+	human_approval_required: bool
 	policy_ref: str | None = None
 	status: str = "active"
 
@@ -295,6 +298,9 @@ class AuthSecurityAgent:
 			"scope": self.scope,
 			"registered": self.registered,
 			"contribution_disclosed": self.contribution_disclosed,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"human_approval_required": self.human_approval_required,
 			"policy_ref": self.policy_ref,
 			"status": self.status,
 		}
