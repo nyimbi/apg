@@ -29,6 +29,8 @@ def dashboard_model(
 		"aggregations": service.list_aggregations(tenant_id),
 		"models": service.list_models(tenant_id),
 		"releases": service.list_releases(tenant_id),
+		"federation_agents": service.list_federation_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -113,6 +115,8 @@ def security_console_model(service: FedlService | None = None, tenant_id: str = 
 	return {
 		"tenant_id": tenant_id,
 		"poisoning_signals": [item for item in updates if item["poisoning_signal"]],
+		"federation_agents": service.list_federation_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": service.describe(tenant_id)["rule_engine"]["rules"],
 		"route": "/fedl/security",
 	}
@@ -134,4 +138,34 @@ def audit_timeline_model(service: FedlService | None = None, tenant_id: str = "d
 		"tenant_id": tenant_id,
 		"audit_events": service.list_audit_events(tenant_id),
 		"route": "/fedl/audit",
+	}
+
+
+def federation_agent_roster_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	contract = service.describe(tenant_id)
+	agents = service.list_federation_agents(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": agents,
+		"pending_review": [item for item in agents if item["status"] == "pending_review"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"route": "/fedl/agents",
+	}
+
+
+def lifecycle_batch_model(service: FedlService | None = None, tenant_id: str = "default") -> dict[str, object]:
+	service = service or FedlService()
+	contract = service.describe(tenant_id)
+	batches = service.list_lifecycle_batches(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"batches": batches,
+		"denied": [item for item in batches if item["status"] == "denied"],
+		"required_processor": contract["streaming"]["required_processor"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"topics": contract["streaming"]["topics"],
+		"route": "/fedl/lifecycle",
 	}

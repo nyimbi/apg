@@ -96,6 +96,31 @@ def release_model(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_federation_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_federation_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload["name"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "federation_steward"),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_fedl_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_fedl_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "federation_agent_batch"),
+		batch_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
 def retire_federation(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.retire_federation(
 		federation_id=str(payload["federation_id"]),
@@ -131,6 +156,14 @@ def list_models(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_releases(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_releases(tenant_id)
+
+
+def list_federation_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_federation_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

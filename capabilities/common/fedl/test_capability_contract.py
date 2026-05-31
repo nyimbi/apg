@@ -3,6 +3,7 @@
 import pytest
 
 from capabilities.common.fedl import register_capability
+from capabilities.common.fedl import api
 from capabilities.common.fedl.capability_contract import (
 	evaluate_capability_rules,
 	get_capability_contract
@@ -13,6 +14,8 @@ from capabilities.common.fedl.views import (
 	attestation_center_model,
 	audit_timeline_model,
 	dashboard_model,
+	federation_agent_roster_model,
+	lifecycle_batch_model,
 	model_registry_model,
 	release_console_model,
 	security_console_model,
@@ -34,13 +37,15 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"training",
 		"aggregation",
 		"model_release",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"federations",
@@ -53,14 +58,24 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"security",
 		"models",
 		"release",
+		"agents",
+		"lifecycle",
 		"audit",
 		"settings"
 	}
+	assert contract["provides"] == ["federated_learning", "privacy_preserving_training", "federation_agent_composition"]
+	assert contract["requires"] == ["aicr", "mlcm", "encr", "mten"]
+	assert contract["agents"]["first_class"] is True
+	assert {"codex", "claude_code", "opencode", "pi"} <= set(contract["agents"]["supported_runtimes"])
+	assert "model_release_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "federation_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
 	assert contract["configuration"]["adapters"]["generated_app_runtime"] == "service.FedlService"
 	assert contract["ui"]["api_prefix"] == "/fedl/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "federation_topology" in contract["theme"]["components"]
+	assert "federation_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_federated_learning_guardrails():
@@ -95,6 +110,44 @@ def test_rule_engine_enforces_federated_learning_guardrails():
 		"event_stream": "kafka",
 	})
 	assert stream_result["matched_rules"] == ["bytewax_stream_required_for_round_events"]
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_federation_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+	})
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"federation_agent_runtime_supported",
+		"federation_agent_role_supported",
+		"federation_agent_requires_scope",
+		"federation_agent_requires_owner",
+		"federation_agent_requires_purpose",
+		"federation_agent_requires_contribution_disclosure",
+	}
+	review_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_federation_agent",
+		"agent_runtime_supported": True,
+		"agent_role_supported": True,
+		"scope_present": True,
+		"owner_present": True,
+		"purpose_present": True,
+		"contribution_disclosed": True,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	assert review_result["decision"] == "require_review"
+	lifecycle_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_fedl_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+	assert lifecycle_result["matched_rules"] == ["bytewax_fedl_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -107,8 +160,12 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "fedl_privacy_mesh"
 	assert registration["ui_components"]["participants"] == "/fedl/participants"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "federation_agent_composition" in registration["capabilities"]
 	assert "mlcm" in registration["dependencies"]
 	assert "fedl:run_rounds" in registration["permissions"]
+	assert "fedl:govern" in registration["permissions"]
 
 
 def test_federated_learning_lifecycle_is_executable():
@@ -191,16 +248,45 @@ def test_federated_learning_lifecycle_is_executable():
 		"aggregation_count": 1,
 		"model_count": 1,
 		"release_count": 0,
+		"federation_agent_count": 0,
+		"pending_agent_review_count": 0,
+		"lifecycle_batch_count": 0,
+		"denied_lifecycle_batch_count": 0,
 		"audit_event_count": 9,
 	}
+	agent = service.register_federation_agent(
+		agent_id="fedl-reviewer",
+		tenant_id="tenant-fed",
+		name="FEDL Privacy Reviewer",
+		runtime="codex",
+		role="privacy_reviewer",
+		scope="fed-risk releases",
+		owner="ml-platform",
+		purpose="Review privacy budget and release guardrails",
+		human_approval_required=True,
+	)
+	batch = service.validate_fedl_lifecycle_batch(
+		tenant_id="tenant-fed",
+		event_stream="bytewax",
+		mutation_count=3,
+		operation="federation_agent_batch",
+		batch_id="fedl-batch-001",
+	)
+	assert agent["runtime"] == "codex"
+	assert agent["role"] == "privacy_reviewer"
+	assert agent["status"] == "active"
+	assert batch["required_processor"] == "bytewax"
 	assert budget["spent_epsilon"] == 2.0
 	assert dashboard_model(service, "tenant-fed")["summary"]["release_count"] == 1
+	assert dashboard_model(service, "tenant-fed")["summary"]["federation_agent_count"] == 1
 	assert attestation_center_model(service, "tenant-fed")["missing_attestation"] == []
 	assert update_queue_model(service, "tenant-fed")["quarantined"] == []
 	assert aggregation_console_model(service, "tenant-fed")["aggregations"][0]["id"] == "agg-001"
 	assert model_registry_model(service, "tenant-fed")["models"][0]["id"] == models[0]["id"]
 	assert release_console_model(service, "tenant-fed")["releases"][0]["id"] == "release-001"
 	assert security_console_model(service, "tenant-fed")["poisoning_signals"] == []
+	assert federation_agent_roster_model(service, "tenant-fed")["agents"][0]["id"] == "fedl-reviewer"
+	assert lifecycle_batch_model(service, "tenant-fed")["batches"][0]["id"] == "fedl-batch-001"
 	assert audit_timeline_model(service, "tenant-fed")["audit_events"]
 
 
@@ -260,3 +346,52 @@ def test_fedl_service_enforces_policy_guardrails():
 		service.retire_federation("fed", "tenant-fed", "", "coord")
 	retired = service.retire_federation("fed", "tenant-fed", "impact-review", "coord")
 	assert retired["status"] == "retired"
+
+	with pytest.raises(PermissionError, match="unsupported_federation_agent_runtime"):
+		service.register_federation_agent("agent-bad-runtime", "tenant-fed", "Bad Runtime", "unknown", "federation_steward", "fed", "owner", "purpose")
+	with pytest.raises(PermissionError, match="federation_agent_scope_required"):
+		service.register_federation_agent("agent-no-scope", "tenant-fed", "No Scope", "codex", "federation_steward", "", "owner", "purpose")
+	agent = service.register_federation_agent("agent-review", "tenant-fed", "Review Agent", "claude-code", "privacy reviewer", "fed", "owner", "purpose")
+	assert agent["runtime"] == "claude_code"
+	assert agent["role"] == "privacy_reviewer"
+	assert agent["status"] == "pending_review"
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_fedl_lifecycle_batch("tenant-fed", "kafka", 1)
+	batch = service.validate_fedl_lifecycle_batch("tenant-fed", "bytewax", 1, "privacy_budget_batch")
+	assert batch["accepted"] is True
+
+
+def test_fedl_api_exposes_agent_and_lifecycle_helpers():
+	tenant_id = "tenant-fedl-api"
+
+	api.create_federation({
+		"id": "fed-api",
+		"tenant_id": tenant_id,
+		"name": "API Federation",
+		"coordinator": "api-coordinator",
+		"model_family": "tabular",
+		"objective_metric": "auc",
+		"data_residency_regions": ["ke"],
+	})
+	agent = api.register_federation_agent({
+		"id": "api-agent",
+		"tenant_id": tenant_id,
+		"name": "API FEDL Agent",
+		"runtime": "opencode",
+		"role": "federation_steward",
+		"scope": "fed-api",
+		"owner": "api-owner",
+		"purpose": "Govern generated-app federation changes",
+	})
+	batch = api.validate_fedl_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": tenant_id,
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "federation_agent_batch",
+	})
+
+	assert agent["runtime"] == "opencode"
+	assert batch["status"] == "accepted"
+	assert api.list_federation_agents(tenant_id)[0]["id"] == "api-agent"
+	assert api.list_lifecycle_batches(tenant_id)[0]["id"] == "api-batch"

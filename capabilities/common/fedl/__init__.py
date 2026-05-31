@@ -35,13 +35,17 @@ capability_metadata: dict[str, Any] = {
 		"training_round_monitoring",
 		"poisoning_defense",
 		"federated_model_release",
-		"federated_model_governance"
+		"federated_model_governance",
+		"federation_agent_composition",
+		"bytewax_lifecycle_governance"
 	],
 	"composition_patterns": [
 		"privacy_preserving_training",
 		"cross_tenant_consent",
 		"secure_model_aggregation",
-		"federated_release_to_mlcm"
+		"federated_release_to_mlcm",
+		"provider_neutral_federation_agents",
+		"bytewax_fedl_lifecycle_stream"
 	],
 	"apis": {
 		"rest": "/fedl/api/v1",
@@ -57,6 +61,8 @@ capability_metadata: dict[str, Any] = {
 		"aggregation": "/fedl/aggregation",
 		"privacy": "/fedl/privacy",
 		"release": "/fedl/release",
+		"agents": "/fedl/agents",
+		"lifecycle": "/fedl/lifecycle",
 		"audit": "/fedl/audit"
 	},
 	"permissions": [
@@ -66,6 +72,7 @@ capability_metadata: dict[str, Any] = {
 		"fedl:run_rounds",
 		"fedl:manage_privacy",
 		"fedl:manage_security",
+		"fedl:govern",
 		"fedl:view_models",
 		"fedl:release_models",
 		"fedl:admin"
@@ -94,6 +101,8 @@ def register_capability() -> dict[str, Any]:
 			"privacy_budgeting": "Track and govern differential privacy budget thresholds",
 			"poisoning_defense": "Block aggregation when poisoning signals are detected",
 			"federated_model_release": "Release federated models through MLCM-linked approval and privacy review",
+			"federation_agent_composition": "Register provider-neutral AI agents for federation governance",
+			"bytewax_lifecycle_governance": "Validate FEDL lifecycle mutation batches through Bytewax",
 			"capability_rules": "Evaluate deterministic federated learning governance rules",
 			"visual_theming": "Apply privacy-mesh theme tokens and components"
 		},
@@ -104,9 +113,13 @@ def register_capability() -> dict[str, Any]:
 			"aggregation": "/fedl/api/v1/aggregation",
 			"privacy": "/fedl/api/v1/privacy",
 			"release": "/fedl/api/v1/release",
+			"agents": "/fedl/api/v1/agents",
+			"lifecycle": "/fedl/api/v1/lifecycle",
 			"audit": "/fedl/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]

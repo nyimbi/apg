@@ -30,9 +30,11 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "fedl"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 15
+	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -50,6 +52,11 @@ def test_package_app_entrypoint_is_publishable():
 	assert "fedl" in model["capabilities"]
 	assert model["capabilities"]["fedl"]["runtime"]["service"] == "service.FedlService"
 	assert model["capabilities"]["fedl"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["fedl"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["fedl"]["agents"]["first_class"] is True
+	assert model["capabilities"]["fedl"]["federated_lifecycle"]["federation_agent"] == "FederationAgentRecord"
+	assert model["capabilities"]["fedl"]["federated_lifecycle"]["lifecycle_batch"] == "FedlLifecycleBatchRecord"
+	assert model["composition"]["capability_dependencies"]["fedl"] == ["aicr", "mlcm", "encr", "mten"]
 
 
 def test_package_runtime_compatibility_surface_creates_federation():

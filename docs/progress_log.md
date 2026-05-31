@@ -21490,3 +21490,64 @@ Not run to preserve battery:
   connectors, live vault/encryption/audit/monitoring adapters, live Bytewax
   topology, rendered browser UI, external AI-agent runtime clients, and
   performance/load tests.
+
+### 2026-05-31 06:47 EAT
+
+FEDL federation-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/fedl` as the next AI-core capability after
+  MLCM in the development order.
+- Extended the FEDL executable contract with first-class federation-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported federation-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and contract
+  `provides`/`requires`.
+- Added deterministic guardrails for unsupported federation-agent runtime,
+  unsupported federation-agent role, missing agent scope, owner, purpose,
+  missing machine contribution disclosure, privileged federation-agent
+  registration without human approval, and non-Bytewax FEDL lifecycle batch
+  routing.
+- Added `FederationAgentRecord`, `FedlLifecycleBatchRecord`, tenant-qualified
+  federation-agent storage, lifecycle-batch storage, registration, listing,
+  audit events, dashboard counts, API helper payload handling, federation-agent
+  roster view models, and lifecycle-batch monitor view models.
+- Added `/fedl/agents`, `/fedl/lifecycle`, federation-agent roster theme
+  metadata, and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md` so
+  the documented packet matches the executable contract and keeps external
+  AI-agent runtimes plus Bytewax workers behind adapter boundaries.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/fedl/__init__.py capabilities/common/fedl/capability_contract.py capabilities/common/fedl/models.py capabilities/common/fedl/federated_engine.py capabilities/common/fedl/service.py capabilities/common/fedl/api.py capabilities/common/fedl/views.py capabilities/common/fedl/app.py capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py`
+  passed.
+- `find capabilities/common/fedl -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python capabilities/common/fedl/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/pytest -q capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py`
+  passed with 9 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect fedl --json` passed with `ok: true`,
+  15 APG Python routes, 38 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/fedl --json`
+  passed with `ok: true`; FEDL remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/fedl --json`
+  passed with side-effect-free package evidence and no warnings.
+- `./.venv/bin/python -c "... FedlService ... register_federation_agent ... validate_fedl_lifecycle_batch ..."`
+  returned one `codex` active federation steward and one `bytewax`
+  lifecycle-batch evidence record.
+- Focused stale-marker scan over touched FEDL packet source, docs, tests, and
+  evidence returned only intentional Kafka-denial/Bytewax-not-Kafka references.
+- `git diff --check -- capabilities/common/fedl docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live distributed training, live secure multiparty computation, live Bytewax
+  topology, live AICR/MLCM/ENCR/MTEN/AUDL/MONI/AUTH adapters, rendered browser
+  UI, external AI-agent runtime clients, and performance/load/convergence
+  tests.

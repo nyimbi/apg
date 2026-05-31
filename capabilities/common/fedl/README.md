@@ -19,6 +19,10 @@ emit audit evidence without moving participant datasets into a central store.
 - Secure aggregation result records, derived federated model versions, and MLCM
   release linkage.
 - Federation retirement after impact review.
+- First-class federation-agent composition for Codex, Claude Code, OpenCode,
+  Pi, and future AICR-adapted runtimes.
+- Bytewax lifecycle-batch validation for generated-app and agent-authored FEDL
+  mutations.
 - Rule-engine metadata, UI route metadata, theme tokens, and generated-app
   semantic package evidence.
 - Adapter configuration for AICR, MLCM, ENCR, MTEN, AUTH, AUDL, MONI, and
@@ -90,6 +94,24 @@ service.release_model(
 	"approval:release-001",
 	"privacy-review:release-001",
 )
+service.register_federation_agent(
+	"fedl-reviewer",
+	"tenant-a",
+	"FEDL Privacy Reviewer",
+	"codex",
+	"privacy_reviewer",
+	"fed-risk releases",
+	"ml-platform",
+	"Review privacy budgets and release guardrails",
+	human_approval_required=True,
+)
+service.validate_fedl_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	3,
+	"federation_agent_batch",
+	"batch-001",
+)
 ```
 
 ## Guardrails
@@ -105,12 +127,40 @@ quality scores, incomplete update sets, poisoning signals, missing aggregate
 digests, model release without MLCM linkage, model release without approval,
 model release without privacy review, federation retirement without impact
 review, cross-tenant participation, and non-Bytewax round event streams.
+Agent guardrails also block unsupported runtimes, unsupported roles, missing
+scope, missing owner, missing purpose, undisclosed machine contribution, and
+non-Bytewax lifecycle batches. Privileged roles without explicit human
+approval are retained as `pending_review` rather than silently activated.
+
+## Agent Composition
+
+FEDL agents are provider-neutral governance actors. The contract currently
+recognizes `codex`, `claude_code`, `opencode`, and `pi` runtime codes, but the
+runtime execution remains behind AICR adapter contracts. Generated applications
+compose agents through `register_federation_agent()` and inspect them through
+`list_federation_agents()` or the `/fedl/agents` UI route metadata.
+
+Supported roles include federation, participant, privacy, security, round,
+aggregation, model-release, residency, and steward responsibilities. Privacy,
+security, round, aggregation, model-release, and residency roles are privileged
+and require human approval evidence for active status.
+
+## Bytewax Lifecycle Batches
+
+FEDL does not use Kafka for lifecycle mutation governance. The streaming
+manifest requires Bytewax with the `fedl.lifecycle` stream and declares
+operation names for federation, participant, training-round, update,
+aggregation, privacy-budget, release, and federation-agent batches.
+Generated applications validate those batches with
+`validate_fedl_lifecycle_batch()` and inspect accepted or denied evidence
+through `list_lifecycle_batches()` or the `/fedl/lifecycle` route metadata.
 
 ## Focused Verification
 
 ```bash
 ./.venv/bin/python -m py_compile capabilities/common/fedl/__init__.py capabilities/common/fedl/capability_contract.py capabilities/common/fedl/models.py capabilities/common/fedl/federated_engine.py capabilities/common/fedl/service.py capabilities/common/fedl/api.py capabilities/common/fedl/views.py capabilities/common/fedl/app.py capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py
 ./.venv/bin/pytest -q capabilities/common/fedl/test_capability_contract.py capabilities/common/fedl/tests/test_package_contract.py
+./.venv/bin/python capabilities/common/fedl/app.py
 ./.venv/bin/apg capabilities implementation-audit --root capabilities/common/fedl --json
 ./.venv/bin/apg capabilities publish-plan capabilities/common/fedl --json
 ```

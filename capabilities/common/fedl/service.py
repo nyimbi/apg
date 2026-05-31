@@ -11,7 +11,9 @@ from .models import (
 	FederatedModel,
 	FederatedModelRelease,
 	Federation,
+	FederationAgentRecord,
 	FedlAuditEvent,
+	FedlLifecycleBatchRecord,
 	ModelUpdate,
 	Participant,
 	TrainingRound,
@@ -22,6 +24,7 @@ class FedlService:
 	"""Federation, participant, training-round, and aggregation service."""
 
 	def __init__(self) -> None:
+		contract = get_capability_contract()
 		self._federations: dict[str, Federation] = {}
 		self._participants: dict[str, Participant] = {}
 		self._rounds: dict[str, TrainingRound] = {}
@@ -29,8 +32,14 @@ class FedlService:
 		self._aggregations: dict[str, AggregationResult] = {}
 		self._models: dict[str, FederatedModel] = {}
 		self._releases: dict[str, FederatedModelRelease] = {}
+		self._federation_agents: dict[str, FederationAgentRecord] = {}
+		self._lifecycle_batches: dict[str, FedlLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, FedlAuditEvent] = {}
 		self._engine = FederatedLearningEngine()
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -345,6 +354,112 @@ class FedlService:
 		)
 		return retired.to_dict()
 
+	def register_federation_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		"""Register a first-class federation agent with guardrail evidence."""
+		self._enforce_allow({"tenant_context_present": bool(tenant_id)})
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_federation_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not name:
+			raise ValueError("federation_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = FederationAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._federation_agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._record_audit(
+			tenant_id,
+			record.id,
+			"federation_agent_registered",
+			owner,
+			result["decision"],
+			reasons=tuple(action.get("reason", "") for action in result["actions"]),
+			metadata={"runtime": runtime_value, "role": role_value, "status": status, "matched_rules": result["matched_rules"]},
+		)
+		return record.to_dict()
+
+	def validate_fedl_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "federation_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Validate that FEDL lifecycle mutation batches flow through Bytewax."""
+		self._enforce_allow({"tenant_context_present": bool(tenant_id)})
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("fedl_lifecycle_batch_empty")
+		stream_value = self._normalize_token(event_stream)
+		operation_value = self._normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_fedl_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_fedl_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = FedlLifecycleBatchRecord(
+			id=batch_id or f"fedlbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._record_audit(
+			tenant_id,
+			record.id,
+			f"fedl_lifecycle_batch_{record.status}",
+			"bytewax",
+			result["decision"],
+			reasons=tuple(action.get("reason", "") for action in result["actions"]),
+			metadata=record.to_dict(),
+		)
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def list_federations(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._federations, tenant_id)
 
@@ -365,6 +480,12 @@ class FedlService:
 
 	def list_releases(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._releases, tenant_id)
+
+	def list_federation_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._federation_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
@@ -410,6 +531,8 @@ class FedlService:
 	def dashboard_summary(self, tenant_id: str = "default") -> dict[str, Any]:
 		rounds = self.list_rounds(tenant_id)
 		updates = self.list_updates(tenant_id)
+		agents = [item for item in self._federation_agents.values() if item.tenant_id == tenant_id]
+		batches = [item for item in self._lifecycle_batches.values() if item.tenant_id == tenant_id]
 		return {
 			"federation_count": len(self.list_federations(tenant_id)),
 			"participant_count": len(self.list_participants(tenant_id)),
@@ -421,6 +544,10 @@ class FedlService:
 			"aggregation_count": len(self.list_aggregations(tenant_id)),
 			"model_count": len(self.list_models(tenant_id)),
 			"release_count": len(self.list_releases(tenant_id)),
+			"federation_agent_count": len(agents),
+			"pending_agent_review_count": sum(1 for item in agents if item.status == "pending_review"),
+			"lifecycle_batch_count": len(batches),
+			"denied_lifecycle_batch_count": sum(1 for item in batches if item.status == "denied"),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -507,3 +634,9 @@ class FedlService:
 		if result["decision"] == "deny":
 			reasons = ", ".join(action.get("reason", "fedl_policy_blocked") for action in result["actions"])
 			raise PermissionError(reasons or "fedl_policy_blocked")
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"

@@ -6,6 +6,28 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_FEDL_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_FEDL_AGENT_ROLES = [
+	"federation_reviewer",
+	"participant_reviewer",
+	"privacy_reviewer",
+	"security_reviewer",
+	"round_reviewer",
+	"aggregation_reviewer",
+	"model_release_reviewer",
+	"residency_reviewer",
+	"federation_steward",
+]
+PRIVILEGED_FEDL_AGENT_ROLES = [
+	"privacy_reviewer",
+	"security_reviewer",
+	"round_reviewer",
+	"aggregation_reviewer",
+	"model_release_reviewer",
+	"residency_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"federation": {
@@ -48,6 +70,45 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"privacy_review_required": True,
 		"artifact_lineage_required": True,
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_FEDL_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_FEDL_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_FEDL_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "fedl.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"federation_batch",
+			"participant_batch",
+			"training_round_batch",
+			"model_update_batch",
+			"aggregation_batch",
+			"privacy_budget_batch",
+			"release_batch",
+			"federation_agent_batch",
+		],
+		"topics": [
+			"fedl.federations",
+			"fedl.participants",
+			"fedl.rounds",
+			"fedl.updates",
+			"fedl.aggregations",
+			"fedl.privacy",
+			"fedl.releases",
+			"fedl.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"auth_required": True,
@@ -89,6 +150,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_security_console": True,
 		"enable_model_registry": True,
 		"enable_release_console": True,
+		"enable_federation_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit_timeline": True,
 		"enable_settings": True,
 	},
@@ -106,6 +169,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"training",
 		"aggregation",
 		"model_release",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -119,6 +184,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"training",
 		"aggregation",
 		"model_release",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -159,6 +226,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "federation_retirement_requires_review", "description": "Federation retirement requires impact review.", "condition": {"operation": "retire_federation", "impact_review_recorded": False}, "effect": {"decision": "deny", "reason": "federation_retirement_review_required", "required_action": "record_retirement_impact"}},
 	{"name": "cross_tenant_participation_denied", "description": "Cross-tenant federation participation is denied by default.", "condition": {"cross_tenant_participation": True}, "effect": {"decision": "deny", "reason": "cross_tenant_participation_denied", "required_action": "use_tenant_scoped_federation"}},
 	{"name": "bytewax_stream_required_for_round_events", "description": "Federated round event streams must use Bytewax.", "condition": {"operation": "configure_round_events", "event_stream": "kafka"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
+	{"name": "federation_agent_runtime_supported", "description": "Federation agents must use supported runtimes.", "condition": {"operation": "register_federation_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_federation_agent_runtime", "required_action": "choose_supported_federation_agent_runtime"}},
+	{"name": "federation_agent_role_supported", "description": "Federation agents must use supported governance roles.", "condition": {"operation": "register_federation_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_federation_agent_role", "required_action": "choose_supported_federation_agent_role"}},
+	{"name": "federation_agent_requires_scope", "description": "Federation agents require an explicit bounded scope.", "condition": {"operation": "register_federation_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "federation_agent_scope_required", "required_action": "declare_federation_agent_scope"}},
+	{"name": "federation_agent_requires_owner", "description": "Federation agents require an accountable owner.", "condition": {"operation": "register_federation_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "federation_agent_owner_required", "required_action": "assign_federation_agent_owner"}},
+	{"name": "federation_agent_requires_purpose", "description": "Federation agents require a documented purpose.", "condition": {"operation": "register_federation_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "federation_agent_purpose_required", "required_action": "document_federation_agent_purpose"}},
+	{"name": "federation_agent_requires_contribution_disclosure", "description": "Federation agents must disclose machine-authored federation contributions.", "condition": {"operation": "register_federation_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "federation_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "federation_agent_privileged_role_requires_human_approval", "description": "Privileged federation-agent roles require human approval evidence.", "condition": {"operation": "register_federation_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "federation_agent_human_approval_required", "required_action": "record_human_federation_agent_approval"}},
+	{"name": "bytewax_fedl_stream_required", "description": "FEDL lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_fedl_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_fedl_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -174,6 +249,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "security", "path": "/fedl/security", "component": "PoisoningDefense", "permission": "fedl:manage_security", "nav_group": "Governance"},
 	{"name": "models", "path": "/fedl/models", "component": "FederatedModelRegistry", "permission": "fedl:view_models", "nav_group": "Models"},
 	{"name": "release", "path": "/fedl/release", "component": "ModelReleaseConsole", "permission": "fedl:release_models", "nav_group": "Models"},
+	{"name": "agents", "path": "/fedl/agents", "component": "FederationAgentRoster", "permission": "fedl:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/fedl/lifecycle", "component": "FEDLLifecycleBatchMonitor", "permission": "fedl:govern", "nav_group": "Operations"},
 	{"name": "audit", "path": "/fedl/audit", "component": "FEDLAuditTimeline", "permission": "fedl:view", "nav_group": "Governance"},
 	{"name": "settings", "path": "/fedl/settings", "component": "FEDLSettings", "permission": "fedl:admin", "nav_group": "Administration"},
 ]
@@ -203,9 +280,63 @@ THEME: dict[str, Any] = {
 		"update_queue": {"visual": "update-ledger", "status_style": "quality-chip"},
 		"aggregation_console": {"visual": "secure-merge", "highlight": "digest-chip"},
 		"release_console": {"visual": "model-release-ladder", "status_style": "approval-chip"},
+		"federation_agent_roster": {"icon": "bot-message-square", "status_indicator": "agent-approval-chip", "risk_style": "scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class FEDL agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_FEDL_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_FEDL_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_FEDL_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the FEDL Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "fedl.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"federation_batch",
+			"participant_batch",
+			"training_round_batch",
+			"model_update_batch",
+			"aggregation_batch",
+			"privacy_budget_batch",
+			"release_batch",
+			"federation_agent_batch",
+		],
+		"topics": [
+			"fedl.federations",
+			"fedl.participants",
+			"fedl.rounds",
+			"fedl.updates",
+			"fedl.aggregations",
+			"fedl.privacy",
+			"fedl.releases",
+			"fedl.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -217,6 +348,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "fedl",
 		"display_name": "Federated Learning",
+		"provides": ["federated_learning", "privacy_preserving_training", "federation_agent_composition"],
+		"requires": ["aicr", "mlcm", "encr", "mten"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -228,6 +361,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 
@@ -255,6 +390,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_gt"):
 			if not context.get(key[:-3], 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

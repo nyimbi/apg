@@ -3,7 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
+
+
+def utc_now_iso() -> str:
+	"""Return a stable UTC timestamp string for in-process FEDL records."""
+	return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 @dataclass(frozen=True)
@@ -199,6 +205,74 @@ class FederatedModelRelease:
 			"privacy_review_ref": self.privacy_review_ref,
 			"artifact_ref": self.artifact_ref,
 			"status": self.status,
+		}
+
+
+@dataclass(frozen=True)
+class FederationAgentRecord:
+	"""First-class federation agent registration."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool
+	human_approval_required: bool
+	status: str = "active"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"agent_id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": self.created_at,
+		}
+
+
+@dataclass(frozen=True)
+class FedlLifecycleBatchRecord:
+	"""Bytewax lifecycle-batch validation evidence."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: list[str] = field(default_factory=list)
+	required_processor: str = "bytewax"
+	status: str = "accepted"
+	created_at: str = field(default_factory=utc_now_iso)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"batch_id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"required_processor": self.required_processor,
+			"status": self.status,
+			"created_at": self.created_at,
 		}
 
 
