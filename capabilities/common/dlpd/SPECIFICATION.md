@@ -16,6 +16,8 @@ DLPD owns:
 - Deterministic generated-app classification helpers.
 - Egress inspection and decisioning.
 - Quarantine metadata, legal hold, incident response, and review routing.
+- First-class AI-agent composition for DLP governance and response work.
+- Bytewax lifecycle-batch validation for DLP mutations.
 - Digest-backed audit events.
 - Contract-derived UI routes, view payloads, theme tokens, and package evidence.
 
@@ -41,6 +43,10 @@ Required adapter evidence:
 - `bytewax` for event-stream composition.
 - `secu`, `encr`, `nlpc`, `anom`, `audl`, `mqeb`, `srch`, `comp`, `moni`,
   and `cach` as integration adapter points.
+- Provider-neutral DLP agent adapter evidence through
+  `aicr_provider_neutral_dlp_agent_adapter`.
+- Bytewax lifecycle stream metadata through `dlpd.lifecycle`; Kafka and
+  broker-core coupling are not allowed.
 
 ## Runtime Lifecycle
 
@@ -75,27 +81,48 @@ Quarantine and incident lifecycle:
 4. Resolve incidents only with resolution notes.
 5. Record digest-backed audit events.
 
+Agent lifecycle:
+
+1. Register agents as tenant-local first-class records.
+2. Support provider-neutral runtimes: `codex`, `claude_code`, `opencode`, and
+   `pi`.
+3. Require role, scope, owner, purpose, and machine-contribution disclosure.
+4. Require review for privileged quarantine, incident, privacy, legal-hold,
+   lifecycle-batch, and steward roles unless human approval is recorded.
+5. Keep provider clients behind the AICR adapter contract.
+
+Bytewax lifecycle batch:
+
+1. Accept only configured DLP lifecycle operations.
+2. Require a positive mutation count.
+3. Require `event_stream="bytewax"`.
+4. Record accepted and denied batch evidence without retaining raw content.
+
 ## Rules
 
 The rule engine is deterministic and returns `allow`, `require_review`, or
 `deny`. Rules must cover tenant context, policies, classifiers, inspections,
 classification, channels, destinations, quarantine, incidents, reviews,
 Bytewax batch mutation, cross-tenant isolation, raw-content retention, and
-audit requirements.
+audit requirements. The agent and lifecycle extensions add rules for supported
+agent runtime, supported role, scope, owner, purpose, contribution disclosure,
+privileged-agent human approval, lifecycle mutation count, and Bytewax lifecycle
+stream routing.
 
 ## UI
 
 The route manifest must include dashboard, policies, classifiers, channels,
-inspections, incidents, quarantine, reviews, legal hold, analytics, audit, and
-settings. View helpers must return dependency-light dictionaries suitable for
-generated Python apps.
+inspections, incidents, quarantine, reviews, legal hold, analytics, agents,
+lifecycle batches, audit, and settings. View helpers must return
+dependency-light dictionaries suitable for generated Python apps.
 
 ## Theming
 
 The default theme is `dlpd_data_protection_ops`. It defines compact density,
 8px radius, protection/status color tokens, and named theme components for
 classifier grids, policy matrices, channel flows, inspection tables, incident
-queues, quarantine vaults, review queues, legal holds, and audit timelines.
+queues, quarantine vaults, review queues, legal holds, agent rosters, lifecycle
+stream panels, and audit timelines.
 
 ## Verification Requirements
 
@@ -103,10 +130,12 @@ The focused packet is serviceable when:
 
 - The contract shape validates.
 - The package self-test passes.
-- The rule count is at least 30.
-- The route count is at least 12.
+- The rule count is at least 39 after agent/lifecycle extension.
+- The route count is at least 14.
 - Bytewax adapter evidence is present.
+- Agents are first-class and expose supported runtimes/roles.
+- Bytewax lifecycle batch metadata is present and executable.
 - The runtime can register classifiers, register policies, inspect egress,
-  quarantine content, open/resolve incidents, audit actions, and isolate
-  tenants.
+  quarantine content, open/resolve incidents, register agents, validate
+  lifecycle batches, audit actions, and isolate tenants.
 - Focused DLPD tests pass without requiring full repository execution.

@@ -7,6 +7,30 @@ from numbers import Number
 from typing import Any
 
 
+SUPPORTED_DLPD_AGENT_RUNTIMES: list[str] = ["codex", "claude_code", "opencode", "pi"]
+
+SUPPORTED_DLPD_AGENT_ROLES: list[str] = [
+	"policy_reviewer",
+	"classifier_reviewer",
+	"inspection_triage_agent",
+	"quarantine_reviewer",
+	"incident_response_reviewer",
+	"privacy_reviewer",
+	"legal_hold_reviewer",
+	"lifecycle_batch_reviewer",
+	"dlp_steward",
+]
+
+PRIVILEGED_DLPD_AGENT_ROLES: list[str] = [
+	"quarantine_reviewer",
+	"incident_response_reviewer",
+	"privacy_reviewer",
+	"legal_hold_reviewer",
+	"lifecycle_batch_reviewer",
+	"dlp_steward",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"data_patterns": {
@@ -79,6 +103,43 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"trace_required": True,
 		"event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_DLPD_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_DLPD_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_DLPD_AGENT_ROLES,
+		"require_scope": True,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "dlpd.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"policy_batch",
+			"classifier_batch",
+			"inspection_batch",
+			"quarantine_batch",
+			"incident_batch",
+			"review_batch",
+			"dlp_agent_batch",
+		],
+		"topics": [
+			"dlpd.policies",
+			"dlpd.classifiers",
+			"dlpd.inspections",
+			"dlpd.quarantine",
+			"dlpd.incidents",
+			"dlpd.reviews",
+			"dlpd.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"adapters": {
 		"generated_app_runtime": "service.DlpdService",
 		"helper_runtime": "dlp_engine.py",
@@ -98,6 +159,7 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"compliance": "comp",
 		"monitoring": "moni",
 		"cache": "cach",
+		"agent_adapter": "aicr_provider_neutral_dlp_agent_adapter",
 	},
 	"ui": {
 		"enable_dashboard": True,
@@ -110,6 +172,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_review_queue": True,
 		"enable_legal_hold": True,
 		"enable_analytics": True,
+		"enable_dlp_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_audit": True,
 		"enable_settings": True,
 	},
@@ -132,6 +196,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -148,6 +214,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"security",
 		"governance",
 		"observability",
+		"agents",
+		"streaming",
 		"adapters",
 		"ui",
 		"theme",
@@ -192,6 +260,15 @@ RULES: list[dict[str, Any]] = [
 	{"name": "batch_dlp_mutation_requires_bytewax", "description": "Batch DLP mutations must use Bytewax event streams.", "condition": {"operation": "batch_dlp_mutation", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
 	{"name": "cross_tenant_dlp_access_denied", "description": "DLP records may not cross tenant boundaries.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_dlp_access_denied", "required_action": "use_tenant_local_context"}},
 	{"name": "dlp_state_change_requires_audit", "description": "DLP state changes require audit evidence.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "dlp_audit_event_required", "required_action": "record_dlp_audit_event"}},
+	{"name": "dlp_agent_runtime_supported", "description": "DLP agents must use supported provider-neutral runtimes.", "condition": {"operation": "register_dlp_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_dlp_agent_runtime", "required_action": "choose_supported_dlpd_agent_runtime"}},
+	{"name": "dlp_agent_role_supported", "description": "DLP agents must use supported data-protection roles.", "condition": {"operation": "register_dlp_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_dlp_agent_role", "required_action": "choose_supported_dlpd_agent_role"}},
+	{"name": "dlp_agent_requires_scope", "description": "DLP agents require an explicit policy, classifier, channel, inspection, quarantine, incident, legal-hold, or lifecycle scope.", "condition": {"operation": "register_dlp_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "dlp_agent_scope_required", "required_action": "declare_dlp_agent_scope"}},
+	{"name": "dlp_agent_requires_owner", "description": "DLP agents require an accountable owner.", "condition": {"operation": "register_dlp_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "dlp_agent_owner_required", "required_action": "assign_dlp_agent_owner"}},
+	{"name": "dlp_agent_requires_purpose", "description": "DLP agents require a documented data-protection purpose.", "condition": {"operation": "register_dlp_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "dlp_agent_purpose_required", "required_action": "document_dlp_agent_purpose"}},
+	{"name": "dlp_agent_requires_contribution_disclosure", "description": "DLP agents must disclose machine-authored policy, classifier, inspection, quarantine, incident, legal-hold, and lifecycle-review contributions.", "condition": {"operation": "register_dlp_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "dlp_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "dlp_agent_privileged_role_requires_human_approval", "description": "Privileged DLP agent roles require human approval evidence.", "condition": {"operation": "register_dlp_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "dlp_agent_human_approval_required", "required_action": "record_human_dlp_agent_approval"}},
+	{"name": "dlpd_lifecycle_batch_requires_mutations", "description": "DLPD lifecycle batches must include at least one mutation.", "condition": {"operation": "validate_dlpd_lifecycle_batch", "mutation_count_lte": 0}, "effect": {"decision": "deny", "reason": "dlpd_lifecycle_batch_empty", "required_action": "include_dlpd_lifecycle_mutations"}},
+	{"name": "bytewax_dlpd_stream_required", "description": "DLPD lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_dlpd_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_dlpd_lifecycle_batch_to_bytewax"}},
 ]
 
 
@@ -206,6 +283,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "reviews", "path": "/dlpd/reviews", "component": "DLPReviewQueue", "permission": "dlpd:review", "nav_group": "Response"},
 	{"name": "legal_hold", "path": "/dlpd/legal-hold", "component": "LegalHoldConsole", "permission": "dlpd:respond", "nav_group": "Governance"},
 	{"name": "analytics", "path": "/dlpd/analytics", "component": "DLPAnalytics", "permission": "dlpd:view", "nav_group": "Operations"},
+	{"name": "agents", "path": "/dlpd/agents", "component": "DLPAgentRoster", "permission": "dlpd:admin", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/dlpd/lifecycle", "component": "DLPDLifecycleBatchMonitor", "permission": "dlpd:admin", "nav_group": "Operations"},
 	{"name": "audit", "path": "/dlpd/audit", "component": "DLPAuditTrail", "permission": "dlpd:audit", "nav_group": "Governance"},
 	{"name": "settings", "path": "/dlpd/settings", "component": "DLPDSettings", "permission": "dlpd:admin", "nav_group": "Administration"},
 ]
@@ -235,6 +314,8 @@ THEME: dict[str, Any] = {
 		"quarantine_vault": {"visual": "encrypted-item-list", "status_style": "hold-chip"},
 		"review_queue": {"visual": "decision-lane", "status_style": "review-chip"},
 		"legal_hold": {"visual": "hold-ledger", "status_style": "hold-chip"},
+		"dlp_agent_roster": {"icon": "bot", "status_indicator": "agent-approval-chip", "risk_style": "data-scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "digest-chip"},
 	},
 }
@@ -252,6 +333,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"ui": {
 			"shell": "apg_python",
 			"view_module": "views.py",
@@ -261,6 +344,42 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"requires_theme": True,
 		},
 		"theme": deepcopy(THEME),
+	}
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return provider-neutral DLP agent composition metadata."""
+	agents = DEFAULT_CONFIGURATION["agents"]
+	return {
+		"first_class": bool(agents["first_class"]),
+		"supported_runtimes": list(agents["supported_runtimes"]),
+		"supported_roles": list(agents["supported_roles"]),
+		"privileged_roles": list(agents["privileged_roles"]),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": agents["adapter_contract"],
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return Bytewax lifecycle stream metadata for DLPD composition."""
+	streaming = DEFAULT_CONFIGURATION["streaming"]
+	return {
+		"engine": streaming["engine"],
+		"lifecycle_stream": streaming["lifecycle_stream"],
+		"watermark": streaming["watermark"],
+		"required_processor": streaming["required_processor"],
+		"required_operations": list(streaming["required_operations"]),
+		"topics": list(streaming["topics"]),
+		"broker_core_dependency_allowed": bool(streaming["broker_core_dependency_allowed"]),
 	}
 
 

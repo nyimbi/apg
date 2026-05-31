@@ -14,9 +14,11 @@ from .dlp_engine import (
 )
 from .models import (
 	DataClassifier,
+	DlpAgentRecord,
 	DlpAuditEvent,
 	DlpIncident,
 	DlpPolicy,
+	DlpdLifecycleBatchRecord,
 	EgressInspection,
 	QuarantineItem,
 	utc_now,
@@ -35,7 +37,13 @@ class DlpdService:
 		self._inspections: dict[StoreKey, EgressInspection] = {}
 		self._quarantine: dict[StoreKey, QuarantineItem] = {}
 		self._incidents: dict[StoreKey, DlpIncident] = {}
+		self._dlp_agents: dict[StoreKey, DlpAgentRecord] = {}
+		self._lifecycle_batches: dict[StoreKey, DlpdLifecycleBatchRecord] = {}
 		self._audit_events: list[DlpAuditEvent] = []
+		self._agent_runtimes = set(DEFAULT_CONFIGURATION["agents"]["supported_runtimes"])
+		self._agent_roles = set(DEFAULT_CONFIGURATION["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(DEFAULT_CONFIGURATION["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(DEFAULT_CONFIGURATION["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -253,6 +261,94 @@ class DlpdService:
 		self._record_audit(tenant_id, "incident_resolved", incident_id, actor, incident.to_dict())
 		return incident.to_dict()
 
+	def register_dlp_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._ensure_new(self._dlp_agents, tenant_id, agent_id)
+		self._require_tenant(tenant_id)
+		runtime_value = _normalize_token(runtime)
+		role_value = _normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_dlp_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not str(name or "").strip():
+			raise ValueError("dlp_agent_name_required")
+		agent = DlpAgentRecord(
+			id=str(agent_id).strip(),
+			tenant_id=tenant_id,
+			name=str(name).strip(),
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="pending_review" if result["decision"] == "require_review" else "active",
+		)
+		self._dlp_agents[self._key(tenant_id, agent.id)] = agent
+		self._record_audit(tenant_id, "dlp_agent_registered", agent.id, owner, {**agent.to_dict(), "rule_decision": result["decision"]})
+		return agent.to_dict()
+
+	def validate_dlpd_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "dlp_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("dlpd_lifecycle_batch_empty")
+		stream_value = _normalize_token(event_stream)
+		operation_value = _normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_dlpd_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_dlpd_lifecycle_batch",
+			"event_stream": stream_value,
+			"mutation_count": mutation_count,
+		})
+		accepted = result["decision"] == "allow"
+		record = DlpdLifecycleBatchRecord(
+			id=batch_id or f"dlpdbatch:{len(self._lifecycle_batches) + 1:06d}",
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=tuple(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._key(tenant_id, record.id)] = record
+		self._record_audit(tenant_id, f"dlpd_lifecycle_batch_{record.status}", record.id, "bytewax", record.to_dict())
+		self._raise_if_denied(result)
+		return record.to_dict()
+
 	def dashboard_summary(self, tenant_id: str) -> dict[str, Any]:
 		self._require_tenant(tenant_id)
 		inspections = self.list_inspections(tenant_id)
@@ -266,6 +362,10 @@ class DlpdService:
 			"quarantine_count": len(self.list_quarantine(tenant_id)),
 			"open_incident_count": sum(1 for item in incidents if item["status"] == "open"),
 			"review_required_count": sum(1 for item in inspections if item["review_required"]),
+			"dlp_agent_count": len(self.list_dlp_agents(tenant_id)),
+			"pending_agent_review_count": sum(1 for item in self.list_dlp_agents(tenant_id) if item["status"] == "pending_review"),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": sum(1 for item in self.list_lifecycle_batches(tenant_id) if item["status"] == "denied"),
 		}
 
 	def list_policies(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
@@ -282,6 +382,12 @@ class DlpdService:
 
 	def list_incidents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list_for_tenant(self._incidents, tenant_id)
+
+	def list_dlp_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list_for_tenant(self._dlp_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list_for_tenant(self._lifecycle_batches, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = self._audit_events
@@ -415,3 +521,7 @@ class DlpdService:
 
 	def _key(self, tenant_id: str, record_id: str) -> StoreKey:
 		return (tenant_id, record_id)
+
+
+def _normalize_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")

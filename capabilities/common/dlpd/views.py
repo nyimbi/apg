@@ -26,6 +26,10 @@ def dashboard_model(
 		"classifiers": service.list_classifiers(tenant_id),
 		"recent_inspections": service.list_inspections(tenant_id)[-10:],
 		"open_incidents": [incident for incident in service.list_incidents(tenant_id) if incident["status"] == "open"],
+		"dlp_agents": service.list_dlp_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 	}
 
@@ -117,6 +121,32 @@ def analytics_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
 		"route": "/dlpd/analytics",
 		"summary": service.dashboard_summary(tenant_id),
 		"theme_component": "inspection_table",
+	}
+
+
+def dlp_agent_roster_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/agents",
+		"agents": service.list_dlp_agents(tenant_id),
+		"agent_manifest": contract["agents"],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"theme_component": "dlp_agent_roster",
+	}
+
+
+def lifecycle_batch_model(service: DlpdService, tenant_id: str) -> dict[str, object]:
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"route": "/dlpd/lifecycle",
+		"streaming": contract["streaming"],
+		"batches": service.list_lifecycle_batches(tenant_id),
+		"required_operations": contract["streaming"]["required_operations"],
+		"theme_component": "bytewax_lifecycle_panel",
 	}
 
 

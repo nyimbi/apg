@@ -2,7 +2,8 @@
 
 ## Delivery Slice
 
-Build DLPD as a coherent lifecycle and guardrail packet for generated APG
+Extend DLPD from its existing policy/classifier/inspection packet into a
+coherent AI-agent and Bytewax lifecycle guardrail packet for generated APG
 applications.
 
 ## Steps
@@ -17,6 +18,9 @@ applications.
    - Add policy, classification, quarantine, incident, review, security,
      observability, adapter, UI, and theme sections.
    - Expand deterministic guardrails to the full DLP lifecycle.
+   - Add provider-neutral DLP agent manifest for `codex`, `claude_code`,
+     `opencode`, and `pi`.
+   - Add Bytewax lifecycle stream manifest and DLP lifecycle batch operations.
    - Add Bytewax event-stream adapter evidence.
 
 3. Harden the runtime.
@@ -24,12 +28,16 @@ applications.
    - Key state by tenant and record ID.
    - Enforce policy, classifier, inspection, quarantine, incident, and
      cross-tenant guardrails.
+   - Register DLP agents with scope, owner, purpose, contribution disclosure,
+     and privileged-role review semantics.
+   - Validate lifecycle batches through Bytewax-only stream metadata.
    - Preserve hash-only generated runtime behavior for sensitive content.
 
 4. Refresh generated app surfaces.
    - Make `app.py` derive semantic output from the live contract.
    - Update registration metadata, endpoint metadata, adapters, permissions,
      and view helpers.
+   - Add agent roster and lifecycle batch view/API surfaces.
    - Refresh JSON package evidence from the live contract.
 
 5. Review and verify.

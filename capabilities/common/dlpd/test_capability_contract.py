@@ -11,9 +11,11 @@ from capabilities.common.dlpd.views import (
 	channel_monitor_model,
 	classifier_workbench_model,
 	dashboard_model,
+	dlp_agent_roster_model,
 	incident_queue_model,
 	inspection_workbench_model,
 	legal_hold_model,
+	lifecycle_batch_model,
 	policy_console_model,
 	quarantine_vault_model,
 	review_queue_model,
@@ -29,12 +31,20 @@ def test_contract_exposes_configuration_rules_ui_theme_and_adapters():
 	assert contract["configuration"]["channels"]["bulk_export_threshold_records"] == 5000
 	assert set(contract["configuration_schema"]["required"]) >= {"tenant_id", "data_patterns", "policies", "channels", "classification", "response", "quarantine", "incidents", "reviews", "security", "governance", "observability", "adapters", "ui", "theme"}
 	assert len(contract["rule_engine"]["rules"]) >= 30
-	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "policies", "classifiers", "channels", "inspections", "incidents", "quarantine", "reviews", "legal_hold", "analytics", "audit", "settings"}
+	assert len(contract["rule_engine"]["rules"]) >= 39
+	assert {route["name"] for route in contract["ui"]["routes"]} >= {"dashboard", "policies", "classifiers", "channels", "inspections", "incidents", "quarantine", "reviews", "legal_hold", "analytics", "agents", "lifecycle", "audit", "settings"}
 	assert contract["ui"]["api_prefix"] == "/dlpd/api/v1"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert set(contract["agents"]["supported_runtimes"]) == {"codex", "claude_code", "opencode", "pi"}
+	assert "dlp_steward" in contract["agents"]["supported_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "dlp_agent_batch" in contract["streaming"]["required_operations"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "incident_queue" in contract["theme"]["components"]
 	assert "review_queue" in contract["theme"]["components"]
+	assert "dlp_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_dlp_guardrails():
@@ -56,6 +66,17 @@ def test_rule_engine_enforces_dlp_guardrails():
 		"review_recorded": False,
 	})
 	batch_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "batch_dlp_mutation", "event_stream": "kafka"})
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_dlp_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+	})
+	lifecycle_result = evaluate_capability_rules({"tenant_context_present": True, "operation": "validate_dlpd_lifecycle_batch", "event_stream": "kafka", "mutation_count": 1})
 
 	assert result["decision"] == "deny"
 	assert set(result["matched_rules"]) >= {
@@ -71,6 +92,16 @@ def test_rule_engine_enforces_dlp_guardrails():
 		"large_export_requires_review",
 	}
 	assert batch_result["matched_rules"] == ["batch_dlp_mutation_requires_bytewax"]
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"dlp_agent_runtime_supported",
+		"dlp_agent_role_supported",
+		"dlp_agent_requires_scope",
+		"dlp_agent_requires_owner",
+		"dlp_agent_requires_purpose",
+		"dlp_agent_requires_contribution_disclosure",
+	}
+	assert lifecycle_result["matched_rules"] == ["bytewax_dlpd_stream_required"]
 
 
 def test_registration_includes_full_capability_contract():
@@ -83,7 +114,11 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "dlpd_data_protection_ops"
 	assert registration["ui_components"]["incidents"] == "/dlpd/incidents"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
 	assert registration["endpoints"]["audit"] == "/dlpd/api/v1/audit"
+	assert registration["endpoints"]["agents"] == "/dlpd/api/v1/agents"
+	assert registration["endpoints"]["lifecycle"] == "/dlpd/api/v1/lifecycle"
 	assert "nlpc" in registration["dependencies"]
 	assert "dlpd:respond" in registration["permissions"]
 	assert "dlpd:audit" in registration["permissions"]
@@ -126,6 +161,8 @@ def test_service_runs_sensitive_egress_quarantine_and_incident_lifecycle():
 	assert review_queue_model(service, tenant_id)["review_rules"]
 	assert legal_hold_model(service, tenant_id)["legal_hold_items"][0]["id"] == "qrn-insp-1"
 	assert analytics_model(service, tenant_id)["summary"]["quarantine_count"] == 1
+	assert dlp_agent_roster_model(service, tenant_id)["supported_runtimes"]
+	assert lifecycle_batch_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert audit_model(service, tenant_id)["audit_events"]
 	assert settings_model(service, tenant_id)["configuration"]["adapters"]["event_stream"] == "bytewax"
 
@@ -148,6 +185,18 @@ def test_service_enforces_dlp_guardrails():
 		service.inspect_egress("insp-wrong-channel", "tenant-dlp", "pol-chat", "email", "user-1", "external@example.com", "alice@example.com")
 	with pytest.raises(PermissionError, match="classification_label_required"):
 		service.inspect_egress("insp-unlabeled", "tenant-dlp", "pol-chat", "chat", "user-1", "external-room", "alice@example.com", auto_classify=False)
+	with pytest.raises(PermissionError, match="unsupported_dlp_agent_runtime"):
+		service.register_dlp_agent("agent-unsupported", "tenant-dlp", "Unsupported", "kafka_agent", "policy_reviewer", "policy:pol-chat", "owner", "review policies")
+
+	pending = service.register_dlp_agent("agent-pending", "tenant-dlp", "Privacy Reviewer", "claude_code", "privacy_reviewer", "tenant:tenant-dlp", "privacy-office", "review sensitive data movement")
+	assert pending["status"] == "pending_review"
+
+	with pytest.raises(ValueError, match="dlpd_lifecycle_batch_empty"):
+		service.validate_dlpd_lifecycle_batch("tenant-dlp", "bytewax", 0, "policy_batch")
+	with pytest.raises(ValueError, match="unsupported_dlpd_lifecycle_operation"):
+		service.validate_dlpd_lifecycle_batch("tenant-dlp", "bytewax", 1, "unknown_batch")
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_dlpd_lifecycle_batch("tenant-dlp", "kafka", 1, "policy_batch")
 
 
 def test_large_export_review_and_high_severity_block_rules_are_executable():
@@ -203,3 +252,50 @@ def test_api_helpers_wrap_runtime_operations():
 	assert policy["id"] == "api-policy"
 	assert inspection["quarantined"] is True
 	assert api.capability_status(tenant_id)["inspection_count"] == 1
+
+
+def test_dlp_agents_and_lifecycle_batches_are_first_class_runtime_surfaces():
+	service = DlpdService()
+	tenant_id = "tenant-agent-dlpd"
+
+	agent = service.register_dlp_agent(
+		"agent-steward",
+		tenant_id,
+		"DLP Steward",
+		"opencode",
+		"dlp_steward",
+		"tenant:tenant-agent-dlpd",
+		"security-platform",
+		"review DLP lifecycle batches",
+		human_approval_required=True,
+	)
+	batch = service.validate_dlpd_lifecycle_batch(tenant_id, "bytewax", 3, "dlp_agent_batch", "batch-agent")
+
+	assert agent["status"] == "active"
+	assert batch["accepted"] is True
+	assert service.dashboard_summary(tenant_id)["dlp_agent_count"] == 1
+	assert service.dashboard_summary(tenant_id)["lifecycle_batch_count"] == 1
+	assert dlp_agent_roster_model(service, tenant_id)["agents"][0]["id"] == "agent-steward"
+	assert lifecycle_batch_model(service, tenant_id)["batches"][0]["id"] == "batch-agent"
+
+	api_agent = api.register_dlp_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api-agent-dlpd",
+		"name": "API Policy Reviewer",
+		"runtime": "codex",
+		"role": "policy_reviewer",
+		"scope": "policy:*",
+		"owner": "security-ops",
+		"purpose": "review generated DLP policies",
+	})
+	api_batch = api.validate_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-api-agent-dlpd",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "policy_batch",
+	})
+
+	assert api_agent["runtime"] == "codex"
+	assert api_batch["status"] == "accepted"
+	assert api.capability_status("tenant-api-agent-dlpd")["dlp_agent_count"] == 1

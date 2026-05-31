@@ -47,11 +47,13 @@ def semantic_model() -> dict[str, Any]:
 			"dlpd": {
 				"name": contract["display_name"],
 				"configuration": contract["configuration"],
-				"provides": ["dlpd_operations"],
-				"requires": ["secu", "encr", "nlpc", "anom"],
+				"provides": ["dlpd_operations", "data_loss_prevention", "dlp_agent_composition"],
+				"requires": ["secu", "encr", "nlpc", "anom", "audl", "mqeb", "moni", "cach"],
 				"erp_modules": ["common"],
 				"rule_engine": contract["rule_engine"],
 				"rules": contract["rule_engine"]["rules"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 				"ui": contract["ui"],
 				"screens": routes,
 				"theme": contract["theme"],
@@ -77,26 +79,33 @@ def semantic_model() -> dict[str, Any]:
 					"quarantine": "QuarantineItem",
 					"incident": "DlpIncident",
 					"audit": "DlpAuditEvent",
+					"dlp_agent": "DlpAgentRecord",
+					"lifecycle_batch": "DlpdLifecycleBatchRecord",
 				},
 				"adapters": contract["configuration"]["adapters"],
 				"i18n": {},
 				"master_data": {},
-				"streaming": {"engine": contract["configuration"]["adapters"]["event_stream"]},
 			}
 		},
 		"contracts": {
 			"dlpd": {
 				"id": "dlpd",
 				"configuration": contract["configuration"],
-				"provides": ["dlpd_operations"],
-				"requires": ["secu", "encr", "nlpc", "anom"],
+				"provides": ["dlpd_operations", "data_loss_prevention", "dlp_agent_composition"],
+				"requires": ["secu", "encr", "nlpc", "anom", "audl", "mqeb", "moni", "cach"],
+				"agents": contract["agents"],
+				"streaming": contract["streaming"],
 			}
 		},
 		"rules": {rule["name"]: rule for rule in contract["rule_engine"]["rules"]},
-		"composition": {"capability_dependencies": {"dlpd": ["secu", "encr", "nlpc", "anom"]}, "applications": {}, "agent_teams": {}},
+		"composition": {
+			"capability_dependencies": {"dlpd": ["secu", "encr", "nlpc", "anom", "audl", "mqeb", "moni", "cach"]},
+			"applications": {},
+			"agent_teams": {"dlp_governance": contract["agents"]},
+		},
 		"deployment": {"source": "capability_contract.py", "target": "python"},
 		"graphs": {
-			"capability": {"kind": "capability", "nodes": 1, "edges": 4},
+			"capability": {"kind": "capability", "nodes": 1, "edges": 8},
 			"package": {"kind": "package", "nodes": 2, "edges": 1},
 		},
 		"source_files": ["capability_contract.py", "models.py", "dlp_engine.py", "service.py", "api.py", "views.py", "app.py"],
@@ -110,7 +119,7 @@ def semantic_model() -> dict[str, Any]:
 				"references": [],
 			}
 		},
-		"agents": {},
+		"agents": {"dlp_governance": contract["agents"]},
 		"flows": {},
 		"llms": {},
 		"operations": {},
@@ -154,12 +163,16 @@ def self_test() -> dict[str, Any]:
 		errors.append("capability missing from semantic model")
 	if manifest.get("interfaces", {}).get("semantic_model") != "/semantic-model.json":
 		errors.append("component manifest semantic model interface mismatch")
-	if len(routes) < 12:
+	if len(routes) < 14:
 		errors.append("DLPD semantic model route manifest is stale")
-	if len(rules) < 30:
+	if len(rules) < 39:
 		errors.append("DLPD semantic model rule manifest is stale")
 	if adapters.get("event_stream") != "bytewax":
 		errors.append("DLPD adapter manifest must use Bytewax for event streaming")
+	if not capability.get("agents", {}).get("first_class"):
+		errors.append("DLPD agent manifest must make agents first-class")
+	if capability.get("streaming", {}).get("required_processor") != "bytewax":
+		errors.append("DLPD lifecycle stream must require Bytewax")
 	if capability.get("runtime", {}).get("service") != "service.DlpdService":
 		errors.append("DLPD generated-app runtime is missing")
 	return {

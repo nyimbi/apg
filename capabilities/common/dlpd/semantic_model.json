@@ -1,5 +1,54 @@
 {
-  "agents": {},
+  "agents": {
+    "dlp_governance": {
+      "adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+      "first_class": true,
+      "guardrails": [
+        "supported_runtime",
+        "supported_role",
+        "explicit_scope",
+        "accountable_owner",
+        "declared_purpose",
+        "machine_contribution_disclosure",
+        "human_approval_for_privileged_roles"
+      ],
+      "privileged_roles": [
+        "quarantine_reviewer",
+        "incident_response_reviewer",
+        "privacy_reviewer",
+        "legal_hold_reviewer",
+        "lifecycle_batch_reviewer",
+        "dlp_steward"
+      ],
+      "required_fields": [
+        "tenant_id",
+        "agent_id",
+        "name",
+        "runtime",
+        "role",
+        "scope",
+        "owner",
+        "purpose"
+      ],
+      "supported_roles": [
+        "policy_reviewer",
+        "classifier_reviewer",
+        "inspection_triage_agent",
+        "quarantine_reviewer",
+        "incident_response_reviewer",
+        "privacy_reviewer",
+        "legal_hold_reviewer",
+        "lifecycle_batch_reviewer",
+        "dlp_steward"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "Data Loss Prevention package-backed APG capability",
     "entity_count": 0,
@@ -9,6 +58,7 @@
   "capabilities": {
     "dlpd": {
       "adapters": {
+        "agent_adapter": "aicr_provider_neutral_dlp_agent_adapter",
         "anomaly_detection": "anom",
         "api_helpers": "api.py",
         "audit_sink": "audl",
@@ -28,6 +78,54 @@
         "security_framework": "secu",
         "view_models": "views.py"
       },
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "quarantine_reviewer",
+          "incident_response_reviewer",
+          "privacy_reviewer",
+          "legal_hold_reviewer",
+          "lifecycle_batch_reviewer",
+          "dlp_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "policy_reviewer",
+          "classifier_reviewer",
+          "inspection_triage_agent",
+          "quarantine_reviewer",
+          "incident_response_reviewer",
+          "privacy_reviewer",
+          "legal_hold_reviewer",
+          "lifecycle_batch_reviewer",
+          "dlp_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "large_export": "DLPReview",
         "quarantine_release": "DLPReview",
@@ -38,6 +136,7 @@
       "components": {},
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_dlp_agent_adapter",
           "anomaly_detection": "anom",
           "api_helpers": "api.py",
           "audit_sink": "audl",
@@ -56,6 +155,40 @@
           "search": "srch",
           "security_framework": "secu",
           "view_models": "views.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "quarantine_reviewer",
+            "incident_response_reviewer",
+            "privacy_reviewer",
+            "legal_hold_reviewer",
+            "lifecycle_batch_reviewer",
+            "dlp_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "policy_reviewer",
+            "classifier_reviewer",
+            "inspection_triage_agent",
+            "quarantine_reviewer",
+            "incident_response_reviewer",
+            "privacy_reviewer",
+            "legal_hold_reviewer",
+            "lifecycle_batch_reviewer",
+            "dlp_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "channels": {
           "anomaly_context_required": true,
@@ -146,6 +279,31 @@
           "raw_content_retention_allowed": false,
           "tenant_isolation_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "dlpd.lifecycle",
+          "required_operations": [
+            "policy_batch",
+            "classifier_batch",
+            "inspection_batch",
+            "quarantine_batch",
+            "incident_batch",
+            "review_batch",
+            "dlp_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "dlpd.policies",
+            "dlpd.classifiers",
+            "dlpd.inspections",
+            "dlpd.quarantine",
+            "dlpd.incidents",
+            "dlpd.reviews",
+            "dlpd.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -157,9 +315,11 @@
           "enable_channel_monitor": true,
           "enable_classifier_workbench": true,
           "enable_dashboard": true,
+          "enable_dlp_agent_roster": true,
           "enable_incident_queue": true,
           "enable_inspection_workbench": true,
           "enable_legal_hold": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_policy_console": true,
           "enable_quarantine_vault": true,
           "enable_review_queue": true,
@@ -169,8 +329,10 @@
       "dlp_lifecycle": {
         "audit": "DlpAuditEvent",
         "classifier": "DataClassifier",
+        "dlp_agent": "DlpAgentRecord",
         "incident": "DlpIncident",
         "inspection": "EgressInspection",
+        "lifecycle_batch": "DlpdLifecycleBatchRecord",
         "policy": "DlpPolicy",
         "quarantine": "QuarantineItem"
       },
@@ -181,13 +343,19 @@
       "master_data": {},
       "name": "Data Loss Prevention",
       "provides": [
-        "dlpd_operations"
+        "dlpd_operations",
+        "data_loss_prevention",
+        "dlp_agent_composition"
       ],
       "requires": [
         "secu",
         "encr",
         "nlpc",
-        "anom"
+        "anom",
+        "audl",
+        "mqeb",
+        "moni",
+        "cach"
       ],
       "rule_engine": {
         "rules": [
@@ -656,6 +824,124 @@
               "required_action": "record_dlp_audit_event"
             },
             "name": "dlp_state_change_requires_audit"
+          },
+          {
+            "condition": {
+              "agent_runtime_supported": false,
+              "operation": "register_dlp_agent"
+            },
+            "description": "DLP agents must use supported provider-neutral runtimes.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_dlp_agent_runtime",
+              "required_action": "choose_supported_dlpd_agent_runtime"
+            },
+            "name": "dlp_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "agent_role_supported": false,
+              "operation": "register_dlp_agent"
+            },
+            "description": "DLP agents must use supported data-protection roles.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_dlp_agent_role",
+              "required_action": "choose_supported_dlpd_agent_role"
+            },
+            "name": "dlp_agent_role_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_dlp_agent",
+              "scope_present": false
+            },
+            "description": "DLP agents require an explicit policy, classifier, channel, inspection, quarantine, incident, legal-hold, or lifecycle scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_agent_scope_required",
+              "required_action": "declare_dlp_agent_scope"
+            },
+            "name": "dlp_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "operation": "register_dlp_agent",
+              "owner_present": false
+            },
+            "description": "DLP agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_agent_owner_required",
+              "required_action": "assign_dlp_agent_owner"
+            },
+            "name": "dlp_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "operation": "register_dlp_agent",
+              "purpose_present": false
+            },
+            "description": "DLP agents require a documented data-protection purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_agent_purpose_required",
+              "required_action": "document_dlp_agent_purpose"
+            },
+            "name": "dlp_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "contribution_disclosed": false,
+              "operation": "register_dlp_agent"
+            },
+            "description": "DLP agents must disclose machine-authored policy, classifier, inspection, quarantine, incident, legal-hold, and lifecycle-review contributions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlp_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "dlp_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_dlp_agent",
+              "privileged_role": true
+            },
+            "description": "Privileged DLP agent roles require human approval evidence.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "dlp_agent_human_approval_required",
+              "required_action": "record_human_dlp_agent_approval"
+            },
+            "name": "dlp_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "mutation_count_lte": 0,
+              "operation": "validate_dlpd_lifecycle_batch"
+            },
+            "description": "DLPD lifecycle batches must include at least one mutation.",
+            "effect": {
+              "decision": "deny",
+              "reason": "dlpd_lifecycle_batch_empty",
+              "required_action": "include_dlpd_lifecycle_mutations"
+            },
+            "name": "dlpd_lifecycle_batch_requires_mutations"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_dlpd_lifecycle_batch"
+            },
+            "description": "DLPD lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_lifecycle_stream_required",
+              "required_action": "route_dlpd_lifecycle_batch_to_bytewax"
+            },
+            "name": "bytewax_dlpd_stream_required"
           }
         ],
         "type": "deterministic"
@@ -1126,6 +1412,124 @@
             "required_action": "record_dlp_audit_event"
           },
           "name": "dlp_state_change_requires_audit"
+        },
+        {
+          "condition": {
+            "agent_runtime_supported": false,
+            "operation": "register_dlp_agent"
+          },
+          "description": "DLP agents must use supported provider-neutral runtimes.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_dlp_agent_runtime",
+            "required_action": "choose_supported_dlpd_agent_runtime"
+          },
+          "name": "dlp_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "agent_role_supported": false,
+            "operation": "register_dlp_agent"
+          },
+          "description": "DLP agents must use supported data-protection roles.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_dlp_agent_role",
+            "required_action": "choose_supported_dlpd_agent_role"
+          },
+          "name": "dlp_agent_role_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_dlp_agent",
+            "scope_present": false
+          },
+          "description": "DLP agents require an explicit policy, classifier, channel, inspection, quarantine, incident, legal-hold, or lifecycle scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_agent_scope_required",
+            "required_action": "declare_dlp_agent_scope"
+          },
+          "name": "dlp_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "operation": "register_dlp_agent",
+            "owner_present": false
+          },
+          "description": "DLP agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_agent_owner_required",
+            "required_action": "assign_dlp_agent_owner"
+          },
+          "name": "dlp_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "operation": "register_dlp_agent",
+            "purpose_present": false
+          },
+          "description": "DLP agents require a documented data-protection purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_agent_purpose_required",
+            "required_action": "document_dlp_agent_purpose"
+          },
+          "name": "dlp_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "contribution_disclosed": false,
+            "operation": "register_dlp_agent"
+          },
+          "description": "DLP agents must disclose machine-authored policy, classifier, inspection, quarantine, incident, legal-hold, and lifecycle-review contributions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlp_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "dlp_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_dlp_agent",
+            "privileged_role": true
+          },
+          "description": "Privileged DLP agent roles require human approval evidence.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "dlp_agent_human_approval_required",
+            "required_action": "record_human_dlp_agent_approval"
+          },
+          "name": "dlp_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "mutation_count_lte": 0,
+            "operation": "validate_dlpd_lifecycle_batch"
+          },
+          "description": "DLPD lifecycle batches must include at least one mutation.",
+          "effect": {
+            "decision": "deny",
+            "reason": "dlpd_lifecycle_batch_empty",
+            "required_action": "include_dlpd_lifecycle_mutations"
+          },
+          "name": "dlpd_lifecycle_batch_requires_mutations"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_dlpd_lifecycle_batch"
+          },
+          "description": "DLPD lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_lifecycle_stream_required",
+            "required_action": "route_dlpd_lifecycle_batch_to_bytewax"
+          },
+          "name": "bytewax_dlpd_stream_required"
         }
       ],
       "runtime": {
@@ -1136,6 +1540,11 @@
         "views": "views.py"
       },
       "screens": {
+        "agents": {
+          "component": "DLPAgentRoster",
+          "permission": "dlpd:admin",
+          "route": "/dlpd/agents"
+        },
         "analytics": {
           "component": "DLPAnalytics",
           "permission": "dlpd:view",
@@ -1176,6 +1585,11 @@
           "permission": "dlpd:respond",
           "route": "/dlpd/legal-hold"
         },
+        "lifecycle": {
+          "component": "DLPDLifecycleBatchMonitor",
+          "permission": "dlpd:admin",
+          "route": "/dlpd/lifecycle"
+        },
         "policies": {
           "component": "DLPPolicyConsole",
           "permission": "dlpd:manage_policies",
@@ -1198,13 +1612,40 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "dlpd.lifecycle",
+        "required_operations": [
+          "policy_batch",
+          "classifier_batch",
+          "inspection_batch",
+          "quarantine_batch",
+          "incident_batch",
+          "review_batch",
+          "dlp_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "dlpd.policies",
+          "dlpd.classifiers",
+          "dlpd.inspections",
+          "dlpd.quarantine",
+          "dlpd.incidents",
+          "dlpd.reviews",
+          "dlpd.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
           "audit_timeline": {
             "status_style": "digest-chip",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "icon": "git-branch",
+            "risk_style": "processor-band",
+            "status_indicator": "stream-chip"
           },
           "channel_flow": {
             "highlight": "blocked-chip",
@@ -1214,6 +1655,11 @@
             "icon": "scan-text",
             "risk_style": "sensitivity-band",
             "status_indicator": "classifier-pill"
+          },
+          "dlp_agent_roster": {
+            "icon": "bot",
+            "risk_style": "data-scope-band",
+            "status_indicator": "agent-approval-chip"
           },
           "incident_queue": {
             "status_style": "response-chip",
@@ -1330,6 +1776,20 @@
             "permission": "dlpd:view"
           },
           {
+            "component": "DLPAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/dlpd/agents",
+            "permission": "dlpd:admin"
+          },
+          {
+            "component": "DLPDLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/dlpd/lifecycle",
+            "permission": "dlpd:admin"
+          },
+          {
             "component": "DLPAuditTrail",
             "name": "audit",
             "nav_group": "Governance",
@@ -1354,21 +1814,123 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "dlp_governance": {
+        "adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "quarantine_reviewer",
+          "incident_response_reviewer",
+          "privacy_reviewer",
+          "legal_hold_reviewer",
+          "lifecycle_batch_reviewer",
+          "dlp_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "policy_reviewer",
+          "classifier_reviewer",
+          "inspection_triage_agent",
+          "quarantine_reviewer",
+          "incident_response_reviewer",
+          "privacy_reviewer",
+          "legal_hold_reviewer",
+          "lifecycle_batch_reviewer",
+          "dlp_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
       "dlpd": [
         "secu",
         "encr",
         "nlpc",
-        "anom"
+        "anom",
+        "audl",
+        "mqeb",
+        "moni",
+        "cach"
       ]
     }
   },
   "contracts": {
     "dlpd": {
+      "agents": {
+        "adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+        "first_class": true,
+        "guardrails": [
+          "supported_runtime",
+          "supported_role",
+          "explicit_scope",
+          "accountable_owner",
+          "declared_purpose",
+          "machine_contribution_disclosure",
+          "human_approval_for_privileged_roles"
+        ],
+        "privileged_roles": [
+          "quarantine_reviewer",
+          "incident_response_reviewer",
+          "privacy_reviewer",
+          "legal_hold_reviewer",
+          "lifecycle_batch_reviewer",
+          "dlp_steward"
+        ],
+        "required_fields": [
+          "tenant_id",
+          "agent_id",
+          "name",
+          "runtime",
+          "role",
+          "scope",
+          "owner",
+          "purpose"
+        ],
+        "supported_roles": [
+          "policy_reviewer",
+          "classifier_reviewer",
+          "inspection_triage_agent",
+          "quarantine_reviewer",
+          "incident_response_reviewer",
+          "privacy_reviewer",
+          "legal_hold_reviewer",
+          "lifecycle_batch_reviewer",
+          "dlp_steward"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
+          "agent_adapter": "aicr_provider_neutral_dlp_agent_adapter",
           "anomaly_detection": "anom",
           "api_helpers": "api.py",
           "audit_sink": "audl",
@@ -1387,6 +1949,40 @@
           "search": "srch",
           "security_framework": "secu",
           "view_models": "views.py"
+        },
+        "agents": {
+          "adapter_contract": "aicr_provider_neutral_dlp_agent_adapter",
+          "first_class": true,
+          "privileged_roles": [
+            "quarantine_reviewer",
+            "incident_response_reviewer",
+            "privacy_reviewer",
+            "legal_hold_reviewer",
+            "lifecycle_batch_reviewer",
+            "dlp_steward"
+          ],
+          "require_contribution_disclosure": true,
+          "require_human_approval_for_privileged_roles": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "policy_reviewer",
+            "classifier_reviewer",
+            "inspection_triage_agent",
+            "quarantine_reviewer",
+            "incident_response_reviewer",
+            "privacy_reviewer",
+            "legal_hold_reviewer",
+            "lifecycle_batch_reviewer",
+            "dlp_steward"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "channels": {
           "anomaly_context_required": true,
@@ -1477,6 +2073,31 @@
           "raw_content_retention_allowed": false,
           "tenant_isolation_required": true
         },
+        "streaming": {
+          "broker_core_dependency_allowed": false,
+          "engine": "bytewax",
+          "lifecycle_stream": "dlpd.lifecycle",
+          "required_operations": [
+            "policy_batch",
+            "classifier_batch",
+            "inspection_batch",
+            "quarantine_batch",
+            "incident_batch",
+            "review_batch",
+            "dlp_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "dlpd.policies",
+            "dlpd.classifiers",
+            "dlpd.inspections",
+            "dlpd.quarantine",
+            "dlpd.incidents",
+            "dlpd.reviews",
+            "dlpd.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1488,9 +2109,11 @@
           "enable_channel_monitor": true,
           "enable_classifier_workbench": true,
           "enable_dashboard": true,
+          "enable_dlp_agent_roster": true,
           "enable_incident_queue": true,
           "enable_inspection_workbench": true,
           "enable_legal_hold": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_policy_console": true,
           "enable_quarantine_vault": true,
           "enable_review_queue": true,
@@ -1499,14 +2122,45 @@
       },
       "id": "dlpd",
       "provides": [
-        "dlpd_operations"
+        "dlpd_operations",
+        "data_loss_prevention",
+        "dlp_agent_composition"
       ],
       "requires": [
         "secu",
         "encr",
         "nlpc",
-        "anom"
-      ]
+        "anom",
+        "audl",
+        "mqeb",
+        "moni",
+        "cach"
+      ],
+      "streaming": {
+        "broker_core_dependency_allowed": false,
+        "engine": "bytewax",
+        "lifecycle_stream": "dlpd.lifecycle",
+        "required_operations": [
+          "policy_batch",
+          "classifier_batch",
+          "inspection_batch",
+          "quarantine_batch",
+          "incident_batch",
+          "review_batch",
+          "dlp_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "dlpd.policies",
+          "dlpd.classifiers",
+          "dlpd.inspections",
+          "dlpd.quarantine",
+          "dlpd.incidents",
+          "dlpd.reviews",
+          "dlpd.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1518,7 +2172,7 @@
   "format": "apg.semantic-model.v1",
   "graphs": {
     "capability": {
-      "edges": 4,
+      "edges": 8,
       "kind": "capability",
       "nodes": 1
     },
@@ -1551,6 +2205,19 @@
         "required_action": "use_bytewax_event_stream"
       },
       "name": "batch_dlp_mutation_requires_bytewax"
+    },
+    "bytewax_dlpd_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_dlpd_lifecycle_batch"
+      },
+      "description": "DLPD lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_lifecycle_stream_required",
+        "required_action": "route_dlpd_lifecycle_batch_to_bytewax"
+      },
+      "name": "bytewax_dlpd_stream_required"
     },
     "classifier_confidence_requires_threshold": {
       "condition": {
@@ -1617,6 +2284,98 @@
       },
       "name": "custom_classifier_requires_review"
     },
+    "dlp_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_dlp_agent",
+        "privileged_role": true
+      },
+      "description": "Privileged DLP agent roles require human approval evidence.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "dlp_agent_human_approval_required",
+        "required_action": "record_human_dlp_agent_approval"
+      },
+      "name": "dlp_agent_privileged_role_requires_human_approval"
+    },
+    "dlp_agent_requires_contribution_disclosure": {
+      "condition": {
+        "contribution_disclosed": false,
+        "operation": "register_dlp_agent"
+      },
+      "description": "DLP agents must disclose machine-authored policy, classifier, inspection, quarantine, incident, legal-hold, and lifecycle-review contributions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "dlp_agent_requires_contribution_disclosure"
+    },
+    "dlp_agent_requires_owner": {
+      "condition": {
+        "operation": "register_dlp_agent",
+        "owner_present": false
+      },
+      "description": "DLP agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_agent_owner_required",
+        "required_action": "assign_dlp_agent_owner"
+      },
+      "name": "dlp_agent_requires_owner"
+    },
+    "dlp_agent_requires_purpose": {
+      "condition": {
+        "operation": "register_dlp_agent",
+        "purpose_present": false
+      },
+      "description": "DLP agents require a documented data-protection purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_agent_purpose_required",
+        "required_action": "document_dlp_agent_purpose"
+      },
+      "name": "dlp_agent_requires_purpose"
+    },
+    "dlp_agent_requires_scope": {
+      "condition": {
+        "operation": "register_dlp_agent",
+        "scope_present": false
+      },
+      "description": "DLP agents require an explicit policy, classifier, channel, inspection, quarantine, incident, legal-hold, or lifecycle scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlp_agent_scope_required",
+        "required_action": "declare_dlp_agent_scope"
+      },
+      "name": "dlp_agent_requires_scope"
+    },
+    "dlp_agent_role_supported": {
+      "condition": {
+        "agent_role_supported": false,
+        "operation": "register_dlp_agent"
+      },
+      "description": "DLP agents must use supported data-protection roles.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_dlp_agent_role",
+        "required_action": "choose_supported_dlpd_agent_role"
+      },
+      "name": "dlp_agent_role_supported"
+    },
+    "dlp_agent_runtime_supported": {
+      "condition": {
+        "agent_runtime_supported": false,
+        "operation": "register_dlp_agent"
+      },
+      "description": "DLP agents must use supported provider-neutral runtimes.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_dlp_agent_runtime",
+        "required_action": "choose_supported_dlpd_agent_runtime"
+      },
+      "name": "dlp_agent_runtime_supported"
+    },
     "dlp_state_change_requires_audit": {
       "condition": {
         "audit_event_recorded": false,
@@ -1629,6 +2388,19 @@
         "required_action": "record_dlp_audit_event"
       },
       "name": "dlp_state_change_requires_audit"
+    },
+    "dlpd_lifecycle_batch_requires_mutations": {
+      "condition": {
+        "mutation_count_lte": 0,
+        "operation": "validate_dlpd_lifecycle_batch"
+      },
+      "description": "DLPD lifecycle batches must include at least one mutation.",
+      "effect": {
+        "decision": "deny",
+        "reason": "dlpd_lifecycle_batch_empty",
+        "required_action": "include_dlpd_lifecycle_mutations"
+      },
+      "name": "dlpd_lifecycle_batch_requires_mutations"
     },
     "duplicate_open_incident_blocked": {
       "condition": {

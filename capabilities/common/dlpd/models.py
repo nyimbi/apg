@@ -210,3 +210,67 @@ class DlpAuditEvent:
 			"created_at": isoformat(self.created_at),
 			"metadata": dict(self.metadata),
 		}
+
+
+@dataclass
+class DlpAgentRecord:
+	"""First-class AI agent assigned to a governed DLP scope."""
+
+	id: str
+	tenant_id: str
+	name: str
+	runtime: str
+	role: str
+	scope: str
+	owner: str
+	purpose: str
+	contribution_disclosed: bool = True
+	human_approval_required: bool = False
+	status: str = "active"
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"name": self.name,
+			"runtime": self.runtime,
+			"role": self.role,
+			"scope": self.scope,
+			"owner": self.owner,
+			"purpose": self.purpose,
+			"contribution_disclosed": self.contribution_disclosed,
+			"human_approval_required": self.human_approval_required,
+			"status": self.status,
+			"created_at": isoformat(self.created_at),
+		}
+
+
+@dataclass
+class DlpdLifecycleBatchRecord:
+	"""Bytewax lifecycle batch evidence for DLPD mutations."""
+
+	id: str
+	tenant_id: str
+	event_stream: str
+	mutation_count: int
+	operation: str
+	accepted: bool
+	decision: str
+	matched_rules: tuple[str, ...] = ()
+	status: str = "accepted"
+	created_at: datetime = field(default_factory=utc_now)
+
+	def to_dict(self) -> dict[str, Any]:
+		return {
+			"id": self.id,
+			"tenant_id": self.tenant_id,
+			"event_stream": self.event_stream,
+			"mutation_count": self.mutation_count,
+			"operation": self.operation,
+			"accepted": self.accepted,
+			"decision": self.decision,
+			"matched_rules": list(self.matched_rules),
+			"status": self.status,
+			"created_at": isoformat(self.created_at),
+		}

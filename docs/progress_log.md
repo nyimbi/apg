@@ -22452,3 +22452,70 @@ Not run to preserve battery:
   adapters, rendered browser UI, external AI-agent runtime clients,
   conformance certification, federation interoperability suites, and
   load/performance checks.
+
+### 2026-05-31 10:56 EAT
+
+DLPD data-loss-prevention agent composition and Bytewax lifecycle guardrail
+packet:
+
+- Selected `capabilities/common/dlpd` as the next ordered capability packet
+  after IDFD and preserved its existing policy, classifier, egress inspection,
+  quarantine, incident, legal-hold, audit, and tenant-isolation lifecycle.
+- Extended the DLPD executable contract with first-class DLP governance-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported data-protection roles, privileged-role metadata, Bytewax lifecycle
+  stream metadata, route metadata, theme components, and expanded
+  `provides`/`requires` evidence.
+- Added deterministic guardrails for unsupported DLP-agent runtime,
+  unsupported role, missing scope, owner, purpose, missing machine
+  contribution disclosure, privileged DLP-agent registration without human
+  approval, empty lifecycle batches, unsupported lifecycle operations, and
+  non-Bytewax DLPD lifecycle batch routing.
+- Added `DlpAgentRecord`, `DlpdLifecycleBatchRecord`, tenant-qualified agent
+  storage, lifecycle-batch storage, registration, listing, audit events,
+  dashboard counts, DLP-agent roster view models, lifecycle-batch monitor view
+  models, and API helpers.
+- Added `/dlpd/agents`, `/dlpd/lifecycle`, DLP-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json`, `release_report.json`, and
+  `package_manifest.json` from the live contract and refreshed `README.md`,
+  `SPECIFICATION.md`, `PLAN.md`, and `cap_spec.md`.
+- Review fix: semantic graph dependency edge metadata now matches the expanded
+  eight-capability dependency list.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/dlpd/__init__.py capabilities/common/dlpd/capability_contract.py capabilities/common/dlpd/dlp_engine.py capabilities/common/dlpd/models.py capabilities/common/dlpd/service.py capabilities/common/dlpd/api.py capabilities/common/dlpd/views.py capabilities/common/dlpd/app.py capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/python capabilities/common/dlpd/app.py` passed the package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/dlpd/test_capability_contract.py capabilities/common/dlpd/tests/test_package_contract.py`
+  passed with 11 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/apg capabilities inspect dlpd --json` passed with `ok: true`,
+  14 APG Python routes, 45 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/dlpd --json`
+  passed with `ok: true`; DLPD remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/dlpd --json`
+  passed with `side_effect_free: true` and no warnings.
+- `./.venv/bin/python -m json.tool capabilities/common/dlpd/semantic_model.json`,
+  `./.venv/bin/python -m json.tool capabilities/common/dlpd/release_report.json`,
+  and `./.venv/bin/python -m json.tool capabilities/common/dlpd/package_manifest.json`
+  passed.
+- Runtime smoke returned one quarantined inspection, one active `codex` DLP
+  steward agent, and one accepted `bytewax` lifecycle-batch evidence record.
+- Focused stale-marker scan over touched DLPD packet source, docs, tests, and
+  evidence returned only intentional non-Bytewax denial examples and
+  no-broker-core/Kafka dependency documentation.
+- `git diff --check -- capabilities/common/dlpd docs/progress_log.md` passed.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live network, mail gateway, endpoint, storage, object-store, clipboard,
+  browser, or chat interception; production classifier/NLP/model providers;
+  production databases; durable Bytewax topology; live SECU/ENCR/NLPC/ANOM/
+  AUDL/MQEB/SRCH/COMP/MONI/CACH adapters; rendered browser UI; external
+  AI-agent runtime clients; DLP appliance interoperability, data residency
+  certification, and load/performance checks.

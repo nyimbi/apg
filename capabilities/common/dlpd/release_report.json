@@ -2,10 +2,12 @@
   "evidence": {
     "contracts": {
       "capability_contract": {
+        "agents_first_class": true,
         "display_name": "Data Loss Prevention",
         "errors": [],
-        "route_count": 12,
-        "rule_count": 36
+        "required_processor": "bytewax",
+        "route_count": 14,
+        "rule_count": 45
       }
     },
     "runtime": {

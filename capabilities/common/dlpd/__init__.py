@@ -11,7 +11,7 @@ from .service import DlpdService
 __version__ = "1.0.0"
 __capability_id__ = "dlpd"
 __capability_name__ = "Data Loss Prevention"
-__apg_dependencies__ = ["secu", "encr", "nlpc", "anom"]
+__apg_dependencies__ = ["secu", "encr", "nlpc", "anom", "audl", "mqeb", "moni", "cach"]
 
 capability_metadata: dict[str, Any] = {
 	"name": "dlpd",
@@ -36,6 +36,8 @@ capability_metadata: dict[str, Any] = {
 		"legal_hold",
 		"dlp_reviews",
 		"dlp_audit",
+		"dlp_agent_composition",
+		"bytewax_lifecycle_batches",
 	],
 	"permissions": ["dlpd:view", "dlpd:inspect", "dlpd:manage_policies", "dlpd:respond", "dlpd:review", "dlpd:audit", "dlpd:admin"]
 }
@@ -51,10 +53,12 @@ def register_capability() -> dict[str, Any]:
 		"description": capability_metadata["description"],
 		"version": capability_metadata["version"],
 		"dependencies": capability_metadata["dependencies"],
-		"optional_dependencies": ["audl", "mqeb", "srch", "comp", "moni", "cach"],
+		"optional_dependencies": ["srch", "comp"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"sensitive_data_discovery": "Classify governed data across documents, streams, messages, and exports",
 			"classifier_governance": "Register built-in and reviewed custom classifiers",
@@ -65,6 +69,8 @@ def register_capability() -> dict[str, Any]:
 			"legal_hold": "Preserve quarantined evidence under legal hold",
 			"dlp_reviews": "Route large exports, source-code egress, and restricted destinations to review",
 			"dlp_audit": "Record digest-backed audit events for DLP state changes",
+			"dlp_agent_composition": "Register provider-neutral AI agents for governed DLP review and lifecycle scopes",
+			"bytewax_lifecycle_batches": "Validate DLP lifecycle mutation batches through Bytewax stream metadata",
 			"capability_rules": "Evaluate deterministic data-loss-prevention rules",
 			"visual_theming": "Apply DLP operations theme tokens and components"
 		},
@@ -77,6 +83,8 @@ def register_capability() -> dict[str, Any]:
 			"classifiers": "/dlpd/api/v1/classifiers",
 			"quarantine": "/dlpd/api/v1/quarantine",
 			"reviews": "/dlpd/api/v1/reviews",
+			"agents": "/dlpd/api/v1/agents",
+			"lifecycle": "/dlpd/api/v1/lifecycle",
 			"audit": "/dlpd/api/v1/audit"
 		},
 		"adapters": contract["configuration"]["adapters"],
