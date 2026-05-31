@@ -2,6 +2,7 @@
 
 import pytest
 
+from capabilities.common.mlcm import api
 from capabilities.common.mlcm import register_capability
 from capabilities.common.mlcm.capability_contract import (
 	evaluate_capability_rules,
@@ -16,6 +17,8 @@ from capabilities.common.mlcm.views import (
 	drift_monitor_model,
 	evaluation_console_model,
 	governance_model,
+	lifecycle_batch_model,
+	model_lifecycle_agent_roster_model,
 	model_card_library_model,
 	promotion_board_model,
 	registry_model,
@@ -38,13 +41,21 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"promotion",
 		"deployment",
 		"monitoring",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
 		"ui",
 		"theme"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["rule_engine"]["rules"]) >= 38
+	assert contract["provides"] == ["model_lifecycle", "model_governance", "model_lifecycle_agent_composition"]
+	assert contract["requires"] == ["aicr", "moni", "audl"]
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert contract["streaming"]["engine"] == "bytewax"
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"registry",
@@ -56,6 +67,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"deployments",
 		"drift",
 		"rollback",
+		"agents",
+		"lifecycle",
 		"governance",
 		"audit",
 		"settings"
@@ -65,6 +78,8 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 	assert contract["ui"]["api_prefix"] == "/mlcm/api/v1"
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "promotion_gate_panel" in contract["theme"]["components"]
+	assert "model_lifecycle_agent_roster" in contract["theme"]["components"]
+	assert "bytewax_lifecycle_panel" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_model_lifecycle_guardrails():
@@ -98,6 +113,39 @@ def test_rule_engine_enforces_model_lifecycle_guardrails():
 	assert stream_result["matched_rules"] == ["bytewax_stream_required_for_monitoring"]
 
 
+def test_rule_engine_enforces_lifecycle_agent_and_bytewax_guardrails():
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_model_lifecycle_agent",
+		"agent_runtime_supported": False,
+		"agent_role_supported": False,
+		"scope_present": False,
+		"owner_present": False,
+		"purpose_present": False,
+		"contribution_disclosed": False,
+		"privileged_role": True,
+		"human_approval_required": False,
+	})
+	batch_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_mlcm_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"model_lifecycle_agent_runtime_supported",
+		"model_lifecycle_agent_role_supported",
+		"model_lifecycle_agent_requires_scope",
+		"model_lifecycle_agent_requires_owner",
+		"model_lifecycle_agent_requires_purpose",
+		"model_lifecycle_agent_requires_contribution_disclosure",
+		"model_lifecycle_agent_privileged_role_requires_human_approval",
+	}
+	assert batch_result["decision"] == "deny"
+	assert batch_result["matched_rules"] == ["bytewax_mlcm_stream_required"]
+
+
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
 
@@ -108,6 +156,9 @@ def test_registration_includes_full_capability_contract():
 	assert registration["theme"]["name"] == "mlcm_model_ops_console"
 	assert registration["ui_components"]["deployments"] == "/mlcm/deployments"
 	assert registration["adapters"]["event_stream"] == "bytewax"
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "model_lifecycle_agent_composition" in registration["capabilities"]
 	assert "aicr" in registration["dependencies"]
 	assert "mlcm:deploy" in registration["permissions"]
 
@@ -184,6 +235,23 @@ def test_mlcm_lifecycle_is_executable():
 		score=0.18,
 		threshold=0.2,
 	)
+	agent = service.register_model_lifecycle_agent(
+		agent_id="model-steward",
+		tenant_id=tenant_id,
+		name="Model Steward",
+		runtime="codex",
+		role="model_steward",
+		scope="fraud model registry",
+		owner="risk-ai",
+		purpose="Keep model release evidence complete.",
+	)
+	batch = service.validate_mlcm_lifecycle_batch(
+		tenant_id=tenant_id,
+		event_stream="bytewax",
+		mutation_count=4,
+		operation="model_lifecycle_agent_batch",
+		batch_id="mlcm-batch-1",
+	)
 
 	assert model["owner"] == "risk-ai"
 	assert version["stage"] == "dev"
@@ -193,12 +261,16 @@ def test_mlcm_lifecycle_is_executable():
 	assert deployment["status"] == "serving"
 	assert deployment["replicas"] == 3
 	assert drift["status"] == "within_threshold"
+	assert agent["status"] == "active"
+	assert batch["accepted"] is True
 
 	summary = service.dashboard_summary(tenant_id)
 	assert summary["model_count"] == 1
 	assert summary["production_version_count"] == 1
 	assert summary["serving_count"] == 1
 	assert summary["unresolved_drift_count"] == 0
+	assert summary["model_lifecycle_agent_count"] == 1
+	assert summary["lifecycle_batch_count"] == 1
 
 	assert dashboard_model(service, tenant_id)["summary"]["deployment_count"] == 1
 	assert registry_model(service, tenant_id)["models"][0]["id"] == "fraud-risk"
@@ -209,6 +281,8 @@ def test_mlcm_lifecycle_is_executable():
 	assert promotion_board_model(service, tenant_id)["promotions"][0]["status"] == "approved"
 	assert deployment_board_model(service, tenant_id)["deployments"][0]["target_id"] == "risk-prod"
 	assert drift_monitor_model(service, tenant_id)["unresolved"] == []
+	assert model_lifecycle_agent_roster_model(service, tenant_id)["agents"][0]["id"] == "model-steward"
+	assert lifecycle_batch_model(service, tenant_id)["batches"][0]["id"] == "mlcm-batch-1"
 	assert audit_timeline_model(service, tenant_id)["audit_events"]
 	assert governance_model(service, tenant_id)["audit_events"]
 
@@ -234,6 +308,33 @@ def test_mlcm_service_enforces_policy_guardrails():
 			owner="",
 			problem_type="classification",
 		)
+
+	with pytest.raises(PermissionError, match="unsupported_model_lifecycle_agent_runtime"):
+		service.register_model_lifecycle_agent(
+			agent_id="bad-agent",
+			tenant_id=tenant_id,
+			name="Bad Agent",
+			runtime="unknown",
+			role="model_steward",
+			scope="models",
+			owner="ml-team",
+			purpose="Review models",
+		)
+
+	with pytest.raises(PermissionError, match="model_lifecycle_agent_scope_required"):
+		service.register_model_lifecycle_agent(
+			agent_id="scope-agent",
+			tenant_id=tenant_id,
+			name="Scope Agent",
+			runtime="codex",
+			role="model_steward",
+			scope="",
+			owner="ml-team",
+			purpose="Review models",
+		)
+
+	with pytest.raises(PermissionError, match="bytewax_lifecycle_stream_required"):
+		service.validate_mlcm_lifecycle_batch(tenant_id, "kafka", 1)
 
 	service.register_model(
 		model_id="guardrail-model",
@@ -405,3 +506,46 @@ def test_mlcm_service_enforces_policy_guardrails():
 			score=0.9,
 			baseline_ref="baseline:other",
 		)
+
+
+def test_privileged_model_lifecycle_agent_without_approval_is_pending_review():
+	service = MlcmService()
+
+	agent = service.register_model_lifecycle_agent(
+		agent_id="deployment-reviewer",
+		tenant_id="tenant-review",
+		name="Deployment Reviewer",
+		runtime="claude_code",
+		role="deployment_reviewer",
+		scope="production deployment gates",
+		owner="ml-release",
+		purpose="Review production model deployment evidence.",
+	)
+
+	assert agent["status"] == "pending_review"
+	assert service.dashboard_summary("tenant-review")["pending_agent_review_count"] == 1
+
+
+def test_api_helpers_expose_model_lifecycle_agents_and_batches():
+	agent = api.register_model_lifecycle_agent({
+		"id": "api-steward",
+		"tenant_id": "tenant-api-mlcm",
+		"name": "API Steward",
+		"runtime": "opencode",
+		"role": "model_steward",
+		"scope": "model card completeness",
+		"owner": "ml-platform",
+		"purpose": "Keep model cards complete.",
+	})
+	batch = api.validate_mlcm_lifecycle_batch({
+		"id": "api-batch",
+		"tenant_id": "tenant-api-mlcm",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+		"operation": "model_lifecycle_agent_batch",
+	})
+
+	assert agent["id"] == "api-steward"
+	assert batch["accepted"] is True
+	assert api.list_model_lifecycle_agents("tenant-api-mlcm")[0]["id"] == "api-steward"
+	assert api.list_lifecycle_batches("tenant-api-mlcm")[0]["id"] == "api-batch"

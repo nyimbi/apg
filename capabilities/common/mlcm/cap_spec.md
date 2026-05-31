@@ -3,6 +3,8 @@
 AI Model Lifecycle Management governs tenant-scoped model registration,
 versioning, evaluation, promotion, deployment, monitoring, drift response,
 rollback, retirement, audit evidence, UI composition, and theming.
+It also treats model lifecycle agents and Bytewax lifecycle batches as
+first-class composition state.
 
 The full packet definition is maintained in `SPECIFICATION.md`; the execution
 sequence is maintained in `PLAN.md`.
@@ -16,8 +18,18 @@ sequence is maintained in `PLAN.md`.
 - Package evidence: `app.py`, `semantic_model.json`, `package_manifest.json`,
   and `release_report.json`
 - Event stream adapter: Bytewax
+- First-class lifecycle agents: `codex`, `claude_code`, `opencode`, `pi`
+- Lifecycle processor: Bytewax
 
 ## Lifecycle
 
 `model -> version -> evaluation -> promotion -> deployment -> monitoring ->
-drift review -> rollback -> retirement -> audit`
+drift review -> rollback -> retirement -> model lifecycle agent -> Bytewax
+lifecycle batch -> audit`
+
+## Guardrail Additions
+
+- Model lifecycle-agent runtime, role, scope, owner, purpose, contribution
+  disclosure, and privileged approval status.
+- Bytewax lifecycle batch processing for model, version, evaluation, promotion,
+  deployment, drift, rollback, retirement, and agent batches.

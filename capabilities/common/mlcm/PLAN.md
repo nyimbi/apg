@@ -8,10 +8,15 @@
 3. Expand the executable contract with full lifecycle configuration, at least
    30 deterministic guardrails, at least 12 UI routes, Bytewax adapter evidence,
    and theme components.
+   - Promote model lifecycle agents and Bytewax lifecycle batches to first-class
+     contract citizens.
 4. Extend runtime records and service behavior only where the lifecycle packet
    needs executable support.
+   - Add model lifecycle agent registration and lifecycle-batch validation.
 5. Refresh API helpers and UI view models so generated applications can compose
    the capability.
+   - Add API/view coverage for model lifecycle agent rosters and Bytewax batch
+     monitors.
 6. Replace static package evidence with dynamic contract-derived evidence.
 7. Update focused tests for contract, rules, service lifecycle, guardrails,
    generated-app views, package evidence, and compatibility behavior.
@@ -24,6 +29,10 @@
 - Configuration schema includes all lifecycle domains.
 - Rule count and route count are high enough to prevent stale narrow packets.
 - Bytewax appears in adapters and package streaming metadata.
+- Model lifecycle agents have supported-runtime, supported-role, scope, owner,
+  purpose, disclosure, and privileged approval guardrails.
+- Lifecycle batches require Bytewax and reject Kafka or other broker-first
+  streams.
 - `MlcmService` remains dependency-light and tenant-scoped.
 - Retirement and rollback behavior does not permit cross-model or serving-risk
   violations.

@@ -1,16 +1,23 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 10,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "AI Model Lifecycle Management",
         "errors": [],
-        "route_count": 13,
-        "rule_count": 35
+        "route_count": 15,
+        "rule_count": 43
       }
     },
     "runtime": {
-      "event_stream": "bytewax",
-      "generated_app_runtime": "service.MlcmService"
+      "api": "api.py",
+      "entrypoint": "app.py",
+      "service": "service.py",
+      "views": "views.py"
     },
     "self_test": {
       "capability": "mlcm",
@@ -27,6 +34,10 @@
     "semantic_model": {
       "capability": "mlcm",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

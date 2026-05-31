@@ -36,7 +36,9 @@ capability_metadata: dict[str, Any] = {
 		"drift_monitoring",
 		"rollback_orchestration",
 		"model_retirement",
-		"model_governance"
+		"model_governance",
+		"model_lifecycle_agent_composition",
+		"bytewax_lifecycle_processing"
 	],
 	"composition_patterns": [
 		"governed_model_release",
@@ -58,6 +60,8 @@ capability_metadata: dict[str, Any] = {
 		"deployments": "/mlcm/deployments",
 		"drift": "/mlcm/drift",
 		"rollback": "/mlcm/rollback",
+		"agents": "/mlcm/agents",
+		"lifecycle": "/mlcm/lifecycle",
 		"audit": "/mlcm/audit"
 	},
 	"permissions": [
@@ -95,6 +99,8 @@ def register_capability() -> dict[str, Any]:
 			"drift_monitoring": "Surface drift state for review, rollback, and retraining workflows",
 			"rollback_orchestration": "Rollback deployments to prior same-model versions with audit evidence",
 			"model_retirement": "Retire models after impact review and serving-deployment drain",
+			"model_lifecycle_agent_composition": "Register scoped and auditable model lifecycle agents for review and release work",
+			"bytewax_lifecycle_processing": "Validate model lifecycle mutation batches against a Bytewax processor contract",
 			"capability_rules": "Evaluate deterministic model lifecycle governance rules",
 			"visual_theming": "Apply model-ops console theme tokens and components"
 		},
@@ -106,9 +112,13 @@ def register_capability() -> dict[str, Any]:
 			"deployments": "/mlcm/api/v1/deployments",
 			"drift": "/mlcm/api/v1/drift",
 			"rollback": "/mlcm/api/v1/rollback",
-			"retirements": "/mlcm/api/v1/retirements"
+			"retirements": "/mlcm/api/v1/retirements",
+			"agents": "/mlcm/api/v1/agents",
+			"lifecycle": "/mlcm/api/v1/lifecycle"
 		},
 		"adapters": contract["configuration"]["adapters"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"ui_components": {
 			route["name"]: route["path"]
 			for route in contract["ui"]["routes"]

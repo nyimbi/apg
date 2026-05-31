@@ -25,6 +25,8 @@ def dashboard_model(
 		"models": service.list_models(tenant_id),
 		"deployments": service.list_deployments(tenant_id),
 		"drift_signals": service.list_drift_signals(tenant_id),
+		"model_lifecycle_agents": service.list_model_lifecycle_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
 	}
@@ -184,6 +186,38 @@ def audit_timeline_model(
 	}
 
 
+def model_lifecycle_agent_roster_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"agents": service.list_model_lifecycle_agents(tenant_id),
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+		"required_fields": contract["agents"]["required_fields"],
+		"route": "/mlcm/agents",
+	}
+
+
+def lifecycle_batch_model(
+	service: MlcmService | None = None,
+	tenant_id: str = "default",
+) -> dict[str, object]:
+	service = service or MlcmService()
+	contract = service.describe(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"batches": service.list_lifecycle_batches(tenant_id),
+		"streaming": contract["streaming"],
+		"required_operations": contract["streaming"]["required_operations"],
+		"route": "/mlcm/lifecycle",
+	}
+
+
 def governance_model(
 	service: MlcmService | None = None,
 	tenant_id: str = "default",
@@ -195,6 +229,8 @@ def governance_model(
 		"rules": contract["rule_engine"]["rules"],
 		"promotions": service.list_promotion_requests(tenant_id),
 		"retirements": service.list_retirements(tenant_id),
+		"model_lifecycle_agents": service.list_model_lifecycle_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"route": "/mlcm/governance",
 	}

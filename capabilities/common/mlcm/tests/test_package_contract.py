@@ -29,9 +29,11 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "mlcm"
-	assert len(contract["ui"]["routes"]) >= 12
-	assert len(contract["rule_engine"]["rules"]) >= 30
+	assert len(contract["ui"]["routes"]) >= 15
+	assert len(contract["rule_engine"]["rules"]) >= 38
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -49,6 +51,10 @@ def test_package_app_entrypoint_is_publishable():
 	assert "mlcm" in model["capabilities"]
 	assert model["capabilities"]["mlcm"]["runtime"]["service"] == "service.MlcmService"
 	assert model["capabilities"]["mlcm"]["streaming"]["engine"] == "bytewax"
+	assert model["capabilities"]["mlcm"]["streaming"]["required_processor"] == "bytewax"
+	assert model["capabilities"]["mlcm"]["agents"]["first_class"] is True
+	assert model["capabilities"]["mlcm"]["model_lifecycle"]["model_lifecycle_agent"] == "ModelLifecycleAgentRecord"
+	assert model["composition"]["capability_dependencies"]["mlcm"] == ["aicr", "moni", "audl"]
 
 
 def test_mlcm_compatibility_record_uses_model_registry():

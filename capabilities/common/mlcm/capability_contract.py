@@ -6,6 +6,31 @@ from copy import deepcopy
 from typing import Any
 
 
+SUPPORTED_MLCM_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_MLCM_AGENT_ROLES = [
+	"model_card_reviewer",
+	"evaluation_reviewer",
+	"fairness_reviewer",
+	"explainability_reviewer",
+	"promotion_reviewer",
+	"deployment_reviewer",
+	"drift_reviewer",
+	"rollback_reviewer",
+	"retirement_reviewer",
+	"model_steward",
+]
+PRIVILEGED_MLCM_AGENT_ROLES = [
+	"evaluation_reviewer",
+	"fairness_reviewer",
+	"explainability_reviewer",
+	"promotion_reviewer",
+	"deployment_reviewer",
+	"drift_reviewer",
+	"rollback_reviewer",
+	"retirement_reviewer",
+]
+
+
 DEFAULT_CONFIGURATION: dict[str, Any] = {
 	"tenant_id": "default",
 	"registry": {
@@ -48,6 +73,47 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"unresolved_drift_blocks_deployment": True,
 		"monitoring_event_stream": "bytewax",
 	},
+	"agents": {
+		"first_class": True,
+		"supported_runtimes": SUPPORTED_MLCM_AGENT_RUNTIMES,
+		"supported_roles": SUPPORTED_MLCM_AGENT_ROLES,
+		"privileged_roles": PRIVILEGED_MLCM_AGENT_ROLES,
+		"require_owner": True,
+		"require_purpose": True,
+		"require_scope": True,
+		"require_contribution_disclosure": True,
+		"require_human_approval_for_privileged_roles": True,
+		"adapter_contract": "aicr_provider_neutral_agent_adapter",
+	},
+	"streaming": {
+		"engine": "bytewax",
+		"lifecycle_stream": "mlcm.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"model_batch",
+			"version_batch",
+			"evaluation_batch",
+			"promotion_batch",
+			"deployment_batch",
+			"drift_batch",
+			"rollback_batch",
+			"retirement_batch",
+			"model_lifecycle_agent_batch",
+		],
+		"topics": [
+			"mlcm.models",
+			"mlcm.versions",
+			"mlcm.evaluations",
+			"mlcm.promotions",
+			"mlcm.deployments",
+			"mlcm.drift",
+			"mlcm.rollbacks",
+			"mlcm.retirements",
+			"mlcm.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	},
 	"governance": {
 		"require_tenant_context": True,
 		"auth_required": True,
@@ -85,6 +151,8 @@ DEFAULT_CONFIGURATION: dict[str, Any] = {
 		"enable_deployment_board": True,
 		"enable_drift_monitor": True,
 		"enable_rollback_console": True,
+		"enable_model_lifecycle_agent_roster": True,
+		"enable_lifecycle_batch_monitor": True,
 		"enable_governance": True,
 		"enable_audit_timeline": True,
 		"enable_settings": True,
@@ -103,6 +171,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"promotion",
 		"deployment",
 		"monitoring",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -116,6 +186,8 @@ CONFIGURATION_SCHEMA: dict[str, Any] = {
 		"promotion",
 		"deployment",
 		"monitoring",
+		"agents",
+		"streaming",
 		"governance",
 		"observability",
 		"adapters",
@@ -159,6 +231,14 @@ RULES: list[dict[str, Any]] = [
 	{"name": "cross_tenant_model_access_denied", "description": "Cross-tenant model access is denied by default.", "condition": {"cross_tenant_access": True}, "effect": {"decision": "deny", "reason": "cross_tenant_access_denied", "required_action": "use_tenant_scoped_model"}},
 	{"name": "audit_event_required_for_state_change", "description": "Lifecycle state changes require audit events.", "condition": {"state_change_requested": True, "audit_event_recorded": False}, "effect": {"decision": "deny", "reason": "audit_event_required", "required_action": "record_audit_event"}},
 	{"name": "bytewax_stream_required_for_monitoring", "description": "Monitoring event flows must use Bytewax.", "condition": {"operation": "configure_monitoring", "event_stream": "kafka"}, "effect": {"decision": "deny", "reason": "bytewax_event_stream_required", "required_action": "use_bytewax_event_stream"}},
+	{"name": "model_lifecycle_agent_runtime_supported", "description": "Model lifecycle agents must use supported runtimes.", "condition": {"operation": "register_model_lifecycle_agent", "agent_runtime_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_model_lifecycle_agent_runtime", "required_action": "choose_supported_model_lifecycle_agent_runtime"}},
+	{"name": "model_lifecycle_agent_role_supported", "description": "Model lifecycle agents must use supported lifecycle roles.", "condition": {"operation": "register_model_lifecycle_agent", "agent_role_supported": False}, "effect": {"decision": "deny", "reason": "unsupported_model_lifecycle_agent_role", "required_action": "choose_supported_model_lifecycle_agent_role"}},
+	{"name": "model_lifecycle_agent_requires_scope", "description": "Model lifecycle agents require an explicit bounded scope.", "condition": {"operation": "register_model_lifecycle_agent", "scope_present": False}, "effect": {"decision": "deny", "reason": "model_lifecycle_agent_scope_required", "required_action": "declare_model_lifecycle_agent_scope"}},
+	{"name": "model_lifecycle_agent_requires_owner", "description": "Model lifecycle agents require an accountable owner.", "condition": {"operation": "register_model_lifecycle_agent", "owner_present": False}, "effect": {"decision": "deny", "reason": "model_lifecycle_agent_owner_required", "required_action": "assign_model_lifecycle_agent_owner"}},
+	{"name": "model_lifecycle_agent_requires_purpose", "description": "Model lifecycle agents require a documented purpose.", "condition": {"operation": "register_model_lifecycle_agent", "purpose_present": False}, "effect": {"decision": "deny", "reason": "model_lifecycle_agent_purpose_required", "required_action": "document_model_lifecycle_agent_purpose"}},
+	{"name": "model_lifecycle_agent_requires_contribution_disclosure", "description": "Model lifecycle agents must disclose machine-authored lifecycle contributions.", "condition": {"operation": "register_model_lifecycle_agent", "contribution_disclosed": False}, "effect": {"decision": "deny", "reason": "model_lifecycle_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}},
+	{"name": "model_lifecycle_agent_privileged_role_requires_human_approval", "description": "Privileged model lifecycle-agent roles require human approval evidence.", "condition": {"operation": "register_model_lifecycle_agent", "privileged_role": True, "human_approval_required": False}, "effect": {"decision": "require_review", "reason": "model_lifecycle_agent_human_approval_required", "required_action": "record_human_model_lifecycle_agent_approval"}},
+	{"name": "bytewax_mlcm_stream_required", "description": "MLCM lifecycle batches must be routed through Bytewax.", "condition": {"operation": "validate_mlcm_lifecycle_batch", "event_stream_ne": "bytewax"}, "effect": {"decision": "deny", "reason": "bytewax_lifecycle_stream_required", "required_action": "route_mlcm_lifecycle_batch_to_bytewax"}},
 	{"name": "lineage_required_for_release", "description": "Release candidates require dataset, baseline, and artifact lineage.", "condition": {"operation": "release_candidate", "lineage_complete": False}, "effect": {"decision": "deny", "reason": "release_lineage_required", "required_action": "complete_release_lineage"}},
 	{"name": "human_review_required_for_critical_risk", "description": "Critical-risk model operations require human review.", "condition": {"risk_level": "critical", "human_review_recorded": False}, "effect": {"decision": "require_review", "reason": "critical_risk_human_review_required", "required_action": "record_human_review"}},
 ]
@@ -175,6 +255,8 @@ UI_ROUTES: list[dict[str, str]] = [
 	{"name": "deployments", "path": "/mlcm/deployments", "component": "DeploymentBoard", "permission": "mlcm:deploy", "nav_group": "Operations"},
 	{"name": "drift", "path": "/mlcm/drift", "component": "DriftMonitor", "permission": "mlcm:view_drift", "nav_group": "Operations"},
 	{"name": "rollback", "path": "/mlcm/rollback", "component": "RollbackConsole", "permission": "mlcm:deploy", "nav_group": "Operations"},
+	{"name": "agents", "path": "/mlcm/agents", "component": "ModelLifecycleAgentRoster", "permission": "mlcm:govern", "nav_group": "Governance"},
+	{"name": "lifecycle", "path": "/mlcm/lifecycle", "component": "MLCMLifecycleBatchMonitor", "permission": "mlcm:govern", "nav_group": "Operations"},
 	{"name": "governance", "path": "/mlcm/governance", "component": "ModelGovernance", "permission": "mlcm:govern", "nav_group": "Governance"},
 	{"name": "audit", "path": "/mlcm/audit", "component": "MLCMAuditTimeline", "permission": "mlcm:view", "nav_group": "Governance"},
 	{"name": "settings", "path": "/mlcm/settings", "component": "MLCMSettings", "permission": "mlcm:admin", "nav_group": "Administration"},
@@ -204,10 +286,66 @@ THEME: dict[str, Any] = {
 		"deployment_rollout_panel": {"visual": "rollout-meter", "highlight": "canary-chip"},
 		"drift_monitor_chart": {"visual": "time-series-grid", "threshold_style": "drift-lines"},
 		"rollback_console": {"visual": "version-timeline", "status_style": "rollback-chip"},
+		"model_lifecycle_agent_roster": {"icon": "bot-message-square", "status_indicator": "agent-approval-chip", "risk_style": "scope-band"},
+		"bytewax_lifecycle_panel": {"icon": "git-branch", "status_indicator": "stream-chip", "risk_style": "processor-band"},
 		"model_card_panel": {"visual": "evidence-list", "status_style": "completeness-pill"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "evidence-chip"},
 	},
 }
+
+
+def agent_manifest() -> dict[str, Any]:
+	"""Return first-class MLCM agent composition manifest."""
+	return {
+		"first_class": True,
+		"supported_runtimes": list(SUPPORTED_MLCM_AGENT_RUNTIMES),
+		"supported_roles": list(SUPPORTED_MLCM_AGENT_ROLES),
+		"privileged_roles": list(PRIVILEGED_MLCM_AGENT_ROLES),
+		"required_fields": ["tenant_id", "agent_id", "name", "runtime", "role", "scope", "owner", "purpose"],
+		"guardrails": [
+			"supported_runtime",
+			"supported_role",
+			"explicit_scope",
+			"accountable_owner",
+			"declared_purpose",
+			"machine_contribution_disclosure",
+			"human_approval_for_privileged_roles",
+		],
+		"adapter_contract": "aicr_provider_neutral_agent_adapter",
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	"""Return the MLCM Bytewax lifecycle stream contract."""
+	return {
+		"engine": "bytewax",
+		"lifecycle_stream": "mlcm.lifecycle",
+		"watermark": "event_time",
+		"required_processor": "bytewax",
+		"required_operations": [
+			"model_batch",
+			"version_batch",
+			"evaluation_batch",
+			"promotion_batch",
+			"deployment_batch",
+			"drift_batch",
+			"rollback_batch",
+			"retirement_batch",
+			"model_lifecycle_agent_batch",
+		],
+		"topics": [
+			"mlcm.models",
+			"mlcm.versions",
+			"mlcm.evaluations",
+			"mlcm.promotions",
+			"mlcm.deployments",
+			"mlcm.drift",
+			"mlcm.rollbacks",
+			"mlcm.retirements",
+			"mlcm.agents",
+		],
+		"broker_core_dependency_allowed": False,
+	}
 
 
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -219,6 +357,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 	return {
 		"capability": "mlcm",
 		"display_name": "AI Model Lifecycle Management",
+		"provides": ["model_lifecycle", "model_governance", "model_lifecycle_agent_composition"],
+		"requires": ["aicr", "moni", "audl"],
 		"configuration": config,
 		"configuration_schema": CONFIGURATION_SCHEMA,
 		"rule_engine": {"type": "deterministic", "rules": deepcopy(RULES)},
@@ -230,6 +370,8 @@ def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any
 			"template_roots": ["templates/", "static/"],
 			"requires_theme": True,
 		},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
 		"theme": deepcopy(THEME),
 	}
 
@@ -257,6 +399,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_gt"):
 			if not context.get(key[:-3], 0) > expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

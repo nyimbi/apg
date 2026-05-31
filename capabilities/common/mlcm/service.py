@@ -22,7 +22,9 @@ from .models import (
 	DriftSignal,
 	EvaluationRun,
 	MlcmAuditEvent,
+	MlcmLifecycleBatchRecord,
 	ModelArtifact,
+	ModelLifecycleAgentRecord,
 	ModelVersion,
 	PromotionRequest,
 	RetirementRecord,
@@ -50,7 +52,13 @@ class MlcmService:
 		self._drift_signals: dict[str, DriftSignal] = {}
 		self._rollbacks: dict[str, RollbackRecord] = {}
 		self._retirements: dict[str, RetirementRecord] = {}
+		self._agents: dict[str, ModelLifecycleAgentRecord] = {}
+		self._lifecycle_batches: dict[str, MlcmLifecycleBatchRecord] = {}
 		self._audit_events: dict[str, MlcmAuditEvent] = {}
+		self._agent_runtimes = set(contract["agents"]["supported_runtimes"])
+		self._agent_roles = set(contract["agents"]["supported_roles"])
+		self._privileged_agent_roles = set(contract["agents"]["privileged_roles"])
+		self._lifecycle_operations = set(contract["streaming"]["required_operations"])
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
 		return get_capability_contract(tenant_id)
@@ -412,6 +420,108 @@ class MlcmService:
 		self._audit(tenant_id, "model_retired", retirement.id, f"Retired model {model.id}")
 		return retirement.to_dict()
 
+	def register_model_lifecycle_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		"""Register a first-class model lifecycle agent with guardrail evidence."""
+		self._require_tenant(tenant_id)
+		runtime_value = self._normalize_token(runtime)
+		role_value = self._normalize_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_model_lifecycle_agent",
+			"agent_runtime_supported": runtime_value in self._agent_runtimes,
+			"agent_role_supported": role_value in self._agent_roles,
+			"scope_present": bool(str(scope or "").strip()),
+			"owner_present": bool(str(owner or "").strip()),
+			"purpose_present": bool(str(purpose or "").strip()),
+			"contribution_disclosed": bool(contribution_disclosed),
+			"privileged_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		self._raise_if_denied(result)
+		if not name:
+			raise ValueError("model_lifecycle_agent_name_required")
+		status = "pending_review" if result["decision"] == "require_review" else "active"
+		record = ModelLifecycleAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status=status,
+		)
+		self._agents[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(
+			tenant_id,
+			"model_lifecycle_agent_registered",
+			record.id,
+			f"Registered model lifecycle agent {name}",
+			metadata={"runtime": runtime_value, "role": role_value, "status": status, "matched_rules": result["matched_rules"]},
+		)
+		return record.to_dict()
+
+	def validate_mlcm_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+		operation: str = "model_lifecycle_agent_batch",
+		batch_id: str | None = None,
+	) -> dict[str, Any]:
+		"""Validate that MLCM lifecycle mutation batches flow through Bytewax."""
+		self._require_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("mlcm_lifecycle_batch_empty")
+		stream_value = self._normalize_token(event_stream)
+		operation_value = self._normalize_token(operation)
+		if operation_value not in self._lifecycle_operations:
+			raise ValueError(f"unsupported_mlcm_lifecycle_operation:{operation_value}")
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_mlcm_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = MlcmLifecycleBatchRecord(
+			id=batch_id or stable_id("mlcmbatch", tenant_id, operation_value, len(self._lifecycle_batches)),
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			operation=operation_value,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=list(result["matched_rules"]),
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_record_key(tenant_id, record.id)] = record
+		self._audit(
+			tenant_id,
+			f"mlcm_lifecycle_batch_{record.status}",
+			record.id,
+			f"MLCM lifecycle batch {record.status}",
+			metadata=record.to_dict(),
+		)
+		if not accepted:
+			self._raise_if_denied(result)
+		return record.to_dict()
+
 	def create_record(
 		self,
 		record_id: str,
@@ -462,6 +572,12 @@ class MlcmService:
 	def list_retirements(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._retirements, tenant_id)
 
+	def list_model_lifecycle_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._list(self._lifecycle_batches, tenant_id)
+
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._list(self._audit_events, tenant_id)
 
@@ -472,6 +588,8 @@ class MlcmService:
 		deployments = [item for item in self._deployments.values() if item.tenant_id == tenant_id]
 		drift = [item for item in self._drift_signals.values() if item.tenant_id == tenant_id]
 		promotions = [item for item in self._promotion_requests.values() if item.tenant_id == tenant_id]
+		agents = [item for item in self._agents.values() if item.tenant_id == tenant_id]
+		batches = [item for item in self._lifecycle_batches.values() if item.tenant_id == tenant_id]
 		return {
 			"tenant_id": tenant_id,
 			"model_count": len(models),
@@ -482,6 +600,10 @@ class MlcmService:
 			"production_version_count": sum(1 for item in versions if item.stage == "production"),
 			"pending_promotion_count": sum(1 for item in promotions if item.status == "blocked"),
 			"unresolved_drift_count": sum(1 for item in drift if item.drift_detected and not item.review_recorded),
+			"model_lifecycle_agent_count": len(agents),
+			"pending_agent_review_count": sum(1 for item in agents if item.status == "pending_review"),
+			"lifecycle_batch_count": len(batches),
+			"denied_lifecycle_batch_count": sum(1 for item in batches if item.status == "denied"),
 			"minimum_eval_score": self.minimum_eval_score,
 			"audit_event_count": sum(1 for item in self._audit_events.values() if item.tenant_id == tenant_id),
 		}
@@ -537,6 +659,12 @@ class MlcmService:
 	def _raise_if_review_required(self, result: dict[str, Any]) -> None:
 		if result["decision"] == "require_review":
 			raise PermissionError(self._reasons(result))
+
+	def _normalize_token(self, value: str) -> str:
+		return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+
+	def _tenant_record_key(self, tenant_id: str, record_id: str) -> str:
+		return f"{tenant_id}:{record_id}"
 
 	def _audit(
 		self,

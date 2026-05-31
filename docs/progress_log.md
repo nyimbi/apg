@@ -16,6 +16,73 @@ Use this file for durable progress, verification evidence, known gaps, and the n
 
 ## Progress Entries
 
+### 2026-05-31 06:35 EAT
+
+MLCM model-lifecycle-agent and Bytewax lifecycle guardrail packet:
+
+- Extended `capabilities/common/mlcm/SPECIFICATION.md`, `PLAN.md`,
+  `README.md`, and `cap_spec.md` to define MLCM as a first-class model
+  lifecycle governance capability with model lifecycle agents and Bytewax
+  lifecycle batches.
+- Added top-level model lifecycle-agent contract metadata for Codex, Claude
+  Code, opencode, and Pi runtimes across model-card, evaluation, fairness,
+  explainability, promotion, deployment, drift, rollback, retirement, and
+  model-steward roles.
+- Added deterministic model lifecycle-agent guardrails for supported runtime,
+  supported role, explicit scope, accountable owner, declared purpose, machine
+  contribution disclosure, and privileged-role human approval status.
+- Added MLCM Bytewax lifecycle stream metadata for `mlcm.lifecycle`, model,
+  version, evaluation, promotion, deployment, drift, rollback, retirement, and
+  model-lifecycle-agent batches, plus a rule that rejects non-Bytewax lifecycle
+  processors.
+- Added dependency-light `ModelLifecycleAgentRecord` and
+  `MlcmLifecycleBatchRecord` runtime state, service registration/validation
+  methods, API helpers, generated UI models, dashboard/governance summaries,
+  audit events, semantic-model publication, and focused tests.
+- Added `/mlcm/agents` and `/mlcm/lifecycle` route metadata plus theme
+  components for lifecycle-agent rosters and Bytewax lifecycle monitoring.
+- Refreshed `semantic_model.json` and `release_report.json` from the live
+  executable app surface.
+
+Battery-conscious verification:
+
+- Baseline focused test before edits: `./.venv/bin/pytest -q
+  capabilities/common/mlcm/test_capability_contract.py
+  capabilities/common/mlcm/tests/test_package_contract.py` passed with 8 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- Focused `./.venv/bin/python -m py_compile` for MLCM contract, models,
+  lifecycle runtime, service, API, view models, app, package init, and focused
+  tests passed.
+- `./.venv/bin/python capabilities/common/mlcm/app.py` passed package
+  self-test.
+- `./.venv/bin/pytest -q capabilities/common/mlcm/test_capability_contract.py
+  capabilities/common/mlcm/tests/test_package_contract.py` passed with 11 tests
+  and 10 pre-existing shared SQLAlchemy/Pydantic deprecation warnings.
+- `find capabilities/common/mlcm -name '*.py' -not -path '*/__pycache__/*'
+  -exec ./.venv/bin/python -m py_compile {} +` passed.
+- `./.venv/bin/apg capabilities inspect mlcm --json` confirmed `ok: true`, 15
+  routes, 43 rules, Bytewax streaming, and first-class agents.
+- `./.venv/bin/apg capabilities implementation-audit --root
+  capabilities/common/mlcm --json` passed with `domain_specific`
+  implementation level, 0 baseline markers, no warnings, and no blocking gaps.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/mlcm --json`
+  confirmed side-effect-free publish planning with no warnings and dependencies
+  `aicr`, `moni`, and `audl`.
+- Service smoke executed model -> version -> evaluation -> promotion ->
+  deployment -> model lifecycle agent -> Bytewax lifecycle batch and produced 8
+  audit events.
+- MLCM stale-marker scan returned no TODO/FIXME/placeholder/stub matches across
+  touched source, docs, tests, and generated evidence files. References to
+  `baseline` are domain model lineage, not stale template markers.
+- `git diff --check -- capabilities/common/mlcm docs/progress_log.md` passed.
+
+Known gaps:
+
+- Did not run full repository tests, rendered browser UI checks, live model
+  provider calls, live Codex/Claude Code/OpenCode/Pi adapters, durable stores,
+  durable Bytewax topology, AICR/MONI/AUDL/AUTH live adapters, load checks,
+  migration checks, or failover checks during this battery-conscious slice.
+
 ### 2026-05-31 06:19 EAT
 
 AICR AI-agent composition and Bytewax lifecycle guardrail packet:

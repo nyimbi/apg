@@ -21,6 +21,11 @@ audit evidence, UI metadata, and a Bytewax event-stream adapter contract.
   when unresolved drift exists.
 - Rollback records and model retirement after impact review and deployment
   drain.
+- First-class model lifecycle agents for Codex, Claude Code, OpenCode, and Pi
+  reviewers, including role, scope, owner, purpose, contribution disclosure, and
+  privileged approval status.
+- Bytewax lifecycle batch validation for model, version, evaluation, promotion,
+  deployment, drift, rollback, retirement, and model-lifecycle-agent mutations.
 - Rule-engine metadata, UI route metadata, theme tokens, and generated-app
   semantic package evidence.
 - Adapter configuration for AICR, AUTH, AUDL, MONI, file artifacts, and Bytewax
@@ -94,6 +99,22 @@ target = service.create_target(
 	"risk-platform",
 )
 service.deploy_model("deploy-fraud-v1", "tenant-a", version["id"], target["id"])
+service.register_model_lifecycle_agent(
+	"model-steward",
+	"tenant-a",
+	"Model Steward",
+	"codex",
+	"model_steward",
+	"fraud model registry",
+	"risk-ai",
+	"Keep release evidence complete.",
+)
+service.validate_mlcm_lifecycle_batch(
+	"tenant-a",
+	"bytewax",
+	4,
+	"model_lifecycle_agent_batch",
+)
 ```
 
 ## Guardrails
@@ -106,7 +127,9 @@ approval, deployments without model cards, low-score promotion, inactive
 deployment targets, unresolved drift, rollback target mismatch, retirement
 without impact review, retirement while deployments are serving, cross-tenant
 model access, state changes without audit evidence, non-Bytewax monitoring
-streams, incomplete release lineage, and critical-risk operations without human
+streams, model lifecycle agents without supported runtime, supported role,
+scope, owner, purpose, or contribution disclosure, non-Bytewax lifecycle
+batches, incomplete release lineage, and critical-risk operations without human
 review.
 
 ## Focused Verification

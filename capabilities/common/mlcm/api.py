@@ -148,6 +148,31 @@ def retire_model(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_model_lifecycle_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_model_lifecycle_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload.get("runtime") or "codex"),
+		role=str(payload.get("role") or "model_steward"),
+		scope=str(payload.get("scope") or ""),
+		owner=str(payload.get("owner") or ""),
+		purpose=str(payload.get("purpose") or ""),
+		contribution_disclosed=bool(payload.get("contribution_disclosed", True)),
+		human_approval_required=bool(payload.get("human_approval_required", False)),
+	)
+
+
+def validate_mlcm_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_mlcm_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload.get("event_stream") or "bytewax"),
+		mutation_count=int(payload.get("mutation_count") or 0),
+		operation=str(payload.get("operation") or "model_lifecycle_agent_batch"),
+		batch_id=str(payload["id"]) if payload.get("id") else None,
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -163,3 +188,11 @@ def list_records(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def dashboard_summary(tenant_id: str = "default") -> dict[str, Any]:
 	return SERVICE.dashboard_summary(tenant_id)
+
+
+def list_model_lifecycle_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_model_lifecycle_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
