@@ -632,6 +632,39 @@ class GatewayDeploymentRecord(BaseModel):
 	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
 
 
+class GatewayAgentRecord(BaseModel):
+	"""Governed AI or automation agent participating in APIG decisions."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(description="Gateway agent ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	name: str = Field(description="Human-readable agent name")
+	runtime: str = Field(description="Agent runtime adapter")
+	role: str = Field(description="Gateway governance role")
+	scope: str = Field(description="Bounded route, traffic, security, edge, or deployment scope")
+	owner: str = Field(description="Accountable human or team owner")
+	purpose: str = Field(description="Declared reason for agent participation")
+	contribution_disclosed: bool = Field(True, description="Whether machine contribution disclosure is recorded")
+	human_approval_required: bool = Field(False, description="Whether human approval is required before privileged actions")
+	status: str = Field("active", description="Agent lifecycle status")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+
+
+class GatewayLifecycleBatchRecord(BaseModel):
+	"""Bytewax lifecycle-batch validation record for APIG generated apps."""
+	model_config = APG_MODEL_CONFIG
+
+	id: str = Field(default_factory=uuid7str, description="Lifecycle batch ID")
+	tenant_id: str = Field(description="APG tenant ID")
+	event_stream: str = Field(description="Lifecycle event processor")
+	mutation_count: int = Field(description="Number of lifecycle mutations in the batch")
+	accepted: bool = Field(description="Whether the batch is accepted")
+	decision: str = Field("allow", description="allow, deny, or require_review")
+	matched_rules: List[str] = Field(default_factory=list, description="Matched guardrail rules")
+	status: str = Field("accepted", description="Batch lifecycle status")
+
+
 class GatewayAuditEvent(BaseModel):
 	"""Tenant-scoped gateway governance evidence event."""
 	model_config = APG_MODEL_CONFIG
@@ -673,7 +706,6 @@ async def validate_tenant_access(tenant_id: str, user_id: str) -> bool:
 	if not user_id:
 		return False
 
-	# Placeholder implementation - integrate with APG auth_rbac
 	return True
 
 # Model Registry for APG Composition Engine

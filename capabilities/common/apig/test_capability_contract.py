@@ -29,10 +29,12 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"governance",
 		"observability",
 		"adapters",
+		"agents",
+		"streaming",
 		"ui",
 		"theme"
 	]
-	assert len(contract["rule_engine"]["rules"]) >= 20
+	assert len(contract["rule_engine"]["rules"]) >= 33
 	assert {route["name"] for route in contract["ui"]["routes"]} >= {
 		"dashboard",
 		"routes",
@@ -45,14 +47,24 @@ def test_contract_exposes_configuration_rules_ui_and_theme():
 		"canary",
 		"deployments",
 		"analytics",
+		"agents",
+		"lifecycle",
 		"audit",
 		"settings"
 	}
 	assert contract["ui"]["api_prefix"] == "/apig/api/v1"
 	assert contract["ui"]["view_module"] == "view_models.py"
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["agents"]["supported_runtimes"] == ["codex", "claude_code", "opencode", "pi"]
+	assert "security_policy_reviewer" in contract["agents"]["privileged_roles"]
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "gateway_agent_batch" in contract["streaming"]["operations"]
+	assert contract["provides"] == ["api_gateway", "traffic_management", "gateway_agent_composition"]
+	assert contract["requires"] == ["auth", "moni", "mqeb", "conf"]
 	assert contract["theme"]["tokens"]["border.radius"] == "8px"
 	assert "gateway_topology_map" in contract["theme"]["components"]
+	assert "gateway_agent_roster" in contract["theme"]["components"]
 
 
 def test_rule_engine_enforces_gateway_guardrails():
@@ -89,6 +101,36 @@ def test_rule_engine_enforces_gateway_guardrails():
 		"high_quota_requires_review"
 	}
 
+	agent_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "register_gateway_agent",
+		"unsupported_agent_runtime": True,
+		"unsupported_agent_role": True,
+		"agent_scope_present": False,
+		"agent_owner_present": False,
+		"agent_purpose_present": False,
+		"agent_contribution_disclosed": False,
+		"privileged_agent_role": True,
+		"human_approval_required": False,
+	})
+	stream_result = evaluate_capability_rules({
+		"tenant_context_present": True,
+		"operation": "validate_apig_lifecycle_batch",
+		"event_stream": "kafka",
+	})
+	assert agent_result["decision"] == "deny"
+	assert set(agent_result["matched_rules"]) >= {
+		"gateway_agent_runtime_supported",
+		"gateway_agent_role_supported",
+		"gateway_agent_requires_scope",
+		"gateway_agent_requires_owner",
+		"gateway_agent_requires_purpose",
+		"gateway_agent_requires_contribution_disclosure",
+		"gateway_agent_privileged_role_requires_human_approval",
+	}
+	assert stream_result["decision"] == "deny"
+	assert stream_result["matched_rules"] == ["bytewax_apig_stream_required"]
+
 
 def test_registration_includes_full_capability_contract():
 	registration = register_capability()
@@ -100,7 +142,10 @@ def test_registration_includes_full_capability_contract():
 	assert registration["ui_components"]["routes"] == "/apig/routes"
 	assert "consumer_lifecycle" in registration["capabilities"]
 	assert "deployment_gates" in registration["capabilities"]
-	assert "auth_rbac" in registration["dependencies"]
+	assert "gateway_agent_composition" in registration["capabilities"]
+	assert registration["agents"]["first_class"] is True
+	assert registration["streaming"]["required_processor"] == "bytewax"
+	assert "auth" in registration["dependencies"]
 
 
 def test_service_runs_high_quota_route_review_activation_lifecycle():
@@ -464,7 +509,66 @@ def test_service_enforces_policy_canary_deployment_and_retirement_guardrails():
 		impact_review_recorded=True,
 	)
 	assert retired["status"] == "retired"
-	assert service.gateway_summary(tenant_id)["audit_event_count"] >= 9
+
+	with pytest.raises(PermissionError, match="unsupported_gateway_agent_runtime"):
+		service.register_gateway_agent(
+			agent_id="bad-agent",
+			tenant_id=tenant_id,
+			name="Bad Agent",
+			runtime="unsupported",
+			role="route_reviewer",
+			scope="public routes",
+			owner="platform",
+			purpose="review routes",
+		)
+
+	pending_agent = service.register_gateway_agent(
+		agent_id="security-agent-pending",
+		tenant_id=tenant_id,
+		name="Security Agent Pending",
+		runtime="claude-code",
+		role="security-policy-reviewer",
+		scope="public and external route security policies",
+		owner="security",
+		purpose="review gateway security policy recommendations",
+		human_approval_required=False,
+	)
+	assert pending_agent["status"] == "pending_review"
+	assert pending_agent["runtime"] == "claude_code"
+	assert pending_agent["role"] == "security_policy_reviewer"
+	assert pending_agent["matched_rules"] == ["gateway_agent_privileged_role_requires_human_approval"]
+
+	agent = service.register_gateway_agent(
+		agent_id="security-agent",
+		tenant_id=tenant_id,
+		name="Security Agent",
+		runtime="codex",
+		role="security_policy_reviewer",
+		scope="public and external route security policies",
+		owner="security",
+		purpose="review gateway security policy recommendations",
+		human_approval_required=True,
+	)
+	assert agent["status"] == "active"
+
+	with pytest.raises(PermissionError, match="bytewax_required"):
+		service.validate_apig_lifecycle_batch(
+			tenant_id=tenant_id,
+			event_stream="kafka",
+			mutation_count=3,
+		)
+
+	batch = service.validate_apig_lifecycle_batch(
+		tenant_id=tenant_id,
+		event_stream="bytewax",
+		mutation_count=3,
+	)
+	assert batch["status"] == "accepted"
+	summary = service.gateway_summary(tenant_id)
+	assert summary["gateway_agent_count"] == 2
+	assert summary["lifecycle_batch_count"] == 2
+	assert summary["denied_lifecycle_batch_count"] == 1
+	assert summary["audit_event_count"] >= 14
 
 
 def test_view_models_expose_gateway_composition_surfaces():
@@ -495,6 +599,21 @@ def test_view_models_expose_gateway_composition_surfaces():
 		wasm_filter_attached=True,
 		filter_signature_verified=True,
 	)
+	service.register_gateway_agent(
+		agent_id="ui-agent",
+		tenant_id=tenant_id,
+		name="UI Agent",
+		runtime="opencode",
+		role="retirement_reviewer",
+		scope="route retirement impact reviews",
+		owner="api",
+		purpose="review retirement impact evidence",
+	)
+	service.validate_apig_lifecycle_batch(
+		tenant_id=tenant_id,
+		event_stream="bytewax",
+		mutation_count=1,
+	)
 
 	assert views.dashboard_model(service, tenant_id)["summary"]["route_count"] == 1
 	assert views.upstream_manager_model(service, tenant_id)["rows"][0]["id"] == "ui-api"
@@ -502,6 +621,8 @@ def test_view_models_expose_gateway_composition_surfaces():
 	assert views.route_designer_model(service, tenant_id)["routes"][0]["id"] == "ui-route"
 	assert views.edge_filter_model(service, tenant_id)["routes"][0]["id"] == "ui-route"
 	assert views.security_policy_model(service, tenant_id)["required_external_route_controls"] == ["mtls_enabled"]
+	assert views.gateway_agent_roster_model(service, tenant_id)["rows"][0]["id"] == "ui-agent"
+	assert views.lifecycle_batch_model(service, tenant_id)["streaming"]["required_processor"] == "bytewax"
 	assert views.settings_model(tenant_id)["configuration"]["adapters"]["event_stream"] == "bytewax"
 
 
@@ -560,3 +681,23 @@ def test_api_helpers_expose_governed_route_lifecycle():
 		"canary_review_recorded": "false",
 	})
 	assert shift["status"] == "active"
+
+	agent = api.register_gateway_agent({
+		"id": "api-agent",
+		"tenant_id": "tenant-api-gateway",
+		"name": "API Agent",
+		"runtime": "pi",
+		"role": "retirement_reviewer",
+		"scope": "route retirement reviews",
+		"owner": "api-owner",
+		"purpose": "review route retirement evidence",
+	})
+	batch = api.validate_apig_lifecycle_batch({
+		"tenant_id": "tenant-api-gateway",
+		"event_stream": "bytewax",
+		"mutation_count": 2,
+	})
+	assert agent["runtime"] == "pi"
+	assert batch["status"] == "accepted"
+	assert api.list_gateway_agents("tenant-api-gateway")[0]["id"] == "api-agent"
+	assert api.list_lifecycle_batches("tenant-api-gateway")[0]["event_stream"] == "bytewax"

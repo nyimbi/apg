@@ -132,6 +132,29 @@ def retire_route(payload: dict[str, Any]) -> dict[str, Any]:
 	)
 
 
+def register_gateway_agent(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.register_gateway_agent(
+		agent_id=str(payload["id"]),
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		name=str(payload.get("name") or payload["id"]),
+		runtime=str(payload["runtime"]),
+		role=str(payload["role"]),
+		scope=str(payload["scope"]),
+		owner=str(payload["owner"]),
+		purpose=str(payload["purpose"]),
+		contribution_disclosed=_payload_bool(payload, "contribution_disclosed", True),
+		human_approval_required=_payload_bool(payload, "human_approval_required", False),
+	)
+
+
+def validate_apig_lifecycle_batch(payload: dict[str, Any]) -> dict[str, Any]:
+	return SERVICE.validate_apig_lifecycle_batch(
+		tenant_id=str(payload.get("tenant_id") or "default"),
+		event_stream=str(payload["event_stream"]),
+		mutation_count=int(payload["mutation_count"]),
+	)
+
+
 def create_record(payload: dict[str, Any]) -> dict[str, Any]:
 	return SERVICE.create_record(
 		record_id=str(payload["id"]),
@@ -171,6 +194,14 @@ def list_traffic_shifts(tenant_id: str | None = None) -> list[dict[str, Any]]:
 
 def list_deployments(tenant_id: str | None = None) -> list[dict[str, Any]]:
 	return SERVICE.list_deployments(tenant_id)
+
+
+def list_gateway_agents(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_gateway_agents(tenant_id)
+
+
+def list_lifecycle_batches(tenant_id: str | None = None) -> list[dict[str, Any]]:
+	return SERVICE.list_lifecycle_batches(tenant_id)
 
 
 def list_audit_events(tenant_id: str | None = None) -> list[dict[str, Any]]:

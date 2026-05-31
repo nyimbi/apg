@@ -1,16 +1,23 @@
 {
   "evidence": {
+    "agents": {
+      "first_class": true,
+      "role_count": 8,
+      "runtime_count": 4
+    },
     "contracts": {
       "capability_contract": {
         "display_name": "API Gateway & Management",
         "errors": [],
-        "route_count": 13,
-        "rule_count": 25
+        "route_count": 15,
+        "rule_count": 33
       }
     },
     "runtime": {
-      "event_stream": "bytewax",
-      "generated_app_runtime": "gateway_runtime.ApigService"
+      "api": "api.py",
+      "entrypoint": "app.py",
+      "service": "gateway_runtime.py",
+      "views": "view_models.py"
     },
     "self_test": {
       "capability": "apig",
@@ -27,6 +34,10 @@
     "semantic_model": {
       "capability": "apig",
       "format": "apg.semantic-model.v1"
+    },
+    "streaming": {
+      "engine": "bytewax",
+      "required_processor": "bytewax"
     }
   },
   "format": "apg.release-report.v1",

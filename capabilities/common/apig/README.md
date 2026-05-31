@@ -29,7 +29,10 @@ APIG is intentionally split into two layers:
 - API helper functions for generated applications.
 - UI view models for dashboard, routes, upstreams, consumers, traffic,
   security, edge filters, quota reviews, canary releases, deployments,
-  analytics, audit, and settings.
+  analytics, gateway agents, lifecycle batches, audit, and settings.
+- First-class gateway-agent records for AI and automation tools.
+- Bytewax lifecycle-batch validation before generated applications apply
+  batched APIG state changes.
 - Contract-derived semantic model and package evidence.
 
 ## Important Files
@@ -83,6 +86,27 @@ route = service.request_route(
 )
 
 assert route["status"] == "active"
+
+agent = service.register_gateway_agent(
+    agent_id="security-agent",
+    tenant_id="tenant-a",
+    name="Security Agent",
+    runtime="codex",
+    role="security_policy_reviewer",
+    scope="public and external route security policies",
+    owner="security",
+    purpose="review gateway security recommendations",
+    human_approval_required=True,
+)
+
+batch = service.validate_apig_lifecycle_batch(
+    tenant_id="tenant-a",
+    event_stream="bytewax",
+    mutation_count=4,
+)
+
+assert agent["status"] == "active"
+assert batch["status"] == "accepted"
 ```
 
 ## UI Composition
@@ -101,7 +125,8 @@ routes = route_designer_model(service, "tenant-a")
 The generated-app control plane does not configure a live reverse proxy or
 execute edge code. Production deployments must bind adapters for reverse proxy,
 service discovery, auth, credential vault, metrics, audit, cache, Bytewax event
-streaming, and edge runtime execution. Those adapters must honor APIG guardrail
+streaming, edge runtime execution, and external AI/automation runtimes such as
+Codex, Claude Code, OpenCode, and Pi. Those adapters must honor APIG guardrail
 decisions before side effects.
 
 ## Focused Verification

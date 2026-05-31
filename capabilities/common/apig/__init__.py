@@ -59,13 +59,10 @@ async def get_capability_info() -> dict[str, Any]:
 def register_capability() -> dict[str, Any]:
 	"""Register APIG with the APG composition engine."""
 	contract = get_capability_contract()
-	required = [
-		dep["capability"] for dep in CAPABILITY_METADATA["dependencies"]
-		if dep.get("required")
-	]
+	required = contract["requires"]
 	optional = [
 		dep["capability"] for dep in CAPABILITY_METADATA["dependencies"]
-		if not dep.get("required")
+		if not dep.get("required") and dep["capability"] not in required
 	]
 	return {
 		"name": "apig",
@@ -75,9 +72,12 @@ def register_capability() -> dict[str, Any]:
 		"version": CAPABILITY_METADATA["version"],
 		"dependencies": required,
 		"optional_dependencies": optional,
+		"provides": contract["provides"],
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
 		"rule_engine": contract["rule_engine"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"capabilities": {
 			"upstream_lifecycle": "Register and govern upstream services",
 			"consumer_lifecycle": "Register API consumers and credential controls",
@@ -85,6 +85,8 @@ def register_capability() -> dict[str, Any]:
 			"traffic_management": "Apply quota, rate-limit, canary, and rollback guardrails",
 			"security_gateway": "Enforce auth, threat, mTLS, and signed filter controls",
 			"deployment_gates": "Evaluate gateway deployment readiness and approvals",
+			"gateway_agent_composition": "Register governed AI and automation agents as first-class APIG participants",
+			"bytewax_lifecycle_batches": "Validate Bytewax-routed lifecycle batches before generated applications mutate APIG state",
 			"capability_rules": "Evaluate deterministic gateway governance rules",
 			"visual_theming": "Apply gateway-console theme tokens and components",
 		},
@@ -99,6 +101,8 @@ def register_capability() -> dict[str, Any]:
 			"canary": "/apig/api/v1/canary",
 			"deployments": "/apig/api/v1/deployments",
 			"analytics": "/apig/api/v1/analytics",
+			"agents": "/apig/api/v1/agents",
+			"lifecycle": "/apig/api/v1/lifecycle",
 			"audit_events": "/apig/api/v1/audit-events",
 		},
 		"ui_components": {

@@ -21101,3 +21101,66 @@ Not run to preserve battery:
   topology, metadata catalog, cache store, credential vault, audit sink,
   rendered browser UI, external AI-agent runtime clients, and
   performance/load tests.
+
+### 2026-05-31 05:27 EAT
+
+APIG gateway-agent composition and Bytewax lifecycle guardrail packet:
+
+- Selected `capabilities/common/apig` as the next integration capability after
+  DVRL.
+- Extended the APIG executable contract with first-class gateway-agent
+  metadata, supported runtimes `codex`, `claude_code`, `opencode`, and `pi`,
+  supported gateway-governance roles, privileged-role metadata, Bytewax
+  lifecycle stream metadata, route metadata, theme components, and
+  contract-level `provides`/`requires`.
+- Added deterministic guardrails for unsupported gateway-agent runtime,
+  unsupported gateway-agent role, missing agent scope, owner, purpose, missing
+  machine contribution disclosure, privileged gateway-agent registration
+  without human approval, and non-Bytewax APIG lifecycle batch routing.
+- Added `GatewayAgentRecord`, `GatewayLifecycleBatchRecord`,
+  tenant-qualified gateway-agent storage, lifecycle-batch storage,
+  registration, listing, audit events, dashboard counts, API helper payload
+  handling, gateway-agent roster view models, and lifecycle-batch monitor view
+  models.
+- Added `/apig/agents`, `/apig/lifecycle`, gateway-agent roster theme metadata,
+  and Bytewax lifecycle panel theme metadata.
+- Regenerated `semantic_model.json` and `release_report.json` from the live
+  `app.py` contract.
+- Refreshed `README.md`, `SPECIFICATION.md`, `PLAN.md`, `cap_spec.md`,
+  `todo.md`, and package evidence so the documented packet matches the
+  executable contract and does not imply embedded external agent runtimes or
+  broker-first processing.
+
+Battery-conscious verification:
+
+- `./.venv/bin/python -m py_compile capabilities/common/apig/__init__.py capabilities/common/apig/capability_contract.py capabilities/common/apig/models.py capabilities/common/apig/gateway_runtime.py capabilities/common/apig/api.py capabilities/common/apig/view_models.py capabilities/common/apig/views.py capabilities/common/apig/app.py capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py`
+  passed.
+- `./.venv/bin/pytest -q capabilities/common/apig/test_capability_contract.py capabilities/common/apig/tests/test_package_contract.py`
+  passed with 11 tests and only existing shared-module deprecation warnings.
+- `./.venv/bin/python capabilities/common/apig/app.py` passed with `passed:
+  true`.
+- `./.venv/bin/apg capabilities inspect apig --json` passed with `ok: true`,
+  15 APG Python routes, 33 deterministic rules, first-class agents, and
+  Bytewax streaming metadata.
+- `./.venv/bin/apg capabilities implementation-audit --root capabilities/common/apig --json`
+  passed with `ok: true`; APIG remains `domain_specific`, with 0 baseline
+  markers, 0 errors, and 0 warnings.
+- `./.venv/bin/apg capabilities publish-plan capabilities/common/apig --json`
+  passed with side-effect-free package evidence and no warnings.
+- `find capabilities/common/apig -name '*.py' -not -path '*/__pycache__/*' -exec ./.venv/bin/python -m py_compile {} +`
+  passed.
+- `./.venv/bin/python -c "import capabilities.common.apig.api as api; print(api.capability_status()['capability'])"`
+  imported `api.py` successfully and returned `apig`.
+- `./.venv/bin/python -c "... ApigService ... register_gateway_agent ... validate_apig_lifecycle_batch ..."`
+  returned one `codex` security-policy reviewer with owner and purpose
+  evidence, human approval required, normalized role, and `bytewax`
+  lifecycle-batch evidence.
+- Focused stale-marker scan over touched APIG packet source, docs, tests, and
+  evidence returned no matches.
+
+Not run to preserve battery:
+
+- Full repository pytest suite.
+- Live reverse proxy, service mesh, live APG auth/config/monitoring/audit
+  adapters, live Bytewax topology, WebAssembly runtime execution, rendered
+  browser UI, external AI-agent runtime clients, and performance/load tests.

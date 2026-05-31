@@ -4,11 +4,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from .capability_contract import evaluate_capability_rules, get_capability_contract
+from .capability_contract import (
+	PRIVILEGED_APIG_AGENT_ROLES,
+	SUPPORTED_APIG_AGENT_ROLES,
+	SUPPORTED_APIG_AGENT_RUNTIMES,
+	evaluate_capability_rules,
+	get_capability_contract,
+)
 from .models import (
 	GatewayAuditEvent,
+	GatewayAgentRecord,
 	GatewayConsumerRecord,
 	GatewayDeploymentRecord,
+	GatewayLifecycleBatchRecord,
 	GatewayPolicyRecord,
 	GatewayQuotaReview,
 	GatewayRouteRecord,
@@ -24,6 +32,9 @@ class ApigService:
 	"""Tenant-scoped gateway control-plane facade for generated APG apps."""
 
 	def __init__(self) -> None:
+		self._agent_runtimes = set(SUPPORTED_APIG_AGENT_RUNTIMES)
+		self._agent_roles = set(SUPPORTED_APIG_AGENT_ROLES)
+		self._privileged_agent_roles = set(PRIVILEGED_APIG_AGENT_ROLES)
 		self._upstreams: dict[tuple[str, str], GatewayUpstreamRecord] = {}
 		self._consumers: dict[tuple[str, str], GatewayConsumerRecord] = {}
 		self._routes: dict[tuple[str, str], GatewayRouteRecord] = {}
@@ -31,6 +42,8 @@ class ApigService:
 		self._policies: dict[tuple[str, str], GatewayPolicyRecord] = {}
 		self._traffic_shifts: dict[tuple[str, str], GatewayTrafficShiftRecord] = {}
 		self._deployments: dict[tuple[str, str], GatewayDeploymentRecord] = {}
+		self._gateway_agents: dict[tuple[str, str], GatewayAgentRecord] = {}
+		self._lifecycle_batches: dict[tuple[str, str], GatewayLifecycleBatchRecord] = {}
 		self._events: list[GatewayAuditEvent] = []
 
 	def describe(self, tenant_id: str = "default") -> dict[str, Any]:
@@ -459,6 +472,108 @@ class ApigService:
 		)
 		return retired.model_dump(mode="json")
 
+	def register_gateway_agent(
+		self,
+		agent_id: str,
+		tenant_id: str,
+		name: str,
+		runtime: str,
+		role: str,
+		scope: str,
+		owner: str,
+		purpose: str,
+		contribution_disclosed: bool = True,
+		human_approval_required: bool = False,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		runtime_value = _normalize_agent_token(runtime)
+		role_value = _normalize_agent_token(role)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "register_gateway_agent",
+			"unsupported_agent_runtime": runtime_value not in self._agent_runtimes,
+			"unsupported_agent_role": role_value not in self._agent_roles,
+			"agent_scope_present": bool(str(scope or "").strip()),
+			"agent_owner_present": bool(str(owner or "").strip()),
+			"agent_purpose_present": bool(str(purpose or "").strip()),
+			"agent_contribution_disclosed": bool(contribution_disclosed),
+			"privileged_agent_role": role_value in self._privileged_agent_roles,
+			"human_approval_required": bool(human_approval_required),
+		})
+		if result["decision"] == "deny":
+			self._record_event(
+				tenant_id=tenant_id,
+				event_type="gateway_agent_registration_denied",
+				subject_id=agent_id,
+				message=f"Denied gateway agent {name}.",
+				evidence={"runtime": runtime_value, "role": role_value, "matched_rules": result["matched_rules"]},
+			)
+			_raise_if_blocked(result)
+		if self._tenant_key(tenant_id, agent_id) in self._gateway_agents:
+			raise ValueError(f"gateway agent already exists for tenant: {agent_id}")
+		record = GatewayAgentRecord(
+			id=agent_id,
+			tenant_id=tenant_id,
+			name=name,
+			runtime=runtime_value,
+			role=role_value,
+			scope=str(scope).strip(),
+			owner=str(owner).strip(),
+			purpose=str(purpose).strip(),
+			contribution_disclosed=bool(contribution_disclosed),
+			human_approval_required=bool(human_approval_required),
+			status="active" if result["decision"] == "allow" else _status_for_decision(result["decision"]),
+			decision=result["decision"],
+			matched_rules=result["matched_rules"],
+		)
+		self._gateway_agents[self._tenant_key(tenant_id, agent_id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type="gateway_agent_registered",
+			subject_id=agent_id,
+			message=f"Registered gateway agent {name}.",
+			evidence={"runtime": runtime_value, "role": role_value, "status": record.status, "matched_rules": result["matched_rules"]},
+		)
+		return record.model_dump(mode="json")
+
+	def validate_apig_lifecycle_batch(
+		self,
+		tenant_id: str,
+		event_stream: str,
+		mutation_count: int,
+	) -> dict[str, Any]:
+		self._enforce_tenant(tenant_id)
+		mutation_count = int(mutation_count)
+		if mutation_count <= 0:
+			raise ValueError("apig_lifecycle_batch_empty")
+		stream_value = _normalize_agent_token(event_stream)
+		result = self.evaluate({
+			"tenant_context_present": bool(tenant_id),
+			"operation": "validate_apig_lifecycle_batch",
+			"event_stream": stream_value,
+		})
+		accepted = result["decision"] == "allow"
+		record = GatewayLifecycleBatchRecord(
+			tenant_id=tenant_id,
+			event_stream=stream_value,
+			mutation_count=mutation_count,
+			accepted=accepted,
+			decision=result["decision"],
+			matched_rules=result["matched_rules"],
+			status="accepted" if accepted else "denied",
+		)
+		self._lifecycle_batches[self._tenant_key(tenant_id, record.id)] = record
+		self._record_event(
+			tenant_id=tenant_id,
+			event_type=f"lifecycle_batch_{record.status}",
+			subject_id=record.id,
+			message=f"Validated APIG lifecycle batch through {stream_value}.",
+			evidence={"event_stream": stream_value, "mutation_count": mutation_count, "matched_rules": result["matched_rules"]},
+		)
+		if not accepted:
+			_raise_if_blocked(result)
+		return record.model_dump(mode="json")
+
 	def list_upstreams(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._upstreams, tenant_id)
 
@@ -479,6 +594,12 @@ class ApigService:
 
 	def list_deployments(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		return self._dump_tenant_records(self._deployments, tenant_id)
+
+	def list_gateway_agents(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._gateway_agents, tenant_id)
+
+	def list_lifecycle_batches(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
+		return self._dump_tenant_records(self._lifecycle_batches, tenant_id)
 
 	def list_audit_events(self, tenant_id: str | None = None) -> list[dict[str, Any]]:
 		events = list(self._events)
@@ -502,6 +623,9 @@ class ApigService:
 			"policy_count": len(self.list_policies(tenant_id)),
 			"traffic_shift_count": len(self.list_traffic_shifts(tenant_id)),
 			"deployment_count": len(self.list_deployments(tenant_id)),
+			"gateway_agent_count": len(self.list_gateway_agents(tenant_id)),
+			"lifecycle_batch_count": len(self.list_lifecycle_batches(tenant_id)),
+			"denied_lifecycle_batch_count": len([batch for batch in self.list_lifecycle_batches(tenant_id) if batch["status"] == "denied"]),
 			"audit_event_count": len(self.list_audit_events(tenant_id)),
 		}
 
@@ -514,6 +638,8 @@ class ApigService:
 			"policies": self.list_policies,
 			"traffic_shifts": self.list_traffic_shifts,
 			"deployments": self.list_deployments,
+			"gateway_agents": self.list_gateway_agents,
+			"lifecycle_batches": self.list_lifecycle_batches,
 			"audit_events": self.list_audit_events,
 		}
 		if record_type:
@@ -620,6 +746,10 @@ def _raise_if_blocked(result: dict[str, Any]) -> None:
 		return
 	reasons = ", ".join(action.get("reason", "gateway_policy_blocked") for action in result["actions"])
 	raise PermissionError(reasons or "gateway_policy_blocked")
+
+
+def _normalize_agent_token(value: str) -> str:
+	return str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
 
 
 def _status_for_decision(decision: str) -> str:

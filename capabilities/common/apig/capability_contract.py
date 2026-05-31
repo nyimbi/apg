@@ -6,6 +6,28 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+SUPPORTED_APIG_AGENT_RUNTIMES = ["codex", "claude_code", "opencode", "pi"]
+SUPPORTED_APIG_AGENT_ROLES = [
+	"route_reviewer",
+	"security_policy_reviewer",
+	"traffic_reviewer",
+	"quota_reviewer",
+	"canary_reviewer",
+	"deployment_reviewer",
+	"edge_filter_reviewer",
+	"retirement_reviewer",
+]
+PRIVILEGED_APIG_AGENT_ROLES = [
+	"route_reviewer",
+	"security_policy_reviewer",
+	"traffic_reviewer",
+	"quota_reviewer",
+	"canary_reviewer",
+	"deployment_reviewer",
+	"edge_filter_reviewer",
+]
+
+
 @dataclass(frozen=True)
 class CapabilityConfiguration:
 	"""Tenant-scoped APIG configuration defaults and schema."""
@@ -91,6 +113,41 @@ class CapabilityConfiguration:
 			"cache_store": "cach",
 			"edge_runtime": "wasm_runtime",
 		},
+		"agents": {
+			"first_class": True,
+			"supported_runtimes": SUPPORTED_APIG_AGENT_RUNTIMES,
+			"supported_roles": SUPPORTED_APIG_AGENT_ROLES,
+			"privileged_roles": PRIVILEGED_APIG_AGENT_ROLES,
+			"require_scope": True,
+			"require_owner": True,
+			"require_purpose": True,
+			"require_contribution_disclosure": True,
+			"human_approval_required_for_privileged_roles": True,
+		},
+		"streaming": {
+			"engine": "bytewax",
+			"required_processor": "bytewax",
+			"lifecycle_stream": "apig.lifecycle",
+			"watermark": "event_time",
+			"operations": [
+				"upstream_batch",
+				"consumer_batch",
+				"route_batch",
+				"policy_batch",
+				"traffic_shift_batch",
+				"deployment_batch",
+				"gateway_agent_batch",
+			],
+			"topics": [
+				"apig.upstreams",
+				"apig.consumers",
+				"apig.routes",
+				"apig.policies",
+				"apig.traffic",
+				"apig.deployments",
+				"apig.agents",
+			],
+		},
 		"ui": {
 			"enable_route_designer": True,
 			"enable_upstream_manager": True,
@@ -102,6 +159,8 @@ class CapabilityConfiguration:
 			"enable_canary_releases": True,
 			"enable_deployment_gates": True,
 			"enable_audit_timeline": True,
+			"enable_gateway_agent_roster": True,
+			"enable_lifecycle_batch_monitor": True,
 		},
 		"theme": {
 			"default_theme": "apig_gateway_console",
@@ -123,6 +182,8 @@ class CapabilityConfiguration:
 			"governance",
 			"observability",
 			"adapters",
+			"agents",
+			"streaming",
 			"ui",
 			"theme",
 		],
@@ -139,6 +200,8 @@ class CapabilityConfiguration:
 			"governance": {"type": "object"},
 			"observability": {"type": "object"},
 			"adapters": {"type": "object"},
+			"agents": {"type": "object"},
+			"streaming": {"type": "object"},
 			"ui": {"type": "object"},
 			"theme": {"type": "object"},
 		},
@@ -220,6 +283,8 @@ class CapabilityTheme:
 		"canary_release_panel": {"visual": "traffic-split", "status_indicator": "canary-pill"},
 		"deployment_gate_panel": {"visual": "environment-lane", "status_indicator": "gate-pill"},
 		"audit_timeline": {"visual": "event-timeline", "status_style": "decision-pill"},
+		"gateway_agent_roster": {"visual": "agent-role-grid", "status_indicator": "approval-pill"},
+		"bytewax_lifecycle_panel": {"visual": "stream-batch-ledger", "status_indicator": "processor-pill"},
 	})
 
 
@@ -250,6 +315,14 @@ def default_rules() -> list[CapabilityRule]:
 		CapabilityRule("production_deployment_requires_approval", "Production deployments require approval evidence.", {"operation": "deploy_gateway", "environment": "production", "deployment_approval_recorded": False}, {"decision": "require_review", "reason": "deployment_approval_required", "required_action": "record_deployment_approval"}),
 		CapabilityRule("policy_change_requires_review", "Gateway policy changes require review.", {"operation": "change_policy", "policy_review_recorded": False}, {"decision": "require_review", "reason": "policy_review_required", "required_action": "record_policy_review"}),
 		CapabilityRule("route_retirement_requires_impact_review", "Retiring a route requires impact review.", {"operation": "retire_route", "impact_review_recorded": False}, {"decision": "deny", "reason": "impact_review_required", "required_action": "record_route_impact_review"}),
+		CapabilityRule("gateway_agent_runtime_supported", "Gateway agents must use an approved runtime.", {"operation": "register_gateway_agent", "unsupported_agent_runtime": True}, {"decision": "deny", "reason": "unsupported_gateway_agent_runtime", "required_action": "choose_supported_agent_runtime"}),
+		CapabilityRule("gateway_agent_role_supported", "Gateway agents must use an approved APIG role.", {"operation": "register_gateway_agent", "unsupported_agent_role": True}, {"decision": "deny", "reason": "unsupported_gateway_agent_role", "required_action": "choose_supported_agent_role"}),
+		CapabilityRule("gateway_agent_requires_scope", "Gateway agents require bounded route, traffic, security, edge, or deployment scope.", {"operation": "register_gateway_agent", "agent_scope_present": False}, {"decision": "deny", "reason": "gateway_agent_scope_required", "required_action": "define_agent_scope"}),
+		CapabilityRule("gateway_agent_requires_owner", "Gateway agents require an accountable owner.", {"operation": "register_gateway_agent", "agent_owner_present": False}, {"decision": "deny", "reason": "gateway_agent_owner_required", "required_action": "assign_agent_owner"}),
+		CapabilityRule("gateway_agent_requires_purpose", "Gateway agents require a declared purpose.", {"operation": "register_gateway_agent", "agent_purpose_present": False}, {"decision": "deny", "reason": "gateway_agent_purpose_required", "required_action": "declare_agent_purpose"}),
+		CapabilityRule("gateway_agent_requires_contribution_disclosure", "Gateway agents must disclose machine contribution before participating in gateway decisions.", {"operation": "register_gateway_agent", "agent_contribution_disclosed": False}, {"decision": "deny", "reason": "gateway_agent_contribution_disclosure_required", "required_action": "disclose_machine_contribution"}),
+		CapabilityRule("gateway_agent_privileged_role_requires_human_approval", "Privileged gateway-agent roles require human approval.", {"operation": "register_gateway_agent", "privileged_agent_role": True, "human_approval_required": False}, {"decision": "require_review", "reason": "privileged_gateway_agent_human_approval_required", "required_action": "record_human_approval_requirement"}),
+		CapabilityRule("bytewax_apig_stream_required", "APIG lifecycle batches must be routed through Bytewax.", {"operation": "validate_apig_lifecycle_batch", "event_stream_ne": "bytewax"}, {"decision": "deny", "reason": "bytewax_required", "required_action": "route_batch_to_bytewax"}),
 	]
 
 
@@ -266,16 +339,56 @@ def ui_manifest() -> dict[str, Any]:
 		CapabilityUIRoute("canary", "/apig/canary", "CanaryReleaseConsole", "apig:manage_traffic", "Gateway"),
 		CapabilityUIRoute("deployments", "/apig/deployments", "GatewayDeployments", "apig:admin", "Operations"),
 		CapabilityUIRoute("analytics", "/apig/analytics", "GatewayAnalytics", "apig:view_metrics", "Operations"),
+		CapabilityUIRoute("agents", "/apig/agents", "GatewayAgentRoster", "apig:admin", "Governance"),
+		CapabilityUIRoute("lifecycle", "/apig/lifecycle", "GatewayLifecycleBatchMonitor", "apig:view_metrics", "Operations"),
 		CapabilityUIRoute("audit", "/apig/audit", "GatewayAuditTimeline", "apig:view_metrics", "Governance"),
 		CapabilityUIRoute("settings", "/apig/settings", "APIGSettings", "apig:admin", "Administration"),
 	]
 	return {"shell": "apg_python", "view_module": "view_models.py", "api_prefix": "/apig/api/v1", "routes": [route.__dict__ for route in routes], "template_roots": ["templates/", "static/"], "requires_theme": True}
 
 
+def agent_manifest() -> dict[str, Any]:
+	config = CapabilityConfiguration().defaults["agents"]
+	return {
+		"first_class": config["first_class"],
+		"supported_runtimes": list(config["supported_runtimes"]),
+		"supported_roles": list(config["supported_roles"]),
+		"privileged_roles": list(config["privileged_roles"]),
+		"requires_scope": config["require_scope"],
+		"requires_owner": config["require_owner"],
+		"requires_purpose": config["require_purpose"],
+		"requires_contribution_disclosure": config["require_contribution_disclosure"],
+	}
+
+
+def streaming_manifest() -> dict[str, Any]:
+	config = CapabilityConfiguration().defaults["streaming"]
+	return {
+		"engine": config["engine"],
+		"required_processor": config["required_processor"],
+		"lifecycle_stream": config["lifecycle_stream"],
+		"watermark": config["watermark"],
+		"operations": list(config["operations"]),
+		"topics": list(config["topics"]),
+	}
+
+
 def get_capability_contract(tenant_id: str = "default", overrides: dict[str, Any] | None = None) -> dict[str, Any]:
 	config = CapabilityConfiguration()
 	theme = CapabilityTheme()
-	return {"capability": "apig", "display_name": "API Gateway & Management", "configuration": config.for_tenant(tenant_id, overrides), "configuration_schema": config.schema, "rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]}, "ui": ui_manifest(), "theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components}}
+	return {
+		"capability": "apig",
+		"display_name": "API Gateway & Management",
+		"provides": ["api_gateway", "traffic_management", "gateway_agent_composition"],
+		"requires": ["auth", "moni", "mqeb", "conf"],
+		"configuration": config.for_tenant(tenant_id, overrides),
+		"configuration_schema": config.schema,
+		"rule_engine": {"type": "deterministic", "rules": [rule.__dict__ for rule in default_rules()]},
+		"ui": ui_manifest(),
+		"theme": {"name": theme.name, "tokens": theme.tokens, "components": theme.components},
+		"agents": agent_manifest(),
+		"streaming": streaming_manifest(),
+	}
 
 
 def evaluate_capability_rules(context: dict[str, Any]) -> dict[str, Any]:
@@ -289,6 +402,9 @@ def _matches(condition: dict[str, Any], context: dict[str, Any]) -> bool:
 				return False
 		elif key.endswith("_lt"):
 			if not context.get(key[:-3], 0) < expected:
+				return False
+		elif key.endswith("_ne"):
+			if context.get(key[:-3]) == expected:
 				return False
 		elif context.get(key) != expected:
 			return False

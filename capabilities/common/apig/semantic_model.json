@@ -1,5 +1,38 @@
 {
-  "agents": {},
+  "agents": {
+    "apig_gateway_agents": {
+      "first_class": true,
+      "privileged_roles": [
+        "route_reviewer",
+        "security_policy_reviewer",
+        "traffic_reviewer",
+        "quota_reviewer",
+        "canary_reviewer",
+        "deployment_reviewer",
+        "edge_filter_reviewer"
+      ],
+      "requires_contribution_disclosure": true,
+      "requires_owner": true,
+      "requires_purpose": true,
+      "requires_scope": true,
+      "supported_roles": [
+        "route_reviewer",
+        "security_policy_reviewer",
+        "traffic_reviewer",
+        "quota_reviewer",
+        "canary_reviewer",
+        "deployment_reviewer",
+        "edge_filter_reviewer",
+        "retirement_reviewer"
+      ],
+      "supported_runtimes": [
+        "codex",
+        "claude_code",
+        "opencode",
+        "pi"
+      ]
+    }
+  },
   "app": {
     "description": "API Gateway & Management package-backed APG capability",
     "entity_count": 0,
@@ -21,9 +54,43 @@
         "reverse_proxy": "adapter",
         "service_discovery": "conf"
       },
+      "agents": {
+        "first_class": true,
+        "privileged_roles": [
+          "route_reviewer",
+          "security_policy_reviewer",
+          "traffic_reviewer",
+          "quota_reviewer",
+          "canary_reviewer",
+          "deployment_reviewer",
+          "edge_filter_reviewer"
+        ],
+        "requires_contribution_disclosure": true,
+        "requires_owner": true,
+        "requires_purpose": true,
+        "requires_scope": true,
+        "supported_roles": [
+          "route_reviewer",
+          "security_policy_reviewer",
+          "traffic_reviewer",
+          "quota_reviewer",
+          "canary_reviewer",
+          "deployment_reviewer",
+          "edge_filter_reviewer",
+          "retirement_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "approvals": {
         "canary_review": "GatewayTrafficShiftRecord",
         "deployment_approval": "GatewayDeploymentRecord",
+        "gateway_agent": "GatewayAgentRecord",
+        "lifecycle_batch": "GatewayLifecycleBatchRecord",
         "policy_review": "GatewayPolicyRecord",
         "quota_review": "GatewayQuotaReview",
         "route_retirement": "GatewayRouteRecord"
@@ -43,6 +110,39 @@
           "production_runtime": "service.ProductionAPGIntelligentGatewayService",
           "reverse_proxy": "adapter",
           "service_discovery": "conf"
+        },
+        "agents": {
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "privileged_roles": [
+            "route_reviewer",
+            "security_policy_reviewer",
+            "traffic_reviewer",
+            "quota_reviewer",
+            "canary_reviewer",
+            "deployment_reviewer",
+            "edge_filter_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "route_reviewer",
+            "security_policy_reviewer",
+            "traffic_reviewer",
+            "quota_reviewer",
+            "canary_reviewer",
+            "deployment_reviewer",
+            "edge_filter_reviewer",
+            "retirement_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "canary": {
           "canary_release_enabled": true,
@@ -110,6 +210,30 @@
           "require_tenant_context": true,
           "waf_policy_required_for_public": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "apig.lifecycle",
+          "operations": [
+            "upstream_batch",
+            "consumer_batch",
+            "route_batch",
+            "policy_batch",
+            "traffic_shift_batch",
+            "deployment_batch",
+            "gateway_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "apig.upstreams",
+            "apig.consumers",
+            "apig.routes",
+            "apig.policies",
+            "apig.traffic",
+            "apig.deployments",
+            "apig.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -128,6 +252,8 @@
           "enable_consumer_manager": true,
           "enable_deployment_gates": true,
           "enable_edge_filters": true,
+          "enable_gateway_agent_roster": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_quota_reviews": true,
           "enable_route_designer": true,
           "enable_security_policies": true,
@@ -149,6 +275,8 @@
         "audit": "GatewayAuditEvent",
         "consumer": "GatewayConsumerRecord",
         "deployment": "GatewayDeploymentRecord",
+        "gateway_agent": "GatewayAgentRecord",
+        "lifecycle_batch": "GatewayLifecycleBatchRecord",
         "policy": "GatewayPolicyRecord",
         "quota_review": "GatewayQuotaReview",
         "route": "GatewayRouteRecord",
@@ -159,9 +287,16 @@
       "master_data": {},
       "name": "API Gateway & Management",
       "provides": [
-        "apig_operations"
+        "api_gateway",
+        "traffic_management",
+        "gateway_agent_composition"
       ],
-      "requires": [],
+      "requires": [
+        "auth",
+        "moni",
+        "mqeb",
+        "conf"
+      ],
       "rule_engine": {
         "rules": [
           {
@@ -495,6 +630,111 @@
               "required_action": "record_route_impact_review"
             },
             "name": "route_retirement_requires_impact_review"
+          },
+          {
+            "condition": {
+              "operation": "register_gateway_agent",
+              "unsupported_agent_runtime": true
+            },
+            "description": "Gateway agents must use an approved runtime.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_gateway_agent_runtime",
+              "required_action": "choose_supported_agent_runtime"
+            },
+            "name": "gateway_agent_runtime_supported"
+          },
+          {
+            "condition": {
+              "operation": "register_gateway_agent",
+              "unsupported_agent_role": true
+            },
+            "description": "Gateway agents must use an approved APIG role.",
+            "effect": {
+              "decision": "deny",
+              "reason": "unsupported_gateway_agent_role",
+              "required_action": "choose_supported_agent_role"
+            },
+            "name": "gateway_agent_role_supported"
+          },
+          {
+            "condition": {
+              "agent_scope_present": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents require bounded route, traffic, security, edge, or deployment scope.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_scope_required",
+              "required_action": "define_agent_scope"
+            },
+            "name": "gateway_agent_requires_scope"
+          },
+          {
+            "condition": {
+              "agent_owner_present": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents require an accountable owner.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_owner_required",
+              "required_action": "assign_agent_owner"
+            },
+            "name": "gateway_agent_requires_owner"
+          },
+          {
+            "condition": {
+              "agent_purpose_present": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents require a declared purpose.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_purpose_required",
+              "required_action": "declare_agent_purpose"
+            },
+            "name": "gateway_agent_requires_purpose"
+          },
+          {
+            "condition": {
+              "agent_contribution_disclosed": false,
+              "operation": "register_gateway_agent"
+            },
+            "description": "Gateway agents must disclose machine contribution before participating in gateway decisions.",
+            "effect": {
+              "decision": "deny",
+              "reason": "gateway_agent_contribution_disclosure_required",
+              "required_action": "disclose_machine_contribution"
+            },
+            "name": "gateway_agent_requires_contribution_disclosure"
+          },
+          {
+            "condition": {
+              "human_approval_required": false,
+              "operation": "register_gateway_agent",
+              "privileged_agent_role": true
+            },
+            "description": "Privileged gateway-agent roles require human approval.",
+            "effect": {
+              "decision": "require_review",
+              "reason": "privileged_gateway_agent_human_approval_required",
+              "required_action": "record_human_approval_requirement"
+            },
+            "name": "gateway_agent_privileged_role_requires_human_approval"
+          },
+          {
+            "condition": {
+              "event_stream_ne": "bytewax",
+              "operation": "validate_apig_lifecycle_batch"
+            },
+            "description": "APIG lifecycle batches must be routed through Bytewax.",
+            "effect": {
+              "decision": "deny",
+              "reason": "bytewax_required",
+              "required_action": "route_batch_to_bytewax"
+            },
+            "name": "bytewax_apig_stream_required"
           }
         ],
         "type": "deterministic"
@@ -831,6 +1071,111 @@
             "required_action": "record_route_impact_review"
           },
           "name": "route_retirement_requires_impact_review"
+        },
+        {
+          "condition": {
+            "operation": "register_gateway_agent",
+            "unsupported_agent_runtime": true
+          },
+          "description": "Gateway agents must use an approved runtime.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_gateway_agent_runtime",
+            "required_action": "choose_supported_agent_runtime"
+          },
+          "name": "gateway_agent_runtime_supported"
+        },
+        {
+          "condition": {
+            "operation": "register_gateway_agent",
+            "unsupported_agent_role": true
+          },
+          "description": "Gateway agents must use an approved APIG role.",
+          "effect": {
+            "decision": "deny",
+            "reason": "unsupported_gateway_agent_role",
+            "required_action": "choose_supported_agent_role"
+          },
+          "name": "gateway_agent_role_supported"
+        },
+        {
+          "condition": {
+            "agent_scope_present": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents require bounded route, traffic, security, edge, or deployment scope.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_scope_required",
+            "required_action": "define_agent_scope"
+          },
+          "name": "gateway_agent_requires_scope"
+        },
+        {
+          "condition": {
+            "agent_owner_present": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents require an accountable owner.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_owner_required",
+            "required_action": "assign_agent_owner"
+          },
+          "name": "gateway_agent_requires_owner"
+        },
+        {
+          "condition": {
+            "agent_purpose_present": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents require a declared purpose.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_purpose_required",
+            "required_action": "declare_agent_purpose"
+          },
+          "name": "gateway_agent_requires_purpose"
+        },
+        {
+          "condition": {
+            "agent_contribution_disclosed": false,
+            "operation": "register_gateway_agent"
+          },
+          "description": "Gateway agents must disclose machine contribution before participating in gateway decisions.",
+          "effect": {
+            "decision": "deny",
+            "reason": "gateway_agent_contribution_disclosure_required",
+            "required_action": "disclose_machine_contribution"
+          },
+          "name": "gateway_agent_requires_contribution_disclosure"
+        },
+        {
+          "condition": {
+            "human_approval_required": false,
+            "operation": "register_gateway_agent",
+            "privileged_agent_role": true
+          },
+          "description": "Privileged gateway-agent roles require human approval.",
+          "effect": {
+            "decision": "require_review",
+            "reason": "privileged_gateway_agent_human_approval_required",
+            "required_action": "record_human_approval_requirement"
+          },
+          "name": "gateway_agent_privileged_role_requires_human_approval"
+        },
+        {
+          "condition": {
+            "event_stream_ne": "bytewax",
+            "operation": "validate_apig_lifecycle_batch"
+          },
+          "description": "APIG lifecycle batches must be routed through Bytewax.",
+          "effect": {
+            "decision": "deny",
+            "reason": "bytewax_required",
+            "required_action": "route_batch_to_bytewax"
+          },
+          "name": "bytewax_apig_stream_required"
         }
       ],
       "runtime": {
@@ -840,6 +1185,11 @@
         "views": "view_models.py"
       },
       "screens": {
+        "agents": {
+          "component": "GatewayAgentRoster",
+          "permission": "apig:admin",
+          "route": "/apig/agents"
+        },
         "analytics": {
           "component": "GatewayAnalytics",
           "permission": "apig:view_metrics",
@@ -875,6 +1225,11 @@
           "permission": "apig:manage_edge",
           "route": "/apig/edge"
         },
+        "lifecycle": {
+          "component": "GatewayLifecycleBatchMonitor",
+          "permission": "apig:view_metrics",
+          "route": "/apig/lifecycle"
+        },
         "quota_reviews": {
           "component": "QuotaReviewQueue",
           "permission": "apig:manage_traffic",
@@ -907,13 +1262,38 @@
         }
       },
       "streaming": {
-        "engine": "bytewax"
+        "engine": "bytewax",
+        "lifecycle_stream": "apig.lifecycle",
+        "operations": [
+          "upstream_batch",
+          "consumer_batch",
+          "route_batch",
+          "policy_batch",
+          "traffic_shift_batch",
+          "deployment_batch",
+          "gateway_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "apig.upstreams",
+          "apig.consumers",
+          "apig.routes",
+          "apig.policies",
+          "apig.traffic",
+          "apig.deployments",
+          "apig.agents"
+        ],
+        "watermark": "event_time"
       },
       "theme": {
         "components": {
           "audit_timeline": {
             "status_style": "decision-pill",
             "visual": "event-timeline"
+          },
+          "bytewax_lifecycle_panel": {
+            "status_indicator": "processor-pill",
+            "visual": "stream-batch-ledger"
           },
           "canary_release_panel": {
             "status_indicator": "canary-pill",
@@ -926,6 +1306,10 @@
           "deployment_gate_panel": {
             "status_indicator": "gate-pill",
             "visual": "environment-lane"
+          },
+          "gateway_agent_roster": {
+            "status_indicator": "approval-pill",
+            "visual": "agent-role-grid"
           },
           "gateway_topology_map": {
             "edge_style": "weighted-route-line",
@@ -1054,6 +1438,20 @@
             "permission": "apig:view_metrics"
           },
           {
+            "component": "GatewayAgentRoster",
+            "name": "agents",
+            "nav_group": "Governance",
+            "path": "/apig/agents",
+            "permission": "apig:admin"
+          },
+          {
+            "component": "GatewayLifecycleBatchMonitor",
+            "name": "lifecycle",
+            "nav_group": "Operations",
+            "path": "/apig/lifecycle",
+            "permission": "apig:view_metrics"
+          },
+          {
             "component": "GatewayAuditTimeline",
             "name": "audit",
             "nav_group": "Governance",
@@ -1078,14 +1476,70 @@
     }
   },
   "composition": {
-    "agent_teams": {},
+    "agent_teams": {
+      "apig_gateway_agents": {
+        "supported_roles": [
+          "route_reviewer",
+          "security_policy_reviewer",
+          "traffic_reviewer",
+          "quota_reviewer",
+          "canary_reviewer",
+          "deployment_reviewer",
+          "edge_filter_reviewer",
+          "retirement_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      }
+    },
     "applications": {},
     "capability_dependencies": {
-      "apig": []
+      "apig": [
+        "auth",
+        "moni",
+        "mqeb",
+        "conf"
+      ]
     }
   },
   "contracts": {
     "apig": {
+      "agents": {
+        "first_class": true,
+        "privileged_roles": [
+          "route_reviewer",
+          "security_policy_reviewer",
+          "traffic_reviewer",
+          "quota_reviewer",
+          "canary_reviewer",
+          "deployment_reviewer",
+          "edge_filter_reviewer"
+        ],
+        "requires_contribution_disclosure": true,
+        "requires_owner": true,
+        "requires_purpose": true,
+        "requires_scope": true,
+        "supported_roles": [
+          "route_reviewer",
+          "security_policy_reviewer",
+          "traffic_reviewer",
+          "quota_reviewer",
+          "canary_reviewer",
+          "deployment_reviewer",
+          "edge_filter_reviewer",
+          "retirement_reviewer"
+        ],
+        "supported_runtimes": [
+          "codex",
+          "claude_code",
+          "opencode",
+          "pi"
+        ]
+      },
       "configuration": {
         "adapters": {
           "audit_sink": "audl",
@@ -1099,6 +1553,39 @@
           "production_runtime": "service.ProductionAPGIntelligentGatewayService",
           "reverse_proxy": "adapter",
           "service_discovery": "conf"
+        },
+        "agents": {
+          "first_class": true,
+          "human_approval_required_for_privileged_roles": true,
+          "privileged_roles": [
+            "route_reviewer",
+            "security_policy_reviewer",
+            "traffic_reviewer",
+            "quota_reviewer",
+            "canary_reviewer",
+            "deployment_reviewer",
+            "edge_filter_reviewer"
+          ],
+          "require_contribution_disclosure": true,
+          "require_owner": true,
+          "require_purpose": true,
+          "require_scope": true,
+          "supported_roles": [
+            "route_reviewer",
+            "security_policy_reviewer",
+            "traffic_reviewer",
+            "quota_reviewer",
+            "canary_reviewer",
+            "deployment_reviewer",
+            "edge_filter_reviewer",
+            "retirement_reviewer"
+          ],
+          "supported_runtimes": [
+            "codex",
+            "claude_code",
+            "opencode",
+            "pi"
+          ]
         },
         "canary": {
           "canary_release_enabled": true,
@@ -1166,6 +1653,30 @@
           "require_tenant_context": true,
           "waf_policy_required_for_public": true
         },
+        "streaming": {
+          "engine": "bytewax",
+          "lifecycle_stream": "apig.lifecycle",
+          "operations": [
+            "upstream_batch",
+            "consumer_batch",
+            "route_batch",
+            "policy_batch",
+            "traffic_shift_batch",
+            "deployment_batch",
+            "gateway_agent_batch"
+          ],
+          "required_processor": "bytewax",
+          "topics": [
+            "apig.upstreams",
+            "apig.consumers",
+            "apig.routes",
+            "apig.policies",
+            "apig.traffic",
+            "apig.deployments",
+            "apig.agents"
+          ],
+          "watermark": "event_time"
+        },
         "tenant_id": "default",
         "theme": {
           "allow_tenant_overrides": true,
@@ -1184,6 +1695,8 @@
           "enable_consumer_manager": true,
           "enable_deployment_gates": true,
           "enable_edge_filters": true,
+          "enable_gateway_agent_roster": true,
+          "enable_lifecycle_batch_monitor": true,
           "enable_quota_reviews": true,
           "enable_route_designer": true,
           "enable_security_policies": true,
@@ -1200,9 +1713,40 @@
       },
       "id": "apig",
       "provides": [
-        "apig_operations"
+        "api_gateway",
+        "traffic_management",
+        "gateway_agent_composition"
       ],
-      "requires": []
+      "requires": [
+        "auth",
+        "moni",
+        "mqeb",
+        "conf"
+      ],
+      "streaming": {
+        "engine": "bytewax",
+        "lifecycle_stream": "apig.lifecycle",
+        "operations": [
+          "upstream_batch",
+          "consumer_batch",
+          "route_batch",
+          "policy_batch",
+          "traffic_shift_batch",
+          "deployment_batch",
+          "gateway_agent_batch"
+        ],
+        "required_processor": "bytewax",
+        "topics": [
+          "apig.upstreams",
+          "apig.consumers",
+          "apig.routes",
+          "apig.policies",
+          "apig.traffic",
+          "apig.deployments",
+          "apig.agents"
+        ],
+        "watermark": "event_time"
+      }
     }
   },
   "deployment": {
@@ -1235,6 +1779,19 @@
   },
   "roles": {},
   "rules": {
+    "bytewax_apig_stream_required": {
+      "condition": {
+        "event_stream_ne": "bytewax",
+        "operation": "validate_apig_lifecycle_batch"
+      },
+      "description": "APIG lifecycle batches must be routed through Bytewax.",
+      "effect": {
+        "decision": "deny",
+        "reason": "bytewax_required",
+        "required_action": "route_batch_to_bytewax"
+      },
+      "name": "bytewax_apig_stream_required"
+    },
     "canary_percent_limit_enforced": {
       "condition": {
         "canary_percent_gt": 50,
@@ -1327,6 +1884,98 @@
         "required_action": "enable_mtls"
       },
       "name": "external_route_requires_mtls"
+    },
+    "gateway_agent_privileged_role_requires_human_approval": {
+      "condition": {
+        "human_approval_required": false,
+        "operation": "register_gateway_agent",
+        "privileged_agent_role": true
+      },
+      "description": "Privileged gateway-agent roles require human approval.",
+      "effect": {
+        "decision": "require_review",
+        "reason": "privileged_gateway_agent_human_approval_required",
+        "required_action": "record_human_approval_requirement"
+      },
+      "name": "gateway_agent_privileged_role_requires_human_approval"
+    },
+    "gateway_agent_requires_contribution_disclosure": {
+      "condition": {
+        "agent_contribution_disclosed": false,
+        "operation": "register_gateway_agent"
+      },
+      "description": "Gateway agents must disclose machine contribution before participating in gateway decisions.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_agent_contribution_disclosure_required",
+        "required_action": "disclose_machine_contribution"
+      },
+      "name": "gateway_agent_requires_contribution_disclosure"
+    },
+    "gateway_agent_requires_owner": {
+      "condition": {
+        "agent_owner_present": false,
+        "operation": "register_gateway_agent"
+      },
+      "description": "Gateway agents require an accountable owner.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_agent_owner_required",
+        "required_action": "assign_agent_owner"
+      },
+      "name": "gateway_agent_requires_owner"
+    },
+    "gateway_agent_requires_purpose": {
+      "condition": {
+        "agent_purpose_present": false,
+        "operation": "register_gateway_agent"
+      },
+      "description": "Gateway agents require a declared purpose.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_agent_purpose_required",
+        "required_action": "declare_agent_purpose"
+      },
+      "name": "gateway_agent_requires_purpose"
+    },
+    "gateway_agent_requires_scope": {
+      "condition": {
+        "agent_scope_present": false,
+        "operation": "register_gateway_agent"
+      },
+      "description": "Gateway agents require bounded route, traffic, security, edge, or deployment scope.",
+      "effect": {
+        "decision": "deny",
+        "reason": "gateway_agent_scope_required",
+        "required_action": "define_agent_scope"
+      },
+      "name": "gateway_agent_requires_scope"
+    },
+    "gateway_agent_role_supported": {
+      "condition": {
+        "operation": "register_gateway_agent",
+        "unsupported_agent_role": true
+      },
+      "description": "Gateway agents must use an approved APIG role.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_gateway_agent_role",
+        "required_action": "choose_supported_agent_role"
+      },
+      "name": "gateway_agent_role_supported"
+    },
+    "gateway_agent_runtime_supported": {
+      "condition": {
+        "operation": "register_gateway_agent",
+        "unsupported_agent_runtime": true
+      },
+      "description": "Gateway agents must use an approved runtime.",
+      "effect": {
+        "decision": "deny",
+        "reason": "unsupported_gateway_agent_runtime",
+        "required_action": "choose_supported_agent_runtime"
+      },
+      "name": "gateway_agent_runtime_supported"
     },
     "high_quota_requires_review": {
       "condition": {

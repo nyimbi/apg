@@ -10,9 +10,15 @@ lifecycle packet.
 - Generated API helpers and UI view models.
 - Contract-derived package evidence.
 - Focused package tests.
+- First-class gateway-agent lifecycle records.
+- Bytewax lifecycle-batch validation.
 
 ## Runtime Work Remaining
 
+- Bind gateway-agent records to real external runtime adapters for Codex,
+  Claude Code, OpenCode, Pi, and future providers.
+- Exercise live Bytewax topologies for upstream, consumer, route, policy,
+  traffic, deployment, and agent lifecycle batches.
 - Bind a concrete reverse proxy, ingress, or service mesh adapter.
 - Validate APG auth/RBAC, configuration, audit, metrics, cache, key management,
   and event-stream adapters.

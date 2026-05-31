@@ -9,15 +9,12 @@ for the current APG capability build-out.
 
 Known gaps:
 
-- No root `README.md`.
-- Primary specification and `cap_spec.md` still contain old market and
-  production-readiness claims.
-- Contract has only a narrow 6-rule, 8-route surface.
-- `app.py` embeds static semantic JSON.
-- UI helpers live in `views.py` rather than the generated-app `view_models.py`
-  convention used by recent packets.
-- Package evidence and tests do not yet cover consumers, deployments, canary
-  traffic shifts, route retirement, policy review, or adapter metadata.
+- APIG has the route, consumer, traffic, deployment, and policy lifecycle
+  packet, but it needs the current first-class agent and Bytewax lifecycle-batch
+  guardrail shape used by the completed MDM, META, ETLP, and DVRL packets.
+- `app.py` and package evidence need to expose contract-level
+  `provides`/`requires`, agents, streaming, and composition metadata instead of
+  static `apig_operations` evidence.
 
 ## Build Sequence
 
@@ -32,16 +29,23 @@ Known gaps:
      UI, and theme configuration.
    - Expand deterministic guardrails to at least 20 route and gateway lifecycle
      rules.
+   - Add first-class gateway-agent runtime/role metadata for Codex, Claude
+     Code, OpenCode, Pi, and future provider-neutral adapters.
+   - Add Bytewax streaming metadata for APIG lifecycle batches.
 
 3. Dependency-light lifecycle service
    - Extend `ApigService` with consumer, policy, canary, deployment, and
      retirement records/workflows.
+   - Add gateway-agent records, registration guardrails, lifecycle-batch
+     records, Bytewax validation, and dashboard counts.
    - Keep production gateway/service-mesh/edge runtime code behind adapter
      boundaries.
 
 4. API and UI
    - Add generated-app helpers for consumer, policy, deployment, traffic shift,
      and retirement workflows.
+   - Add generated-app helpers and view models for gateway agents and lifecycle
+     batches.
    - Add `view_models.py` and keep `views.py` as a compatibility re-export.
 
 5. Package evidence and tests

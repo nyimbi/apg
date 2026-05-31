@@ -27,6 +27,8 @@ def dashboard_model(service: ApigService | None = None, tenant_id: str = "defaul
 		"quota_reviews": service.list_quota_reviews(tenant_id),
 		"traffic_shifts": service.list_traffic_shifts(tenant_id),
 		"deployments": service.list_deployments(tenant_id),
+		"gateway_agents": service.list_gateway_agents(tenant_id),
+		"lifecycle_batches": service.list_lifecycle_batches(tenant_id),
 		"audit_events": service.list_audit_events(tenant_id),
 		"rules": contract["rule_engine"]["rules"],
 		"theme": contract["theme"],
@@ -138,6 +140,40 @@ def analytics_model(service: ApigService | None = None, tenant_id: str = "defaul
 	}
 
 
+def gateway_agent_roster_model(service: ApigService | None = None, tenant_id: str = "default") -> dict[str, Any]:
+	service = service or ApigService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_gateway_agents(tenant_id),
+		"columns": [
+			"id",
+			"name",
+			"runtime",
+			"role",
+			"scope",
+			"owner",
+			"purpose",
+			"human_approval_required",
+			"status",
+		],
+		"supported_runtimes": contract["agents"]["supported_runtimes"],
+		"supported_roles": contract["agents"]["supported_roles"],
+		"privileged_roles": contract["agents"]["privileged_roles"],
+	}
+
+
+def lifecycle_batch_model(service: ApigService | None = None, tenant_id: str = "default") -> dict[str, Any]:
+	service = service or ApigService()
+	contract = get_capability_contract(tenant_id)
+	return {
+		"tenant_id": tenant_id,
+		"rows": service.list_lifecycle_batches(tenant_id),
+		"columns": ["id", "event_stream", "mutation_count", "accepted", "status", "matched_rules"],
+		"streaming": contract["streaming"],
+	}
+
+
 def audit_timeline_model(service: ApigService | None = None, tenant_id: str = "default") -> dict[str, Any]:
 	service = service or ApigService()
 	return {
@@ -153,6 +189,8 @@ def settings_model(tenant_id: str = "default") -> dict[str, Any]:
 		"tenant_id": tenant_id,
 		"configuration": contract["configuration"],
 		"configuration_schema": contract["configuration_schema"],
+		"agents": contract["agents"],
+		"streaming": contract["streaming"],
 		"theme": contract["theme"],
 		"routes": contract["ui"]["routes"],
 	}

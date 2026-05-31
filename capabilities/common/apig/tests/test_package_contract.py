@@ -28,9 +28,13 @@ def test_package_contract_shape_is_valid():
 
 	validate_contract_shape(contract, PACKAGE_DIR / "capability_contract.py")
 	assert contract["capability"] == "apig"
-	assert len(contract["ui"]["routes"]) >= 13
-	assert len(contract["rule_engine"]["rules"]) >= 20
+	assert len(contract["ui"]["routes"]) >= 15
+	assert len(contract["rule_engine"]["rules"]) >= 33
 	assert contract["configuration"]["adapters"]["event_stream"] == "bytewax"
+	assert contract["agents"]["first_class"] is True
+	assert contract["streaming"]["required_processor"] == "bytewax"
+	assert "gateway_agent_composition" in contract["provides"]
+	assert contract["requires"] == ["auth", "moni", "mqeb", "conf"]
 	assert contract["theme"]["tokens"]["border.radius"]
 
 
@@ -48,3 +52,6 @@ def test_package_app_entrypoint_is_publishable():
 	assert "apig" in model["capabilities"]
 	assert model["capabilities"]["apig"]["runtime"]["views"] == "view_models.py"
 	assert model["capabilities"]["apig"]["gateway_lifecycle"]["route"] == "GatewayRouteRecord"
+	assert model["capabilities"]["apig"]["gateway_lifecycle"]["gateway_agent"] == "GatewayAgentRecord"
+	assert model["capabilities"]["apig"]["streaming"]["required_processor"] == "bytewax"
+	assert model["agents"]["apig_gateway_agents"]["first_class"] is True
